@@ -298,3 +298,7 @@ Integrated sources:
 - Project Gutenberg: retained as a provider with the existing mirror/cache fallback
 
 Open Library is intentionally discovery-focused because many editions require borrowing or preview access. Individual providers can fail without taking down results from the other providers. Searches are cached briefly on the server.
+## Reader keyboard shortcut
+
+Press **Space** while the reader is open to alternate between starting/resuming and pausing the highlighter. The shortcut is disabled while typing in form controls and does not interfere with buttons or links.
+

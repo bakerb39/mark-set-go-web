@@ -515,7 +515,8 @@ const state = {
   sessionStartIndex: 0,
   returnIndex: 0,
   returnMode: 'highlight',
-  returnWasRunning: false
+  returnWasRunning: false,
+  spacebarHandler: null
 };
 
 function closeMenus() {
@@ -2092,7 +2093,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <button id="fs-translate" class="secondary" type="button">Translate</button>
                 <button id="fs-restore" class="secondary" type="button">Restore English</button>
               </div>
-              <p class="fullscreen-options-hint">Click the text to pause or resume. Press <kbd>O</kbd> to show these controls after hiding them.</p>
+              <p class="fullscreen-options-hint">Click the text or press <kbd>Space</kbd> to pause or resume. Press <kbd>O</kbd> to show these controls after hiding them.</p>
             </section>
           </div>
           <div id="book-page-controls" class="book-page-controls" hidden>
@@ -2135,7 +2136,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         <button id="start-reader" class="primary">Start</button>
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
-        <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. Click a word to continue from there; click empty space to pause or resume.</span>
+        <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. Click a word to continue from there; click empty space or press Space to pause or resume.</span>
       </div>
     </section>`;
 
@@ -2163,6 +2164,23 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     updateModeControls(modeSelect.value);
     updateReaderStatus();
   });
+
+  // Spacebar acts as a simple play/pause toggle while the reader is open.
+  // Remove the previous handler first because loading another book rebuilds this view.
+  if (state.spacebarHandler) document.removeEventListener('keydown', state.spacebarHandler);
+  state.spacebarHandler = (event) => {
+    if (event.code !== 'Space' || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('input, textarea, select, button, a, summary, [contenteditable="true"], [role="textbox"]')) return;
+    if (!app.querySelector('#reader') || getSelectedMode() === 'two-column') return;
+
+    event.preventDefault();
+    if (isReaderRunning()) pauseReader();
+    else startReader();
+    persistReaderSession();
+  };
+  document.addEventListener('keydown', state.spacebarHandler);
 
   reader.addEventListener('click', (event) => {
     const translatedWord = event.target.closest('.translated-word');
