@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Mark, Set, Go! reading-speed test and reading accelerator.">
+  <title>Mark, Set, Go!</title>
+  <link rel="stylesheet" href="/styles.css?v=bold-focus-1?v=flash-spacing-1">
+  <script src="/app.js?v=bold-focus-1?v=flash-spacing-1" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#" data-action="home">Mark, Set, Go!</a>
+    <nav aria-label="Main navigation">
+      <details>
+        <summary>WPM Test</summary>
+        <button data-test="gatsby">The Great Gatsby</button>
+        <button data-test="hound">The Hound of the Baskervilles</button>
+        <button data-test="cities">A Tale of Two Cities</button>
+      </details>
+      <details>
+        <summary>Read</summary>
+        <button data-read="gatsby">The Great Gatsby</button>
+        <button data-read="hound">The Hound of the Baskervilles</button>
+        <button data-read="cities">A Tale of Two Cities</button>
+        <button data-read="pride">Pride and Prejudice</button>
+        <button data-read="news">Today's News</button>
+        <button data-read="weather">Local Weather</button>
+        <button data-read="url">Choose URL</button>
+        <button data-read="upload">Upload Text</button>
+      </details>
+      <details>
+        <summary>Help</summary>
+        <button data-action="help">Instructions</button>
+        <button data-action="about">About</button>
+      </details>
+    </nav>
+  </header>
+
+  <main id="app" class="app-shell" tabindex="-1" aria-live="polite"></main>
+
+  <footer>Reading practice tool · Browser edition</footer>
+</body>
+</html>
