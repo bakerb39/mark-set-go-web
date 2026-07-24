@@ -1,44 +1,80 @@
-<!doctype html>
+<!DOCTYPE html>
+
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Mark, Set, Go! reading-speed test and reading accelerator.">
-  <title>Mark, Set, Go!</title>
-  <link rel="stylesheet" href="/styles.css?v=bold-focus-1?v=flash-spacing-1">
-  <script src="/app.js?v=bold-focus-1?v=flash-spacing-1" defer></script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
+<title>Mark, Set, Go!</title>
+<link href="/styles.css?v=illustrated-music-2" rel="stylesheet"/>
+<script defer="" src="/app.js?v=illustrated-music-2"></script>
 </head>
 <body>
-  <header class="site-header">
-    <a class="brand" href="#" data-action="home">Mark, Set, Go!</a>
-    <nav aria-label="Main navigation">
-      <details>
-        <summary>WPM Test</summary>
-        <button data-test="gatsby">The Great Gatsby</button>
-        <button data-test="hound">The Hound of the Baskervilles</button>
-        <button data-test="cities">A Tale of Two Cities</button>
-      </details>
-      <details>
-        <summary>Read</summary>
-        <button data-read="gatsby">The Great Gatsby</button>
-        <button data-read="hound">The Hound of the Baskervilles</button>
-        <button data-read="cities">A Tale of Two Cities</button>
-        <button data-read="pride">Pride and Prejudice</button>
-        <button data-read="news">Today's News</button>
-        <button data-read="weather">Local Weather</button>
-        <button data-read="url">Choose URL</button>
-        <button data-read="upload">Upload Text</button>
-      </details>
-      <details>
-        <summary>Help</summary>
-        <button data-action="help">Instructions</button>
-        <button data-action="about">About</button>
-      </details>
-    </nav>
-  </header>
+<header class="site-header">
+<a class="brand" data-action="home" href="#">Mark, Set, Go!</a>
+<nav aria-label="Main navigation">
+<details class="reader-menu">
+<summary>Reader</summary>
+<div class="menu-popover">
+<button data-action="reader" type="button">Return to Reader</button>
+<button data-read="upload" type="button">Upload Text</button>
+<button data-read="url" type="button">Choose URL</button>
+</div>
+</details>
+<details>
+<summary>WPM Test</summary>
 
-  <main id="app" class="app-shell" tabindex="-1" aria-live="polite"></main>
 
-  <footer>Reading practice tool · Browser edition</footer>
+
+<div class="menu-popover"><button data-test="gatsby">The Great Gatsby</button><button data-test="hound">The Hound of the Baskervilles</button><button data-test="cities">A Tale of Two Cities</button></div></details>
+<details>
+<summary>Read</summary>
+
+
+
+
+
+
+
+
+
+
+
+<div class="menu-popover"><button data-read="news">Today's News</button><button data-read="weather">Local Weather</button><button data-read="gutenberg">Project Gutenberg Library</button><button data-read="great-books">Great Books Library</button><button data-read="current-reading">News, Sports &amp; Interests</button></div></details>
+<details>
+<summary>My Library</summary>
+
+
+
+<div class="menu-popover"><button data-action="reading-list">Reading List</button><button data-action="progress-dashboard">Reading Progress</button><button data-action="vocabulary-builder">Vocabulary Builder</button></div></details>
+<details>
+<summary>Music</summary>
+
+
+
+
+<div class="menu-popover"><button data-action="music">Music Library</button><button data-music-quick="lofi-study">Lofi for Reading</button><button data-music-quick="classical-reading">Classical Reading</button><button data-music-quick="rain-focus">Rain &amp; Focus</button></div></details>
+<details>
+<summary>Help</summary>
+
+
+<div class="menu-popover"><button data-action="help">Instructions</button><button data-action="about">About</button></div></details>
+</nav>
+</header>
+<main aria-live="polite" class="app-shell" id="app" tabindex="-1"></main>
+<aside aria-label="Music player" class="music-dock" hidden="" id="music-dock">
+<div class="music-dock-bar">
+<div><strong id="music-now-title">Music</strong><span id="music-now-source">YouTube</span></div>
+<div class="music-dock-actions">
+<button aria-label="Try another result" id="music-next" type="button" hidden>↻</button>
+<button aria-label="Minimize music player" id="music-minimize" type="button">—</button>
+<button aria-label="Close music player" id="music-close" type="button">×</button>
+</div>
+</div>
+<div class="music-player-wrap" id="music-player-wrap">
+<iframe allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen="" id="music-player" title="YouTube music player"></iframe>
+</div>
+</aside>
+<footer>Reading practice tool · Browser edition</footer>
 </body>
 </html>

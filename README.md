@@ -117,3 +117,122 @@ The **Bionic text** checkbox bolds approximately the first 45% of each word. It 
 ## Fullscreen options menu
 
 In text-viewer fullscreen mode, use **Options** to open a compact menu containing reading mode, WPM, words shown, font, text size, theme, Bionic text, translation, and playback controls. Select **×** to hide every floating fullscreen control. Move the pointer into the upper-right corner or press **O** to restore the controls. Press **Esc** to leave fullscreen.
+
+
+## Meaningful Chunks
+
+Enable **Meaningful chunks** in Reading settings to group text using punctuation and common phrase boundaries. In supported modes, **Words shown** becomes the maximum chunk size rather than an exact fixed count. The toggle applies to Highlight, Bold Focus, Smooth Glide, Pointing Guide, Marquee, and Flash.
+
+
+## Project Gutenberg Library
+
+The **Read → Project Gutenberg Library** option searches the Gutendex catalog and loads a selected Project Gutenberg plain-text edition through the Node server. Search results are paginated, may be filtered by language, and are downloaded only after the user clicks **Load into Reader**. The server removes common Project Gutenberg header and footer boilerplate before sending the text to the browser.
+
+Gutendex is an independent metadata service. For a long-lived or high-traffic deployment, consider self-hosting Gutendex or using Project Gutenberg's machine-readable catalog and mirrors rather than placing heavy automated traffic on the main Gutenberg site.
+
+
+## Contents and bookmarks
+
+The reader detects common chapter headings and displays them in a left-side Contents pane. Selecting a heading jumps to that chapter. The Bookmark button saves the current document and reading position in browser storage. A small same-site cookie remembers the bookmark identifiers; the document text and bookmark details are kept in localStorage because browser cookies are too small for books. Bookmarks are private to that browser and device.
+
+
+## Click-to-resume reading
+
+In full-text guided modes, click any rendered word to move the reading position to that word's current phrase group. If the reader was already running, it continues from the new position. If it was paused, the selected phrase is shown and remains paused until resumed. Clicking empty space in the viewer continues to toggle pause and resume.
+
+
+## Additional online libraries
+
+- **Great Books Library** is a curated public-domain reading list. It searches Project Gutenberg for an available English plain-text edition when a reader selects a work. It does not reproduce Britannica's copyrighted anthology or editorial content.
+- **News, Sports & Interests** displays RSS/Atom headlines and summaries from listed sources and topical feeds. Full article import is user-triggered and may fail when a publisher blocks automated access or requires a subscription.
+- Always preserve source links and respect publisher terms, copyrights, and public-domain rules in the reader's country.
+
+
+## Music
+
+The top-level Music menu provides reading-mood playlists, a persistent YouTube player, custom YouTube video or playlist URLs, and a best-effort current Hot 100 listing. Music keeps playing while the user returns to the reader.
+
+
+## Facing book pages
+Enable **Book pages** under Display to flow supported guided modes across two facing pages. Highlight, Bold Focus, Smooth Glide, Pointing Guide, Marquee, Bionic text, meaningful chunks, click-to-resume, bookmarks, contents links, themes, fonts, and fullscreen remain available. Use the page arrows or horizontal scrolling to move between spreads. On narrow screens the layout changes to one page.
+
+
+### Book Pages navigation fix
+Book Pages now creates as many horizontal page columns as the document requires. The arrows advance one two-page spread at a time, and large documents render additional pages as needed.
+
+## Dictionary and saved definitions
+
+Right-click any rendered word and choose **Look up word** to show an English definition in the right pane. Choose **Save definition** to preserve the definition in browser storage, highlight that word occurrence, and add it under **Saved definitions** beneath Bookmarks. Saved definitions are local to the browser and can be opened to return to the saved word or removed individually. Dictionary lookup uses the free Dictionary API through the Node server; no API key is required.
+
+
+## Notes, reading list, and book music
+
+- Right-click a word and choose **Add note** to save a position-aware note in the browser.
+- Use **Reading List** to organize books as Want to Read, Currently Reading, or Finished.
+- Gutenberg results, Great Books entries, and reading-list items now include optional YouTube searches for an adaptation score and a reading-mood soundtrack. These are suggestions only; users choose what to play, and availability depends on YouTube and regional restrictions.
+
+
+## Reading Progress Dashboard
+The My Library menu includes a private, browser-based dashboard for words read, time, WPM, streaks, document completion, and recent sessions.
+
+## Vocabulary Builder
+Saved dictionary definitions become review cards. Rate a word Again, Hard, Good, or Easy to schedule future reviews using a lightweight spaced-repetition system.
+
+
+## Automatic document formatting
+
+Imported books and documents are scanned for structural boundaries such as parts, chapters, sections, contents, appendices, notes, bibliographies, glossaries, and indexes. Detected headings receive book-like spacing and typography and populate the navigation pane when appropriate.
+
+## Notes
+
+Right-click a word and choose **Add note**. Notes now open in a modal editor, can be edited or deleted, remain associated with the document and word position, and appear in the Notes section of the left navigation pane. Notes are stored in browser local storage; a small cookie keeps lightweight note references.
+
+## Reliability update
+
+- Project Gutenberg catalog requests are cached, allowed more time to respond, and retried once when Gutendex is temporarily slow.
+- The Gutenberg catalog screen now offers a Try again button after a failed request.
+- Retired Lofi video IDs were replaced, and every built-in music card now includes Open on YouTube and Find alternative links in case a video is unavailable or blocked from embedding.
+
+## Reader tools and local weather
+
+- **Upload Text** and **Choose URL** are now under the persistent **Reader** menu rather than the Read library menu.
+- **Local Weather** accepts a five-digit U.S. ZIP code and stores it in a SameSite browser cookie for one year.
+- Weather is returned as structured daily sections, with separate daytime/nighttime periods, temperature, precipitation chance, wind, and detailed forecast.
+- The formatted forecast can be loaded into the reading viewer with **Load forecast into Reader**.
+
+
+## Illustrated Reading
+
+The Display settings include an **Illustrations** option:
+
+- **Off** — no images are inserted.
+- **Chapter openings** — searches for an open-license image at detected chapter, part, prologue, introduction, epilogue, and appendix headings.
+- **Automatic** — also adds images at section headings and occasional natural points in long text.
+
+Images are searched dynamically through the Wikimedia Commons API. Each image includes creator/license information and **Replace**, **Hide**, and **Source** controls. No API key is required. Search results can be imperfect, so readers remain in control of what appears.
+
+## Reader music recommendation
+
+Every loaded book, article, upload, or URL now shows a **Play recommended music** button beside the reader title. The app chooses an embeddable mood playlist from the existing Music Library using the document title and a small text sample, then opens it in the persistent YouTube player. Related adaptation-score and reading-mood searches remain available beneath the title when a more specific soundtrack is desired.
+
+## Reader music choices and Grokipedia
+
+The reader title now provides separate **Adaptation score** and **Reading mood** controls. Adaptation score opens a title-specific YouTube search, while Reading mood launches the closest matching option in the built-in player. A Grokipedia search link for the loaded title appears below the title.
+
+Illustrations now retry alternate Wikimedia Commons results when an image fails to load and remove failed placeholders automatically so blank white spaces do not remain in the text.
+
+
+## Book-specific music playback
+
+The reader's **Adaptation score** and **Reading mood** buttons now both load inside the persistent YouTube player. Each button creates a YouTube embedded search playlist rather than opening a separate browser tab. Reading-mood searches use a title-specific profile when available and otherwise infer atmosphere from the loaded text (for example mystery, Regency romance, maritime adventure, ancient epic, gothic, nature, war, or science fiction).
+
+
+- Illustrated Reading now scores Wikimedia results against the current chapter heading and nearby story context, reducing generic book-cover matches and favoring chapter-specific scenes, places, maps, portraits, and illustrations.
+
+
+## Session recovery and source reliability
+
+- The active reader document and all reading controls are saved in IndexedDB and restored when the user returns to the site. This includes reading position, WPM, mode, words shown, font, size, theme, Bionic text, meaningful chunks, book pages, and illustration mode.
+- Reading List titles are checked against Project Gutenberg. Matching titles open directly in the reader; unmatched titles provide searches for Standard Ebooks, Internet Archive, and Google Books free editions.
+- Book-specific music searches now resolve to actual YouTube video IDs. If a result is unavailable or blocked, use the circular-arrow button in the player to try the next search result.
+- Illustration matching now uses chapter headings, nearby context, repeated terms, and proper nouns, while avoiding book covers and unrelated promotional images.
