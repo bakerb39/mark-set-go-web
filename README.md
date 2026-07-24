@@ -236,3 +236,26 @@ The reader's **Adaptation score** and **Reading mood** buttons now both load ins
 - Reading List titles are checked against Project Gutenberg. Matching titles open directly in the reader; unmatched titles provide searches for Standard Ebooks, Internet Archive, and Google Books free editions.
 - Book-specific music searches now resolve to actual YouTube video IDs. If a result is unavailable or blocked, use the circular-arrow button in the player to try the next search result.
 - Illustration matching now uses chapter headings, nearby context, repeated terms, and proper nouns, while avoiding book covers and unrelated promotional images.
+
+
+## Illustrated book ZIP upload
+
+Use **Reader → Upload Illustrated Book** to import a ZIP containing `manifest.json`, a text file, and mapped PNG/JPG/WEBP/GIF illustrations. Each manifest illustration uses a chapter `heading`, image path, and optional caption. Uploaded illustrations are inserted beneath matching detected chapter headings and saved with the persistent reader session in IndexedDB.
+
+Example manifest:
+
+```json
+{
+  "title": "Frankenstein",
+  "author": "Mary Shelley",
+  "textFile": "book.txt",
+  "illustrations": [
+    { "heading": "Chapter 1", "image": "images/chapter-01.png", "caption": "Victor's childhood near Geneva." }
+  ]
+}
+```
+
+
+## Built-in Frankenstein illustrated demo
+
+The **Read** menu includes **Frankenstein Illustrated Demo**, a permanent first-five-chapter showcase bundled under `public/demos/frankenstein/`. It loads through the normal reader, supports the existing illustration display controls, music recommendations, notes, bookmarks, and persistent reading-session recovery.

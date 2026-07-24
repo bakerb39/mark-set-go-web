@@ -6,6 +6,7 @@ const dns = require('node:dns').promises;
 const net = require('node:net');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const AdmZip = require('adm-zip');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -690,6 +691,74 @@ app.get('/api/youtube/search', async (req, res) => {
     return res.status(502).json({ error: message });
   } finally {
     clearTimeout(timeout);
+  }
+});
+
+
+
+function normalizeZipEntryName(value) {
+  return String(value || '').replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\/+/, '');
+}
+
+function safeIllustratedBookManifest(manifest, zip) {
+  if (!manifest || typeof manifest !== 'object') throw new Error('manifest.json must contain a JSON object.');
+  const title = String(manifest.title || '').trim() || 'Illustrated Book';
+  const author = String(manifest.author || '').trim();
+  const textFile = normalizeZipEntryName(manifest.textFile || 'book.txt');
+  const textEntry = zip.getEntry(textFile);
+  if (!textEntry || textEntry.isDirectory) throw new Error(`The text file “${textFile}” was not found in the ZIP.`);
+  const text = textEntry.getData().toString('utf8').replace(/^\uFEFF/, '').trim();
+  if (!text) throw new Error('The book text file is empty.');
+  if (text.length > 3_000_000) throw new Error('The book text is too large.');
+
+  const mappings = Array.isArray(manifest.illustrations) ? manifest.illustrations : [];
+  const illustrations = [];
+  let totalImageBytes = 0;
+  for (const mapping of mappings.slice(0, 250)) {
+    const heading = String(mapping?.heading || '').trim();
+    const imagePath = normalizeZipEntryName(mapping?.image || '');
+    if (!heading || !imagePath) continue;
+    const entry = zip.getEntry(imagePath);
+    if (!entry || entry.isDirectory) continue;
+    const extension = imagePath.split('.').pop()?.toLowerCase();
+    const mime = extension === 'png' ? 'image/png'
+      : extension === 'jpg' || extension === 'jpeg' ? 'image/jpeg'
+      : extension === 'webp' ? 'image/webp'
+      : extension === 'gif' ? 'image/gif'
+      : '';
+    if (!mime) continue;
+    const buffer = entry.getData();
+    if (buffer.length > 8 * 1024 * 1024) continue;
+    totalImageBytes += buffer.length;
+    if (totalImageBytes > 28 * 1024 * 1024) throw new Error('The combined illustration files are too large.');
+    illustrations.push({
+      heading,
+      caption: String(mapping.caption || '').trim(),
+      alt: String(mapping.alt || mapping.caption || heading).trim(),
+      image: `data:${mime};base64,${buffer.toString('base64')}`,
+      filename: imagePath
+    });
+  }
+  if (!illustrations.length) throw new Error('No supported chapter illustrations were found in the ZIP. Use PNG, JPG, WEBP, or GIF files.');
+  return { title, author, text, illustrations };
+}
+
+app.post('/api/illustrated-book/import', express.raw({
+  type: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'],
+  limit: '35mb'
+}), (req, res) => {
+  try {
+    if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Choose an illustrated-book ZIP file.' });
+    const zip = new AdmZip(req.body);
+    const manifestEntry = zip.getEntry('manifest.json') || zip.getEntries().find((entry) => normalizeZipEntryName(entry.entryName).toLowerCase().endsWith('/manifest.json'));
+    if (!manifestEntry) return res.status(400).json({ error: 'The ZIP must contain manifest.json.' });
+    let manifest;
+    try { manifest = JSON.parse(manifestEntry.getData().toString('utf8').replace(/^\uFEFF/, '')); }
+    catch { return res.status(400).json({ error: 'manifest.json is not valid JSON.' }); }
+    const result = safeIllustratedBookManifest(manifest, zip);
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ error: error?.message || 'The illustrated book could not be imported.' });
   }
 });
 

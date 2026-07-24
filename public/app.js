@@ -496,6 +496,7 @@ const state = {
   illustrationCache: new Map(),
   illustrationAnchors: new Set(),
   illustrationHidden: new Set(),
+  uploadedIllustrations: [],
   readingGroups: [],
   groupIndexByStart: new Map(),
   renderedMeaningfulChunks: false,
@@ -1819,8 +1820,10 @@ function renderWeather() {
 
 async function renderReader(kind) {
   stopReader();
+  if (kind === 'frankenstein-demo') return loadBuiltInIllustratedDemo();
   if (kind === 'url') return renderUrlImporter();
   if (kind === 'upload') return renderUpload();
+  if (kind === 'illustrated-upload') return renderIllustratedUpload();
   if (kind === 'gutenberg') return renderGutenbergLibrary();
   if (kind === 'great-books') return renderGreatBooksLibrary();
   if (kind === 'current-reading') return renderCurrentReading();
@@ -1866,7 +1869,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   state.illustrationCache.clear();
   state.illustrationAnchors.clear();
   state.illustrationHidden.clear();
-  state.illustrationMode = 'off';
+  state.uploadedIllustrations = Array.isArray(source?.illustrations) ? source.illustrations : [];
+  state.illustrationMode = state.uploadedIllustrations.length ? 'chapter' : 'off';
   if (!state.words.length) return renderError('No readable text', 'The selected source did not contain readable words.');
 
   app.innerHTML = `
@@ -1925,6 +1929,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
               <option value="chapter">Chapter openings</option>
               <option value="automatic">Automatic</option>
             </select></div>
+            <button id="show-hidden-illustrations" class="secondary illustration-restore-button" type="button" disabled>Show hidden illustrations</button>
           </div>
         </details>
       </section>
@@ -1956,6 +1961,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <label class="fullscreen-checkbox"><input id="fs-bionic-reading" type="checkbox"> Bionic text</label>
                 <label class="fullscreen-checkbox"><input id="fs-book-pages" type="checkbox"> Book pages</label>
                 <label>Illustrations<select id="fs-illustration-mode"><option value="off">Off</option><option value="chapter">Chapter openings</option><option value="automatic">Automatic</option></select></label>
+                <button id="fs-show-hidden-illustrations" class="secondary" type="button" disabled>Show hidden illustrations</button>
                 <label class="fullscreen-checkbox"><input id="fs-meaningful-chunks" type="checkbox"> Meaningful chunks</label>
                 <label>Translation<select id="fs-translation-language">
                   <option value="">Choose language…</option>
@@ -2118,6 +2124,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         ? 'Chapter-opening illustrations will load as you read.'
         : 'Relevant illustrations will load dynamically as you read.');
   });
+  app.querySelector('#show-hidden-illustrations')?.addEventListener('click', restoreHiddenIllustrations);
+  app.querySelector('#fs-show-hidden-illustrations')?.addEventListener('click', restoreHiddenIllustrations);
+  updateHiddenIllustrationControls();
   app.querySelector('#translate-text').addEventListener('click', translateCurrentText);
   app.querySelector('#restore-english').addEventListener('click', restoreEnglish);
   app.querySelectorAll('#mode-select, #speed, #word-count, #meaningful-chunks, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
@@ -2603,6 +2612,72 @@ function bindDictionaryMenu(reader) {
 }
 
 
+
+
+function updateHiddenIllustrationControls() {
+  const count = state.illustrationHidden.size;
+  const label = count === 1 ? 'Show hidden illustration' : `Show hidden illustrations (${count})`;
+  ['#show-hidden-illustrations', '#fs-show-hidden-illustrations'].forEach((selector) => {
+    const button = app.querySelector(selector);
+    if (!button) return;
+    button.disabled = count === 0;
+    button.textContent = count ? label : 'Show hidden illustrations';
+  });
+}
+
+function restoreHiddenIllustrations() {
+  if (!state.illustrationHidden.size) return;
+  stopReader();
+  state.illustrationHidden.clear();
+  state.illustrationAnchors.clear();
+  const mode = getSelectedMode();
+  const count = Number(app.querySelector('#word-count')?.value) || 1;
+  prepareReaderView(mode, count);
+  updateModeControls(mode);
+  updateHiddenIllustrationControls();
+  updateReaderStatus('Hidden illustrations are visible again.');
+  persistReaderSession();
+}
+
+function normalizedIllustrationHeading(value) {
+  return String(value || '')
+    .toLocaleLowerCase()
+    .replace(/\b(chapter|book|part|section)\b/g, '$1')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function uploadedIllustrationFor(structure) {
+  if (!structure || !state.uploadedIllustrations.length) return null;
+  const target = normalizedIllustrationHeading(structure.title);
+  if (!target) return null;
+  return state.uploadedIllustrations.find((item) => {
+    const candidate = normalizedIllustrationHeading(item.heading);
+    return candidate === target || candidate.endsWith(` ${target}`) || target.endsWith(` ${candidate}`);
+  }) || null;
+}
+
+function renderUploadedIllustration(figure, item) {
+  if (!figure || !item?.image) { figure?.remove(); return; }
+  figure.classList.remove('illustration-loading');
+  figure.classList.add('illustration-ready', 'uploaded-reader-illustration');
+  figure.innerHTML = `
+    <img src="${escapeHtml(item.image)}" alt="${escapeHtml(item.alt || item.caption || item.heading || 'Book illustration')}" decoding="async">
+    <figcaption>
+      <span class="illustration-caption">${escapeHtml(item.caption || item.heading || 'Chapter illustration')}</span>
+      <span class="illustration-credit">Uploaded with this illustrated book</span>
+      <span class="illustration-actions"><button type="button" data-illustration-action="hide">Hide</button></span>
+    </figcaption>`;
+  figure.querySelector('img')?.addEventListener('error', () => figure.remove(), { once: true });
+  figure.querySelector('[data-illustration-action="hide"]')?.addEventListener('click', () => {
+    const key = figure.dataset.illustrationKey;
+    if (key) state.illustrationHidden.add(key);
+    figure.remove();
+    updateHiddenIllustrationControls();
+    persistReaderSession();
+  });
+}
+
 function modeSupportsIllustrations(mode) {
   return ['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'auto-scroll'].includes(mode);
 }
@@ -2695,6 +2770,8 @@ function renderIllustrationResult(figure, query, results, selectedIndex) {
     const key = figure.dataset.illustrationKey;
     if (key) state.illustrationHidden.add(key);
     figure.remove();
+    updateHiddenIllustrationControls();
+    persistReaderSession();
   });
 }
 
@@ -2735,14 +2812,19 @@ function createDynamicIllustration(reader, wordIndex, structure = null) {
   const anchor = nearestIllustrationAnchor(reader, wordIndex);
   if (!anchor) return;
   state.illustrationAnchors.add(key);
-  const query = illustrationCandidateQuery(structure, wordIndex);
-  if (!query || (!query.title && !query.heading && !(query.keywords || []).length)) return;
+  const uploaded = uploadedIllustrationFor(structure);
   const figure = document.createElement('figure');
   figure.className = 'reader-illustration illustration-loading';
   figure.dataset.illustrationKey = key;
-  figure.dataset.query = query;
-  figure.innerHTML = `<div class="illustration-placeholder" aria-label="Loading illustration"></div><figcaption>Finding a relevant open-license illustration…</figcaption>`;
   anchor.insertAdjacentElement('afterend', figure);
+  if (uploaded) {
+    renderUploadedIllustration(figure, uploaded);
+    return;
+  }
+  const query = illustrationCandidateQuery(structure, wordIndex);
+  if (!query || (!query.title && !query.heading && !(query.keywords || []).length)) { figure.remove(); return; }
+  figure.dataset.query = JSON.stringify(query);
+  figure.innerHTML = `<div class="illustration-placeholder" aria-label="Loading illustration"></div><figcaption>Finding a relevant open-license illustration…</figcaption>`;
   loadIllustration(figure, query);
 }
 
@@ -3808,6 +3890,102 @@ async function renderCurrentReading(category = 'all') {
   } catch (error) {
     renderError('Sources unavailable', error.message);
   }
+}
+
+
+
+async function loadBuiltInIllustratedDemo() {
+  stopReader();
+  app.innerHTML = `<section class="panel"><h1>Loading Frankenstein Illustrated Demo…</h1><p class="status">Preparing the first five chapters and their illustrations.</p></section>`;
+  try {
+    const basePath = '/demos/frankenstein';
+    const [manifestResponse, textResponse] = await Promise.all([
+      fetch(`${basePath}/manifest.json`, { cache: 'no-store' }),
+      fetch(`${basePath}/book.txt`, { cache: 'no-store' })
+    ]);
+    if (!manifestResponse.ok) throw new Error('The demo manifest could not be loaded.');
+    if (!textResponse.ok) throw new Error('The demo text could not be loaded.');
+    const manifest = await manifestResponse.json();
+    const text = await textResponse.text();
+    const illustrations = (Array.isArray(manifest.illustrations) ? manifest.illustrations : []).map((item) => ({
+      ...item,
+      image: new URL(String(item.image || ''), `${window.location.origin}${basePath}/`).href
+    }));
+    const displayTitle = manifest.author ? `${manifest.title} — ${manifest.author}` : manifest.title;
+    renderReaderWithText(displayTitle || 'Frankenstein Illustrated Demo', text, {
+      type: 'built-in-illustrated-demo',
+      key: 'frankenstein-demo',
+      title: manifest.title || 'Frankenstein Illustrated Demo',
+      author: manifest.author || 'Mary Wollstonecraft Shelley',
+      illustrations,
+      demoPath: basePath
+    });
+    persistReaderSession({ immediate: true });
+  } catch (error) {
+    renderError('Demo unavailable', error.message || 'The illustrated demo could not be loaded.');
+  }
+}
+
+function renderIllustratedUpload() {
+  stopReader();
+  app.innerHTML = `
+    <section class="panel illustrated-upload-panel">
+      <h1>Upload Illustrated Book</h1>
+      <p>Upload a ZIP containing <code>manifest.json</code>, the book text, and chapter images. The imported book and its images are retained with your saved reader session in this browser.</p>
+      <div class="illustrated-upload-example">
+        <strong>Expected ZIP contents</strong>
+        <pre>book.txt
+manifest.json
+images/chapter-01.png
+images/chapter-02.png</pre>
+      </div>
+      <details>
+        <summary>Example manifest.json</summary>
+        <pre>{
+  "title": "Frankenstein",
+  "author": "Mary Shelley",
+  "textFile": "book.txt",
+  "illustrations": [
+    {
+      "heading": "Chapter 1",
+      "image": "images/chapter-01.png",
+      "caption": "Victor's childhood near Geneva."
+    }
+  ]
+}</pre>
+      </details>
+      <div class="controls">
+        <input id="illustrated-book-file" type="file" accept=".zip,application/zip,application/x-zip-compressed">
+        <span id="illustrated-upload-status" class="status"></span>
+      </div>
+    </section>`;
+
+  app.querySelector('#illustrated-book-file')?.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const status = app.querySelector('#illustrated-upload-status');
+    if (status) { status.className = 'status'; status.textContent = 'Importing illustrated book…'; }
+    try {
+      const response = await fetch('/api/illustrated-book/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/zip' },
+        body: file
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'The illustrated book could not be imported.');
+      const displayTitle = payload.author ? `${payload.title} — ${payload.author}` : payload.title;
+      renderReaderWithText(displayTitle, payload.text, {
+        type: 'illustrated-upload',
+        name: file.name,
+        title: payload.title,
+        author: payload.author,
+        illustrations: payload.illustrations
+      });
+      persistReaderSession({ immediate: true });
+    } catch (error) {
+      if (status) { status.className = 'status error'; status.textContent = error.message; }
+    }
+  });
 }
 
 function renderUpload() {
