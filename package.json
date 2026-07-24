@@ -1,8 +1,8 @@
 {
   "name": "mark-set-go-web",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Browser-based reading accelerator with guided highlighting, automatic scrolling, and optional translation.",
+  "description": "Unified public-library reader and reading accelerator with guided highlighting, imports, progress, music, and illustrated books.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

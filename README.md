@@ -283,3 +283,18 @@ Books load from configured Gutenberg mirrors and are cached only in memory for t
 ## Gutenberg 403 correction
 
 The downloader no longer appends Gutendex's original `gutenberg.org` text URL after mirror failures. It now tries configured mirrors and then resolves the matching GITenberg GitHub repository as a free fallback. This prevents a failed mirror attempt from silently returning to the host that blocked Render with HTTP 403.
+
+
+## Version 2.0 unified library
+
+The Read menu now includes **Search All Libraries**, a unified interface with source cards, icons, responsive results, and direct reader loading where the source permits it.
+
+Integrated sources:
+
+- Standard Ebooks: OPDS discovery and EPUB extraction
+- Internet Archive: search plus TXT/OCR/EPUB reader loading
+- Open Library: discovery, covers, edition metadata, and book-page links
+- Wikisource: search and direct plain-text loading
+- Project Gutenberg: retained as a provider with the existing mirror/cache fallback
+
+Open Library is intentionally discovery-focused because many editions require borrowing or preview access. Individual providers can fail without taking down results from the other providers. Searches are cached briefly on the server.
