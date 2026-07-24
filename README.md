@@ -259,3 +259,22 @@ Example manifest:
 ## Built-in Frankenstein illustrated demo
 
 The **Read** menu includes **Frankenstein Illustrated Demo**, a permanent first-five-chapter showcase bundled under `public/demos/frankenstein/`. It loads through the normal reader, supports the existing illustration display controls, music recommendations, notes, bookmarks, and persistent reading-session recovery.
+
+
+## Persistent Project Gutenberg cache
+
+The server now checks a local disk cache before downloading a Gutenberg title. The first successful download is cleaned and saved as `<book-id>.txt` plus metadata, and future users receive the local cached copy.
+
+For Render, attach a persistent disk mounted at `/var/data` and add these environment variables:
+
+```text
+GUTENBERG_CACHE_DIR=/var/data/gutenberg
+GUTENBERG_MIRROR_BASES=https://gutenberg.pglaf.org,https://mirrors.xmission.com/gutenberg
+```
+
+Without a persistent disk, caching still works until Render replaces or restarts the instance, but the files will not be durable across deployments.
+
+
+## Gutenberg mirror loading
+
+Books load from configured Gutenberg mirrors and are cached only in memory for the current Render instance. No persistent disk is required.

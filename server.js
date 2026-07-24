@@ -14,6 +14,7 @@ const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_TRANSLATION_CHARS = 120000;
 const MAX_GUTENBERG_BOOK_BYTES = 12 * 1024 * 1024;
 const GUTENDEX_BASE = 'https://gutendex.com';
+const GUTENBERG_MIRROR_BASES = (process.env.GUTENBERG_MIRROR_BASES || process.env.GUTENBERG_MIRROR_BASE || 'https://gutenberg.pglaf.org,https://mirrors.xmission.com/gutenberg').split(',').map((value) => value.trim().replace(/\/+$/, '')).filter(Boolean);
 
 const CURRENT_READING_SOURCES = [
   { id: 'bbc-world', category: 'news', name: 'BBC World News', description: 'World headlines from BBC News.', feedUrl: 'https://feeds.bbci.co.uk/news/world/rss.xml', siteUrl: 'https://www.bbc.com/news/world' },
@@ -334,6 +335,64 @@ function removeGutenbergBoilerplate(text) {
     if (match) { value = value.slice(0, match.index); break; }
   }
   return value.replace(/\n{4,}/g, '\n\n\n').trim();
+}
+
+
+const gutenbergMemoryCache = new Map();
+
+function readCachedGutenbergBook(id) {
+  const cached = gutenbergMemoryCache.get(id);
+  if (!cached) return null;
+  return { text: cached.text, metadata: cached.metadata, cached: true };
+}
+
+function writeCachedGutenbergBook(id, text, metadata) {
+  gutenbergMemoryCache.set(id, { text, metadata, cachedAt: Date.now() });
+}
+
+function mirrorTextCandidates(base, id) {
+  return [
+    `${base}/cache/epub/${id}/pg${id}.txt`,
+    `${base}/cache/epub/${id}/pg${id}.txt.utf-8`,
+    `${base}/ebooks/${id}.txt.utf-8`,
+    `${base}/files/${id}/${id}-0.txt`,
+    `${base}/files/${id}/${id}.txt`
+  ];
+}
+
+async function downloadGutenbergTextFromMirrors(id, catalogTextUrl = '') {
+  const candidates = [];
+  for (const base of GUTENBERG_MIRROR_BASES) candidates.push(...mirrorTextCandidates(base, id));
+  if (catalogTextUrl) candidates.push(catalogTextUrl);
+
+  let lastError = null;
+  for (const url of [...new Set(candidates)]) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'MarkSetGoWeb/3.2 (+public-domain reader; contact via hosted application)',
+          Accept: 'text/plain,*/*;q=0.1'
+        }
+      });
+      if (!response.ok) throw new Error(`${new URL(url).hostname} returned HTTP ${response.status}.`);
+      const length = Number(response.headers.get('content-length') || 0);
+      if (length > MAX_GUTENBERG_BOOK_BYTES) throw new Error('This book is too large to cache.');
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (buffer.length > MAX_GUTENBERG_BOOK_BYTES) throw new Error('This book is too large to cache.');
+      const text = removeGutenbergBoilerplate(buffer.toString('utf8'));
+      if (text.length < 500) throw new Error('The mirror returned insufficient readable text.');
+      return { text, downloadedFrom: url };
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError || new Error('No configured Gutenberg mirror returned this book.');
 }
 
 function translatorConfig() {
@@ -871,45 +930,51 @@ app.get('/api/gutenberg/books/:id/text', async (req, res) => {
   if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid Gutenberg book number.' });
 
   try {
-    const payload = await fetchJsonWithRetry(`${GUTENDEX_BASE}/books/${id}`, { timeoutMs: 22000, attempts: 2, cacheTtlMs: 30 * 60 * 1000 });
-    const textUrl = selectGutenbergTextUrl(payload?.formats);
-    if (!textUrl) return res.status(422).json({ error: 'This title does not have a plain-text edition available through the catalog.' });
-    const parsedUrl = validateGutenbergDownloadUrl(textUrl);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
-    let response;
-    try {
-      response = await fetch(parsedUrl, {
-        signal: controller.signal,
-        redirect: 'follow',
-        headers: {
-          'User-Agent': 'MarkSetGoWeb/1.2 (+Project Gutenberg reader)',
-          Accept: 'text/plain,*/*;q=0.1'
-        }
+    const cached = readCachedGutenbergBook(id);
+    if (cached) {
+      return res.json({
+        id,
+        title: cached.metadata.title || `Project Gutenberg eBook #${id}`,
+        authors: Array.isArray(cached.metadata.authors) ? cached.metadata.authors : [],
+        text: cached.text,
+        sourceUrl: cached.metadata.sourceUrl || `https://www.gutenberg.org/ebooks/${id}`,
+        cached: true
       });
-    } finally {
-      clearTimeout(timeout);
     }
-    if (!response.ok) throw new Error(`Project Gutenberg returned HTTP ${response.status}.`);
-    const length = Number(response.headers.get('content-length') || 0);
-    if (length > MAX_GUTENBERG_BOOK_BYTES) throw new Error('This book is too large to load into the reader.');
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length > MAX_GUTENBERG_BOOK_BYTES) throw new Error('This book is too large to load into the reader.');
-    const text = removeGutenbergBoilerplate(buffer.toString('utf8'));
-    if (!text) throw new Error('No readable text was found in this edition.');
-    return res.json({
+
+    const payload = await fetchJsonWithRetry(`${GUTENDEX_BASE}/books/${id}`, { timeoutMs: 22000, attempts: 2, cacheTtlMs: 30 * 60 * 1000 });
+    const catalogTextUrl = selectGutenbergTextUrl(payload?.formats);
+    if (!catalogTextUrl) return res.status(422).json({ error: 'This title does not have a plain-text edition available through the catalog.' });
+
+    const downloaded = await downloadGutenbergTextFromMirrors(id, catalogTextUrl);
+    const metadata = {
       id,
       title: String(payload?.title || `Project Gutenberg eBook #${id}`),
       authors: Array.isArray(payload?.authors) ? payload.authors.map((author) => author?.name).filter(Boolean) : [],
-      text,
-      sourceUrl: `https://www.gutenberg.org/ebooks/${id}`
+      sourceUrl: `https://www.gutenberg.org/ebooks/${id}`,
+      downloadedFrom: downloaded.downloadedFrom,
+      cachedAt: new Date().toISOString()
+    };
+    writeCachedGutenbergBook(id, downloaded.text, metadata);
+
+    return res.json({
+      id,
+      title: metadata.title,
+      authors: metadata.authors,
+      text: downloaded.text,
+      sourceUrl: metadata.sourceUrl,
+      cached: false
     });
   } catch (error) {
-    const message = error?.name === 'AbortError' ? 'The book download took too long to respond.' : error?.message || 'The book could not be loaded.';
-    return res.status(502).json({ error: message });
+    const message = error?.name === 'AbortError'
+      ? 'The free-text mirrors took too long to respond.'
+      : error?.message || 'The book could not be loaded.';
+    return res.status(502).json({
+      error: message,
+      landingPage: `https://www.gutenberg.org/ebooks/${id}`
+    });
   }
 });
-
 
 
 app.post('/api/current/article', async (req, res) => {
