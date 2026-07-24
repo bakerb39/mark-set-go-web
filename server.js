@@ -360,39 +360,132 @@ function mirrorTextCandidates(base, id) {
   ];
 }
 
-async function downloadGutenbergTextFromMirrors(id, catalogTextUrl = '') {
-  const candidates = [];
-  for (const base of GUTENBERG_MIRROR_BASES) candidates.push(...mirrorTextCandidates(base, id));
-  if (catalogTextUrl) candidates.push(catalogTextUrl);
+const gitenbergRepositoryCache = new Map();
 
+async function fetchTextResponse(url, userAgent) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent': userAgent,
+        Accept: 'text/plain,*/*;q=0.1'
+      }
+    });
+    if (!response.ok) throw new Error(`${new URL(url).hostname} returned HTTP ${response.status}.`);
+    const length = Number(response.headers.get('content-length') || 0);
+    if (length > MAX_GUTENBERG_BOOK_BYTES) throw new Error('This book is too large to load.');
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > MAX_GUTENBERG_BOOK_BYTES) throw new Error('This book is too large to load.');
+    const text = removeGutenbergBoilerplate(buffer.toString('utf8'));
+    if (text.length < 500) throw new Error('The source returned insufficient readable text.');
+    return text;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function resolveGitenbergRepository(id) {
+  if (gitenbergRepositoryCache.has(id)) return gitenbergRepositoryCache.get(id);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(`https://www.gitenberg.org/book/${id}`, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: { 'User-Agent': 'MarkSetGoWeb/3.3 (+public-domain reader)', Accept: 'text/html' }
+    });
+    if (!response.ok) throw new Error(`GITenberg returned HTTP ${response.status}.`);
+    const html = await response.text();
+    const $ = cheerio.load(html);
+    const href = $('a[href*="github.com/GITenberg/"]').map((_index, element) => $(element).attr('href')).get()
+      .find((value) => /github\.com\/GITenberg\/[^/]+/i.test(value || ''));
+    if (!href) throw new Error('No GITenberg repository was found for this title.');
+    const match = href.match(/github\.com\/(GITenberg)\/([^/#?]+)/i);
+    if (!match) throw new Error('The GITenberg repository address was invalid.');
+    const repository = { owner: match[1], repo: match[2].replace(/\.git$/i, '') };
+    gitenbergRepositoryCache.set(id, repository);
+    return repository;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function downloadGitenbergText(id) {
+  const { owner, repo } = await resolveGitenbergRepository(id);
   let lastError = null;
-  for (const url of [...new Set(candidates)]) {
+  for (const branch of ['master', 'main']) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 25000);
+    const timeout = setTimeout(() => controller.abort(), 20000);
     try {
-      const response = await fetch(url, {
+      const treeResponse = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, {
         signal: controller.signal,
-        redirect: 'follow',
         headers: {
-          'User-Agent': 'MarkSetGoWeb/3.2 (+public-domain reader; contact via hosted application)',
-          Accept: 'text/plain,*/*;q=0.1'
+          'User-Agent': 'MarkSetGoWeb/3.3',
+          Accept: 'application/vnd.github+json'
         }
       });
-      if (!response.ok) throw new Error(`${new URL(url).hostname} returned HTTP ${response.status}.`);
-      const length = Number(response.headers.get('content-length') || 0);
-      if (length > MAX_GUTENBERG_BOOK_BYTES) throw new Error('This book is too large to cache.');
-      const buffer = Buffer.from(await response.arrayBuffer());
-      if (buffer.length > MAX_GUTENBERG_BOOK_BYTES) throw new Error('This book is too large to cache.');
-      const text = removeGutenbergBoilerplate(buffer.toString('utf8'));
-      if (text.length < 500) throw new Error('The mirror returned insufficient readable text.');
-      return { text, downloadedFrom: url };
+      if (!treeResponse.ok) throw new Error(`GitHub returned HTTP ${treeResponse.status}.`);
+      const tree = await treeResponse.json();
+      const files = Array.isArray(tree?.tree) ? tree.tree.filter((item) => item.type === 'blob' && /\.txt$/i.test(item.path || '')) : [];
+      const ranked = files.sort((a, b) => {
+        const score = (item) => {
+          const path = String(item.path || '').toLowerCase();
+          let value = 0;
+          if (path === `${id}.txt` || path.endsWith(`/${id}.txt`)) value += 100;
+          if (path.includes(`pg${id}`)) value += 80;
+          if (path.includes('README'.toLowerCase())) value -= 100;
+          if (path.includes('metadata')) value -= 80;
+          if (path.includes('cover')) value -= 40;
+          value -= path.split('/').length;
+          return value;
+        };
+        return score(b) - score(a);
+      });
+      if (!ranked.length) throw new Error('No plain-text file was found in the GITenberg repository.');
+      for (const file of ranked.slice(0, 5)) {
+        try {
+          const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${file.path.split('/').map(encodeURIComponent).join('/')}`;
+          const text = await fetchTextResponse(rawUrl, 'MarkSetGoWeb/3.3 (+public-domain reader)');
+          return { text, downloadedFrom: rawUrl };
+        } catch (error) {
+          lastError = error;
+        }
+      }
     } catch (error) {
       lastError = error;
     } finally {
       clearTimeout(timeout);
     }
   }
-  throw lastError || new Error('No configured Gutenberg mirror returned this book.');
+  throw lastError || new Error('GITenberg did not provide a readable text file.');
+}
+
+async function downloadGutenbergTextFromMirrors(id) {
+  const candidates = [];
+  for (const base of GUTENBERG_MIRROR_BASES) candidates.push(...mirrorTextCandidates(base, id));
+
+  let lastError = null;
+  for (const url of [...new Set(candidates)]) {
+    try {
+      const text = await fetchTextResponse(url, 'MarkSetGoWeb/3.3 (+public-domain reader)');
+      return { text, downloadedFrom: url };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  // GITenberg repositories are hosted on GitHub and avoid falling back to the
+  // blocked gutenberg.org download URL from Gutendex.
+  try {
+    return await downloadGitenbergText(id);
+  } catch (error) {
+    lastError = error;
+  }
+
+  throw lastError || new Error('No free text mirror returned this book.');
 }
 
 function translatorConfig() {

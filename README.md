@@ -278,3 +278,8 @@ Without a persistent disk, caching still works until Render replaces or restarts
 ## Gutenberg mirror loading
 
 Books load from configured Gutenberg mirrors and are cached only in memory for the current Render instance. No persistent disk is required.
+
+
+## Gutenberg 403 correction
+
+The downloader no longer appends Gutendex's original `gutenberg.org` text URL after mirror failures. It now tries configured mirrors and then resolves the matching GITenberg GitHub repository as a free fallback. This prevents a failed mirror attempt from silently returning to the host that blocked Render with HTTP 403.
