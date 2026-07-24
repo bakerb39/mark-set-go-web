@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
+<title>Mark, Set, Go!</title>
+<link href="/styles.css?v=library-v2-1" rel="stylesheet"/>
+<script defer="" src="/app.js?v=library-v2-1"></script>
+</head>
+<body>
+<header class="site-header">
+<a class="brand" data-action="home" href="#">Mark, Set, Go!</a>
+<nav aria-label="Main navigation">
+<details class="reader-menu">
+<summary><span class="nav-icon" aria-hidden="true">▤</span> Reader</summary>
+<div class="menu-popover">
+<button data-action="reader" type="button"><span class="menu-icon">↩</span> Return to Reader</button>
+<button data-read="upload" type="button"><span class="menu-icon">⇧</span> Upload Text</button>
+<button data-read="illustrated-upload" type="button"><span class="menu-icon">▧</span> Upload Illustrated Book</button>
+<button data-read="url" type="button"><span class="menu-icon">⌁</span> Choose URL</button>
+</div>
+</details>
+<details>
+<summary><span class="nav-icon" aria-hidden="true">⏱</span> WPM Test</summary>
+
+
+
+<div class="menu-popover"><button data-test="gatsby">The Great Gatsby</button><button data-test="hound">The Hound of the Baskervilles</button><button data-test="cities">A Tale of Two Cities</button></div></details>
+<details>
+<summary><span class="nav-icon" aria-hidden="true">◫</span> Read</summary>
+
+
+
+
+
+
+
+
+
+
+
+<div class="menu-popover"><button data-read="unified-library" type="button"><span class="menu-icon">⌕</span> Search All Libraries</button><button data-read="frankenstein-demo" type="button"><span class="menu-icon">▧</span> Frankenstein Illustrated Demo</button><button data-read="news"><span class="menu-icon">◫</span> Today's News</button><button data-read="weather"><span class="menu-icon">☼</span> Local Weather</button><button data-read="gutenberg"><span class="menu-icon">G</span> Project Gutenberg</button><button data-read="great-books"><span class="menu-icon">★</span> Great Books Library</button><button data-read="current-reading"><span class="menu-icon">◎</span> News, Sports &amp; Interests</button></div></details>
+<details>
+<summary><span class="nav-icon" aria-hidden="true">▥</span> My Library</summary>
+
+
+
+<div class="menu-popover"><button data-action="reading-list"><span class="menu-icon">☷</span> Reading List</button><button data-action="progress-dashboard"><span class="menu-icon">↗</span> Reading Progress</button><button data-action="vocabulary-builder"><span class="menu-icon">Aa</span> Vocabulary Builder</button></div></details>
+<details>
+<summary><span class="nav-icon" aria-hidden="true">♫</span> Music</summary>
+
+
+
+
+<div class="menu-popover"><button data-action="music">Music Library</button><button data-music-quick="lofi-study">Lofi for Reading</button><button data-music-quick="classical-reading">Classical Reading</button><button data-music-quick="rain-focus">Rain &amp; Focus</button></div></details>
+<details>
+<summary><span class="nav-icon" aria-hidden="true">?</span> Help</summary>
+
+
+<div class="menu-popover"><button data-action="help">Instructions</button><button data-action="about">About</button></div></details>
+</nav>
+</header>
+<main aria-live="polite" class="app-shell" id="app" tabindex="-1"></main>
+<aside aria-label="Music player" class="music-dock" hidden="" id="music-dock">
+<div class="music-dock-bar">
+<div><strong id="music-now-title">Music</strong><span id="music-now-source">YouTube</span></div>
+<div class="music-dock-actions">
+<button aria-label="Try another result" id="music-next" type="button" hidden>↻</button>
+<button aria-label="Minimize music player" id="music-minimize" type="button">—</button>
+<button aria-label="Close music player" id="music-close" type="button">×</button>
+</div>
+</div>
+<div class="music-player-wrap" id="music-player-wrap">
+<iframe allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen="" id="music-player" title="YouTube music player"></iframe>
+</div>
+</aside>
+<footer>Reading practice tool · Browser edition</footer>
+</body>
+</html>
