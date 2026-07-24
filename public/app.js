@@ -1818,12 +1818,129 @@ function renderWeather() {
   if (savedZip) loadWeatherForZip(savedZip);
 }
 
+
+const LIBRARY_PROVIDERS = {
+  standardebooks: { label: 'Standard Ebooks', icon: 'S', note: 'Carefully produced public-domain EPUB editions.' },
+  internetarchive: { label: 'Internet Archive', icon: 'IA', note: 'Digitized books in EPUB, text, and OCR formats.' },
+  openlibrary: { label: 'Open Library', icon: 'OL', note: 'Book discovery, editions, covers, and lending links.' },
+  wikisource: { label: 'Wikisource', icon: 'W', note: 'Proofread public-domain texts from Wikimedia.' },
+  gutenberg: { label: 'Project Gutenberg', icon: 'G', note: 'Public-domain ebooks with mirror fallback.' }
+};
+
+function unifiedBookCard(book) {
+  const provider = LIBRARY_PROVIDERS[book.provider] || { label: book.provider || 'Library', icon: '◫' };
+  const canRead = Boolean(book.readable);
+  const author = book.author || 'Unknown author';
+  const details = [book.year, book.language, book.format].filter(Boolean).join(' · ');
+  return `
+    <article class="unified-book-card">
+      <div class="unified-cover-wrap">
+        ${book.cover ? `<img class="unified-cover" src="${escapeHtml(book.cover)}" alt="Cover of ${escapeHtml(book.title)}" loading="lazy" referrerpolicy="no-referrer">` : `<div class="unified-cover-placeholder" aria-hidden="true">${escapeHtml(provider.icon)}</div>`}
+        <span class="provider-badge">${escapeHtml(provider.icon)} ${escapeHtml(provider.label)}</span>
+      </div>
+      <div class="unified-book-body">
+        <h2>${escapeHtml(book.title || 'Untitled')}</h2>
+        <p class="unified-author">${escapeHtml(author)}</p>
+        ${details ? `<p class="unified-meta">${escapeHtml(details)}</p>` : ''}
+        ${book.description ? `<p class="unified-description">${escapeHtml(book.description)}</p>` : ''}
+        <div class="unified-actions">
+          ${canRead ? `<button class="primary" type="button" data-library-read="${escapeHtml(book.provider)}" data-library-id="${escapeHtml(book.id)}">▸ Read now</button>` : ''}
+          ${book.externalUrl ? `<a class="secondary button-link" href="${escapeHtml(book.externalUrl)}" target="_blank" rel="noopener noreferrer">↗ Book page</a>` : ''}
+          <button class="secondary" type="button" data-library-save='${escapeHtml(JSON.stringify({title: book.title, author, sourceUrl: book.externalUrl || '', provider: book.provider}))}'>＋ Reading list</button>
+        </div>
+      </div>
+    </article>`;
+}
+
+async function renderUnifiedLibrary(initial = {}) {
+  stopReader();
+  const query = initial.query || '';
+  const provider = initial.provider || 'all';
+  app.innerHTML = `
+    <section class="panel unified-library">
+      <div class="library-heading unified-library-heading">
+        <div><h1><span class="title-icon">⌕</span> Library</h1><p>Search several public book collections from one place, then open readable editions directly in Mark, Set, Go!</p></div>
+        <button class="secondary" type="button" data-read="upload">⇧ Import my own text</button>
+      </div>
+      <div class="provider-strip" aria-label="Library sources">
+        ${Object.entries(LIBRARY_PROVIDERS).map(([key, item]) => `<button class="provider-tile ${provider === key ? 'active' : ''}" type="button" data-provider-filter="${key}"><span>${escapeHtml(item.icon)}</span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.note)}</small></button>`).join('')}
+      </div>
+      <form id="unified-library-search" class="unified-search-form">
+        <label class="unified-search-box"><span aria-hidden="true">⌕</span><input id="unified-library-query" type="search" value="${escapeHtml(query)}" placeholder="Search title or author…" autocomplete="off"></label>
+        <select id="unified-library-provider" aria-label="Library source">
+          <option value="all" ${provider === 'all' ? 'selected' : ''}>All libraries</option>
+          ${Object.entries(LIBRARY_PROVIDERS).map(([key, item]) => `<option value="${key}" ${provider === key ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
+        </select>
+        <button class="primary" type="submit">Search</button>
+      </form>
+      <p id="unified-library-status" class="status">Enter a title or author to search all libraries.</p>
+      <div id="unified-library-results" class="unified-results" aria-live="polite"></div>
+      <p class="library-note">Availability differs by source and country. Open Library may link to borrowing or preview pages rather than provide downloadable text.</p>
+    </section>`;
+
+  const form = app.querySelector('#unified-library-search');
+  const status = app.querySelector('#unified-library-status');
+  const results = app.querySelector('#unified-library-results');
+  const search = async () => {
+    const q = app.querySelector('#unified-library-query').value.trim();
+    const source = app.querySelector('#unified-library-provider').value;
+    if (!q) { status.textContent = 'Enter a title or author.'; results.innerHTML = ''; return; }
+    status.className = 'status';
+    status.textContent = `Searching ${source === 'all' ? 'all libraries' : LIBRARY_PROVIDERS[source]?.label || source}…`;
+    results.innerHTML = '<div class="library-loading"><span class="loading-book">◫</span><p>Gathering editions…</p></div>';
+    try {
+      const payload = await loadApiPayload(`/api/library/search?q=${encodeURIComponent(q)}&provider=${encodeURIComponent(source)}`);
+      const books = Array.isArray(payload.books) ? payload.books : [];
+      status.textContent = books.length ? `${books.length} result${books.length === 1 ? '' : 's'} found.` : 'No books found. Try a broader search.';
+      results.innerHTML = books.length ? books.map(unifiedBookCard).join('') : '<div class="empty-library"><h2>No results</h2><p>Try another title, author, or source.</p></div>';
+      bindUnifiedLibraryActions(results);
+    } catch (error) {
+      status.className = 'status error';
+      status.textContent = error.message;
+      results.innerHTML = '<div class="empty-library"><h2>Search unavailable</h2><p>One or more libraries may be temporarily unavailable.</p></div>';
+    }
+  };
+  form?.addEventListener('submit', (event) => { event.preventDefault(); search(); });
+  app.querySelectorAll('[data-provider-filter]').forEach((button) => button.addEventListener('click', () => {
+    app.querySelector('#unified-library-provider').value = button.dataset.providerFilter;
+    app.querySelectorAll('[data-provider-filter]').forEach((item) => item.classList.toggle('active', item === button));
+    if (app.querySelector('#unified-library-query').value.trim()) search();
+  }));
+  if (query) search();
+}
+
+function bindUnifiedLibraryActions(container) {
+  container.querySelectorAll('[data-library-read]').forEach((button) => button.addEventListener('click', async () => {
+    const provider = button.dataset.libraryRead;
+    const id = button.dataset.libraryId;
+    const original = button.textContent;
+    button.disabled = true; button.textContent = 'Loading…';
+    try {
+      const book = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}`);
+      renderReaderWithText(`${book.title}${book.author ? ` — ${book.author}` : ''}`, book.text, { type: provider, id, sourceUrl: book.sourceUrl });
+    } catch (error) {
+      window.alert(error.message);
+      button.disabled = false; button.textContent = original;
+    }
+  }));
+  container.querySelectorAll('[data-library-save]').forEach((button) => button.addEventListener('click', () => {
+    try {
+      const item = JSON.parse(button.dataset.librarySave);
+      const list = getReadingList();
+      list.unshift({ id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()), title: item.title, author: item.author, sourceUrl: item.sourceUrl, status: 'want-to-read', addedAt: new Date().toISOString() });
+      saveReadingList(list);
+      button.textContent = '✓ Added'; button.disabled = true;
+    } catch { window.alert('This book could not be added to the reading list.'); }
+  }));
+}
+
 async function renderReader(kind) {
   stopReader();
   if (kind === 'frankenstein-demo') return loadBuiltInIllustratedDemo();
   if (kind === 'url') return renderUrlImporter();
   if (kind === 'upload') return renderUpload();
   if (kind === 'illustrated-upload') return renderIllustratedUpload();
+  if (kind === 'unified-library') return renderUnifiedLibrary();
   if (kind === 'gutenberg') return renderGutenbergLibrary();
   if (kind === 'great-books') return renderGreatBooksLibrary();
   if (kind === 'current-reading') return renderCurrentReading();
