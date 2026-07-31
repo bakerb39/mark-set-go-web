@@ -1446,7 +1446,7 @@ function renderHome() {
       </div>
     </section>`;
 
-  app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('gatsby'));
+  app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));
   app.querySelector('#resume-last-reading')?.addEventListener('click', async (event) => {
     const button = event.currentTarget;
     const original = button.textContent;
@@ -1474,18 +1474,61 @@ function renderHome() {
 
 }
 
-async function renderWpmTest(key) {
-  stopReader();
-  app.innerHTML = `<section class="panel"><h1>Loading…</h1><p class="status">Preparing the reading test.</p></section>`;
-  try {
-    const { title, text } = await loadLocalText(key);
-    const words = splitWords(text).slice(0, 250);
-    if (words.length < 250) throw new Error('This WPM test requires a text file containing at least 250 words.');
+const WPM_TEST_OPTIONS = [
+  { key: 'gatsby', label: 'The Great Gatsby' },
+  { key: 'hound', label: 'The Hound of the Baskervilles' },
+  { key: 'cities', label: 'A Tale of Two Cities' }
+];
 
-    app.innerHTML = `
-      <section class="panel">
-        <h1>WPM Test: ${escapeHtml(title)}</h1>
-        <div class="controls">
+async function renderWpmTest(key = 'wpm') {
+  stopReader();
+
+  const requested = WPM_TEST_OPTIONS.some((item) => item.key === key) ? key : 'gatsby';
+
+  app.innerHTML = `
+    <section class="panel wpm-test-page">
+      <div class="library-heading">
+        <div>
+          <span class="source-category">Learn</span>
+          <h1>WPM Test</h1>
+          <p>Choose a passage, read at your natural pace, and measure your words per minute.</p>
+        </div>
+      </div>
+
+      <div class="wpm-test-picker">
+        <label for="wpm-test-text">
+          <span>Test passage</span>
+          <select id="wpm-test-text">
+            ${WPM_TEST_OPTIONS.map((item) => `<option value="${item.key}" ${item.key === requested ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
+          </select>
+        </label>
+        <span class="status" id="wpm-load-status">Loading passage…</span>
+      </div>
+
+      <div id="wpm-test-content"></div>
+    </section>`;
+
+  const selector = app.querySelector('#wpm-test-text');
+  const content = app.querySelector('#wpm-test-content');
+  const loadStatus = app.querySelector('#wpm-load-status');
+
+  const loadPassage = async (selectedKey) => {
+    loadStatus.className = 'status';
+    loadStatus.textContent = 'Loading passage…';
+    content.innerHTML = '';
+
+    try {
+      const { title, text } = await loadLocalText(selectedKey);
+      const words = splitWords(text).slice(0, 250);
+      if (words.length < 250) throw new Error('This WPM test requires a text file containing at least 250 words.');
+
+      content.innerHTML = `
+        <div class="wpm-test-heading">
+          <h2>${escapeHtml(title)}</h2>
+          <span>250-word test passage</span>
+        </div>
+
+        <div class="controls wpm-test-controls">
           <div class="control">
             <span class="label">Theme</span>
             <div class="segmented">
@@ -1498,43 +1541,54 @@ async function renderWpmTest(key) {
             <select id="font-size">${fontOptions(14)}</select>
           </div>
         </div>
-        <article id="reader" class="reader" style="font-size:14px">${escapeHtml(words.join(' '))}</article>
-        <div class="controls">
+
+        <article id="reader" class="reader wpm-test-reader" style="font-size:14px">${escapeHtml(words.join(' '))}</article>
+
+        <div class="controls wpm-test-actions">
           <button id="start-test" class="primary">GO!</button>
           <button id="stop-test" class="danger" disabled>Stop</button>
           <span id="test-status" class="status">Press GO!, read the passage, then press Stop.</span>
         </div>
-      </section>`;
+      `;
 
-    const reader = app.querySelector('#reader');
-    bindAppearance(reader);
-    const start = app.querySelector('#start-test');
-    const stop = app.querySelector('#stop-test');
-    const status = app.querySelector('#test-status');
-    let startedAt = 0;
+      const reader = app.querySelector('#reader');
+      bindAppearance(reader);
+      const start = app.querySelector('#start-test');
+      const stop = app.querySelector('#stop-test');
+      const status = app.querySelector('#test-status');
+      let startedAt = 0;
 
-    start.addEventListener('click', () => {
-      startedAt = performance.now();
-      start.disabled = true;
-      stop.disabled = false;
-      status.textContent = 'Begin reading…';
-    });
+      start.addEventListener('click', () => {
+        startedAt = performance.now();
+        start.disabled = true;
+        stop.disabled = false;
+        selector.disabled = true;
+        status.textContent = 'Begin reading…';
+      });
 
-    stop.addEventListener('click', () => {
-      if (!startedAt) return;
-      const elapsedMinutes = (performance.now() - startedAt) / 60000;
-      const measured = Math.max(1, Math.round(words.length / elapsedMinutes));
-      state.wpm = measured;
-      start.disabled = false;
-      stop.disabled = true;
-      startedAt = 0;
-      status.innerHTML = `<span class="wpm-result">Your speed: ${measured.toLocaleString()} WPM</span>`;
-    });
-  } catch (error) {
-    renderError('WPM test unavailable', error.message);
-  }
+      stop.addEventListener('click', () => {
+        if (!startedAt) return;
+        const elapsedMinutes = (performance.now() - startedAt) / 60000;
+        const measured = Math.max(1, Math.round(words.length / elapsedMinutes));
+        state.wpm = measured;
+        start.disabled = false;
+        stop.disabled = true;
+        selector.disabled = false;
+        startedAt = 0;
+        status.innerHTML = `<span class="wpm-result">Your speed: ${measured.toLocaleString()} WPM</span>`;
+      });
+
+      loadStatus.textContent = '';
+    } catch (error) {
+      loadStatus.className = 'status error';
+      loadStatus.textContent = error.message;
+      content.innerHTML = '';
+    }
+  };
+
+  selector.addEventListener('change', () => loadPassage(selector.value));
+  await loadPassage(requested);
 }
-
 function fontOptions(selected) {
   return Array.from({ length: 14 }, (_, i) => 10 + i * 2)
     .map((size) => `<option value="${size}" ${size === selected ? 'selected' : ''}>${size}px</option>`)
