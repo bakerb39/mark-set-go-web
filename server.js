@@ -67,6 +67,466 @@ async function fetchFeedItems(source) {
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '150kb' }));
+
+const COMPREHENSION_MODEL = process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
+
+function extractOpenAIOutputText(payload) {
+  for (const item of Array.isArray(payload?.output) ? payload.output : []) {
+    for (const content of Array.isArray(item?.content) ? item.content : []) {
+      if (content?.type === 'output_text' && typeof content.text === 'string') return content.text;
+    }
+  }
+  return '';
+}
+
+app.post('/api/comprehension', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) {
+    return res.status(503).json({
+      error: 'Comprehension AI is not configured. Add OPENAI_API_KEY to the server environment.'
+    });
+  }
+
+  const passage = String(req.body?.passage || '').replace(/\s+/g, ' ').trim();
+  const title = String(req.body?.title || 'Untitled reading').trim().slice(0, 300);
+  const wordCount = passage ? passage.split(/\s+/).length : 0;
+
+  if (wordCount < 120) {
+    return res.status(400).json({ error: 'Read at least 120 words before starting a comprehension check.' });
+  }
+  if (wordCount > 1200 || passage.length > 12000) {
+    return res.status(400).json({ error: 'The comprehension passage is too large.' });
+  }
+
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['questions'],
+    properties: {
+      questions: {
+        type: 'array',
+        minItems: 4,
+        maxItems: 4,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['type', 'question', 'choices', 'correctIndex', 'explanation'],
+          properties: {
+            type: { type: 'string', enum: ['recall', 'main_idea', 'inference', 'deeper_understanding'] },
+            question: { type: 'string' },
+            choices: {
+              type: 'array',
+              minItems: 4,
+              maxItems: 4,
+              items: { type: 'string' }
+            },
+            correctIndex: { type: 'integer', minimum: 0, maximum: 3 },
+            explanation: { type: 'string' }
+          }
+        }
+      }
+    }
+  };
+
+  const prompt = `Create exactly four multiple-choice comprehension questions based ONLY on the supplied passage from "${title}".
+The four question types must be, in this order: factual recall, main idea, inference, and deeper understanding.
+Each question must be answerable from the passage itself. Do not rely on outside knowledge, later parts of the work, or facts not present in the passage.
+Use plausible distractors. Keep explanations concise and cite the relevant idea from the passage without long quotation.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: COMPREHENSION_MODEL,
+        reasoning: { effort: 'low' },
+        store: false,
+        input: [
+          { role: 'developer', content: [{ type: 'input_text', text: prompt }] },
+          { role: 'user', content: [{ type: 'input_text', text: passage }] }
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'comprehension_quiz',
+            strict: true,
+            schema
+          }
+        }
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = payload?.error?.message || `OpenAI returned HTTP ${response.status}.`;
+      console.error('Comprehension API error:', detail);
+      return res.status(502).json({ error: 'Unable to generate comprehension questions.', detail });
+    }
+
+    const outputText = extractOpenAIOutputText(payload);
+    if (!outputText) throw new Error('OpenAI returned no structured text output.');
+    const quiz = JSON.parse(outputText);
+    if (!Array.isArray(quiz.questions) || quiz.questions.length !== 4) throw new Error('Unexpected quiz structure.');
+
+    res.json({
+      title,
+      wordCount,
+      model: COMPREHENSION_MODEL,
+      questions: quiz.questions
+    });
+  } catch (error) {
+    console.error('Comprehension generation failed:', error);
+    res.status(502).json({ error: 'Unable to generate comprehension questions.' });
+  }
+});
+
+
+app.post('/api/study-guide', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error: 'AI study tools are not configured. Add OPENAI_API_KEY to the server environment.' });
+
+  const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
+  const author = String(req.body?.author || '').trim().slice(0, 200);
+  const sourceType = String(req.body?.sourceType || 'great-book').trim();
+  const language = String(req.body?.language || 'English').trim().slice(0, 100);
+  const passage = String(req.body?.passage || '').replace(/\s+/g, ' ').trim().slice(0, 14000);
+
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['overview', 'context', 'greatIdeas', 'studyQuestions', 'connections'],
+    properties: {
+      overview: { type: 'string' },
+      context: { type: 'string' },
+      greatIdeas: {
+        type: 'array', minItems: 3, maxItems: 7,
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['idea', 'whyItMatters', 'questions'],
+          properties: {
+            idea: { type: 'string' },
+            whyItMatters: { type: 'string' },
+            questions: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string' } }
+          }
+        }
+      },
+      studyQuestions: { type: 'array', minItems: 4, maxItems: 8, items: { type: 'string' } },
+      connections: {
+        type: 'array', minItems: 2, maxItems: 6,
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['work', 'connection'],
+          properties: { work: { type: 'string' }, connection: { type: 'string' } }
+        }
+      }
+    }
+  };
+
+  const instruction = sourceType === 'bible'
+    ? `Create a careful study guide for the supplied Bible passage. Stay grounded in the supplied text. Distinguish observation from interpretation. Identify major theological, ethical, literary, and philosophical ideas. Connections may name other biblical passages or Great Books only when you are confident; do not invent quotations or claim a disputed interpretation is certain.`
+    : `Create a study guide for this Great Book or passage using syntopical reading principles. Explain context, identify durable Great Ideas, pose interpretive questions, and connect the work to other major works or authors. Do not reproduce copyrighted commentary or the Britannica Syntopicon; create an original study guide.`;
+  const localizedInstruction = `${instruction}
+Write the entire response in ${language}.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna',
+        reasoning: { effort: 'low' },
+        store: false,
+        input: [
+          { role: 'developer', content: [{ type: 'input_text', text: localizedInstruction }] },
+          { role: 'user', content: [{ type: 'input_text', text: `Title: ${title}\nAuthor: ${author || 'N/A'}\n${passage ? `Passage:\n${passage}` : 'No passage supplied; provide a work-level orientation.'}` }] }
+        ],
+        text: { format: { type: 'json_schema', name: 'study_guide', strict: true, schema } }
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) return res.status(502).json({ error: payload?.error?.message || 'Unable to generate study guide.' });
+    const outputText = extractOpenAIOutputText(payload);
+    if (!outputText) throw new Error('No structured study output returned.');
+    res.json(JSON.parse(outputText));
+  } catch (error) {
+    console.error('Study guide generation failed:', error);
+    res.status(502).json({ error: 'Unable to generate study guide.' });
+  }
+});
+
+// Free Use Bible API proxy. The upstream service requires no API key.
+app.get('/api/bible/translations', async (_req, res) => {
+  try {
+    const response = await fetch('https://bible.helloao.org/api/available_translations.json');
+    if (!response.ok) throw new Error(`Bible service returned HTTP ${response.status}.`);
+    const payload = await response.json();
+    const translations = (payload.translations || [])
+      .map((item) => ({
+        id: item.id,
+        name: item.englishName || item.name,
+        nativeName: item.name || item.englishName,
+        shortName: item.shortName || item.id,
+        language: item.language || '',
+        languageName: item.languageEnglishName || item.languageName || item.language || 'Unknown',
+        website: item.website,
+        licenseUrl: item.licenseUrl,
+        numberOfBooks: item.numberOfBooks,
+        totalNumberOfVerses: item.totalNumberOfVerses
+      }))
+      .sort((a,b) => `${a.languageName} ${a.name}`.localeCompare(`${b.languageName} ${b.name}`));
+    res.json({ translations });
+  } catch (error) {
+    res.status(502).json({ error: error.message || 'Bible translations unavailable.' });
+  }
+});
+
+app.get('/api/bible/:translation/books', async (req, res) => {
+  try {
+    const translation = encodeURIComponent(String(req.params.translation || ''));
+    const response = await fetch(`https://bible.helloao.org/api/${translation}/books.json`);
+    if (!response.ok) throw new Error(`Bible service returned HTTP ${response.status}.`);
+    const payload = await response.json();
+    res.json({
+      translation: payload.translation,
+      books: (payload.books || []).map((book) => ({
+        id: book.id, name: book.commonName || book.name, title: book.title,
+        order: book.order, numberOfChapters: book.numberOfChapters, isApocryphal: Boolean(book.isApocryphal)
+      }))
+    });
+  } catch (error) {
+    res.status(502).json({ error: error.message || 'Bible books unavailable.' });
+  }
+});
+
+app.get('/api/bible/:translation/:book/:chapter', async (req, res) => {
+  try {
+    const translation = encodeURIComponent(String(req.params.translation || ''));
+    const book = encodeURIComponent(String(req.params.book || ''));
+    const chapter = Math.max(1, Number(req.params.chapter) || 1);
+    const response = await fetch(`https://bible.helloao.org/api/${translation}/${book}/${chapter}.json`);
+    if (!response.ok) throw new Error(`Bible service returned HTTP ${response.status}.`);
+    const payload = await response.json();
+    res.json(payload);
+  } catch (error) {
+    res.status(502).json({ error: error.message || 'Bible chapter unavailable.' });
+  }
+});
+
+
+app.get('/api/bible/commentaries', async (_req, res) => {
+  try {
+    const response = await fetch('https://bible.helloao.org/api/available_commentaries.json');
+    if (!response.ok) throw new Error(`Bible service returned HTTP ${response.status}.`);
+    const payload = await response.json();
+    const commentaries = (payload.commentaries || [])
+      .filter((item) => item.language === 'eng' || item.languageEnglishName === 'English')
+      .map((item) => ({
+        id: item.id,
+        name: item.englishName || item.name,
+        website: item.website,
+        licenseUrl: item.licenseUrl,
+        numberOfBooks: item.numberOfBooks,
+        totalNumberOfProfiles: item.totalNumberOfProfiles || 0
+      }))
+      .sort((a,b) => a.name.localeCompare(b.name));
+    res.json({ commentaries });
+  } catch (error) {
+    res.status(502).json({ error: error.message || 'Bible commentaries unavailable.' });
+  }
+});
+
+app.get('/api/bible/commentary/:commentary/:book/:chapter', async (req, res) => {
+  try {
+    const commentary = encodeURIComponent(String(req.params.commentary || ''));
+    const book = encodeURIComponent(String(req.params.book || ''));
+    const chapter = Math.max(1, Number(req.params.chapter) || 1);
+    const response = await fetch(`https://bible.helloao.org/api/c/${commentary}/${book}/${chapter}.json`);
+    if (!response.ok) throw new Error(`Bible service returned HTTP ${response.status}.`);
+    res.json(await response.json());
+  } catch (error) {
+    res.status(502).json({ error: error.message || 'Commentary chapter unavailable.' });
+  }
+});
+
+app.get('/api/bible/datasets', async (_req, res) => {
+  try {
+    const response = await fetch('https://bible.helloao.org/api/available_datasets.json');
+    if (!response.ok) throw new Error(`Bible service returned HTTP ${response.status}.`);
+    const payload = await response.json();
+    const datasets = (payload.datasets || []).map((item) => ({
+      id: item.id,
+      name: item.englishName || item.name,
+      website: item.website,
+      licenseUrl: item.licenseUrl,
+      numberOfBooks: item.numberOfBooks,
+      totalNumberOfReferences: item.totalNumberOfReferences || 0
+    }));
+    res.json({ datasets });
+  } catch (error) {
+    res.status(502).json({ error: error.message || 'Bible datasets unavailable.' });
+  }
+});
+
+app.get('/api/bible/dataset/:dataset/:book/:chapter', async (req, res) => {
+  try {
+    const dataset = encodeURIComponent(String(req.params.dataset || ''));
+    const book = encodeURIComponent(String(req.params.book || ''));
+    const chapter = Math.max(1, Number(req.params.chapter) || 1);
+    const response = await fetch(`https://bible.helloao.org/api/d/${dataset}/${book}/${chapter}.json`);
+    if (!response.ok) throw new Error(`Bible service returned HTTP ${response.status}.`);
+    res.json(await response.json());
+  } catch (error) {
+    res.status(502).json({ error: error.message || 'Bible dataset chapter unavailable.' });
+  }
+});
+
+app.get('/api/bible/commentary/:commentary/profiles', async (req, res) => {
+  try {
+    const commentary = encodeURIComponent(String(req.params.commentary || ''));
+    const response = await fetch(`https://bible.helloao.org/api/c/${commentary}/profiles.json`);
+    if (!response.ok) throw new Error(`Bible service returned HTTP ${response.status}.`);
+    res.json(await response.json());
+  } catch (error) {
+    res.status(502).json({ error: error.message || 'Commentary profiles unavailable.' });
+  }
+});
+
+app.get('/api/bible/commentary/:commentary/profiles/:profile', async (req, res) => {
+  try {
+    const commentary = encodeURIComponent(String(req.params.commentary || ''));
+    const profile = encodeURIComponent(String(req.params.profile || ''));
+    const response = await fetch(`https://bible.helloao.org/api/c/${commentary}/profiles/${profile}.json`);
+    if (!response.ok) throw new Error(`Bible service returned HTTP ${response.status}.`);
+    res.json(await response.json());
+  } catch (error) {
+    res.status(502).json({ error: error.message || 'Commentary profile unavailable.' });
+  }
+});
+
+app.get('/api/bible/:translation/:book/complete', async (req, res) => {
+  try {
+    const translation = encodeURIComponent(String(req.params.translation || ''));
+    const bookId = String(req.params.book || '');
+    const booksResponse = await fetch(`https://bible.helloao.org/api/${translation}/books.json`);
+    if (!booksResponse.ok) throw new Error(`Bible service returned HTTP ${booksResponse.status}.`);
+    const booksPayload = await booksResponse.json();
+    const book = (booksPayload.books || []).find((item) => item.id === bookId);
+    if (!book) return res.status(404).json({ error: 'Book not found in this translation.' });
+
+    const chapters = [];
+    for (let chapter = Number(book.firstChapterNumber || 1); chapter <= Number(book.lastChapterNumber || book.numberOfChapters || 1); chapter += 1) {
+      const response = await fetch(`https://bible.helloao.org/api/${translation}/${encodeURIComponent(bookId)}/${chapter}.json`);
+      if (!response.ok) throw new Error(`Bible service returned HTTP ${response.status} while loading chapter ${chapter}.`);
+      chapters.push(await response.json());
+    }
+    res.json({ translation: booksPayload.translation, book, chapters });
+  } catch (error) {
+    res.status(502).json({ error: error.message || 'Bible book unavailable.' });
+  }
+});
+
+
+app.post('/api/syntopicon', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error: 'Syntopical AI is not configured. Add OPENAI_API_KEY to the server environment.' });
+
+  const idea = String(req.body?.idea || '').trim().slice(0, 200);
+  const language = String(req.body?.language || 'English').trim().slice(0, 100);
+  const sources = Array.isArray(req.body?.sources) ? req.body.sources.slice(0, 12) : [];
+  if (!idea) return res.status(400).json({ error: 'Choose or enter a Great Idea first.' });
+  if (sources.length < 2) return res.status(400).json({ error: 'Choose at least two sources for a syntopical comparison.' });
+
+  const normalizedSources = sources.map((source, index) => ({
+    id: String(source?.id || `source-${index + 1}`).slice(0, 100),
+    title: String(source?.title || 'Untitled').slice(0, 300),
+    author: String(source?.author || '').slice(0, 200),
+    type: String(source?.type || 'great-book').slice(0, 50),
+    excerpt: String(source?.excerpt || '').replace(/\s+/g, ' ').trim().slice(0, 9000)
+  }));
+
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['idea', 'centralQuestion', 'terms', 'sourcePositions', 'agreements', 'disagreements', 'distinctions', 'studyQuestions', 'readingPath'],
+    properties: {
+      idea: { type: 'string' },
+      centralQuestion: { type: 'string' },
+      terms: {
+        type: 'array', minItems: 3, maxItems: 8,
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['term', 'meaning'],
+          properties: { term: { type: 'string' }, meaning: { type: 'string' } }
+        }
+      },
+      sourcePositions: {
+        type: 'array', minItems: 2, maxItems: 12,
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['source', 'position', 'evidenceBasis', 'questions'],
+          properties: {
+            source: { type: 'string' },
+            position: { type: 'string' },
+            evidenceBasis: { type: 'string' },
+            questions: { type: 'array', minItems: 1, maxItems: 3, items: { type: 'string' } }
+          }
+        }
+      },
+      agreements: { type: 'array', minItems: 1, maxItems: 6, items: { type: 'string' } },
+      disagreements: { type: 'array', minItems: 1, maxItems: 6, items: { type: 'string' } },
+      distinctions: { type: 'array', minItems: 2, maxItems: 8, items: { type: 'string' } },
+      studyQuestions: { type: 'array', minItems: 4, maxItems: 10, items: { type: 'string' } },
+      readingPath: {
+        type: 'array', minItems: 2, maxItems: 12,
+        items: {
+          type: 'object', additionalProperties: false,
+          required: ['source', 'reason'],
+          properties: { source: { type: 'string' }, reason: { type: 'string' } }
+        }
+      }
+    }
+  };
+
+  const sourceText = normalizedSources.map((source, index) =>
+    `SOURCE ${index + 1}\nTitle: ${source.title}\nAuthor: ${source.author || 'N/A'}\nType: ${source.type}\n${source.excerpt ? `Excerpt supplied by user/app:\n${source.excerpt}` : 'No excerpt supplied; use only broadly established knowledge of this work and clearly avoid fabricated quotation or page-level claims.'}`
+  ).join('\n\n');
+
+  const instruction = `Perform a genuine syntopical comparison centered on the Great Idea "${idea}".
+Follow the spirit of syntopical reading: establish a neutral central question, define shared terms, identify each source's position, compare agreements and disagreements, distinguish meanings that look similar but are not identical, and propose further questions and an efficient reading order.
+Do not reproduce or imitate copyrighted Syntopicon entries. Produce original analysis.
+When an excerpt is supplied, ground claims in that excerpt. When no excerpt is supplied, limit yourself to broadly established features of the work and explicitly avoid invented quotations, chapter references, or precise textual claims.
+Bible sources may involve contested interpretations; distinguish text, interpretation, and inference.
+Write the entire response in ${language}.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna',
+        reasoning: { effort: 'medium' },
+        store: false,
+        input: [
+          { role: 'developer', content: [{ type: 'input_text', text: instruction }] },
+          { role: 'user', content: [{ type: 'input_text', text: sourceText }] }
+        ],
+        text: { format: { type: 'json_schema', name: 'syntopical_analysis', strict: true, schema } }
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) return res.status(502).json({ error: payload?.error?.message || 'Unable to create syntopical analysis.' });
+    const outputText = extractOpenAIOutputText(payload);
+    if (!outputText) throw new Error('No structured syntopical output returned.');
+    res.json(JSON.parse(outputText));
+  } catch (error) {
+    console.error('Syntopicon generation failed:', error);
+    res.status(502).json({ error: 'Unable to create syntopical analysis.' });
+  }
+});
+
 app.use(express.static(path.join(__dirname, 'public'), {
   extensions: ['html'],
   maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0
