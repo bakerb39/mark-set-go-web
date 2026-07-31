@@ -42,7 +42,7 @@
       span.dataset.index = String(index);
       if (this.savedDefinitionAt?.(index)) span.classList.add('saved-definition-word');
       if (this.noteAt?.(index)) span.classList.add('saved-note-word');
-      this.setWordContent(span, word);
+      this.setWordContent(span, word, index);
       span.tabIndex = state.language === 'en' ? -1 : 0;
       if (state.language !== 'en') {
         span.classList.add('translated-word');
@@ -77,6 +77,13 @@
         const visibleEnd = Math.min(definition.end, endWord);
         if (visibleEnd <= visibleStart) continue;
 
+        if (state.paragraphBreaks?.has(definition.start) && definition.start > 0) {
+          const paragraphBreak = document.createElement('span');
+          paragraphBreak.className = 'reader-paragraph-break';
+          paragraphBreak.setAttribute('aria-hidden', 'true');
+          fragment.appendChild(paragraphBreak);
+        }
+
         const group = document.createElement('span');
         group.className = 'reader-group';
         group.dataset.startIndex = String(definition.start);
@@ -88,9 +95,11 @@
         if (structure) {
           group.classList.add('document-structure', `structure-${structure.type}`);
           group.dataset.structureType = structure.type;
-          group.setAttribute('role', 'heading');
-          const headingLevel = structure.type === 'part' ? '1' : structure.type === 'chapter' ? '2' : '3';
-          group.setAttribute('aria-level', headingLevel);
+          if (structure.type !== 'paragraph') {
+            group.setAttribute('role', 'heading');
+            const headingLevel = structure.type === 'part' ? '1' : structure.type === 'chapter' ? '2' : '3';
+            group.setAttribute('aria-level', headingLevel);
+          }
         }
         if (mode === 'marquee') group.classList.add('pending-group');
 

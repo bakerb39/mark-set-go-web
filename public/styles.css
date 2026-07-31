@@ -3733,3 +3733,211 @@ body.light .comprehension-actions,
     aspect-ratio: 720 / 635;
   }
 }
+
+
+/* v5.40 empty reader destination */
+.empty-reader-page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.empty-reader-heading {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 16px;
+}
+
+.empty-reader-heading h1 {
+  margin: 4px 0 6px;
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+}
+
+.empty-reader-heading p {
+  margin: 0;
+  line-height: 1.55;
+  opacity: .72;
+}
+
+.empty-reader-canvas {
+  min-height: 270px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(148,163,184,.22);
+  border-radius: 14px;
+  background: #090e14;
+  color: #f8fafc;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.02);
+}
+
+.empty-reader-placeholder {
+  text-align: center;
+  padding: 28px;
+}
+
+.empty-reader-icon {
+  font-size: 3rem;
+  margin-bottom: 8px;
+}
+
+.empty-reader-placeholder h2 {
+  margin: 0 0 5px;
+}
+
+.empty-reader-placeholder p {
+  margin: 0;
+  opacity: .66;
+}
+
+.empty-reader-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.empty-reader-action {
+  display: grid !important;
+  grid-template-columns: 30px minmax(0,1fr);
+  align-items: center;
+  gap: 9px;
+  min-height: 70px;
+  padding: 11px 12px !important;
+  text-align: left !important;
+}
+
+.empty-reader-action > span:first-child {
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+.empty-reader-action > span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.empty-reader-action strong {
+  font-size: .9rem;
+}
+
+.empty-reader-action small {
+  font-size: .74rem;
+  opacity: .67;
+  line-height: 1.25;
+  font-weight: 400;
+}
+
+.empty-reader-hint {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 13px 10px 0;
+  font-size: .8rem;
+  opacity: .68;
+}
+
+@media (max-width: 760px) {
+  .empty-reader-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .empty-reader-canvas {
+    min-height: 210px;
+  }
+}
+
+
+/* v5.41 structured Bible text + Pointing Guide paging */
+.reader-paragraph-break {
+  display: block;
+  flex-basis: 100%;
+  width: 100%;
+  height: .72em;
+  break-after: auto;
+}
+
+.reader-word:has(.bible-verse-number) {
+  margin-right: .12em;
+}
+
+.bible-verse-number {
+  position: relative;
+  top: -.28em;
+  font-size: .66em;
+  line-height: 0;
+  font-weight: 600;
+  opacity: .58;
+  color: currentColor;
+}
+
+.document-structure.structure-chapter {
+  display: block;
+  width: 100%;
+  margin: .7em 0 .5em;
+  font-size: 1.28em;
+  font-weight: 750;
+}
+
+.document-structure.structure-section {
+  display: block;
+  width: 100%;
+  margin: 1em 0 .42em;
+  font-size: 1.02em;
+  font-weight: 680;
+  opacity: .92;
+}
+
+/* Bible source headings are authoritative; ordinary verse text remains normal. */
+.reader .structure-section + .reader-paragraph-break {
+  height: .36em;
+}
+
+
+/* v5.42 clearer open Reading / Display panels */
+.reader-toolbar .settings-panel[open] {
+  background: rgba(225, 246, 233, .82);
+  border-color: rgba(72, 151, 102, .38);
+  box-shadow: 0 1px 0 rgba(72, 151, 102, .08), 0 5px 14px rgba(30, 90, 54, .06);
+}
+
+.reader-toolbar .settings-panel[open] > summary {
+  background: rgba(211, 240, 222, .72);
+  border-bottom-color: rgba(72, 151, 102, .24);
+}
+
+.reader-toolbar .settings-panel[open] > summary > span:first-child {
+  color: #24663d;
+  font-weight: 750;
+}
+
+.reader-toolbar .settings-panel[open] .settings-summary {
+  color: #48745a;
+}
+
+.reader-toolbar .settings-panel[open] .settings-content {
+  background: rgba(245, 252, 247, .58);
+}
+
+/* Preserve readable contrast in a dark reader/theme context. */
+.reader-frame:fullscreen .reader-toolbar .settings-panel[open],
+.reader-frame.fullscreen-fallback .reader-toolbar .settings-panel[open] {
+  background: rgba(30, 72, 46, .92);
+  border-color: rgba(116, 203, 145, .44);
+}
+
+.reader-frame:fullscreen .reader-toolbar .settings-panel[open] > summary,
+.reader-frame.fullscreen-fallback .reader-toolbar .settings-panel[open] > summary {
+  background: rgba(39, 88, 57, .9);
+}
+
+.reader-frame:fullscreen .reader-toolbar .settings-panel[open] > summary > span:first-child,
+.reader-frame.fullscreen-fallback .reader-toolbar .settings-panel[open] > summary > span:first-child,
+.reader-frame:fullscreen .reader-toolbar .settings-panel[open] .settings-summary,
+.reader-frame.fullscreen-fallback .reader-toolbar .settings-panel[open] .settings-summary {
+  color: #d9f5e3;
+}
+
+.reader-frame:fullscreen .reader-toolbar .settings-panel[open] .settings-content,
+.reader-frame.fullscreen-fallback .reader-toolbar .settings-panel[open] .settings-content {
+  background: rgba(24, 62, 38, .42);
+}

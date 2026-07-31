@@ -797,7 +797,10 @@ function buildReadingGroups(mode, maximumWords) {
   const useMeaning = state.meaningfulChunks && modeSupportsMeaningfulChunks(mode) && maxWords > 1;
   const groups = [];
   const starts = state.structureByStart || new Map();
-  const boundaries = new Set(state.structure.flatMap((entry) => [entry.start, entry.end]));
+  const boundaries = new Set([
+    ...state.structure.flatMap((entry) => [entry.start, entry.end]),
+    ...Array.from(state.paragraphBreaks || [])
+  ]);
 
   for (let start = 0; start < state.words.length;) {
     const structure = starts.get(start);
@@ -854,8 +857,17 @@ function getBionicParts(word) {
   };
 }
 
-function setWordContent(element, word) {
+function setWordContent(element, word, index = null) {
   element.replaceChildren();
+
+  if (Number.isFinite(Number(index)) && state.verseNumberIndexes?.has(Number(index))) {
+    const verse = document.createElement('sup');
+    verse.className = 'bible-verse-number';
+    verse.textContent = String(word).replace(/[.]+$/, '');
+    element.append(verse);
+    return;
+  }
+
   if (!state.bionic) {
     element.textContent = word;
     return;
@@ -1143,7 +1155,8 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   state.bookPages = Boolean(controls.bookPages ?? snapshot.bookPages);
   state.illustrationMode = controls.illustrationMode || snapshot.illustrationMode || 'off';
 
-  const mode = controls.mode || snapshot.mode || 'highlight';
+  const requestedMode = controls.mode || snapshot.mode || 'highlight';
+  const mode = requestedMode === 'two-column' ? 'highlight' : requestedMode;
   const wordCount = Math.max(1, Number(controls.wordCount ?? 1));
   const fontSize = Math.max(10, Number(controls.fontSize ?? 14));
   const fontFamily = controls.fontFamily || 'system';
@@ -1288,11 +1301,72 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   return true;
 }
 
+
+function renderEmptyReader() {
+  stopReader();
+
+  app.innerHTML = `
+    <section class="panel empty-reader-page">
+      <div class="empty-reader-heading">
+        <div>
+          <span class="source-category">Reader</span>
+          <h1>Open something to read</h1>
+          <p>Your reader is ready. Choose a source below and it will open here with your reading modes, Focus Anchor, Book Pages, comprehension tools, notes, and other reader controls.</p>
+        </div>
+      </div>
+
+      <div class="empty-reader-canvas" aria-label="Empty reader">
+        <div class="empty-reader-placeholder">
+          <div class="empty-reader-icon" aria-hidden="true">📖</div>
+          <h2>No text loaded yet</h2>
+          <p>Import a book or choose something from Discover to begin.</p>
+        </div>
+      </div>
+
+      <div class="empty-reader-actions">
+        <button class="primary empty-reader-action" type="button" data-read="import">
+          <span aria-hidden="true">⬆</span>
+          <span><strong>Import Book / Text</strong><small>EPUB, EPUB3, or TXT</small></span>
+        </button>
+
+        <button class="secondary empty-reader-action" type="button" data-read="url">
+          <span aria-hidden="true">🔗</span>
+          <span><strong>Read from URL</strong><small>Open supported web content</small></span>
+        </button>
+
+        <button class="secondary empty-reader-action" type="button" data-read="all">
+          <span aria-hidden="true">⌕</span>
+          <span><strong>Search All Libraries</strong><small>Find an open digital edition</small></span>
+        </button>
+
+        <button class="secondary empty-reader-action" type="button" data-read="great-books">
+          <span aria-hidden="true">★</span>
+          <span><strong>Great Books</strong><small>Read and study the Great Books collection</small></span>
+        </button>
+
+        <button class="secondary empty-reader-action" type="button" data-read="bible">
+          <span aria-hidden="true">✦</span>
+          <span><strong>Bible Study</strong><small>Translations, commentary, cross references, and study</small></span>
+        </button>
+
+        <button class="secondary empty-reader-action" type="button" data-read="library">
+          <span aria-hidden="true">▤</span>
+          <span><strong>My Library</strong><small>Open something you already saved</small></span>
+        </button>
+      </div>
+
+      <div class="empty-reader-hint">
+        <strong>Once a text is loaded:</strong>
+        <span>the Reader button returns here to your active text and preserves your current reading position and settings.</span>
+      </div>
+    </section>`;
+}
+
 function renderCurrentReader() {
   if (!activeReaderSnapshot?.title || !activeReaderSnapshot?.currentText) {
-    // No document has been explicitly opened in this app session. Do not read
-    // IndexedDB here; that is what Home > Resume Last Reading is for.
-    renderHome();
+    // Reader should still be a meaningful destination before a book is loaded.
+    // Persistent saved sessions remain explicit under Home > Resume Last Reading.
+    renderEmptyReader();
     return;
   }
 
@@ -2273,7 +2347,7 @@ function classifyStructureLine(line, wordCount) {
   if (/^appendix(?:\s+[a-z0-9ivxlcdm]+)?\b/i.test(clean)) return 'appendix';
   if (/^(?:notes?|endnotes?|footnotes?)\s+(?:to|on|for)\b/i.test(clean)) return 'notes';
   if (/^index\s+(?:of|to)\b/i.test(clean)) return 'index';
-  if (/^(?:\d+|[ivxlcdm]+)\s*[.):-]\s+\S/i.test(clean) && wordCount <= 14) return 'section';
+  if (/^(?:\d+|[ivxlcdm]+)\s*[.):-]\s+[A-Z][^.!?]{1,80}$/u.test(clean) && wordCount <= 10) return 'section';
 
   const allCaps = clean.length >= 4 && clean.length <= 90
     && /[A-Z]/.test(clean)
@@ -2838,13 +2912,19 @@ async function renderReader(kind) {
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
   const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });
-  let structure = detectDocumentStructure(text);
+  const isStructuredBible = Boolean(source?.type === 'bible' || source?.type === 'bible-book');
+  let structure = isStructuredBible && Array.isArray(source?.documentStructure)
+    ? source.documentStructure
+    : detectDocumentStructure(text);
 
   // EPUBs carry an authoritative navigation document. Prefer that TOC over
   // heuristic heading detection, while still keeping detected structure for
   // reader formatting and illustration placement.
-  const suppliedToc = Array.isArray(source?.epubToc)
-    ? source.epubToc
+  const authoritativeToc = Array.isArray(source?.documentToc) ? source.documentToc : null;
+  const suppliedToc = Array.isArray(authoritativeToc)
+    ? authoritativeToc
+    : Array.isArray(source?.epubToc)
+      ? source.epubToc
         .filter((entry) => entry && Number.isFinite(Number(entry.index)) && String(entry.title || '').trim())
         .map((entry) => ({
           title: String(entry.title).replace(/\s+/g, ' ').trim(),
@@ -2854,7 +2934,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         .sort((a, b) => a.index - b.index)
         .filter((entry, index, all) => index === 0 || entry.index !== all[index - 1].index || normalizeTocTitle(entry.title) !== normalizeTocTitle(all[index - 1].title))
         .slice(0, 500)
-    : [];
+      : [];
 
   if (suppliedToc.length) {
     const suppliedStructure = suppliedToc.map((entry) => ({
@@ -2885,6 +2965,12 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     structure,
     toc
   });
+  state.paragraphBreaks = new Set(
+    Array.isArray(source?.paragraphBreaks) ? source.paragraphBreaks.map(Number).filter(Number.isFinite) : []
+  );
+  state.verseNumberIndexes = new Set(
+    Array.isArray(source?.verseNumberIndexes) ? source.verseNumberIndexes.map(Number).filter(Number.isFinite) : []
+  );
   state.bionic = false;
   state.meaningfulChunks = false;
   state.uploadedIllustrations = Array.isArray(source?.illustrations) ? source.illustrations : [];
@@ -2919,7 +3005,6 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <option value="flash">Flash</option>
                 <option value="digital-sign">Digital Sign</option>
                 <option value="auto-scroll">Auto Scroll</option>
-                <option value="two-column">Two Columns</option>
               </select>
             </div>
             <div class="control"><label for="speed">Speed</label><div class="input-suffix"><input id="speed" type="number" min="30" max="900" value="${Math.min(900, state.wpm)}"><span>WPM</span></div></div>
@@ -2988,7 +3073,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <div class="fullscreen-options-grid fullscreen-options-grid-reading">
                   <label>Mode<select id="fs-mode-select">
                     <option value="highlight">Highlight</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
-                    <option value="digital-sign">Digital Sign</option><option value="auto-scroll">Auto Scroll</option><option value="two-column">Two Columns</option>
+                    <option value="digital-sign">Digital Sign</option><option value="auto-scroll">Auto Scroll</option>
                   </select></label>
                   <label>Speed<div class="input-suffix"><input id="fs-speed" type="number" min="30" max="900"><span>WPM</span></div></label>
                   <label>Words shown<input id="fs-word-count" type="number" min="1" max="10"></label>
@@ -4588,6 +4673,7 @@ function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
 }
 
 function switchReadingMode(nextMode) {
+  if (nextMode === 'two-column') nextMode = 'highlight';
   const reader = app.querySelector('#reader');
   if (!reader) return;
 
@@ -5025,6 +5111,21 @@ function startReader() {
       ensureWordsRendered(reader, mode, count, nextIndex + 1000);
 
       if (mode === 'pointing-guide') {
+        // Pointing Guide computes its step from element geometry. In Book Pages,
+        // move to the spread containing the current word BEFORE measuring that
+        // geometry; otherwise the hand can advance into an off-screen spread.
+        if (state.bookPages) {
+          const requiredSpread = bookSpreadForWordIndex(reader, startIndex);
+          if (requiredSpread != null && requiredSpread !== getCurrentBookSpread(reader)) {
+            goToBookSpread(requiredSpread, {
+              behavior: 'auto',
+              ensureRendered: true,
+              syncReaderPosition: false
+            });
+            state.index = startIndex;
+          }
+        }
+
         const semanticLimit = Math.max(1, nextIndex - startIndex);
         pointingStep = getPointingLineStep(reader, startIndex, Math.min(count, semanticLimit));
         if (pointingStep) nextIndex = pointingStep.nextIndex;
@@ -5072,6 +5173,19 @@ function startReader() {
     }
 
     state.index = nextIndex;
+
+    if (mode === 'pointing-guide' && state.bookPages && nextIndex < state.words.length) {
+      const nextSpread = bookSpreadForWordIndex(reader, nextIndex);
+      if (nextSpread != null && nextSpread !== getCurrentBookSpread(reader)) {
+        goToBookSpread(nextSpread, {
+          behavior: 'auto',
+          ensureRendered: true,
+          syncReaderPosition: false
+        });
+        state.index = nextIndex;
+      }
+    }
+
     updateReaderStatus();
 
     // Advance from the planned deadline, not from the end of this DOM update.
@@ -5904,103 +6018,159 @@ function greatBookGrokipediaUrl(book) {
   return grokipediaSearchUrl(book.title, book.author);
 }
 
-function flattenBibleContent(content) {
-  const textOf = (value) => {
-    if (typeof value === 'string') return value;
-    if (!value || typeof value !== 'object') return '';
-    if (typeof value.text === 'string') return value.text;
-    if (typeof value.heading === 'string') return value.heading;
-    if (value.lineBreak) return '\n';
-    return '';
-  };
-  const lines = [];
-  for (const item of Array.isArray(content) ? content : []) {
-    if (item?.type === 'heading') {
-      const heading = (item.content || []).map(textOf).join(' ').replace(/\s+/g,' ').trim();
-      if (heading) lines.push(heading);
-    } else if (item?.type === 'hebrew_subtitle') {
-      const subtitle = (item.content || []).map(textOf).join(' ').replace(/\s+/g,' ').trim();
-      if (subtitle) lines.push(subtitle);
-    } else if (item?.type === 'verse') {
-      const verseText = (item.content || []).map(textOf).join('').replace(/\s+/g,' ').trim();
-      if (verseText) lines.push(`${item.number}. ${verseText}`);
-    } else if (item?.type === 'line_break') {
-      lines.push('');
-    }
-  }
-  return lines.join('\n').replace(/\n{3,}/g,'\n\n').trim();
+function bibleTextFragment(value) {
+  if (typeof value === 'string') return value;
+  if (!value || typeof value !== 'object') return '';
+  if (typeof value.text === 'string') return value.text;
+  if (typeof value.heading === 'string') return value.heading;
+  if (value.lineBreak) return '\n';
+  return '';
 }
 
-function renderStudyGuide(title, guide, { sourceType = 'great-book', returnAction = 'great-books' } = {}) {
-  stopReader();
-  app.innerHTML = `
-    <section class="panel study-guide-page">
-      <div class="library-heading">
-        <div><span class="source-category">${sourceType === 'bible' ? 'Bible Study' : 'Syntopical Study'}</span><h1>${escapeHtml(title)}</h1><p>An AI-assisted study guide. Treat interpretations and cross-connections as prompts for further reading, not as a substitute for the primary text.</p></div>
-        <button class="secondary" type="button" data-study-return>Back</button>
-      </div>
-      <div class="study-guide-grid">
-        <article class="study-guide-card study-guide-wide"><h2>Overview</h2><p>${escapeHtml(guide.overview || '')}</p></article>
-        <article class="study-guide-card study-guide-wide"><h2>Context</h2><p>${escapeHtml(guide.context || '')}</p></article>
-        <section class="study-guide-wide"><h2>Great Ideas</h2><div class="great-idea-grid">
-          ${(guide.greatIdeas || []).map((idea) => `<article class="great-idea-card"><h3>${escapeHtml(idea.idea)}</h3><p>${escapeHtml(idea.whyItMatters)}</p><ul>${(idea.questions || []).map((q)=>`<li>${escapeHtml(q)}</li>`).join('')}</ul></article>`).join('')}
-        </div></section>
-        <article class="study-guide-card"><h2>Study Questions</h2><ol>${(guide.studyQuestions || []).map((q)=>`<li>${escapeHtml(q)}</li>`).join('')}</ol></article>
-        <article class="study-guide-card"><h2>Syntopical Connections</h2>${(guide.connections || []).map((item)=>`<div class="study-connection"><strong>${escapeHtml(item.work)}</strong><p>${escapeHtml(item.connection)}</p></div>`).join('')}</article>
-      </div>
-    </section>`;
-  app.querySelector('[data-study-return]')?.addEventListener('click', () => {
-    if (returnAction === 'bible') renderBibleStudy();
-    else renderGreatBooksLibrary();
-  });
+function bibleItemText(item) {
+  return (item?.content || [])
+    .map(bibleTextFragment)
+    .join('')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
-
-async function requestStudyGuide({ title, author = '', passage = '', sourceType = 'great-book', language = getStudyLanguage() }) {
-  return loadApiPayload('/api/study-guide', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ title, author, passage, sourceType, language: studyLanguages[language] || language || 'English' })
-  });
-}
-
-async function renderGreatBookStudy(book, button) {
-  const original = button?.textContent;
-  if (button) { button.disabled = true; button.textContent = 'Building study guide…'; }
-  try {
-    const guide = await requestStudyGuide({ title: book.title, author: book.author, sourceType: 'great-book', language: getStudyLanguage() });
-    renderStudyGuide(`${book.title} — ${book.author}`, guide, { sourceType: 'great-book', returnAction: 'great-books' });
-  } catch (error) {
-    window.alert(`Study guide unavailable: ${error.message}`);
-    if (button) { button.disabled = false; button.textContent = original || 'Study / Great Ideas'; }
-  }
-}
-
 
 function flattenBibleContent(content) {
-  const textOf = (value) => {
-    if (typeof value === 'string') return value;
-    if (!value || typeof value !== 'object') return '';
-    if (typeof value.text === 'string') return value.text;
-    if (typeof value.heading === 'string') return value.heading;
-    if (value.lineBreak) return '\n';
-    return '';
+  // Study view: retain explicit headings and paragraph breaks from the source.
+  // Verses remain readable inline rather than being misidentified as headings.
+  const blocks = [];
+  let paragraph = [];
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    blocks.push(paragraph.join(' '));
+    paragraph = [];
   };
-  const lines = [];
+
   for (const item of Array.isArray(content) ? content : []) {
-    if (item?.type === 'heading') {
-      const heading = (item.content || []).map(textOf).join(' ').replace(/\s+/g,' ').trim();
-      if (heading) lines.push(heading);
-    } else if (item?.type === 'hebrew_subtitle') {
-      const subtitle = (item.content || []).map(textOf).join(' ').replace(/\s+/g,' ').trim();
-      if (subtitle) lines.push(subtitle);
-    } else if (item?.type === 'verse') {
-      const verseText = (item.content || []).map(textOf).join('').replace(/\s+/g,' ').trim();
-      if (verseText) lines.push(`${item.number}. ${verseText}`);
-    } else if (item?.type === 'line_break') {
-      lines.push('');
+    if (item?.type === 'heading' || item?.type === 'hebrew_subtitle') {
+      flushParagraph();
+      const heading = bibleItemText(item);
+      if (heading) blocks.push(heading);
+      continue;
+    }
+
+    if (item?.type === 'verse') {
+      const verseText = bibleItemText(item);
+      if (verseText) paragraph.push(`${item.number}. ${verseText}`);
+      continue;
+    }
+
+    if (item?.type === 'line_break') {
+      flushParagraph();
     }
   }
-  return lines.join('\n').replace(/\n{3,}/g,'\n\n').trim();
+
+  flushParagraph();
+  return blocks.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function buildBibleReaderDocument(payload, {
+  bookName = '',
+  chapterNumber = null,
+  includeChapterHeading = true
+} = {}) {
+  const content = payload?.chapter?.content || payload?.content || [];
+  const resolvedChapter = Number(payload?.chapter?.number || chapterNumber || 1);
+  const structures = [];
+  const toc = [];
+  const paragraphBreaks = [];
+  const verseNumberIndexes = [];
+  const pieces = [];
+  let wordIndex = 0;
+  let paragraphWords = [];
+
+  const appendRaw = (text) => {
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!clean) return { start: wordIndex, end: wordIndex };
+    const count = splitWords(clean).length;
+    const start = wordIndex;
+    pieces.push(clean);
+    wordIndex += count;
+    return { start, end: wordIndex };
+  };
+
+  const flushParagraph = () => {
+    if (!paragraphWords.length) return;
+    paragraphBreaks.push(wordIndex);
+    appendRaw(paragraphWords.join(' '));
+    paragraphWords = [];
+  };
+
+  if (includeChapterHeading) {
+    const chapterTitle = `Chapter ${resolvedChapter}`;
+    const range = appendRaw(chapterTitle);
+    structures.push({
+      title: chapterTitle,
+      type: 'chapter',
+      start: range.start,
+      end: range.end,
+      preferredToc: true,
+      authoritative: true
+    });
+    toc.push({
+      title: chapterTitle,
+      index: range.start,
+      type: 'chapter'
+    });
+  }
+
+  for (const item of Array.isArray(content) ? content : []) {
+    if (item?.type === 'heading' || item?.type === 'hebrew_subtitle') {
+      flushParagraph();
+      const heading = bibleItemText(item);
+      if (!heading) continue;
+      paragraphBreaks.push(wordIndex);
+      const range = appendRaw(heading);
+      structures.push({
+        title: heading,
+        type: 'section',
+        start: range.start,
+        end: range.end,
+        preferredToc: true,
+        authoritative: true
+      });
+      paragraphBreaks.push(wordIndex);
+      continue;
+    }
+
+    if (item?.type === 'verse') {
+      const verseText = bibleItemText(item);
+      if (!verseText) continue;
+      // Keep the verse number as its own word so it can be visually subdued.
+      // It is not structural and can never become a TOC entry.
+      const verseNumberToken = `${item.number}.`;
+      verseNumberIndexes.push(wordIndex + splitWords(paragraphWords.join(' ')).length);
+      paragraphWords.push(verseNumberToken, verseText);
+      continue;
+    }
+
+    if (item?.type === 'line_break') {
+      flushParagraph();
+    }
+  }
+
+  flushParagraph();
+
+  // Remove duplicate adjacent break positions.
+  const cleanBreaks = [...new Set(paragraphBreaks)]
+    .filter((index) => index > 0 && index < wordIndex)
+    .sort((x, y) => x - y);
+
+  return {
+    text: pieces.join('\n\n').trim(),
+    structure: structures,
+    toc,
+    paragraphBreaks: cleanBreaks,
+    verseNumberIndexes,
+    bookName,
+    chapterNumber: resolvedChapter
+  };
 }
 
 function flattenCommentaryContent(payload) {
@@ -6391,13 +6561,31 @@ async function renderBibleStudy() {
 
       const parts = [];
       const toc = [];
-      let wordIndex = 0;
-      for (const chapter of chapters) {
-        const heading = `Chapter ${chapter.number}`;
-        const block = `${heading}\n\n${chapter.text}`;
-        toc.push({ title: heading, index: wordIndex, type: 'chapter' });
-        parts.push(block);
-        wordIndex += splitWords(block).length;
+      const structure = [];
+      const paragraphBreaks = [];
+      const verseNumberIndexes = [];
+      let wordOffset = 0;
+
+      for (let i = 0; i < chapters.length; i += 1) {
+        const sourcePayload = await loadApiPayload(
+          `/api/bible/${encodeURIComponent(selectedTranslation)}/${encodeURIComponent(bookSelect.value)}/${i + 1}`
+        );
+        const doc = buildBibleReaderDocument(sourcePayload, {
+          bookName: selectedBook,
+          chapterNumber: chapters[i].number || i + 1,
+          includeChapterHeading: true
+        });
+
+        parts.push(doc.text);
+        doc.toc.forEach((entry) => toc.push({ ...entry, index: entry.index + wordOffset }));
+        doc.structure.forEach((entry) => structure.push({
+          ...entry,
+          start: entry.start + wordOffset,
+          end: entry.end + wordOffset
+        }));
+        doc.paragraphBreaks.forEach((index) => paragraphBreaks.push(index + wordOffset));
+        doc.verseNumberIndexes.forEach((index) => verseNumberIndexes.push(index + wordOffset));
+        wordOffset += splitWords(doc.text).length;
       }
 
       const fullText = parts.join('\n\n');
@@ -6411,7 +6599,10 @@ async function renderBibleStudy() {
         translation:selectedTranslation,
         book:bookSelect.value,
         author:'Bible',
-        epubToc:toc
+        documentToc:toc,
+        documentStructure:structure,
+        paragraphBreaks,
+        verseNumberIndexes
       });
     } catch(error) {
       setStatus(`Unable to load entire book: ${error.message}`, true);
@@ -6432,8 +6623,21 @@ async function renderBibleStudy() {
     if (!chapterPayload) await loadChapter();
     if (!chapterPayload || !chapterText) return;
     const heading = referenceLabel();
-    renderReaderWithText(`${heading} — ${chapterPayload.translation?.shortName || translationSelect.value}`, chapterText, {
-      type:'bible', translation:translationSelect.value, book:bookSelect.value, chapter:Number(chapterSelect.value), author:'Bible'
+    const bibleDoc = buildBibleReaderDocument(chapterPayload, {
+      bookName: bookLabel(),
+      chapterNumber: Number(chapterSelect.value),
+      includeChapterHeading: true
+    });
+    renderReaderWithText(`${heading} — ${chapterPayload.translation?.shortName || translationSelect.value}`, bibleDoc.text, {
+      type:'bible',
+      translation:translationSelect.value,
+      book:bookSelect.value,
+      chapter:Number(chapterSelect.value),
+      author:'Bible',
+      documentStructure:bibleDoc.structure,
+      documentToc:bibleDoc.toc,
+      paragraphBreaks:bibleDoc.paragraphBreaks,
+      verseNumberIndexes:bibleDoc.verseNumberIndexes
     });
   });
   app.querySelector('#bible-read-book').addEventListener('click', readEntireBook);
