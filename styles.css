@@ -156,7 +156,10 @@ footer { text-align: center; padding: 1.5rem; color: var(--muted); }
   border-radius: .28em;
   background: rgba(244, 220, 99, .68);
   box-shadow: 0 0 .45em rgba(244, 220, 99, .28);
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   opacity: 0;
   transform: translate3d(0, 0, 0);
   transition-property: transform, width, height, opacity;
@@ -799,7 +802,10 @@ body.viewer-fullscreen-open { overflow: hidden; }
 .reader-frame:fullscreen .fullscreen-control-strip.controls-hidden,
 .reader-frame.fullscreen-fallback .fullscreen-control-strip.controls-hidden {
   opacity: 0;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   transform: translateY(-.5rem);
 }
 
@@ -880,7 +886,7 @@ body.viewer-fullscreen-open { overflow: hidden; }
 .fullscreen-checkbox input { margin: 0 .35rem 0 0; }
 .fullscreen-option-actions {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: .4rem;
   margin-top: .65rem;
 }
@@ -937,7 +943,10 @@ body.viewer-fullscreen-open { overflow: hidden; }
 .reader-frame:fullscreen.fullscreen-controls-hidden .viewer-fullscreen-button,
 .reader-frame.fullscreen-fallback.fullscreen-controls-hidden .viewer-fullscreen-button {
   opacity: 0;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   transform: translateY(-.5rem);
 }
 .reader-frame:fullscreen .viewer-fullscreen-button,
@@ -999,7 +1008,10 @@ body.viewer-fullscreen-open { overflow: hidden; }
   font-size: clamp(15px, 1.15em, 24px);
   line-height: 1;
   text-align: center;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
   opacity: 0;
   transform: translate3d(0, 0, 0);
   transition-property: transform, opacity;
@@ -1224,21 +1236,24 @@ body.viewer-fullscreen-open { overflow: hidden; }
 
 
 
-/* Facing-page layout: the full text flows down the left page, then the right,
-   before advancing horizontally to the next two-page spread. */
+/* Facing-page layout. Book Pages intentionally uses its own deterministic
+   horizontal pagination model; other reading modes keep their normal scrolling. */
 .reader.book-pages-layout {
   --book-page-gap: clamp(2rem, 5vw, 5rem);
   --book-page-width: calc((100% - var(--book-page-gap)) / 2);
+  --book-spread-width: calc(100% + var(--book-page-gap));
   height: clamp(360px, calc(100vh - 330px), 690px);
-  overflow-x: auto;
+  box-sizing: border-box;
+  overflow-x: hidden;
   overflow-y: hidden;
   column-width: var(--book-page-width);
   column-count: auto;
   column-gap: var(--book-page-gap);
   column-fill: auto;
   column-rule: 1px solid color-mix(in srgb, currentColor 18%, transparent);
-  scroll-snap-type: x mandatory;
-  scroll-behavior: smooth;
+  scroll-behavior: auto;
+  scroll-snap-type: none;
+  overscroll-behavior: contain;
   padding: clamp(1.2rem, 2.5vw, 2rem);
   text-align: left;
   line-height: 1.65;
@@ -1249,13 +1264,18 @@ body.viewer-fullscreen-open { overflow: hidden; }
     transparent calc(50% + .5px));
   background-attachment: local;
 }
-.reader.book-pages-layout .reader-group {
-  break-inside: avoid;
+.reader.book-pages-layout .reader-group { break-inside: avoid; }
+.reader.book-pages-layout::-webkit-scrollbar { display: none; }
+.reader.book-pages-layout { scrollbar-width: none; }
+.book-page-controls #book-page-status {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  pointer-events: auto;
 }
-.reader.book-pages-layout::-webkit-scrollbar { height: .55rem; }
 .book-page-controls {
   position: absolute;
-  z-index: 7;
+  z-index: 20;
   left: 50%;
   bottom: .55rem;
   transform: translateX(-50%);
@@ -1268,6 +1288,7 @@ body.viewer-fullscreen-open { overflow: hidden; }
   background: color-mix(in srgb, var(--surface) 92%, transparent);
   box-shadow: 0 3px 14px rgba(0,0,0,.16);
   backdrop-filter: blur(8px);
+  pointer-events: auto;
 }
 .book-page-controls[hidden] { display: none !important; }
 .book-page-controls button {
@@ -1277,8 +1298,9 @@ body.viewer-fullscreen-open { overflow: hidden; }
   border-radius: 999px;
   font-size: 1.15rem;
   line-height: 1;
+  pointer-events: auto;
 }
-.book-page-controls span { min-width: 5.4rem; text-align: center; font-size: .72rem; font-weight: 750; }
+.book-page-controls span { min-width: 7.4rem; text-align: center; font-size: .72rem; font-weight: 750; }
 .reader-frame:fullscreen .reader.book-pages-layout,
 .reader-frame.fullscreen-fallback .reader.book-pages-layout {
   height: 100%;
@@ -1287,10 +1309,7 @@ body.viewer-fullscreen-open { overflow: hidden; }
 }
 @media (max-width: 760px) {
   .reader.book-pages-layout {
-    --book-page-width: 100%;
-    --book-page-gap: 2rem;
-    column-width: 100%;
-    column-count: auto;
+    --book-page-gap: 1rem;
     background-image: none;
   }
 }
@@ -1841,3 +1860,170 @@ body.viewer-fullscreen-open { overflow: hidden; }
 .provider-badge{position:absolute;left:.35rem;bottom:.35rem;max-width:calc(100% - .7rem);padding:.25rem .4rem;border-radius:.4rem;background:rgba(12,29,36,.86);color:#fff;font-size:.66rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.unified-book-body h2{margin:.1rem 0 .25rem;font-size:1.2rem}.unified-author{font-weight:700;margin:.15rem 0}.unified-meta{font-size:.82rem;opacity:.7}.unified-description{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;line-height:1.45}.unified-actions{display:flex;gap:.55rem;flex-wrap:wrap;margin-top:.75rem}.library-loading{text-align:center;padding:2rem}.loading-book{display:inline-block;font-size:2rem;animation:libraryPulse 1s ease-in-out infinite alternate}@keyframes libraryPulse{to{transform:translateY(-4px);opacity:.55}}
 @media(max-width:900px){.provider-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.unified-search-form{grid-template-columns:1fr 1fr}.unified-search-form .primary{grid-column:1/-1}.unified-book-card{grid-template-columns:100px 1fr}.unified-cover,.unified-cover-placeholder{height:145px}.unified-cover-wrap{min-height:145px}}
 @media(max-width:560px){.provider-strip{grid-template-columns:1fr}.unified-search-form{grid-template-columns:1fr}.unified-search-form .primary{grid-column:auto}.unified-book-card{grid-template-columns:1fr}.unified-cover-wrap{width:120px}.unified-actions>*{flex:1 1 auto}}
+
+/* Collapsible side panes and draggable horizontal splitters */
+.reader-pane-controls {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; margin: .25rem 0 .65rem;
+}
+.pane-toggle { min-height: 2rem; padding: .35rem .65rem; font-size: .76rem; }
+.pane-toggle[aria-pressed="true"] { background: color-mix(in srgb, var(--accent) 14%, #dfe6ed); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.pane-toggle.pane-closed { opacity: .72; }
+.reader-resize-hint { margin-left: auto; color: var(--muted); font-size: .7rem; }
+.reader-layout {
+  --navigation-width: clamp(190px, 18vw, 260px);
+  --word-panel-width: clamp(210px, 22vw, 290px);
+  display: grid;
+  grid-template-columns: var(--navigation-width) 8px minmax(0, 1fr) 8px var(--word-panel-width);
+  align-items: stretch;
+  gap: 0;
+}
+.reader-center-column { min-width: 0; display: flex; flex-direction: column; }
+.reader-frame-toolbar { display: flex; justify-content: flex-end; align-items: center; min-height: 2.25rem; padding: 0 0 .35rem; }
+.reader-frame-toolbar .viewer-fullscreen-button { position: static; inset: auto; z-index: auto; }
+.pane-splitter { position: relative; cursor: col-resize; touch-action: none; }
+.pane-splitter::before { content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; border-radius: 2px; background: color-mix(in srgb, var(--border) 75%, transparent); }
+.pane-splitter:hover::before, .pane-splitter:focus-visible::before, body.resizing-reader-panes .pane-splitter::before { background: var(--accent); }
+body.resizing-reader-panes { cursor: col-resize; user-select: none; }
+.reader-layout.navigation-hidden { grid-template-columns: minmax(0, 1fr) 8px var(--word-panel-width); }
+.reader-layout.word-panel-hidden { grid-template-columns: var(--navigation-width) 8px minmax(0, 1fr); }
+.reader-layout.navigation-hidden.word-panel-hidden { grid-template-columns: minmax(0, 1fr); }
+.reader-layout.navigation-hidden .navigation-pane,
+.reader-layout.navigation-hidden #left-pane-splitter,
+.reader-layout.word-panel-hidden .word-panel,
+.reader-layout.word-panel-hidden #right-pane-splitter { display: none; }
+.reader-frame { min-height: 300px; height: min(64vh, 660px); overflow: hidden; padding-bottom: 0; resize: none; }
+.reader-frame::after { display: none; content: none; }
+.reader-frame > .interactive-reader { height: 100%; min-height: 260px; box-sizing: border-box; overflow-y: auto; overflow-x: hidden; }
+@media (max-width: 1050px) {
+  .reader-layout, .reader-layout.navigation-hidden, .reader-layout.word-panel-hidden, .reader-layout.navigation-hidden.word-panel-hidden { grid-template-columns: minmax(0, 1fr); }
+  .navigation-pane, .word-panel { grid-column: 1; }
+  .pane-splitter { display: none; }
+  .reader-center-column { grid-row: auto; }
+}
+@media (max-width: 760px) {
+  .reader-resize-hint { width: 100%; margin-left: 0; }
+  .reader-frame { height: 520px; }
+}
+
+/* Sprint 2B: lightweight spacers represent off-screen book content. */
+.virtual-reader-spacer {
+  display: block;
+  width: 1px;
+  min-width: 1px;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  user-select: none;
+}
+
+/* Flash center-focus anchor (RSVP/optimal recognition position). */
+.reader.flash:has(.focus-anchor-stage) {
+  overflow: hidden;
+}
+.focus-anchor-stage {
+  width: min(92%, 70rem);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
+  font-size: inherit;
+  line-height: 1.1;
+  letter-spacing: .01em;
+}
+.focus-anchor-left {
+  text-align: right;
+  white-space: pre;
+}
+.focus-anchor-letter {
+  color: var(--accent);
+  font-weight: inherit;
+  white-space: pre;
+  position: relative;
+}
+.focus-anchor-letter::before,
+.focus-anchor-letter::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  height: .58em;
+  border-radius: 999px;
+  background: var(--accent);
+  pointer-events: none;
+}
+.focus-anchor-letter::before {
+  bottom: calc(100% + .22em);
+}
+.focus-anchor-letter::after {
+  top: calc(100% + .22em);
+}
+.focus-anchor-right {
+  text-align: left;
+  white-space: pre;
+}
+.reader.light .focus-anchor-letter {
+  color: var(--accent);
+}
+
+
+/* Focus Anchor can also run as a lightweight overlay with guided modes. */
+.focus-anchor-overlay {
+  position: absolute;
+  z-index: 5;
+  top: 3.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(82%, 46rem);
+  min-height: 3.2em;
+  padding: .55em .8em;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: .65rem;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 .35rem 1.1rem rgb(0 0 0 / .2);
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  overflow: hidden;
+}
+.focus-anchor-overlay[hidden] { display: none; }
+.focus-anchor-overlay .focus-anchor-stage { width: 100%; }
+.reader-frame:has(.reader.light) .focus-anchor-overlay {
+  background: rgb(255 255 255 / .94);
+  color: #111;
+}
+
+.focus-anchor-overlay:active { cursor: grabbing; }
+
+/* v5.2 — Preferred Music */
+.preferred-music-control {
+  display: grid;
+  gap: .25rem;
+  min-width: 12rem;
+  font-size: .8rem;
+  font-weight: 650;
+}
+.preferred-music-control select { width: 100%; min-width: 0; }
+.music-url-form { grid-template-columns: minmax(220px, 1.2fr) minmax(180px, .8fr) auto; }
+.music-url-actions { display: flex; gap: .5rem; align-items: end; flex-wrap: wrap; }
+.music-card-actions { display: flex; gap: .45rem; flex-wrap: wrap; align-self: center; }
+.preferred-music-list { display: grid; gap: .55rem; }
+.preferred-music-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .7rem .8rem;
+  border: 1px solid var(--border);
+  border-radius: .7rem;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+}
+.preferred-music-item > div:first-child { display: grid; gap: .15rem; }
+.preferred-music-item span { opacity: .72; font-size: .85rem; }
+.preferred-music-actions { display: flex; gap: .45rem; flex-wrap: wrap; }
+@media (max-width: 900px) {
+  .music-url-form { grid-template-columns: 1fr; }
+  .music-url-actions { align-items: stretch; }
+  .reader-music-actions .preferred-music-control { flex: 1 1 100%; }
+}

@@ -3,52 +3,31 @@
 const app = document.querySelector('#app');
 
 
-const READER_SESSION_DB = 'markSetGoReaderSessionDB';
-const READER_SESSION_STORE = 'sessions';
-const READER_SESSION_KEY = 'current';
-let readerSessionSaveTimer = null;
-
-function openReaderSessionDb() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(READER_SESSION_DB, 1);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(READER_SESSION_STORE)) db.createObjectStore(READER_SESSION_STORE);
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error('Reader storage could not be opened.'));
-  });
+const { BookModel, SessionManager, ReaderEngine, VirtualRenderer } = window.MarkSetGoReader || {};
+if (!BookModel || !SessionManager || !ReaderEngine || !VirtualRenderer) {
+  throw new Error('Reader Engine modules failed to load.');
 }
 
+const readerSessionManager = new SessionManager();
+const readerEngine = new ReaderEngine();
+const state = readerEngine.state;
+const virtualRenderer = new VirtualRenderer({
+  getState: () => state,
+  setWordContent: (element, word) => setWordContent(element, word),
+  savedDefinitionAt: (index) => savedDefinitionAt(index),
+  noteAt: (index) => noteAt(index),
+  refreshReadingGroups: (mode, groupSize) => refreshReadingGroups(mode, groupSize),
+  scheduleIllustrationsForRange: (reader, start, end, mode) => scheduleIllustrationsForRange(reader, start, end, mode),
+  updateBookPageStatus: () => updateBookPageStatus()
+});
+let readerSessionSaveTimer = null;
+
 async function writeReaderSession(snapshot) {
-  try {
-    const db = await openReaderSessionDb();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(READER_SESSION_STORE, 'readwrite');
-      tx.objectStore(READER_SESSION_STORE).put(snapshot, READER_SESSION_KEY);
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
-    localStorage.setItem('markSetGoHasReaderSession', '1');
-  } catch {
-    try { localStorage.setItem('markSetGoReaderSessionFallback', JSON.stringify(snapshot)); } catch {}
-  }
+  return readerSessionManager.write(snapshot);
 }
 
 async function readReaderSession() {
-  try {
-    const db = await openReaderSessionDb();
-    const value = await new Promise((resolve, reject) => {
-      const tx = db.transaction(READER_SESSION_STORE, 'readonly');
-      const request = tx.objectStore(READER_SESSION_STORE).get(READER_SESSION_KEY);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error);
-    });
-    db.close();
-    if (value) return value;
-  } catch {}
-  try { return JSON.parse(localStorage.getItem('markSetGoReaderSessionFallback') || 'null'); } catch { return null; }
+  return readerSessionManager.read();
 }
 
 function captureReaderControls() {
@@ -57,6 +36,9 @@ function captureReaderControls() {
     wpm: Number(app.querySelector('#speed')?.value || state.wpm || 300),
     wordCount: Number(app.querySelector('#word-count')?.value || 1),
     meaningfulChunks: Boolean(app.querySelector('#meaningful-chunks')?.checked ?? state.meaningfulChunks),
+    focusAnchor: Boolean(app.querySelector('#focus-anchor')?.checked ?? state.focusAnchor),
+    focusAnchorPosition: state.focusAnchorPosition || null,
+    focusAnchorFontSize: Number(app.querySelector('#focus-anchor-font-size')?.value || state.focusAnchorFontSize || 24),
     fontFamily: app.querySelector('#font-family')?.value || 'system',
     fontSize: Number(app.querySelector('#font-size')?.value || 14),
     theme: app.querySelector('#theme-select')?.value || 'dark',
@@ -67,19 +49,10 @@ function captureReaderControls() {
 }
 
 function buildReaderSessionSnapshot() {
-  if (!state.title || !state.currentText || !state.words.length) return null;
-  return {
-    version: 2,
-    savedAt: new Date().toISOString(),
-    title: state.title,
-    currentText: state.currentText,
-    originalText: state.originalText,
-    source: state.source,
-    language: state.language,
-    index: Math.max(0, state.index || 0),
-    wasRunning: isReaderRunning(),
-    controls: captureReaderControls()
-  };
+  return readerEngine.snapshot({
+    controls: captureReaderControls(),
+    wasRunning: isReaderRunning()
+  });
 }
 
 function persistReaderSession({ immediate = false } = {}) {
@@ -134,6 +107,87 @@ const musicChoices = [
   { id: 'anime-lofi', category: 'Lofi', title: 'Anime Lofi', description: 'Relaxed anime-inspired lofi beats.', type: 'playlist', youtubeId: 'PLApjonMF-0Y8uSA_-6ZbX1DIr-muc2nDg' },
   { id: 'classical-piano', category: 'Classical', title: 'Classical Piano', description: 'Familiar piano and orchestral selections.', type: 'playlist', youtubeId: 'PLgW6PU42e5RLa6NENfz5kusVilq58Cojm' }
 ];
+
+
+const preferredMusicStorageKey = 'markSetGoPreferredMusic';
+
+function getPreferredMusic() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(preferredMusicStorageKey) || '[]');
+    return Array.isArray(saved) ? saved.filter((item) => item && item.id && item.title) : [];
+  } catch {
+    return [];
+  }
+}
+
+function setPreferredMusic(items) {
+  try { localStorage.setItem(preferredMusicStorageKey, JSON.stringify(items.slice(0, 100))); } catch {}
+}
+
+function preferredMusicId(item) {
+  const source = item.choiceId || item.src || item.title || String(Date.now());
+  let hash = 0;
+  for (const char of String(source)) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
+  return `preferred-${Math.abs(hash)}`;
+}
+
+function addPreferredMusic(item) {
+  if (!item?.title) return false;
+  const next = { ...item, id: item.id || preferredMusicId(item) };
+  const items = getPreferredMusic();
+  const duplicate = items.some((saved) => saved.id === next.id || (next.choiceId && saved.choiceId === next.choiceId) || (next.src && saved.src === next.src));
+  if (duplicate) return false;
+  items.push(next);
+  setPreferredMusic(items);
+  return true;
+}
+
+function removePreferredMusic(id) {
+  setPreferredMusic(getPreferredMusic().filter((item) => item.id !== id));
+}
+
+function preferredMusicOptionsMarkup() {
+  const items = getPreferredMusic();
+  return `
+    <option value="">Preferred music…</option>
+    ${items.map((item) => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.title)}</option>`).join('')}
+    <option value="__manage__">Manage preferred music…</option>`;
+}
+
+function mediaMatchOptionsMarkup() {
+  const items = getPreferredMusic();
+  return `
+    <option value="music">♫ Music score</option>
+    ${items.length ? `<optgroup label="Preferred music">${items.map((item) => `<option value="preferred:${escapeHtml(item.id)}">♫ ${escapeHtml(item.title)}</option>`).join('')}</optgroup>` : ''}
+    <option value="manage-music">Manage preferred music…</option>
+    <option value="news">▶ News video</option>`;
+}
+
+function playPreferredMusic(id) {
+  const item = getPreferredMusic().find((saved) => saved.id === id);
+  if (!item) return;
+  if (item.choiceId) {
+    const choice = musicChoices.find((candidate) => candidate.id === item.choiceId);
+    if (choice) return playMusic(choice);
+  }
+  if (item.src) return playMusic({ title: item.title, source: item.source || 'Preferred music', src: item.src });
+}
+
+function bindPreferredMusicSelectors() {
+  const selects = [...app.querySelectorAll('[data-preferred-music-select]')];
+  selects.forEach((select) => {
+    select.addEventListener('change', () => {
+      const value = select.value;
+      if (!value) return;
+      if (value === '__manage__') {
+        renderMusicLibrary();
+        return;
+      }
+      playPreferredMusic(value);
+      selects.forEach((other) => { if (other !== select) other.value = value; });
+    });
+  });
+}
 
 
 const bookMusicProfiles = [
@@ -224,18 +278,54 @@ function grokipediaSearchUrl(title) {
   return `https://grokipedia.com/search?q=${encodeURIComponent(cleanTitle)}`;
 }
 
-function bindReaderMusicControls(title, text) {
-  const scoreButton = app.querySelector('#play-adaptation-score');
+function bindReaderMusicControls(title, text, source = {}) {
+  const mediaSelect = app.querySelector('#media-match-select');
+  const mediaButton = app.querySelector('#play-media-match');
   const moodButton = app.querySelector('#play-reading-mood');
   const grokipediaLink = app.querySelector('#grokipedia-book-link');
   const recommendation = recommendedPlayerChoice(title, text);
-
-  if (scoreButton) {
-    scoreButton.title = `Play an adaptation score for ${title}`;
-    scoreButton.addEventListener('click', () => playYouTubeSearch(
-      recommendation.scoreQuery,
-      `${title} — adaptation score`
-    ));
+  const isNewsReading = ['article', 'feed-summary', 'news'].includes(source?.type);
+  const newsSource = String(source?.source || '').trim();
+  const newsVideoQuery = `${title}${newsSource ? ` ${newsSource}` : ''} news video`;
+  if (mediaSelect) {
+    mediaSelect.value = isNewsReading ? 'news' : 'music';
+    mediaSelect.title = isNewsReading
+      ? 'Choose news video coverage or a music score for this reading'
+      : 'Choose a music score or search for video coverage related to this text';
+  }
+  if (mediaButton) {
+    const syncMediaButton = () => {
+      const choice = mediaSelect?.value || (isNewsReading ? 'news' : 'music');
+      mediaButton.textContent = choice === 'news' ? '▶ Watch news video' : '♫ Play music score';
+      mediaButton.title = choice === 'news'
+        ? `Find video coverage for ${title}`
+        : `Play an adaptation or cinematic score for ${title}`;
+    };
+    syncMediaButton();
+    mediaSelect?.addEventListener('change', () => {
+      const choice = mediaSelect.value;
+      if (choice === 'manage-music') {
+        renderMusicLibrary();
+        return;
+      }
+      if (choice.startsWith('preferred:')) {
+        playPreferredMusic(choice.slice('preferred:'.length));
+        return;
+      }
+      syncMediaButton();
+    });
+    mediaButton.addEventListener('click', () => {
+      const choice = mediaSelect?.value || (isNewsReading ? 'news' : 'music');
+      if (choice === 'news') {
+        playYouTubeSearch(newsVideoQuery, `${title} — news video`);
+      } else if (choice.startsWith('preferred:')) {
+        playPreferredMusic(choice.slice('preferred:'.length));
+      } else if (choice === 'manage-music') {
+        renderMusicLibrary();
+      } else {
+        playYouTubeSearch(recommendation.scoreQuery, `${title} — music score`);
+      }
+    });
   }
   if (moodButton) {
     moodButton.title = `Play a reading mood selected for ${title}`;
@@ -359,18 +449,30 @@ function stopMusic() {
 function renderMusicLibrary() {
   stopReader();
   const categories = [...new Set(musicChoices.map((item) => item.category))];
+  const preferred = getPreferredMusic();
   app.innerHTML = `
     <section class="panel music-library">
-      <div class="library-heading"><div><h1>Music</h1><p>Choose background music from YouTube and keep it playing while you return to the reader.</p></div></div>
+      <div class="library-heading"><div><h1>Music</h1><p>Choose background music from YouTube, save favorites, and switch among them quickly while reading.</p></div></div>
+      <section class="music-category preferred-music-library">
+        <div class="library-heading"><div><h2>Preferred Music</h2><p>Music saved here appears in the Preferred Music dropdown in both the reader and fullscreen controls.</p></div></div>
+        <div id="preferred-music-list" class="preferred-music-list">
+          ${preferred.length ? preferred.map((item) => `
+            <article class="preferred-music-item">
+              <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'YouTube')}</span></div>
+              <div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-remove-preferred="${escapeHtml(item.id)}">Remove</button></div>
+            </article>`).join('') : '<p class="library-note">No preferred music yet. Add selections below.</p>'}
+        </div>
+      </section>
       <form id="youtube-music-form" class="music-url-form">
-        <label>Paste a YouTube video or playlist URL<input id="youtube-music-url" type="url" placeholder="https://www.youtube.com/watch?v=…"></label>
-        <button class="primary" type="submit">Load player</button>
+        <label>YouTube video or playlist URL<input id="youtube-music-url" type="url" placeholder="https://www.youtube.com/watch?v=…"></label>
+        <label>Preferred name (optional)<input id="youtube-music-name" type="text" maxlength="80" placeholder="My reading playlist"></label>
+        <div class="music-url-actions"><button class="primary" type="submit">Load player</button><button id="save-youtube-preferred" class="secondary" type="button">Add to Preferred</button></div>
         <span id="youtube-music-status" class="status"></span>
       </form>
       ${categories.map((category) => `
         <section class="music-category"><h2>${escapeHtml(category)}</h2><div class="music-card-grid">
           ${musicChoices.filter((item) => item.category === category).map((item) => `
-            <article class="music-card"><div class="music-card-icon" aria-hidden="true">♫</div><div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.description)}</p><div class="music-card-links"><a href="${escapeHtml(musicWatchUrl(item))}" target="_blank" rel="noopener noreferrer">Open on YouTube</a><a href="${escapeHtml(youtubeSearchUrl(musicSearchQuery(item)))}" target="_blank" rel="noopener noreferrer">Find alternative</a></div></div><button class="primary" type="button" data-play-music="${escapeHtml(item.id)}">Play</button></article>`).join('')}
+            <article class="music-card"><div class="music-card-icon" aria-hidden="true">♫</div><div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.description)}</p><div class="music-card-links"><a href="${escapeHtml(musicWatchUrl(item))}" target="_blank" rel="noopener noreferrer">Open on YouTube</a><a href="${escapeHtml(youtubeSearchUrl(musicSearchQuery(item)))}" target="_blank" rel="noopener noreferrer">Find alternative</a></div></div><div class="music-card-actions"><button class="primary" type="button" data-play-music="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-save-music="${escapeHtml(item.id)}">Add to Preferred</button></div></article>`).join('')}
         </div></section>`).join('')}
       <section class="music-category billboard-section">
         <div class="library-heading"><div><h2>Billboard Hot 100 — Top 25</h2><p>The current chart is loaded from a public chart page. Choose a song to search for its official version on YouTube.</p></div><a class="secondary button-link" href="https://www.billboard.com/charts/hot-100/" target="_blank" rel="noopener noreferrer">View Billboard</a></div>
@@ -384,6 +486,18 @@ function renderMusicLibrary() {
     const choice = musicChoices.find((item) => item.id === button.dataset.playMusic);
     if (choice) playMusic(choice);
   }));
+  app.querySelectorAll('[data-save-music]').forEach((button) => button.addEventListener('click', () => {
+    const choice = musicChoices.find((item) => item.id === button.dataset.saveMusic);
+    if (!choice) return;
+    const added = addPreferredMusic({ title: choice.title, source: choice.category, choiceId: choice.id });
+    button.textContent = added ? 'Saved ✓' : 'Already saved';
+    button.disabled = true;
+  }));
+  app.querySelectorAll('[data-play-preferred]').forEach((button) => button.addEventListener('click', () => playPreferredMusic(button.dataset.playPreferred)));
+  app.querySelectorAll('[data-remove-preferred]').forEach((button) => button.addEventListener('click', () => {
+    removePreferredMusic(button.dataset.removePreferred);
+    renderMusicLibrary();
+  }));
   app.querySelector('#youtube-music-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const status = app.querySelector('#youtube-music-status');
@@ -391,6 +505,21 @@ function renderMusicLibrary() {
       playMusic(parseYouTubeInput(app.querySelector('#youtube-music-url').value));
       status.className = 'status';
       status.textContent = 'Loaded in the music player.';
+    } catch (error) {
+      status.className = 'status error';
+      status.textContent = error.message;
+    }
+  });
+  app.querySelector('#save-youtube-preferred')?.addEventListener('click', () => {
+    const status = app.querySelector('#youtube-music-status');
+    try {
+      const parsed = parseYouTubeInput(app.querySelector('#youtube-music-url').value);
+      const customName = app.querySelector('#youtube-music-name')?.value.trim();
+      const title = customName || parsed.title;
+      const added = addPreferredMusic({ title, source: 'YouTube', src: parsed.src });
+      status.className = 'status';
+      status.textContent = added ? `Added “${title}” to Preferred Music.` : 'That music is already in Preferred Music.';
+      if (added) window.setTimeout(renderMusicLibrary, 450);
     } catch (error) {
       status.className = 'status error';
       status.textContent = error.message;
@@ -461,63 +590,7 @@ const greatBooksCatalog = [
   { era: 'Literature', author: 'Fyodor Dostoevsky', title: 'The Brothers Karamazov', query: 'Brothers Karamazov Dostoevsky' }
 ];
 
-const state = {
-  words: [],
-  originalText: '',
-  currentText: '',
-  title: '',
-  language: 'en',
-  index: 0,
-  interval: null,
-  runToken: 0,
-  nextTickAt: 0,
-  wordElements: [],
-  activeElements: [],
-  groupElements: [],
-  renderedGroupSize: 1,
-  wpm: 300,
-  renderedMode: null,
-  translationCache: new Map(),
-  renderedWordEnd: 0,
-  tickerAnimation: null,
-  tickerPaused: false,
-  tickerStatusTimer: null,
-  tickerStartIndex: 0,
-  tickerWordCount: 0,
-  tickerFrame: null,
-  tickerLastAt: 0,
-  tickerOffset: 0,
-  tickerNextWordIndex: 0,
-  tickerLoadedWords: 0,
-  bionic: false,
-  meaningfulChunks: false,
-  bookPages: false,
-  illustrationMode: 'off',
-  illustrationCache: new Map(),
-  illustrationAnchors: new Set(),
-  illustrationHidden: new Set(),
-  uploadedIllustrations: [],
-  readingGroups: [],
-  groupIndexByStart: new Map(),
-  renderedMeaningfulChunks: false,
-  autoScrollLastAt: 0,
-  autoScrollCarry: 0,
-  toc: [],
-  structure: [],
-  structureByStart: new Map(),
-  source: null,
-  documentId: null,
-  dictionaryCache: new Map(),
-  contextWord: null,
-  activeNoteId: null,
-  sessionActive: false,
-  sessionStartedAt: 0,
-  sessionStartIndex: 0,
-  returnIndex: 0,
-  returnMode: 'highlight',
-  returnWasRunning: false,
-  spacebarHandler: null
-};
+// Reader state is owned by ReaderEngine (Sprint 1).
 
 function closeMenus() {
   document.querySelectorAll('details[open]').forEach((menu) => menu.removeAttribute('open'));
@@ -691,6 +764,98 @@ function renderPhrase(element, words) {
   });
 }
 
+function focusAnchorIndex(word) {
+  const match = String(word || '').match(/^(?<leading>[^\p{L}\p{N}]*)(?<core>[\p{L}\p{N}][\p{L}\p{N}'’’-]*)(?<trailing>[^\p{L}\p{N}]*)$/u);
+  const core = Array.from(match?.groups?.core || String(word || ''));
+  if (!core.length) return 0;
+  // Place the fixation point slightly left of center for longer words.
+  if (core.length <= 1) return 0;
+  if (core.length <= 5) return 1;
+  if (core.length <= 9) return 2;
+  if (core.length <= 13) return 3;
+  return 4;
+}
+
+function renderFocusAnchorPhrase(element, words) {
+  const phrase = words.join(' ');
+  const chars = Array.from(phrase);
+  const anchor = Math.min(chars.length - 1, focusAnchorIndex(phrase));
+  const stage = document.createElement('span');
+  stage.className = 'focus-anchor-stage';
+
+  const left = document.createElement('span');
+  left.className = 'focus-anchor-left';
+  left.textContent = chars.slice(0, anchor).join('');
+
+  const pivot = document.createElement('span');
+  pivot.className = 'focus-anchor-letter';
+  pivot.textContent = chars[anchor] || '';
+
+  const right = document.createElement('span');
+  right.className = 'focus-anchor-right';
+  right.textContent = chars.slice(anchor + 1).join('');
+
+  stage.append(left, pivot, right);
+  element.replaceChildren(stage);
+}
+
+function modeSupportsFocusAnchorOverlay(mode) {
+  return ['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
+}
+
+function applyFocusAnchorPosition(overlay) {
+  const position = state.focusAnchorPosition;
+  if (!overlay || !position) return;
+  overlay.style.left = `${Math.max(0, Math.min(100, position.x))}%`;
+  overlay.style.top = `${Math.max(0, Math.min(100, position.y))}%`;
+  overlay.style.transform = 'translate(-50%, -50%)';
+}
+
+function bindDraggableFocusAnchor(overlay) {
+  if (!overlay || overlay.dataset.dragBound === 'true') return;
+  overlay.dataset.dragBound = 'true';
+  overlay.addEventListener('pointerdown', (event) => {
+    if (overlay.hidden) return;
+    const frame = overlay.closest('.reader-frame');
+    if (!frame) return;
+    event.preventDefault();
+    overlay.setPointerCapture?.(event.pointerId);
+    const move = (moveEvent) => {
+      const rect = frame.getBoundingClientRect();
+      const x = ((moveEvent.clientX - rect.left) / Math.max(1, rect.width)) * 100;
+      const y = ((moveEvent.clientY - rect.top) / Math.max(1, rect.height)) * 100;
+      state.focusAnchorPosition = { x: Math.max(3, Math.min(97, x)), y: Math.max(5, Math.min(95, y)) };
+      applyFocusAnchorPosition(overlay);
+    };
+    const stop = () => {
+      overlay.removeEventListener('pointermove', move);
+      overlay.removeEventListener('pointerup', stop);
+      overlay.removeEventListener('pointercancel', stop);
+      persistReaderSession({ immediate: true });
+    };
+    overlay.addEventListener('pointermove', move);
+    overlay.addEventListener('pointerup', stop);
+    overlay.addEventListener('pointercancel', stop);
+  });
+}
+
+function updateFocusAnchorOverlay(words = []) {
+  const overlay = app.querySelector('#focus-anchor-overlay');
+  const mode = getSelectedMode();
+  if (!overlay) return;
+  const enabled = Boolean(state.focusAnchor) && modeSupportsFocusAnchorOverlay(mode) && mode !== 'flash';
+  overlay.hidden = !enabled;
+  if (!enabled) {
+    overlay.replaceChildren();
+    return;
+  }
+  const fontSize = Math.max(10, Number(app.querySelector('#focus-anchor-font-size')?.value || state.focusAnchorFontSize || 24));
+  overlay.style.fontSize = `${fontSize}px`;
+  bindDraggableFocusAnchor(overlay);
+  applyFocusAnchorPosition(overlay);
+  if (words.length) renderFocusAnchorPhrase(overlay, words);
+}
+
 async function loadLocalText(key) {
   const source = sources[key];
   if (!source) throw new Error('Unknown reading selection.');
@@ -726,10 +891,13 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   renderReaderWithText(snapshot.title, snapshot.currentText, snapshot.source || { type: 'restored' });
   state.originalText = snapshot.originalText || snapshot.currentText;
   state.language = snapshot.language || 'en';
-  state.index = Math.min(Number(snapshot.index || 0), Math.max(0, state.words.length - 1));
+  readerEngine.setPosition(snapshot.index || 0);
   state.wpm = Number(controls.wpm || snapshot.wpm || 300);
   state.bionic = Boolean(controls.bionic ?? snapshot.bionic);
   state.meaningfulChunks = Boolean(controls.meaningfulChunks ?? snapshot.meaningfulChunks);
+  state.focusAnchor = Boolean(controls.focusAnchor ?? snapshot.focusAnchor);
+  state.focusAnchorPosition = controls.focusAnchorPosition || snapshot.focusAnchorPosition || null;
+  state.focusAnchorFontSize = Number(controls.focusAnchorFontSize || snapshot.focusAnchorFontSize || 24);
   state.bookPages = Boolean(controls.bookPages ?? snapshot.bookPages);
   state.illustrationMode = controls.illustrationMode || snapshot.illustrationMode || 'off';
   state.returnIndex = state.index;
@@ -752,6 +920,7 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   const checks = {
     '#bionic-reading': state.bionic,
     '#meaningful-chunks': state.meaningfulChunks,
+    '#focus-anchor': state.focusAnchor,
     '#book-pages': state.bookPages
   };
   Object.entries(checks).forEach(([selector, checked]) => {
@@ -885,7 +1054,11 @@ function fontOptions(selected) {
 
 function bindAppearance(reader) {
   const font = app.querySelector('#font-size');
-  font?.addEventListener('change', () => { reader.style.fontSize = `${font.value}px`; });
+  font?.addEventListener('change', () => {
+    const snapshot = captureReaderLocation();
+    reader.style.fontSize = `${font.value}px`;
+    restoreCapturedReaderLocation(snapshot);
+  });
 
   const fontFamily = app.querySelector('#font-family');
   const fontFamilies = {
@@ -902,7 +1075,11 @@ function bindAppearance(reader) {
     reader.style.fontFamily = fontFamilies[fontFamily.value] || fontFamilies.system;
     reader.classList.toggle('dyslexia-friendly-font', fontFamily.value === 'dyslexic');
   };
-  fontFamily?.addEventListener('change', applyFontFamily);
+  fontFamily?.addEventListener('change', () => {
+    const snapshot = captureReaderLocation();
+    applyFontFamily();
+    restoreCapturedReaderLocation(snapshot);
+  });
   applyFontFamily();
 
   const bookPages = app.querySelector('#book-pages');
@@ -914,10 +1091,15 @@ function bindAppearance(reader) {
     window.requestAnimationFrame(() => updateBookPageStatus());
   };
   bookPages?.addEventListener('change', () => {
+    const snapshot = captureReaderLocation();
     stopReader();
     applyBookPages();
-    prepareReaderView(getSelectedMode(), Number(app.querySelector('#word-count')?.value) || 1);
-    updateModeControls(getSelectedMode());
+    const mode = getSelectedMode();
+    const count = Number(app.querySelector('#word-count')?.value) || 1;
+    state.index = snapshot.anchorIndex;
+    prepareReaderView(mode, count);
+    updateModeControls(mode);
+    restoreCapturedReaderLocation(snapshot, { rerendered: true });
   });
   applyBookPages();
 
@@ -1548,14 +1730,77 @@ function detectDocumentStructure(text) {
   return structures.slice(0, 1000);
 }
 
+function normalizeTocTitle(value) {
+  return String(value || '')
+    .toLocaleLowerCase()
+    .replace(/[.·•…]+\s*\d+\s*$/u, '')
+    .replace(/^\s*(?:chapter|chap\.?|part|book|section)\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s*[:.\-–—]?\s*/iu, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
 function detectTableOfContents(text) {
   const structures = detectDocumentStructure(text);
   const tocTypes = new Set(['chapter', 'part', 'section', 'appendix', 'notes', 'index', 'frontmatter', 'backmatter', 'bibliography', 'glossary']);
+  const contentsMarker = structures.find((entry) => entry.type === 'contents' && entry.start < 5000);
+
+  // If the book contains a printed Contents section, use it as a guide but
+  // always link each entry to a later, real heading in the body. This prevents
+  // the navigation pane from becoming a copy of the printed contents pages.
+  if (contentsMarker) {
+    const lines = String(text).replace(/\r/g, '').split('\n');
+    let running = 0, inContents = false;
+    const printed = [];
+    for (const raw of lines) {
+      const line = raw.replace(/\s+/g, ' ').trim();
+      const count = splitWords(line).length;
+      if (!inContents && running <= contentsMarker.start + 10 && /^(?:table of contents|contents)$/i.test(line)) {
+        inContents = true; running += count; continue;
+      }
+      if (inContents) {
+        if (running > contentsMarker.start + 4500) break;
+        if (line && line.length <= 160 && count <= 24) {
+          const cleaned = line.replace(/(?:\.{2,}|\s{2,})\s*\d+\s*$/u, '').replace(/\s+\d+\s*$/u, '').trim();
+          if (cleaned && !/^(?:contents|table of contents)$/i.test(cleaned)) printed.push(cleaned);
+        }
+      }
+      running += count;
+    }
+
+    const bodyCandidates = structures.filter((e) => tocTypes.has(e.type) && e.start > contentsMarker.start + 30);
+    const used = new Set();
+    const matched = [];
+    for (const label of printed) {
+      const key = normalizeTocTitle(label);
+      if (!key || key.length < 2) continue;
+      let candidate = bodyCandidates.find((e) => !used.has(e.start) && normalizeTocTitle(e.title) === key);
+      if (!candidate) candidate = bodyCandidates.find((e) => {
+        if (used.has(e.start)) return false;
+        const bodyKey = normalizeTocTitle(e.title);
+        return key.length >= 5 && bodyKey.length >= 5 && (bodyKey.includes(key) || key.includes(bodyKey));
+      });
+      if (candidate) {
+        used.add(candidate.start);
+        matched.push({ title: candidate.title, index: candidate.start, type: candidate.type });
+      }
+    }
+    if (matched.length >= 2) return matched.slice(0, 300);
+  }
+
+  // Fallback for books without a usable printed Contents section: keep only
+  // unique structural headings and prefer their body occurrence.
+  const seen = new Set();
   return structures
     .filter((entry) => tocTypes.has(entry.type) && entry.preferredToc)
+    .filter((entry) => {
+      const key = normalizeTocTitle(entry.title);
+      if (!key || seen.has(key)) return false;
+      seen.add(key); return true;
+    })
     .map((entry) => ({ title: entry.title, index: entry.start, type: entry.type }))
     .slice(0, 300);
 }
+
 function currentReadingPosition() {
   const reader = app.querySelector('#reader');
   if (!reader || !state.words.length) return Math.max(0, state.index || 0);
@@ -1612,9 +1857,18 @@ function jumpToWordIndex(wordIndex) {
       const target = reader.querySelector(`.reader-word[data-index="${index}"]`)
         || reader.querySelector(`.reader-group[data-start-index="${index}"]`);
       if (target) {
-        const readerRect = reader.getBoundingClientRect();
-        const targetRect = target.getBoundingClientRect();
-        reader.scrollTop = Math.max(0, reader.scrollTop + targetRect.top - readerRect.top - 20);
+        if (state.bookPages) {
+          const readerRect = reader.getBoundingClientRect();
+          const targetRect = target.getBoundingClientRect();
+          const metrics = applyBookPageMetrics(reader);
+          const absoluteLeft = targetRect.left - readerRect.left + reader.scrollLeft - metrics.paddingLeft;
+          const pageIndex = Math.max(0, Math.floor((absoluteLeft + Math.min(targetRect.width / 2, metrics.pageWidth / 4)) / metrics.pagePitch));
+          goToBookSpread(Math.floor(pageIndex / 2), { behavior: 'auto', ensureRendered: true });
+        } else {
+          const readerRect = reader.getBoundingClientRect();
+          const targetRect = target.getBoundingClientRect();
+          reader.scrollTop = Math.max(0, reader.scrollTop + targetRect.top - readerRect.top - 20);
+        }
       }
     }
     updateReaderStatus();
@@ -1647,7 +1901,9 @@ async function openBookmark(id) {
 
     renderReaderWithText(documentData.title, documentData.text, documentData.source || bookmark.source || { type: 'bookmark' });
     requestAnimationFrame(() => {
-      const modeSelect = app.querySelector('#mode-select');
+      app.querySelector('#font-size')?.addEventListener('change', () => updateFocusAnchorOverlay());
+
+  const modeSelect = app.querySelector('#mode-select');
       if (modeSelect && bookmark.mode) {
         modeSelect.value = bookmark.mode;
         prepareReaderView(bookmark.mode);
@@ -1966,27 +2222,20 @@ async function renderReader(kind) {
 }
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
-  state.originalText = String(text);
-  state.currentText = String(text);
-  state.title = title;
-  state.language = 'en';
-  state.bionic = false;
-  state.meaningfulChunks = false;
-  state.source = source;
-  state.documentId = documentIdFor(title, String(text));
-  state.structure = detectDocumentStructure(text);
-  state.structureByStart = new Map(state.structure.map((entry) => [entry.start, entry]));
-  state.toc = state.structure
+  const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });
+  const structure = detectDocumentStructure(text);
+  const toc = structure
     .filter((entry) => entry.preferredToc && entry.type !== 'contents')
     .map((entry) => ({ title: entry.title, index: entry.start, type: entry.type }))
     .slice(0, 300);
-  state.words = splitWords(text);
-  state.index = 0;
-  state.renderedMode = null;
-  state.translationCache.clear();
-  state.illustrationCache.clear();
-  state.illustrationAnchors.clear();
-  state.illustrationHidden.clear();
+
+  readerEngine.loadBook(bookModel, {
+    documentId: documentIdFor(title, String(text)),
+    structure,
+    toc
+  });
+  state.bionic = false;
+  state.meaningfulChunks = false;
   state.uploadedIllustrations = Array.isArray(source?.illustrations) ? source.illustrations : [];
   state.illustrationMode = state.uploadedIllustrations.length ? 'chapter' : 'off';
   if (!state.words.length) return renderError('No readable text', 'The selected source did not contain readable words.');
@@ -1999,12 +2248,13 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
           <div class="reader-title-links"><a id="grokipedia-book-link" href="${grokipediaSearchUrl(title)}" target="_blank" rel="noopener noreferrer">Read about this book on Grokipedia</a></div>
         </div>
         <div class="reader-music-actions" aria-label="Music for this reading">
-          <button id="play-adaptation-score" class="secondary reader-music-button" type="button">♫ Adaptation score</button>
+          <label class="preferred-music-control media-match-control"><span>Media match</span><select id="media-match-select">${mediaMatchOptionsMarkup()}</select></label>
+          <button id="play-media-match" class="secondary reader-music-button" type="button">♫ Play music score</button>
           <button id="play-reading-mood" class="secondary reader-music-button" type="button">♫ Reading mood</button>
         </div>
       </div>
       <section class="reader-toolbar" aria-label="Reading settings">
-        <details class="settings-panel" open>
+        <details class="settings-panel">
           <summary><span>Reading</span><span class="settings-summary">Mode, speed, words</span></summary>
           <div class="toolbar-fields settings-content">
             <div class="control mode-control">
@@ -2041,6 +2291,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
             <div class="control"><label for="font-size">Text size</label><select id="font-size">${fontOptions(14)}</select></div>
             <div class="control"><label for="theme-select">Theme</label><select id="theme-select"><option value="dark" selected>Dark</option><option value="light">Light</option></select></div>
             <label class="compact-toggle"><input id="bionic-reading" type="checkbox"><span>Bionic text</span></label>
+            <label class="compact-toggle" title="Show the current word or phrase at a fixed center point while using Flash or another guided mode."><input id="focus-anchor" type="checkbox"><span>Center focus anchor overlay</span></label>
+            <div class="control"><label for="focus-anchor-font-size">Focus anchor size</label><select id="focus-anchor-font-size">${fontOptions(24)}</select></div>
             <label class="compact-toggle" title="Show the text as two facing book pages."><input id="book-pages" type="checkbox"><span>Book pages</span></label>
             <div class="control illustration-control"><label for="illustration-mode">Illustrations</label><select id="illustration-mode">
               <option value="off" selected>Off</option>
@@ -2052,13 +2304,22 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         </details>
       </section>
 
-      <div class="reader-layout">
+      <div class="reader-pane-controls" aria-label="Reading area layout controls">
+        <button id="toggle-navigation-pane" class="secondary pane-toggle" type="button" aria-pressed="true" aria-controls="navigation-pane"><span aria-hidden="true">☰</span> Contents</button>
+        <button id="toggle-word-panel" class="secondary pane-toggle" type="button" aria-pressed="true" aria-controls="word-panel"><span aria-hidden="true">▥</span> Right pane</button>
+        <span class="reader-resize-hint">Drag either divider to resize the reading area.</span>
+      </div>
+      <div class="reader-layout" id="reader-layout">
         <aside id="navigation-pane" class="navigation-pane" aria-label="Contents and bookmarks"></aside>
-        <div id="reader-frame" class="reader-frame">
-          <button id="toggle-reader-fullscreen" class="viewer-fullscreen-button" type="button" aria-label="Enter text viewer fullscreen" title="Full screen text viewer">
-            <span class="fullscreen-icon" aria-hidden="true">⛶</span>
-            <span class="fullscreen-label">Full screen</span>
-          </button>
+        <div id="left-pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize contents pane" tabindex="0"></div>
+        <div class="reader-center-column">
+          <div class="reader-frame-toolbar">
+            <button id="toggle-reader-fullscreen" class="viewer-fullscreen-button" type="button" aria-label="Enter text viewer fullscreen" title="Full screen text viewer">
+              <span class="fullscreen-icon" aria-hidden="true">⛶</span>
+              <span class="fullscreen-label">Full screen</span>
+            </button>
+          </div>
+          <div id="reader-frame" class="reader-frame">
           <div id="fullscreen-control-strip" class="fullscreen-control-strip" aria-label="Fullscreen reader controls">
             <button id="fullscreen-options-toggle" class="fullscreen-options-toggle" type="button" aria-expanded="false" aria-controls="fullscreen-options-menu">Options ▾</button>
             <button id="fullscreen-controls-close" class="fullscreen-controls-close" type="button" aria-label="Hide fullscreen controls" title="Hide controls">×</button>
@@ -2077,6 +2338,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <label>Text size<select id="fs-font-size">${fontOptions(14)}</select></label>
                 <label>Theme<select id="fs-theme-select"><option value="dark">Dark</option><option value="light">Light</option></select></label>
                 <label class="fullscreen-checkbox"><input id="fs-bionic-reading" type="checkbox"> Bionic text</label>
+                <label class="fullscreen-checkbox"><input id="fs-focus-anchor" type="checkbox"> Center focus anchor overlay</label>
+                <label>Focus anchor size<select id="fs-focus-anchor-font-size">${fontOptions(24)}</select></label>
                 <label class="fullscreen-checkbox"><input id="fs-book-pages" type="checkbox"> Book pages</label>
                 <label>Illustrations<select id="fs-illustration-mode"><option value="off">Off</option><option value="chapter">Chapter openings</option><option value="automatic">Automatic</option></select></label>
                 <button id="fs-show-hidden-illustrations" class="secondary" type="button" disabled>Show hidden illustrations</button>
@@ -2092,6 +2355,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <button id="fs-reset" class="secondary" type="button">Reset</button>
                 <button id="fs-translate" class="secondary" type="button">Translate</button>
                 <button id="fs-restore" class="secondary" type="button">Restore English</button>
+                <label>Media match<select id="fs-media-match-select">${mediaMatchOptionsMarkup()}</select></label>
+                <button id="fs-media-match" class="secondary" type="button">Play media match</button>
+                <button id="fs-reading-mood" class="secondary" type="button">♫ Reading mood</button>
               </div>
               <p class="fullscreen-options-hint">Click the text or press <kbd>Space</kbd> to pause or resume. Press <kbd>O</kbd> to show these controls after hiding them.</p>
             </section>
@@ -2101,8 +2367,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
             <span id="book-page-status">Pages 1–2</span>
             <button id="book-page-next" type="button" aria-label="Next page spread">›</button>
           </div>
+          <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
           <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text" title="Click a word to move the reading position; click empty space to pause or resume"></article>
+          </div>
         </div>
+        <div id="right-pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize right pane" tabindex="0"></div>
         <aside id="word-panel" class="word-panel" aria-live="polite">
           <section class="translation-tools" aria-label="Translation controls">
             <h2>Translate</h2>
@@ -2144,25 +2413,62 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   const readerFrame = app.querySelector('#reader-frame');
   const fullscreenButton = app.querySelector('#toggle-reader-fullscreen');
   bindAppearance(reader);
-  bindReaderMusicControls(title, text);
+  bindReaderMusicControls(title, text, source);
   bindReaderFullscreen(readerFrame, fullscreenButton);
   bindFullscreenOptions(readerFrame);
+  bindReaderPaneControls();
+  bindReaderResize(readerFrame, reader);
+  observeBookPageReader();
   renderNavigationPane();
   prepareReaderView('highlight');
   updateModeControls('highlight');
   app.querySelector('#book-page-prev')?.addEventListener('click', () => turnBookPages(-1));
   app.querySelector('#book-page-next')?.addEventListener('click', () => turnBookPages(1));
+  app.querySelector('#book-page-status')?.addEventListener('click', () => turnBookPages(1));
+  app.querySelector('#book-page-status')?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      turnBookPages(1);
+    }
+  });
+  app.querySelector('#reader')?.addEventListener('scroll', () => {
+    if (state.bookPages) window.requestAnimationFrame(updateBookPageStatus);
+  });
+  // Book Pages treats one physical wheel gesture as exactly one two-page
+  // spread.  While a gesture is being consumed we intentionally discard the
+  // trailing wheel events (especially important for trackpads/inertial mice),
+  // so one flick can never skip several spreads.
+  let bookPageWheelLocked = false;
+  let bookPageWheelDelta = 0;
+  let bookPageWheelResetTimer = null;
+  app.querySelector('#reader')?.addEventListener('wheel', (event) => {
+    if (!state.bookPages || Math.abs(event.deltaY) < Math.abs(event.deltaX)) return;
+    event.preventDefault();
+
+    if (bookPageWheelLocked) {
+      bookPageWheelDelta = 0;
+      return;
+    }
+
+    bookPageWheelDelta += event.deltaY;
+    window.clearTimeout(bookPageWheelResetTimer);
+    bookPageWheelResetTimer = window.setTimeout(() => { bookPageWheelDelta = 0; }, 140);
+    if (Math.abs(bookPageWheelDelta) < 24) return;
+
+    // Match the user's physical wheel convention on this system:
+    // wheel/scroll UP -> next spread; wheel/scroll DOWN -> previous spread.
+    // The browser reports this device's wheel polarity opposite the earlier
+    // assumption, so positive deltaY advances and negative deltaY goes back.
+    const direction = bookPageWheelDelta > 0 ? 1 : -1;
+    bookPageWheelDelta = 0;
+    bookPageWheelLocked = true;
+    turnBookPages(direction);
+    window.setTimeout(() => { bookPageWheelLocked = false; }, 380);
+  }, { passive: false });
 
   const modeSelect = app.querySelector('#mode-select');
   modeSelect.addEventListener('change', () => {
-    // A mode change must fully dispose of any paused Web Animation. Merely
-    // pausing Digital Sign leaves an animation attached to the old stage,
-    // which can make the next Start command resume an invisible element.
-    stopReader();
-    state.index = 0;
-    prepareReaderView(modeSelect.value);
-    updateModeControls(modeSelect.value);
-    updateReaderStatus();
+    switchReadingMode(modeSelect.value);
   });
 
   // Spacebar acts as a simple play/pause toggle while the reader is open.
@@ -2221,50 +2527,63 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.querySelector('#pause-reader').addEventListener('click', () => { pauseReader(); persistReaderSession(); });
   app.querySelector('#reset-reader').addEventListener('click', () => { resetReader(); persistReaderSession(); });
   app.querySelector('#bionic-reading').addEventListener('change', (event) => {
+    const snapshot = captureReaderLocation();
     stopReader();
     state.bionic = event.target.checked;
+    state.index = snapshot.anchorIndex;
     const mode = getSelectedMode();
     const count = Number(app.querySelector('#word-count')?.value) || 1;
     prepareReaderView(mode, count);
     updateModeControls(mode);
-    updateReaderStatus();
-    const start = app.querySelector('#start-reader');
-    if (start) start.textContent = state.index ? 'Resume' : 'Start';
+    restoreCapturedReaderLocation(snapshot, { rerendered: true });
+  });
+  app.querySelector('#focus-anchor-font-size')?.addEventListener('change', (event) => {
+    state.focusAnchorFontSize = Number(event.target.value) || 24;
+    updateFocusAnchorOverlay();
+    persistReaderSession({ immediate: true });
+  });
+
+  app.querySelector('#focus-anchor').addEventListener('change', (event) => {
+    const snapshot = captureReaderLocation();
+    stopReader();
+    state.focusAnchor = event.target.checked;
+    state.index = snapshot.anchorIndex;
+    const mode = getSelectedMode();
+    const count = Number(app.querySelector('#word-count')?.value) || 1;
+    prepareReaderView(mode, count);
+    updateModeControls(mode);
+    updateFocusAnchorOverlay();
+    restoreCapturedReaderLocation(snapshot, { rerendered: true });
   });
   app.querySelector('#meaningful-chunks').addEventListener('change', (event) => {
+    const snapshot = captureReaderLocation();
     stopReader();
     state.meaningfulChunks = event.target.checked;
-    state.index = 0;
+    state.index = snapshot.anchorIndex;
     const mode = getSelectedMode();
     const count = Number(app.querySelector('#word-count')?.value) || 1;
     prepareReaderView(mode, count);
     updateModeControls(mode);
-    updateReaderStatus(state.meaningfulChunks && modeSupportsMeaningfulChunks(mode)
-      ? 'Meaningful chunks enabled. Words shown is now the maximum phrase size.'
-      : `${state.words.length.toLocaleString()} words loaded.`);
-    const start = app.querySelector('#start-reader');
-    if (start) start.textContent = 'Start';
+    restoreCapturedReaderLocation(snapshot, { rerendered: true });
   });
   app.querySelector('#illustration-mode').addEventListener('change', (event) => {
+    const snapshot = captureReaderLocation();
     stopReader();
     state.illustrationMode = event.target.value;
     state.illustrationAnchors.clear();
+    state.index = snapshot.anchorIndex;
     const mode = getSelectedMode();
     const count = Number(app.querySelector('#word-count')?.value) || 1;
     prepareReaderView(mode, count);
     updateModeControls(mode);
-    updateReaderStatus(state.illustrationMode === 'off'
-      ? 'Illustrations are off.'
-      : state.illustrationMode === 'chapter'
-        ? 'Chapter-opening illustrations will load as you read.'
-        : 'Relevant illustrations will load dynamically as you read.');
+    restoreCapturedReaderLocation(snapshot, { rerendered: true });
   });
   app.querySelector('#show-hidden-illustrations')?.addEventListener('click', restoreHiddenIllustrations);
   app.querySelector('#fs-show-hidden-illustrations')?.addEventListener('click', restoreHiddenIllustrations);
   updateHiddenIllustrationControls();
   app.querySelector('#translate-text').addEventListener('click', translateCurrentText);
   app.querySelector('#restore-english').addEventListener('click', restoreEnglish);
-  app.querySelectorAll('#mode-select, #speed, #word-count, #meaningful-chunks, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
+  app.querySelectorAll('#mode-select, #speed, #word-count, #meaningful-chunks, #focus-anchor, #focus-anchor-font-size, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
     control.addEventListener('change', () => persistReaderSession());
     control.addEventListener('input', () => persistReaderSession());
   });
@@ -2287,6 +2606,8 @@ function bindFullscreenOptions(readerFrame) {
     ['#fs-font-size', '#font-size'],
     ['#fs-theme-select', '#theme-select'],
     ['#fs-bionic-reading', '#bionic-reading'],
+    ['#fs-focus-anchor', '#focus-anchor'],
+    ['#fs-focus-anchor-font-size', '#focus-anchor-font-size'],
     ['#fs-book-pages', '#book-pages'],
     ['#fs-illustration-mode', '#illustration-mode'],
     ['#fs-meaningful-chunks', '#meaningful-chunks'],
@@ -2369,11 +2690,36 @@ function bindFullscreenOptions(readerFrame) {
       window.setTimeout(syncFromMain, 0);
     });
   };
+  const fsMediaMatchSelect = app.querySelector('#fs-media-match-select');
+  const mediaMatchSelect = app.querySelector('#media-match-select');
+  if (fsMediaMatchSelect && mediaMatchSelect) {
+    const syncFsMedia = () => { fsMediaMatchSelect.value = mediaMatchSelect.value; };
+    syncFsMedia();
+    fsMediaMatchSelect.addEventListener('change', () => {
+      mediaMatchSelect.value = fsMediaMatchSelect.value;
+      mediaMatchSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      const mainButton = app.querySelector('#play-media-match');
+      const fsButton = app.querySelector('#fs-media-match');
+      if (mainButton && fsButton) fsButton.textContent = mainButton.textContent;
+    });
+    mediaMatchSelect.addEventListener('change', () => {
+      syncFsMedia();
+      const mainButton = app.querySelector('#play-media-match');
+      const fsButton = app.querySelector('#fs-media-match');
+      if (mainButton && fsButton) fsButton.textContent = mainButton.textContent;
+    });
+    const mainButton = app.querySelector('#play-media-match');
+    const fsButton = app.querySelector('#fs-media-match');
+    if (mainButton && fsButton) fsButton.textContent = mainButton.textContent;
+  }
+
   proxyClick('#fs-start', '#start-reader');
   proxyClick('#fs-pause', '#pause-reader');
   proxyClick('#fs-reset', '#reset-reader');
   proxyClick('#fs-translate', '#translate-text');
   proxyClick('#fs-restore', '#restore-english');
+  proxyClick('#fs-media-match', '#play-media-match');
+  proxyClick('#fs-reading-mood', '#play-reading-mood');
 
   readerFrame.addEventListener('pointermove', (event) => {
     if (!isFullscreen() || !strip.classList.contains('controls-hidden')) return;
@@ -2421,6 +2767,98 @@ function bindFullscreenOptions(readerFrame) {
   syncFromMain();
 }
 
+
+
+function bindReaderPaneControls() {
+  const layout = app.querySelector('#reader-layout');
+  const navigationButton = app.querySelector('#toggle-navigation-pane');
+  const wordButton = app.querySelector('#toggle-word-panel');
+  if (!layout || !navigationButton || !wordButton) return;
+
+  const setPane = (pane, visible) => {
+    const hiddenClass = pane === 'navigation' ? 'navigation-hidden' : 'word-panel-hidden';
+    const button = pane === 'navigation' ? navigationButton : wordButton;
+    layout.classList.toggle(hiddenClass, !visible);
+    button.setAttribute('aria-pressed', String(visible));
+    button.classList.toggle('pane-closed', !visible);
+    const label = pane === 'navigation' ? 'Contents' : 'Right pane';
+    button.title = `${visible ? 'Close' : 'Open'} ${label.toLowerCase()}`;
+  };
+
+  setPane('navigation', true);
+  setPane('word', true);
+  navigationButton.addEventListener('click', () => {
+    setPane('navigation', layout.classList.contains('navigation-hidden'));
+  });
+  wordButton.addEventListener('click', () => {
+    setPane('word', layout.classList.contains('word-panel-hidden'));
+  });
+}
+
+function bindReaderResize(readerFrame, reader) {
+  const layout = app.querySelector('#reader-layout');
+  const leftSplitter = app.querySelector('#left-pane-splitter');
+  const rightSplitter = app.querySelector('#right-pane-splitter');
+  if (!layout || !readerFrame || !reader) return;
+
+  const savedLeft = Number(localStorage.getItem('msg-navigation-width'));
+  const savedRight = Number(localStorage.getItem('msg-word-panel-width'));
+  if (Number.isFinite(savedLeft)) layout.style.setProperty('--navigation-width', `${Math.max(150, Math.min(420, savedLeft))}px`);
+  if (Number.isFinite(savedRight)) layout.style.setProperty('--word-panel-width', `${Math.max(180, Math.min(480, savedRight))}px`);
+
+  const bindSplitter = (splitter, side) => {
+    if (!splitter) return;
+    let startX = 0;
+    let startWidth = 0;
+    const pane = side === 'left' ? app.querySelector('#navigation-pane') : app.querySelector('#word-panel');
+    const property = side === 'left' ? '--navigation-width' : '--word-panel-width';
+    const storageKey = side === 'left' ? 'msg-navigation-width' : 'msg-word-panel-width';
+
+    const move = (event) => {
+      const delta = event.clientX - startX;
+      const next = side === 'left' ? startWidth + delta : startWidth - delta;
+      const width = Math.max(side === 'left' ? 150 : 180, Math.min(side === 'left' ? 420 : 480, next));
+      layout.style.setProperty(property, `${width}px`);
+      localStorage.setItem(storageKey, String(Math.round(width)));
+    };
+    const stop = () => {
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', stop);
+      document.body.classList.remove('resizing-reader-panes');
+    };
+    splitter.addEventListener('pointerdown', (event) => {
+      if (!pane || layout.classList.contains(side === 'left' ? 'navigation-hidden' : 'word-panel-hidden')) return;
+      startX = event.clientX;
+      startWidth = pane.getBoundingClientRect().width;
+      splitter.setPointerCapture?.(event.pointerId);
+      document.body.classList.add('resizing-reader-panes');
+      document.addEventListener('pointermove', move);
+      document.addEventListener('pointerup', stop, { once: true });
+      event.preventDefault();
+    });
+    splitter.addEventListener('dblclick', () => {
+      layout.style.removeProperty(property);
+      localStorage.removeItem(storageKey);
+    });
+  };
+
+  bindSplitter(leftSplitter, 'left');
+  bindSplitter(rightSplitter, 'right');
+}
+function scheduleBookPageReflow({ delay = 0 } = {}) {
+  if (!state.bookPages) return;
+  const preservedSpread = Math.max(0, Number(state.bookSpreadIndex) || 0);
+  window.setTimeout(() => {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        const reader = app.querySelector('#reader');
+        if (!reader || !state.bookPages) return;
+        applyBookPageMetrics(reader);
+        goToBookSpread(preservedSpread, { behavior: 'auto', ensureRendered: false });
+      });
+    });
+  }, delay);
+}
 
 function bindReaderFullscreen(readerFrame, button) {
   if (!readerFrame || !button) return;
@@ -2476,6 +2914,7 @@ function bindReaderFullscreen(readerFrame, button) {
       document.body.classList.remove('viewer-fullscreen-open');
     }
     updateButton();
+    scheduleBookPageReflow({ delay: 60 });
   });
 
   document.addEventListener('keydown', (event) => {
@@ -2487,35 +2926,152 @@ function bindReaderFullscreen(readerFrame, button) {
   updateButton();
 }
 
+function getBookPageMetrics(reader) {
+  const styles = window.getComputedStyle(reader);
+  const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
+  const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
+  const columnGap = Number.parseFloat(styles.columnGap) || 0;
+  const viewportWidth = Math.max(1, reader.clientWidth - paddingLeft - paddingRight);
+  const pageWidth = Math.max(1, (viewportWidth - columnGap) / 2);
+  const pagePitch = pageWidth + columnGap;
+  const spreadWidth = pagePitch * 2;
+  return { paddingLeft, paddingRight, columnGap, viewportWidth, pageWidth, pagePitch, spreadWidth };
+}
+
+function applyBookPageMetrics(reader) {
+  if (!reader || !state.bookPages) return getBookPageMetrics(reader);
+  const metrics = getBookPageMetrics(reader);
+  reader.style.setProperty('--book-page-width', `${metrics.pageWidth}px`);
+  reader.style.setProperty('--book-spread-width', `${metrics.spreadWidth}px`);
+  return metrics;
+}
+
 function getBookSpreadWidth(reader) {
-  return Math.max(1, reader.clientWidth);
+  return applyBookPageMetrics(reader).spreadWidth;
 }
 
 function getBookSpreadCount(reader) {
-  return Math.max(1, Math.ceil(reader.scrollWidth / getBookSpreadWidth(reader)));
+  const metrics = applyBookPageMetrics(reader);
+  // scrollWidth includes the reader padding. Subtract it before counting the
+  // exact two-page spread strides created by the fixed column width.
+  const laidOutWidth = Math.max(metrics.viewportWidth, reader.scrollWidth - metrics.paddingLeft - metrics.paddingRight);
+  return Math.max(1, Math.ceil((laidOutWidth - metrics.viewportWidth) / metrics.spreadWidth) + 1);
 }
 
-function updateBookPageStatus() {
+function getEstimatedBookPageCount(reader) {
+  const renderedWords = Math.max(1, state.renderedWordEnd || 0);
+  const renderedPages = Math.max(2, getBookSpreadCount(reader) * 2);
+  const wordsPerPage = Math.max(1, renderedWords / renderedPages);
+  return Math.max(renderedPages, Math.ceil(state.words.length / wordsPerPage));
+}
+
+function getCurrentBookSpread(reader) {
+  // Book Pages uses one logical spread index everywhere (buttons, wheel,
+  // highlighter, TOC and fullscreen).  Do not infer it from scrollLeft during
+  // animations/reflow because that creates off-by-one and multi-spread jumps.
+  if (Number.isInteger(state.bookSpreadIndex) && state.bookSpreadIndex >= 0) {
+    return state.bookSpreadIndex;
+  }
+  const spreadWidth = getBookSpreadWidth(reader);
+  state.bookSpreadIndex = Math.max(0, Math.round(reader.scrollLeft / spreadWidth));
+  return state.bookSpreadIndex;
+}
+
+function firstReadingIndexInVisibleBookSpread(reader) {
+  if (!reader) return Math.max(0, state.index || 0);
+  const readerRect = reader.getBoundingClientRect();
+  let firstIndex = Number.POSITIVE_INFINITY;
+
+  for (const group of reader.querySelectorAll('.reader-group[data-start-index]')) {
+    const rect = group.getBoundingClientRect();
+    if (rect.right <= readerRect.left + 1 || rect.left >= readerRect.right - 1) continue;
+    const index = Number(group.dataset.visibleStartIndex ?? group.dataset.startIndex);
+    if (Number.isFinite(index)) firstIndex = Math.min(firstIndex, index);
+  }
+
+  if (!Number.isFinite(firstIndex)) {
+    for (const word of reader.querySelectorAll('.reader-word[data-index]')) {
+      const rect = word.getBoundingClientRect();
+      if (rect.right <= readerRect.left + 1 || rect.left >= readerRect.right - 1) continue;
+      const index = Number(word.dataset.index);
+      if (Number.isFinite(index)) firstIndex = Math.min(firstIndex, index);
+    }
+  }
+
+  return Number.isFinite(firstIndex) ? firstIndex : Math.max(0, state.index || 0);
+}
+
+function syncReaderToVisibleBookSpread(reader) {
+  const nextIndex = firstReadingIndexInVisibleBookSpread(reader);
+  state.index = Math.max(0, Math.min(state.words.length - 1, nextIndex));
+  for (const active of state.activeElements || []) {
+    active.classList.remove('active-group', 'active-bold-group');
+  }
+  state.activeElements = [];
+  updateReaderStatus();
+}
+
+function goToBookSpread(targetSpread, { behavior = 'smooth', ensureRendered = true, syncReaderPosition = false } = {}) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !state.bookPages) return;
+
+  applyBookPageMetrics(reader);
+  let target = Math.max(0, Math.trunc(Number(targetSpread) || 0));
+
+  if (ensureRendered && target >= getBookSpreadCount(reader) - 1 && state.renderedWordEnd < state.words.length) {
+    ensureWordsRendered(
+      reader,
+      state.renderedMode || getSelectedMode(),
+      state.renderedGroupSize || 1,
+      Math.min(state.words.length, state.renderedWordEnd + 800)
+    );
+    applyBookPageMetrics(reader);
+  }
+
+  const maxSpread = Math.max(0, getBookSpreadCount(reader) - 1);
+  target = Math.min(target, maxSpread);
+  state.bookSpreadIndex = target;
+
+  // Book Pages has one canonical horizontal position. The highlighter never
+  // nudges the viewport within a spread; it only requests an exact spread.
+  reader.scrollTop = 0;
+  const exactLeft = target * getBookSpreadWidth(reader);
+  reader.scrollTo({ left: exactLeft, top: 0, behavior: 'auto' });
+
+  // A manual page turn must move the logical reading position as well as the
+  // viewport. Otherwise the running highlighter immediately snaps the reader
+  // back to the old (later) spread, making Previous and wheel-down appear to
+  // move forward.
+  if (syncReaderPosition) syncReaderToVisibleBookSpread(reader);
+  updateBookPageStatus(target);
+}
+
+function updateBookPageStatus(forcedSpread = null) {
   const reader = app.querySelector('#reader');
   const status = app.querySelector('#book-page-status');
   if (!reader || !status || !state.bookPages) return;
 
-  const spreadWidth = getBookSpreadWidth(reader);
   const spreadCount = getBookSpreadCount(reader);
   const spreadIndex = Math.min(
     spreadCount - 1,
-    Math.max(0, Math.round(reader.scrollLeft / spreadWidth))
+    Math.max(0, forcedSpread == null ? getCurrentBookSpread(reader) : forcedSpread)
   );
+  state.bookSpreadIndex = spreadIndex;
+
   const firstPage = spreadIndex * 2 + 1;
-  const lastPage = Math.min(spreadCount * 2, firstPage + 1);
+  const totalPages = getEstimatedBookPageCount(reader);
+  const lastPage = Math.min(totalPages, firstPage + 1);
   status.textContent = firstPage === lastPage
-    ? `Page ${firstPage}`
-    : `Pages ${firstPage}–${lastPage}`;
+    ? `Page ${firstPage} of ${totalPages}`
+    : `Pages ${firstPage}–${lastPage} of ${totalPages}`;
+  status.title = 'Click to turn to the next page spread';
+  status.setAttribute('role', 'button');
+  status.setAttribute('tabindex', '0');
 
   const previous = app.querySelector('#book-page-prev');
   const next = app.querySelector('#book-page-next');
   if (previous) previous.disabled = spreadIndex <= 0;
-  if (next) next.disabled = spreadIndex >= spreadCount - 1 && state.renderedWordEnd >= state.words.length;
+  if (next) next.disabled = firstPage >= totalPages;
 }
 
 function updateBookPageControls() {
@@ -2525,32 +3081,57 @@ function updateBookPageControls() {
   const enabled = state.bookPages && modeSupportsBookPages(getSelectedMode());
   controls.hidden = !enabled;
   reader.classList.toggle('book-pages-layout', enabled);
-  if (!enabled) reader.scrollLeft = 0;
+  if (enabled) {
+    state.bookSpreadIndex = Math.max(0, Number(state.bookSpreadIndex) || 0);
+    window.requestAnimationFrame(() => {
+      applyBookPageMetrics(reader);
+      goToBookSpread(state.bookSpreadIndex, { behavior: 'auto', ensureRendered: false });
+    });
+  } else {
+    state.bookSpreadIndex = 0;
+    reader.scrollLeft = 0;
+    reader.scrollTop = 0;
+    reader.style.removeProperty('--book-page-width');
+    reader.style.removeProperty('--book-spread-width');
+  }
 }
 
 function turnBookPages(direction) {
   const reader = app.querySelector('#reader');
   if (!reader || !state.bookPages) return;
 
-  const spreadWidth = getBookSpreadWidth(reader);
-  const currentSpread = Math.max(0, Math.round(reader.scrollLeft / spreadWidth));
+  const step = Math.sign(direction || 1);
+  const currentSpread = getCurrentBookSpread(reader);
+  const targetSpread = Math.max(0, currentSpread + step);
 
-  // If the reader reaches the last currently rendered spread in a large file,
-  // render another section before advancing.
-  if (direction > 0 && currentSpread >= getBookSpreadCount(reader) - 1 && state.renderedWordEnd < state.words.length) {
-    ensureWordsRendered(
-      reader,
-      state.renderedMode || getSelectedMode(),
-      state.renderedGroupSize || 1,
-      state.renderedWordEnd + 5000
-    );
+  // A running reading tick can fire during a manual page turn and immediately
+  // send the viewport back to the active word. Temporarily stop that tick,
+  // move the spread, then derive the new logical word position only after the
+  // browser has committed the new column geometry.
+  const wasRunning = Boolean(state.interval);
+  if (wasRunning) {
+    state.runToken += 1;
+    window.clearTimeout(state.interval);
+    state.interval = null;
+    state.nextTickAt = 0;
   }
 
+  goToBookSpread(targetSpread, {
+    behavior: 'auto',
+    ensureRendered: true,
+    syncReaderPosition: false
+  });
+
   window.requestAnimationFrame(() => {
-    const maxSpread = Math.max(0, getBookSpreadCount(reader) - 1);
-    const targetSpread = Math.min(maxSpread, Math.max(0, currentSpread + direction));
-    reader.scrollTo({ left: targetSpread * spreadWidth, behavior: 'smooth' });
-    window.setTimeout(updateBookPageStatus, 360);
+    window.requestAnimationFrame(() => {
+      // Reassert the exact spread after any reflow caused by rendering.
+      state.bookSpreadIndex = targetSpread;
+      reader.scrollTop = 0;
+      reader.scrollLeft = targetSpread * getBookSpreadWidth(reader);
+      syncReaderToVisibleBookSpread(reader);
+      updateBookPageStatus(targetSpread);
+      if (wasRunning) startReader();
+    });
   });
 }
 
@@ -2565,6 +3146,8 @@ function updateModeControls(mode) {
   const meaningfulSupported = modeSupportsMeaningfulChunks(mode);
   const bookPagesInput = app.querySelector('#book-pages');
   const bookPagesSupported = modeSupportsBookPages(mode);
+  const focusAnchorInput = app.querySelector('#focus-anchor');
+  const focusAnchorSupported = modeSupportsFocusAnchorOverlay(mode);
   if (bookPagesInput) {
     bookPagesInput.disabled = !bookPagesSupported;
     if (!bookPagesSupported && bookPagesInput.checked) {
@@ -2576,6 +3159,15 @@ function updateModeControls(mode) {
       : 'Book pages is available for full-text guided modes.';
   }
   updateBookPageControls();
+
+  if (focusAnchorInput) {
+    focusAnchorInput.disabled = !focusAnchorSupported;
+    focusAnchorInput.title = focusAnchorSupported
+      ? (mode === 'flash'
+        ? 'Hold the optimal recognition letter at the center of the reader.'
+        : 'Show the current guided word or phrase in a centered overlay while this mode continues below.')
+      : 'The focus anchor overlay is available in Flash and timed guided modes.';
+  }
 
   if (meaningfulInput) {
     meaningfulInput.disabled = !meaningfulSupported;
@@ -2661,9 +3253,22 @@ async function lookupDictionaryWord(word) {
   return payload;
 }
 
+function openWordPanelForDictionary() {
+  const layout = app.querySelector('#reader-layout');
+  const button = app.querySelector('#toggle-word-panel');
+  if (!layout) return;
+  layout.classList.remove('word-panel-hidden');
+  if (button) {
+    button.setAttribute('aria-pressed', 'true');
+    button.classList.remove('pane-closed');
+    button.title = 'Close right pane';
+  }
+}
+
 async function performDictionaryLookup(saveAfter = false) {
   const context = state.contextWord;
   if (!context) return;
+  openWordPanelForDictionary();
   const panel = app.querySelector('#word-result');
   if (panel) panel.innerHTML = `<h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
   try {
@@ -2982,105 +3587,112 @@ function scheduleIllustrationsForRange(reader, startWord, endWord, mode) {
 }
 
 function createWordSpan(word, index, extraClass = '') {
-  const span = document.createElement('span');
-  span.className = `reader-word ${extraClass}`.trim();
-  span.dataset.index = String(index);
-  if (savedDefinitionAt(index)) span.classList.add('saved-definition-word');
-  if (noteAt(index)) span.classList.add('saved-note-word');
-  setWordContent(span, word);
-  span.tabIndex = state.language === 'en' ? -1 : 0;
-  if (state.language !== 'en') {
-    span.classList.add('translated-word');
-    span.title = 'Click for English translation';
-  }
-  return span;
+  return virtualRenderer.createWordSpan(word, index, extraClass);
 }
 
 function appendWordDocumentChunk(reader, mode, groupSize, targetWordEnd) {
-  const startWord = state.renderedWordEnd;
-  const desiredEnd = Math.min(state.words.length, Math.max(startWord, targetWordEnd));
-  if (desiredEnd <= startWord) return;
-
-  const fragment = document.createDocumentFragment();
-  let actualEnd = startWord;
-
-  for (const definition of state.readingGroups) {
-    if (definition.end <= startWord) continue;
-    if (definition.start >= desiredEnd && actualEnd >= desiredEnd) break;
-
-    const group = document.createElement('span');
-    group.className = 'reader-group';
-    group.dataset.startIndex = String(definition.start);
-    group.dataset.endIndex = String(definition.end);
-    const structure = definition.structure || state.structureByStart.get(definition.start);
-    if (structure) {
-      group.classList.add('document-structure', `structure-${structure.type}`);
-      group.dataset.structureType = structure.type;
-      group.setAttribute('role', 'heading');
-      const headingLevel = structure.type === 'part' ? '1' : structure.type === 'chapter' ? '2' : '3';
-      group.setAttribute('aria-level', headingLevel);
-    }
-    if (mode === 'marquee') group.classList.add('pending-group');
-
-    for (let index = definition.start; index < definition.end; index += 1) {
-      const span = createWordSpan(state.words[index], index);
-      span.appendChild(document.createTextNode(index < state.words.length - 1 ? ' ' : ''));
-      group.appendChild(span);
-    }
-    fragment.appendChild(group);
-    actualEnd = definition.end;
-  }
-
-  reader.appendChild(fragment);
-  state.renderedWordEnd = Math.max(startWord, actualEnd);
-  state.wordElements = Array.from(reader.querySelectorAll('.reader-word'));
-  state.groupElements = Array.from(reader.querySelectorAll('.reader-group'));
-  scheduleIllustrationsForRange(reader, startWord, actualEnd, mode);
+  return virtualRenderer.appendWordDocumentChunk(reader, mode, groupSize, targetWordEnd);
 }
 
 function ensureWordsRendered(reader, mode, groupSize, requiredWordEnd) {
-  const CHUNK_WORDS = 5000;
-  if (requiredWordEnd <= state.renderedWordEnd) return;
-  const target = Math.min(
-    state.words.length,
-    Math.max(requiredWordEnd, state.renderedWordEnd + CHUNK_WORDS)
-  );
-  appendWordDocumentChunk(reader, mode, groupSize, target);
+  return virtualRenderer.ensureWordsRendered(reader, mode, groupSize, requiredWordEnd);
 }
 
 function renderWordDocument(reader, mode, groupSize = 1) {
-  const safeGroupSize = Math.min(10, Math.max(1, Number(groupSize) || 1));
-  reader.replaceChildren();
-  state.wordElements = [];
-  state.groupElements = [];
-  state.activeElements = [];
-  state.renderedGroupSize = safeGroupSize;
-  state.renderedWordEnd = 0;
-  refreshReadingGroups(mode, safeGroupSize);
+  return virtualRenderer.renderWordDocument(reader, mode, groupSize);
+}
 
-  ensureWordsRendered(reader, mode, safeGroupSize, Math.min(state.words.length, 5000));
-  if (state.bookPages) {
-    reader.scrollLeft = 0;
-    window.requestAnimationFrame(() => window.requestAnimationFrame(updateBookPageStatus));
-  }
+function visibleReadingAnchor(reader, fallbackIndex = state.index) {
+  return virtualRenderer.visibleReadingAnchor(reader, fallbackIndex);
+}
 
-  reader.addEventListener('scroll', () => {
-    const nearEnd = state.bookPages
-      ? reader.scrollLeft + reader.clientWidth >= reader.scrollWidth - Math.max(600, reader.clientWidth)
-      : reader.scrollTop + reader.clientHeight >= reader.scrollHeight - 600;
-    if (nearEnd && state.renderedWordEnd < state.words.length) {
-      ensureWordsRendered(reader, mode, safeGroupSize, state.renderedWordEnd + 5000);
-    }
-    if (state.bookPages) updateBookPageStatus();
-  }, { passive: true });
+function restoreReadingAnchor(reader, mode, groupSize, wordIndex) {
+  return virtualRenderer.restoreReadingAnchor(reader, mode, groupSize, wordIndex);
+}
+
+function captureReaderLocation() {
+  const reader = app.querySelector('#reader');
+  const mode = state.renderedMode || getSelectedMode();
+  const anchorIndex = (!reader || ['flash', 'digital-sign'].includes(mode))
+    ? Math.max(0, state.index || 0)
+    : visibleReadingAnchor(reader, state.index);
+  return {
+    anchorIndex: Math.max(0, anchorIndex),
+    wasRunning: isReaderRunning()
+  };
+}
+
+function bookSpreadForWordIndex(reader, wordIndex) {
+  if (!reader || !state.bookPages) return null;
+  const mode = state.renderedMode || getSelectedMode();
+  const groupSize = Number(app.querySelector('#word-count')?.value) || 1;
+  ensureWordsRendered(reader, mode, groupSize, Math.min(state.words.length, Number(wordIndex) + 250));
+  applyBookPageMetrics(reader);
+  const target = reader.querySelector(`.reader-word[data-index="${Number(wordIndex)}"]`)
+    || Array.from(reader.querySelectorAll('.reader-group[data-start-index]'))
+      .find((group) => Number(group.dataset.startIndex) <= Number(wordIndex)
+        && Number(group.dataset.endIndex) > Number(wordIndex));
+  if (!target) return null;
+  const readerRect = reader.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const metrics = applyBookPageMetrics(reader);
+  const absoluteLeft = targetRect.left - readerRect.left + reader.scrollLeft - metrics.paddingLeft;
+  const pageIndex = Math.max(0, Math.floor((absoluteLeft + Math.min(targetRect.width / 2, metrics.pageWidth / 4)) / metrics.pagePitch));
+  return Math.floor(pageIndex / 2);
+}
+
+function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
+  if (!snapshot) return;
+  const anchorIndex = Math.max(0, Math.min(state.words.length - 1, Number(snapshot.anchorIndex) || 0));
+  state.index = anchorIndex;
+  window.requestAnimationFrame(() => {
+    window.requestAnimationFrame(() => {
+      const reader = app.querySelector('#reader');
+      if (!reader) return;
+      const mode = state.renderedMode || getSelectedMode();
+      const groupSize = Number(app.querySelector('#word-count')?.value) || 1;
+      restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
+      if (state.bookPages) {
+        const spread = bookSpreadForWordIndex(reader, anchorIndex);
+        if (spread != null) goToBookSpread(spread, { behavior: 'auto', ensureRendered: true, syncReaderPosition: false });
+      }
+      state.index = anchorIndex;
+      updateReaderStatus();
+      const start = app.querySelector('#start-reader');
+      if (start && mode !== 'two-column') start.textContent = anchorIndex ? 'Resume' : 'Start';
+      if (snapshot.wasRunning && mode !== 'two-column') startReader();
+      persistReaderSession();
+    });
+  });
+}
+
+function switchReadingMode(nextMode) {
+  const reader = app.querySelector('#reader');
+  if (!reader) return;
+
+  const previousMode = state.renderedMode || getSelectedMode();
+  const wasRunning = isReaderRunning();
+  const groupSize = Number(app.querySelector('#word-count')?.value) || 1;
+  const anchorIndex = ['flash', 'digital-sign'].includes(previousMode)
+    ? Math.max(0, state.index || 0)
+    : visibleReadingAnchor(reader, state.index);
+
+  // A mode change must fully dispose of paused timers and Web Animations, but
+  // it must not reset the reader's logical position.
+  stopReader();
+  state.index = anchorIndex;
+  prepareReaderView(nextMode, groupSize);
+  updateModeControls(nextMode);
+
+  restoreCapturedReaderLocation({ anchorIndex, wasRunning }, { rerendered: true });
 }
 
 function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-count')?.value) || 1) {
   const reader = app.querySelector('#reader');
   if (!reader) return;
   reader.classList.remove('flash', 'highlight-mode', 'bold-focus-mode', 'smooth-glide-mode', 'pointing-guide-mode', 'marquee-mode', 'digital-sign-mode', 'two-column-mode', 'auto-scroll-mode', 'reading-guide-enabled', 'book-pages-layout', 'illustrated-reading');
-  reader.scrollTop = 0;
   state.renderedMode = mode;
+  updateFocusAnchorOverlay();
   state.bookPages = Boolean(app.querySelector('#book-pages')?.checked) && modeSupportsBookPages(mode);
   reader.classList.toggle('book-pages-layout', state.bookPages);
   reader.classList.toggle('illustrated-reading', state.illustrationMode !== 'off' && modeSupportsIllustrations(mode));
@@ -3151,13 +3763,15 @@ function scrollActiveGroup(reader, groupIndex) {
   // that edge, advance the text just enough to place the same active phrase
   // near the top, creating a page-like reading rhythm.
   if (state.bookPages) {
-    const leftInsidePane = activeRect.left - readerRect.left;
-    const rightInsidePane = activeRect.right - readerRect.left;
-    if (leftInsidePane < 0 || rightInsidePane > reader.clientWidth) {
-      const spread = Math.max(1, reader.clientWidth);
-      const targetSpread = Math.max(0, Math.floor((reader.scrollLeft + leftInsidePane) / spread));
-      reader.scrollLeft = targetSpread * spread;
-      updateBookPageStatus();
+    const metrics = applyBookPageMetrics(reader);
+    const absoluteLeft = activeRect.left - readerRect.left + reader.scrollLeft - metrics.paddingLeft;
+    const pageIndex = Math.max(0, Math.floor((absoluteLeft + Math.min(activeRect.width / 2, metrics.pageWidth / 4)) / metrics.pagePitch));
+    const targetSpread = Math.floor(pageIndex / 2);
+    const currentSpread = getCurrentBookSpread(reader);
+    if (targetSpread !== currentSpread) {
+      // The reading helper may advance only to the spread that actually owns
+      // the active group; never animate through intermediate horizontal states.
+      goToBookSpread(targetSpread, { behavior: 'auto', ensureRendered: true });
     }
     return;
   }
@@ -3384,7 +3998,7 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
     state.autoScrollLastAt = now;
 
     if (reader.scrollTop + reader.clientHeight >= reader.scrollHeight - 900 && state.renderedWordEnd < state.words.length) {
-      ensureWordsRendered(reader, 'auto-scroll', 1, state.renderedWordEnd + 5000);
+      ensureWordsRendered(reader, 'auto-scroll', 1, state.renderedWordEnd + 800);
     }
 
     const measuredWords = Math.max(1, state.renderedWordEnd);
@@ -3485,8 +4099,12 @@ function startReader() {
     let pointingStep = null;
 
     if (mode === 'flash') {
-      renderPhrase(reader, state.words.slice(startIndex, nextIndex));
+      const flashWords = state.words.slice(startIndex, nextIndex);
+      reader.style.fontSize = `${Math.max(10, Number(app.querySelector('#font-size')?.value) || 14)}px`;
+      if (state.focusAnchor) renderFocusAnchorPhrase(reader, flashWords);
+      else renderPhrase(reader, flashWords);
     } else {
+      updateFocusAnchorOverlay(state.words.slice(startIndex, nextIndex));
       ensureWordsRendered(reader, mode, count, nextIndex + 1000);
 
       if (mode === 'pointing-guide') {
@@ -3618,6 +4236,98 @@ function resetReader() {
   if (start) start.textContent = 'Start';
 }
 
+function splitTranslationChunks(text, maxChars = 3500) {
+  const source = String(text || '');
+  if (!source) return [];
+
+  const chunks = [];
+  let current = '';
+  const paragraphs = source.split(/(\n\s*\n)/);
+
+  const flush = () => {
+    if (current) chunks.push(current);
+    current = '';
+  };
+
+  for (const part of paragraphs) {
+    if (!part) continue;
+    if (part.length <= maxChars) {
+      if (current.length + part.length <= maxChars) current += part;
+      else {
+        flush();
+        current = part;
+      }
+      continue;
+    }
+
+    flush();
+    // Very long paragraphs are split on sentence/word boundaries so the
+    // browser translator is never handed an unnecessarily huge request.
+    let remaining = part;
+    while (remaining.length > maxChars) {
+      let cut = remaining.lastIndexOf('. ', maxChars);
+      if (cut < Math.floor(maxChars * 0.55)) cut = remaining.lastIndexOf(' ', maxChars);
+      if (cut < Math.floor(maxChars * 0.35)) cut = maxChars;
+      else cut += 1;
+      chunks.push(remaining.slice(0, cut));
+      remaining = remaining.slice(cut);
+    }
+    current = remaining;
+  }
+  flush();
+  return chunks;
+}
+
+async function translateWithBrowser(text, sourceLanguage, targetLanguage, onProgress) {
+  const BrowserTranslator = globalThis.Translator;
+  if (!BrowserTranslator || typeof BrowserTranslator.create !== 'function') throw new Error('Browser translation is not available in this Chrome installation.');
+
+  const availability = typeof BrowserTranslator.availability === 'function'
+    ? await BrowserTranslator.availability({ sourceLanguage, targetLanguage })
+    : 'available';
+  if (availability === 'unavailable' || availability === 'no') {
+    throw new Error(`Browser translation does not support ${sourceLanguage} → ${targetLanguage} on this device.`);
+  }
+
+  const translator = await BrowserTranslator.create({
+    sourceLanguage,
+    targetLanguage,
+    monitor(monitor) {
+      monitor.addEventListener('downloadprogress', (event) => {
+        if (onProgress) onProgress({ type: 'download', value: event.loaded || 0 });
+      });
+    }
+  });
+
+  try {
+    const chunks = splitTranslationChunks(text);
+    const translated = [];
+    for (let i = 0; i < chunks.length; i += 1) {
+      if (onProgress) onProgress({ type: 'translate', current: i + 1, total: chunks.length });
+      translated.push(await translator.translate(chunks[i]));
+    }
+    return translated.join('');
+  } finally {
+    if (typeof translator.destroy === 'function') translator.destroy();
+  }
+}
+
+async function translateTextPreferBrowser(text, sourceLanguage, targetLanguage, onProgress) {
+  try {
+    const translated = await translateWithBrowser(text, sourceLanguage, targetLanguage, onProgress);
+    return { text: translated, provider: 'browser' };
+  } catch (browserError) {
+    // Preserve the existing server/API path as a fallback for browsers that do
+    // not expose Chrome's Translator API or for unsupported language pairs.
+    const payload = await loadApiPayload('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, to: targetLanguage, from: sourceLanguage })
+    });
+    return { text: payload.text, provider: 'server', browserError };
+  }
+}
+
 async function translateCurrentText() {
   const language = app.querySelector('#translation-language')?.value;
   const status = app.querySelector('#translation-status');
@@ -3631,17 +4341,19 @@ async function translateCurrentText() {
   pauseReader();
   button.disabled = true;
   status.className = 'status';
-  status.textContent = `Translating to ${languages[language]}…`;
+  status.textContent = `Preparing ${languages[language]} translation…`;
 
   try {
-    const payload = await loadApiPayload('/api/translate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: state.originalText, to: language })
+    const result = await translateTextPreferBrowser(state.originalText, 'en', language, (progress) => {
+      if (progress.type === 'download') {
+        status.textContent = `Downloading browser language pack… ${Math.round(progress.value * 100)}%`;
+      } else if (progress.type === 'translate') {
+        status.textContent = `Translating in browser… ${progress.current} of ${progress.total}`;
+      }
     });
-    state.currentText = payload.text;
+    state.currentText = result.text;
     state.language = language;
-    state.words = splitWords(payload.text);
+    state.words = splitWords(result.text);
     state.index = 0;
     state.translationCache.clear();
     const mode = getSelectedMode();
@@ -3649,7 +4361,9 @@ async function translateCurrentText() {
     updateReaderStatus(`${state.words.length.toLocaleString()} translated words loaded.`);
     app.querySelector('#restore-english').disabled = false;
     app.querySelector('#word-result').innerHTML = `<h2>Word translation</h2><p>Click any translated word to see its English meaning.</p>`;
-    status.textContent = `Translated to ${languages[language]}.`;
+    status.textContent = result.provider === 'browser'
+      ? `Translated to ${languages[language]} in your browser.`
+      : `Translated to ${languages[language]} using the server fallback.`;
   } catch (error) {
     status.className = 'status error';
     status.textContent = error.message;
@@ -3686,12 +4400,16 @@ async function handleTranslatedWordClick(event) {
   try {
     let translation = state.translationCache.get(cacheKey);
     if (!translation) {
-      const payload = await loadApiPayload('/api/translate-word', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: word, from: state.language })
-      });
-      translation = payload.text;
+      try {
+        translation = await translateWithBrowser(word, state.language, 'en');
+      } catch {
+        const payload = await loadApiPayload('/api/translate-word', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: word, from: state.language })
+        });
+        translation = payload.text;
+      }
       state.translationCache.set(cacheKey, translation);
     }
     panel.innerHTML = `
@@ -3978,6 +4696,7 @@ async function renderCurrentFeed(sourceId) {
             ${item.summary ? `<p>${escapeHtml(item.summary)}</p>` : '<p class="status">No summary was supplied by this feed.</p>'}
             <div class="feed-actions">
               <button class="primary" type="button" data-read-summary="${index}">Read summary</button>
+              <button class="secondary" type="button" data-watch-news="${index}">Watch news</button>
               <button class="secondary" type="button" data-load-article="${index}">Try article text</button>
               <a class="secondary button-link" href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer">Open original</a>
             </div><p class="status article-status" data-article-status="${index}"></p>
@@ -3989,6 +4708,15 @@ async function renderCurrentFeed(sourceId) {
         const item = items[Number(button.dataset.readSummary)];
         const text = `${item.title}\n\n${item.summary || 'No summary was supplied.'}\n\nSource: ${source.name}\n${item.link}`;
         renderReaderWithText(item.title, text, { type: 'feed-summary', url: item.link, source: source.name });
+      });
+    });
+    app.querySelectorAll('[data-watch-news]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const item = items[Number(button.dataset.watchNews)];
+        if (!item?.title) return;
+        const query = encodeURIComponent(`"${item.title}" ${source?.name || ''}`.trim());
+        const url = `https://news.google.com/search?q=${query}&hl=en-US&gl=US&ceid=US%3Aen`;
+        window.open(url, '_blank', 'noopener,noreferrer');
       });
     });
     app.querySelectorAll('[data-load-article]').forEach((button) => {
@@ -4233,6 +4961,32 @@ try {
 } catch {}
 
 window.setInterval(() => { if (state.words.length) persistReaderSession(); }, 10000);
+let bookPageResizeTimer = null;
+window.addEventListener('resize', () => {
+  if (!state.bookPages) return;
+  window.clearTimeout(bookPageResizeTimer);
+  bookPageResizeTimer = window.setTimeout(() => scheduleBookPageReflow(), 90);
+});
+
+// Fullscreen and pane changes can alter the reader width without producing a
+// useful window resize event. Observe the actual reader box and rebuild the
+// two-page geometry while preserving the same logical spread.
+let observedBookReader = null;
+const bookPageResizeObserver = typeof ResizeObserver === 'function'
+  ? new ResizeObserver(() => {
+      if (!state.bookPages) return;
+      window.clearTimeout(bookPageResizeTimer);
+      bookPageResizeTimer = window.setTimeout(() => scheduleBookPageReflow(), 70);
+    })
+  : null;
+function observeBookPageReader() {
+  const reader = app.querySelector('#reader');
+  if (!bookPageResizeObserver || !reader || reader === observedBookReader) return;
+  if (observedBookReader) bookPageResizeObserver.unobserve(observedBookReader);
+  observedBookReader = reader;
+  bookPageResizeObserver.observe(reader);
+}
+
 window.addEventListener('pagehide', () => persistReaderSession({ immediate: true }));
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistReaderSession({ immediate: true }); });
 
