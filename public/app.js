@@ -21,6 +21,10 @@ const virtualRenderer = new VirtualRenderer({
   updateBookPageStatus: () => updateBookPageStatus()
 });
 let readerSessionSaveTimer = null;
+const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
+// The top Reader button must return only to a reader explicitly opened during
+// this browser/app session. Persistent IndexedDB is reserved for Home > Resume.
+let activeReaderSnapshot = null;
 
 async function writeReaderSession(snapshot) {
   return readerSessionManager.write(snapshot);
@@ -28,6 +32,11 @@ async function writeReaderSession(snapshot) {
 
 async function readReaderSession() {
   return readerSessionManager.read();
+}
+
+async function clearReaderSession() {
+  await readerSessionManager.clear();
+  try { localStorage.removeItem(READER_SESSION_META_KEY); } catch {}
 }
 
 function captureReaderControls() {
@@ -39,6 +48,8 @@ function captureReaderControls() {
     focusAnchor: Boolean(app.querySelector('#focus-anchor')?.checked ?? state.focusAnchor),
     focusAnchorPosition: state.focusAnchorPosition || null,
     focusAnchorFontSize: Number(app.querySelector('#focus-anchor-font-size')?.value || state.focusAnchorFontSize || 24),
+    focusAnchorColor: app.querySelector('#focus-anchor-color')?.value || state.focusAnchorColor || '#20a866',
+    focusAnchorBold: Boolean(app.querySelector('#focus-anchor-bold')?.checked ?? state.focusAnchorBold),
     fontFamily: app.querySelector('#font-family')?.value || 'system',
     fontSize: Number(app.querySelector('#font-size')?.value || 14),
     theme: app.querySelector('#theme-select')?.value || 'dark',
@@ -59,7 +70,19 @@ function persistReaderSession({ immediate = false } = {}) {
   const save = () => {
     readerSessionSaveTimer = null;
     const snapshot = buildReaderSessionSnapshot();
-    if (snapshot) writeReaderSession(snapshot);
+    if (snapshot) {
+      try {
+        const totalWords = Array.isArray(state.words) ? state.words.length : splitWords(snapshot.currentText || '').length;
+        localStorage.setItem(READER_SESSION_META_KEY, JSON.stringify({
+          documentId: snapshot.documentId || state.documentId || '',
+          title: snapshot.title || state.title || 'Untitled',
+          index: Math.max(0, Number(snapshot.index) || 0),
+          totalWords: Math.max(0, Number(totalWords) || 0),
+          savedAt: new Date().toISOString()
+        }));
+      } catch {}
+      writeReaderSession(snapshot);
+    }
   };
   window.clearTimeout(readerSessionSaveTimer);
   if (immediate) save();
@@ -273,9 +296,10 @@ function recommendedPlayerChoice(title = '', text = '') {
   };
 }
 
-function grokipediaSearchUrl(title) {
+function grokipediaSearchUrl(title, author = '') {
   const cleanTitle = String(title || '').replace(/\s*[—-].*$/, '').trim();
-  return `https://grokipedia.com/search?q=${encodeURIComponent(cleanTitle)}`;
+  const query = `${cleanTitle}${author ? ` ${author}` : ''}`.trim();
+  return `https://grokipedia.com/search?q=${encodeURIComponent(query)}`;
 }
 
 function bindReaderMusicControls(title, text, source = {}) {
@@ -334,7 +358,7 @@ function bindReaderMusicControls(title, text, source = {}) {
       `${title} — reading mood`
     ));
   }
-  if (grokipediaLink) grokipediaLink.href = grokipediaSearchUrl(title);
+  if (grokipediaLink) grokipediaLink.href = grokipediaSearchUrl(title, source?.author || '');
 }
 
 const musicDock = document.querySelector('#music-dock');
@@ -549,45 +573,145 @@ async function loadBillboardSongs() {
 
 
 const greatBooksCatalog = [
-  { era: 'Ancient', author: 'Homer', title: 'The Iliad', query: 'Iliad Homer' },
-  { era: 'Ancient', author: 'Homer', title: 'The Odyssey', query: 'Odyssey Homer' },
-  { era: 'Ancient', author: 'Aeschylus', title: 'The Oresteia / Tragedies', query: 'Aeschylus tragedies' },
-  { era: 'Ancient', author: 'Sophocles', title: 'The Tragedies of Sophocles', query: 'Sophocles tragedies' },
-  { era: 'Ancient', author: 'Herodotus', title: 'The Histories', query: 'Herodotus history' },
-  { era: 'Ancient', author: 'Thucydides', title: 'History of the Peloponnesian War', query: 'Thucydides Peloponnesian War' },
-  { era: 'Ancient', author: 'Plato', title: 'The Republic', query: 'Republic Plato' },
-  { era: 'Ancient', author: 'Plato', title: 'Dialogues', query: 'Dialogues Plato' },
-  { era: 'Ancient', author: 'Aristotle', title: 'Politics', query: 'Politics Aristotle' },
-  { era: 'Ancient', author: 'Aristotle', title: 'Poetics', query: 'Poetics Aristotle' },
-  { era: 'Roman & Early Christian', author: 'Virgil', title: 'The Aeneid', query: 'Aeneid Virgil' },
-  { era: 'Roman & Early Christian', author: 'Plutarch', title: 'Lives', query: 'Plutarch lives' },
-  { era: 'Roman & Early Christian', author: 'Marcus Aurelius', title: 'Meditations', query: 'Meditations Marcus Aurelius' },
-  { era: 'Roman & Early Christian', author: 'Augustine', title: 'Confessions', query: 'Confessions Augustine' },
-  { era: 'Middle Ages & Renaissance', author: 'Dante Alighieri', title: 'The Divine Comedy', query: 'Divine Comedy Dante' },
-  { era: 'Middle Ages & Renaissance', author: 'Thomas Aquinas', title: 'Selected Works', query: 'Thomas Aquinas' },
-  { era: 'Middle Ages & Renaissance', author: 'Niccolò Machiavelli', title: 'The Prince', query: 'Prince Machiavelli' },
-  { era: 'Middle Ages & Renaissance', author: 'Michel de Montaigne', title: 'Essays', query: 'Essays Montaigne' },
-  { era: 'Middle Ages & Renaissance', author: 'William Shakespeare', title: 'Complete Works', query: 'Shakespeare complete works' },
-  { era: 'Early Modern', author: 'Miguel de Cervantes', title: 'Don Quixote', query: 'Don Quixote Cervantes' },
-  { era: 'Early Modern', author: 'Francis Bacon', title: 'Essays', query: 'Essays Francis Bacon' },
-  { era: 'Early Modern', author: 'Thomas Hobbes', title: 'Leviathan', query: 'Leviathan Hobbes' },
-  { era: 'Early Modern', author: 'René Descartes', title: 'Discourse on Method', query: 'Discourse Method Descartes' },
-  { era: 'Early Modern', author: 'John Milton', title: 'Paradise Lost', query: 'Paradise Lost Milton' },
-  { era: 'Enlightenment & Modern', author: 'John Locke', title: 'Second Treatise of Government', query: 'Second Treatise Government Locke' },
-  { era: 'Enlightenment & Modern', author: 'David Hume', title: 'An Enquiry Concerning Human Understanding', query: 'Enquiry Human Understanding Hume' },
-  { era: 'Enlightenment & Modern', author: 'Jean-Jacques Rousseau', title: 'The Social Contract', query: 'Social Contract Rousseau' },
-  { era: 'Enlightenment & Modern', author: 'Adam Smith', title: 'The Wealth of Nations', query: 'Wealth Nations Adam Smith' },
-  { era: 'Enlightenment & Modern', author: 'Edward Gibbon', title: 'The Decline and Fall of the Roman Empire', query: 'Decline Fall Roman Empire Gibbon' },
-  { era: 'Enlightenment & Modern', author: 'Immanuel Kant', title: 'Critique of Pure Reason', query: 'Critique Pure Reason Kant' },
-  { era: 'Enlightenment & Modern', author: 'John Stuart Mill', title: 'On Liberty', query: 'On Liberty Mill' },
-  { era: 'Science', author: 'Euclid', title: 'The Elements', query: 'Elements Euclid' },
-  { era: 'Science', author: 'Galileo Galilei', title: 'Dialogues Concerning Two New Sciences', query: 'Two New Sciences Galileo' },
-  { era: 'Science', author: 'Charles Darwin', title: 'On the Origin of Species', query: 'Origin Species Darwin' },
-  { era: 'Literature', author: 'Jane Austen', title: 'Pride and Prejudice', query: 'Pride Prejudice Austen' },
-  { era: 'Literature', author: 'Johann Wolfgang von Goethe', title: 'Faust', query: 'Faust Goethe' },
-  { era: 'Literature', author: 'Herman Melville', title: 'Moby-Dick', query: 'Moby Dick Melville' },
-  { era: 'Literature', author: 'Leo Tolstoy', title: 'War and Peace', query: 'War Peace Tolstoy' },
-  { era: 'Literature', author: 'Fyodor Dostoevsky', title: 'The Brothers Karamazov', query: 'Brothers Karamazov Dostoevsky' }
+  {"volume": 3, "era": "Ancient", "author": "Homer", "title": "The Iliad", "query": "Iliad Homer"},
+  {"volume": 3, "era": "Ancient", "author": "Homer", "title": "The Odyssey", "query": "Odyssey Homer"},
+  {"volume": 4, "era": "Ancient Drama", "author": "Aeschylus", "title": "Plays", "query": "Aeschylus plays"},
+  {"volume": 4, "era": "Ancient Drama", "author": "Sophocles", "title": "Plays", "query": "Sophocles plays"},
+  {"volume": 4, "era": "Ancient Drama", "author": "Euripides", "title": "Plays", "query": "Euripides plays"},
+  {"volume": 4, "era": "Ancient Drama", "author": "Aristophanes", "title": "Plays", "query": "Aristophanes plays"},
+  {"volume": 5, "era": "Ancient History", "author": "Herodotus", "title": "The History of the Persian Wars", "query": "Herodotus Persian Wars"},
+  {"volume": 5, "era": "Ancient History", "author": "Thucydides", "title": "The History of the Peloponnesian War", "query": "Thucydides Peloponnesian War"},
+  {"volume": 6, "era": "Ancient Philosophy", "author": "Plato", "title": "Dialogues and The Seventh Letter", "query": "Plato Dialogues"},
+  {"volume": 7, "era": "Ancient Philosophy", "author": "Aristotle", "title": "Works, Volume I", "query": "Aristotle works"},
+  {"volume": 8, "era": "Ancient Philosophy", "author": "Aristotle", "title": "Works, Volume II", "query": "Aristotle works"},
+  {"volume": 9, "era": "Ancient Science & Medicine", "author": "Hippocrates", "title": "Works", "query": "Hippocrates works"},
+  {"volume": 9, "era": "Ancient Science & Medicine", "author": "Galen", "title": "On the Natural Faculties", "query": "Galen Natural Faculties"},
+  {"volume": 10, "era": "Ancient Mathematics", "author": "Euclid", "title": "Elements", "query": "Euclid Elements"},
+  {"volume": 10, "era": "Ancient Mathematics", "author": "Archimedes", "title": "Works", "query": "Archimedes works"},
+  {"volume": 10, "era": "Ancient Mathematics", "author": "Nicomachus", "title": "Introduction to Arithmetic", "query": "Nicomachus Introduction Arithmetic"},
+  {"volume": 11, "era": "Ancient Philosophy", "author": "Lucretius", "title": "The Way Things Are", "query": "Lucretius Nature Things"},
+  {"volume": 11, "era": "Ancient Philosophy", "author": "Epictetus", "title": "Discourses", "query": "Epictetus Discourses"},
+  {"volume": 11, "era": "Ancient Philosophy", "author": "Marcus Aurelius", "title": "Meditations", "query": "Marcus Aurelius Meditations"},
+  {"volume": 11, "era": "Ancient Philosophy", "author": "Plotinus", "title": "The Six Enneads", "query": "Plotinus Enneads"},
+  {"volume": 12, "era": "Roman Literature", "author": "Virgil", "title": "Eclogues, Georgics, and The Aeneid", "query": "Virgil Aeneid"},
+  {"volume": 13, "era": "Roman History", "author": "Plutarch", "title": "The Lives of the Noble Grecians and Romans", "query": "Plutarch Lives"},
+  {"volume": 14, "era": "Roman History", "author": "Tacitus", "title": "The Annals and The Histories", "query": "Tacitus Annals Histories"},
+  {"volume": 15, "era": "Astronomy", "author": "Ptolemy", "title": "The Almagest", "query": "Ptolemy Almagest"},
+  {"volume": 15, "era": "Astronomy", "author": "Nicolaus Copernicus", "title": "On the Revolutions of the Heavenly Spheres", "query": "Copernicus Revolutions Heavenly Spheres"},
+  {"volume": 15, "era": "Astronomy", "author": "Johannes Kepler", "title": "Epitome of Copernican Astronomy and Harmonies of the World", "query": "Kepler Copernican Astronomy Harmonies World"},
+  {"volume": 16, "era": "Christian Thought", "author": "Saint Augustine", "title": "The Confessions", "query": "Augustine Confessions"},
+  {"volume": 16, "era": "Christian Thought", "author": "Saint Augustine", "title": "The City of God", "query": "Augustine City of God"},
+  {"volume": 16, "era": "Christian Thought", "author": "Saint Augustine", "title": "On Christian Doctrine", "query": "Augustine Christian Doctrine"},
+  {"volume": 17, "era": "Medieval Philosophy & Theology", "author": "Thomas Aquinas", "title": "Summa Theologica, Part I", "query": "Aquinas Summa Theologica"},
+  {"volume": 18, "era": "Medieval Philosophy & Theology", "author": "Thomas Aquinas", "title": "Summa Theologica, Part II", "query": "Aquinas Summa Theologica"},
+  {"volume": 19, "era": "Medieval Literature", "author": "Dante Alighieri", "title": "The Divine Comedy", "query": "Dante Divine Comedy"},
+  {"volume": 19, "era": "Medieval Literature", "author": "Geoffrey Chaucer", "title": "Troilus and Criseyde", "query": "Chaucer Troilus Criseyde"},
+  {"volume": 19, "era": "Medieval Literature", "author": "Geoffrey Chaucer", "title": "The Canterbury Tales", "query": "Chaucer Canterbury Tales"},
+  {"volume": 20, "era": "Reformation", "author": "John Calvin", "title": "Institutes of the Christian Religion", "query": "Calvin Institutes Christian Religion"},
+  {"volume": 21, "era": "Political Philosophy", "author": "Niccolò Machiavelli", "title": "The Prince", "query": "Machiavelli Prince"},
+  {"volume": 21, "era": "Political Philosophy", "author": "Thomas Hobbes", "title": "Leviathan", "query": "Hobbes Leviathan"},
+  {"volume": 22, "era": "Renaissance Literature", "author": "François Rabelais", "title": "Gargantua and Pantagruel", "query": "Rabelais Gargantua Pantagruel"},
+  {"volume": 23, "era": "Renaissance Thought", "author": "Desiderius Erasmus", "title": "Praise of Folly", "query": "Erasmus Praise Folly"},
+  {"volume": 23, "era": "Renaissance Thought", "author": "Michel de Montaigne", "title": "Essays", "query": "Montaigne Essays"},
+  {"volume": 24, "era": "Shakespeare", "author": "William Shakespeare", "title": "Plays, Volume I", "query": "Shakespeare plays"},
+  {"volume": 25, "era": "Shakespeare", "author": "William Shakespeare", "title": "Plays, Volume II and Sonnets", "query": "Shakespeare Sonnets plays"},
+  {"volume": 26, "era": "Early Modern Science", "author": "William Gilbert", "title": "On the Loadstone and Magnetic Bodies", "query": "William Gilbert Loadstone"},
+  {"volume": 26, "era": "Early Modern Science", "author": "Galileo Galilei", "title": "Dialogues Concerning the Two New Sciences", "query": "Galileo Two New Sciences"},
+  {"volume": 26, "era": "Early Modern Science", "author": "William Harvey", "title": "Works on the Heart, Blood, and Generation", "query": "William Harvey heart blood animals"},
+  {"volume": 27, "era": "Early Modern Literature", "author": "Miguel de Cervantes", "title": "Don Quixote", "query": "Cervantes Don Quixote"},
+  {"volume": 28, "era": "Early Modern Philosophy", "author": "Francis Bacon", "title": "Advancement of Learning, Novum Organum, and New Atlantis", "query": "Francis Bacon Novum Organum"},
+  {"volume": 28, "era": "Early Modern Philosophy", "author": "René Descartes", "title": "Major Philosophical Works", "query": "Descartes Discourse Method Meditations"},
+  {"volume": 28, "era": "Early Modern Philosophy", "author": "Benedict de Spinoza", "title": "Ethics", "query": "Spinoza Ethics"},
+  {"volume": 29, "era": "Early Modern Literature", "author": "John Milton", "title": "Paradise Lost and Other Works", "query": "Milton Paradise Lost"},
+  {"volume": 30, "era": "Early Modern Thought", "author": "Blaise Pascal", "title": "Provincial Letters, Pensées, and Scientific Treatises", "query": "Pascal Pensees"},
+  {"volume": 31, "era": "French Drama", "author": "Molière", "title": "Major Plays", "query": "Moliere plays"},
+  {"volume": 31, "era": "French Drama", "author": "Jean Racine", "title": "Berenice and Phaedra", "query": "Racine Phaedra Berenice"},
+  {"volume": 32, "era": "Science", "author": "Isaac Newton", "title": "Mathematical Principles of Natural Philosophy and Optics", "query": "Newton Principia Opticks"},
+  {"volume": 32, "era": "Science", "author": "Christiaan Huygens", "title": "Treatise on Light", "query": "Huygens Treatise Light"},
+  {"volume": 33, "era": "Enlightenment Philosophy", "author": "John Locke", "title": "A Letter Concerning Toleration, Civil Government, and Human Understanding", "query": "Locke Human Understanding Government"},
+  {"volume": 33, "era": "Enlightenment Philosophy", "author": "George Berkeley", "title": "The Principles of Human Knowledge", "query": "Berkeley Human Knowledge"},
+  {"volume": 33, "era": "Enlightenment Philosophy", "author": "David Hume", "title": "An Enquiry Concerning Human Understanding", "query": "Hume Enquiry Human Understanding"},
+  {"volume": 34, "era": "Enlightenment Literature", "author": "Jonathan Swift", "title": "Gulliver’s Travels", "query": "Swift Gulliver Travels"},
+  {"volume": 34, "era": "Enlightenment Literature", "author": "Voltaire", "title": "Candide", "query": "Voltaire Candide"},
+  {"volume": 34, "era": "Enlightenment Literature", "author": "Denis Diderot", "title": "Rameau’s Nephew", "query": "Diderot Rameau Nephew"},
+  {"volume": 35, "era": "Political Philosophy", "author": "Montesquieu", "title": "The Spirit of Laws", "query": "Montesquieu Spirit Laws"},
+  {"volume": 35, "era": "Political Philosophy", "author": "Jean-Jacques Rousseau", "title": "Political Writings including The Social Contract", "query": "Rousseau Social Contract"},
+  {"volume": 36, "era": "Economics", "author": "Adam Smith", "title": "The Wealth of Nations", "query": "Adam Smith Wealth Nations"},
+  {"volume": 37, "era": "History", "author": "Edward Gibbon", "title": "The Decline and Fall of the Roman Empire, Volume I", "query": "Gibbon Decline Fall Roman Empire"},
+  {"volume": 38, "era": "History", "author": "Edward Gibbon", "title": "The Decline and Fall of the Roman Empire, Volume II", "query": "Gibbon Decline Fall Roman Empire"},
+  {"volume": 39, "era": "Modern Philosophy", "author": "Immanuel Kant", "title": "Major Critical and Moral Works", "query": "Kant Critique Pure Reason"},
+  {"volume": 40, "era": "American Political Thought", "author": "United States", "title": "Declaration, Articles of Confederation, and Constitution", "query": "United States Constitution Declaration Independence"},
+  {"volume": 40, "era": "American Political Thought", "author": "Alexander Hamilton, James Madison, John Jay", "title": "The Federalist Papers", "query": "Federalist Papers"},
+  {"volume": 40, "era": "Liberal Political Thought", "author": "John Stuart Mill", "title": "On Liberty, Representative Government, and Utilitarianism", "query": "John Stuart Mill On Liberty"},
+  {"volume": 41, "era": "Biography", "author": "James Boswell", "title": "The Life of Samuel Johnson", "query": "Boswell Life Samuel Johnson"},
+  {"volume": 42, "era": "Science", "author": "Antoine Lavoisier", "title": "Elements of Chemistry", "query": "Lavoisier Elements Chemistry"},
+  {"volume": 42, "era": "Science", "author": "Michael Faraday", "title": "Experimental Researches in Electricity", "query": "Faraday Experimental Researches Electricity"},
+  {"volume": 43, "era": "Modern Philosophy", "author": "G. W. F. Hegel", "title": "The Philosophy of Right and The Philosophy of History", "query": "Hegel Philosophy Right History"},
+  {"volume": 43, "era": "Modern Philosophy", "author": "Søren Kierkegaard", "title": "Fear and Trembling", "query": "Kierkegaard Fear Trembling"},
+  {"volume": 43, "era": "Modern Philosophy", "author": "Friedrich Nietzsche", "title": "Beyond Good and Evil", "query": "Nietzsche Beyond Good Evil"},
+  {"volume": 44, "era": "Political Thought", "author": "Alexis de Tocqueville", "title": "Democracy in America", "query": "Tocqueville Democracy America"},
+  {"volume": 45, "era": "Literature", "author": "Johann Wolfgang von Goethe", "title": "Faust", "query": "Goethe Faust"},
+  {"volume": 45, "era": "Literature", "author": "Honoré de Balzac", "title": "Cousin Bette", "query": "Balzac Cousin Bette"},
+  {"volume": 46, "era": "Literature", "author": "Jane Austen", "title": "Emma", "query": "Jane Austen Emma"},
+  {"volume": 46, "era": "Literature", "author": "George Eliot", "title": "Middlemarch", "query": "George Eliot Middlemarch"},
+  {"volume": 47, "era": "Literature", "author": "Charles Dickens", "title": "Little Dorrit", "query": "Dickens Little Dorrit"},
+  {"volume": 48, "era": "Literature", "author": "Herman Melville", "title": "Moby-Dick", "query": "Melville Moby Dick"},
+  {"volume": 48, "era": "Literature", "author": "Mark Twain", "title": "Adventures of Huckleberry Finn", "query": "Mark Twain Huckleberry Finn"},
+  {"volume": 49, "era": "Science", "author": "Charles Darwin", "title": "The Origin of Species", "query": "Darwin Origin Species"},
+  {"volume": 49, "era": "Science", "author": "Charles Darwin", "title": "The Descent of Man", "query": "Darwin Descent Man"},
+  {"volume": 50, "era": "Political Economy", "author": "Karl Marx and Friedrich Engels", "title": "Manifesto of the Communist Party", "query": "Communist Manifesto Marx Engels"},
+  {"volume": 50, "era": "Political Economy", "author": "Karl Marx", "title": "Capital, Volume I", "query": "Marx Capital Volume 1"},
+  {"volume": 51, "era": "Literature", "author": "Leo Tolstoy", "title": "War and Peace", "query": "Tolstoy War Peace"},
+  {"volume": 52, "era": "Literature", "author": "Fyodor Dostoevsky", "title": "The Brothers Karamazov", "query": "Dostoevsky Brothers Karamazov"},
+  {"volume": 52, "era": "Literature", "author": "Henrik Ibsen", "title": "A Doll’s House, The Wild Duck, Hedda Gabler, and The Master Builder", "query": "Ibsen plays"},
+  {"volume": 53, "era": "Psychology", "author": "William James", "title": "The Principles of Psychology", "query": "William James Principles Psychology"},
+  {"volume": 54, "era": "Psychology", "author": "Sigmund Freud", "title": "Major Works", "query": "Freud Interpretation Dreams Psychoanalysis"},
+  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "William James", "title": "Pragmatism", "query": "William James Pragmatism"},
+  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Henri Bergson", "title": "An Introduction to Metaphysics", "query": "Bergson Introduction Metaphysics"},
+  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "John Dewey", "title": "Experience and Education", "query": "Dewey Experience Education"},
+  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Alfred North Whitehead", "title": "Science and the Modern World", "query": "Whitehead Science Modern World"},
+  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Bertrand Russell", "title": "The Problems of Philosophy", "query": "Russell Problems Philosophy"},
+  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Martin Heidegger", "title": "What Is Metaphysics?", "query": "Heidegger What Is Metaphysics"},
+  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Ludwig Wittgenstein", "title": "Philosophical Investigations", "query": "Wittgenstein Philosophical Investigations"},
+  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Karl Barth", "title": "The Word of God and the Word of Man", "query": "Karl Barth Word God Word Man"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "Henri Poincaré", "title": "Science and Hypothesis", "query": "Poincare Science Hypothesis"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "Max Planck", "title": "Scientific Autobiography and Other Papers", "query": "Planck Scientific Autobiography"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "Alfred North Whitehead", "title": "An Introduction to Mathematics", "query": "Whitehead Introduction Mathematics"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "Albert Einstein", "title": "Relativity: The Special and the General Theory", "query": "Einstein Relativity"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "Arthur Eddington", "title": "The Expanding Universe", "query": "Eddington Expanding Universe"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "Niels Bohr", "title": "Atomic Theory and Selected Essays", "query": "Bohr Atomic Theory"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "G. H. Hardy", "title": "A Mathematician’s Apology", "query": "Hardy Mathematician Apology"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "Werner Heisenberg", "title": "Physics and Philosophy", "query": "Heisenberg Physics Philosophy"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "Erwin Schrödinger", "title": "What Is Life?", "query": "Schrodinger What Is Life"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "Theodosius Dobzhansky", "title": "Genetics and the Origin of Species", "query": "Dobzhansky Genetics Origin Species"},
+  {"volume": 56, "era": "20th Century Natural Science", "author": "C. H. Waddington", "title": "The Nature of Life", "query": "Waddington Nature Life"},
+  {"volume": 57, "era": "20th Century Social Science", "author": "Thorstein Veblen", "title": "The Theory of the Leisure Class", "query": "Veblen Theory Leisure Class"},
+  {"volume": 57, "era": "20th Century Social Science", "author": "R. H. Tawney", "title": "The Acquisitive Society", "query": "Tawney Acquisitive Society"},
+  {"volume": 57, "era": "20th Century Social Science", "author": "John Maynard Keynes", "title": "The General Theory of Employment, Interest and Money", "query": "Keynes General Theory Employment Interest Money"},
+  {"volume": 58, "era": "20th Century Social Science", "author": "James George Frazer", "title": "The Golden Bough (selections)", "query": "Frazer Golden Bough"},
+  {"volume": 58, "era": "20th Century Social Science", "author": "Max Weber", "title": "Essays in Sociology (selections)", "query": "Max Weber Sociology Essays"},
+  {"volume": 58, "era": "20th Century Social Science", "author": "Johan Huizinga", "title": "The Waning of the Middle Ages", "query": "Huizinga Waning Middle Ages"},
+  {"volume": 58, "era": "20th Century Social Science", "author": "Claude Lévi-Strauss", "title": "Structural Anthropology (selections)", "query": "Levi Strauss Structural Anthropology"},
+  {"volume": 59, "era": "20th Century Literature", "author": "Henry James", "title": "The Beast in the Jungle", "query": "Henry James Beast Jungle"},
+  {"volume": 59, "era": "20th Century Literature", "author": "George Bernard Shaw", "title": "Saint Joan", "query": "Shaw Saint Joan"},
+  {"volume": 59, "era": "20th Century Literature", "author": "Joseph Conrad", "title": "Heart of Darkness", "query": "Conrad Heart Darkness"},
+  {"volume": 59, "era": "20th Century Literature", "author": "Anton Chekhov", "title": "Uncle Vanya", "query": "Chekhov Uncle Vanya"},
+  {"volume": 59, "era": "20th Century Literature", "author": "Luigi Pirandello", "title": "Six Characters in Search of an Author", "query": "Pirandello Six Characters"},
+  {"volume": 59, "era": "20th Century Literature", "author": "Marcel Proust", "title": "Swann in Love", "query": "Proust Swann in Love"},
+  {"volume": 59, "era": "20th Century Literature", "author": "Willa Cather", "title": "A Lost Lady", "query": "Willa Cather Lost Lady"},
+  {"volume": 59, "era": "20th Century Literature", "author": "Thomas Mann", "title": "Death in Venice", "query": "Thomas Mann Death Venice"},
+  {"volume": 59, "era": "20th Century Literature", "author": "James Joyce", "title": "A Portrait of the Artist as a Young Man", "query": "Joyce Portrait Artist Young Man"},
+  {"volume": 60, "era": "20th Century Literature", "author": "Virginia Woolf", "title": "To the Lighthouse", "query": "Woolf To Lighthouse"},
+  {"volume": 60, "era": "20th Century Literature", "author": "Franz Kafka", "title": "The Metamorphosis", "query": "Kafka Metamorphosis"},
+  {"volume": 60, "era": "20th Century Literature", "author": "D. H. Lawrence", "title": "The Prussian Officer", "query": "Lawrence Prussian Officer"},
+  {"volume": 60, "era": "20th Century Literature", "author": "T. S. Eliot", "title": "The Waste Land", "query": "Eliot Waste Land"},
+  {"volume": 60, "era": "20th Century Literature", "author": "Eugene O’Neill", "title": "Mourning Becomes Electra", "query": "O'Neill Mourning Becomes Electra"},
+  {"volume": 60, "era": "20th Century Literature", "author": "F. Scott Fitzgerald", "title": "The Great Gatsby", "query": "Fitzgerald Great Gatsby"},
+  {"volume": 60, "era": "20th Century Literature", "author": "William Faulkner", "title": "A Rose for Emily", "query": "Faulkner Rose Emily"},
+  {"volume": 60, "era": "20th Century Literature", "author": "Bertolt Brecht", "title": "Mother Courage and Her Children", "query": "Brecht Mother Courage"},
+  {"volume": 60, "era": "20th Century Literature", "author": "Ernest Hemingway", "title": "The Short Happy Life of Francis Macomber", "query": "Hemingway Francis Macomber"},
+  {"volume": 60, "era": "20th Century Literature", "author": "George Orwell", "title": "Animal Farm", "query": "Orwell Animal Farm"},
+  {"volume": 60, "era": "20th Century Literature", "author": "Samuel Beckett", "title": "Waiting for Godot", "query": "Beckett Waiting Godot"}
 ];
 
 // Reader state is owned by ReaderEngine (Sprint 1).
@@ -796,11 +920,26 @@ function renderFocusAnchorPhrase(element, words) {
   right.textContent = chars.slice(anchor + 1).join('');
 
   stage.append(left, pivot, right);
+  const anchorColor = app.querySelector('#focus-anchor-color')?.value || state.focusAnchorColor || '#20a866';
+  const anchorBold = Boolean(app.querySelector('#focus-anchor-bold')?.checked ?? state.focusAnchorBold);
+  stage.style.setProperty('--focus-anchor-color', anchorColor);
+  stage.classList.toggle('focus-anchor-bold', anchorBold);
   element.replaceChildren(stage);
 }
 
 function modeSupportsFocusAnchorOverlay(mode) {
   return ['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
+}
+
+function refreshFocusAnchorStyle() {
+  const color = app.querySelector('#focus-anchor-color')?.value || state.focusAnchorColor || '#20a866';
+  const bold = Boolean(app.querySelector('#focus-anchor-bold')?.checked ?? state.focusAnchorBold);
+  state.focusAnchorColor = color;
+  state.focusAnchorBold = bold;
+  app.querySelectorAll('.focus-anchor-stage, #focus-anchor-overlay').forEach((element) => {
+    element.style.setProperty('--focus-anchor-color', color);
+    element.classList.toggle('focus-anchor-bold', bold);
+  });
 }
 
 function applyFocusAnchorReaderClearance() {
@@ -832,41 +971,84 @@ function applyFocusAnchorReaderClearance() {
   reader.style.setProperty('--focus-anchor-clearance', `${clearance}px`);
 }
 
+function focusAnchorIsFullscreen(overlay) {
+  const frame = overlay?.closest('.reader-frame');
+  return Boolean(frame && (document.fullscreenElement === frame || frame.classList.contains('fullscreen-fallback')));
+}
+
 function applyFocusAnchorPosition(overlay) {
-  const position = state.focusAnchorPosition;
-  if (overlay && position) {
-    overlay.style.left = `${Math.max(0, Math.min(100, position.x))}%`;
-    overlay.style.top = `${Math.max(0, Math.min(100, position.y))}%`;
-    overlay.style.transform = 'translate(-50%, -50%)';
+  if (!overlay) return;
+  if (focusAnchorIsFullscreen(overlay)) {
+    // Fullscreen uses a dedicated, stable top band so the reading text always begins below it.
+    overlay.classList.add('focus-anchor-fullscreen-band');
+    overlay.style.left = '50%';
+    overlay.style.top = '0.75rem';
+    overlay.style.transform = 'translateX(-50%)';
+  } else {
+    overlay.classList.remove('focus-anchor-fullscreen-band');
+    const position = state.focusAnchorPosition;
+    if (position) {
+      overlay.style.left = `${Math.max(0, Math.min(100, position.x))}%`;
+      overlay.style.top = `${Math.max(0, Math.min(100, position.y))}%`;
+      overlay.style.transform = 'translate(-50%, -50%)';
+    } else {
+      overlay.style.left = '50%';
+      overlay.style.top = '3.2rem';
+      overlay.style.transform = 'translateX(-50%)';
+    }
   }
   requestAnimationFrame(applyFocusAnchorReaderClearance);
+}
+
+function refreshFocusAnchorFullscreenLayout() {
+  const overlay = app.querySelector('#focus-anchor-overlay');
+  if (!overlay || overlay.hidden) return;
+  applyFocusAnchorPosition(overlay);
+  refreshFocusAnchorStyle();
 }
 
 function bindDraggableFocusAnchor(overlay) {
   if (!overlay || overlay.dataset.dragBound === 'true') return;
   overlay.dataset.dragBound = 'true';
+  overlay.title = 'Drag the Focus Anchor to reposition it';
+
   overlay.addEventListener('pointerdown', (event) => {
-    if (overlay.hidden) return;
+    if (overlay.hidden || focusAnchorIsFullscreen(overlay)) return;
+    if (event.button !== undefined && event.button !== 0) return;
+
     const frame = overlay.closest('.reader-frame');
     if (!frame) return;
+
     event.preventDefault();
-    overlay.setPointerCapture?.(event.pointerId);
+    event.stopPropagation();
+    overlay.classList.add('focus-anchor-dragging');
+
     const move = (moveEvent) => {
       const rect = frame.getBoundingClientRect();
       const x = ((moveEvent.clientX - rect.left) / Math.max(1, rect.width)) * 100;
       const y = ((moveEvent.clientY - rect.top) / Math.max(1, rect.height)) * 100;
-      state.focusAnchorPosition = { x: Math.max(3, Math.min(97, x)), y: Math.max(5, Math.min(95, y)) };
+      state.focusAnchorPosition = {
+        x: Math.max(3, Math.min(97, x)),
+        y: Math.max(5, Math.min(95, y))
+      };
       applyFocusAnchorPosition(overlay);
     };
+
     const stop = () => {
-      overlay.removeEventListener('pointermove', move);
-      overlay.removeEventListener('pointerup', stop);
-      overlay.removeEventListener('pointercancel', stop);
+      window.removeEventListener('pointermove', move, true);
+      window.removeEventListener('pointerup', stop, true);
+      window.removeEventListener('pointercancel', stop, true);
+      overlay.classList.remove('focus-anchor-dragging');
       persistReaderSession({ immediate: true });
     };
-    overlay.addEventListener('pointermove', move);
-    overlay.addEventListener('pointerup', stop);
-    overlay.addEventListener('pointercancel', stop);
+
+    // Track at window level. This remains reliable even when the pointer leaves
+    // the overlay or crosses the reading text while dragging.
+    window.addEventListener('pointermove', move, true);
+    window.addEventListener('pointerup', stop, true);
+    window.addEventListener('pointercancel', stop, true);
+
+    move(event);
   });
 }
 
@@ -883,6 +1065,8 @@ function updateFocusAnchorOverlay(words = []) {
   }
   const fontSize = Math.max(10, Number(app.querySelector('#focus-anchor-font-size')?.value || state.focusAnchorFontSize || 24));
   overlay.style.fontSize = `${fontSize}px`;
+  overlay.style.setProperty('--focus-anchor-color', app.querySelector('#focus-anchor-color')?.value || state.focusAnchorColor || '#20a866');
+  overlay.classList.toggle('focus-anchor-bold', Boolean(app.querySelector('#focus-anchor-bold')?.checked ?? state.focusAnchorBold));
   bindDraggableFocusAnchor(overlay);
   applyFocusAnchorPosition(overlay);
   if (words.length) renderFocusAnchorPhrase(overlay, words);
@@ -911,50 +1095,118 @@ async function loadApiText(endpoint, options) {
 }
 
 function rememberReaderForReturn() {
-  if (!state.words.length || !state.title) return;
+  if (!state.words.length || !state.title || !app.querySelector('#reader')) return;
+
   state.returnIndex = Math.max(0, state.index || 0);
   state.returnMode = getSelectedMode?.() || state.renderedMode || 'highlight';
   state.returnWasRunning = isReaderRunning();
+  state.returnControls = captureReaderControls();
+
+  activeReaderSnapshot = buildReaderSessionSnapshot() || {
+    title: state.title,
+    currentText: state.currentText,
+    originalText: state.originalText,
+    source: state.source,
+    language: state.language,
+    index: state.returnIndex,
+    wasRunning: state.returnWasRunning,
+    controls: state.returnControls
+  };
+  if (activeReaderSnapshot) {
+    activeReaderSnapshot.index = state.returnIndex;
+    activeReaderSnapshot.wasRunning = state.returnWasRunning;
+    activeReaderSnapshot.controls = { ...(activeReaderSnapshot.controls || {}), ...state.returnControls };
+    activeReaderSnapshot.controls.mode = state.returnMode;
+  }
+
   persistReaderSession({ immediate: true });
 }
+
 
 function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   if (!snapshot?.title || !snapshot?.currentText) return false;
   const controls = snapshot.controls || {};
+
   renderReaderWithText(snapshot.title, snapshot.currentText, snapshot.source || { type: 'restored' });
+
   state.originalText = snapshot.originalText || snapshot.currentText;
+  state.currentText = snapshot.currentText;
   state.language = snapshot.language || 'en';
-  readerEngine.setPosition(snapshot.index || 0);
-  state.wpm = Number(controls.wpm || snapshot.wpm || 300);
+  state.wpm = Number(controls.wpm ?? snapshot.wpm ?? 300);
   state.bionic = Boolean(controls.bionic ?? snapshot.bionic);
   state.meaningfulChunks = Boolean(controls.meaningfulChunks ?? snapshot.meaningfulChunks);
   state.focusAnchor = Boolean(controls.focusAnchor ?? snapshot.focusAnchor);
   state.focusAnchorPosition = controls.focusAnchorPosition || snapshot.focusAnchorPosition || null;
-  state.focusAnchorFontSize = Number(controls.focusAnchorFontSize || snapshot.focusAnchorFontSize || 24);
+  state.focusAnchorFontSize = Number(controls.focusAnchorFontSize ?? snapshot.focusAnchorFontSize ?? 24);
+  state.focusAnchorColor = controls.focusAnchorColor || snapshot.focusAnchorColor || '#20a866';
+  state.focusAnchorBold = Boolean(controls.focusAnchorBold ?? snapshot.focusAnchorBold);
   state.bookPages = Boolean(controls.bookPages ?? snapshot.bookPages);
   state.illustrationMode = controls.illustrationMode || snapshot.illustrationMode || 'off';
-  state.returnIndex = state.index;
-  state.returnMode = controls.mode || snapshot.mode || 'highlight';
+
+  const mode = controls.mode || snapshot.mode || 'highlight';
+  const wordCount = Math.max(1, Number(controls.wordCount ?? 1));
+  const fontSize = Math.max(10, Number(controls.fontSize ?? 14));
+  const fontFamily = controls.fontFamily || 'system';
+  const theme = controls.theme || 'dark';
+  const savedIndex = Math.max(0, Number(snapshot.index) || 0);
+
+  state.returnIndex = savedIndex;
+  state.returnMode = mode;
   state.returnWasRunning = Boolean(snapshot.wasRunning);
+  state.returnControls = {
+    mode,
+    wpm: state.wpm,
+    wordCount,
+    meaningfulChunks: state.meaningfulChunks,
+    focusAnchor: state.focusAnchor,
+    focusAnchorPosition: state.focusAnchorPosition,
+    focusAnchorFontSize: state.focusAnchorFontSize,
+    focusAnchorColor: state.focusAnchorColor,
+    focusAnchorBold: state.focusAnchorBold,
+    fontFamily,
+    fontSize,
+    theme,
+    bionic: state.bionic,
+    bookPages: state.bookPages,
+    illustrationMode: state.illustrationMode
+  };
 
   const values = {
-    '#mode-select': state.returnMode,
+    '#mode-select': mode,
+    '#fs-mode-select': mode,
     '#speed': state.wpm,
-    '#word-count': Number(controls.wordCount || 1),
-    '#font-family': controls.fontFamily || 'system',
-    '#font-size': Number(controls.fontSize || 14),
-    '#theme-select': controls.theme || 'dark',
-    '#illustration-mode': state.illustrationMode
+    '#fs-speed': state.wpm,
+    '#word-count': wordCount,
+    '#fs-word-count': wordCount,
+    '#font-family': fontFamily,
+    '#fs-font-family': fontFamily,
+    '#font-size': fontSize,
+    '#fs-font-size': fontSize,
+    '#theme-select': theme,
+    '#fs-theme-select': theme,
+    '#illustration-mode': state.illustrationMode,
+    '#fs-illustration-mode': state.illustrationMode,
+    '#focus-anchor-font-size': state.focusAnchorFontSize,
+    '#fs-focus-anchor-font-size': state.focusAnchorFontSize,
+    '#focus-anchor-color': state.focusAnchorColor,
+    '#fs-focus-anchor-color': state.focusAnchorColor
   };
   Object.entries(values).forEach(([selector, value]) => {
     const element = app.querySelector(selector);
-    if (element) element.value = String(value);
+    if (element && value !== undefined && value !== null) element.value = String(value);
   });
+
   const checks = {
     '#bionic-reading': state.bionic,
+    '#fs-bionic-reading': state.bionic,
     '#meaningful-chunks': state.meaningfulChunks,
+    '#fs-meaningful-chunks': state.meaningfulChunks,
     '#focus-anchor': state.focusAnchor,
-    '#book-pages': state.bookPages
+    '#fs-focus-anchor': state.focusAnchor,
+    '#focus-anchor-bold': state.focusAnchorBold,
+    '#fs-focus-anchor-bold': state.focusAnchorBold,
+    '#book-pages': state.bookPages,
+    '#fs-book-pages': state.bookPages
   };
   Object.entries(checks).forEach(([selector, checked]) => {
     const element = app.querySelector(selector);
@@ -963,59 +1215,189 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
 
   const reader = app.querySelector('#reader');
   if (reader) {
-    reader.style.fontSize = `${Number(controls.fontSize || 14)}px`;
-    reader.classList.toggle('light', (controls.theme || 'dark') === 'light');
+    const fontFamilies = {
+      system: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      serif: 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif',
+      georgia: 'Georgia, "Times New Roman", serif',
+      verdana: 'Verdana, Geneva, sans-serif',
+      trebuchet: '"Trebuchet MS", Arial, sans-serif',
+      monospace: 'Consolas, "Courier New", monospace',
+      dyslexic: '"Arial", "Verdana", sans-serif'
+    };
+    reader.style.fontSize = `${fontSize}px`;
+    reader.style.fontFamily = fontFamilies[fontFamily] || fontFamilies.system;
+    reader.classList.toggle('dyslexia-friendly-font', fontFamily === 'dyslexic');
+    reader.classList.toggle('light', theme === 'light');
   }
-  prepareReaderView(state.returnMode, Number(controls.wordCount || 1));
-  updateModeControls(state.returnMode);
+
+  // Set the position only after the new reader has been constructed, then
+  // rebuild the active renderer using the restored settings.
+  readerEngine.setPosition(savedIndex);
+  state.index = savedIndex;
+  prepareReaderView(mode, wordCount);
+  updateModeControls(mode);
+  refreshFocusAnchorStyle();
+  updateFocusAnchorOverlay();
+
+  // Book Pages needs a geometry pass after the DOM has its final font, width,
+  // mode and page setting. Merely checking the checkbox is not sufficient.
+  requestAnimationFrame(() => {
+    if (state.bookPages) {
+      scheduleBookPageReflow();
+      requestAnimationFrame(() => {
+        const activeReader = app.querySelector('#reader');
+        if (activeReader) {
+          ensureWordsRendered(activeReader, mode, wordCount, state.index + 100);
+          const target =
+            activeReader.querySelector(`.reader-word[data-index="${state.index}"]`) ||
+            activeReader.querySelector(`.reader-group[data-start-index="${state.index}"]`);
+          if (target) {
+            const readerRect = activeReader.getBoundingClientRect();
+            const targetRect = target.getBoundingClientRect();
+            const metrics = applyBookPageMetrics(activeReader);
+            const absoluteLeft = targetRect.left - readerRect.left + activeReader.scrollLeft - metrics.paddingLeft;
+            const pageIndex = Math.max(0, Math.floor(absoluteLeft / Math.max(1, metrics.pagePitch)));
+            goToBookSpread(Math.floor(pageIndex / 2), { behavior: 'auto', ensureRendered: true });
+          } else {
+            updateBookPageStatus();
+          }
+        }
+      });
+    }
+  });
+
   window.setTimeout(() => {
     const activeReader = app.querySelector('#reader');
-    if (activeReader) {
-      ensureWordsRendered(activeReader, state.returnMode, Number(controls.wordCount || 1), state.index + 100);
-      const target = activeReader.querySelector(`.reader-word[data-index="${state.index}"]`) || activeReader.querySelector(`.reader-group[data-start-index="${state.index}"]`);
+    if (activeReader && !state.bookPages) {
+      ensureWordsRendered(activeReader, mode, wordCount, state.index + 100);
+      const target =
+        activeReader.querySelector(`.reader-word[data-index="${state.index}"]`) ||
+        activeReader.querySelector(`.reader-group[data-start-index="${state.index}"]`);
       target?.scrollIntoView({ block: 'center', inline: 'nearest' });
     }
     updateReaderStatus(`Resumed at word ${(state.index + 1).toLocaleString()}.`);
     if (resumePlayback && snapshot.wasRunning) startReader();
   }, 0);
+
+  activeReaderSnapshot = {
+    ...snapshot,
+    index: state.index,
+    wasRunning: Boolean(snapshot.wasRunning),
+    controls: { ...(snapshot.controls || {}), ...(state.returnControls || {}) }
+  };
   return true;
 }
 
 function renderCurrentReader() {
-  if (!state.words.length || !state.title || !state.currentText) {
-    readReaderSession().then((saved) => {
-      if (!applyReaderSessionSnapshot(saved)) renderError('No reading session', 'Load a book, article, or text file first.');
-    });
+  if (!activeReaderSnapshot?.title || !activeReaderSnapshot?.currentText) {
+    // No document has been explicitly opened in this app session. Do not read
+    // IndexedDB here; that is what Home > Resume Last Reading is for.
+    renderHome();
     return;
   }
-  const snapshot = buildReaderSessionSnapshot() || {
-    title: state.title,
-    currentText: state.currentText,
-    originalText: state.originalText,
-    source: state.source,
-    language: state.language,
-    index: state.returnIndex ?? state.index,
-    wasRunning: state.returnWasRunning,
-    controls: captureReaderControls()
+
+  const snapshot = {
+    ...activeReaderSnapshot,
+    index: Math.max(0, Number(activeReaderSnapshot.index) || 0),
+    controls: { ...(activeReaderSnapshot.controls || {}) }
   };
-  snapshot.index = Math.max(0, state.returnIndex ?? state.index ?? 0);
-  snapshot.wasRunning = Boolean(state.returnWasRunning);
-  snapshot.controls.mode = state.returnMode || snapshot.controls.mode;
   applyReaderSessionSnapshot(snapshot);
 }
 
+
 function renderHome() {
   stopReader();
+
+  let resumeMeta = null;
+  try { resumeMeta = JSON.parse(localStorage.getItem(READER_SESSION_META_KEY) || 'null'); } catch {}
+  const resumePercent = resumeMeta?.totalWords
+    ? Math.min(100, Math.max(0, Math.round((Number(resumeMeta.index) || 0) / Number(resumeMeta.totalWords) * 100)))
+    : null;
+
   app.innerHTML = `
-    <section class="hero">
-      <div>
-        <div class="hero-mark" aria-hidden="true">📖</div>
-        <h1>Mark, Set, Go!</h1>
-        <p>Measure your reading speed, then practice with flash, marquee, digital-sign scrolling, guided highlighting, two-column reading, or automatic scrolling at a controlled words-per-minute rate.</p>
-        <button class="primary" data-start-home>Start a WPM test</button>
+    <section class="home-simple">
+      <header class="home-simple-brand">
+        <h1><span class="home-speed-mark" aria-hidden="true">≡</span>Mark, Set, Go!</h1>
+        <p class="home-simple-tagline">Read Faster. Understand Deeper. Remember Longer. Apply Daily.</p>
+        <p class="home-simple-subtitle">The all-in-one reading accelerator for lifelong learning and personal growth.</p>
+      </header>
+
+      <div class="home-reader-launch">
+        <figure class="home-mark-card">
+          <img
+            class="home-reading-gif"
+            src="/assets/home/mark-reading.gif"
+            alt="Mark reading a book with animated eye movement."
+          >
+          <figcaption>
+            <strong>Meet Mark.</strong>
+            <span>Practice smoother eye movement, stronger focus, faster reading, and better comprehension.</span>
+          </figcaption>
+        </figure>
+
+        <section class="home-launch-panel" aria-label="Reading actions">
+          <div class="home-launch-copy">
+            <span class="source-category">Ready to read?</span>
+            <h2>Start reading or continue where you left off.</h2>
+            <p>Open the reader, measure your natural reading speed, or return to your saved book without loading anything automatically.</p>
+          </div>
+
+          <div class="home-launch-actions">
+            <button class="primary home-large-action" data-action="reader" type="button">
+              <span aria-hidden="true">📖</span>
+              <span><strong>Open Reader</strong><small>Start or return to the active reader</small></span>
+            </button>
+
+            <button class="secondary home-large-action" data-start-home type="button">
+              <span aria-hidden="true">⏱</span>
+              <span><strong>WPM Test</strong><small>Measure your natural reading speed</small></span>
+            </button>
+
+            <button class="secondary home-large-action" id="resume-last-reading" type="button">
+              <span aria-hidden="true">↩</span>
+              <span><strong>Resume Last Reading</strong><small>${resumeMeta?.title ? escapeHtml(resumeMeta.title) : 'No saved reading yet'}</small></span>
+            </button>
+          </div>
+
+          ${resumeMeta?.title ? `<article class="resume-reading-card home-simple-resume">
+            <div>
+              <span class="resume-reading-kicker">Last reading</span>
+              <strong>${escapeHtml(resumeMeta.title)}</strong>
+              <small>${resumePercent === null ? 'Saved reading position' : `${resumePercent}% complete`} · opens only when you choose Resume</small>
+            </div>
+            ${resumePercent === null ? '' : `<div class="progress-meter"><span style="width:${resumePercent}%"></span></div>`}
+          </article>
+          <button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Forget Saved Reading</button>` : ''}
+        </section>
       </div>
     </section>`;
-  app.querySelector('[data-start-home]').addEventListener('click', () => renderWpmTest('gatsby'));
+
+  app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('gatsby'));
+  app.querySelector('#resume-last-reading')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Loading saved reading…';
+    try {
+      const saved = await readReaderSession();
+      if (!applyReaderSessionSnapshot(saved, { resumePlayback: false })) {
+        window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
+        button.disabled = false;
+        button.textContent = original;
+      }
+    } catch (error) {
+      console.error('Resume reading failed:', error);
+      window.alert('The saved reading session could not be opened. You can still reopen the book from Library or Reading Progress.');
+      button.disabled = false;
+      button.textContent = original;
+    }
+  });
+  app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
+    await clearReaderSession();
+    activeReaderSnapshot = null;
+    renderHome();
+  });
+
 }
 
 async function renderWpmTest(key) {
@@ -1171,6 +1553,9 @@ const SAVED_DEFINITIONS_KEY = 'markSetGoDefinitionsV1';
 
 const READING_PROGRESS_KEY = 'markSetGoReadingProgressV1';
 const READING_ACTIVITY_KEY = 'markSetGoReadingActivityV1';
+const COMPREHENSION_RESULTS_KEY = 'markSetGoComprehensionV1';
+const COMPREHENSION_POSITION_KEY = 'markSetGoComprehensionPositionV1';
+
 
 function readStoredArray(key) {
   try {
@@ -1273,6 +1658,11 @@ function renderProgressDashboard() {
   const averageWpm = totalSeconds ? Math.round(totalWords / (totalSeconds / 60)) : 0;
   const streak = readingStreak(activity);
   const recentBooks = progress.sort((a,b) => new Date(b.lastReadAt || 0) - new Date(a.lastReadAt || 0)).slice(0, 8);
+  const comprehensionResults = getComprehensionResults();
+  const recentComprehension = comprehensionResults.slice(0, 8);
+  const averageComprehension = comprehensionResults.length
+    ? Math.round(comprehensionResults.reduce((sum, item) => sum + (Number(item.scorePercent) || 0), 0) / comprehensionResults.length)
+    : 0;
 
   app.innerHTML = `<section class="panel progress-dashboard">
     <div class="library-heading"><div><h1>Reading Progress</h1><p>Your reading activity is stored privately in this browser.</p></div><button id="clear-reading-progress" class="secondary" type="button">Clear history</button></div>
@@ -1281,6 +1671,7 @@ function renderProgressDashboard() {
       <article><span>Reading time</span><strong>${formatDuration(totalSeconds)}</strong><small>today</small></article>
       <article><span>Average pace</span><strong>${averageWpm || '—'}</strong><small>WPM today</small></article>
       <article><span>Current streak</span><strong>${streak}</strong><small>${streak === 1 ? 'day' : 'days'}</small></article>
+      <article><span>Comprehension</span><strong>${averageComprehension || '—'}</strong><small>${averageComprehension ? '% average' : 'no checks yet'}</small></article>
     </div>
     <section class="dashboard-section"><h2>Books and documents</h2>
       <div class="progress-book-list">${recentBooks.length ? recentBooks.map((item) => {
@@ -1288,6 +1679,9 @@ function renderProgressDashboard() {
         const wpm = item.totalSeconds ? Math.round((Number(item.totalWordsRead)||0) / (item.totalSeconds / 60)) : 0;
         return `<article class="progress-book-card"><div><h3>${escapeHtml(item.title || 'Untitled')}</h3><p>${percent}% complete · ${formatDuration(item.totalSeconds)} · ${Number(item.sessions)||0} sessions${wpm ? ` · ${wpm} WPM` : ''}</p></div><div class="progress-meter"><span style="width:${percent}%"></span></div><button class="secondary" type="button" data-progress-open="${escapeHtml(item.documentId)}">Open saved text</button></article>`;
       }).join('') : '<p class="navigation-empty">Complete a reading session to begin tracking progress.</p>'}</div>
+    </section>
+    <section class="dashboard-section"><h2>Comprehension checks</h2>
+      <div class="activity-list">${recentComprehension.map((item) => `<article><div><strong>${escapeHtml(item.title || 'Untitled')}</strong><span>${new Date(item.createdAt).toLocaleString()}</span></div><p>${Number(item.scorePercent)}% comprehension${item.wpm ? ` · ${Number(item.wpm)} WPM · ${Number(item.effectiveWpm)} effective WPM` : ''} · ${Number(item.wordsTested).toLocaleString()} words tested</p></article>`).join('') || '<p class="navigation-empty">No comprehension checks yet. Use Check Comprehension while reading.</p>'}</div>
     </section>
     <section class="dashboard-section"><h2>Recent sessions</h2>
       <div class="activity-list">${activity.slice(0,12).map((item) => `<article><div><strong>${escapeHtml(item.title || 'Untitled')}</strong><span>${new Date(item.endedAt).toLocaleString()}</span></div><p>${Number(item.wordsRead).toLocaleString()} words · ${formatDuration(item.seconds)}${item.seconds ? ` · ${Math.round(item.wordsRead/(item.seconds/60))} WPM` : ''}</p></article>`).join('') || '<p class="navigation-empty">No sessions recorded yet.</p>'}</div>
@@ -1306,6 +1700,168 @@ function renderProgressDashboard() {
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
     requestAnimationFrame(() => jumpToWordIndex(record?.lastWord || 0));
   }));
+}
+
+
+function getComprehensionResults() {
+  return readStoredArray(COMPREHENSION_RESULTS_KEY);
+}
+
+function getComprehensionPositions() {
+  return readStoredObject(COMPREHENSION_POSITION_KEY);
+}
+
+function setLastComprehensionPosition(documentId, index) {
+  const positions = getComprehensionPositions();
+  positions[documentId] = Math.max(0, Number(index) || 0);
+  localStorage.setItem(COMPREHENSION_POSITION_KEY, JSON.stringify(positions));
+}
+
+function comprehensionPassage() {
+  const endIndex = Math.max(0, Math.min(state.words.length, Number(state.index) || 0));
+  const positions = getComprehensionPositions();
+  const previous = Math.max(0, Math.min(endIndex, Number(positions[state.documentId]) || 0));
+  let startIndex = previous;
+
+  // Avoid huge requests when a reader has gone a long time between checks.
+  if (endIndex - startIndex > 900) startIndex = Math.max(0, endIndex - 900);
+
+  // On the first check, use up to the last 750 words.
+  if (!previous) startIndex = Math.max(0, endIndex - 750);
+
+  return {
+    startIndex,
+    endIndex,
+    words: Math.max(0, endIndex - startIndex),
+    passage: state.words.slice(startIndex, endIndex).join(' ')
+  };
+}
+
+function closeComprehensionDialog() {
+  app.querySelector('#comprehension-dialog')?.close();
+}
+
+function renderComprehensionQuiz(quiz, context) {
+  const dialog = app.querySelector('#comprehension-dialog');
+  if (!dialog) return;
+  const typeNames = {
+    recall: 'Recall',
+    main_idea: 'Main idea',
+    inference: 'Inference',
+    deeper_understanding: 'Deeper understanding'
+  };
+
+  dialog.innerHTML = `<form method="dialog" class="comprehension-card" id="comprehension-form">
+    <div class="comprehension-heading">
+      <div><span class="comprehension-kicker">Learning check</span><h2>Comprehension Check</h2><p>${context.words.toLocaleString()} words · ${escapeHtml(state.title)}</p></div>
+      <button class="comprehension-close" value="cancel" type="submit" aria-label="Close">×</button>
+    </div>
+    <div class="comprehension-questions">
+      ${quiz.questions.map((item, qIndex) => `<fieldset class="comprehension-question">
+        <legend><span>${qIndex + 1}</span><div><small>${escapeHtml(typeNames[item.type] || item.type)}</small>${escapeHtml(item.question)}</div></legend>
+        <div class="comprehension-choices">${item.choices.map((choice, cIndex) =>
+          `<label><input type="radio" name="question-${qIndex}" value="${cIndex}"><span>${escapeHtml(choice)}</span></label>`
+        ).join('')}</div>
+        <div class="comprehension-explanation" id="explanation-${qIndex}" hidden></div>
+      </fieldset>`).join('')}
+    </div>
+    <div class="comprehension-actions">
+      <span id="comprehension-status" class="status"></span>
+      <button id="score-comprehension" class="primary" type="button">Score Check</button>
+      <button class="secondary" value="cancel" type="submit">Close</button>
+    </div>
+  </form>`;
+  dialog.showModal();
+
+  dialog.querySelector('#score-comprehension')?.addEventListener('click', () => {
+    const unanswered = quiz.questions.some((_, index) => !dialog.querySelector(`input[name="question-${index}"]:checked`));
+    if (unanswered) {
+      dialog.querySelector('#comprehension-status').textContent = 'Answer all four questions first.';
+      return;
+    }
+
+    let correct = 0;
+    quiz.questions.forEach((item, index) => {
+      const chosen = Number(dialog.querySelector(`input[name="question-${index}"]:checked`)?.value);
+      const isCorrect = chosen === Number(item.correctIndex);
+      if (isCorrect) correct += 1;
+      dialog.querySelectorAll(`input[name="question-${index}"]`).forEach((input) => {
+        input.disabled = true;
+        const label = input.closest('label');
+        label?.classList.toggle('answer-correct', Number(input.value) === Number(item.correctIndex));
+        label?.classList.toggle('answer-wrong', input.checked && !isCorrect);
+      });
+      const explanation = dialog.querySelector(`#explanation-${index}`);
+      explanation.hidden = false;
+      explanation.innerHTML = `<strong>${isCorrect ? 'Correct.' : 'Not quite.'}</strong> ${escapeHtml(item.explanation)}`;
+    });
+
+    const percent = Math.round((correct / quiz.questions.length) * 100);
+    const currentWpm = Math.max(0, Number(app.querySelector('#speed')?.value) || Number(state.wpm) || 0);
+    const effectiveWpm = Math.round(currentWpm * (percent / 100));
+    const result = {
+      id: `comprehension-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      documentId: state.documentId,
+      title: state.title,
+      startIndex: context.startIndex,
+      endIndex: context.endIndex,
+      wordsTested: context.words,
+      correct,
+      total: quiz.questions.length,
+      scorePercent: percent,
+      wpm: currentWpm,
+      effectiveWpm,
+      createdAt: new Date().toISOString()
+    };
+    const results = getComprehensionResults();
+    results.unshift(result);
+    localStorage.setItem(COMPREHENSION_RESULTS_KEY, JSON.stringify(results.slice(0, 500)));
+    setLastComprehensionPosition(state.documentId, context.endIndex);
+
+    const status = dialog.querySelector('#comprehension-status');
+    status.innerHTML = `<strong>${percent}% comprehension</strong>${currentWpm ? ` · ${effectiveWpm} effective WPM` : ''}`;
+    const scoreButton = dialog.querySelector('#score-comprehension');
+    scoreButton.disabled = true;
+    scoreButton.textContent = `${correct} of ${quiz.questions.length} correct`;
+  });
+}
+
+async function startComprehensionCheck() {
+  if (!state.documentId || !state.words.length) return;
+  const context = comprehensionPassage();
+  if (context.words < 120) {
+    window.alert(`Read a little farther first. You currently have ${context.words} new words available; a comprehension check needs at least 120.`);
+    return;
+  }
+
+  const button = app.querySelector('#check-comprehension');
+  const fsButton = app.querySelector('#fs-check-comprehension');
+  const original = button?.textContent;
+  if (button) { button.disabled = true; button.textContent = 'Generating…'; }
+  if (fsButton) { fsButton.disabled = true; fsButton.textContent = 'Generating…'; }
+
+  const wasRunning = isReaderRunning();
+  if (wasRunning) pauseReader();
+
+  try {
+    const response = await fetch('/api/comprehension', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: state.title,
+        passage: context.passage
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
+    renderComprehensionQuiz(payload, context);
+  } catch (error) {
+    window.alert(`Comprehension check unavailable: ${error.message}`);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = original || '🧠 Comprehension'; }
+    if (fsButton) { fsButton.disabled = false; fsButton.textContent = 'Check comprehension'; }
+  }
 }
 
 function vocabularyDue(item) {
@@ -1970,22 +2526,46 @@ function renderNavigationPane() {
     : '<p class="navigation-empty">No notes saved for this text.</p>';
 
   pane.innerHTML = `
-    <section class="navigation-section">
+    <div class="reader-library-header">
+      <div><span>Reading tools</span><strong>Marks &amp; Contents</strong></div>
+      <button id="close-navigation-pane" class="reader-panel-close" type="button" aria-label="Close marks and contents">×</button>
+    </div>
+    <div class="reader-library-tabs" role="tablist" aria-label="Reading tools">
+      <button class="reader-library-tab active" type="button" role="tab" data-reader-tab="contents" aria-selected="true">Contents</button>
+      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="bookmarks" aria-selected="false">Bookmarks <span>${bookmarks.length}</span></button>
+      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="definitions" aria-selected="false">Definitions <span>${definitions.length}</span></button>
+      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="notes" aria-selected="false">Notes <span>${notes.length}</span></button>
+    </div>
+    <section class="navigation-section reader-library-view active" data-reader-view="contents">
       <div class="navigation-heading"><h2>Contents</h2><button id="add-bookmark" class="bookmark-add" type="button">＋ Bookmark</button></div>
       <div class="toc-list">${tocMarkup}</div>
     </section>
-    <details class="navigation-section bookmark-section" open>
-      <summary>Bookmarks</summary>
+    <section class="navigation-section reader-library-view" data-reader-view="bookmarks">
       <div class="bookmark-list">${bookmarkMarkup}</div>
-    </details>
-    <details class="navigation-section definition-section" open>
-      <summary>Saved definitions</summary>
+    </section>
+    <section class="navigation-section reader-library-view" data-reader-view="definitions">
       <div class="definition-list">${definitionMarkup}</div>
-    </details>
-    <details class="navigation-section note-section" open>
-      <summary>Notes</summary>
+    </section>
+    <section class="navigation-section reader-library-view" data-reader-view="notes">
       <div class="note-list">${noteMarkup}</div>
-    </details>`;
+    </section>`;
+
+  pane.querySelectorAll('[data-reader-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const tab = button.dataset.readerTab;
+      pane.querySelectorAll('[data-reader-tab]').forEach((item) => {
+        const selected = item === button;
+        item.classList.toggle('active', selected);
+        item.setAttribute('aria-selected', String(selected));
+      });
+      pane.querySelectorAll('[data-reader-view]').forEach((view) => {
+        view.classList.toggle('active', view.dataset.readerView === tab);
+      });
+    });
+  });
+  pane.querySelector('#close-navigation-pane')?.addEventListener('click', () => {
+    app.querySelector('#toggle-navigation-pane')?.click();
+  });
 
   pane.querySelectorAll('[data-toc-index]').forEach((button) => {
     button.addEventListener('click', () => jumpToWordIndex(button.dataset.tocIndex));
@@ -2233,6 +2813,8 @@ async function renderReader(kind) {
   if (kind === 'unified-library') return renderUnifiedLibrary();
   if (kind === 'gutenberg') return renderGutenbergLibrary();
   if (kind === 'great-books') return renderGreatBooksLibrary();
+  if (kind === 'syntopicon') return renderSyntopicon();
+  if (kind === 'bible') return renderBibleStudy();
   if (kind === 'current-reading') return renderCurrentReading();
   if (kind === 'weather') return renderWeather();
 
@@ -2362,6 +2944,10 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
             <label class="compact-toggle"><input id="bionic-reading" type="checkbox"><span>Bionic text</span></label>
             <label class="compact-toggle" title="Show the current word or phrase at a fixed center point while using Flash or another guided mode."><input id="focus-anchor" type="checkbox"><span>Center focus anchor overlay</span></label>
             <div class="control"><label for="focus-anchor-font-size">Focus anchor size</label><select id="focus-anchor-font-size">${fontOptions(24)}</select></div>
+            <div class="control"><label for="focus-anchor-color">Anchor color</label><select id="focus-anchor-color">
+              <option value="#20a866" selected>Green</option><option value="#2f7de1">Blue</option><option value="#d28a00">Amber</option><option value="#d94b4b">Red</option><option value="#8a63d2">Purple</option>
+            </select></div>
+            <label class="compact-toggle"><input id="focus-anchor-bold" type="checkbox"><span>Bold anchor letter</span></label>
             <label class="compact-toggle" title="Show the text as two facing book pages."><input id="book-pages" type="checkbox"><span>Book pages</span></label>
             <div class="control illustration-control"><label for="illustration-mode">Illustrations</label><select id="illustration-mode">
               <option value="off" selected>Off</option>
@@ -2374,20 +2960,19 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </section>
 
       <div class="reader-pane-controls" aria-label="Reading area layout controls">
-        <button id="toggle-navigation-pane" class="secondary pane-toggle" type="button" aria-pressed="true" aria-controls="navigation-pane"><span aria-hidden="true">☰</span> Contents</button>
-        <button id="toggle-word-panel" class="secondary pane-toggle" type="button" aria-pressed="true" aria-controls="word-panel"><span aria-hidden="true">▥</span> Right pane</button>
-        <span class="reader-resize-hint">Drag either divider to resize the reading area.</span>
+        <div class="reader-pane-buttons">
+          <button id="toggle-navigation-pane" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="navigation-pane"><span aria-hidden="true">☰</span> Marks &amp; Contents</button>
+          <button id="toggle-word-panel" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="word-panel"><span aria-hidden="true">⚙</span> Reader Controls</button>
+        </div>
+        <button id="toggle-reader-fullscreen" class="viewer-fullscreen-button" type="button" aria-label="Enter text viewer fullscreen" title="Full screen text viewer">
+          <span class="fullscreen-icon" aria-hidden="true">⛶</span>
+          <span class="fullscreen-label">Full screen</span>
+        </button>
       </div>
       <div class="reader-layout" id="reader-layout">
         <aside id="navigation-pane" class="navigation-pane" aria-label="Contents and bookmarks"></aside>
         <div id="left-pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize contents pane" tabindex="0"></div>
         <div class="reader-center-column">
-          <div class="reader-frame-toolbar">
-            <button id="toggle-reader-fullscreen" class="viewer-fullscreen-button" type="button" aria-label="Enter text viewer fullscreen" title="Full screen text viewer">
-              <span class="fullscreen-icon" aria-hidden="true">⛶</span>
-              <span class="fullscreen-label">Full screen</span>
-            </button>
-          </div>
           <div id="reader-frame" class="reader-frame">
           <div id="fullscreen-control-strip" class="fullscreen-control-strip" aria-label="Fullscreen reader controls">
             <button id="fullscreen-options-toggle" class="fullscreen-options-toggle" type="button" aria-expanded="false" aria-controls="fullscreen-options-menu">Options ▾</button>
@@ -2412,6 +2997,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                   <button id="fs-start" class="primary" type="button">Start</button>
                   <button id="fs-pause" class="secondary" type="button">Pause</button>
                   <button id="fs-reset" class="secondary" type="button">Reset</button>
+                  <button id="fs-check-comprehension" class="secondary" type="button">Check comprehension</button>
                 </div>
               </details>
 
@@ -2420,6 +3006,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <div class="fullscreen-options-grid">
                   <label class="fullscreen-checkbox"><input id="fs-focus-anchor" type="checkbox"> Focus anchor</label>
                   <label>Anchor size<select id="fs-focus-anchor-font-size">${fontOptions(24)}</select></label>
+                  <label>Anchor color<select id="fs-focus-anchor-color"><option value="#20a866">Green</option><option value="#2f7de1">Blue</option><option value="#d28a00">Amber</option><option value="#d94b4b">Red</option><option value="#8a63d2">Purple</option></select></label>
+                  <label class="fullscreen-checkbox"><input id="fs-focus-anchor-bold" type="checkbox"> Bold anchor letter</label>
                   <label class="fullscreen-checkbox"><input id="fs-meaningful-chunks" type="checkbox"> Meaningful chunks</label>
                   <label class="fullscreen-checkbox"><input id="fs-bionic-reading" type="checkbox"> Bionic text</label>
                 </div>
@@ -2468,7 +3056,12 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
           </div>
           <div id="book-page-controls" class="book-page-controls" hidden>
             <button id="book-page-prev" type="button" aria-label="Previous page spread">‹</button>
-            <span id="book-page-status">Pages 1–2</span>
+            <label class="book-page-jump" for="book-page-input">
+              <span>Page</span>
+              <input id="book-page-input" type="number" min="1" step="1" inputmode="numeric" value="1" aria-label="Go to page number">
+              <span id="book-page-total">of 1</span>
+            </label>
+            <span id="book-page-status" class="book-page-spread-label">Pages 1–2</span>
             <button id="book-page-next" type="button" aria-label="Next page spread">›</button>
           </div>
           <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
@@ -2504,11 +3097,13 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         <button type="button" data-dictionary-action="save" role="menuitem">Save definition</button>
         <button type="button" data-dictionary-action="note" role="menuitem">Add note</button>
       </div>
+      <dialog id="comprehension-dialog" class="comprehension-dialog" aria-label="Comprehension check"></dialog>
 
       <div class="controls playback-controls">
         <button id="start-reader" class="primary">Start</button>
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
+        <button id="check-comprehension" class="secondary comprehension-trigger" type="button">🧠 Comprehension</button>
         <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. Click a word to continue from there; click empty space or press Space to pause or resume.</span>
       </div>
     </section>`;
@@ -2516,6 +3111,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   const reader = app.querySelector('#reader');
   const readerFrame = app.querySelector('#reader-frame');
   const fullscreenButton = app.querySelector('#toggle-reader-fullscreen');
+  arrangeReaderSidePanels();
   bindAppearance(reader);
   bindReaderMusicControls(title, text, source);
   bindReaderFullscreen(readerFrame, fullscreenButton);
@@ -2528,13 +3124,46 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   updateModeControls('highlight');
   app.querySelector('#book-page-prev')?.addEventListener('click', () => turnBookPages(-1));
   app.querySelector('#book-page-next')?.addEventListener('click', () => turnBookPages(1));
-  app.querySelector('#book-page-status')?.addEventListener('click', () => turnBookPages(1));
-  app.querySelector('#book-page-status')?.addEventListener('keydown', (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
+
+  const jumpToTypedBookPage = () => {
+    const input = app.querySelector('#book-page-input');
+    const reader = app.querySelector('#reader');
+    if (!input || !reader || !state.bookPages) return;
+
+    const totalPages = Math.max(1, getEstimatedBookPageCount(reader));
+    const requestedPage = Math.max(1, Math.min(totalPages, Math.trunc(Number(input.value) || 1)));
+    input.value = String(requestedPage);
+
+    // Facing-page layout: pages 1–2 are spread 0, 3–4 spread 1, etc.
+    const targetSpread = Math.floor((requestedPage - 1) / 2);
+    goToBookSpread(targetSpread, {
+      behavior: 'auto',
+      ensureRendered: true,
+      syncReaderPosition: false
+    });
+
+    // Once the new spread is physically in place, move the logical reading
+    // position to the first readable word on that spread so playback, resume,
+    // TOC changes, and subsequent reflow all remain synchronized.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        state.bookSpreadIndex = targetSpread;
+        reader.scrollLeft = targetSpread * getBookSpreadWidth(reader);
+        syncReaderToVisibleBookSpread(reader);
+        updateBookPageStatus(targetSpread);
+        persistReaderSession();
+      });
+    });
+  };
+
+  app.querySelector('#book-page-input')?.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
       event.preventDefault();
-      turnBookPages(1);
+      jumpToTypedBookPage();
+      event.currentTarget.blur();
     }
   });
+  app.querySelector('#book-page-input')?.addEventListener('change', jumpToTypedBookPage);
   app.querySelector('#reader')?.addEventListener('scroll', () => {
     if (state.bookPages) window.requestAnimationFrame(updateBookPageStatus);
   });
@@ -2630,6 +3259,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.querySelector('#start-reader').addEventListener('click', () => { startReader(); persistReaderSession(); });
   app.querySelector('#pause-reader').addEventListener('click', () => { pauseReader(); persistReaderSession(); });
   app.querySelector('#reset-reader').addEventListener('click', () => { resetReader(); persistReaderSession(); });
+  app.querySelector('#check-comprehension')?.addEventListener('click', startComprehensionCheck);
+  app.querySelector('#fs-check-comprehension')?.addEventListener('click', startComprehensionCheck);
   app.querySelector('#bionic-reading').addEventListener('change', (event) => {
     const snapshot = captureReaderLocation();
     stopReader();
@@ -2646,6 +3277,21 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     state.focusAnchorFontSize = Number(event.target.value) || 24;
     updateFocusAnchorOverlay();
     requestAnimationFrame(() => restoreCapturedReaderLocation(snapshot, { rerendered: false }));
+    persistReaderSession({ immediate: true });
+  });
+
+  app.querySelector('#focus-anchor-color')?.addEventListener('change', (event) => {
+    const snapshot = captureReaderLocation();
+    state.focusAnchorColor = event.target.value || '#20a866';
+    refreshFocusAnchorStyle();
+    restoreCapturedReaderLocation(snapshot, { rerendered: false });
+    persistReaderSession({ immediate: true });
+  });
+  app.querySelector('#focus-anchor-bold')?.addEventListener('change', (event) => {
+    const snapshot = captureReaderLocation();
+    state.focusAnchorBold = Boolean(event.target.checked);
+    refreshFocusAnchorStyle();
+    restoreCapturedReaderLocation(snapshot, { rerendered: false });
     persistReaderSession({ immediate: true });
   });
 
@@ -2689,11 +3335,29 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   updateHiddenIllustrationControls();
   app.querySelector('#translate-text').addEventListener('click', translateCurrentText);
   app.querySelector('#restore-english').addEventListener('click', restoreEnglish);
-  app.querySelectorAll('#mode-select, #speed, #word-count, #meaningful-chunks, #focus-anchor, #focus-anchor-font-size, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
+  app.querySelectorAll('#mode-select, #speed, #word-count, #meaningful-chunks, #focus-anchor, #focus-anchor-font-size, #focus-anchor-color, #focus-anchor-bold, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
     control.addEventListener('change', () => persistReaderSession());
     control.addEventListener('input', () => persistReaderSession());
   });
-  persistReaderSession();
+  // Bible chapters/books are typically small enough to save immediately, and
+  // doing so guarantees Resume Last Reading points at the passage just opened.
+  // This document is now the explicit current reader for the top Reader button.
+  activeReaderSnapshot = buildReaderSessionSnapshot() || {
+    title: state.title,
+    currentText: state.currentText,
+    originalText: state.originalText,
+    source: state.source,
+    language: state.language,
+    index: state.index,
+    wasRunning: false,
+    controls: captureReaderControls()
+  };
+
+  if (source?.type === 'bible' || source?.type === 'bible-book') {
+    persistReaderSession({ immediate: true });
+  } else {
+    persistReaderSession();
+  }
 }
 
 
@@ -2714,6 +3378,8 @@ function bindFullscreenOptions(readerFrame) {
     ['#fs-bionic-reading', '#bionic-reading'],
     ['#fs-focus-anchor', '#focus-anchor'],
     ['#fs-focus-anchor-font-size', '#focus-anchor-font-size'],
+    ['#fs-focus-anchor-color', '#focus-anchor-color'],
+    ['#fs-focus-anchor-bold', '#focus-anchor-bold'],
     ['#fs-book-pages', '#book-pages'],
     ['#fs-illustration-mode', '#illustration-mode'],
     ['#fs-meaningful-chunks', '#meaningful-chunks'],
@@ -2834,6 +3500,7 @@ function bindFullscreenOptions(readerFrame) {
     if (nearTopRight) {
       strip.classList.remove('controls-hidden');
       readerFrame.classList.remove('fullscreen-controls-hidden');
+      requestAnimationFrame(refreshFocusAnchorFullscreenLayout);
     }
   });
 
@@ -2852,6 +3519,7 @@ function bindFullscreenOptions(readerFrame) {
       readerFrame.classList.remove('fullscreen-controls-hidden');
       closeMenu();
       syncFromMain();
+      requestAnimationFrame(refreshFocusAnchorFullscreenLayout);
     } else if (!readerFrame.classList.contains('fullscreen-fallback')) {
       closeMenu();
       strip.classList.remove('controls-hidden');
@@ -2875,6 +3543,54 @@ function bindFullscreenOptions(readerFrame) {
 
 
 
+
+function arrangeReaderSidePanels() {
+  const wordPanel = app.querySelector('#word-panel');
+  const toolbar = app.querySelector('.reader-toolbar');
+  const media = app.querySelector('.reader-music-actions');
+  const comprehension = app.querySelector('#check-comprehension');
+  const translation = app.querySelector('.translation-tools');
+  const wordResult = app.querySelector('#word-result');
+  if (!wordPanel || !toolbar) return;
+
+  wordPanel.classList.add('reader-control-panel');
+  wordPanel.setAttribute('aria-label', 'Reader controls');
+
+  const shell = document.createElement('div');
+  shell.className = 'reader-control-shell';
+  shell.innerHTML = `
+    <div class="reader-control-header">
+      <div><span>Reader</span><strong>Controls</strong></div>
+      <button id="close-reader-controls" class="reader-panel-close" type="button" aria-label="Close reader controls">×</button>
+    </div>
+    <div id="reader-control-core" class="reader-control-section"></div>
+    <details class="reader-control-group" open>
+      <summary>Learn</summary>
+      <div id="reader-control-learn" class="reader-control-group-body">
+        <p class="reader-control-help">Check how well you understood the passage you just read.</p>
+      </div>
+    </details>
+    <details class="reader-control-group">
+      <summary>Media</summary>
+      <div id="reader-control-media" class="reader-control-group-body"></div>
+    </details>
+    <details class="reader-control-group">
+      <summary>Language &amp; Words</summary>
+      <div id="reader-control-language" class="reader-control-group-body"></div>
+    </details>`;
+
+  wordPanel.replaceChildren(shell);
+  shell.querySelector('#reader-control-core')?.appendChild(toolbar);
+  if (comprehension) shell.querySelector('#reader-control-learn')?.appendChild(comprehension);
+  if (media) shell.querySelector('#reader-control-media')?.appendChild(media);
+  if (translation) shell.querySelector('#reader-control-language')?.appendChild(translation);
+  if (wordResult) shell.querySelector('#reader-control-language')?.appendChild(wordResult);
+
+  shell.querySelector('#close-reader-controls')?.addEventListener('click', () => {
+    app.querySelector('#toggle-word-panel')?.click();
+  });
+}
+
 function bindReaderPaneControls() {
   const layout = app.querySelector('#reader-layout');
   const navigationButton = app.querySelector('#toggle-navigation-pane');
@@ -2887,17 +3603,23 @@ function bindReaderPaneControls() {
     layout.classList.toggle(hiddenClass, !visible);
     button.setAttribute('aria-pressed', String(visible));
     button.classList.toggle('pane-closed', !visible);
-    const label = pane === 'navigation' ? 'Contents' : 'Right pane';
-    button.title = `${visible ? 'Close' : 'Open'} ${label.toLowerCase()}`;
+    const label = pane === 'navigation' ? 'marks and contents' : 'reader controls';
+    button.title = `${visible ? 'Close' : 'Open'} ${label}`;
   };
 
-  setPane('navigation', true);
-  setPane('word', true);
+  // Keep the reading canvas clean. The labeled side-panel buttons remain visible
+  // so readers can discover Contents/Bookmarks and Reader Controls when needed.
+  setPane('navigation', false);
+  setPane('word', false);
   navigationButton.addEventListener('click', () => {
+    const anchorIndex = state.bookPages ? Math.max(0, Number(state.index) || 0) : null;
     setPane('navigation', layout.classList.contains('navigation-hidden'));
+    if (state.bookPages) scheduleBookPageReflow({ delay: 40, anchorIndex });
   });
   wordButton.addEventListener('click', () => {
+    const anchorIndex = state.bookPages ? Math.max(0, Number(state.index) || 0) : null;
     setPane('word', layout.classList.contains('word-panel-hidden'));
+    if (state.bookPages) scheduleBookPageReflow({ delay: 40, anchorIndex });
   });
 }
 
@@ -2916,6 +3638,7 @@ function bindReaderResize(readerFrame, reader) {
     if (!splitter) return;
     let startX = 0;
     let startWidth = 0;
+    let resizeAnchorIndex = null;
     const pane = side === 'left' ? app.querySelector('#navigation-pane') : app.querySelector('#word-panel');
     const property = side === 'left' ? '--navigation-width' : '--word-panel-width';
     const storageKey = side === 'left' ? 'msg-navigation-width' : 'msg-word-panel-width';
@@ -2931,11 +3654,16 @@ function bindReaderResize(readerFrame, reader) {
       document.removeEventListener('pointermove', move);
       document.removeEventListener('pointerup', stop);
       document.body.classList.remove('resizing-reader-panes');
+      if (state.bookPages && Number.isFinite(Number(resizeAnchorIndex))) {
+        scheduleBookPageReflow({ delay: 30, anchorIndex: resizeAnchorIndex });
+      }
+      resizeAnchorIndex = null;
     };
     splitter.addEventListener('pointerdown', (event) => {
       if (!pane || layout.classList.contains(side === 'left' ? 'navigation-hidden' : 'word-panel-hidden')) return;
       startX = event.clientX;
       startWidth = pane.getBoundingClientRect().width;
+      resizeAnchorIndex = state.bookPages ? Math.max(0, Number(state.index) || 0) : null;
       splitter.setPointerCapture?.(event.pointerId);
       document.body.classList.add('resizing-reader-panes');
       document.addEventListener('pointermove', move);
@@ -2951,16 +3679,69 @@ function bindReaderResize(readerFrame, reader) {
   bindSplitter(leftSplitter, 'left');
   bindSplitter(rightSplitter, 'right');
 }
-function scheduleBookPageReflow({ delay = 0 } = {}) {
+let pendingBookPageAnchorIndex = null;
+let bookPageReflowTimer = null;
+
+function restoreBookPageWordAnchor(anchorIndex) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !state.bookPages || !state.words.length) return;
+
+  const safeIndex = Math.max(0, Math.min(state.words.length - 1, Number(anchorIndex) || 0));
+  const mode = state.renderedMode || getSelectedMode();
+  const groupSize = Number(app.querySelector('#word-count')?.value) || 1;
+
+  // The word index is canonical. Page/spread numbers are only a consequence of
+  // the current viewport dimensions and must be recalculated after every reflow.
+  state.index = safeIndex;
+  ensureWordsRendered(reader, mode, groupSize, Math.min(state.words.length, safeIndex + 250));
+  applyBookPageMetrics(reader);
+
+  const spread = bookSpreadForWordIndex(reader, safeIndex);
+  if (spread != null) {
+    goToBookSpread(spread, {
+      behavior: 'auto',
+      ensureRendered: true,
+      syncReaderPosition: false
+    });
+    // Do not let page navigation rewrite the preserved logical position.
+    state.index = safeIndex;
+    state.bookSpreadIndex = spread;
+    updateBookPageStatus(spread);
+  } else {
+    updateBookPageStatus();
+  }
+}
+
+function scheduleBookPageReflow({ delay = 0, anchorIndex = null } = {}) {
   if (!state.bookPages) return;
-  const preservedSpread = Math.max(0, Number(state.bookSpreadIndex) || 0);
-  window.setTimeout(() => {
+
+  // Capture once before a layout mutation when possible. ResizeObserver may fire
+  // multiple times while panes animate/change width, so retain the same anchor
+  // until the final geometry has settled.
+  const requestedAnchor = Number(anchorIndex);
+  if (Number.isFinite(requestedAnchor)) {
+    pendingBookPageAnchorIndex = requestedAnchor;
+  } else if (!Number.isFinite(Number(pendingBookPageAnchorIndex))) {
+    pendingBookPageAnchorIndex = Math.max(0, Number(state.index) || 0);
+  }
+
+  window.clearTimeout(bookPageReflowTimer);
+  bookPageReflowTimer = window.setTimeout(() => {
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
-        const reader = app.querySelector('#reader');
-        if (!reader || !state.bookPages) return;
-        applyBookPageMetrics(reader);
-        goToBookSpread(preservedSpread, { behavior: 'auto', ensureRendered: false });
+        if (!state.bookPages) {
+          pendingBookPageAnchorIndex = null;
+          return;
+        }
+        const preservedWord = Math.max(
+          0,
+          Number.isFinite(Number(pendingBookPageAnchorIndex))
+            ? Number(pendingBookPageAnchorIndex)
+            : Number(state.index) || 0
+        );
+        restoreBookPageWordAnchor(preservedWord);
+        pendingBookPageAnchorIndex = null;
+        persistReaderSession();
       });
     });
   }, delay);
@@ -2995,6 +3776,7 @@ function bindReaderFullscreen(readerFrame, button) {
     readerFrame.classList.add('fullscreen-fallback');
     document.body.classList.add('viewer-fullscreen-open');
     updateButton();
+    requestAnimationFrame(refreshFocusAnchorFullscreenLayout);
   };
 
   const exitFullscreen = async () => {
@@ -3005,13 +3787,16 @@ function bindReaderFullscreen(readerFrame, button) {
     readerFrame.classList.remove('fullscreen-fallback');
     document.body.classList.remove('viewer-fullscreen-open');
     updateButton();
+    requestAnimationFrame(refreshFocusAnchorFullscreenLayout);
   };
 
   button.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
+    const anchorIndex = state.bookPages ? Math.max(0, Number(state.index) || 0) : null;
     if (isViewerFullscreen()) await exitFullscreen();
     else await enterFullscreen();
+    if (state.bookPages) scheduleBookPageReflow({ delay: 80, anchorIndex });
   });
 
   document.addEventListener('fullscreenchange', () => {
@@ -3020,7 +3805,7 @@ function bindReaderFullscreen(readerFrame, button) {
       document.body.classList.remove('viewer-fullscreen-open');
     }
     updateButton();
-    scheduleBookPageReflow({ delay: 60 });
+    scheduleBookPageReflow({ delay: 60, anchorIndex: pendingBookPageAnchorIndex ?? state.index });
   });
 
   document.addEventListener('keydown', (event) => {
@@ -3168,11 +3953,16 @@ function updateBookPageStatus(forcedSpread = null) {
   const totalPages = getEstimatedBookPageCount(reader);
   const lastPage = Math.min(totalPages, firstPage + 1);
   status.textContent = firstPage === lastPage
-    ? `Page ${firstPage} of ${totalPages}`
-    : `Pages ${firstPage}–${lastPage} of ${totalPages}`;
-  status.title = 'Click to turn to the next page spread';
-  status.setAttribute('role', 'button');
-  status.setAttribute('tabindex', '0');
+    ? `Page ${firstPage}`
+    : `Pages ${firstPage}–${lastPage}`;
+
+  const pageInput = app.querySelector('#book-page-input');
+  const pageTotal = app.querySelector('#book-page-total');
+  if (pageInput) {
+    pageInput.max = String(totalPages);
+    if (document.activeElement !== pageInput) pageInput.value = String(firstPage);
+  }
+  if (pageTotal) pageTotal.textContent = `of ${totalPages}`;
 
   const previous = app.querySelector('#book-page-prev');
   const next = app.querySelector('#book-page-next');
@@ -4707,59 +5497,1047 @@ function groupBy(items, key) {
   }, {});
 }
 
+function normalizeLibraryMatchText(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\b(the|a|an|volume|vol|book|works|complete|selected|selections)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function scoreGreatBookCandidate(item, candidate) {
+  const wantedTitle = normalizeLibraryMatchText(item.title);
+  const wantedAuthor = normalizeLibraryMatchText(item.author);
+  const candidateTitle = normalizeLibraryMatchText(candidate.title);
+  const candidateAuthor = normalizeLibraryMatchText(candidate.author);
+  if (!candidateTitle) return -1000;
+
+  let score = 0;
+  if (candidateTitle === wantedTitle) score += 100;
+  else {
+    const wantedWords = new Set(wantedTitle.split(' ').filter(Boolean));
+    const candidateWords = new Set(candidateTitle.split(' ').filter(Boolean));
+    const overlap = [...wantedWords].filter((word) => candidateWords.has(word)).length;
+    const denominator = Math.max(1, Math.min(wantedWords.size, candidateWords.size));
+    score += (overlap / denominator) * 65;
+    if (candidateTitle.includes(wantedTitle) || wantedTitle.includes(candidateTitle)) score += 20;
+  }
+
+  if (wantedAuthor && candidateAuthor) {
+    const authorWords = wantedAuthor.split(' ').filter((word) => word.length > 2);
+    const authorHits = authorWords.filter((word) => candidateAuthor.includes(word)).length;
+    score += Math.min(25, authorHits * 8);
+  }
+
+  // Prefer sources that are directly readable. Within readable sources,
+  // favor curated/proofread editions before OCR when relevance is comparable.
+  const providerBonus = {
+    standardebooks: 14,
+    wikisource: 11,
+    gutenberg: 9,
+    internetarchive: 6,
+    openlibrary: 0
+  };
+  score += providerBonus[candidate.provider] || 0;
+  if (!candidate.readable) score -= 200;
+  return score;
+}
+
+
+function validateGreatBookPrimaryText(item, candidate, loaded) {
+  const text = String(loaded?.text || '').trim();
+  const words = splitWords(text);
+  const loadedTitle = loaded?.title || candidate?.title || '';
+  const loadedAuthor = loaded?.author || candidate?.author || '';
+
+  if (!text || words.length < 1500) {
+    return { ok:false, reason:`Only ${words.length.toLocaleString()} readable words were returned; this looks like an excerpt or summary rather than the complete work.` };
+  }
+
+  const matchScore = scoreGreatBookCandidate(item, {
+    ...candidate,
+    title: loadedTitle || candidate?.title,
+    author: loadedAuthor || candidate?.author,
+    readable: true
+  });
+
+  if (matchScore < 45) {
+    return { ok:false, reason:'The returned text does not match the requested title/author closely enough.' };
+  }
+
+  const opening = text.slice(0, 9000).toLowerCase();
+  const summarySignals = [
+    /\bplot summary\b/,
+    /\bchapter summary\b/,
+    /\bbook summary\b/,
+    /\bsummary and analysis\b/,
+    /\bstudy guide\b/,
+    /\bcliffsnotes\b/,
+    /\bsparknotes\b/,
+    /\bshmoop\b/,
+    /\bsynopsis\b/,
+    /\babout the book\b/,
+    /\bthis article is about\b/,
+    /\boverview of\b/
+  ];
+  const signal = summarySignals.find((pattern) => pattern.test(opening));
+  if (signal) {
+    return { ok:false, reason:'The returned page appears to be summary/commentary material rather than the primary text.' };
+  }
+
+  // A true full-text edition normally has considerably more text than a catalog
+  // extract. Keep the threshold lower for known short Great Books selections.
+  const shortWorkPattern = /waste land|rose for emily|prussian officer|beast in the jungle|metamorphosis|saint joan|waiting for godot|fear and trembling|what is metaphysics/i;
+  const minimumWords = shortWorkPattern.test(item.title) ? 1200 : 3000;
+  if (words.length < minimumWords) {
+    return { ok:false, reason:`The returned text is only ${words.length.toLocaleString()} words, which is too short to trust as the complete requested work.` };
+  }
+
+  return { ok:true, words:words.length, matchScore };
+}
+
 async function loadGreatBookEdition(item, status, button) {
+  const original = button.textContent;
   button.disabled = true;
-  button.textContent = 'Finding edition…';
-  status.textContent = 'Searching Project Gutenberg…';
+  button.textContent = 'Searching libraries…';
+  status.className = 'status book-load-status';
+  status.textContent = 'Searching Standard Ebooks, Internet Archive, Open Library, Wikisource, and Project Gutenberg…';
+
   try {
-    const params = new URLSearchParams({ search: item.query, language: 'en', page: '1' });
-    const payload = await loadApiPayload(`/api/gutenberg/books?${params}`);
-    const book = payload.books?.[0];
-    if (!book) throw new Error('No public-domain plain-text edition was found.');
-    button.textContent = 'Loading text…';
-    const loaded = await loadApiPayload(`/api/gutenberg/books/${book.id}/text`);
-    const author = loaded.authors?.length ? ` — ${loaded.authors.join(', ')}` : '';
-    renderReaderWithText(`${loaded.title}${author}`, loaded.text, { type: 'gutenberg', id: loaded.id, collection: 'great-books' });
+    // Search the unified catalog, using title + author for better precision.
+    const searchTerms = [
+      `${item.title} ${item.author}`.trim(),
+      item.query || item.title,
+      item.title
+    ].filter((value, index, all) => value && all.indexOf(value) === index);
+
+    const candidatesByKey = new Map();
+    const searchErrors = [];
+
+    for (const query of searchTerms) {
+      try {
+        const payload = await loadApiPayload(`/api/library/search?q=${encodeURIComponent(query)}&provider=all`);
+        (payload.books || []).forEach((book) => {
+          const key = `${book.provider}:${book.id}`;
+          if (!candidatesByKey.has(key)) candidatesByKey.set(key, book);
+        });
+        if ([...candidatesByKey.values()].some((book) => book.readable && scoreGreatBookCandidate(item, book) >= 70)) break;
+      } catch (error) {
+        searchErrors.push(error.message);
+      }
+    }
+
+    const candidates = [...candidatesByKey.values()]
+      .filter((book) => book.readable)
+      .map((book) => ({ ...book, matchScore: scoreGreatBookCandidate(item, book) }))
+      .filter((book) => book.matchScore >= 40)
+      .sort((a, b) => b.matchScore - a.matchScore);
+
+    if (!candidates.length) {
+      const discovery = [...candidatesByKey.values()]
+        .filter((book) => !book.readable)
+        .sort((a,b) => scoreGreatBookCandidate(item,b) - scoreGreatBookCandidate(item,a))[0];
+      if (discovery?.externalUrl) {
+        status.innerHTML = `No directly readable edition was found. <a href="${escapeHtml(discovery.externalUrl)}" target="_blank" rel="noopener noreferrer">Open the closest catalog result</a>.`;
+      } else {
+        throw new Error(searchErrors[0] || 'No readable edition was found in the connected public book libraries.');
+      }
+      button.disabled = false;
+      button.textContent = original;
+      return;
+    }
+
+    const failed = [];
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = candidates[index];
+      const provider = LIBRARY_PROVIDERS[candidate.provider]?.label || candidate.provider;
+      button.textContent = `Trying ${provider}…`;
+      status.textContent = `Found ${candidates.length} possible full-text edition${candidates.length === 1 ? '' : 's'}. Verifying ${provider}: ${candidate.title}…`;
+
+      try {
+        const loaded = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(candidate.provider)}&id=${encodeURIComponent(candidate.id)}`);
+        const text = String(loaded.text || '').trim();
+        const validation = validateGreatBookPrimaryText(item, candidate, loaded);
+        if (!validation.ok) throw new Error(validation.reason);
+
+        const title = loaded.title || candidate.title || item.title;
+        const author = loaded.author || candidate.author || item.author || '';
+        renderReaderWithText(`${title}${author ? ` — ${author}` : ''}`, text, {
+          type: candidate.provider,
+          id: candidate.id,
+          sourceUrl: loaded.sourceUrl || candidate.externalUrl || '',
+          collection: 'great-books',
+          greatBooksTitle: item.title,
+          greatBooksAuthor: item.author,
+          verifiedPrimaryText: true
+        });
+        return;
+      } catch (error) {
+        failed.push(`${provider}: ${error.message}`);
+      }
+    }
+
+    throw new Error(`Matching editions were found, but none could be opened. ${failed.slice(0,3).join(' · ')}`);
   } catch (error) {
     button.disabled = false;
-    button.textContent = 'Load into Reader';
+    button.textContent = original;
     status.className = 'status error book-load-status';
     status.textContent = error.message;
   }
 }
 
+
+const STUDY_LANGUAGE_KEY = 'markSetGoStudyLanguageV1';
+const LAST_BIBLE_PASSAGE_KEY = 'markSetGoLastBiblePassageV1';
+const SYNTOPICON_SAVED_KEY = 'markSetGoSyntopiconSavedV1';
+
+const studyLanguages = {
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  it: 'Italian',
+  pt: 'Portuguese',
+  nl: 'Dutch',
+  pl: 'Polish',
+  ru: 'Russian',
+  uk: 'Ukrainian',
+  el: 'Greek',
+  he: 'Hebrew',
+  la: 'Latin',
+  ar: 'Arabic',
+  zh: 'Chinese',
+  ja: 'Japanese',
+  ko: 'Korean'
+};
+
+const greatIdeasCatalog = [
+  'Angel', 'Animal', 'Aristocracy', 'Art', 'Astronomy', 'Beauty', 'Being', 'Cause',
+  'Chance', 'Change', 'Citizen', 'Constitution', 'Courage', 'Custom and Convention',
+  'Definition', 'Democracy', 'Desire', 'Dialectic', 'Duty', 'Education', 'Emotion',
+  'Equality', 'Eternity', 'Evolution', 'Experience', 'Family', 'Fate', 'Form',
+  'Freedom', 'Friendship', 'God', 'Good and Evil', 'Government', 'Habit',
+  'Happiness', 'History', 'Honor', 'Hypothesis', 'Idea', 'Immortality', 'Induction',
+  'Infinity', 'Judgment', 'Justice', 'Knowledge', 'Labor', 'Language', 'Law',
+  'Liberty', 'Life and Death', 'Logic', 'Love', 'Man', 'Mathematics', 'Matter',
+  'Mechanics', 'Medicine', 'Memory and Imagination', 'Metaphysics', 'Mind',
+  'Monarchy', 'Nature', 'Necessity and Contingency', 'Oligarchy', 'One and Many',
+  'Opinion', 'Opposition', 'Philosophy', 'Physics', 'Pleasure and Pain', 'Poetry',
+  'Principle', 'Progress', 'Prophecy', 'Prudence', 'Punishment', 'Quality',
+  'Quantity', 'Reasoning', 'Relation', 'Religion', 'Revolution', 'Rhetoric',
+  'Same and Other', 'Science', 'Sense', 'Sign and Symbol', 'Sin', 'Slavery',
+  'Soul', 'Space', 'State', 'Temperance', 'Theology', 'Time', 'Truth',
+  'Tyranny', 'Universal and Particular', 'Virtue and Vice', 'War and Peace',
+  'Wealth', 'Will', 'Wisdom', 'World'
+];
+
+function studyLanguageOptions(selected = 'en') {
+  return Object.entries(studyLanguages).map(([code,name]) =>
+    `<option value="${code}" ${code === selected ? 'selected' : ''}>${escapeHtml(name)}</option>`
+  ).join('');
+}
+
+function getStudyLanguage() {
+  return localStorage.getItem(STUDY_LANGUAGE_KEY) || 'en';
+}
+
+function setStudyLanguage(code) {
+  localStorage.setItem(STUDY_LANGUAGE_KEY, code || 'en');
+}
+
+function getLastBiblePassage() {
+  try { return JSON.parse(localStorage.getItem(LAST_BIBLE_PASSAGE_KEY) || 'null'); } catch { return null; }
+}
+
+function saveLastBiblePassage(value) {
+  try { localStorage.setItem(LAST_BIBLE_PASSAGE_KEY, JSON.stringify(value)); } catch {}
+}
+
+function savedSyntopiconAnalyses() {
+  try {
+    const value = JSON.parse(localStorage.getItem(SYNTOPICON_SAVED_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch { return []; }
+}
+
+function saveSyntopiconAnalysis(value) {
+  const saved = savedSyntopiconAnalyses();
+  saved.unshift(value);
+  localStorage.setItem(SYNTOPICON_SAVED_KEY, JSON.stringify(saved.slice(0, 50)));
+}
+
+async function translateStudyBlock(text, targetLanguage, statusElement) {
+  if (!text || !targetLanguage || targetLanguage === 'en') return text;
+  if (statusElement) statusElement.textContent = `Translating to ${studyLanguages[targetLanguage] || targetLanguage}…`;
+  const result = await translateTextPreferBrowser(text, 'en', targetLanguage, (progress) => {
+    if (!statusElement) return;
+    if (progress.type === 'download') statusElement.textContent = `Downloading language pack… ${Math.round(progress.value * 100)}%`;
+    if (progress.type === 'translate') statusElement.textContent = `Translating… ${progress.current} of ${progress.total}`;
+  });
+  if (statusElement) statusElement.textContent = result.provider === 'browser' ? 'Translated in browser.' : 'Translated using server fallback.';
+  return result.text;
+}
+
+function renderSyntopiconResult(analysis, meta) {
+  stopReader();
+  app.innerHTML = `
+    <section class="panel syntopicon-result-page">
+      <div class="library-heading">
+        <div><span class="source-category">Syntopicon</span><h1>${escapeHtml(analysis.idea || meta.idea)}</h1><p>${escapeHtml(analysis.centralQuestion || '')}</p></div>
+        <div class="source-actions"><button id="save-syntopicon-result" class="secondary" type="button">Save Study</button><button class="secondary" type="button" data-read="syntopicon">New Comparison</button></div>
+      </div>
+      <div class="syntopicon-result-grid">
+        <article class="study-guide-card"><h2>Shared Terms</h2>${(analysis.terms || []).map((item)=>`<div class="study-connection"><strong>${escapeHtml(item.term)}</strong><p>${escapeHtml(item.meaning)}</p></div>`).join('')}</article>
+        <article class="study-guide-card"><h2>Agreements</h2><ul>${(analysis.agreements || []).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></article>
+        <article class="study-guide-card"><h2>Disagreements</h2><ul>${(analysis.disagreements || []).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></article>
+        <article class="study-guide-card"><h2>Important Distinctions</h2><ul>${(analysis.distinctions || []).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></article>
+        <section class="study-guide-wide"><h2>Positions by Source</h2><div class="great-idea-grid">
+          ${(analysis.sourcePositions || []).map((item)=>`<article class="great-idea-card"><h3>${escapeHtml(item.source)}</h3><p>${escapeHtml(item.position)}</p><p class="syntopicon-evidence"><strong>Basis:</strong> ${escapeHtml(item.evidenceBasis)}</p><ul>${(item.questions || []).map((q)=>`<li>${escapeHtml(q)}</li>`).join('')}</ul></article>`).join('')}
+        </div></section>
+        <article class="study-guide-card"><h2>Questions to Pursue</h2><ol>${(analysis.studyQuestions || []).map((q)=>`<li>${escapeHtml(q)}</li>`).join('')}</ol></article>
+        <article class="study-guide-card"><h2>Suggested Reading Path</h2><ol>${(analysis.readingPath || []).map((item)=>`<li><strong>${escapeHtml(item.source)}</strong><p>${escapeHtml(item.reason)}</p></li>`).join('')}</ol></article>
+      </div>
+    </section>`;
+  app.querySelector('#save-syntopicon-result')?.addEventListener('click', (event) => {
+    saveSyntopiconAnalysis({ ...meta, analysis, savedAt: new Date().toISOString() });
+    event.currentTarget.textContent = 'Saved';
+    event.currentTarget.disabled = true;
+  });
+}
+
+function renderSyntopicon() {
+  stopReader();
+  const lastBible = getLastBiblePassage();
+  const language = getStudyLanguage();
+  const saved = savedSyntopiconAnalyses();
+
+  app.innerHTML = `
+    <section class="panel syntopicon-page">
+      <div class="library-heading">
+        <div><span class="source-category">Discover · Syntopical Reading</span><h1>Syntopicon</h1><p>Study one Great Idea across multiple books and Bible passages. The goal is comparison: shared terms, competing answers, agreements, disagreements, and the questions that remain.</p></div>
+        <button class="secondary" type="button" data-action="reader">Return to Reader</button>
+      </div>
+
+      <div class="syntopicon-builder">
+        <section class="syntopicon-step">
+          <span>1</span><div><h2>Choose the Great Idea</h2><p>Select a classic idea or enter your own question/topic.</p></div>
+          <label>Great Idea<select id="syntopicon-idea"><option value="">Choose an idea…</option>${greatIdeasCatalog.map((idea)=>`<option value="${escapeHtml(idea)}">${escapeHtml(idea)}</option>`).join('')}</select></label>
+          <label>Or custom idea<input id="syntopicon-custom-idea" type="text" placeholder="e.g. What makes political authority legitimate?"></label>
+        </section>
+
+        <section class="syntopicon-step">
+          <span>2</span><div><h2>Select Sources</h2><p>Choose at least two sources. Great Book entries without supplied excerpts are treated as work-level orientation, not quoted textual evidence.</p></div>
+          ${lastBible ? `<label class="syntopicon-source bible-source"><input type="checkbox" data-syntopicon-bible checked><div><strong>${escapeHtml(lastBible.title)}</strong><small>${escapeHtml(lastBible.translation || 'Bible')} · exact chapter text available</small></div></label>` : `<div class="help-note">Load a Bible chapter in Bible Study if you want it available here as an exact-text source.</div>`}
+          <label class="curated-filter">Filter Great Books<input id="syntopicon-book-filter" type="search" placeholder="Plato, Augustine, Locke, Tolstoy…"></label>
+          <div id="syntopicon-books" class="syntopicon-books">
+            ${greatBooksCatalog.map((book,index)=>`<label class="syntopicon-source" data-syntopicon-book-card data-search-text="${escapeHtml(`${book.title} ${book.author} ${book.era}`.toLowerCase())}"><input type="checkbox" data-syntopicon-book="${index}"><div><strong>${escapeHtml(book.title)}</strong><small>${escapeHtml(book.author)} · Vol. ${book.volume}</small></div></label>`).join('')}
+          </div>
+        </section>
+
+        <section class="syntopicon-step">
+          <span>3</span><div><h2>Analysis Language</h2><p>The comparative study can be generated directly in another language.</p></div>
+          <label>Language<select id="syntopicon-language">${studyLanguageOptions(language)}</select></label>
+        </section>
+
+        <div class="syntopicon-actions">
+          <button id="run-syntopicon" class="primary" type="button">Compare Selected Sources</button>
+          <span id="syntopicon-status" class="status"></span>
+        </div>
+      </div>
+
+      ${saved.length ? `<section class="dashboard-section"><h2>Saved Syntopical Studies</h2><div class="activity-list">${saved.slice(0,8).map((item,index)=>`<article><div><strong>${escapeHtml(item.idea || item.analysis?.idea || 'Study')}</strong><span>${new Date(item.savedAt).toLocaleString()}</span></div><p>${escapeHtml(item.analysis?.centralQuestion || '')}</p><button class="secondary" type="button" data-open-syntopicon="${index}">Open</button></article>`).join('')}</div></section>` : ''}
+    </section>`;
+
+  app.querySelector('#syntopicon-book-filter')?.addEventListener('input', (event) => {
+    const query = event.target.value.trim().toLowerCase();
+    app.querySelectorAll('[data-syntopicon-book-card]').forEach((card) => {
+      card.hidden = Boolean(query) && !card.dataset.searchText.includes(query);
+    });
+  });
+
+  app.querySelector('#syntopicon-language')?.addEventListener('change', (event) => setStudyLanguage(event.target.value));
+
+  app.querySelector('#run-syntopicon')?.addEventListener('click', async (event) => {
+    const idea = app.querySelector('#syntopicon-custom-idea').value.trim() || app.querySelector('#syntopicon-idea').value;
+    const status = app.querySelector('#syntopicon-status');
+    if (!idea) { status.className='status error'; status.textContent='Choose or enter a Great Idea.'; return; }
+
+    const sources = [];
+    if (lastBible && app.querySelector('[data-syntopicon-bible]')?.checked) {
+      sources.push({ id:'last-bible', title:lastBible.title, author:lastBible.translation || 'Bible', type:'bible', excerpt:lastBible.text || '' });
+    }
+    app.querySelectorAll('[data-syntopicon-book]:checked').forEach((input) => {
+      const book = greatBooksCatalog[Number(input.dataset.syntopiconBook)];
+      if (book) sources.push({ id:`great-${input.dataset.syntopiconBook}`, title:book.title, author:book.author, type:'great-book', excerpt:'' });
+    });
+    if (sources.length < 2) { status.className='status error'; status.textContent='Select at least two sources.'; return; }
+
+    const languageCode = app.querySelector('#syntopicon-language').value || 'en';
+    setStudyLanguage(languageCode);
+    const button = event.currentTarget;
+    button.disabled=true; button.textContent='Comparing…';
+    status.className='status'; status.textContent='Building a syntopical map of the selected sources…';
+    try {
+      const analysis = await loadApiPayload('/api/syntopicon', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({ idea, language:studyLanguages[languageCode] || 'English', sources })
+      });
+      renderSyntopiconResult(analysis, { idea, language:languageCode, sources:sources.map(({excerpt,...rest})=>rest) });
+    } catch(error) {
+      status.className='status error'; status.textContent=error.message;
+      button.disabled=false; button.textContent='Compare Selected Sources';
+    }
+  });
+
+  app.querySelectorAll('[data-open-syntopicon]').forEach((button)=>button.addEventListener('click',()=>{
+    const item=saved[Number(button.dataset.openSyntopicon)];
+    if(item?.analysis) renderSyntopiconResult(item.analysis,item);
+  }));
+}
+
+
+function greatBookGrokipediaUrl(book) {
+  return grokipediaSearchUrl(book.title, book.author);
+}
+
+function flattenBibleContent(content) {
+  const textOf = (value) => {
+    if (typeof value === 'string') return value;
+    if (!value || typeof value !== 'object') return '';
+    if (typeof value.text === 'string') return value.text;
+    if (typeof value.heading === 'string') return value.heading;
+    if (value.lineBreak) return '\n';
+    return '';
+  };
+  const lines = [];
+  for (const item of Array.isArray(content) ? content : []) {
+    if (item?.type === 'heading') {
+      const heading = (item.content || []).map(textOf).join(' ').replace(/\s+/g,' ').trim();
+      if (heading) lines.push(heading);
+    } else if (item?.type === 'hebrew_subtitle') {
+      const subtitle = (item.content || []).map(textOf).join(' ').replace(/\s+/g,' ').trim();
+      if (subtitle) lines.push(subtitle);
+    } else if (item?.type === 'verse') {
+      const verseText = (item.content || []).map(textOf).join('').replace(/\s+/g,' ').trim();
+      if (verseText) lines.push(`${item.number}. ${verseText}`);
+    } else if (item?.type === 'line_break') {
+      lines.push('');
+    }
+  }
+  return lines.join('\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+
+function renderStudyGuide(title, guide, { sourceType = 'great-book', returnAction = 'great-books' } = {}) {
+  stopReader();
+  app.innerHTML = `
+    <section class="panel study-guide-page">
+      <div class="library-heading">
+        <div><span class="source-category">${sourceType === 'bible' ? 'Bible Study' : 'Syntopical Study'}</span><h1>${escapeHtml(title)}</h1><p>An AI-assisted study guide. Treat interpretations and cross-connections as prompts for further reading, not as a substitute for the primary text.</p></div>
+        <button class="secondary" type="button" data-study-return>Back</button>
+      </div>
+      <div class="study-guide-grid">
+        <article class="study-guide-card study-guide-wide"><h2>Overview</h2><p>${escapeHtml(guide.overview || '')}</p></article>
+        <article class="study-guide-card study-guide-wide"><h2>Context</h2><p>${escapeHtml(guide.context || '')}</p></article>
+        <section class="study-guide-wide"><h2>Great Ideas</h2><div class="great-idea-grid">
+          ${(guide.greatIdeas || []).map((idea) => `<article class="great-idea-card"><h3>${escapeHtml(idea.idea)}</h3><p>${escapeHtml(idea.whyItMatters)}</p><ul>${(idea.questions || []).map((q)=>`<li>${escapeHtml(q)}</li>`).join('')}</ul></article>`).join('')}
+        </div></section>
+        <article class="study-guide-card"><h2>Study Questions</h2><ol>${(guide.studyQuestions || []).map((q)=>`<li>${escapeHtml(q)}</li>`).join('')}</ol></article>
+        <article class="study-guide-card"><h2>Syntopical Connections</h2>${(guide.connections || []).map((item)=>`<div class="study-connection"><strong>${escapeHtml(item.work)}</strong><p>${escapeHtml(item.connection)}</p></div>`).join('')}</article>
+      </div>
+    </section>`;
+  app.querySelector('[data-study-return]')?.addEventListener('click', () => {
+    if (returnAction === 'bible') renderBibleStudy();
+    else renderGreatBooksLibrary();
+  });
+}
+
+async function requestStudyGuide({ title, author = '', passage = '', sourceType = 'great-book', language = getStudyLanguage() }) {
+  return loadApiPayload('/api/study-guide', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, author, passage, sourceType, language: studyLanguages[language] || language || 'English' })
+  });
+}
+
+async function renderGreatBookStudy(book, button) {
+  const original = button?.textContent;
+  if (button) { button.disabled = true; button.textContent = 'Building study guide…'; }
+  try {
+    const guide = await requestStudyGuide({ title: book.title, author: book.author, sourceType: 'great-book', language: getStudyLanguage() });
+    renderStudyGuide(`${book.title} — ${book.author}`, guide, { sourceType: 'great-book', returnAction: 'great-books' });
+  } catch (error) {
+    window.alert(`Study guide unavailable: ${error.message}`);
+    if (button) { button.disabled = false; button.textContent = original || 'Study / Great Ideas'; }
+  }
+}
+
+
+function flattenBibleContent(content) {
+  const textOf = (value) => {
+    if (typeof value === 'string') return value;
+    if (!value || typeof value !== 'object') return '';
+    if (typeof value.text === 'string') return value.text;
+    if (typeof value.heading === 'string') return value.heading;
+    if (value.lineBreak) return '\n';
+    return '';
+  };
+  const lines = [];
+  for (const item of Array.isArray(content) ? content : []) {
+    if (item?.type === 'heading') {
+      const heading = (item.content || []).map(textOf).join(' ').replace(/\s+/g,' ').trim();
+      if (heading) lines.push(heading);
+    } else if (item?.type === 'hebrew_subtitle') {
+      const subtitle = (item.content || []).map(textOf).join(' ').replace(/\s+/g,' ').trim();
+      if (subtitle) lines.push(subtitle);
+    } else if (item?.type === 'verse') {
+      const verseText = (item.content || []).map(textOf).join('').replace(/\s+/g,' ').trim();
+      if (verseText) lines.push(`${item.number}. ${verseText}`);
+    } else if (item?.type === 'line_break') {
+      lines.push('');
+    }
+  }
+  return lines.join('\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+
+function flattenCommentaryContent(payload) {
+  const intro = String(payload?.chapter?.introduction || payload?.introduction || '').trim();
+  const content = payload?.chapter?.content || payload?.content || [];
+  const body = flattenBibleContent(content);
+  return [intro, body].filter(Boolean).join('\n\n').trim();
+}
+
+function collectDatasetReferences(payload) {
+  const refs = [];
+  const walk = (value, verseNumber = null) => {
+    if (Array.isArray(value)) return value.forEach((item) => walk(item, verseNumber));
+    if (!value || typeof value !== 'object') return;
+    const currentVerse = value.verse ?? value.number ?? verseNumber;
+    const candidates = value.references || value.crossReferences || value.refs || value.content;
+    if (Array.isArray(candidates)) {
+      candidates.forEach((ref) => {
+        if (typeof ref === 'string') refs.push({ verse: currentVerse, reference: ref });
+        else if (ref && typeof ref === 'object') {
+          const book = ref.book || ref.bookId || ref.bookName || '';
+          const chapter = ref.chapter || '';
+          const verse = ref.verse || ref.startVerse || '';
+          const endVerse = ref.endVerse || '';
+          const label = ref.reference || ref.label || [book, chapter && `${chapter}:${verse}${endVerse && endVerse !== verse ? `-${endVerse}` : ''}`].filter(Boolean).join(' ');
+          if (label) refs.push({ verse: currentVerse, reference: label });
+        }
+      });
+    }
+    Object.entries(value).forEach(([key, child]) => {
+      if (!['references','crossReferences','refs','content'].includes(key)) walk(child, currentVerse);
+    });
+  };
+  walk(payload);
+  return refs.slice(0, 500);
+}
+
+async function renderBibleStudy() {
+  stopReader();
+  app.innerHTML = `
+    <section class="panel bible-study-page">
+      <div class="library-heading">
+        <div><span class="source-category">Discover · Study</span><h1>Bible Study</h1><p>Read chapters or books, compare translations, consult public-domain commentaries, follow cross references, and generate Great Ideas study guides.</p></div>
+        <button class="secondary" type="button" data-action="reader">Return to Reader</button>
+      </div>
+
+      <div class="bible-language-toolbar">
+        <label>Bible language<select id="bible-language-filter"><option value="">All languages</option></select></label>
+        <label>Study / display language<select id="bible-study-language">${studyLanguageOptions(getStudyLanguage())}</select></label>
+        <button id="bible-translate-display" class="secondary" type="button" disabled>Translate Displayed Chapter</button>
+        <button id="bible-restore-display" class="secondary" type="button" disabled>Restore Source Translation</button>
+      </div>
+      <div class="bible-study-controls">
+        <label>Translation<select id="bible-translation"><option>Loading translations…</option></select></label>
+        <label>Book<select id="bible-book" disabled><option>Select a translation</option></select></label>
+        <label>Chapter<select id="bible-chapter" disabled><option>—</option></select></label>
+        <label>Compare with<select id="bible-compare"><option value="">No comparison</option></select></label>
+      </div>
+
+      <div class="bible-study-actions">
+        <button id="bible-load" class="primary" type="button" disabled>Load Chapter</button>
+        <button id="bible-reader" class="secondary" type="button" disabled>Read Chapter</button>
+        <button id="bible-read-book" class="secondary" type="button" disabled>Read Entire Book</button>
+        <button id="bible-study-guide" class="secondary" type="button" disabled>Study / Great Ideas</button>
+        <a id="bible-grokipedia" class="secondary button-link" href="${grokipediaSearchUrl('Bible')}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
+      </div>
+
+      <div class="bible-study-tabs" role="tablist" aria-label="Bible study tools">
+        <button class="active" type="button" data-bible-tab="text">Text</button>
+        <button type="button" data-bible-tab="commentary">Commentary</button>
+        <button type="button" data-bible-tab="crossrefs">Cross References</button>
+        <button type="button" data-bible-tab="profiles">Profiles</button>
+        <button type="button" data-bible-tab="notes">Notes</button>
+      </div>
+
+      <p id="bible-status" class="status"></p>
+
+      <section data-bible-view="text" class="bible-study-view active">
+        <div id="bible-results" class="bible-results">
+          <div class="empty-library"><h2>Choose a translation, book, and chapter</h2><p>Load a chapter to read, compare, study, or send it into the main reader.</p></div>
+        </div>
+      </section>
+
+      <section data-bible-view="commentary" class="bible-study-view">
+        <div class="bible-tool-heading"><div><h2>Commentary</h2><p>Select a public-domain commentary for the current chapter.</p></div>
+          <label>Commentary<select id="bible-commentary"><option value="">Loading commentaries…</option></select></label>
+        </div>
+        <div id="bible-commentary-result" class="bible-study-resource"><p class="navigation-empty">Load a chapter, then choose a commentary.</p></div>
+      </section>
+
+      <section data-bible-view="crossrefs" class="bible-study-view">
+        <div class="bible-tool-heading"><div><h2>Cross References</h2><p>Explore related passages from available open datasets.</p></div>
+          <label>Dataset<select id="bible-dataset"><option value="">Loading datasets…</option></select></label>
+        </div>
+        <div id="bible-crossref-result" class="bible-study-resource"><p class="navigation-empty">Load a chapter to view related references.</p></div>
+      </section>
+
+      <section data-bible-view="profiles" class="bible-study-view">
+        <div class="bible-tool-heading"><div><h2>People & Profiles</h2><p>Profiles are available where the selected commentary provides them.</p></div></div>
+        <div id="bible-profile-result" class="bible-study-resource"><p class="navigation-empty">Choose a commentary with profile data.</p></div>
+      </section>
+
+      <section data-bible-view="notes" class="bible-study-view">
+        <div class="bible-tool-heading"><div><h2>Study Notes</h2><p>Keep observations and questions tied to this chapter.</p></div></div>
+        <textarea id="bible-study-notes" rows="10" placeholder="Observations, questions, themes, connections…"></textarea>
+        <div class="bible-study-actions"><button id="save-bible-notes" class="secondary" type="button">Save Notes</button><span id="bible-notes-status" class="status"></span></div>
+      </section>
+    </section>`;
+
+  const translationSelect = app.querySelector('#bible-translation');
+  const compareSelect = app.querySelector('#bible-compare');
+  const bookSelect = app.querySelector('#bible-book');
+  const chapterSelect = app.querySelector('#bible-chapter');
+  const commentarySelect = app.querySelector('#bible-commentary');
+  const datasetSelect = app.querySelector('#bible-dataset');
+  const bibleLanguageFilter = app.querySelector('#bible-language-filter');
+  const bibleStudyLanguage = app.querySelector('#bible-study-language');
+  const status = app.querySelector('#bible-status');
+
+  let chapterPayload = null;
+  let chapterText = '';
+  let displayedChapterText = '';
+  let commentaries = [];
+  let datasets = [];
+  let bibleTranslations = [];
+
+  const setStatus = (message, error = false) => {
+    status.className = `status${error ? ' error' : ''}`;
+    status.textContent = message || '';
+  };
+
+  const bookLabel = () => bookSelect.selectedOptions[0]?.textContent?.replace(/\s+·.*$/,'') || 'Bible';
+  const referenceLabel = () => `${bookLabel()} ${chapterSelect.value || ''}`.trim();
+  const notesKey = () => `markSetGoBibleNotesV1:${translationSelect.value}:${bookSelect.value}:${chapterSelect.value}`;
+
+  const selectTab = (tab) => {
+    app.querySelectorAll('[data-bible-tab]').forEach((button) => {
+      const active = button.dataset.bibleTab === tab;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', String(active));
+    });
+    app.querySelectorAll('[data-bible-view]').forEach((view) => {
+      view.classList.toggle('active', view.dataset.bibleView === tab);
+    });
+  };
+
+  app.querySelectorAll('[data-bible-tab]').forEach((button) => {
+    button.addEventListener('click', () => selectTab(button.dataset.bibleTab));
+  });
+
+  const popularOrder = ['KJV','BSB','WEB','ASV','YLT','DARBY'];
+
+  try {
+    const [translationsPayload, commentariesPayload, datasetsPayload] = await Promise.all([
+      loadApiPayload('/api/bible/translations'),
+      loadApiPayload('/api/bible/commentaries'),
+      loadApiPayload('/api/bible/datasets')
+    ]);
+    bibleTranslations = translationsPayload.translations || [];
+    bibleTranslations.sort((a,b) => {
+      const ai = popularOrder.indexOf(a.id), bi = popularOrder.indexOf(b.id);
+      if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      return `${a.languageName} ${a.name}`.localeCompare(`${b.languageName} ${b.name}`);
+    });
+    const languageNames = [...new Set(bibleTranslations.map((item)=>item.languageName || item.language).filter(Boolean))].sort();
+    bibleLanguageFilter.innerHTML = `<option value="">All languages</option>${languageNames.map((name)=>`<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')}`;
+    const englishName = languageNames.find((name)=>/^english$/i.test(name));
+    if (englishName) bibleLanguageFilter.value = englishName;
+
+    const renderTranslationOptions = () => {
+      const filterLanguage = bibleLanguageFilter.value;
+      const filtered = bibleTranslations.filter((item)=>!filterLanguage || (item.languageName || item.language) === filterLanguage);
+      const options = filtered.map((item)=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.shortName)} — ${escapeHtml(item.name)}</option>`).join('');
+      const previous = translationSelect.value;
+      translationSelect.innerHTML = options;
+      compareSelect.innerHTML = `<option value="">No comparison</option>${options}`;
+      const preferred = filtered.find((item)=>item.id === previous) || filtered.find((item)=>item.id === 'KJV') || filtered.find((item)=>item.id === 'BSB') || filtered[0];
+      if (preferred) translationSelect.value = preferred.id;
+    };
+    renderTranslationOptions();
+    bibleLanguageFilter.addEventListener('change', async () => {
+      renderTranslationOptions();
+      if (translationSelect.value) await loadBooks();
+    });
+
+    commentaries = commentariesPayload.commentaries || [];
+    commentarySelect.innerHTML = `<option value="">Choose commentary…</option>${commentaries.map((item)=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('')}`;
+
+    datasets = datasetsPayload.datasets || [];
+    datasetSelect.innerHTML = `<option value="">Choose dataset…</option>${datasets.map((item)=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}</option>`).join('')}`;
+    const crossRef = datasets.find((item) => /cross/i.test(item.name) || /cross-ref/i.test(item.id));
+    if (crossRef) datasetSelect.value = crossRef.id;
+
+    await loadBooks();
+  } catch (error) {
+    setStatus(error.message, true);
+    return;
+  }
+
+  async function loadBooks() {
+    setStatus('Loading books…');
+    const payload = await loadApiPayload(`/api/bible/${encodeURIComponent(translationSelect.value)}/books`);
+    const books = payload.books || [];
+    bookSelect.innerHTML = books.map((book)=>`<option value="${escapeHtml(book.id)}" data-chapters="${Number(book.numberOfChapters)}">${escapeHtml(book.name)}${book.isApocryphal ? ' · Deuterocanonical/Apocryphal' : ''}</option>`).join('');
+    bookSelect.disabled = false;
+    updateChapters();
+    setStatus('');
+  }
+
+  function updateChapters() {
+    const option = bookSelect.selectedOptions[0];
+    const count = Math.max(1, Number(option?.dataset.chapters) || 1);
+    chapterSelect.innerHTML = Array.from({length:count},(_,i)=>`<option value="${i+1}">${i+1}</option>`).join('');
+    chapterSelect.disabled=false;
+    app.querySelector('#bible-load').disabled=false;
+    app.querySelector('#bible-read-book').disabled=false;
+    updateGrokipedia();
+    loadSavedNotes();
+  }
+
+  function updateGrokipedia() {
+    app.querySelector('#bible-grokipedia').href = grokipediaSearchUrl(`${referenceLabel()} Bible`);
+  }
+
+  function loadSavedNotes() {
+    app.querySelector('#bible-study-notes').value = localStorage.getItem(notesKey()) || '';
+  }
+
+  async function fetchChapter(translation) {
+    return loadApiPayload(`/api/bible/${encodeURIComponent(translation)}/${encodeURIComponent(bookSelect.value)}/${encodeURIComponent(chapterSelect.value)}`);
+  }
+
+  async function loadCommentary() {
+    const id = commentarySelect.value;
+    const result = app.querySelector('#bible-commentary-result');
+    if (!id || !chapterPayload) {
+      result.innerHTML = '<p class="navigation-empty">Load a chapter, then choose a commentary.</p>';
+      return;
+    }
+    result.innerHTML = '<p class="status">Loading commentary…</p>';
+    try {
+      const payload = await loadApiPayload(`/api/bible/commentary/${encodeURIComponent(id)}/${encodeURIComponent(bookSelect.value)}/${encodeURIComponent(chapterSelect.value)}`);
+      const text = flattenCommentaryContent(payload);
+      result.innerHTML = text
+        ? `<article class="bible-resource-card"><div class="bible-resource-title"><h3>${escapeHtml(commentarySelect.selectedOptions[0]?.textContent || 'Commentary')}</h3></div><pre>${escapeHtml(text)}</pre></article>`
+        : '<p class="navigation-empty">No commentary text is available for this chapter.</p>';
+      loadProfiles();
+    } catch (error) {
+      result.innerHTML = `<p class="status error">${escapeHtml(error.message)}</p>`;
+    }
+  }
+
+  async function loadCrossRefs() {
+    const id = datasetSelect.value;
+    const result = app.querySelector('#bible-crossref-result');
+    if (!id || !chapterPayload) {
+      result.innerHTML = '<p class="navigation-empty">Load a chapter and choose a dataset.</p>';
+      return;
+    }
+    result.innerHTML = '<p class="status">Loading cross references…</p>';
+    try {
+      const payload = await loadApiPayload(`/api/bible/dataset/${encodeURIComponent(id)}/${encodeURIComponent(bookSelect.value)}/${encodeURIComponent(chapterSelect.value)}`);
+      const refs = collectDatasetReferences(payload);
+      result.innerHTML = refs.length
+        ? `<div class="bible-reference-list">${refs.map((item)=>`<article><span>${item.verse ? `Verse ${escapeHtml(item.verse)}` : 'Related'}</span><strong>${escapeHtml(item.reference)}</strong></article>`).join('')}</div>`
+        : `<article class="bible-resource-card"><pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre></article>`;
+    } catch (error) {
+      result.innerHTML = `<p class="status error">${escapeHtml(error.message)}</p>`;
+    }
+  }
+
+  async function loadProfiles() {
+    const id = commentarySelect.value;
+    const result = app.querySelector('#bible-profile-result');
+    const commentary = commentaries.find((item)=>item.id === id);
+    if (!id || !commentary?.totalNumberOfProfiles) {
+      result.innerHTML = '<p class="navigation-empty">This commentary does not advertise profile data.</p>';
+      return;
+    }
+    result.innerHTML = '<p class="status">Loading profiles…</p>';
+    try {
+      const payload = await loadApiPayload(`/api/bible/commentary/${encodeURIComponent(id)}/profiles`);
+      const matching = (payload.profiles || []).filter((profile) =>
+        profile.reference?.book === bookSelect.value &&
+        Number(profile.reference?.chapter) === Number(chapterSelect.value)
+      );
+      result.innerHTML = matching.length
+        ? `<div class="bible-profile-list">${matching.map((profile)=>`<button class="secondary" type="button" data-bible-profile="${escapeHtml(profile.id)}">${escapeHtml(profile.subject || profile.id)}</button>`).join('')}</div>`
+        : '<p class="navigation-empty">No profiles are tied directly to this chapter.</p>';
+      result.querySelectorAll('[data-bible-profile]').forEach((button)=>button.addEventListener('click',async()=>{
+        result.innerHTML='<p class="status">Loading profile…</p>';
+        try {
+          const profile = await loadApiPayload(`/api/bible/commentary/${encodeURIComponent(id)}/profiles/${encodeURIComponent(button.dataset.bibleProfile)}`);
+          result.innerHTML=`<article class="bible-resource-card"><pre>${escapeHtml(JSON.stringify(profile, null, 2))}</pre></article>`;
+        } catch(error) {
+          result.innerHTML=`<p class="status error">${escapeHtml(error.message)}</p>`;
+        }
+      }));
+    } catch (error) {
+      result.innerHTML = `<p class="status error">${escapeHtml(error.message)}</p>`;
+    }
+  }
+
+  async function loadChapter() {
+    const loadButton=app.querySelector('#bible-load');
+    loadButton.disabled=true;
+    setStatus('Loading chapter…');
+    try {
+      chapterPayload = await fetchChapter(translationSelect.value);
+      chapterText = flattenBibleContent(chapterPayload.chapter?.content);
+      displayedChapterText = chapterText;
+      const compareId = compareSelect.value;
+      let comparePayload=null, compareText='';
+      if (compareId) {
+        comparePayload = await fetchChapter(compareId);
+        compareText = flattenBibleContent(comparePayload.chapter?.content);
+      }
+      const heading = referenceLabel();
+      app.querySelector('#bible-results').innerHTML = `
+        <div class="bible-translation-grid ${comparePayload ? 'comparing' : ''}">
+          <article class="bible-chapter-card"><div class="bible-chapter-heading"><h2>${escapeHtml(heading)}</h2><span>${escapeHtml(chapterPayload.translation?.shortName || translationSelect.value)}</span></div><pre>${escapeHtml(chapterText)}</pre></article>
+          ${comparePayload ? `<article class="bible-chapter-card"><div class="bible-chapter-heading"><h2>${escapeHtml(heading)}</h2><span>${escapeHtml(comparePayload.translation?.shortName || compareId)}</span></div><pre>${escapeHtml(compareText)}</pre></article>` : ''}
+        </div>`;
+      app.querySelector('#bible-reader').disabled=false;
+      app.querySelector('#bible-study-guide').disabled=false;
+      app.querySelector('#bible-translate-display').disabled=false;
+      app.querySelector('#bible-restore-display').disabled=true;
+      saveLastBiblePassage({
+        title: heading,
+        translation: chapterPayload.translation?.shortName || translationSelect.value,
+        translationId: translationSelect.value,
+        book: bookSelect.value,
+        chapter: Number(chapterSelect.value),
+        text: chapterText,
+        savedAt: new Date().toISOString()
+      });
+      setStatus(comparePayload ? 'Translations loaded side by side.' : 'Chapter loaded.');
+      loadSavedNotes();
+      if (commentarySelect.value) loadCommentary();
+      if (datasetSelect.value) loadCrossRefs();
+    } catch(error) {
+      setStatus(error.message,true);
+    } finally {
+      loadButton.disabled=false;
+    }
+  }
+
+  async function readEntireBook() {
+    const button = app.querySelector('#bible-read-book');
+    const original = button.textContent;
+    const selectedBook = bookLabel();
+    const selectedTranslation = translationSelect.value;
+    const chapterCount = Math.max(1, Number(bookSelect.selectedOptions[0]?.dataset.chapters) || 1);
+    button.disabled = true;
+    button.textContent = 'Loading book…';
+    setStatus(`Loading ${selectedBook}: 0 of ${chapterCount} chapters…`);
+
+    try {
+      // The upstream Bible API is chapter-oriented. Build the book from those
+      // known-good chapter responses instead of depending on a "complete"
+      // response whose shape varies by translation.
+      const chapters = new Array(chapterCount);
+      const concurrency = Math.min(4, chapterCount);
+      let nextChapter = 1;
+      let completed = 0;
+
+      const worker = async () => {
+        while (nextChapter <= chapterCount) {
+          const chapterNumber = nextChapter++;
+          const payload = await loadApiPayload(
+            `/api/bible/${encodeURIComponent(selectedTranslation)}/${encodeURIComponent(bookSelect.value)}/${chapterNumber}`
+          );
+          const text = flattenBibleContent(payload.chapter?.content);
+          if (!text || !splitWords(text).length) {
+            throw new Error(`Chapter ${chapterNumber} did not contain readable text.`);
+          }
+          chapters[chapterNumber - 1] = {
+            number: payload.chapter?.number || chapterNumber,
+            text,
+            translation: payload.translation
+          };
+          completed += 1;
+          setStatus(`Loading ${selectedBook}: ${completed} of ${chapterCount} chapters…`);
+        }
+      };
+
+      await Promise.all(Array.from({ length: concurrency }, () => worker()));
+
+      const parts = [];
+      const toc = [];
+      let wordIndex = 0;
+      for (const chapter of chapters) {
+        const heading = `Chapter ${chapter.number}`;
+        const block = `${heading}\n\n${chapter.text}`;
+        toc.push({ title: heading, index: wordIndex, type: 'chapter' });
+        parts.push(block);
+        wordIndex += splitWords(block).length;
+      }
+
+      const fullText = parts.join('\n\n');
+      if (!splitWords(fullText).length) {
+        throw new Error(`No readable text was returned for ${selectedBook}.`);
+      }
+
+      const title = `${selectedBook} — ${chapters[0]?.translation?.shortName || selectedTranslation}`;
+      renderReaderWithText(title, fullText, {
+        type:'bible-book',
+        translation:selectedTranslation,
+        book:bookSelect.value,
+        author:'Bible',
+        epubToc:toc
+      });
+    } catch(error) {
+      setStatus(`Unable to load entire book: ${error.message}`, true);
+      button.disabled=false;
+      button.textContent=original;
+    }
+  }
+
+  translationSelect.addEventListener('change', loadBooks);
+  bookSelect.addEventListener('change', () => { updateChapters(); chapterPayload=null; chapterText=''; });
+  chapterSelect.addEventListener('change', () => { updateGrokipedia(); loadSavedNotes(); });
+  compareSelect.addEventListener('change', () => { if (chapterPayload) loadChapter(); });
+  commentarySelect.addEventListener('change', () => { loadCommentary(); });
+  datasetSelect.addEventListener('change', () => { loadCrossRefs(); });
+
+  app.querySelector('#bible-load').addEventListener('click', loadChapter);
+  app.querySelector('#bible-reader').addEventListener('click', async () => {
+    if (!chapterPayload) await loadChapter();
+    if (!chapterPayload || !chapterText) return;
+    const heading = referenceLabel();
+    renderReaderWithText(`${heading} — ${chapterPayload.translation?.shortName || translationSelect.value}`, chapterText, {
+      type:'bible', translation:translationSelect.value, book:bookSelect.value, chapter:Number(chapterSelect.value), author:'Bible'
+    });
+  });
+  app.querySelector('#bible-read-book').addEventListener('click', readEntireBook);
+  app.querySelector('#bible-study-guide').addEventListener('click', async (event) => {
+    if (!chapterPayload) await loadChapter();
+    if (!chapterPayload || !chapterText) return;
+    const button=event.currentTarget, original=button.textContent;
+    button.disabled=true; button.textContent='Building study guide…';
+    try {
+      const heading = referenceLabel();
+      const guide = await requestStudyGuide({ title: heading, author: chapterPayload.translation?.shortName || translationSelect.value, passage: chapterText, sourceType:'bible', language: bibleStudyLanguage.value || getStudyLanguage() });
+      renderStudyGuide(heading, guide, { sourceType:'bible', returnAction:'bible' });
+    } catch(error) {
+      window.alert(`Bible study guide unavailable: ${error.message}`);
+      button.disabled=false; button.textContent=original;
+    }
+  });
+
+  bibleStudyLanguage.addEventListener('change', () => setStudyLanguage(bibleStudyLanguage.value));
+
+  app.querySelector('#bible-translate-display').addEventListener('click', async (event) => {
+    if (!chapterPayload || !chapterText) return;
+    const target = bibleStudyLanguage.value || 'en';
+    if (target === 'en') {
+      setStatus('Study/display language is already English.');
+      return;
+    }
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      displayedChapterText = await translateStudyBlock(chapterText, target, status);
+      const heading = referenceLabel();
+      const card = app.querySelector('#bible-results .bible-chapter-card');
+      if (card) card.querySelector('pre').textContent = displayedChapterText;
+      app.querySelector('#bible-restore-display').disabled = false;
+      setStatus(`Displayed chapter translated to ${studyLanguages[target] || target}. Source translation remains unchanged.`);
+    } catch(error) {
+      setStatus(error.message,true);
+    } finally {
+      button.disabled=false;
+    }
+  });
+
+  app.querySelector('#bible-restore-display').addEventListener('click', () => {
+    displayedChapterText = chapterText;
+    const card = app.querySelector('#bible-results .bible-chapter-card');
+    if (card) card.querySelector('pre').textContent = chapterText;
+    app.querySelector('#bible-restore-display').disabled = true;
+    setStatus('Restored source translation.');
+  });
+
+  app.querySelector('#save-bible-notes').addEventListener('click', () => {
+    localStorage.setItem(notesKey(), app.querySelector('#bible-study-notes').value || '');
+    const noteStatus=app.querySelector('#bible-notes-status');
+    noteStatus.textContent='Saved.';
+    window.setTimeout(()=>{ if(noteStatus) noteStatus.textContent=''; },1200);
+  });
+}
+
 function renderGreatBooksLibrary() {
   stopReader();
-  const grouped = groupBy(greatBooksCatalog, 'era');
+  const grouped = groupBy(greatBooksCatalog, 'volume');
   app.innerHTML = `
-    <section class="panel curated-library">
+    <section class="panel curated-library great-books-study-library">
       <div class="library-heading">
-        <div><h1>Great Books Library</h1><p>A curated path through major works of the Western tradition using lawful public-domain editions.</p></div>
-        <button class="secondary" type="button" data-read="gutenberg">Search all Gutenberg</button>
+        <div><span class="source-category">Discover · Study</span><h1>Great Books of the Western World</h1><p>The 1990 60-volume reading list, organized for primary-text reading, study, and syntopical exploration.</p></div>
+        <div class="source-actions"><button class="secondary" type="button" data-read="gutenberg">Search Gutenberg</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
       </div>
-      <label class="curated-filter">Filter works<input id="great-books-filter" type="search" placeholder="Plato, Shakespeare, science…"></label>
-      <div id="great-books-groups" class="curated-groups">
-        ${Object.entries(grouped).map(([era, books]) => `
-          <details class="curated-era" open>
-            <summary>${escapeHtml(era)} <span>${books.length}</span></summary>
+      <div class="study-language-bar">
+        <div><strong>Study language</strong><span>AI study guides can be generated in another language; imported books can be translated from the Reader.</span></div>
+        <select id="great-books-study-language">${studyLanguageOptions(getStudyLanguage())}</select>
+      </div>
+      <div class="great-books-study-intro">
+        <article><strong>${greatBooksCatalog.length}</strong><span>works / author groups</span></article>
+        <article><strong>60</strong><span>volume framework</span></article>
+        <article><strong>AI</strong><span>Great Ideas study guides</span></article>
+      </div>
+      <label class="curated-filter">Filter works, authors, volumes, or ideas<input id="great-books-filter" type="search" placeholder="Plato, justice, Shakespeare, science…"></label>
+      <div id="great-books-groups" class="curated-groups great-books-volumes">
+        ${Object.entries(grouped).sort((a,b)=>Number(a[0])-Number(b[0])).map(([volume, books]) => `
+          <details class="curated-era" ${Number(volume) <= 6 ? 'open' : ''}>
+            <summary>Volume ${escapeHtml(volume)} · ${escapeHtml(books[0]?.era || '')} <span>${books.length}</span></summary>
             <div class="curated-grid">
-              ${books.map((book) => `<article class="curated-card" data-great-book-card data-search-text="${escapeHtml(`${book.title} ${book.author} ${book.era}`.toLowerCase())}">
-                <div><h2>${escapeHtml(book.title)}</h2><p>${escapeHtml(book.author)}</p></div>
-                ${bookMusicMarkup(book.title, book.author)}
-                <button class="primary" type="button" data-load-great-book="${escapeHtml(book.query)}">Load into Reader</button>
+              ${books.map((book) => `<article class="curated-card" data-great-book-card data-search-text="${escapeHtml(`${book.title} ${book.author} ${book.era} volume ${book.volume}`.toLowerCase())}">
+                <div><span class="source-category">Volume ${book.volume}</span><h2>${escapeHtml(book.title)}</h2><p>${escapeHtml(book.author)}</p></div>
+                <div class="great-book-actions">
+                  <button class="primary" type="button" data-load-great-book="${escapeHtml(book.query)}">Find &amp; Import Edition</button>
+                  <button class="secondary" type="button" data-study-great-book="${escapeHtml(book.query)}">Study / Great Ideas</button>
+                  <a class="secondary button-link" href="${greatBookGrokipediaUrl(book)}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
+                </div>
                 <p class="status book-load-status"></p>
               </article>`).join('')}
             </div>
           </details>`).join('')}
       </div>
-      <p class="library-note">This is a curated public-domain reading list, not a reproduction of Britannica’s copyrighted anthology or its editorial material. Edition availability and public-domain status can vary by country.</p>
+      <p class="library-note">The reading list follows the 1990 edition’s contents. Find & Import searches all connected public book sources—Standard Ebooks, Internet Archive, Open Library, Wikisource, and Project Gutenberg—and opens only a verified primary/full-text edition. Summaries, excerpts, study guides, and weak title matches are rejected automatically. It may not find works that remain copyrighted or lack a suitable open digital edition. This app does not reproduce Britannica’s copyrighted Syntopicon commentary; its Great Ideas study guides are newly generated for syntopical reading.</p>
     </section>`;
 
+  app.querySelector('#great-books-study-language')?.addEventListener('change', (event) => setStudyLanguage(event.target.value));
   const filter = app.querySelector('#great-books-filter');
   filter.addEventListener('input', () => {
     const query = filter.value.trim().toLowerCase();
     app.querySelectorAll('[data-great-book-card]').forEach((card) => {
-      card.hidden = query && !card.dataset.searchText.includes(query);
+      card.hidden = Boolean(query) && !card.dataset.searchText.includes(query);
     });
     app.querySelectorAll('.curated-era').forEach((era) => {
       era.hidden = !Array.from(era.querySelectorAll('[data-great-book-card]')).some((card) => !card.hidden);
@@ -4768,7 +6546,13 @@ function renderGreatBooksLibrary() {
   app.querySelectorAll('[data-load-great-book]').forEach((button) => {
     button.addEventListener('click', () => {
       const item = greatBooksCatalog.find((book) => book.query === button.dataset.loadGreatBook);
-      loadGreatBookEdition(item, button.parentElement.querySelector('.book-load-status'), button);
+      loadGreatBookEdition(item, button.closest('.curated-card').querySelector('.book-load-status'), button);
+    });
+  });
+  app.querySelectorAll('[data-study-great-book]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const item = greatBooksCatalog.find((book) => book.query === button.dataset.studyGreatBook);
+      if (item) renderGreatBookStudy(item, button);
     });
   });
 }
@@ -5316,20 +7100,259 @@ function renderUpload() {
 
 function renderHelp() {
   stopReader();
+  const sections = [
+    ['getting-started', 'Getting Started'],
+    ['navigation', 'Navigation'],
+    ['library', 'Library & Imports'],
+    ['reader', 'Reader Basics'],
+    ['modes', 'Reading Modes'],
+    ['focus', 'Focus Anchor'],
+    ['pages', 'Book Pages'],
+    ['panels', 'Side Panels'],
+    ['comprehension', 'Comprehension'],
+    ['words', 'Dictionary, Notes & Vocabulary'],
+    ['media', 'Music & Media Match'],
+    ['translation', 'Translation'],
+    ['fullscreen', 'Fullscreen'],
+    ['shortcuts', 'Shortcuts'],
+    ['progress', 'Reading Progress'],
+    ['privacy', 'Storage & Privacy'],
+    ['troubleshooting', 'Troubleshooting']
+  ];
+
   app.innerHTML = `
-    <section class="panel">
-      <h1>How to Use Mark, Set, Go!</h1>
-      <div class="help-grid">
-        <article class="help-card"><h2>Test</h2><p>Choose a title under WPM Test, press GO!, read all 250 words, then press Stop.</p></article>
-        <article class="help-card"><h2>Highlight</h2><p>The complete passage stays visible while the current word group is highlighted and the pane follows it automatically.</p></article>
-        <article class="help-card"><h2>Bold Focus</h2><p>The full passage remains visible while the current word group becomes bold and one size larger, without a colored highlight.</p></article>
-        <article class="help-card"><h2>Pointing Guide</h2><p>A standalone reading mode that keeps the full passage visible while a pointing hand glides beneath the active word group.</p></article>
-        <article class="help-card"><h2>Smooth Glide</h2><p>A soft focus band glides continuously from one word group to the next while the complete passage stays visible.</p></article>
-        <article class="help-card"><h2>Marquee</h2><p>Words appear progressively, and the pane follows your reading position automatically.</p></article>
-        <article class="help-card"><h2>Bionic text</h2><p>Turn on Bionic text to bold the opening portion of each word in any reading mode.</p></article>
-        <article class="help-card"><h2>Translate</h2><p>Choose a language and translate the passage. Click any translated word to display an English meaning in the side panel.</p></article>
+    <section class="panel help-page">
+      <div class="help-hero">
+        <div>
+          <span class="help-eyebrow">Mark, Set, Go! Guide</span>
+          <h1>Help</h1>
+          <p>Everything you need to import a book, configure the reader, practice comprehension, save what matters, and troubleshoot common issues.</p>
+        </div>
+        <label class="help-search">
+          <span>Search Help</span>
+          <input id="help-search-input" type="search" placeholder="Try “EPUB”, “focus anchor”, “comprehension”…" autocomplete="off">
+        </label>
+      </div>
+
+      <div class="help-layout">
+        <aside class="help-toc" aria-label="Help topics">
+          <strong>On this page</strong>
+          ${sections.map(([id, label]) => `<a href="#help-${id}" data-help-link="${id}">${label}</a>`).join('')}
+        </aside>
+
+        <div class="help-content" id="help-content">
+          <section class="help-section" id="help-getting-started" data-help-section data-help-keywords="start begin first book quick start">
+            <h2>Getting Started</h2>
+            <ol class="help-steps">
+              <li><strong>Find or import something to read.</strong> Use <em>Library</em> for your own books and files, or <em>Discover</em> for Gutenberg, Great Books, news, weather, and other sources.</li>
+              <li><strong>Open the Reader.</strong> Your book loads into the central reading canvas. The left and right slide panels stay closed until you need them.</li>
+              <li><strong>Choose a mode and pace.</strong> Open <strong>⚙ Reader Controls</strong> and set the reading mode, WPM, words shown, display options, and Focus Anchor.</li>
+              <li><strong>Start reading.</strong> Use Start/Pause, press Space, or click the reading area in supported modes.</li>
+              <li><strong>Check understanding.</strong> Open Reader Controls → Learn → <strong>Comprehension</strong> after you have read at least about 120 words.</li>
+            </ol>
+            <div class="help-tip"><strong>Tip:</strong> Mark, Set, Go! opens to a lightweight home screen instead of rebuilding your previous book automatically. Use <strong>Resume Last Reading</strong> when you want to restore the saved reader session.</div>
+          </section>
+
+          <section class="help-section" id="help-navigation" data-help-section data-help-keywords="menu library discover learn music help about navigation">
+            <h2>Navigation</h2>
+            <div class="help-card-grid">
+              <article><h3>Library</h3><p>Your reading list, reading progress, imported EPUB/TXT content, illustrated books, and URL imports.</p></article>
+              <article><h3>Discover</h3><p>Find new material through Search All Libraries, Project Gutenberg, Great Books, Bible Study, news, weather, and other feeds.</p></article>
+              <article><h3>Learn</h3><p>Reader-training tools such as WPM tests and Vocabulary Builder. Comprehension checks are available inside the Reader Controls panel.</p></article>
+              <article><h3>Music</h3><p>Manage reading music and launch quick reading playlists. Reader-specific Media Match options are also available in the Reader Controls panel.</p></article>
+              <article><h3>Help</h3><p>This guide and About information.</p></article>
+            </div>
+          </section>
+
+          <section class="help-section" id="help-library" data-help-section data-help-keywords="library epub epub3 txt upload import url gutenberg reading list">
+            <h2>Library & Imports</h2>
+            <h3>Import Book / Text</h3>
+            <p>Use <strong>Library → Import Book / Text</strong> for TXT and EPUB/EPUB3 files. EPUB files are unpacked locally in your browser rather than interpreted as raw text. Great Books uses the unified public-library search and tries readable editions across all connected sources rather than relying on Project Gutenberg alone.</p>
+            <h3>EPUB navigation</h3>
+            <p>When available, the app uses the EPUB’s own navigation document and reading spine to preserve chapter order and build a cleaner table of contents. Older EPUBs can fall back to NCX navigation.</p>
+            <h3>Read from URL</h3>
+            <p>Use this for supported web content. Some sites block automated article extraction; if a page cannot be fetched, open the original page or paste/import readable text instead.</p>
+            <div class="help-note"><strong>Kindle:</strong> DRM-protected Kindle purchases cannot be imported directly. DRM-free EPUBs and personal documents are appropriate import sources.</div>
+          </section>
+
+          <section class="help-section" id="help-reader" data-help-section data-help-keywords="reader start pause reset speed wpm words shown position">
+            <h2>Reader Basics</h2>
+            <p>The central reader is designed to remain uncluttered. Start, Pause, Reset, fullscreen, and page controls stay close to the text. Less-frequent controls live in the right drawer.</p>
+            <dl class="help-definition-list">
+              <div><dt>Speed / WPM</dt><dd>Controls the target words per minute for timed reading modes.</dd></div>
+              <div><dt>Words shown</dt><dd>Controls how many words are presented as a group in compatible modes.</dd></div>
+              <div><dt>Meaningful chunks</dt><dd>Uses punctuation and phrase boundaries to form more natural groups up to the selected word maximum.</dd></div>
+              <div><dt>Position preservation</dt><dd>Changing a reading mode or layout option should keep the same logical word position rather than restarting the book.</dd></div>
+            </dl>
+          </section>
+
+          <section class="help-section" id="help-modes" data-help-section data-help-keywords="highlight bold focus smooth glide pointing guide marquee flash digital sign auto scroll two columns">
+            <h2>Reading Modes</h2>
+            <div class="help-card-grid help-modes">
+              <article><h3>Highlight</h3><p>Keeps the full passage visible while highlighting the active word group.</p></article>
+              <article><h3>Bold Focus</h3><p>Keeps the passage visible and emphasizes the active group with typography instead of a colored highlight.</p></article>
+              <article><h3>Smooth Glide</h3><p>Moves a soft visual focus guide continuously through the text.</p></article>
+              <article><h3>Pointing Guide</h3><p>Uses a pointer beneath the current group to guide the eye.</p></article>
+              <article><h3>Marquee</h3><p>Advances through the passage progressively while following the reading position.</p></article>
+              <article><h3>Flash</h3><p>Presents a limited number of words at a fixed reading point for RSVP-style practice.</p></article>
+              <article><h3>Digital Sign</h3><p>Moves text continuously across the display.</p></article>
+              <article><h3>Auto Scroll</h3><p>Scrolls through normal text at a controlled pace.</p></article>
+              <article><h3>Two Columns</h3><p>Formats text in a two-column reading layout.</p></article>
+            </div>
+            <div class="help-tip"><strong>Start conservatively:</strong> choose a comfortable speed and increase it only when comprehension stays strong.</div>
+          </section>
+
+          <section class="help-section" id="help-focus" data-help-section data-help-keywords="focus anchor center green color bold line overlay size">
+            <h2>Focus Anchor</h2>
+            <p>The Focus Anchor provides a stable recognition point while the current word or phrase changes around it.</p>
+            <ul>
+              <li><strong>Anchor size</strong> is independent of the normal book font size.</li>
+              <li><strong>Anchor color</strong> can be changed; green is the default.</li>
+              <li><strong>Bold anchor letter</strong> is optional if normal weight feels less visually disruptive.</li>
+              <li>Short guide markers above and below the recognition point help keep the eyes centered.</li>
+              <li>In normal reading, the anchor can be repositioned. In fullscreen, it occupies a dedicated upper band so the book text begins below it.</li>
+            </ul>
+          </section>
+
+          <section class="help-section" id="help-pages" data-help-section data-help-keywords="book pages pagination page spread wheel previous next fullscreen">
+            <h2>Book Pages</h2>
+            <p>Book Pages creates a two-page spread using the available reader width. Spreads advance in pairs: 1–2, 3–4, 5–6, and so on.</p>
+            <ul>
+              <li>Use the page arrows or page indicator to navigate spreads.</li>
+              <li>The mouse wheel can change spreads while Book Pages is active.</li>
+              <li>Entering or leaving fullscreen recalculates the usable page geometry while preserving the logical reading position.</li>
+              <li>The highlighter should remain within the visible spread rather than horizontally nudging the page.</li>
+            </ul>
+          </section>
+
+          <section class="help-section" id="help-panels" data-help-section data-help-keywords="left right side panel marks contents bookmarks definitions notes reader controls">
+            <h2>Left & Right Side Panels</h2>
+            <h3>☰ Marks & Contents — left</h3>
+            <p>This drawer exposes the features connected to the text itself:</p>
+            <ul><li>Contents</li><li>Bookmarks</li><li>Saved Definitions</li><li>Notes</li></ul>
+            <h3>⚙ Reader Controls — right</h3>
+            <p>This is the reader control center. Settings are stacked vertically and grouped into Reading, Display, Learn, Media, and Language/Words. Both drawers normally stay closed so the book gets the maximum available space.</p>
+          </section>
+
+          <section class="help-section" id="help-comprehension" data-help-section data-help-keywords="comprehension ai quiz openai effective wpm questions recall main idea inference">
+            <h2>Comprehension Checks</h2>
+            <p>Open <strong>Reader Controls → Learn → Comprehension</strong> after reading a passage. The app sends only the bounded passage being tested to your server, which requests four structured questions from the configured OpenAI model.</p>
+            <p>The quiz contains:</p>
+            <ol><li>Factual recall</li><li>Main idea</li><li>Inference</li><li>Deeper understanding</li></ol>
+            <p>After scoring, Mark, Set, Go! stores the comprehension percentage and calculates <strong>effective WPM</strong>:</p>
+            <div class="help-formula">Effective WPM = Reading WPM × Comprehension Rate</div>
+            <p>Results appear in Reading Progress. A check requires at least about 120 newly read words and normally uses the passage read since the previous check, within a safe size limit.</p>
+            <div class="help-note"><strong>API setup:</strong> local/server comprehension requires <code>OPENAI_API_KEY</code> in the Node server environment. The key must never be stored in browser JavaScript.</div>
+          </section>
+
+          <section class="help-section" id="help-words" data-help-section data-help-keywords="dictionary definition note bookmark vocabulary word lookup save">
+            <h2>Dictionary, Notes & Vocabulary</h2>
+            <p>Use the word context menu to look up a word, save its definition, or attach a note. Saved definitions and notes for the current document appear in the left Marks & Contents drawer.</p>
+            <p>The Vocabulary Builder under Learn is intended for reviewing saved words and building longer-term recall.</p>
+          </section>
+
+          <section class="help-section" id="help-media" data-help-section data-help-keywords="music media match score mood preferred news video youtube">
+            <h2>Music & Media Match</h2>
+            <p>The top-level Music menu manages general reading music. Inside the Reader Controls panel, Media Match adapts to the current content:</p>
+            <ul>
+              <li><strong>Music Score</strong> searches for an appropriate soundtrack/ambient score for books and general text.</li>
+              <li><strong>News Video</strong> is useful for headlines/articles and looks for video coverage related to the current story.</li>
+              <li><strong>Reading Mood</strong> searches for music matching the tone of the current reading.</li>
+              <li><strong>Preferred Music</strong> lets readers quickly reuse music they previously saved from the Music page.</li>
+            </ul>
+          </section>
+
+          <section class="help-section" id="help-translation" data-help-section data-help-keywords="translation browser translator language translate restore english">
+            <h2>Translation</h2>
+            <p>Choose a target language under Reader Controls → Language & Words. The app can use supported browser translation capabilities when available and retains server-side fallback behavior where configured.</p>
+            <p>After a passage is translated, supported word interactions can show English meanings. Use <strong>Restore English</strong> to return to the source text.</p>
+          </section>
+
+          <section class="help-section" id="help-fullscreen" data-help-section data-help-keywords="fullscreen full screen options controls focus">
+            <h2>Fullscreen Reading</h2>
+            <p>Fullscreen removes surrounding page distractions. The compact Options panel contains fullscreen versions of the reading, focus, display, media, and translation controls.</p>
+            <p>Press <kbd>O</kbd> to restore hidden fullscreen controls if needed. Focus Anchor uses a dedicated top band in fullscreen so it does not cover the beginning of the book text.</p>
+          </section>
+
+          <section class="help-section" id="help-shortcuts" data-help-section data-help-keywords="keyboard shortcuts space o mouse wheel click">
+            <h2>Shortcuts & Interaction</h2>
+            <table class="help-table">
+              <thead><tr><th>Action</th><th>Shortcut / Interaction</th></tr></thead>
+              <tbody>
+                <tr><td>Pause / resume</td><td><kbd>Space</kbd> in compatible reader modes</td></tr>
+                <tr><td>Move reading position</td><td>Click a word in supported full-text modes</td></tr>
+                <tr><td>Restore fullscreen controls</td><td><kbd>O</kbd></td></tr>
+                <tr><td>Turn Book Pages</td><td>Page arrows / indicator / mouse wheel while Book Pages is active</td></tr>
+                <tr><td>Resize side panes</td><td>Drag a divider when the pane is open; double-click the divider to reset its stored width</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <section class="help-section" id="help-progress" data-help-section data-help-keywords="progress sessions comprehension effective wpm streak">
+            <h2>Reading Progress</h2>
+            <p>Library → Reading Progress summarizes reading time, words, pace, streaks, book/document progress, comprehension results, and effective WPM when comprehension checks have been completed.</p>
+            <p>Progress is currently stored in the browser, so clearing browser storage can remove history unless the feature is later migrated to an account-backed database.</p>
+          </section>
+
+          <section class="help-section" id="help-privacy" data-help-section data-help-keywords="privacy local storage indexeddb server openai data">
+            <h2>Storage & Privacy</h2>
+            <ul>
+              <li>Reader sessions may use IndexedDB with a Local Storage fallback.</li>
+              <li>Reading progress, notes, bookmarks, definitions, vocabulary, and comprehension history are currently stored locally in the browser.</li>
+              <li>EPUB parsing occurs in the browser.</li>
+              <li>Comprehension sends only the bounded passage being tested to the server/OpenAI request; it does not require sending the entire book.</li>
+              <li>API keys belong on the server only.</li>
+            </ul>
+          </section>
+
+          <section class="help-section" id="help-troubleshooting" data-help-section data-help-keywords="troubleshooting fetch failed 502 certificate node system ca frozen cache ctrl f5">
+            <h2>Troubleshooting</h2>
+            <details open><summary>External features return “Fetch failed” or 502 locally</summary>
+              <p>If Node reports <code>UNABLE_TO_GET_ISSUER_CERT_LOCALLY</code> on a managed Windows computer, start Node with the Windows system certificate store:</p>
+              <pre><code>$env:NODE_OPTIONS="--use-system-ca"
+npm start</code></pre>
+            </details>
+            <details><summary>Comprehension says AI is not configured</summary>
+              <p>Ensure <code>OPENAI_API_KEY</code> is set in the same PowerShell/server environment before starting Node. API usage also requires an API account with available billing/credits.</p>
+            </details>
+            <details><summary>The browser appears to show an older interface</summary>
+              <p>Use <kbd>Ctrl</kbd>+<kbd>F5</kbd> once after installing a new build so cached JavaScript and CSS are replaced.</p>
+            </details>
+            <details><summary>A previous large book makes startup slow</summary>
+              <p>Current builds open a lightweight home screen. The full saved reader session is reconstructed only after you explicitly choose Resume Last Reading.</p>
+            </details>
+            <details><summary>An EPUB looks like gibberish</summary>
+              <p>Use Import Book / Text in a build with EPUB support. EPUB is a ZIP-based ebook package and cannot be treated as a normal TXT file.</p>
+            </details>
+          </section>
+
+          <p id="help-no-results" class="navigation-empty help-no-results" hidden>No Help topics matched your search.</p>
+        </div>
       </div>
     </section>`;
+
+  const input = app.querySelector('#help-search-input');
+  const helpSections = Array.from(app.querySelectorAll('[data-help-section]'));
+  const noResults = app.querySelector('#help-no-results');
+
+  input?.addEventListener('input', () => {
+    const query = input.value.trim().toLowerCase();
+    let visible = 0;
+    helpSections.forEach((section) => {
+      const haystack = `${section.textContent} ${section.dataset.helpKeywords || ''}`.toLowerCase();
+      const matches = !query || haystack.includes(query);
+      section.hidden = !matches;
+      if (matches) visible += 1;
+    });
+    noResults.hidden = visible !== 0;
+  });
+
+  app.querySelectorAll('[data-help-link]').forEach((link) => {
+    link.addEventListener('click', (event) => {
+      event.preventDefault();
+      app.querySelector(`#help-${CSS.escape(link.dataset.helpLink)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
 }
 
 function renderAbout() {
@@ -5401,12 +7424,20 @@ try {
   }
 } catch {}
 
-window.setInterval(() => { if (state.words.length) persistReaderSession(); }, 10000);
+window.setInterval(() => {
+  // Only persist while the actual reader is mounted. Otherwise state may still
+  // contain the previous large book while the user is in Bible Study/Library.
+  if (state.words.length && app.querySelector('#reader')) persistReaderSession();
+}, 10000);
 let bookPageResizeTimer = null;
 window.addEventListener('resize', () => {
   if (!state.bookPages) return;
+  const anchorIndex = Math.max(0, Number(state.index) || 0);
   window.clearTimeout(bookPageResizeTimer);
-  bookPageResizeTimer = window.setTimeout(() => scheduleBookPageReflow(), 90);
+  bookPageResizeTimer = window.setTimeout(
+    () => scheduleBookPageReflow({ anchorIndex }),
+    90
+  );
 });
 
 // Fullscreen and pane changes can alter the reader width without producing a
@@ -5416,8 +7447,14 @@ let observedBookReader = null;
 const bookPageResizeObserver = typeof ResizeObserver === 'function'
   ? new ResizeObserver(() => {
       if (!state.bookPages) return;
+      const anchorIndex = Number.isFinite(Number(pendingBookPageAnchorIndex))
+        ? Number(pendingBookPageAnchorIndex)
+        : Math.max(0, Number(state.index) || 0);
       window.clearTimeout(bookPageResizeTimer);
-      bookPageResizeTimer = window.setTimeout(() => scheduleBookPageReflow(), 70);
+      bookPageResizeTimer = window.setTimeout(
+        () => scheduleBookPageReflow({ anchorIndex }),
+        70
+      );
     })
   : null;
 function observeBookPageReader() {
@@ -5428,13 +7465,17 @@ function observeBookPageReader() {
   bookPageResizeObserver.observe(reader);
 }
 
-window.addEventListener('pagehide', () => persistReaderSession({ immediate: true }));
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') persistReaderSession({ immediate: true }); });
+window.addEventListener('pagehide', () => {
+  if (app.querySelector('#reader')) persistReaderSession({ immediate: true });
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden' && app.querySelector('#reader')) {
+    persistReaderSession({ immediate: true });
+  }
+});
 
-(async function restorePreviousReaderOnLaunch() {
-  const saved = await readReaderSession();
-  if (!applyReaderSessionSnapshot(saved, { resumePlayback: false })) renderHome();
-})();
+// v5.16: startup stays lightweight. The last book is restored only after an explicit Resume action.
+renderHome();
 
 // Keep top navigation popovers over the page rather than in document flow.
 (function initializeOverlayNavigation() {

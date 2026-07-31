@@ -39,6 +39,21 @@
       }
     }
 
+    async clear() {
+      try {
+        const db = await this.open();
+        await new Promise((resolve, reject) => {
+          const tx = db.transaction(this.storeName, 'readwrite');
+          tx.objectStore(this.storeName).delete(this.key);
+          tx.oncomplete = resolve;
+          tx.onerror = () => reject(tx.error);
+        });
+        db.close();
+      } catch {}
+      try { localStorage.removeItem(this.fallbackKey); } catch {}
+      try { localStorage.removeItem('markSetGoHasReaderSession'); } catch {}
+    }
+
     async read() {
       try {
         const db = await this.open();
