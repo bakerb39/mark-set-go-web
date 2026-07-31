@@ -1996,6 +1996,12 @@ body.resizing-reader-panes { cursor: col-resize; user-select: none; }
 
 .focus-anchor-overlay:active { cursor: grabbing; }
 
+
+/* v5.10 — reserve readable space beneath a top-positioned Focus Anchor without scrolling the document. */
+.reader-frame > .interactive-reader.focus-anchor-clearance {
+  padding-top: var(--focus-anchor-clearance, 5rem);
+}
+
 /* v5.2 — Preferred Music */
 .preferred-music-control {
   display: grid;
@@ -2026,4 +2032,121 @@ body.resizing-reader-panes { cursor: col-resize; user-select: none; }
   .music-url-form { grid-template-columns: 1fr; }
   .music-url-actions { align-items: stretch; }
   .reader-music-actions .preferred-music-control { flex: 1 1 100%; }
+}
+
+/* v5.11 compact fullscreen control palette */
+.fullscreen-options-menu {
+  width: min(470px, calc(100vw - 1.4rem));
+  padding: .55rem;
+  border-radius: .7rem;
+}
+.fullscreen-options-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .05rem .1rem .45rem;
+  border-bottom: 1px solid #d9e0e6;
+}
+.fullscreen-options-header strong { font-size: .82rem; }
+.fullscreen-options-header span { color: #6a7480; font-size: .66rem; }
+.fullscreen-option-group {
+  margin-top: .38rem;
+  border: 1px solid #d9e0e6;
+  border-radius: .5rem;
+  background: rgb(255 255 255 / .76);
+  overflow: hidden;
+}
+.fullscreen-option-group > summary {
+  position: relative;
+  cursor: pointer;
+  list-style: none;
+  padding: .42rem .58rem;
+  color: #25313d;
+  font-size: .73rem;
+  font-weight: 800;
+  user-select: none;
+}
+.fullscreen-option-group > summary::-webkit-details-marker { display: none; }
+.fullscreen-option-group > summary::after {
+  content: '▸';
+  position: absolute;
+  right: .55rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #68737f;
+}
+.fullscreen-option-group[open] > summary::after { content: '▾'; }
+.fullscreen-option-group[open] > summary { border-bottom: 1px solid #e3e8ed; }
+.fullscreen-option-group .fullscreen-options-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .38rem;
+  padding: .48rem;
+}
+.fullscreen-option-group .fullscreen-options-grid-reading {
+  grid-template-columns: 1.35fr .9fr .75fr;
+}
+.fullscreen-option-group .fullscreen-options-grid-media {
+  grid-template-columns: 1.4fr 1fr 1fr;
+  align-items: end;
+}
+.fullscreen-option-group .fullscreen-options-grid-translation {
+  grid-template-columns: 1.35fr 1fr;
+  align-items: end;
+}
+.fullscreen-option-group .fullscreen-options-grid > label {
+  gap: .14rem;
+  font-size: .66rem;
+}
+.fullscreen-option-group .fullscreen-options-grid select,
+.fullscreen-option-group .fullscreen-options-grid input[type="number"] {
+  min-height: 1.8rem;
+  padding-top: .18rem;
+  padding-bottom: .18rem;
+  font-size: .74rem;
+}
+.fullscreen-option-group .fullscreen-checkbox {
+  min-height: 1.8rem;
+  padding: .28rem .4rem;
+  font-size: .69rem;
+}
+.fullscreen-reading-actions {
+  grid-template-columns: 1.2fr 1fr 1fr;
+  margin: 0;
+  padding: 0 .48rem .48rem;
+}
+.fullscreen-option-group .fullscreen-option-actions button,
+.fullscreen-inline-button,
+.fullscreen-translation-actions button {
+  min-height: 1.8rem;
+  padding: .28rem .38rem;
+  font-size: .7rem;
+}
+.fullscreen-inline-button { align-self: end; }
+.fullscreen-translation-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .32rem;
+}
+.fullscreen-options-hint {
+  margin: .42rem .12rem .05rem;
+  font-size: .64rem;
+}
+@media (max-width: 560px) {
+  .fullscreen-options-menu { width: min(390px, calc(100vw - .8rem)); }
+  .fullscreen-options-header span { display: none; }
+  .fullscreen-option-group .fullscreen-options-grid,
+  .fullscreen-option-group .fullscreen-options-grid-reading,
+  .fullscreen-option-group .fullscreen-options-grid-media,
+  .fullscreen-option-group .fullscreen-options-grid-translation {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 390px) {
+  .fullscreen-option-group .fullscreen-options-grid,
+  .fullscreen-option-group .fullscreen-options-grid-reading,
+  .fullscreen-option-group .fullscreen-options-grid-media,
+  .fullscreen-option-group .fullscreen-options-grid-translation {
+    grid-template-columns: 1fr;
+  }
 }

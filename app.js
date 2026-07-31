@@ -803,12 +803,43 @@ function modeSupportsFocusAnchorOverlay(mode) {
   return ['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
 }
 
+function applyFocusAnchorReaderClearance() {
+  const overlay = app.querySelector('#focus-anchor-overlay');
+  const frame = overlay?.closest('.reader-frame');
+  const reader = frame?.querySelector('.interactive-reader');
+  if (!overlay || !frame || !reader || overlay.hidden) {
+    if (reader) {
+      reader.classList.remove('focus-anchor-clearance');
+      reader.style.removeProperty('--focus-anchor-clearance');
+    }
+    return;
+  }
+
+  // Only reserve top space while the anchor is in the upper portion of the viewer.
+  // If the reader intentionally drags it lower, do not push half the book off screen.
+  const frameRect = frame.getBoundingClientRect();
+  const overlayRect = overlay.getBoundingClientRect();
+  const overlayCenterY = overlayRect.top + (overlayRect.height / 2);
+  const relativeCenter = overlayCenterY - frameRect.top;
+  if (relativeCenter > frameRect.height * 0.38) {
+    reader.classList.remove('focus-anchor-clearance');
+    reader.style.removeProperty('--focus-anchor-clearance');
+    return;
+  }
+
+  const clearance = Math.max(72, Math.ceil(overlayRect.bottom - frameRect.top + 14));
+  reader.classList.add('focus-anchor-clearance');
+  reader.style.setProperty('--focus-anchor-clearance', `${clearance}px`);
+}
+
 function applyFocusAnchorPosition(overlay) {
   const position = state.focusAnchorPosition;
-  if (!overlay || !position) return;
-  overlay.style.left = `${Math.max(0, Math.min(100, position.x))}%`;
-  overlay.style.top = `${Math.max(0, Math.min(100, position.y))}%`;
-  overlay.style.transform = 'translate(-50%, -50%)';
+  if (overlay && position) {
+    overlay.style.left = `${Math.max(0, Math.min(100, position.x))}%`;
+    overlay.style.top = `${Math.max(0, Math.min(100, position.y))}%`;
+    overlay.style.transform = 'translate(-50%, -50%)';
+  }
+  requestAnimationFrame(applyFocusAnchorReaderClearance);
 }
 
 function bindDraggableFocusAnchor(overlay) {
@@ -847,6 +878,7 @@ function updateFocusAnchorOverlay(words = []) {
   overlay.hidden = !enabled;
   if (!enabled) {
     overlay.replaceChildren();
+    applyFocusAnchorReaderClearance();
     return;
   }
   const fontSize = Math.max(10, Number(app.querySelector('#focus-anchor-font-size')?.value || state.focusAnchorFontSize || 24));
@@ -854,6 +886,7 @@ function updateFocusAnchorOverlay(words = []) {
   bindDraggableFocusAnchor(overlay);
   applyFocusAnchorPosition(overlay);
   if (words.length) renderFocusAnchorPhrase(overlay, words);
+  requestAnimationFrame(applyFocusAnchorReaderClearance);
 }
 
 async function loadLocalText(key) {
@@ -2223,11 +2256,47 @@ async function renderReader(kind) {
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
   const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });
-  const structure = detectDocumentStructure(text);
-  const toc = structure
-    .filter((entry) => entry.preferredToc && entry.type !== 'contents')
-    .map((entry) => ({ title: entry.title, index: entry.start, type: entry.type }))
-    .slice(0, 300);
+  let structure = detectDocumentStructure(text);
+
+  // EPUBs carry an authoritative navigation document. Prefer that TOC over
+  // heuristic heading detection, while still keeping detected structure for
+  // reader formatting and illustration placement.
+  const suppliedToc = Array.isArray(source?.epubToc)
+    ? source.epubToc
+        .filter((entry) => entry && Number.isFinite(Number(entry.index)) && String(entry.title || '').trim())
+        .map((entry) => ({
+          title: String(entry.title).replace(/\s+/g, ' ').trim(),
+          index: Math.max(0, Number(entry.index) || 0),
+          type: entry.type || 'chapter'
+        }))
+        .sort((a, b) => a.index - b.index)
+        .filter((entry, index, all) => index === 0 || entry.index !== all[index - 1].index || normalizeTocTitle(entry.title) !== normalizeTocTitle(all[index - 1].title))
+        .slice(0, 500)
+    : [];
+
+  if (suppliedToc.length) {
+    const suppliedStructure = suppliedToc.map((entry) => ({
+      title: entry.title,
+      type: entry.type,
+      start: entry.index,
+      end: entry.index + Math.max(1, splitWords(entry.title).length),
+      preferredToc: true,
+      epubNavigation: true
+    }));
+    const seen = new Set();
+    structure = [...structure, ...suppliedStructure]
+      .sort((a, b) => a.start - b.start || (a.epubNavigation ? -1 : 1))
+      .filter((entry) => {
+        const key = `${entry.start}|${normalizeTocTitle(entry.title)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  }
+
+  const toc = suppliedToc.length
+    ? suppliedToc
+    : detectTableOfContents(text);
 
   readerEngine.loadBook(bookModel, {
     documentId: documentIdFor(title, String(text)),
@@ -2324,42 +2393,77 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
             <button id="fullscreen-options-toggle" class="fullscreen-options-toggle" type="button" aria-expanded="false" aria-controls="fullscreen-options-menu">Options ▾</button>
             <button id="fullscreen-controls-close" class="fullscreen-controls-close" type="button" aria-label="Hide fullscreen controls" title="Hide controls">×</button>
             <section id="fullscreen-options-menu" class="fullscreen-options-menu" hidden>
-              <div class="fullscreen-options-grid">
-                <label>Mode<select id="fs-mode-select">
-                  <option value="highlight">Highlight</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
-                  <option value="digital-sign">Digital Sign</option><option value="auto-scroll">Auto Scroll</option><option value="two-column">Two Columns</option>
-                </select></label>
-                <label>Speed<div class="input-suffix"><input id="fs-speed" type="number" min="30" max="900"><span>WPM</span></div></label>
-                <label>Words shown<input id="fs-word-count" type="number" min="1" max="10"></label>
-                <label>Font<select id="fs-font-family">
-                  <option value="system">System Sans</option><option value="serif">Book Serif</option><option value="georgia">Georgia</option>
-                  <option value="verdana">Verdana</option><option value="trebuchet">Trebuchet</option><option value="monospace">Monospace</option><option value="dyslexic">Dyslexia-friendly</option>
-                </select></label>
-                <label>Text size<select id="fs-font-size">${fontOptions(14)}</select></label>
-                <label>Theme<select id="fs-theme-select"><option value="dark">Dark</option><option value="light">Light</option></select></label>
-                <label class="fullscreen-checkbox"><input id="fs-bionic-reading" type="checkbox"> Bionic text</label>
-                <label class="fullscreen-checkbox"><input id="fs-focus-anchor" type="checkbox"> Center focus anchor overlay</label>
-                <label>Focus anchor size<select id="fs-focus-anchor-font-size">${fontOptions(24)}</select></label>
-                <label class="fullscreen-checkbox"><input id="fs-book-pages" type="checkbox"> Book pages</label>
-                <label>Illustrations<select id="fs-illustration-mode"><option value="off">Off</option><option value="chapter">Chapter openings</option><option value="automatic">Automatic</option></select></label>
-                <button id="fs-show-hidden-illustrations" class="secondary" type="button" disabled>Show hidden illustrations</button>
-                <label class="fullscreen-checkbox"><input id="fs-meaningful-chunks" type="checkbox"> Meaningful chunks</label>
-                <label>Translation<select id="fs-translation-language">
-                  <option value="">Choose language…</option>
-                  ${Object.entries(languages).map(([code, name]) => `<option value="${code}">${name}</option>`).join('')}
-                </select></label>
+              <div class="fullscreen-options-header">
+                <strong>Reader controls</strong>
+                <span>Compact fullscreen settings</span>
               </div>
-              <div class="fullscreen-option-actions">
-                <button id="fs-start" class="primary" type="button">Start</button>
-                <button id="fs-pause" class="secondary" type="button">Pause</button>
-                <button id="fs-reset" class="secondary" type="button">Reset</button>
-                <button id="fs-translate" class="secondary" type="button">Translate</button>
-                <button id="fs-restore" class="secondary" type="button">Restore English</button>
-                <label>Media match<select id="fs-media-match-select">${mediaMatchOptionsMarkup()}</select></label>
-                <button id="fs-media-match" class="secondary" type="button">Play media match</button>
-                <button id="fs-reading-mood" class="secondary" type="button">♫ Reading mood</button>
-              </div>
-              <p class="fullscreen-options-hint">Click the text or press <kbd>Space</kbd> to pause or resume. Press <kbd>O</kbd> to show these controls after hiding them.</p>
+
+              <details class="fullscreen-option-group" open>
+                <summary>Reading</summary>
+                <div class="fullscreen-options-grid fullscreen-options-grid-reading">
+                  <label>Mode<select id="fs-mode-select">
+                    <option value="highlight">Highlight</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
+                    <option value="digital-sign">Digital Sign</option><option value="auto-scroll">Auto Scroll</option><option value="two-column">Two Columns</option>
+                  </select></label>
+                  <label>Speed<div class="input-suffix"><input id="fs-speed" type="number" min="30" max="900"><span>WPM</span></div></label>
+                  <label>Words shown<input id="fs-word-count" type="number" min="1" max="10"></label>
+                </div>
+                <div class="fullscreen-option-actions fullscreen-reading-actions">
+                  <button id="fs-start" class="primary" type="button">Start</button>
+                  <button id="fs-pause" class="secondary" type="button">Pause</button>
+                  <button id="fs-reset" class="secondary" type="button">Reset</button>
+                </div>
+              </details>
+
+              <details class="fullscreen-option-group" open>
+                <summary>Focus</summary>
+                <div class="fullscreen-options-grid">
+                  <label class="fullscreen-checkbox"><input id="fs-focus-anchor" type="checkbox"> Focus anchor</label>
+                  <label>Anchor size<select id="fs-focus-anchor-font-size">${fontOptions(24)}</select></label>
+                  <label class="fullscreen-checkbox"><input id="fs-meaningful-chunks" type="checkbox"> Meaningful chunks</label>
+                  <label class="fullscreen-checkbox"><input id="fs-bionic-reading" type="checkbox"> Bionic text</label>
+                </div>
+              </details>
+
+              <details class="fullscreen-option-group">
+                <summary>Display</summary>
+                <div class="fullscreen-options-grid">
+                  <label>Font<select id="fs-font-family">
+                    <option value="system">System Sans</option><option value="serif">Book Serif</option><option value="georgia">Georgia</option>
+                    <option value="verdana">Verdana</option><option value="trebuchet">Trebuchet</option><option value="monospace">Monospace</option><option value="dyslexic">Dyslexia-friendly</option>
+                  </select></label>
+                  <label>Text size<select id="fs-font-size">${fontOptions(14)}</select></label>
+                  <label>Theme<select id="fs-theme-select"><option value="dark">Dark</option><option value="light">Light</option></select></label>
+                  <label class="fullscreen-checkbox"><input id="fs-book-pages" type="checkbox"> Book pages</label>
+                  <label>Illustrations<select id="fs-illustration-mode"><option value="off">Off</option><option value="chapter">Chapter openings</option><option value="automatic">Automatic</option></select></label>
+                  <button id="fs-show-hidden-illustrations" class="secondary fullscreen-inline-button" type="button" disabled>Show hidden illustrations</button>
+                </div>
+              </details>
+
+              <details class="fullscreen-option-group">
+                <summary>Media</summary>
+                <div class="fullscreen-options-grid fullscreen-options-grid-media">
+                  <label>Media match<select id="fs-media-match-select">${mediaMatchOptionsMarkup()}</select></label>
+                  <button id="fs-media-match" class="secondary fullscreen-inline-button" type="button">Play media match</button>
+                  <button id="fs-reading-mood" class="secondary fullscreen-inline-button" type="button">♫ Reading mood</button>
+                </div>
+              </details>
+
+              <details class="fullscreen-option-group">
+                <summary>Translation</summary>
+                <div class="fullscreen-options-grid fullscreen-options-grid-translation">
+                  <label>Language<select id="fs-translation-language">
+                    <option value="">Choose language…</option>
+                    ${Object.entries(languages).map(([code, name]) => `<option value="${code}">${name}</option>`).join('')}
+                  </select></label>
+                  <div class="fullscreen-translation-actions">
+                    <button id="fs-translate" class="secondary" type="button">Translate</button>
+                    <button id="fs-restore" class="secondary" type="button">Restore English</button>
+                  </div>
+                </div>
+              </details>
+
+              <p class="fullscreen-options-hint">Click text or press <kbd>Space</kbd> to pause/resume. Press <kbd>O</kbd> to restore hidden controls.</p>
             </section>
           </div>
           <div id="book-page-controls" class="book-page-controls" hidden>
@@ -2538,8 +2642,10 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     restoreCapturedReaderLocation(snapshot, { rerendered: true });
   });
   app.querySelector('#focus-anchor-font-size')?.addEventListener('change', (event) => {
+    const snapshot = captureReaderLocation();
     state.focusAnchorFontSize = Number(event.target.value) || 24;
     updateFocusAnchorOverlay();
+    requestAnimationFrame(() => restoreCapturedReaderLocation(snapshot, { rerendered: false }));
     persistReaderSession({ immediate: true });
   });
 
@@ -3613,11 +3719,26 @@ function restoreReadingAnchor(reader, mode, groupSize, wordIndex) {
 function captureReaderLocation() {
   const reader = app.querySelector('#reader');
   const mode = state.renderedMode || getSelectedMode();
-  const anchorIndex = (!reader || ['flash', 'digital-sign'].includes(mode))
-    ? Math.max(0, state.index || 0)
-    : visibleReadingAnchor(reader, state.index);
+
+  // The reader engine's word index is the canonical reading position for all
+  // timed/guided modes.  Earlier builds tried to infer the position from the
+  // first visible DOM word during option/mode changes.  That is unreliable
+  // while a virtualized document is being rebuilt and can resolve to word 0,
+  // which is why toggling Focus Anchor or changing modes jumped to the start.
+  let anchorIndex;
+  if (mode === 'two-column') {
+    // Two-column is self-paced, so there is no continuously maintained engine
+    // index. Estimate from the visible scroll position when leaving that mode.
+    anchorIndex = currentReadingPosition();
+  } else {
+    anchorIndex = Number(state.index);
+    if (!Number.isFinite(anchorIndex) || anchorIndex < 0) {
+      anchorIndex = reader ? visibleReadingAnchor(reader, 0) : 0;
+    }
+  }
+
   return {
-    anchorIndex: Math.max(0, anchorIndex),
+    anchorIndex: Math.max(0, Math.min(Math.max(0, state.words.length - 1), Number(anchorIndex) || 0)),
     wasRunning: isReaderRunning()
   };
 }
@@ -3651,6 +3772,16 @@ function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
       if (!reader) return;
       const mode = state.renderedMode || getSelectedMode();
       const groupSize = Number(app.querySelector('#word-count')?.value) || 1;
+
+      // If a long document is virtualized and the saved word is outside the
+      // current render window, render a window around that word first. This
+      // preserves position without materializing tens of thousands of words.
+      if (!state.bookPages
+          && !['flash', 'digital-sign', 'two-column'].includes(mode)
+          && state.virtualized
+          && (anchorIndex < state.renderedWordStart || anchorIndex >= state.renderedWordEnd)) {
+        virtualRenderer.renderWindowAround(reader, mode, groupSize, anchorIndex);
+      }
       restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
       if (state.bookPages) {
         const spread = bookSpreadForWordIndex(reader, anchorIndex);
@@ -3670,21 +3801,17 @@ function switchReadingMode(nextMode) {
   const reader = app.querySelector('#reader');
   if (!reader) return;
 
-  const previousMode = state.renderedMode || getSelectedMode();
-  const wasRunning = isReaderRunning();
+  // Capture the logical reading position BEFORE the renderer is replaced.
+  // This is intentionally shared with every other layout-changing option so
+  // mode changes cannot fall back to the first DOM word.
+  const snapshot = captureReaderLocation();
   const groupSize = Number(app.querySelector('#word-count')?.value) || 1;
-  const anchorIndex = ['flash', 'digital-sign'].includes(previousMode)
-    ? Math.max(0, state.index || 0)
-    : visibleReadingAnchor(reader, state.index);
 
-  // A mode change must fully dispose of paused timers and Web Animations, but
-  // it must not reset the reader's logical position.
   stopReader();
-  state.index = anchorIndex;
+  state.index = snapshot.anchorIndex;
   prepareReaderView(nextMode, groupSize);
   updateModeControls(nextMode);
-
-  restoreCapturedReaderLocation({ anchorIndex, wasRunning }, { rerendered: true });
+  restoreCapturedReaderLocation(snapshot, { rerendered: true });
 }
 
 function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-count')?.value) || 1) {
@@ -4851,24 +4978,338 @@ images/chapter-02.png</pre>
   });
 }
 
+function normalizeArchivePath(value) {
+  const parts = String(value || '').replace(/\\/g, '/').split('/');
+  const out = [];
+  for (const part of parts) {
+    if (!part || part === '.') continue;
+    if (part === '..') out.pop();
+    else out.push(part);
+  }
+  return out.join('/');
+}
+
+function resolveArchivePath(baseFile, relativePath) {
+  const clean = String(relativePath || '').split('#')[0].split('?')[0];
+  if (!clean) return normalizeArchivePath(baseFile);
+  if (clean.startsWith('/')) return normalizeArchivePath(clean.slice(1));
+  const base = normalizeArchivePath(baseFile).split('/');
+  base.pop();
+  return normalizeArchivePath([...base, ...clean.split('/')].join('/'));
+}
+
+function decodeUtf8(bytes) {
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+async function inflateRaw(bytes) {
+  if (typeof DecompressionStream !== 'function') {
+    throw new Error('This browser does not provide the decompression support needed for EPUB files. Try a current version of Chrome or Edge.');
+  }
+  const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+  return new Uint8Array(await new Response(stream).arrayBuffer());
+}
+
+async function unzipEpub(arrayBuffer) {
+  const bytes = new Uint8Array(arrayBuffer);
+  const view = new DataView(arrayBuffer);
+  const u16 = (offset) => view.getUint16(offset, true);
+  const u32 = (offset) => view.getUint32(offset, true);
+  let eocd = -1;
+  const min = Math.max(0, bytes.length - 65557);
+  for (let i = bytes.length - 22; i >= min; i -= 1) {
+    if (u32(i) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('This does not appear to be a valid EPUB/ZIP file.');
+
+  const entryCount = u16(eocd + 10);
+  const centralOffset = u32(eocd + 16);
+  const entries = new Map();
+  let cursor = centralOffset;
+
+  for (let n = 0; n < entryCount; n += 1) {
+    if (u32(cursor) !== 0x02014b50) throw new Error('The EPUB ZIP directory is malformed.');
+    const method = u16(cursor + 10);
+    const compressedSize = u32(cursor + 20);
+    const uncompressedSize = u32(cursor + 24);
+    const nameLength = u16(cursor + 28);
+    const extraLength = u16(cursor + 30);
+    const commentLength = u16(cursor + 32);
+    const localOffset = u32(cursor + 42);
+    const name = normalizeArchivePath(decodeUtf8(bytes.slice(cursor + 46, cursor + 46 + nameLength)));
+    entries.set(name, { name, method, compressedSize, uncompressedSize, localOffset });
+    cursor += 46 + nameLength + extraLength + commentLength;
+  }
+
+  const cache = new Map();
+  async function read(path) {
+    const normalized = normalizeArchivePath(path);
+    if (cache.has(normalized)) return cache.get(normalized);
+    const entry = entries.get(normalized);
+    if (!entry) throw new Error(`EPUB file is missing ${normalized}.`);
+    const local = entry.localOffset;
+    if (u32(local) !== 0x04034b50) throw new Error(`EPUB entry ${normalized} has an invalid ZIP header.`);
+    const nameLength = u16(local + 26);
+    const extraLength = u16(local + 28);
+    const start = local + 30 + nameLength + extraLength;
+    const compressed = bytes.slice(start, start + entry.compressedSize);
+    let result;
+    if (entry.method === 0) result = compressed;
+    else if (entry.method === 8) result = await inflateRaw(compressed);
+    else throw new Error(`EPUB uses unsupported ZIP compression method ${entry.method}.`);
+    cache.set(normalized, result);
+    return result;
+  }
+
+  return { entries, read, readText: async (path) => decodeUtf8(await read(path)) };
+}
+
+function xmlLocalElements(root, name) {
+  return Array.from(root.getElementsByTagNameNS?.('*', name) || root.getElementsByTagName(name) || []);
+}
+
+function firstXmlLocal(root, name) {
+  return xmlLocalElements(root, name)[0] || null;
+}
+
+function cleanEpubText(value) {
+  return String(value || '').replace(/\u00ad/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function epubContentLines(doc) {
+  const body = doc.body || firstXmlLocal(doc, 'body') || doc.documentElement;
+  const candidates = Array.from(body.querySelectorAll?.('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,figcaption') || []);
+  const raw = [];
+  const seen = new Set();
+
+  for (const el of candidates) {
+    // Do not duplicate text already represented by a nested paragraph.
+    if (el.matches?.('li,blockquote') && el.querySelector?.('p')) continue;
+    const text = cleanEpubText(el.textContent);
+    if (!text) continue;
+
+    const tag = String(el.tagName || '').toLowerCase();
+    const kind = /^h[1-6]$/.test(tag) ? 'heading' : 'paragraph';
+    const signature = `${kind}|${text}|${raw.length ? raw[raw.length - 1].text : ''}`;
+    if (seen.has(signature)) continue;
+    seen.add(signature);
+
+    const ids = [];
+    let node = el;
+    while (node && node !== body.parentElement) {
+      if (node.id) ids.push(node.id);
+      node = node.parentElement;
+    }
+    raw.push({ text, ids, kind });
+  }
+
+  if (!raw.length) {
+    const fallback = cleanEpubText(body.textContent);
+    if (fallback) raw.push({ text: fallback, ids: [], kind: 'paragraph' });
+  }
+
+  // Some EPUB producers split a single prose sentence across adjacent <p> or
+  // wrapper elements. Joining obvious continuations prevents fragments such as
+  // "We returned" / "to our college..." from becoming artificial paragraphs.
+  const lines = [];
+  for (const item of raw) {
+    const previous = lines[lines.length - 1];
+    const previousEndsSentence = previous ? /[.!?][\"'’”)]?$/.test(previous.text) : true;
+    const startsLikeContinuation = /^[a-zà-öø-ÿ0-9,;:—–)\]}'’”]/.test(item.text);
+    const previousLooksFragmentary = previous && previous.kind !== 'heading' && previous.text.length < 120 && !previousEndsSentence;
+
+    if (previous && item.kind !== 'heading' && previous.kind !== 'heading' &&
+        (startsLikeContinuation || previousLooksFragmentary)) {
+      previous.text = cleanEpubText(`${previous.text} ${item.text}`);
+      for (const id of item.ids) if (!previous.ids.includes(id)) previous.ids.push(id);
+      continue;
+    }
+    lines.push({ ...item });
+  }
+  return lines;
+}
+
+function parseEpubNavigation(navText, navPath) {
+  const doc = new DOMParser().parseFromString(navText, 'text/html');
+  const navs = Array.from(doc.querySelectorAll('nav'));
+  const tocNav = navs.find((nav) => {
+    const epubType = nav.getAttribute('epub:type') || nav.getAttribute('type') || '';
+    const role = nav.getAttribute('role') || '';
+    return /toc/i.test(epubType) || /doc-toc/i.test(role);
+  }) || navs[0];
+  if (!tocNav) return [];
+  return Array.from(tocNav.querySelectorAll('a[href]')).map((a) => {
+    const rawHref = a.getAttribute('href') || '';
+    const [filePart, fragment = ''] = rawHref.split('#');
+    return {
+      title: cleanEpubText(a.textContent),
+      path: resolveArchivePath(navPath, filePart || navPath),
+      fragment: decodeURIComponent(fragment || '')
+    };
+  }).filter((entry) => entry.title && entry.path);
+}
+
+function parseNcxNavigation(ncxText, ncxPath) {
+  const doc = new DOMParser().parseFromString(ncxText, 'application/xml');
+  return xmlLocalElements(doc, 'navPoint').map((point) => {
+    const label = firstXmlLocal(point, 'navLabel');
+    const content = firstXmlLocal(point, 'content');
+    const src = content?.getAttribute('src') || '';
+    const [filePart, fragment = ''] = src.split('#');
+    return {
+      title: cleanEpubText(label?.textContent),
+      path: resolveArchivePath(ncxPath, filePart),
+      fragment: decodeURIComponent(fragment || '')
+    };
+  }).filter((entry) => entry.title && entry.path);
+}
+
+async function parseEpubFile(file) {
+  const archive = await unzipEpub(await file.arrayBuffer());
+  const containerText = await archive.readText('META-INF/container.xml');
+  const containerDoc = new DOMParser().parseFromString(containerText, 'application/xml');
+  const rootfile = firstXmlLocal(containerDoc, 'rootfile');
+  const opfPath = normalizeArchivePath(rootfile?.getAttribute('full-path') || '');
+  if (!opfPath) throw new Error('The EPUB package file could not be located.');
+
+  const opfText = await archive.readText(opfPath);
+  const opfDoc = new DOMParser().parseFromString(opfText, 'application/xml');
+  const title = cleanEpubText(firstXmlLocal(opfDoc, 'title')?.textContent) || file.name.replace(/\.epub$/i, '');
+  const creator = cleanEpubText(firstXmlLocal(opfDoc, 'creator')?.textContent);
+
+  const manifest = new Map();
+  for (const item of xmlLocalElements(opfDoc, 'item')) {
+    const id = item.getAttribute('id');
+    if (!id) continue;
+    manifest.set(id, {
+      id,
+      href: item.getAttribute('href') || '',
+      mediaType: item.getAttribute('media-type') || '',
+      properties: item.getAttribute('properties') || ''
+    });
+  }
+
+  const spine = firstXmlLocal(opfDoc, 'spine');
+  const spineIds = xmlLocalElements(spine || opfDoc, 'itemref').map((item) => item.getAttribute('idref')).filter(Boolean);
+  if (!spineIds.length) throw new Error('The EPUB does not contain a readable spine.');
+
+  let navEntries = [];
+  const navItem = Array.from(manifest.values()).find((item) => /(^|\s)nav(\s|$)/i.test(item.properties));
+  if (navItem) {
+    const navPath = resolveArchivePath(opfPath, navItem.href);
+    try { navEntries = parseEpubNavigation(await archive.readText(navPath), navPath); } catch (error) { console.warn('EPUB nav document could not be read.', error); }
+  }
+  if (!navEntries.length) {
+    const tocId = spine?.getAttribute('toc');
+    const ncxItem = (tocId && manifest.get(tocId)) || Array.from(manifest.values()).find((item) => /ncx/i.test(item.mediaType));
+    if (ncxItem) {
+      const ncxPath = resolveArchivePath(opfPath, ncxItem.href);
+      try { navEntries = parseNcxNavigation(await archive.readText(ncxPath), ncxPath); } catch (error) { console.warn('EPUB NCX could not be read.', error); }
+    }
+  }
+
+  const bookLines = [];
+  const fileStart = new Map();
+  const anchorStart = new Map();
+  const headingStart = new Map();
+  let wordIndex = 0;
+
+  for (const idref of spineIds) {
+    const item = manifest.get(idref);
+    if (!item?.href) continue;
+    const chapterPath = resolveArchivePath(opfPath, item.href);
+    if (!archive.entries.has(chapterPath)) continue;
+    const chapterText = await archive.readText(chapterPath);
+    const chapterDoc = new DOMParser().parseFromString(chapterText, 'text/html');
+    const lines = epubContentLines(chapterDoc);
+    fileStart.set(chapterPath, wordIndex);
+    for (const line of lines) {
+      for (const id of line.ids) anchorStart.set(`${chapterPath}#${id}`, wordIndex);
+      if (line.kind === 'heading') {
+        const headingKey = `${chapterPath}|${normalizeTocTitle(line.text)}`;
+        if (!headingStart.has(headingKey)) headingStart.set(headingKey, wordIndex);
+      }
+      bookLines.push(line.text);
+      wordIndex += splitWords(line.text).length;
+    }
+    if (lines.length) bookLines.push('');
+  }
+
+  const text = bookLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (!text || splitWords(text).length < 5) throw new Error('No readable text could be extracted from this EPUB.');
+
+  const seen = new Set();
+  const epubToc = navEntries.map((entry) => {
+    // Prefer a real heading whose text matches the EPUB navigation label.
+    // This avoids TOC links landing on incidental paragraph anchors inserted
+    // by the publisher for page breaks or formatting.
+    const headingKey = `${entry.path}|${normalizeTocTitle(entry.title)}`;
+    const matchedHeadingIndex = headingStart.get(headingKey);
+    const anchorKey = entry.fragment ? `${entry.path}#${entry.fragment}` : '';
+    const anchoredIndex = anchorKey ? anchorStart.get(anchorKey) : undefined;
+    const index = matchedHeadingIndex ?? anchoredIndex ?? fileStart.get(entry.path);
+    if (!Number.isFinite(index)) return null;
+    return { title: entry.title, index, type: 'chapter' };
+  }).filter(Boolean).filter((entry) => {
+    const key = `${entry.index}|${normalizeTocTitle(entry.title)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 500);
+
+  // If the EPUB has no usable nav document, its chapter files still provide
+  // reliable boundaries that are cleaner than guessing from a printed TOC.
+  if (!epubToc.length) {
+    for (const idref of spineIds) {
+      const item = manifest.get(idref);
+      if (!item?.href) continue;
+      const chapterPath = resolveArchivePath(opfPath, item.href);
+      const index = fileStart.get(chapterPath);
+      if (!Number.isFinite(index)) continue;
+      epubToc.push({ title: `Section ${epubToc.length + 1}`, index, type: 'chapter' });
+    }
+  }
+
+  return {
+    title: creator ? `${title} — ${creator}` : title,
+    text,
+    source: {
+      type: 'epub-upload',
+      name: file.name,
+      epubTitle: title,
+      author: creator,
+      epubToc
+    }
+  };
+}
+
 function renderUpload() {
   stopReader();
   app.innerHTML = `
     <section class="panel">
-      <h1>Upload Text</h1>
-      <p>Select a UTF-8 or ordinary text file. The file stays in your browser and is not uploaded to the server unless you choose to translate it.</p>
-      <div class="controls"><input id="text-file" type="file" accept=".txt,text/plain"><span id="upload-status" class="status"></span></div>
+      <h1>Upload Book or Text</h1>
+      <p>Select an EPUB/EPUB3 or UTF-8 text file. EPUB books are unpacked and parsed locally in your browser; the EPUB itself is not uploaded to the server. Mark, Set, Go! uses the EPUB's built-in reading order and table of contents when available.</p>
+      <div class="controls"><input id="text-file" type="file" accept=".epub,application/epub+zip,.txt,text/plain"><span id="upload-status" class="status"></span></div>
     </section>`;
   app.querySelector('#text-file').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     const status = app.querySelector('#upload-status');
     try {
-      const text = await file.text();
-      renderReaderWithText(file.name, text, { type: 'upload', name: file.name });
-    } catch {
+      const isEpub = /\.epub$/i.test(file.name) || file.type === 'application/epub+zip';
+      if (isEpub) {
+        status.className = 'status';
+        status.textContent = 'Opening EPUB…';
+        const book = await parseEpubFile(file);
+        renderReaderWithText(book.title, book.text, book.source);
+      } else {
+        const text = await file.text();
+        renderReaderWithText(file.name, text, { type: 'upload', name: file.name });
+      }
+    } catch (error) {
+      console.error('Book import failed.', error);
       status.className = 'status error';
-      status.textContent = 'The file could not be read.';
+      status.textContent = error?.message || 'The file could not be read.';
     }
   });
 }
