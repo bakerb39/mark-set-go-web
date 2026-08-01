@@ -6,61 +6,99 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=5.45" rel="stylesheet"/>
+<link href="/styles.css?v=7.0.0" rel="stylesheet"/>
 <script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/SessionManager.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/ReaderEngine.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/VirtualRenderer.js?v=3.2.1-stable-recovery"></script>
-<script defer src="/app.js?v=5.45"></script>
+<script defer src="/app.js?v=7.0.0"></script>
 </head>
 <body>
 <header class="site-header">
 <a class="brand" data-action="home" href="#">Mark, Set, Go!</a>
 <nav aria-label="Main navigation">
 <button class="top-reader-return" data-action="reader" type="button" title="Return to the current reader"><span class="nav-icon" aria-hidden="true">↩</span> Reader</button>
-<details>
-<summary><span class="nav-icon" aria-hidden="true">▥</span> Library</summary>
-<div class="menu-popover">
-<button data-action="reading-list" type="button"><span class="menu-icon">☷</span> My Reading List</button>
-<button data-action="progress-dashboard" type="button"><span class="menu-icon">↗</span> Reading Progress</button>
-<button data-read="upload" type="button"><span class="menu-icon">⇧</span> Import Book / Text</button>
-<button data-read="illustrated-upload" type="button"><span class="menu-icon">▧</span> Import Illustrated Book</button>
-<button data-read="url" type="button"><span class="menu-icon">⌁</span> Read from URL</button>
+
+<details class="top-nav-menu library-menu-root">
+<summary><span class="nav-icon" aria-hidden="true">▥</span> My Library</summary>
+<div class="menu-popover library-nav-popover professional-library-menu" role="menu">
+  <div class="menu-section-label">Library</div>
+
+  <button data-action="my-library" type="button" role="menuitem">
+    <span class="menu-icon icon-home">⌂</span>
+    <span class="menu-copy"><strong>Library Home</strong><small>Continue reading and manage your books</small></span>
+  </button>
+
+  <button data-action="my-reading" type="button" role="menuitem">
+    <span class="menu-icon icon-reading">☷</span>
+    <span class="menu-copy"><strong>My Reading</strong><small>Reading list, statuses, and saved editions</small></span>
+  </button>
+
+  <div class="menu-divider"></div>
+  <div class="menu-section-label">Collections</div>
+
+  <div class="library-menu-grid">
+    <button data-action="library-bookmarks" type="button" role="menuitem">
+      <span class="menu-icon icon-bookmark">🔖</span>
+      <span>Bookmarks</span>
+    </button>
+    <button data-action="library-notes" type="button" role="menuitem">
+      <span class="menu-icon icon-notes">✎</span>
+      <span>Notes</span>
+    </button>
+    <button data-action="vocabulary-builder" type="button" role="menuitem">
+      <span class="menu-icon icon-vocab">Aa</span>
+      <span>Definitions</span>
+    </button>
+    <button data-read="upload" type="button" role="menuitem">
+      <span class="menu-icon icon-import">⇧</span>
+      <span>Imports</span>
+    </button>
+  </div>
+
+  <div class="menu-divider"></div>
+  <div class="menu-section-label">Insights</div>
+
+  <button data-action="progress-awards" type="button" role="menuitem">
+    <span class="menu-icon icon-progress">↗</span>
+    <span class="menu-copy"><strong>Progress &amp; Awards</strong><small>Statistics, goals, coaching, and trophies</small></span>
+  </button>
 </div>
 </details>
-<details>
-<summary><span class="nav-icon" aria-hidden="true">⌕</span> Discover</summary>
+
+<details class="top-nav-menu">
+<summary><span class="nav-icon" aria-hidden="true">⌕</span> Browse</summary>
 <div class="menu-popover">
-<button data-read="unified-library" type="button"><span class="menu-icon">⌕</span> Search All Libraries</button>
-<button data-read="gutenberg" type="button"><span class="menu-icon">G</span> Project Gutenberg</button>
-<button data-read="great-books" type="button"><span class="menu-icon">★</span> Great Books Library</button>
-
-
-<button data-read="current-reading" type="button"><span class="menu-icon">◎</span> News, Sports &amp; Interests</button>
-<button data-read="news" type="button"><span class="menu-icon">◫</span> Today's News</button>
-<button data-read="weather" type="button"><span class="menu-icon">☼</span> Local Weather</button>
-<button data-read="frankenstein-demo" type="button"><span class="menu-icon">▧</span> Illustrated Demo</button>
+<button data-action="browse" type="button"><span class="menu-icon">⌕</span> Browse Libraries</button>
+<button data-read="great-books" type="button"><span class="menu-icon">★</span> Great Books</button>
+<button data-read="bible" type="button"><span class="menu-icon">✦</span> Bible Study</button>
+<button data-read="upload" type="button"><span class="menu-icon">⇧</span> Import Book</button>
+<button data-action="ai-center" type="button"><span class="menu-icon">AI</span> AI Companion</button>
 </div>
 </details>
+
 <details>
 <summary><span class="nav-icon" aria-hidden="true">↗</span> Learn</summary>
 <div class="menu-popover">
-<button data-read="syntopicon" type="button"><span class="menu-icon">◎</span> Syntopicon · Great Ideas</button>
-<button data-read="bible" type="button"><span class="menu-icon">✦</span> Bible Study</button>
+<button data-read="syntopicon" type="button"><span class="menu-icon">◎</span> Great Ideas</button>
 <button data-test="wpm" type="button"><span class="menu-icon">⏱</span> WPM Test</button>
-
 <button data-action="vocabulary-builder" type="button"><span class="menu-icon">Aa</span> Vocabulary Builder</button>
+<button data-action="progress-awards" type="button"><span class="menu-icon">🏆</span> Progress &amp; Awards</button>
 </div>
 </details>
+
+<button class="top-level-nav-button" data-action="ai-center" type="button"><span class="nav-icon" aria-hidden="true">✦</span> AI</button>
+
 <details>
 <summary><span class="nav-icon" aria-hidden="true">♫</span> Music</summary>
 <div class="menu-popover">
 <button data-action="music" type="button"><span class="menu-icon">♫</span> Music Library</button>
-<button data-music-quick="lofi-study" type="button">Lofi for Reading</button>
+<button data-music-quick="lofi-study" type="button">LoFi Music</button>
 <button data-music-quick="classical-reading" type="button">Classical Reading</button>
 <button data-music-quick="rain-focus" type="button">Rain &amp; Focus</button>
 </div>
 </details>
+
 <details>
 <summary><span class="nav-icon" aria-hidden="true">?</span> Help</summary>
 <div class="menu-popover">

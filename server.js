@@ -10,7 +10,6 @@ const AdmZip = require('adm-zip');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_TRANSLATION_CHARS = 120000;
 const MAX_GUTENBERG_BOOK_BYTES = 12 * 1024 * 1024;
@@ -69,7 +68,7 @@ async function fetchFeedItems(source) {
 app.disable('x-powered-by');
 app.use(express.json({ limit: '150kb' }));
 
-const COMPREHENSION_MODEL = process.env.OPENAI_COMPREHENSION_MODEL || process.env.OPENAI_MODEL || 'gpt-5';
+const COMPREHENSION_MODEL = process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
 
 function extractOpenAIOutputText(payload) {
   for (const item of Array.isArray(payload?.output) ? payload.output : []) {
@@ -185,6 +184,399 @@ Use plausible distractors. Keep explanations concise and cite the relevant idea 
 });
 
 
+
+app.post('/api/reading-profile', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) {
+    return res.status(503).json({
+      error: 'Reading Profile AI is not configured. Add OPENAI_API_KEY to the server environment.'
+    });
+  }
+
+  const book = req.body?.book && typeof req.body.book === 'object' ? req.body.book : {};
+  const localProfile = req.body?.localProfile && typeof req.body.localProfile === 'object'
+    ? req.body.localProfile
+    : {};
+  const sample = String(req.body?.sample || '').replace(/\s+/g, ' ').trim().slice(0, 30000);
+
+  const title = String(book.title || 'Untitled').trim().slice(0, 300);
+  const author = String(book.author || '').trim().slice(0, 300);
+  const description = String(book.description || '').trim().slice(0, 3000);
+  const subjects = Array.isArray(book.subjects)
+    ? book.subjects.slice(0, 20).map((item) => String(item).slice(0, 180))
+    : String(book.subjects || '').split(/[,;|]/).slice(0, 20);
+
+  if (!title && !sample) {
+    return res.status(400).json({ error: 'A title or text sample is required.' });
+  }
+
+  const scoreProperty = { type: 'integer', minimum: 0, maximum: 100 };
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'textualDifficulty',
+      'interpretationDifficulty',
+      'contextualDifficulty',
+      'literaryComplexity',
+      'summary',
+      'confidence',
+      'evidence',
+      'preparationTopics',
+      'interpretiveFeatures',
+      'cautions'
+    ],
+    properties: {
+      textualDifficulty: scoreProperty,
+      interpretationDifficulty: scoreProperty,
+      contextualDifficulty: scoreProperty,
+      literaryComplexity: scoreProperty,
+      summary: { type: 'string' },
+      confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+      evidence: {
+        type: 'array',
+        minItems: 4,
+        maxItems: 10,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['dimension', 'finding', 'basis'],
+          properties: {
+            dimension: {
+              type: 'string',
+              enum: ['textual', 'interpretive', 'contextual', 'literary_structure']
+            },
+            finding: { type: 'string' },
+            basis: {
+              type: 'string',
+              enum: ['text_sample', 'metadata', 'established_work_characteristic']
+            }
+          }
+        }
+      },
+      preparationTopics: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 8,
+        items: { type: 'string' }
+      },
+      interpretiveFeatures: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 8,
+        items: { type: 'string' }
+      },
+      cautions: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 5,
+        items: { type: 'string' }
+      }
+    }
+  };
+
+  const instructions = `You are evaluating a book's reading profile for an adult reading application.
+
+Treat these as four separate constructs:
+1. Textual difficulty: vocabulary, sentence syntax, grammar, and decoding effort.
+2. Interpretive difficulty: ambiguity, implication, irony, symbolism, subtext, philosophical depth, and unstated meaning.
+3. Contextual difficulty: historical, geographical, cultural, theological, scientific, political, or specialized knowledge expected.
+4. Literary structure: chronology, narrators, viewpoints, character burden, framing, fragmentation, and formal experimentation.
+
+Critical calibration rules:
+- Never treat literary prestige, seriousness, profundity, or emotional power as evidence of difficult syntax.
+- Never treat dialogue or quotation marks as narrative complexity.
+- Direct, short prose may be accessible to read but challenging to interpret.
+- Hemingway is a canonical example: generally direct vocabulary and syntax; interpretation may be harder because of omission, subtext, and the iceberg method.
+- Do not invent textual evidence. Distinguish evidence from the supplied sample, metadata, and established characteristics of the work.
+- The local linguistic metrics are evidence, not a verdict.
+- Scores should be conservative. Scores above 80 are reserved for genuinely exceptional difficulty.
+- Avoid spoilers.
+- If title or edition identity is uncertain, lower confidence and state that uncertainty in cautions.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: COMPREHENSION_MODEL,
+        reasoning: { effort: 'medium' },
+        store: false,
+        input: [
+          { role: 'developer', content: [{ type: 'input_text', text: instructions }] },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({
+            book: {
+              title,
+              author,
+              year: String(book.year || '').slice(0, 30),
+              language: String(book.language || '').slice(0, 50),
+              description,
+              subjects
+            },
+            localLinguisticProfile: {
+              textualDifficulty: Number(localProfile.textualDifficulty) || 0,
+              interpretationDifficulty: Number(localProfile.interpretationDifficulty) || 0,
+              contextualDifficulty: Number(localProfile.contextualDifficulty) || 0,
+              literaryComplexity: Number(localProfile.literaryComplexity) || 0,
+              dimensions: localProfile.dimensions || {},
+              evidence: localProfile.evidence || {}
+            },
+            textSample: sample || null
+          }) }] }
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'hybrid_reading_profile',
+            strict: true,
+            schema
+          }
+        }
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = payload?.error?.message || `OpenAI returned HTTP ${response.status}.`;
+      return res.status(502).json({ error: 'Unable to enhance the Reading Profile.', detail });
+    }
+
+    const outputText = extractOpenAIOutputText(payload);
+    if (!outputText) throw new Error('OpenAI returned no structured Reading Profile.');
+    const profile = JSON.parse(outputText);
+    res.json({ model: COMPREHENSION_MODEL, profile });
+  } catch (error) {
+    console.error('Reading Profile generation failed:', error);
+    res.status(502).json({ error: 'Unable to enhance the Reading Profile.' });
+  }
+});
+
+
+app.post('/api/book-guide', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) {
+    return res.status(503).json({
+      error: 'Book Guide AI is not configured. Add OPENAI_API_KEY to the server environment.'
+    });
+  }
+
+  const book = req.body?.book && typeof req.body.book === 'object' ? req.body.book : {};
+  const sample = String(req.body?.sample || '').replace(/\s+/g, ' ').trim().slice(0, 24000);
+  const spoilerMode = ['none', 'light', 'full'].includes(req.body?.spoilerMode)
+    ? req.body.spoilerMode
+    : 'none';
+
+  const title = String(book.title || 'Untitled').trim().slice(0, 300);
+  const author = String(book.author || '').trim().slice(0, 300);
+
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: [
+      'overview',
+      'setting',
+      'characters',
+      'themes',
+      'structure',
+      'context',
+      'symbolsAndMotifs',
+      'readingTips',
+      'spoilerNote'
+    ],
+    properties: {
+      overview: { type: 'string' },
+      setting: { type: 'string' },
+      characters: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 12,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['name', 'role'],
+          properties: {
+            name: { type: 'string' },
+            role: { type: 'string' }
+          }
+        }
+      },
+      themes: {
+        type: 'array',
+        minItems: 2,
+        maxItems: 10,
+        items: { type: 'string' }
+      },
+      structure: { type: 'string' },
+      context: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 10,
+        items: { type: 'string' }
+      },
+      symbolsAndMotifs: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 10,
+        items: { type: 'string' }
+      },
+      readingTips: {
+        type: 'array',
+        minItems: 2,
+        maxItems: 8,
+        items: { type: 'string' }
+      },
+      spoilerNote: { type: 'string' }
+    }
+  };
+
+  const spoilerInstruction = spoilerMode === 'full'
+    ? 'A full-work guide is allowed, including major plot developments and ending significance.'
+    : spoilerMode === 'light'
+      ? 'Mention only early-premise information and broad developments; do not reveal the ending or major twists.'
+      : 'Avoid spoilers completely. Describe only the premise, setting, initial character roles, themes, structure, context, and what to notice.';
+
+  const instructions = `Create a concise, dependable quick book guide for an adult reader.
+${spoilerInstruction}
+Do not imitate or claim affiliation with any commercial study-guide publisher.
+Be specific to the identified work and edition when possible.
+Do not invent characters, events, symbols, or historical facts.
+When information is uncertain, say so.
+Keep each section compact and useful before or during reading.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: COMPREHENSION_MODEL,
+        reasoning: { effort: 'medium' },
+        store: false,
+        input: [
+          { role: 'developer', content: [{ type: 'input_text', text: instructions }] },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({
+            book: {
+              title,
+              author,
+              year: book.year || '',
+              description: String(book.description || '').slice(0, 3000),
+              subjects: book.subjects || []
+            },
+            textSample: sample || null
+          }) }] }
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'quick_book_guide',
+            strict: true,
+            schema
+          }
+        }
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = payload?.error?.message || `OpenAI returned HTTP ${response.status}.`;
+      return res.status(502).json({ error: 'Unable to create the Quick Book Guide.', detail });
+    }
+
+    const outputText = extractOpenAIOutputText(payload);
+    if (!outputText) throw new Error('OpenAI returned no structured Book Guide.');
+    const guide = JSON.parse(outputText);
+    res.json({ model: COMPREHENSION_MODEL, guide });
+  } catch (error) {
+    console.error('Book Guide generation failed:', error);
+    res.status(502).json({ error: 'Unable to create the Quick Book Guide.' });
+  }
+});
+
+app.post('/api/progress-recommendations', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) {
+    return res.status(503).json({
+      error: 'Progress AI is not configured. Add OPENAI_API_KEY to the server environment.'
+    });
+  }
+
+  const summary = req.body?.summary && typeof req.body.summary === 'object' ? req.body.summary : {};
+  const daily = Array.isArray(req.body?.daily) ? req.body.daily.slice(-14) : [];
+  const weekly = Array.isArray(req.body?.weekly) ? req.body.weekly.slice(-12) : [];
+
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['recommendations'],
+    properties: {
+      recommendations: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 5,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['title','recommendation','reason'],
+          properties: {
+            title: { type:'string' },
+            recommendation: { type:'string' },
+            reason: { type:'string' }
+          }
+        }
+      }
+    }
+  };
+
+  const prompt = `Act as a supportive reading coach. Analyze only the supplied reading metrics.
+Give 3 to 5 specific, achievable recommendations that balance reading consistency, speed, comprehension, and annual book goals.
+Do not diagnose health or learning disorders. Do not shame the reader. Do not invent missing measurements.
+Make each recommendation practical for the next one to four weeks.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method:'POST',
+      headers:{
+        Authorization:`Bearer ${apiKey}`,
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        model:COMPREHENSION_MODEL,
+        reasoning:{effort:'low'},
+        store:false,
+        input:[
+          {role:'developer',content:[{type:'input_text',text:prompt}]},
+          {role:'user',content:[{type:'input_text',text:JSON.stringify({summary,daily,weekly})}]}
+        ],
+        text:{
+          format:{
+            type:'json_schema',
+            name:'reading_progress_recommendations',
+            strict:true,
+            schema
+          }
+        }
+      })
+    });
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok) {
+      const detail=payload?.error?.message||`OpenAI returned HTTP ${response.status}.`;
+      return res.status(502).json({error:'Unable to generate progress recommendations.',detail});
+    }
+    const outputText=extractOpenAIOutputText(payload);
+    if(!outputText) throw new Error('OpenAI returned no structured output.');
+    return res.json(JSON.parse(outputText));
+  } catch(error) {
+    console.error('Progress recommendation error:',error);
+    return res.status(500).json({error:'Unable to generate progress recommendations.',detail:error.message});
+  }
+});
+
+
 app.post('/api/study-guide', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) return res.status(503).json({ error: 'AI study tools are not configured. Add OPENAI_API_KEY to the server environment.' });
@@ -237,7 +629,7 @@ Write the entire response in ${language}.`;
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_MODEL || COMPREHENSION_MODEL,
+        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna',
         reasoning: { effort: 'low' },
         store: false,
         input: [
@@ -507,7 +899,7 @@ Write the entire response in ${language}.`;
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_MODEL || COMPREHENSION_MODEL,
+        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna',
         reasoning: { effort: 'medium' },
         store: false,
         input: [
@@ -526,15 +918,6 @@ Write the entire response in ${language}.`;
     console.error('Syntopicon generation failed:', error);
     res.status(502).json({ error: 'Unable to create syntopical analysis.' });
   }
-});
-
-app.get('/healthz', (_req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    service: 'mark-set-go-web',
-    version: require('./package.json').version,
-    aiConfigured: Boolean(String(process.env.OPENAI_API_KEY || '').trim())
-  });
 });
 
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -1976,17 +2359,4 @@ app.get('/api/library/read', async (req, res) => {
 });
 
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-
-const httpServer = app.listen(PORT, HOST, () => {
-  console.log(`Mark, Set, Go! is listening on ${HOST}:${PORT}`);
-  console.log(`OpenAI features: ${String(process.env.OPENAI_API_KEY || '').trim() ? 'configured' : 'not configured'}`);
-});
-
-function shutdown(signal) {
-  console.log(`${signal} received; closing HTTP server.`);
-  httpServer.close(() => process.exit(0));
-  setTimeout(() => process.exit(1), 10000).unref();
-}
-
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+app.listen(PORT, () => console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`));

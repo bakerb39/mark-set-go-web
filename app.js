@@ -1,6 +1,7 @@
 'use strict';
 
 const app = document.querySelector('#app');
+app.dataset.viewKey = 'home';
 
 
 const { BookModel, SessionManager, ReaderEngine, VirtualRenderer } = window.MarkSetGoReader || {};
@@ -26,6 +27,150 @@ const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
 // this browser/app session. Persistent IndexedDB is reserved for Home > Resume.
 let activeReaderSnapshot = null;
 
+
+const APP_VIEW_STATE_KEY = 'markSetGoViewStateV1';
+
+const ReaderContinuity = {
+  transitionId: 0,
+  protectedControlSelector: [
+    '#mode-select', '#fs-mode-select',
+    '#word-count', '#fs-word-count',
+    '#meaningful-chunks', '#fs-meaningful-chunks',
+    '#focus-anchor', '#fs-focus-anchor',
+    '#focus-anchor-font-size', '#fs-focus-anchor-font-size',
+    '#focus-anchor-color', '#fs-focus-anchor-color',
+    '#focus-anchor-bold', '#fs-focus-anchor-bold',
+    '#font-family', '#fs-font-family',
+    '#font-size', '#fs-font-size',
+    '#theme-select', '#fs-theme-select',
+    '#bionic-reading', '#fs-bionic-reading',
+    '#book-pages', '#fs-book-pages',
+    '#illustration-mode', '#fs-illustration-mode',
+    '#pointer-style', '#fs-pointer-style',
+    '#pointer-color', '#fs-pointer-color'
+  ].join(', '),
+
+  hasActiveReader() {
+    return Boolean(state?.title && state?.words?.length && app.querySelector('#reader'));
+  },
+
+  capture() {
+    if (!this.hasActiveReader()) return null;
+    const location = captureReaderLocation();
+    const snapshot = buildReaderSessionSnapshot();
+    if (!snapshot) return null;
+    snapshot.index = location.anchorIndex;
+    snapshot.wasRunning = location.wasRunning;
+    snapshot.controls = { ...(snapshot.controls || {}), ...captureReaderControls() };
+    return snapshot;
+  },
+
+  commit(snapshot, { immediate = true } = {}) {
+    if (!snapshot?.title || !snapshot?.currentText) return;
+    activeReaderSnapshot = {
+      ...snapshot,
+      index: Math.max(0, Number(snapshot.index) || 0),
+      controls: { ...(snapshot.controls || {}) }
+    };
+    state.returnIndex = activeReaderSnapshot.index;
+    state.returnMode = activeReaderSnapshot.controls.mode || state.renderedMode || 'highlight';
+    state.returnWasRunning = Boolean(activeReaderSnapshot.wasRunning);
+    state.returnControls = { ...activeReaderSnapshot.controls };
+
+    if (!immediate) {
+      persistReaderSession();
+      return;
+    }
+
+    try {
+      const totalWords = state.words?.length || splitWords(snapshot.currentText || '').length;
+      localStorage.setItem(READER_SESSION_META_KEY, JSON.stringify({
+        documentId: snapshot.documentId || state.documentId || '',
+        title: snapshot.title || state.title || 'Untitled',
+        index: activeReaderSnapshot.index,
+        totalWords,
+        savedAt: new Date().toISOString()
+      }));
+    } catch {}
+    writeReaderSession(activeReaderSnapshot);
+  },
+
+  saveBeforeNavigation() {
+    const snapshot = this.capture();
+    if (snapshot) this.commit(snapshot, { immediate: true });
+    return snapshot;
+  }
+};
+
+function readAppViewState() {
+  try { return JSON.parse(localStorage.getItem(APP_VIEW_STATE_KEY) || '{}') || {}; }
+  catch { return {}; }
+}
+
+function writeAppViewState(value) {
+  try { localStorage.setItem(APP_VIEW_STATE_KEY, JSON.stringify(value || {})); } catch {}
+}
+
+function currentViewKey() {
+  return app.dataset.viewKey || 'home';
+}
+
+function captureCurrentViewPosition() {
+  const key = currentViewKey();
+  const stateMap = readAppViewState();
+  const scrollContainers = {};
+
+  app.querySelectorAll('[data-preserve-scroll], .panel, .platform-page, .reader-side-panel').forEach((element, index) => {
+    if (element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth) {
+      const id = element.id || element.dataset.preserveScroll || `${element.className}:${index}`;
+      scrollContainers[id] = { top: element.scrollTop, left: element.scrollLeft };
+    }
+  });
+
+  stateMap[key] = {
+    windowY: window.scrollY,
+    windowX: window.scrollX,
+    scrollContainers,
+    savedAt: Date.now()
+  };
+  writeAppViewState(stateMap);
+}
+
+function restoreViewPosition(key) {
+  app.dataset.viewKey = key || 'home';
+  const saved = readAppViewState()[app.dataset.viewKey];
+  if (!saved) {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    return;
+  }
+
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    window.scrollTo({
+      top: Number(saved.windowY) || 0,
+      left: Number(saved.windowX) || 0,
+      behavior: 'auto'
+    });
+
+    const entries = saved.scrollContainers || {};
+    app.querySelectorAll('[data-preserve-scroll], .panel, .platform-page, .reader-side-panel').forEach((element, index) => {
+      const id = element.id || element.dataset.preserveScroll || `${element.className}:${index}`;
+      const position = entries[id];
+      if (position) {
+        element.scrollTop = Number(position.top) || 0;
+        element.scrollLeft = Number(position.left) || 0;
+      }
+    });
+  }));
+}
+
+function navigationViewKey({ action, read, test } = {}) {
+  if (action) return `action:${action}`;
+  if (read) return `read:${read}`;
+  if (test) return `test:${test}`;
+  return 'home';
+}
+
+
 async function writeReaderSession(snapshot) {
   return readerSessionManager.write(snapshot);
 }
@@ -45,6 +190,8 @@ function captureReaderControls() {
     wpm: Number(app.querySelector('#speed')?.value || state.wpm || 300),
     wordCount: Number(app.querySelector('#word-count')?.value || 1),
     meaningfulChunks: Boolean(app.querySelector('#meaningful-chunks')?.checked ?? state.meaningfulChunks),
+    pointerStyle: app.querySelector('#pointer-style')?.value || state.pointerStyle || 'hand',
+    pointerColor: app.querySelector('#pointer-color')?.value || state.pointerColor || '#20a866',
     focusAnchor: Boolean(app.querySelector('#focus-anchor')?.checked ?? state.focusAnchor),
     focusAnchorPosition: state.focusAnchorPosition || null,
     focusAnchorFontSize: Number(app.querySelector('#focus-anchor-font-size')?.value || state.focusAnchorFontSize || 24),
@@ -573,145 +720,1483 @@ async function loadBillboardSongs() {
 
 
 const greatBooksCatalog = [
-  {"volume": 3, "era": "Ancient", "author": "Homer", "title": "The Iliad", "query": "Iliad Homer"},
-  {"volume": 3, "era": "Ancient", "author": "Homer", "title": "The Odyssey", "query": "Odyssey Homer"},
-  {"volume": 4, "era": "Ancient Drama", "author": "Aeschylus", "title": "Plays", "query": "Aeschylus plays"},
-  {"volume": 4, "era": "Ancient Drama", "author": "Sophocles", "title": "Plays", "query": "Sophocles plays"},
-  {"volume": 4, "era": "Ancient Drama", "author": "Euripides", "title": "Plays", "query": "Euripides plays"},
-  {"volume": 4, "era": "Ancient Drama", "author": "Aristophanes", "title": "Plays", "query": "Aristophanes plays"},
-  {"volume": 5, "era": "Ancient History", "author": "Herodotus", "title": "The History of the Persian Wars", "query": "Herodotus Persian Wars"},
-  {"volume": 5, "era": "Ancient History", "author": "Thucydides", "title": "The History of the Peloponnesian War", "query": "Thucydides Peloponnesian War"},
-  {"volume": 6, "era": "Ancient Philosophy", "author": "Plato", "title": "Dialogues and The Seventh Letter", "query": "Plato Dialogues"},
-  {"volume": 7, "era": "Ancient Philosophy", "author": "Aristotle", "title": "Works, Volume I", "query": "Aristotle works"},
-  {"volume": 8, "era": "Ancient Philosophy", "author": "Aristotle", "title": "Works, Volume II", "query": "Aristotle works"},
-  {"volume": 9, "era": "Ancient Science & Medicine", "author": "Hippocrates", "title": "Works", "query": "Hippocrates works"},
-  {"volume": 9, "era": "Ancient Science & Medicine", "author": "Galen", "title": "On the Natural Faculties", "query": "Galen Natural Faculties"},
-  {"volume": 10, "era": "Ancient Mathematics", "author": "Euclid", "title": "Elements", "query": "Euclid Elements"},
-  {"volume": 10, "era": "Ancient Mathematics", "author": "Archimedes", "title": "Works", "query": "Archimedes works"},
-  {"volume": 10, "era": "Ancient Mathematics", "author": "Nicomachus", "title": "Introduction to Arithmetic", "query": "Nicomachus Introduction Arithmetic"},
-  {"volume": 11, "era": "Ancient Philosophy", "author": "Lucretius", "title": "The Way Things Are", "query": "Lucretius Nature Things"},
-  {"volume": 11, "era": "Ancient Philosophy", "author": "Epictetus", "title": "Discourses", "query": "Epictetus Discourses"},
-  {"volume": 11, "era": "Ancient Philosophy", "author": "Marcus Aurelius", "title": "Meditations", "query": "Marcus Aurelius Meditations"},
-  {"volume": 11, "era": "Ancient Philosophy", "author": "Plotinus", "title": "The Six Enneads", "query": "Plotinus Enneads"},
-  {"volume": 12, "era": "Roman Literature", "author": "Virgil", "title": "Eclogues, Georgics, and The Aeneid", "query": "Virgil Aeneid"},
-  {"volume": 13, "era": "Roman History", "author": "Plutarch", "title": "The Lives of the Noble Grecians and Romans", "query": "Plutarch Lives"},
-  {"volume": 14, "era": "Roman History", "author": "Tacitus", "title": "The Annals and The Histories", "query": "Tacitus Annals Histories"},
-  {"volume": 15, "era": "Astronomy", "author": "Ptolemy", "title": "The Almagest", "query": "Ptolemy Almagest"},
-  {"volume": 15, "era": "Astronomy", "author": "Nicolaus Copernicus", "title": "On the Revolutions of the Heavenly Spheres", "query": "Copernicus Revolutions Heavenly Spheres"},
-  {"volume": 15, "era": "Astronomy", "author": "Johannes Kepler", "title": "Epitome of Copernican Astronomy and Harmonies of the World", "query": "Kepler Copernican Astronomy Harmonies World"},
-  {"volume": 16, "era": "Christian Thought", "author": "Saint Augustine", "title": "The Confessions", "query": "Augustine Confessions"},
-  {"volume": 16, "era": "Christian Thought", "author": "Saint Augustine", "title": "The City of God", "query": "Augustine City of God"},
-  {"volume": 16, "era": "Christian Thought", "author": "Saint Augustine", "title": "On Christian Doctrine", "query": "Augustine Christian Doctrine"},
-  {"volume": 17, "era": "Medieval Philosophy & Theology", "author": "Thomas Aquinas", "title": "Summa Theologica, Part I", "query": "Aquinas Summa Theologica"},
-  {"volume": 18, "era": "Medieval Philosophy & Theology", "author": "Thomas Aquinas", "title": "Summa Theologica, Part II", "query": "Aquinas Summa Theologica"},
-  {"volume": 19, "era": "Medieval Literature", "author": "Dante Alighieri", "title": "The Divine Comedy", "query": "Dante Divine Comedy"},
-  {"volume": 19, "era": "Medieval Literature", "author": "Geoffrey Chaucer", "title": "Troilus and Criseyde", "query": "Chaucer Troilus Criseyde"},
-  {"volume": 19, "era": "Medieval Literature", "author": "Geoffrey Chaucer", "title": "The Canterbury Tales", "query": "Chaucer Canterbury Tales"},
-  {"volume": 20, "era": "Reformation", "author": "John Calvin", "title": "Institutes of the Christian Religion", "query": "Calvin Institutes Christian Religion"},
-  {"volume": 21, "era": "Political Philosophy", "author": "Niccolò Machiavelli", "title": "The Prince", "query": "Machiavelli Prince"},
-  {"volume": 21, "era": "Political Philosophy", "author": "Thomas Hobbes", "title": "Leviathan", "query": "Hobbes Leviathan"},
-  {"volume": 22, "era": "Renaissance Literature", "author": "François Rabelais", "title": "Gargantua and Pantagruel", "query": "Rabelais Gargantua Pantagruel"},
-  {"volume": 23, "era": "Renaissance Thought", "author": "Desiderius Erasmus", "title": "Praise of Folly", "query": "Erasmus Praise Folly"},
-  {"volume": 23, "era": "Renaissance Thought", "author": "Michel de Montaigne", "title": "Essays", "query": "Montaigne Essays"},
-  {"volume": 24, "era": "Shakespeare", "author": "William Shakespeare", "title": "Plays, Volume I", "query": "Shakespeare plays"},
-  {"volume": 25, "era": "Shakespeare", "author": "William Shakespeare", "title": "Plays, Volume II and Sonnets", "query": "Shakespeare Sonnets plays"},
-  {"volume": 26, "era": "Early Modern Science", "author": "William Gilbert", "title": "On the Loadstone and Magnetic Bodies", "query": "William Gilbert Loadstone"},
-  {"volume": 26, "era": "Early Modern Science", "author": "Galileo Galilei", "title": "Dialogues Concerning the Two New Sciences", "query": "Galileo Two New Sciences"},
-  {"volume": 26, "era": "Early Modern Science", "author": "William Harvey", "title": "Works on the Heart, Blood, and Generation", "query": "William Harvey heart blood animals"},
-  {"volume": 27, "era": "Early Modern Literature", "author": "Miguel de Cervantes", "title": "Don Quixote", "query": "Cervantes Don Quixote"},
-  {"volume": 28, "era": "Early Modern Philosophy", "author": "Francis Bacon", "title": "Advancement of Learning, Novum Organum, and New Atlantis", "query": "Francis Bacon Novum Organum"},
-  {"volume": 28, "era": "Early Modern Philosophy", "author": "René Descartes", "title": "Major Philosophical Works", "query": "Descartes Discourse Method Meditations"},
-  {"volume": 28, "era": "Early Modern Philosophy", "author": "Benedict de Spinoza", "title": "Ethics", "query": "Spinoza Ethics"},
-  {"volume": 29, "era": "Early Modern Literature", "author": "John Milton", "title": "Paradise Lost and Other Works", "query": "Milton Paradise Lost"},
-  {"volume": 30, "era": "Early Modern Thought", "author": "Blaise Pascal", "title": "Provincial Letters, Pensées, and Scientific Treatises", "query": "Pascal Pensees"},
-  {"volume": 31, "era": "French Drama", "author": "Molière", "title": "Major Plays", "query": "Moliere plays"},
-  {"volume": 31, "era": "French Drama", "author": "Jean Racine", "title": "Berenice and Phaedra", "query": "Racine Phaedra Berenice"},
-  {"volume": 32, "era": "Science", "author": "Isaac Newton", "title": "Mathematical Principles of Natural Philosophy and Optics", "query": "Newton Principia Opticks"},
-  {"volume": 32, "era": "Science", "author": "Christiaan Huygens", "title": "Treatise on Light", "query": "Huygens Treatise Light"},
-  {"volume": 33, "era": "Enlightenment Philosophy", "author": "John Locke", "title": "A Letter Concerning Toleration, Civil Government, and Human Understanding", "query": "Locke Human Understanding Government"},
-  {"volume": 33, "era": "Enlightenment Philosophy", "author": "George Berkeley", "title": "The Principles of Human Knowledge", "query": "Berkeley Human Knowledge"},
-  {"volume": 33, "era": "Enlightenment Philosophy", "author": "David Hume", "title": "An Enquiry Concerning Human Understanding", "query": "Hume Enquiry Human Understanding"},
-  {"volume": 34, "era": "Enlightenment Literature", "author": "Jonathan Swift", "title": "Gulliver’s Travels", "query": "Swift Gulliver Travels"},
-  {"volume": 34, "era": "Enlightenment Literature", "author": "Voltaire", "title": "Candide", "query": "Voltaire Candide"},
-  {"volume": 34, "era": "Enlightenment Literature", "author": "Denis Diderot", "title": "Rameau’s Nephew", "query": "Diderot Rameau Nephew"},
-  {"volume": 35, "era": "Political Philosophy", "author": "Montesquieu", "title": "The Spirit of Laws", "query": "Montesquieu Spirit Laws"},
-  {"volume": 35, "era": "Political Philosophy", "author": "Jean-Jacques Rousseau", "title": "Political Writings including The Social Contract", "query": "Rousseau Social Contract"},
-  {"volume": 36, "era": "Economics", "author": "Adam Smith", "title": "The Wealth of Nations", "query": "Adam Smith Wealth Nations"},
-  {"volume": 37, "era": "History", "author": "Edward Gibbon", "title": "The Decline and Fall of the Roman Empire, Volume I", "query": "Gibbon Decline Fall Roman Empire"},
-  {"volume": 38, "era": "History", "author": "Edward Gibbon", "title": "The Decline and Fall of the Roman Empire, Volume II", "query": "Gibbon Decline Fall Roman Empire"},
-  {"volume": 39, "era": "Modern Philosophy", "author": "Immanuel Kant", "title": "Major Critical and Moral Works", "query": "Kant Critique Pure Reason"},
-  {"volume": 40, "era": "American Political Thought", "author": "United States", "title": "Declaration, Articles of Confederation, and Constitution", "query": "United States Constitution Declaration Independence"},
-  {"volume": 40, "era": "American Political Thought", "author": "Alexander Hamilton, James Madison, John Jay", "title": "The Federalist Papers", "query": "Federalist Papers"},
-  {"volume": 40, "era": "Liberal Political Thought", "author": "John Stuart Mill", "title": "On Liberty, Representative Government, and Utilitarianism", "query": "John Stuart Mill On Liberty"},
-  {"volume": 41, "era": "Biography", "author": "James Boswell", "title": "The Life of Samuel Johnson", "query": "Boswell Life Samuel Johnson"},
-  {"volume": 42, "era": "Science", "author": "Antoine Lavoisier", "title": "Elements of Chemistry", "query": "Lavoisier Elements Chemistry"},
-  {"volume": 42, "era": "Science", "author": "Michael Faraday", "title": "Experimental Researches in Electricity", "query": "Faraday Experimental Researches Electricity"},
-  {"volume": 43, "era": "Modern Philosophy", "author": "G. W. F. Hegel", "title": "The Philosophy of Right and The Philosophy of History", "query": "Hegel Philosophy Right History"},
-  {"volume": 43, "era": "Modern Philosophy", "author": "Søren Kierkegaard", "title": "Fear and Trembling", "query": "Kierkegaard Fear Trembling"},
-  {"volume": 43, "era": "Modern Philosophy", "author": "Friedrich Nietzsche", "title": "Beyond Good and Evil", "query": "Nietzsche Beyond Good Evil"},
-  {"volume": 44, "era": "Political Thought", "author": "Alexis de Tocqueville", "title": "Democracy in America", "query": "Tocqueville Democracy America"},
-  {"volume": 45, "era": "Literature", "author": "Johann Wolfgang von Goethe", "title": "Faust", "query": "Goethe Faust"},
-  {"volume": 45, "era": "Literature", "author": "Honoré de Balzac", "title": "Cousin Bette", "query": "Balzac Cousin Bette"},
-  {"volume": 46, "era": "Literature", "author": "Jane Austen", "title": "Emma", "query": "Jane Austen Emma"},
-  {"volume": 46, "era": "Literature", "author": "George Eliot", "title": "Middlemarch", "query": "George Eliot Middlemarch"},
-  {"volume": 47, "era": "Literature", "author": "Charles Dickens", "title": "Little Dorrit", "query": "Dickens Little Dorrit"},
-  {"volume": 48, "era": "Literature", "author": "Herman Melville", "title": "Moby-Dick", "query": "Melville Moby Dick"},
-  {"volume": 48, "era": "Literature", "author": "Mark Twain", "title": "Adventures of Huckleberry Finn", "query": "Mark Twain Huckleberry Finn"},
-  {"volume": 49, "era": "Science", "author": "Charles Darwin", "title": "The Origin of Species", "query": "Darwin Origin Species"},
-  {"volume": 49, "era": "Science", "author": "Charles Darwin", "title": "The Descent of Man", "query": "Darwin Descent Man"},
-  {"volume": 50, "era": "Political Economy", "author": "Karl Marx and Friedrich Engels", "title": "Manifesto of the Communist Party", "query": "Communist Manifesto Marx Engels"},
-  {"volume": 50, "era": "Political Economy", "author": "Karl Marx", "title": "Capital, Volume I", "query": "Marx Capital Volume 1"},
-  {"volume": 51, "era": "Literature", "author": "Leo Tolstoy", "title": "War and Peace", "query": "Tolstoy War Peace"},
-  {"volume": 52, "era": "Literature", "author": "Fyodor Dostoevsky", "title": "The Brothers Karamazov", "query": "Dostoevsky Brothers Karamazov"},
-  {"volume": 52, "era": "Literature", "author": "Henrik Ibsen", "title": "A Doll’s House, The Wild Duck, Hedda Gabler, and The Master Builder", "query": "Ibsen plays"},
-  {"volume": 53, "era": "Psychology", "author": "William James", "title": "The Principles of Psychology", "query": "William James Principles Psychology"},
-  {"volume": 54, "era": "Psychology", "author": "Sigmund Freud", "title": "Major Works", "query": "Freud Interpretation Dreams Psychoanalysis"},
-  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "William James", "title": "Pragmatism", "query": "William James Pragmatism"},
-  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Henri Bergson", "title": "An Introduction to Metaphysics", "query": "Bergson Introduction Metaphysics"},
-  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "John Dewey", "title": "Experience and Education", "query": "Dewey Experience Education"},
-  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Alfred North Whitehead", "title": "Science and the Modern World", "query": "Whitehead Science Modern World"},
-  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Bertrand Russell", "title": "The Problems of Philosophy", "query": "Russell Problems Philosophy"},
-  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Martin Heidegger", "title": "What Is Metaphysics?", "query": "Heidegger What Is Metaphysics"},
-  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Ludwig Wittgenstein", "title": "Philosophical Investigations", "query": "Wittgenstein Philosophical Investigations"},
-  {"volume": 55, "era": "20th Century Philosophy & Religion", "author": "Karl Barth", "title": "The Word of God and the Word of Man", "query": "Karl Barth Word God Word Man"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "Henri Poincaré", "title": "Science and Hypothesis", "query": "Poincare Science Hypothesis"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "Max Planck", "title": "Scientific Autobiography and Other Papers", "query": "Planck Scientific Autobiography"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "Alfred North Whitehead", "title": "An Introduction to Mathematics", "query": "Whitehead Introduction Mathematics"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "Albert Einstein", "title": "Relativity: The Special and the General Theory", "query": "Einstein Relativity"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "Arthur Eddington", "title": "The Expanding Universe", "query": "Eddington Expanding Universe"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "Niels Bohr", "title": "Atomic Theory and Selected Essays", "query": "Bohr Atomic Theory"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "G. H. Hardy", "title": "A Mathematician’s Apology", "query": "Hardy Mathematician Apology"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "Werner Heisenberg", "title": "Physics and Philosophy", "query": "Heisenberg Physics Philosophy"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "Erwin Schrödinger", "title": "What Is Life?", "query": "Schrodinger What Is Life"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "Theodosius Dobzhansky", "title": "Genetics and the Origin of Species", "query": "Dobzhansky Genetics Origin Species"},
-  {"volume": 56, "era": "20th Century Natural Science", "author": "C. H. Waddington", "title": "The Nature of Life", "query": "Waddington Nature Life"},
-  {"volume": 57, "era": "20th Century Social Science", "author": "Thorstein Veblen", "title": "The Theory of the Leisure Class", "query": "Veblen Theory Leisure Class"},
-  {"volume": 57, "era": "20th Century Social Science", "author": "R. H. Tawney", "title": "The Acquisitive Society", "query": "Tawney Acquisitive Society"},
-  {"volume": 57, "era": "20th Century Social Science", "author": "John Maynard Keynes", "title": "The General Theory of Employment, Interest and Money", "query": "Keynes General Theory Employment Interest Money"},
-  {"volume": 58, "era": "20th Century Social Science", "author": "James George Frazer", "title": "The Golden Bough (selections)", "query": "Frazer Golden Bough"},
-  {"volume": 58, "era": "20th Century Social Science", "author": "Max Weber", "title": "Essays in Sociology (selections)", "query": "Max Weber Sociology Essays"},
-  {"volume": 58, "era": "20th Century Social Science", "author": "Johan Huizinga", "title": "The Waning of the Middle Ages", "query": "Huizinga Waning Middle Ages"},
-  {"volume": 58, "era": "20th Century Social Science", "author": "Claude Lévi-Strauss", "title": "Structural Anthropology (selections)", "query": "Levi Strauss Structural Anthropology"},
-  {"volume": 59, "era": "20th Century Literature", "author": "Henry James", "title": "The Beast in the Jungle", "query": "Henry James Beast Jungle"},
-  {"volume": 59, "era": "20th Century Literature", "author": "George Bernard Shaw", "title": "Saint Joan", "query": "Shaw Saint Joan"},
-  {"volume": 59, "era": "20th Century Literature", "author": "Joseph Conrad", "title": "Heart of Darkness", "query": "Conrad Heart Darkness"},
-  {"volume": 59, "era": "20th Century Literature", "author": "Anton Chekhov", "title": "Uncle Vanya", "query": "Chekhov Uncle Vanya"},
-  {"volume": 59, "era": "20th Century Literature", "author": "Luigi Pirandello", "title": "Six Characters in Search of an Author", "query": "Pirandello Six Characters"},
-  {"volume": 59, "era": "20th Century Literature", "author": "Marcel Proust", "title": "Swann in Love", "query": "Proust Swann in Love"},
-  {"volume": 59, "era": "20th Century Literature", "author": "Willa Cather", "title": "A Lost Lady", "query": "Willa Cather Lost Lady"},
-  {"volume": 59, "era": "20th Century Literature", "author": "Thomas Mann", "title": "Death in Venice", "query": "Thomas Mann Death Venice"},
-  {"volume": 59, "era": "20th Century Literature", "author": "James Joyce", "title": "A Portrait of the Artist as a Young Man", "query": "Joyce Portrait Artist Young Man"},
-  {"volume": 60, "era": "20th Century Literature", "author": "Virginia Woolf", "title": "To the Lighthouse", "query": "Woolf To Lighthouse"},
-  {"volume": 60, "era": "20th Century Literature", "author": "Franz Kafka", "title": "The Metamorphosis", "query": "Kafka Metamorphosis"},
-  {"volume": 60, "era": "20th Century Literature", "author": "D. H. Lawrence", "title": "The Prussian Officer", "query": "Lawrence Prussian Officer"},
-  {"volume": 60, "era": "20th Century Literature", "author": "T. S. Eliot", "title": "The Waste Land", "query": "Eliot Waste Land"},
-  {"volume": 60, "era": "20th Century Literature", "author": "Eugene O’Neill", "title": "Mourning Becomes Electra", "query": "O'Neill Mourning Becomes Electra"},
-  {"volume": 60, "era": "20th Century Literature", "author": "F. Scott Fitzgerald", "title": "The Great Gatsby", "query": "Fitzgerald Great Gatsby"},
-  {"volume": 60, "era": "20th Century Literature", "author": "William Faulkner", "title": "A Rose for Emily", "query": "Faulkner Rose Emily"},
-  {"volume": 60, "era": "20th Century Literature", "author": "Bertolt Brecht", "title": "Mother Courage and Her Children", "query": "Brecht Mother Courage"},
-  {"volume": 60, "era": "20th Century Literature", "author": "Ernest Hemingway", "title": "The Short Happy Life of Francis Macomber", "query": "Hemingway Francis Macomber"},
-  {"volume": 60, "era": "20th Century Literature", "author": "George Orwell", "title": "Animal Farm", "query": "Orwell Animal Farm"},
-  {"volume": 60, "era": "20th Century Literature", "author": "Samuel Beckett", "title": "Waiting for Godot", "query": "Beckett Waiting Godot"}
+  {
+    "volume": 0,
+    "era": "Bible",
+    "author": "The Bible",
+    "title": "Exodus",
+    "query": "Bible Exodus"
+  },
+  {
+    "volume": 0,
+    "era": "Bible",
+    "author": "The Bible",
+    "title": "Genesis",
+    "query": "Bible Genesis"
+  },
+  {
+    "volume": 0,
+    "era": "Bible",
+    "author": "The Bible",
+    "title": "Isaiah",
+    "query": "Bible Isaiah"
+  },
+  {
+    "volume": 0,
+    "era": "Bible",
+    "author": "The Bible",
+    "title": "Proverbs",
+    "query": "Bible Proverbs"
+  },
+  {
+    "volume": 0,
+    "era": "Bible",
+    "author": "The Bible",
+    "title": "Psalms",
+    "query": "Bible Psalms"
+  },
+  {
+    "volume": 0,
+    "era": "Bible",
+    "author": "The Bible",
+    "title": "Revelation",
+    "query": "Bible Revelation"
+  },
+  {
+    "volume": 0,
+    "era": "Bible",
+    "author": "The Bible",
+    "title": "The Acts of the Apostles",
+    "query": "Bible Acts"
+  },
+  {
+    "volume": 0,
+    "era": "Bible",
+    "author": "The Bible",
+    "title": "The Epistle to the Romans",
+    "query": "Bible Romans"
+  },
+  {
+    "volume": 0,
+    "era": "Bible",
+    "author": "The Bible",
+    "title": "The Gospel According to John",
+    "query": "Bible John"
+  },
+  {
+    "volume": 0,
+    "era": "Bible",
+    "author": "The Bible",
+    "title": "The Gospel According to Matthew",
+    "query": "Bible Matthew"
+  },
+  {
+    "volume": 3,
+    "era": "Ancient",
+    "author": "Homer",
+    "title": "The Iliad",
+    "query": "Iliad Homer"
+  },
+  {
+    "volume": 3,
+    "era": "Ancient",
+    "author": "Homer",
+    "title": "The Odyssey",
+    "query": "Odyssey Homer"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Aeschylus",
+    "title": "Agamemnon",
+    "query": "Aeschylus Agamemnon"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Aeschylus",
+    "title": "Plays",
+    "query": "Aeschylus plays"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Aeschylus",
+    "title": "Prometheus Bound",
+    "query": "Aeschylus Prometheus Bound"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Aeschylus",
+    "title": "The Eumenides",
+    "query": "Aeschylus Eumenides"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Aeschylus",
+    "title": "The Libation Bearers",
+    "query": "Aeschylus Libation Bearers"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Aristophanes",
+    "title": "Plays",
+    "query": "Aristophanes plays"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Aristophanes",
+    "title": "The Birds",
+    "query": "Aristophanes Birds"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Aristophanes",
+    "title": "The Clouds",
+    "query": "Aristophanes Clouds"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Aristophanes",
+    "title": "The Frogs",
+    "query": "Aristophanes Frogs"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Euripides",
+    "title": "Hippolytus",
+    "query": "Euripides Hippolytus"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Euripides",
+    "title": "Medea",
+    "query": "Euripides Medea"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Euripides",
+    "title": "Plays",
+    "query": "Euripides plays"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Euripides",
+    "title": "The Bacchae",
+    "query": "Euripides Bacchae"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Sophocles",
+    "title": "Antigone",
+    "query": "Sophocles Antigone"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Sophocles",
+    "title": "Oedipus at Colonus",
+    "query": "Sophocles Oedipus Colonus"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Sophocles",
+    "title": "Oedipus the King",
+    "query": "Sophocles Oedipus Rex"
+  },
+  {
+    "volume": 4,
+    "era": "Ancient Drama",
+    "author": "Sophocles",
+    "title": "Plays",
+    "query": "Sophocles plays"
+  },
+  {
+    "volume": 5,
+    "era": "Ancient History",
+    "author": "Herodotus",
+    "title": "The History of the Persian Wars",
+    "query": "Herodotus Persian Wars"
+  },
+  {
+    "volume": 5,
+    "era": "Ancient History",
+    "author": "Thucydides",
+    "title": "The History of the Peloponnesian War",
+    "query": "Thucydides Peloponnesian War"
+  },
+  {
+    "volume": 6,
+    "era": "Ancient Philosophy",
+    "author": "Plato",
+    "title": "Apology",
+    "query": "Plato Apology"
+  },
+  {
+    "volume": 6,
+    "era": "Ancient Philosophy",
+    "author": "Plato",
+    "title": "Crito",
+    "query": "Plato Crito"
+  },
+  {
+    "volume": 6,
+    "era": "Ancient Philosophy",
+    "author": "Plato",
+    "title": "Dialogues and The Seventh Letter",
+    "query": "Plato Dialogues"
+  },
+  {
+    "volume": 6,
+    "era": "Ancient Philosophy",
+    "author": "Plato",
+    "title": "Laws",
+    "query": "Plato Laws"
+  },
+  {
+    "volume": 6,
+    "era": "Ancient Philosophy",
+    "author": "Plato",
+    "title": "Phaedo",
+    "query": "Plato Phaedo"
+  },
+  {
+    "volume": 6,
+    "era": "Ancient Philosophy",
+    "author": "Plato",
+    "title": "Phaedrus",
+    "query": "Plato Phaedrus"
+  },
+  {
+    "volume": 6,
+    "era": "Ancient Philosophy",
+    "author": "Plato",
+    "title": "Republic",
+    "query": "Plato Republic"
+  },
+  {
+    "volume": 6,
+    "era": "Ancient Philosophy",
+    "author": "Plato",
+    "title": "Symposium",
+    "query": "Plato Symposium"
+  },
+  {
+    "volume": 6,
+    "era": "Ancient Philosophy",
+    "author": "Plato",
+    "title": "Theaetetus",
+    "query": "Plato Theaetetus"
+  },
+  {
+    "volume": 6,
+    "era": "Ancient Philosophy",
+    "author": "Plato",
+    "title": "Timaeus",
+    "query": "Plato Timaeus"
+  },
+  {
+    "volume": 7,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Categories",
+    "query": "Aristotle Categories"
+  },
+  {
+    "volume": 7,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Metaphysics",
+    "query": "Aristotle Metaphysics"
+  },
+  {
+    "volume": 7,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "On Interpretation",
+    "query": "Aristotle On Interpretation"
+  },
+  {
+    "volume": 7,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Physics",
+    "query": "Aristotle Physics"
+  },
+  {
+    "volume": 7,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Posterior Analytics",
+    "query": "Aristotle Posterior Analytics"
+  },
+  {
+    "volume": 7,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Prior Analytics",
+    "query": "Aristotle Prior Analytics"
+  },
+  {
+    "volume": 7,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Works, Volume I",
+    "query": "Aristotle works"
+  },
+  {
+    "volume": 8,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Nicomachean Ethics",
+    "query": "Aristotle Nicomachean Ethics"
+  },
+  {
+    "volume": 8,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "On the Soul",
+    "query": "Aristotle On the Soul"
+  },
+  {
+    "volume": 8,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Poetics",
+    "query": "Aristotle Poetics"
+  },
+  {
+    "volume": 8,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Politics",
+    "query": "Aristotle Politics"
+  },
+  {
+    "volume": 8,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Rhetoric",
+    "query": "Aristotle Rhetoric"
+  },
+  {
+    "volume": 8,
+    "era": "Ancient Philosophy",
+    "author": "Aristotle",
+    "title": "Works, Volume II",
+    "query": "Aristotle works"
+  },
+  {
+    "volume": 9,
+    "era": "Ancient Science & Medicine",
+    "author": "Galen",
+    "title": "On the Natural Faculties",
+    "query": "Galen Natural Faculties"
+  },
+  {
+    "volume": 9,
+    "era": "Ancient Science & Medicine",
+    "author": "Hippocrates",
+    "title": "Works",
+    "query": "Hippocrates works"
+  },
+  {
+    "volume": 10,
+    "era": "Ancient Mathematics",
+    "author": "Archimedes",
+    "title": "Works",
+    "query": "Archimedes works"
+  },
+  {
+    "volume": 10,
+    "era": "Ancient Mathematics",
+    "author": "Euclid",
+    "title": "Elements",
+    "query": "Euclid Elements"
+  },
+  {
+    "volume": 10,
+    "era": "Ancient Mathematics",
+    "author": "Nicomachus",
+    "title": "Introduction to Arithmetic",
+    "query": "Nicomachus Introduction Arithmetic"
+  },
+  {
+    "volume": 11,
+    "era": "Ancient Philosophy",
+    "author": "Epictetus",
+    "title": "Discourses",
+    "query": "Epictetus Discourses"
+  },
+  {
+    "volume": 11,
+    "era": "Ancient Philosophy",
+    "author": "Lucretius",
+    "title": "The Way Things Are",
+    "query": "Lucretius Nature Things"
+  },
+  {
+    "volume": 11,
+    "era": "Ancient Philosophy",
+    "author": "Marcus Aurelius",
+    "title": "Meditations",
+    "query": "Marcus Aurelius Meditations"
+  },
+  {
+    "volume": 11,
+    "era": "Ancient Philosophy",
+    "author": "Plotinus",
+    "title": "The Six Enneads",
+    "query": "Plotinus Enneads"
+  },
+  {
+    "volume": 12,
+    "era": "Roman Literature",
+    "author": "Virgil",
+    "title": "Eclogues, Georgics, and The Aeneid",
+    "query": "Virgil Aeneid"
+  },
+  {
+    "volume": 13,
+    "era": "Roman History",
+    "author": "Plutarch",
+    "title": "The Lives of the Noble Grecians and Romans",
+    "query": "Plutarch Lives"
+  },
+  {
+    "volume": 14,
+    "era": "Roman History",
+    "author": "Tacitus",
+    "title": "The Annals and The Histories",
+    "query": "Tacitus Annals Histories"
+  },
+  {
+    "volume": 15,
+    "era": "Astronomy",
+    "author": "Johannes Kepler",
+    "title": "Epitome of Copernican Astronomy and Harmonies of the World",
+    "query": "Kepler Copernican Astronomy Harmonies World"
+  },
+  {
+    "volume": 15,
+    "era": "Astronomy",
+    "author": "Nicolaus Copernicus",
+    "title": "On the Revolutions of the Heavenly Spheres",
+    "query": "Copernicus Revolutions Heavenly Spheres"
+  },
+  {
+    "volume": 15,
+    "era": "Astronomy",
+    "author": "Ptolemy",
+    "title": "The Almagest",
+    "query": "Ptolemy Almagest"
+  },
+  {
+    "volume": 16,
+    "era": "Christian Thought",
+    "author": "Saint Augustine",
+    "title": "On Christian Doctrine",
+    "query": "Augustine Christian Doctrine"
+  },
+  {
+    "volume": 16,
+    "era": "Christian Thought",
+    "author": "Saint Augustine",
+    "title": "The City of God",
+    "query": "Augustine City of God"
+  },
+  {
+    "volume": 16,
+    "era": "Christian Thought",
+    "author": "Saint Augustine",
+    "title": "The Confessions",
+    "query": "Augustine Confessions"
+  },
+  {
+    "volume": 17,
+    "era": "Medieval Philosophy & Theology",
+    "author": "Thomas Aquinas",
+    "title": "Summa Theologica, Part I",
+    "query": "Aquinas Summa Theologica"
+  },
+  {
+    "volume": 18,
+    "era": "Medieval Philosophy & Theology",
+    "author": "Thomas Aquinas",
+    "title": "Summa Theologica, Part II",
+    "query": "Aquinas Summa Theologica"
+  },
+  {
+    "volume": 19,
+    "era": "Medieval Literature",
+    "author": "Dante Alighieri",
+    "title": "The Divine Comedy",
+    "query": "Dante Divine Comedy"
+  },
+  {
+    "volume": 19,
+    "era": "Medieval Literature",
+    "author": "Geoffrey Chaucer",
+    "title": "The Canterbury Tales",
+    "query": "Chaucer Canterbury Tales"
+  },
+  {
+    "volume": 19,
+    "era": "Medieval Literature",
+    "author": "Geoffrey Chaucer",
+    "title": "Troilus and Criseyde",
+    "query": "Chaucer Troilus Criseyde"
+  },
+  {
+    "volume": 20,
+    "era": "Reformation",
+    "author": "John Calvin",
+    "title": "Institutes of the Christian Religion",
+    "query": "Calvin Institutes Christian Religion"
+  },
+  {
+    "volume": 21,
+    "era": "Political Philosophy",
+    "author": "Niccolò Machiavelli",
+    "title": "The Prince",
+    "query": "Machiavelli Prince"
+  },
+  {
+    "volume": 21,
+    "era": "Political Philosophy",
+    "author": "Thomas Hobbes",
+    "title": "Leviathan",
+    "query": "Hobbes Leviathan"
+  },
+  {
+    "volume": 22,
+    "era": "Renaissance Literature",
+    "author": "François Rabelais",
+    "title": "Gargantua and Pantagruel",
+    "query": "Rabelais Gargantua Pantagruel"
+  },
+  {
+    "volume": 23,
+    "era": "Renaissance Thought",
+    "author": "Desiderius Erasmus",
+    "title": "Praise of Folly",
+    "query": "Erasmus Praise Folly"
+  },
+  {
+    "volume": 23,
+    "era": "Renaissance Thought",
+    "author": "Michel de Montaigne",
+    "title": "Essays",
+    "query": "Montaigne Essays"
+  },
+  {
+    "volume": 23,
+    "era": "Renaissance",
+    "author": "Michel de Montaigne",
+    "title": "Of Cannibals",
+    "query": "Montaigne Of Cannibals"
+  },
+  {
+    "volume": 23,
+    "era": "Renaissance",
+    "author": "Michel de Montaigne",
+    "title": "Of Experience",
+    "query": "Montaigne Of Experience"
+  },
+  {
+    "volume": 24,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "Hamlet",
+    "query": "Shakespeare Hamlet"
+  },
+  {
+    "volume": 24,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "Julius Caesar",
+    "query": "Shakespeare Julius Caesar"
+  },
+  {
+    "volume": 24,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "King Lear",
+    "query": "Shakespeare King Lear"
+  },
+  {
+    "volume": 24,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "Macbeth",
+    "query": "Shakespeare Macbeth"
+  },
+  {
+    "volume": 24,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "Othello",
+    "query": "Shakespeare Othello"
+  },
+  {
+    "volume": 24,
+    "era": "Shakespeare",
+    "author": "William Shakespeare",
+    "title": "Plays, Volume I",
+    "query": "Shakespeare plays"
+  },
+  {
+    "volume": 24,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "Romeo and Juliet",
+    "query": "Shakespeare Romeo Juliet"
+  },
+  {
+    "volume": 24,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "The Tempest",
+    "query": "Shakespeare Tempest"
+  },
+  {
+    "volume": 25,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "A Midsummer Night's Dream",
+    "query": "Shakespeare Midsummer Night Dream"
+  },
+  {
+    "volume": 25,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "Much Ado About Nothing",
+    "query": "Shakespeare Much Ado"
+  },
+  {
+    "volume": 25,
+    "era": "Shakespeare",
+    "author": "William Shakespeare",
+    "title": "Plays, Volume II and Sonnets",
+    "query": "Shakespeare Sonnets plays"
+  },
+  {
+    "volume": 25,
+    "era": "Poetry",
+    "author": "William Shakespeare",
+    "title": "Sonnets",
+    "query": "Shakespeare Sonnets"
+  },
+  {
+    "volume": 25,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "The Merchant of Venice",
+    "query": "Shakespeare Merchant Venice"
+  },
+  {
+    "volume": 25,
+    "era": "Drama",
+    "author": "William Shakespeare",
+    "title": "Twelfth Night",
+    "query": "Shakespeare Twelfth Night"
+  },
+  {
+    "volume": 26,
+    "era": "Early Modern Science",
+    "author": "Galileo Galilei",
+    "title": "Dialogues Concerning the Two New Sciences",
+    "query": "Galileo Two New Sciences"
+  },
+  {
+    "volume": 26,
+    "era": "Early Modern Science",
+    "author": "William Gilbert",
+    "title": "On the Loadstone and Magnetic Bodies",
+    "query": "William Gilbert Loadstone"
+  },
+  {
+    "volume": 26,
+    "era": "Early Modern Science",
+    "author": "William Harvey",
+    "title": "Works on the Heart, Blood, and Generation",
+    "query": "William Harvey heart blood animals"
+  },
+  {
+    "volume": 27,
+    "era": "Early Modern Literature",
+    "author": "Miguel de Cervantes",
+    "title": "Don Quixote",
+    "query": "Cervantes Don Quixote"
+  },
+  {
+    "volume": 28,
+    "era": "Early Modern Philosophy",
+    "author": "Benedict de Spinoza",
+    "title": "Ethics",
+    "query": "Spinoza Ethics"
+  },
+  {
+    "volume": 28,
+    "era": "Early Modern Philosophy",
+    "author": "Francis Bacon",
+    "title": "Advancement of Learning, Novum Organum, and New Atlantis",
+    "query": "Francis Bacon Novum Organum"
+  },
+  {
+    "volume": 28,
+    "era": "Early Modern Philosophy",
+    "author": "Francis Bacon",
+    "title": "New Atlantis",
+    "query": "Bacon New Atlantis"
+  },
+  {
+    "volume": 28,
+    "era": "Early Modern Philosophy",
+    "author": "Francis Bacon",
+    "title": "Novum Organum",
+    "query": "Bacon Novum Organum"
+  },
+  {
+    "volume": 28,
+    "era": "Early Modern Philosophy",
+    "author": "Francis Bacon",
+    "title": "The Advancement of Learning",
+    "query": "Bacon Advancement Learning"
+  },
+  {
+    "volume": 28,
+    "era": "Early Modern Philosophy",
+    "author": "René Descartes",
+    "title": "Discourse on the Method",
+    "query": "Descartes Discourse Method"
+  },
+  {
+    "volume": 28,
+    "era": "Early Modern Philosophy",
+    "author": "René Descartes",
+    "title": "Major Philosophical Works",
+    "query": "Descartes Discourse Method Meditations"
+  },
+  {
+    "volume": 28,
+    "era": "Early Modern Philosophy",
+    "author": "René Descartes",
+    "title": "Meditations on First Philosophy",
+    "query": "Descartes Meditations"
+  },
+  {
+    "volume": 29,
+    "era": "Early Modern Literature",
+    "author": "John Milton",
+    "title": "Paradise Lost and Other Works",
+    "query": "Milton Paradise Lost"
+  },
+  {
+    "volume": 30,
+    "era": "Philosophy & Science",
+    "author": "Blaise Pascal",
+    "title": "Pensées",
+    "query": "Pascal Pensees"
+  },
+  {
+    "volume": 30,
+    "era": "Early Modern Thought",
+    "author": "Blaise Pascal",
+    "title": "Provincial Letters, Pensées, and Scientific Treatises",
+    "query": "Pascal Pensees"
+  },
+  {
+    "volume": 31,
+    "era": "French Drama",
+    "author": "Jean Racine",
+    "title": "Berenice and Phaedra",
+    "query": "Racine Phaedra Berenice"
+  },
+  {
+    "volume": 31,
+    "era": "French Drama",
+    "author": "Molière",
+    "title": "Major Plays",
+    "query": "Moliere plays"
+  },
+  {
+    "volume": 32,
+    "era": "Science",
+    "author": "Christiaan Huygens",
+    "title": "Treatise on Light",
+    "query": "Huygens Treatise Light"
+  },
+  {
+    "volume": 32,
+    "era": "Science",
+    "author": "Isaac Newton",
+    "title": "Mathematical Principles of Natural Philosophy and Optics",
+    "query": "Newton Principia Opticks"
+  },
+  {
+    "volume": 33,
+    "era": "Enlightenment Philosophy",
+    "author": "David Hume",
+    "title": "An Enquiry Concerning Human Understanding",
+    "query": "Hume Enquiry Human Understanding"
+  },
+  {
+    "volume": 33,
+    "era": "Enlightenment Philosophy",
+    "author": "George Berkeley",
+    "title": "The Principles of Human Knowledge",
+    "query": "Berkeley Human Knowledge"
+  },
+  {
+    "volume": 33,
+    "era": "Empiricism",
+    "author": "John Locke",
+    "title": "A Letter Concerning Toleration",
+    "query": "Locke Letter Toleration"
+  },
+  {
+    "volume": 33,
+    "era": "Enlightenment Philosophy",
+    "author": "John Locke",
+    "title": "A Letter Concerning Toleration, Civil Government, and Human Understanding",
+    "query": "Locke Human Understanding Government"
+  },
+  {
+    "volume": 33,
+    "era": "Empiricism",
+    "author": "John Locke",
+    "title": "An Essay Concerning Human Understanding",
+    "query": "Locke Human Understanding"
+  },
+  {
+    "volume": 33,
+    "era": "Empiricism",
+    "author": "John Locke",
+    "title": "Second Treatise of Government",
+    "query": "Locke Second Treatise Government"
+  },
+  {
+    "volume": 34,
+    "era": "Enlightenment Literature",
+    "author": "Denis Diderot",
+    "title": "Rameau’s Nephew",
+    "query": "Diderot Rameau Nephew"
+  },
+  {
+    "volume": 34,
+    "era": "Enlightenment Literature",
+    "author": "Jonathan Swift",
+    "title": "Gulliver’s Travels",
+    "query": "Swift Gulliver Travels"
+  },
+  {
+    "volume": 34,
+    "era": "Enlightenment Literature",
+    "author": "Voltaire",
+    "title": "Candide",
+    "query": "Voltaire Candide"
+  },
+  {
+    "volume": 35,
+    "era": "Political Philosophy",
+    "author": "Jean-Jacques Rousseau",
+    "title": "Discourse on Inequality",
+    "query": "Rousseau Discourse Inequality"
+  },
+  {
+    "volume": 35,
+    "era": "Political Philosophy",
+    "author": "Jean-Jacques Rousseau",
+    "title": "Political Writings including The Social Contract",
+    "query": "Rousseau Social Contract"
+  },
+  {
+    "volume": 35,
+    "era": "Political Philosophy",
+    "author": "Jean-Jacques Rousseau",
+    "title": "The Social Contract",
+    "query": "Rousseau Social Contract"
+  },
+  {
+    "volume": 35,
+    "era": "Political Philosophy",
+    "author": "Montesquieu",
+    "title": "The Spirit of Laws",
+    "query": "Montesquieu Spirit Laws"
+  },
+  {
+    "volume": 36,
+    "era": "Economics",
+    "author": "Adam Smith",
+    "title": "The Wealth of Nations",
+    "query": "Adam Smith Wealth Nations"
+  },
+  {
+    "volume": 37,
+    "era": "History",
+    "author": "Edward Gibbon",
+    "title": "The Decline and Fall of the Roman Empire, Volume I",
+    "query": "Gibbon Decline Fall Roman Empire"
+  },
+  {
+    "volume": 38,
+    "era": "History",
+    "author": "Edward Gibbon",
+    "title": "The Decline and Fall of the Roman Empire, Volume II",
+    "query": "Gibbon Decline Fall Roman Empire"
+  },
+  {
+    "volume": 39,
+    "era": "Modern Philosophy",
+    "author": "Immanuel Kant",
+    "title": "Major Critical and Moral Works",
+    "query": "Kant Critique Pure Reason"
+  },
+  {
+    "volume": 40,
+    "era": "American Political Thought",
+    "author": "Alexander Hamilton, James Madison, John Jay",
+    "title": "The Federalist Papers",
+    "query": "Federalist Papers"
+  },
+  {
+    "volume": 40,
+    "era": "Political Philosophy",
+    "author": "John Stuart Mill",
+    "title": "On Liberty",
+    "query": "Mill On Liberty"
+  },
+  {
+    "volume": 40,
+    "era": "Liberal Political Thought",
+    "author": "John Stuart Mill",
+    "title": "On Liberty, Representative Government, and Utilitarianism",
+    "query": "John Stuart Mill On Liberty"
+  },
+  {
+    "volume": 40,
+    "era": "Political Philosophy",
+    "author": "John Stuart Mill",
+    "title": "Utilitarianism",
+    "query": "Mill Utilitarianism"
+  },
+  {
+    "volume": 40,
+    "era": "American Political Thought",
+    "author": "United States",
+    "title": "Declaration, Articles of Confederation, and Constitution",
+    "query": "United States Constitution Declaration Independence"
+  },
+  {
+    "volume": 41,
+    "era": "Biography",
+    "author": "James Boswell",
+    "title": "The Life of Samuel Johnson",
+    "query": "Boswell Life Samuel Johnson"
+  },
+  {
+    "volume": 42,
+    "era": "Science",
+    "author": "Antoine Lavoisier",
+    "title": "Elements of Chemistry",
+    "query": "Lavoisier Elements Chemistry"
+  },
+  {
+    "volume": 42,
+    "era": "Science",
+    "author": "Michael Faraday",
+    "title": "Experimental Researches in Electricity",
+    "query": "Faraday Experimental Researches Electricity"
+  },
+  {
+    "volume": 43,
+    "era": "Modern Philosophy",
+    "author": "Friedrich Nietzsche",
+    "title": "Beyond Good and Evil",
+    "query": "Nietzsche Beyond Good Evil"
+  },
+  {
+    "volume": 43,
+    "era": "Modern Philosophy",
+    "author": "G. W. F. Hegel",
+    "title": "The Philosophy of Right and The Philosophy of History",
+    "query": "Hegel Philosophy Right History"
+  },
+  {
+    "volume": 43,
+    "era": "Modern Philosophy",
+    "author": "Søren Kierkegaard",
+    "title": "Fear and Trembling",
+    "query": "Kierkegaard Fear Trembling"
+  },
+  {
+    "volume": 44,
+    "era": "Political Thought",
+    "author": "Alexis de Tocqueville",
+    "title": "Democracy in America",
+    "query": "Tocqueville Democracy America"
+  },
+  {
+    "volume": 45,
+    "era": "Literature",
+    "author": "Honoré de Balzac",
+    "title": "Cousin Bette",
+    "query": "Balzac Cousin Bette"
+  },
+  {
+    "volume": 45,
+    "era": "Literature",
+    "author": "Johann Wolfgang von Goethe",
+    "title": "Faust",
+    "query": "Goethe Faust"
+  },
+  {
+    "volume": 46,
+    "era": "Literature",
+    "author": "George Eliot",
+    "title": "Middlemarch",
+    "query": "George Eliot Middlemarch"
+  },
+  {
+    "volume": 46,
+    "era": "Literature",
+    "author": "Jane Austen",
+    "title": "Emma",
+    "query": "Jane Austen Emma"
+  },
+  {
+    "volume": 47,
+    "era": "Literature",
+    "author": "Charles Dickens",
+    "title": "Little Dorrit",
+    "query": "Dickens Little Dorrit"
+  },
+  {
+    "volume": 48,
+    "era": "Literature",
+    "author": "Herman Melville",
+    "title": "Moby-Dick",
+    "query": "Melville Moby Dick"
+  },
+  {
+    "volume": 48,
+    "era": "Literature",
+    "author": "Mark Twain",
+    "title": "Adventures of Huckleberry Finn",
+    "query": "Mark Twain Huckleberry Finn"
+  },
+  {
+    "volume": 49,
+    "era": "Science",
+    "author": "Charles Darwin",
+    "title": "The Descent of Man",
+    "query": "Darwin Descent Man"
+  },
+  {
+    "volume": 49,
+    "era": "Science",
+    "author": "Charles Darwin",
+    "title": "The Origin of Species",
+    "query": "Darwin Origin Species"
+  },
+  {
+    "volume": 50,
+    "era": "Political Economy",
+    "author": "Karl Marx",
+    "title": "Capital, Volume I",
+    "query": "Marx Capital Volume 1"
+  },
+  {
+    "volume": 50,
+    "era": "Political Economy",
+    "author": "Karl Marx and Friedrich Engels",
+    "title": "Manifesto of the Communist Party",
+    "query": "Communist Manifesto Marx Engels"
+  },
+  {
+    "volume": 51,
+    "era": "Literature",
+    "author": "Leo Tolstoy",
+    "title": "War and Peace",
+    "query": "Tolstoy War Peace"
+  },
+  {
+    "volume": 52,
+    "era": "Literature",
+    "author": "Fyodor Dostoevsky",
+    "title": "The Brothers Karamazov",
+    "query": "Dostoevsky Brothers Karamazov"
+  },
+  {
+    "volume": 52,
+    "era": "Literature",
+    "author": "Henrik Ibsen",
+    "title": "A Doll’s House, The Wild Duck, Hedda Gabler, and The Master Builder",
+    "query": "Ibsen plays"
+  },
+  {
+    "volume": 53,
+    "era": "Psychology",
+    "author": "William James",
+    "title": "The Principles of Psychology",
+    "query": "William James Principles Psychology"
+  },
+  {
+    "volume": 54,
+    "era": "Psychology",
+    "author": "Sigmund Freud",
+    "title": "Major Works",
+    "query": "Freud Interpretation Dreams Psychoanalysis"
+  },
+  {
+    "volume": 55,
+    "era": "20th Century Philosophy & Religion",
+    "author": "Alfred North Whitehead",
+    "title": "Science and the Modern World",
+    "query": "Whitehead Science Modern World"
+  },
+  {
+    "volume": 55,
+    "era": "20th Century Philosophy & Religion",
+    "author": "Bertrand Russell",
+    "title": "The Problems of Philosophy",
+    "query": "Russell Problems Philosophy"
+  },
+  {
+    "volume": 55,
+    "era": "20th Century Philosophy & Religion",
+    "author": "Henri Bergson",
+    "title": "An Introduction to Metaphysics",
+    "query": "Bergson Introduction Metaphysics"
+  },
+  {
+    "volume": 55,
+    "era": "20th Century Philosophy & Religion",
+    "author": "John Dewey",
+    "title": "Experience and Education",
+    "query": "Dewey Experience Education"
+  },
+  {
+    "volume": 55,
+    "era": "20th Century Philosophy & Religion",
+    "author": "Karl Barth",
+    "title": "The Word of God and the Word of Man",
+    "query": "Karl Barth Word God Word Man"
+  },
+  {
+    "volume": 55,
+    "era": "20th Century Philosophy & Religion",
+    "author": "Ludwig Wittgenstein",
+    "title": "Philosophical Investigations",
+    "query": "Wittgenstein Philosophical Investigations"
+  },
+  {
+    "volume": 55,
+    "era": "20th Century Philosophy & Religion",
+    "author": "Martin Heidegger",
+    "title": "What Is Metaphysics?",
+    "query": "Heidegger What Is Metaphysics"
+  },
+  {
+    "volume": 55,
+    "era": "20th Century Philosophy & Religion",
+    "author": "William James",
+    "title": "Pragmatism",
+    "query": "William James Pragmatism"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Science",
+    "author": "Albert Einstein",
+    "title": "Relativity: The Special and General Theory",
+    "query": "Einstein Relativity"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "Albert Einstein",
+    "title": "Relativity: The Special and the General Theory",
+    "query": "Einstein Relativity"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "Alfred North Whitehead",
+    "title": "An Introduction to Mathematics",
+    "query": "Whitehead Introduction Mathematics"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "Arthur Eddington",
+    "title": "The Expanding Universe",
+    "query": "Eddington Expanding Universe"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "C. H. Waddington",
+    "title": "The Nature of Life",
+    "query": "Waddington Nature Life"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "Erwin Schrödinger",
+    "title": "What Is Life?",
+    "query": "Schrodinger What Is Life"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Science",
+    "author": "G. H. Hardy",
+    "title": "A Mathematician's Apology",
+    "query": "Hardy Mathematician Apology"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "G. H. Hardy",
+    "title": "A Mathematician’s Apology",
+    "query": "Hardy Mathematician Apology"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "Henri Poincaré",
+    "title": "Science and Hypothesis",
+    "query": "Poincare Science Hypothesis"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "Max Planck",
+    "title": "Scientific Autobiography and Other Papers",
+    "query": "Planck Scientific Autobiography"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "Niels Bohr",
+    "title": "Atomic Theory and Selected Essays",
+    "query": "Bohr Atomic Theory"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "Theodosius Dobzhansky",
+    "title": "Genetics and the Origin of Species",
+    "query": "Dobzhansky Genetics Origin Species"
+  },
+  {
+    "volume": 56,
+    "era": "20th Century Natural Science",
+    "author": "Werner Heisenberg",
+    "title": "Physics and Philosophy",
+    "query": "Heisenberg Physics Philosophy"
+  },
+  {
+    "volume": 57,
+    "era": "20th Century Social Science",
+    "author": "John Maynard Keynes",
+    "title": "The General Theory of Employment, Interest and Money",
+    "query": "Keynes General Theory Employment Interest Money"
+  },
+  {
+    "volume": 57,
+    "era": "20th Century Social Science",
+    "author": "R. H. Tawney",
+    "title": "The Acquisitive Society",
+    "query": "Tawney Acquisitive Society"
+  },
+  {
+    "volume": 57,
+    "era": "20th Century Social Science",
+    "author": "Thorstein Veblen",
+    "title": "The Theory of the Leisure Class",
+    "query": "Veblen Theory Leisure Class"
+  },
+  {
+    "volume": 58,
+    "era": "20th Century Social Science",
+    "author": "Claude Lévi-Strauss",
+    "title": "Structural Anthropology (selections)",
+    "query": "Levi Strauss Structural Anthropology"
+  },
+  {
+    "volume": 58,
+    "era": "20th Century Social Science",
+    "author": "James George Frazer",
+    "title": "The Golden Bough (selections)",
+    "query": "Frazer Golden Bough"
+  },
+  {
+    "volume": 58,
+    "era": "20th Century Social Science",
+    "author": "Johan Huizinga",
+    "title": "The Waning of the Middle Ages",
+    "query": "Huizinga Waning Middle Ages"
+  },
+  {
+    "volume": 58,
+    "era": "20th Century Social Science",
+    "author": "Max Weber",
+    "title": "Essays in Sociology (selections)",
+    "query": "Max Weber Sociology Essays"
+  },
+  {
+    "volume": 59,
+    "era": "20th Century Literature",
+    "author": "Anton Chekhov",
+    "title": "Uncle Vanya",
+    "query": "Chekhov Uncle Vanya"
+  },
+  {
+    "volume": 59,
+    "era": "20th Century Literature",
+    "author": "George Bernard Shaw",
+    "title": "Saint Joan",
+    "query": "Shaw Saint Joan"
+  },
+  {
+    "volume": 59,
+    "era": "20th Century Literature",
+    "author": "Henry James",
+    "title": "The Beast in the Jungle",
+    "query": "Henry James Beast Jungle"
+  },
+  {
+    "volume": 59,
+    "era": "20th Century Literature",
+    "author": "James Joyce",
+    "title": "A Portrait of the Artist as a Young Man",
+    "query": "Joyce Portrait Artist Young Man"
+  },
+  {
+    "volume": 59,
+    "era": "20th Century Literature",
+    "author": "Joseph Conrad",
+    "title": "Heart of Darkness",
+    "query": "Conrad Heart Darkness"
+  },
+  {
+    "volume": 59,
+    "era": "20th Century Literature",
+    "author": "Luigi Pirandello",
+    "title": "Six Characters in Search of an Author",
+    "query": "Pirandello Six Characters"
+  },
+  {
+    "volume": 59,
+    "era": "20th Century Literature",
+    "author": "Marcel Proust",
+    "title": "Swann in Love",
+    "query": "Proust Swann in Love"
+  },
+  {
+    "volume": 59,
+    "era": "20th Century Literature",
+    "author": "Thomas Mann",
+    "title": "Death in Venice",
+    "query": "Thomas Mann Death Venice"
+  },
+  {
+    "volume": 59,
+    "era": "20th Century Literature",
+    "author": "Willa Cather",
+    "title": "A Lost Lady",
+    "query": "Willa Cather Lost Lady"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "Bertolt Brecht",
+    "title": "Mother Courage and Her Children",
+    "query": "Brecht Mother Courage"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "D. H. Lawrence",
+    "title": "The Prussian Officer",
+    "query": "Lawrence Prussian Officer"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "Ernest Hemingway",
+    "title": "The Short Happy Life of Francis Macomber",
+    "query": "Hemingway Francis Macomber"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "Eugene O’Neill",
+    "title": "Mourning Becomes Electra",
+    "query": "O'Neill Mourning Becomes Electra"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "F. Scott Fitzgerald",
+    "title": "The Great Gatsby",
+    "query": "Fitzgerald Great Gatsby"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "Franz Kafka",
+    "title": "The Metamorphosis",
+    "query": "Kafka Metamorphosis"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "George Orwell",
+    "title": "Animal Farm",
+    "query": "Orwell Animal Farm"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "Samuel Beckett",
+    "title": "Waiting for Godot",
+    "query": "Beckett Waiting Godot"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "T. S. Eliot",
+    "title": "The Waste Land",
+    "query": "Eliot Waste Land"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "Virginia Woolf",
+    "title": "To the Lighthouse",
+    "query": "Woolf To Lighthouse"
+  },
+  {
+    "volume": 60,
+    "era": "20th Century Literature",
+    "author": "William Faulkner",
+    "title": "A Rose for Emily",
+    "query": "Faulkner Rose Emily"
+  }
 ];
 
 // Reader state is owned by ReaderEngine (Sprint 1).
@@ -1107,33 +2592,8 @@ async function loadApiText(endpoint, options) {
 }
 
 function rememberReaderForReturn() {
-  if (!state.words.length || !state.title || !app.querySelector('#reader')) return;
-
-  state.returnIndex = Math.max(0, state.index || 0);
-  state.returnMode = getSelectedMode?.() || state.renderedMode || 'highlight';
-  state.returnWasRunning = isReaderRunning();
-  state.returnControls = captureReaderControls();
-
-  activeReaderSnapshot = buildReaderSessionSnapshot() || {
-    title: state.title,
-    currentText: state.currentText,
-    originalText: state.originalText,
-    source: state.source,
-    language: state.language,
-    index: state.returnIndex,
-    wasRunning: state.returnWasRunning,
-    controls: state.returnControls
-  };
-  if (activeReaderSnapshot) {
-    activeReaderSnapshot.index = state.returnIndex;
-    activeReaderSnapshot.wasRunning = state.returnWasRunning;
-    activeReaderSnapshot.controls = { ...(activeReaderSnapshot.controls || {}), ...state.returnControls };
-    activeReaderSnapshot.controls.mode = state.returnMode;
-  }
-
-  persistReaderSession({ immediate: true });
+  return ReaderContinuity.saveBeforeNavigation();
 }
-
 
 function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   if (!snapshot?.title || !snapshot?.currentText) return false;
@@ -1171,6 +2631,8 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
     wpm: state.wpm,
     wordCount,
     meaningfulChunks: state.meaningfulChunks,
+    pointerStyle: state.pointerStyle || 'hand',
+    pointerColor: state.pointerColor || '#20a866',
     focusAnchor: state.focusAnchor,
     focusAnchorPosition: state.focusAnchorPosition,
     focusAnchorFontSize: state.focusAnchorFontSize,
@@ -1191,6 +2653,10 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
     '#fs-speed': state.wpm,
     '#word-count': wordCount,
     '#fs-word-count': wordCount,
+    '#pointer-style': state.pointerStyle || 'hand',
+    '#fs-pointer-style': state.pointerStyle || 'hand',
+    '#pointer-color': state.pointerColor || '#20a866',
+    '#fs-pointer-color': state.pointerColor || '#20a866',
     '#font-family': fontFamily,
     '#fs-font-family': fontFamily,
     '#font-size': fontSize,
@@ -1324,9 +2790,9 @@ function renderEmptyReader() {
       </div>
 
       <div class="empty-reader-actions">
-        <button class="primary empty-reader-action" type="button" data-read="import">
+        <button class="primary empty-reader-action" type="button" data-read="upload">
           <span aria-hidden="true">⬆</span>
-          <span><strong>Import Book / Text</strong><small>EPUB, EPUB3, or TXT</small></span>
+          <span><strong>Import Book / Text</strong><small>EPUB, PDF, or TXT</small></span>
         </button>
 
         <button class="secondary empty-reader-action" type="button" data-read="url">
@@ -1334,7 +2800,7 @@ function renderEmptyReader() {
           <span><strong>Read from URL</strong><small>Open supported web content</small></span>
         </button>
 
-        <button class="secondary empty-reader-action" type="button" data-read="all">
+        <button class="secondary empty-reader-action" type="button" data-read="unified-library">
           <span aria-hidden="true">⌕</span>
           <span><strong>Search All Libraries</strong><small>Find an open digital edition</small></span>
         </button>
@@ -1349,7 +2815,7 @@ function renderEmptyReader() {
           <span><strong>Bible Study</strong><small>Translations, commentary, cross references, and study</small></span>
         </button>
 
-        <button class="secondary empty-reader-action" type="button" data-read="library">
+        <button class="secondary empty-reader-action" type="button" data-action="my-library">
           <span aria-hidden="true">▤</span>
           <span><strong>My Library</strong><small>Open something you already saved</small></span>
         </button>
@@ -1454,7 +2920,16 @@ function renderHome() {
     button.textContent = 'Loading saved reading…';
     try {
       const saved = await readReaderSession();
+      if (!saved?.title || !saved?.currentText) {
+        await clearReaderSession();
+        window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
+        button.disabled = false;
+        button.textContent = original;
+        return;
+      }
+
       if (!applyReaderSessionSnapshot(saved, { resumePlayback: false })) {
+        await clearReaderSession();
         window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
         button.disabled = false;
         button.textContent = original;
@@ -1676,6 +3151,8 @@ function isReaderRunning() {
 const BOOKMARK_STORAGE_KEY = 'markSetGoBookmarksV1';
 const NOTE_STORAGE_KEY = 'markSetGoNotesV1';
 const READING_LIST_STORAGE_KEY = 'markSetGoReadingListV1';
+const READING_LIBRARY_DB = 'markSetGoLocalLibraryV1';
+const READING_LIBRARY_STORE = 'books';
 const DOCUMENT_STORAGE_PREFIX = 'markSetGoDocumentV1:';
 const SAVED_DEFINITIONS_KEY = 'markSetGoDefinitionsV1';
 
@@ -1683,8 +3160,154 @@ const READING_PROGRESS_KEY = 'markSetGoReadingProgressV1';
 const READING_ACTIVITY_KEY = 'markSetGoReadingActivityV1';
 const COMPREHENSION_RESULTS_KEY = 'markSetGoComprehensionV1';
 const COMPREHENSION_POSITION_KEY = 'markSetGoComprehensionPositionV1';
+const READING_GOAL_KEY = 'markSetGoAnnualReadingGoalV1';
+const READING_AWARDS_KEY = 'markSetGoReadingAwardsV1';
 
 
+function openReadingLibraryDb() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(READING_LIBRARY_DB, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(READING_LIBRARY_STORE)) {
+        db.createObjectStore(READING_LIBRARY_STORE, { keyPath: 'key' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function getCachedReadingBook(key) {
+  try {
+    const db = await openReadingLibraryDb();
+    const value = await new Promise((resolve, reject) => {
+      const tx = db.transaction(READING_LIBRARY_STORE, 'readonly');
+      const request = tx.objectStore(READING_LIBRARY_STORE).get(key);
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error);
+    });
+    db.close();
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+async function cacheReadingBook(record) {
+  try {
+    const db = await openReadingLibraryDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(READING_LIBRARY_STORE, 'readwrite');
+      tx.objectStore(READING_LIBRARY_STORE).put(record);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+    return true;
+  } catch (error) {
+    console.warn('Book could not be cached locally.', error);
+    return false;
+  }
+}
+
+async function removeCachedReadingBook(key) {
+  try {
+    const db = await openReadingLibraryDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(READING_LIBRARY_STORE, 'readwrite');
+      tx.objectStore(READING_LIBRARY_STORE).delete(key);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  } catch {}
+}
+
+function readingCacheKey(item) {
+  return `reading-list:${item.id}`;
+}
+
+function myReadingTabs(active) {
+  return `<div class="my-reading-tabs" role="tablist" aria-label="My Reading">
+    <button type="button" class="${active === 'list' ? 'active' : ''}" data-my-reading-tab="list">Reading List</button>
+    <button type="button" class="${active === 'progress' ? 'active' : ''}" data-my-reading-tab="progress">Progress &amp; Awards</button>
+  </div>`;
+}
+
+function bindMyReadingTabs() {
+  app.querySelectorAll('[data-my-reading-tab]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (button.dataset.myReadingTab === 'progress') renderProgressDashboard();
+      else renderReadingList();
+    });
+  });
+}
+
+
+const LIST_VIEW_STORAGE_KEY = 'markSetGoListViewPreferencesV1';
+
+function getListViewPreference(key, fallback = 'tiles') {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LIST_VIEW_STORAGE_KEY) || '{}');
+    return saved?.[key] || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveListViewPreference(key, value) {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LIST_VIEW_STORAGE_KEY) || '{}');
+    saved[key] = value;
+    localStorage.setItem(LIST_VIEW_STORAGE_KEY, JSON.stringify(saved));
+  } catch {}
+}
+
+function listPresentationControls(key, { collapsible = true, defaultView = 'tiles' } = {}) {
+  const selected = getListViewPreference(key, defaultView);
+  return `<div class="list-presentation-controls" data-list-controls="${escapeHtml(key)}">
+    <span>View</span>
+    <div class="segmented compact-view-toggle" role="group" aria-label="Choose item presentation">
+      <button type="button" class="${selected === 'tiles' ? 'active' : ''}" data-list-view="tiles" aria-pressed="${selected === 'tiles'}">▦ Tiles</button>
+      <button type="button" class="${selected === 'list' ? 'active' : ''}" data-list-view="list" aria-pressed="${selected === 'list'}">☷ List</button>
+    </div>
+    ${collapsible ? '<button type="button" class="secondary compact-collapse-button" data-list-collapse>Collapse all</button><button type="button" class="secondary compact-collapse-button" data-list-expand>Expand all</button>' : ''}
+  </div>`;
+}
+
+function bindListPresentationControls({
+  key,
+  root,
+  itemSelector,
+  groupSelector = 'details',
+  defaultView = 'tiles'
+}) {
+  const container = typeof root === 'string' ? app.querySelector(root) : root;
+  if (!container) return;
+  const controls = app.querySelector(`[data-list-controls="${CSS.escape(key)}"]`);
+  const apply = (view) => {
+    const selected = view === 'list' ? 'list' : 'tiles';
+    container.classList.toggle('presentation-list', selected === 'list');
+    container.classList.toggle('presentation-tiles', selected === 'tiles');
+    saveListViewPreference(key, selected);
+    controls?.querySelectorAll('[data-list-view]').forEach((button) => {
+      const active = button.dataset.listView === selected;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  };
+  controls?.querySelectorAll('[data-list-view]').forEach((button) => {
+    button.addEventListener('click', () => apply(button.dataset.listView));
+  });
+  controls?.querySelector('[data-list-collapse]')?.addEventListener('click', () => {
+    container.querySelectorAll(groupSelector).forEach((group) => { if ('open' in group) group.open = false; });
+  });
+  controls?.querySelector('[data-list-expand]')?.addEventListener('click', () => {
+    container.querySelectorAll(groupSelector).forEach((group) => { if ('open' in group) group.open = true; });
+  });
+  apply(getListViewPreference(key, defaultView));
+}
 function readStoredArray(key) {
   try {
     const value = JSON.parse(localStorage.getItem(key) || '[]');
@@ -1774,62 +3397,422 @@ function readingStreak(activity) {
   return streak;
 }
 
-function renderProgressDashboard() {
-  finalizeReadingSession();
-  stopReader();
-  const activity = readStoredArray(READING_ACTIVITY_KEY);
-  const progress = Object.values(readStoredObject(READING_PROGRESS_KEY));
-  const today = dateKey(new Date());
-  const todaySessions = activity.filter((item) => dateKey(item.endedAt) === today);
-  const totalWords = todaySessions.reduce((sum, item) => sum + (Number(item.wordsRead) || 0), 0);
-  const totalSeconds = todaySessions.reduce((sum, item) => sum + (Number(item.seconds) || 0), 0);
-  const averageWpm = totalSeconds ? Math.round(totalWords / (totalSeconds / 60)) : 0;
-  const streak = readingStreak(activity);
-  const recentBooks = progress.sort((a,b) => new Date(b.lastReadAt || 0) - new Date(a.lastReadAt || 0)).slice(0, 8);
-  const comprehensionResults = getComprehensionResults();
-  const recentComprehension = comprehensionResults.slice(0, 8);
-  const averageComprehension = comprehensionResults.length
-    ? Math.round(comprehensionResults.reduce((sum, item) => sum + (Number(item.scorePercent) || 0), 0) / comprehensionResults.length)
-    : 0;
 
-  app.innerHTML = `<section class="panel progress-dashboard">
-    <div class="library-heading"><div><h1>Reading Progress</h1><p>Your reading activity is stored privately in this browser.</p></div><button id="clear-reading-progress" class="secondary" type="button">Clear history</button></div>
-    <div class="dashboard-stats">
-      <article><span>Today</span><strong>${totalWords.toLocaleString()}</strong><small>words</small></article>
-      <article><span>Reading time</span><strong>${formatDuration(totalSeconds)}</strong><small>today</small></article>
-      <article><span>Average pace</span><strong>${averageWpm || '—'}</strong><small>WPM today</small></article>
-      <article><span>Current streak</span><strong>${streak}</strong><small>${streak === 1 ? 'day' : 'days'}</small></article>
-      <article><span>Comprehension</span><strong>${averageComprehension || '—'}</strong><small>${averageComprehension ? '% average' : 'no checks yet'}</small></article>
-    </div>
-    <section class="dashboard-section"><h2>Books and documents</h2>
-      <div class="progress-book-list">${recentBooks.length ? recentBooks.map((item) => {
-        const percent = item.totalWords ? Math.min(100, Math.round((Number(item.furthestWord)||0) / item.totalWords * 100)) : 0;
-        const wpm = item.totalSeconds ? Math.round((Number(item.totalWordsRead)||0) / (item.totalSeconds / 60)) : 0;
-        return `<article class="progress-book-card"><div><h3>${escapeHtml(item.title || 'Untitled')}</h3><p>${percent}% complete · ${formatDuration(item.totalSeconds)} · ${Number(item.sessions)||0} sessions${wpm ? ` · ${wpm} WPM` : ''}</p></div><div class="progress-meter"><span style="width:${percent}%"></span></div><button class="secondary" type="button" data-progress-open="${escapeHtml(item.documentId)}">Open saved text</button></article>`;
-      }).join('') : '<p class="navigation-empty">Complete a reading session to begin tracking progress.</p>'}</div>
-    </section>
-    <section class="dashboard-section"><h2>Comprehension checks</h2>
-      <div class="activity-list">${recentComprehension.map((item) => `<article><div><strong>${escapeHtml(item.title || 'Untitled')}</strong><span>${new Date(item.createdAt).toLocaleString()}</span></div><p>${Number(item.scorePercent)}% comprehension${item.wpm ? ` · ${Number(item.wpm)} WPM · ${Number(item.effectiveWpm)} effective WPM` : ''} · ${Number(item.wordsTested).toLocaleString()} words tested</p></article>`).join('') || '<p class="navigation-empty">No comprehension checks yet. Use Check Comprehension while reading.</p>'}</div>
-    </section>
-    <section class="dashboard-section"><h2>Recent sessions</h2>
-      <div class="activity-list">${activity.slice(0,12).map((item) => `<article><div><strong>${escapeHtml(item.title || 'Untitled')}</strong><span>${new Date(item.endedAt).toLocaleString()}</span></div><p>${Number(item.wordsRead).toLocaleString()} words · ${formatDuration(item.seconds)}${item.seconds ? ` · ${Math.round(item.wordsRead/(item.seconds/60))} WPM` : ''}</p></article>`).join('') || '<p class="navigation-empty">No sessions recorded yet.</p>'}</div>
-    </section>
-  </section>`;
-  app.querySelector('#clear-reading-progress')?.addEventListener('click', () => {
-    if (!window.confirm('Clear all reading progress and session history from this browser?')) return;
-    localStorage.removeItem(READING_PROGRESS_KEY); localStorage.removeItem(READING_ACTIVITY_KEY); renderProgressDashboard();
-  });
-  app.querySelectorAll('[data-progress-open]').forEach((button) => button.addEventListener('click', async () => {
-    const documentId = button.dataset.progressOpen;
-    let data = null;
-    try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
-    if (!data?.text) return window.alert('That text is not stored in this browser. Open it again from its original library.');
-    renderReaderWithText(data.title, data.text, data.source || {type:'saved'});
-    const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
-    requestAnimationFrame(() => jumpToWordIndex(record?.lastWord || 0));
+function startOfDay(value) {
+  const date = new Date(value);
+  date.setHours(0,0,0,0);
+  return date;
+}
+
+function addDays(value, days) {
+  const date = new Date(value);
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+function dateLabel(value) {
+  return new Date(value).toLocaleDateString(undefined, { month:'short', day:'numeric' });
+}
+
+function getAnnualReadingGoal() {
+  const stored = Number(localStorage.getItem(READING_GOAL_KEY));
+  return Number.isFinite(stored) && stored > 0 ? Math.min(500, Math.round(stored)) : 25;
+}
+
+function setAnnualReadingGoal(value) {
+  const goal = Math.max(1, Math.min(500, Math.round(Number(value) || 25)));
+  localStorage.setItem(READING_GOAL_KEY, String(goal));
+  return goal;
+}
+
+function completedBooksThisYear(progress, readingList) {
+  const year = new Date().getFullYear();
+  const ids = new Set();
+  readingList.filter((item) => item.status === 'finished').forEach((item) => ids.add(`list:${item.id}`));
+  progress.filter((item) => {
+    const percent = item.totalWords ? (Number(item.furthestWord)||0) / Number(item.totalWords) : 0;
+    return percent >= .95 && new Date(item.lastReadAt || 0).getFullYear() === year;
+  }).forEach((item) => ids.add(`progress:${item.documentId}`));
+  return ids.size;
+}
+
+function aggregateDailyReading(activity, days = 30) {
+  const today = startOfDay(new Date());
+  const map = new Map();
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const date = addDays(today, -offset);
+    map.set(dateKey(date), {
+      date,
+      label: dateLabel(date),
+      words: 0,
+      minutes: 0,
+      sessions: 0,
+      wpm: 0
+    });
+  }
+  for (const item of activity) {
+    const key = dateKey(item.endedAt);
+    const row = map.get(key);
+    if (!row) continue;
+    row.words += Number(item.wordsRead) || 0;
+    row.minutes += (Number(item.seconds) || 0) / 60;
+    row.sessions += 1;
+  }
+  return [...map.values()].map((row) => ({
+    ...row,
+    minutes: Math.round(row.minutes),
+    wpm: row.minutes ? Math.round(row.words / row.minutes) : 0
   }));
 }
 
+function aggregateWeeklyReading(activity, weeks = 8) {
+  const today = startOfDay(new Date());
+  const rows = [];
+  for (let offset = weeks - 1; offset >= 0; offset -= 1) {
+    const end = addDays(today, -(offset * 7));
+    const start = addDays(end, -6);
+    const matching = activity.filter((item) => {
+      const date = new Date(item.endedAt);
+      return date >= start && date < addDays(end, 1);
+    });
+    const words = matching.reduce((sum, item) => sum + (Number(item.wordsRead)||0), 0);
+    const seconds = matching.reduce((sum, item) => sum + (Number(item.seconds)||0), 0);
+    rows.push({
+      label: dateLabel(start),
+      words,
+      minutes: Math.round(seconds / 60),
+      sessions: matching.length
+    });
+  }
+  return rows;
+}
+
+function escapeSvg(value) {
+  return escapeHtml(String(value));
+}
+
+function lineChartSvg(data, valueKey, { label = '', suffix = '', empty = 'No trend data yet.' } = {}) {
+  const width = 760, height = 165, left = 42, right = 12, top = 10, bottom = 28;
+  const values = data.map((row) => Number(row[valueKey]) || 0);
+  const max = Math.max(1, ...values);
+  const usableW = width - left - right;
+  const usableH = height - top - bottom;
+  const points = data.map((row, index) => {
+    const x = left + (data.length === 1 ? usableW / 2 : index * usableW / (data.length - 1));
+    const y = top + usableH - ((Number(row[valueKey]) || 0) / max) * usableH;
+    return { x, y, row };
+  });
+  const polyline = points.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  const nonzero = values.some(Boolean);
+  return `<svg class="progress-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeSvg(label)}">
+    <line x1="${left}" y1="${top+usableH}" x2="${width-right}" y2="${top+usableH}" class="chart-axis"/>
+    <line x1="${left}" y1="${top}" x2="${left}" y2="${top+usableH}" class="chart-axis"/>
+    ${[0,.25,.5,.75,1].map((ratio) => {
+      const y=top+usableH-(ratio*usableH);
+      return `<line x1="${left}" y1="${y}" x2="${width-right}" y2="${y}" class="chart-grid"/><text x="${left-7}" y="${y+4}" text-anchor="end">${Math.round(max*ratio).toLocaleString()}</text>`;
+    }).join('')}
+    ${nonzero ? `<polyline points="${polyline}" class="chart-line"/>${points.map((p) => `<circle cx="${p.x}" cy="${p.y}" r="3.5"><title>${escapeSvg(p.row.label)}: ${(Number(p.row[valueKey])||0).toLocaleString()}${escapeSvg(suffix)}</title></circle>`).join('')}` : `<text x="${width/2}" y="${height/2}" text-anchor="middle" class="chart-empty">${escapeSvg(empty)}</text>`}
+    ${points.filter((_,i)=>i===0 || i===points.length-1 || i%7===0).map((p) => `<text x="${p.x}" y="${height-12}" text-anchor="middle">${escapeSvg(p.row.label)}</text>`).join('')}
+  </svg>`;
+}
+
+function barChartSvg(data, valueKey, { label = '', suffix = '' } = {}) {
+  const width=760,height=165,left=42,right=12,top=10,bottom=28;
+  const max=Math.max(1,...data.map((row)=>Number(row[valueKey])||0));
+  const usableW=width-left-right, usableH=height-top-bottom;
+  const gap=8, barW=Math.max(8,(usableW-(gap*(data.length-1)))/Math.max(1,data.length));
+  return `<svg class="progress-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeSvg(label)}">
+    <line x1="${left}" y1="${top+usableH}" x2="${width-right}" y2="${top+usableH}" class="chart-axis"/>
+    ${data.map((row,index)=>{
+      const value=Number(row[valueKey])||0;
+      const h=(value/max)*usableH;
+      const x=left+index*(barW+gap), y=top+usableH-h;
+      return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="4"><title>${escapeSvg(row.label)}: ${value.toLocaleString()}${escapeSvg(suffix)}</title></rect><text x="${x+barW/2}" y="${height-14}" text-anchor="middle">${escapeSvg(row.label)}</text>`;
+    }).join('')}
+  </svg>`;
+}
+
+function pieChartSvg(entries, { label = '' } = {}) {
+  const total=entries.reduce((sum,item)=>sum+(Number(item.value)||0),0);
+  let angle=-Math.PI/2;
+  const cx=125,cy=125,r=92;
+  const paths=entries.filter((item)=>item.value>0).map((item,index)=>{
+    const slice=(item.value/Math.max(1,total))*Math.PI*2;
+    const end=angle+slice;
+    const x1=cx+r*Math.cos(angle),y1=cy+r*Math.sin(angle);
+    const x2=cx+r*Math.cos(end),y2=cy+r*Math.sin(end);
+    const large=slice>Math.PI?1:0;
+    const d=`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${large} 1 ${x2} ${y2} Z`;
+    angle=end;
+    return `<path d="${d}" class="chart-slice chart-slice-${(index%6)+1}"><title>${escapeSvg(item.label)}: ${item.value}</title></path>`;
+  }).join('');
+  return `<div class="pie-chart-layout"><svg class="pie-chart" viewBox="0 0 250 250" role="img" aria-label="${escapeSvg(label)}">${total?paths:`<circle cx="${cx}" cy="${cy}" r="${r}" class="pie-empty"/><text x="${cx}" y="${cy+5}" text-anchor="middle">No data</text>`}<circle cx="${cx}" cy="${cy}" r="46" class="pie-hole"/><text x="${cx}" y="${cy-2}" text-anchor="middle" class="pie-total">${total}</text><text x="${cx}" y="${cy+18}" text-anchor="middle">sessions</text></svg>
+  <div class="pie-legend">${entries.map((item,index)=>`<div><span class="legend-dot chart-slice-${(index%6)+1}"></span><strong>${escapeHtml(item.label)}</strong><span>${Number(item.value)||0}</span></div>`).join('')}</div></div>`;
+}
+
+function calculateReadingAwards({ activity, progress, comprehension, readingList, goal }) {
+  const streak = readingStreak(activity);
+  const completed = completedBooksThisYear(progress, readingList);
+  const totalWords = activity.reduce((sum,item)=>sum+(Number(item.wordsRead)||0),0);
+  const totalMinutes = Math.round(activity.reduce((sum,item)=>sum+(Number(item.seconds)||0),0)/60);
+  const activeDays = new Set(activity.map((item)=>dateKey(item.endedAt))).size;
+  const monthlyDays = new Set(activity.filter((item)=>new Date(item.endedAt) >= addDays(new Date(),-30)).map((item)=>dateKey(item.endedAt))).size;
+  const compAverage = comprehension.length ? Math.round(comprehension.reduce((s,i)=>s+(Number(i.scorePercent)||0),0)/comprehension.length) : 0;
+  const recent = activity.slice(0,5);
+  const earlier = activity.slice(5,10);
+  const avgWpm=(rows)=>{
+    const words=rows.reduce((s,i)=>s+(Number(i.wordsRead)||0),0);
+    const seconds=rows.reduce((s,i)=>s+(Number(i.seconds)||0),0);
+    return seconds ? Math.round(words/(seconds/60)) : 0;
+  };
+  const improvement = avgWpm(recent)-avgWpm(earlier);
+
+  const definitions = [
+    {id:'first-step',icon:'🌱',title:'First Step',description:'Complete your first recorded reading session.',earned:activity.length>=1,progress:Math.min(1,activity.length)},
+    {id:'daily-reader',icon:'☀️',title:'Daily Reader',description:'Read on 3 consecutive days.',earned:streak>=3,progress:Math.min(1,streak/3)},
+    {id:'week-warrior',icon:'🔥',title:'Week Warrior',description:'Maintain a 7-day reading streak.',earned:streak>=7,progress:Math.min(1,streak/7)},
+    {id:'monthly-master',icon:'🗓️',title:'Monthly Master',description:'Read on 20 different days in a month.',earned:monthlyDays>=20,progress:Math.min(1,monthlyDays/20)},
+    {id:'word-explorer',icon:'🧭',title:'Word Explorer',description:'Read 25,000 recorded words.',earned:totalWords>=25000,progress:Math.min(1,totalWords/25000)},
+    {id:'deep-reader',icon:'🧠',title:'Deep Reader',description:'Average 80% or better on comprehension checks.',earned:comprehension.length>=3&&compAverage>=80,progress:Math.min(1,(compAverage/80)*(Math.min(1,comprehension.length/3)))},
+    {id:'speed-builder',icon:'⚡',title:'Speed Builder',description:'Improve recent WPM by at least 10%.',earned:earlier.length>=3&&improvement>=Math.max(10,avgWpm(earlier)*.1),progress:earlier.length<3?0:Math.min(1,improvement/Math.max(10,avgWpm(earlier)*.1))},
+    {id:'book-finisher',icon:'📚',title:'Book Finisher',description:'Finish your first book.',earned:completed>=1,progress:Math.min(1,completed)},
+    {id:'goal-halfway',icon:'🥈',title:'Halfway Hero',description:'Reach half of your annual book goal.',earned:completed>=Math.ceil(goal/2),progress:Math.min(1,completed/Math.max(1,Math.ceil(goal/2)))},
+    {id:'goal-champion',icon:'🏆',title:'Goal Champion',description:'Complete your annual reading goal.',earned:completed>=goal,progress:Math.min(1,completed/goal)},
+    {id:'time-scholar',icon:'⏳',title:'Time Scholar',description:'Record 10 hours of focused reading.',earned:totalMinutes>=600,progress:Math.min(1,totalMinutes/600)},
+    {id:'consistent-scholar',icon:'🎓',title:'Consistent Scholar',description:'Read on 30 different days.',earned:activeDays>=30,progress:Math.min(1,activeDays/30)}
+  ];
+  return { definitions, streak, completed, totalWords, totalMinutes, activeDays, monthlyDays, compAverage, improvement };
+}
+
+function localProgressRecommendations({ daily, weekly, awards, comprehension, goal }) {
+  const recommendations=[];
+  const last7=daily.slice(-7);
+  const activeLast7=last7.filter((d)=>d.words>0).length;
+  const wordsLast7=last7.reduce((s,d)=>s+d.words,0);
+  const prior7=daily.slice(-14,-7).reduce((s,d)=>s+d.words,0);
+  if (activeLast7<4) recommendations.push({title:'Build a repeatable rhythm',text:'Aim for four short reading sessions this week. Consistency is currently a bigger opportunity than session length.'});
+  else recommendations.push({title:'Protect your consistency',text:`You read on ${activeLast7} of the last 7 days. Keep the same time cue and make the next session easy to start.`});
+  if (prior7>0 && wordsLast7<prior7*.85) recommendations.push({title:'Reverse the recent slowdown',text:'Your recorded word volume declined from the prior week. Schedule one slightly longer recovery session rather than trying to compensate all at once.'});
+  if (comprehension.length && awards.compAverage<75) recommendations.push({title:'Trade a little speed for retention',text:'Comprehension is below 75%. Reduce WPM by about 10% and use a comprehension check after each major section.'});
+  else if (comprehension.length>=3 && awards.compAverage>=85) recommendations.push({title:'Increase difficulty gradually',text:'Your comprehension is strong. Increase speed in small 5–8% steps or choose denser material while protecting understanding.'});
+  if (awards.completed<goal) {
+    const monthsLeft=Math.max(1,12-new Date().getMonth());
+    const monthly=Math.ceil((goal-awards.completed)/monthsLeft);
+    recommendations.push({title:'Stay on pace for your annual goal',text:`Finish about ${monthly} book${monthly===1?'':'s'} per month for the rest of the year to reach ${goal}.`});
+  }
+  if (!recommendations.length) recommendations.push({title:'Keep building evidence',text:'Complete several reading sessions and comprehension checks so the dashboard can identify meaningful trends.'});
+  return recommendations.slice(0,4);
+}
+function renderProgressDashboard() {
+  finalizeReadingSession();
+  stopReader();
+
+  const activity = readStoredArray(READING_ACTIVITY_KEY);
+  const progress = Object.values(readStoredObject(READING_PROGRESS_KEY));
+  const readingList = getReadingList();
+  const comprehension = getComprehensionResults();
+  const goal = getAnnualReadingGoal();
+  const daily = aggregateDailyReading(activity, 30);
+  const weekly = aggregateWeeklyReading(activity, 8);
+  const awards = calculateReadingAwards({ activity, progress, comprehension, readingList, goal });
+  const recommendations = localProgressRecommendations({ daily, weekly, awards, comprehension, goal });
+
+  const totalSeconds=activity.reduce((sum,item)=>sum+(Number(item.seconds)||0),0);
+  const totalWords=activity.reduce((sum,item)=>sum+(Number(item.wordsRead)||0),0);
+  const averageWpm=totalSeconds?Math.round(totalWords/(totalSeconds/60)):0;
+  const effectiveWpm=comprehension.length
+    ? Math.round(comprehension.reduce((sum,item)=>sum+(Number(item.effectiveWpm)||0),0)/comprehension.length)
+    : 0;
+  const earned=awards.definitions.filter((item)=>item.earned).length;
+  const goalPercent=Math.min(100,Math.round(awards.completed/Math.max(1,goal)*100));
+
+  const modeCounts = activity.reduce((map,item)=>{
+    const label=({
+      highlight:'Highlight',
+      'pointing-guide':'Pointing Guide',
+      'bold-focus':'Bold Focus',
+      flash:'Flash',
+      'smooth-glide':'Smooth Glide',
+      marquee:'Marquee',
+      'digital-sign':'Digital Sign',
+      'auto-scroll':'Auto Scroll'
+    })[item.mode] || 'Other';
+    map[label]=(map[label]||0)+1;
+    return map;
+  },{});
+  const modeEntries=Object.entries(modeCounts).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,6);
+
+  app.innerHTML = `<section class="panel progress-analytics-page compact-progress-dashboard">
+    <div class="progress-hero">
+      <div>
+        <span class="source-category">Recorded analysis</span>
+        <h1>Progress &amp; Awards</h1>
+        <p>A visual record of reading consistency, speed, comprehension, completed books, and long-term growth.</p>
+      </div>
+      <div class="progress-hero-actions">
+        <button class="secondary" type="button" data-action="my-reading">My Reading List</button>
+        <button id="clear-reading-progress" class="secondary" type="button">Clear recorded history</button>
+      </div>
+    </div>
+
+    <div class="progress-stat-grid">
+      <article class="progress-stat"><span>Recorded words</span><strong>${totalWords.toLocaleString()}</strong><small>${activity.length.toLocaleString()} sessions</small></article>
+      <article class="progress-stat"><span>Reading time</span><strong>${formatDuration(totalSeconds)}</strong><small>${awards.activeDays} active days</small></article>
+      <article class="progress-stat"><span>Average pace</span><strong>${averageWpm||'—'}</strong><small>WPM</small></article>
+      <article class="progress-stat"><span>Comprehension</span><strong>${awards.compAverage||'—'}${awards.compAverage?'%':''}</strong><small>${comprehension.length} checks</small></article>
+      <article class="progress-stat"><span>Effective pace</span><strong>${effectiveWpm||'—'}</strong><small>WPM × comprehension</small></article>
+      <article class="progress-stat"><span>Current streak</span><strong>${awards.streak}</strong><small>${awards.streak===1?'day':'days'}</small></article>
+    </div>
+
+    <section class="annual-goal-card">
+      <div>
+        <span class="source-category">Annual reading goal</span>
+        <h2>${awards.completed} of ${goal} books completed</h2>
+        <p>Set a yearly target and the dashboard will calculate pace, progress, and goal-based awards.</p>
+      </div>
+      <div class="annual-goal-control">
+        <label for="annual-reading-goal">Books per year
+          <input id="annual-reading-goal" type="number" min="1" max="500" value="${goal}">
+        </label>
+        <button id="save-annual-reading-goal" class="secondary" type="button">Save goal</button>
+      </div>
+      <div class="annual-goal-meter"><span style="width:${goalPercent}%"></span></div>
+      <strong class="annual-goal-percent">${goalPercent}%</strong>
+    </section>
+
+    <div class="progress-chart-grid">
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Daily reading volume</h2><p>Words recorded over the last 30 days.</p></div></div>
+        ${lineChartSvg(daily,'words',{label:'Daily words read during the last 30 days'})}
+      </section>
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Weekly reading time</h2><p>Minutes across the last eight weeks.</p></div></div>
+        ${barChartSvg(weekly,'minutes',{label:'Weekly reading minutes',suffix:' min'})}
+      </section>
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Reading modes</h2><p>Share of recorded sessions by mode.</p></div></div>
+        ${pieChartSvg(modeEntries,{label:'Reading sessions by mode'})}
+      </section>
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Pace trend</h2><p>Daily average WPM. Empty days remain visible so consistency is not hidden.</p></div></div>
+        ${lineChartSvg(daily,'wpm',{label:'Daily average reading speed',suffix:' WPM'})}
+      </section>
+    </div>
+
+    <details class="analytics-card progress-collapsible">
+      <summary><span><span class="source-category">Statistical analysis</span><strong>What the record shows</strong></span><small>Open</small></summary>
+      <div class="progress-collapsible-body">
+      <div class="analysis-grid">
+        <article><span>Average session</span><strong>${activity.length?Math.round(totalWords/activity.length).toLocaleString():'—'}</strong><small>words</small></article>
+        <article><span>Average duration</span><strong>${activity.length?formatDuration(totalSeconds/activity.length):'—'}</strong><small>per session</small></article>
+        <article><span>30-day consistency</span><strong>${awards.monthlyDays}/30</strong><small>active days</small></article>
+        <article><span>Recent improvement</span><strong>${awards.improvement>0?'+':''}${awards.improvement||0}</strong><small>WPM vs prior sessions</small></article>
+        <article><span>Books completed</span><strong>${awards.completed}</strong><small>this year</small></article>
+        <article><span>Awards earned</span><strong>${earned}/${awards.definitions.length}</strong><small>trophies</small></article>
+      </div>
+      </div>
+    </details>
+
+    <details class="analytics-card recommendation-card progress-collapsible">
+      <summary><span><span class="source-category">Coach</span><strong>Recommendations</strong></span><small>Open</small></summary>
+      <div class="progress-collapsible-body">
+      <div class="analytics-heading">
+        <div><span class="source-category">Coach</span><h2>Recommendations</h2><p>Immediate guidance is calculated privately from the reading record. An optional AI analysis can add a more nuanced interpretation.</p></div>
+        <button id="generate-ai-progress" class="primary" type="button">Generate AI analysis</button>
+      </div>
+      <div id="progress-recommendations" class="recommendation-grid">
+        ${recommendations.map((item)=>`<article><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.text)}</p></article>`).join('')}
+      </div>
+      <p id="progress-ai-status" class="status"></p>
+      </div>
+    </details>
+
+    <details class="analytics-card progress-collapsible">
+      <summary><span><span class="source-category">Achievement cabinet</span><strong>Trophies &amp; milestones</strong></span><small>${earned} earned</small></summary>
+      <div class="progress-collapsible-body">
+      <div class="trophy-grid">
+        ${awards.definitions.map((award)=>`<article class="trophy-card ${award.earned?'earned':'locked'}">
+          <div class="trophy-icon" aria-hidden="true">${award.icon}</div>
+          <div><h3>${escapeHtml(award.title)}</h3><p>${escapeHtml(award.description)}</p></div>
+          <div class="trophy-progress"><span style="width:${Math.round(award.progress*100)}%"></span></div>
+          <small>${award.earned?'Earned':'In progress · '+Math.round(award.progress*100)+'%'}</small>
+        </article>`).join('')}
+      </div>
+      </div>
+    </details>
+
+    <details class="analytics-card progress-collapsible">
+      <summary><span><strong>Recent books &amp; documents</strong></span><small>Open</small></summary>
+      <div class="progress-collapsible-body">
+      <div class="progress-book-list">${progress.sort((x,y)=>new Date(y.lastReadAt||0)-new Date(x.lastReadAt||0)).slice(0,10).map((item)=>{
+        const percent=item.totalWords?Math.min(100,Math.round((Number(item.furthestWord)||0)/item.totalWords*100)):0;
+        return `<article class="progress-book-card"><div><h3>${escapeHtml(item.title||'Untitled')}</h3><p>${percent}% complete · ${formatDuration(item.totalSeconds)} · ${Number(item.sessions)||0} sessions</p></div><div class="progress-meter"><span style="width:${percent}%"></span></div><button class="secondary" type="button" data-progress-open="${escapeHtml(item.documentId)}">Resume saved text</button></article>`;
+      }).join('')||'<p class="navigation-empty">Complete a reading session to begin the analysis.</p>'}</div>
+      </div>
+    </details>
+  </section>`;
+
+  app.querySelector('#save-annual-reading-goal')?.addEventListener('click',()=>{
+    setAnnualReadingGoal(app.querySelector('#annual-reading-goal')?.value);
+    renderProgressDashboard();
+  });
+
+  app.querySelector('#clear-reading-progress')?.addEventListener('click',()=>{
+    if(!window.confirm('Clear all recorded reading activity, progress, comprehension results, and earned award history from this browser?')) return;
+    localStorage.removeItem(READING_PROGRESS_KEY);
+    localStorage.removeItem(READING_ACTIVITY_KEY);
+    localStorage.removeItem(COMPREHENSION_RESULTS_KEY);
+    localStorage.removeItem(READING_AWARDS_KEY);
+    renderProgressDashboard();
+  });
+
+  app.querySelectorAll('[data-progress-open]').forEach((button)=>button.addEventListener('click',()=>{
+    const documentId=button.dataset.progressOpen;
+    let data=null;
+    try{data=JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`)||'null');}catch{}
+    if(!data?.text) return window.alert('That text is not stored in this browser. Open it again from My Reading or its original library.');
+    renderReaderWithText(data.title,data.text,data.source||{type:'saved'});
+    const record=readStoredObject(READING_PROGRESS_KEY)[documentId];
+    requestAnimationFrame(()=>jumpToWordIndex(record?.lastWord||0));
+  }));
+
+  app.querySelector('#generate-ai-progress')?.addEventListener('click',async()=>{
+    const button=app.querySelector('#generate-ai-progress');
+    const status=app.querySelector('#progress-ai-status');
+    const container=app.querySelector('#progress-recommendations');
+    button.disabled=true;
+    status.className='status';
+    status.textContent='Analyzing your reading record…';
+    try{
+      const payload=await loadApiPayload('/api/progress-recommendations',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          summary:{
+            totalWords,totalSeconds,averageWpm,effectiveWpm,
+            comprehensionAverage:awards.compAverage,
+            comprehensionChecks:comprehension.length,
+            currentStreak:awards.streak,
+            activeDays:awards.activeDays,
+            completedBooks:awards.completed,
+            annualGoal:goal,
+            recentImprovementWpm:awards.improvement
+          },
+          daily:daily.slice(-14).map(({label,words,minutes,wpm,sessions})=>({label,words,minutes,wpm,sessions})),
+          weekly
+        })
+      });
+      const items=Array.isArray(payload.recommendations)?payload.recommendations:[];
+      if(!items.length) throw new Error('No recommendations were returned.');
+      container.innerHTML=items.map((item)=>`<article><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.recommendation)}</p><small>${escapeHtml(item.reason||'')}</small></article>`).join('');
+      status.className='status success';
+      status.textContent='AI analysis complete.';
+    }catch(error){
+      status.className='status error';
+      status.textContent=error.message||'AI analysis is unavailable.';
+    }finally{button.disabled=false;}
+  });
+}
 
 function getComprehensionResults() {
   return readStoredArray(COMPREHENSION_RESULTS_KEY);
@@ -2021,8 +4004,8 @@ function renderVocabularyBuilder() {
   app.innerHTML = `<section class="panel vocabulary-builder">
     <div class="library-heading"><div><h1>Vocabulary Builder</h1><p>Review words you saved while reading. Rate each card to schedule its next review.</p></div></div>
     <div class="dashboard-stats vocabulary-stats"><article><span>Saved</span><strong>${items.length}</strong><small>words</small></article><article><span>Due now</span><strong>${due.length}</strong><small>reviews</small></article><article><span>Mastered</span><strong>${mastered}</strong><small>words</small></article></div>
-    <div class="vocabulary-toolbar"><input id="vocabulary-search" type="search" placeholder="Search saved words or definitions"><select id="vocabulary-filter"><option value="all">All words</option><option value="due">Due now</option><option value="learning">Learning</option><option value="familiar">Familiar</option><option value="mastered">Mastered</option></select></div>
-    <div id="vocabulary-list" class="vocabulary-list"></div>
+    <div class="vocabulary-toolbar"><input id="vocabulary-search" type="search" placeholder="Search saved words or definitions"><select id="vocabulary-filter"><option value="all">All words</option><option value="due">Due now</option><option value="learning">Learning</option><option value="familiar">Familiar</option><option value="mastered">Mastered</option></select>${listPresentationControls('vocabulary', { collapsible:false, defaultView:'tiles' })}</div>
+    <div id="vocabulary-list" class="vocabulary-list presentation-tiles"></div>
   </section>`;
   const list = app.querySelector('#vocabulary-list');
   const renderList = () => {
@@ -2041,6 +4024,12 @@ function renderVocabularyBuilder() {
     list.querySelectorAll('[data-vocab-rate]').forEach((button) => button.addEventListener('click', () => updateVocabularyRating(button.dataset.vocabId, button.dataset.vocabRate)));
     list.querySelectorAll('[data-vocab-delete]').forEach((button) => button.addEventListener('click', () => { removeSavedDefinition(button.dataset.vocabDelete); renderVocabularyBuilder(); }));
   };
+  bindListPresentationControls({
+    key:'vocabulary',
+    root:'#vocabulary-list',
+    itemSelector:'.vocabulary-card',
+    defaultView:'tiles'
+  });
   app.querySelector('#vocabulary-search')?.addEventListener('input', renderList);
   app.querySelector('#vocabulary-filter')?.addEventListener('change', renderList);
   renderList();
@@ -2229,6 +4218,104 @@ function saveReadingList(items) {
   document.cookie = `markSetGoReadingList=${encodeURIComponent(ids)}; Max-Age=31536000; Path=/; SameSite=Lax`;
 }
 
+
+function normalizedBookIdentity(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\.[a-z0-9]{1,5}$/i, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function sameBookIdentity(left, right) {
+  const a = normalizedBookIdentity(left);
+  const b = normalizedBookIdentity(right);
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+async function clearRemovedBookReferences(removed) {
+  if (!removed) return;
+
+  const removedTitle = removed.title || removed.name || '';
+  const removedDocumentId = removed.documentId || removed.source?.documentId || '';
+
+  // Clear the current in-memory Reader only when it is the removed book.
+  if (
+    (removedDocumentId && activeReaderSnapshot?.documentId === removedDocumentId)
+    || sameBookIdentity(activeReaderSnapshot?.title, removedTitle)
+  ) {
+    activeReaderSnapshot = null;
+  }
+
+  // Clear the persistent Reader session stored independently in IndexedDB.
+  try {
+    const savedSession = await readReaderSession();
+    if (
+      savedSession
+      && (
+        (removedDocumentId && savedSession.documentId === removedDocumentId)
+        || sameBookIdentity(savedSession.title, removedTitle)
+      )
+    ) {
+      await clearReaderSession();
+    }
+  } catch (error) {
+    console.warn('Could not inspect the saved Reader session while deleting a book.', error);
+  }
+
+  // Remove matching lightweight resume metadata even when IndexedDB is stale.
+  try {
+    const meta = JSON.parse(localStorage.getItem(READER_SESSION_META_KEY) || 'null');
+    if (
+      meta
+      && (
+        (removedDocumentId && meta.documentId === removedDocumentId)
+        || sameBookIdentity(meta.title, removedTitle)
+      )
+    ) {
+      localStorage.removeItem(READER_SESSION_META_KEY);
+    }
+  } catch {
+    localStorage.removeItem(READER_SESSION_META_KEY);
+  }
+
+  // Remove matching progress and locally stored document records.
+  const progress = readStoredObject(READING_PROGRESS_KEY);
+  let progressChanged = false;
+
+  Object.entries(progress).forEach(([documentId, record]) => {
+    if (
+      (removedDocumentId && documentId === removedDocumentId)
+      || sameBookIdentity(record?.title, removedTitle)
+    ) {
+      delete progress[documentId];
+      localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`);
+      progressChanged = true;
+    }
+  });
+
+  if (progressChanged) {
+    localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progress));
+  }
+
+  // The live engine must not silently re-save a removed book on pagehide.
+  if (
+    (removedDocumentId && state.documentId === removedDocumentId)
+    || sameBookIdentity(state.title, removedTitle)
+  ) {
+    stopReader();
+    readerEngine.reset?.();
+    state.title = '';
+    state.currentText = '';
+    state.originalText = '';
+    state.words = [];
+    state.index = 0;
+    state.documentId = '';
+    state.source = null;
+  }
+}
+
 function renderReadingList() {
   stopReader();
   const items = getReadingList();
@@ -2239,8 +4326,8 @@ function renderReadingList() {
   ];
   app.innerHTML = `
     <section class="panel reading-list-page">
-      <div class="library-heading"><div><h1>My Reading List</h1><p>Keep track of books you want to read, are reading now, or have finished.</p></div></div>
-      <blockquote class="reading-list-quote">“I cannot live without books.” <cite>— Thomas Jefferson</cite></blockquote>
+      <div class="library-heading"><div><h1>My Reading</h1><p>Keep your reading list, locally saved books, and progress together.</p></div></div>
+      ${myReadingTabs('list')}
       <form id="reading-list-form" class="reading-list-form">
         <label>Title<input id="reading-list-title" required placeholder="Book title"></label>
         <label>Author<input id="reading-list-author" placeholder="Author"></label>
@@ -2249,16 +4336,19 @@ function renderReadingList() {
         <button class="primary" type="submit">Add book</button>
         ${state.title && state.words.length ? '<button id="add-current-reading" class="secondary" type="button">Add current text</button>' : ''}
       </form>
-      <p id="reading-list-status-message" class="status"></p>
-      <div class="reading-list-groups">
+      <div class="list-toolbar-row">
+        <p id="reading-list-status-message" class="status"></p>
+        ${listPresentationControls('my-reading-list', { collapsible:true, defaultView:'list' })}
+      </div>
+      <div class="reading-list-groups presentation-list">
         ${groups.map(([key, label]) => {
           const groupItems = items.filter((item) => item.status === key);
-          return `<section class="reading-list-group"><h2>${label} <span>${groupItems.length}</span></h2><div class="reading-list-items">${groupItems.length ? groupItems.map((item) => `
+          return `<details class="reading-list-group" open><summary>${label} <span>${groupItems.length}</span></summary><div class="reading-list-items">${groupItems.length ? groupItems.map((item) => `
             <article class="reading-list-item" data-reading-item="${escapeHtml(item.id)}">
-              <div><h3><button class="reading-title-link" type="button" data-free-text-item="${escapeHtml(item.id)}" data-free-text-title="${escapeHtml(item.title)}" data-free-text-author="${escapeHtml(item.author || '')}">${escapeHtml(item.title)}</button></h3><p>${escapeHtml(item.author || 'Author not entered')}</p><div class="free-text-links" data-free-text-links="${escapeHtml(item.id)}"><span>Checking free editions…</span></div>${item.note ? `<p class="reading-list-item-note">${escapeHtml(item.note)}</p>` : ''}${bookMusicMarkup(item.title, item.author || '')}</div>
+              <div><h3><button class="reading-title-link" type="button" data-free-text-item="${escapeHtml(item.id)}" data-free-text-title="${escapeHtml(item.title)}" data-free-text-author="${escapeHtml(item.author || '')}">${escapeHtml(item.title)}</button></h3><p>${escapeHtml(item.author || 'Author not entered')}</p>${difficultyBadge(getBookDifficulty({title:item.title, author:item.author || '', description:item.note || ''}), item)}<div class="free-text-links" data-free-text-links="${escapeHtml(item.id)}"><span>Checking local library and open sources…</span></div>${item.note ? `<p class="reading-list-item-note">${escapeHtml(item.note)}</p>` : ''}</div>
               <label>Status<select data-reading-status="${escapeHtml(item.id)}"><option value="want-to-read" ${item.status === 'want-to-read' ? 'selected' : ''}>Want to Read</option><option value="reading" ${item.status === 'reading' ? 'selected' : ''}>Currently Reading</option><option value="finished" ${item.status === 'finished' ? 'selected' : ''}>Finished</option></select></label>
               <button class="bookmark-remove" type="button" data-remove-reading="${escapeHtml(item.id)}" aria-label="Remove ${escapeHtml(item.title)}">×</button>
-            </article>`).join('') : '<p class="navigation-empty">No books in this section.</p>'}</div></section>`;
+            </article>`).join('') : '<p class="navigation-empty">No books in this section.</p>'}</div></details>`;
         }).join('')}
       </div>
     </section>`;
@@ -2267,41 +4357,145 @@ function renderReadingList() {
     const container = app.querySelector(`[data-free-text-links="${CSS.escape(item.id)}"]`);
     const titleButton = app.querySelector(`[data-free-text-item="${CSS.escape(item.id)}"]`);
     if (!container) return;
-    try {
-      const payload = await loadApiPayload(`/api/free-text/search?title=${encodeURIComponent(item.title)}&author=${encodeURIComponent(item.author || '')}`);
-      if (payload.found && payload.book?.id) {
-        container.innerHTML = `<button class="free-text-open" type="button" data-free-gutenberg-id="${Number(payload.book.id)}">Read free on Project Gutenberg</button><a href="${escapeHtml(payload.sourceUrl)}" target="_blank" rel="noopener noreferrer">Source</a>`;
-        titleButton?.setAttribute('data-free-gutenberg-id', String(payload.book.id));
-        titleButton?.setAttribute('title', 'Open the free Project Gutenberg text');
-      } else {
-        const alternatives = Array.isArray(payload.alternatives) ? payload.alternatives : [];
-        container.innerHTML = alternatives.length
-          ? alternatives.map((link) => `<a href="${escapeHtml(link.url)}" target="_blank" rel="noopener noreferrer">Search ${escapeHtml(link.provider)}</a>`).join('')
-          : '<span>No free edition was found.</span>';
-        titleButton?.setAttribute('title', 'No direct Gutenberg edition found; use the free-source links below');
-      }
-    } catch {
-      container.innerHTML = '<button class="free-text-retry" type="button">Retry free-text search</button>';
-      container.querySelector('.free-text-retry')?.addEventListener('click', () => resolveFreeTextForItem(item));
+
+    const cached = await getCachedReadingBook(readingCacheKey(item));
+    if (cached?.text) {
+      container.innerHTML = `<button class="free-text-open" type="button" data-open-cached-reading="${escapeHtml(item.id)}">Open local copy</button><span class="local-book-badge">Saved locally</span><button class="subtle-link" type="button" data-refresh-reading="${escapeHtml(item.id)}">Find another edition</button>`;
+      titleButton?.setAttribute('data-open-cached-reading', item.id);
+      titleButton?.setAttribute('title', 'Open the locally saved full text');
+      return;
     }
+
+    container.innerHTML = `<button class="free-text-open" type="button" data-find-reading="${escapeHtml(item.id)}">Find &amp; save full text</button><span>Searches all connected open sources</span>`;
+    titleButton?.setAttribute('data-find-reading', item.id);
+    titleButton?.setAttribute('title', 'Search all open sources and save the best readable edition locally');
   }
 
-  async function openGutenbergFromReadingList(id) {
+  async function findAndCacheReadingBook(item, { force = false } = {}) {
     const status = app.querySelector('#reading-list-status-message');
-    if (status) { status.className = 'status'; status.textContent = 'Loading the free text…'; }
+    const container = app.querySelector(`[data-free-text-links="${CSS.escape(item.id)}"]`);
+    if (!force) {
+      const cached = await getCachedReadingBook(readingCacheKey(item));
+      if (cached?.text) return cached;
+    }
+
+    if (status) {
+      status.className = 'status';
+      status.textContent = `Searching all open sources for ${item.title}…`;
+    }
+    if (container) container.innerHTML = '<span>Searching Standard Ebooks, Internet Archive, Wikisource, Project Gutenberg, and other connected sources…</span>';
+
+    const queries = [
+      `${item.title} ${item.author || ''}`.trim(),
+      item.title
+    ].filter((value, index, all) => value && all.indexOf(value) === index);
+
+    const candidatesByKey = new Map();
+    for (const query of queries) {
+      const payload = await loadApiPayload(`/api/library/search?q=${encodeURIComponent(query)}&provider=all`);
+      (payload.books || []).forEach((book) => {
+        if (!book?.readable) return;
+        candidatesByKey.set(`${book.provider}:${book.id}`, book);
+      });
+    }
+
+    const reference = { title: item.title, author: item.author || '' };
+    const candidates = [...candidatesByKey.values()]
+      .map((book) => ({ ...book, matchScore: scoreGreatBookCandidate(reference, book) }))
+      .filter((book) => book.matchScore >= 40)
+      .sort((x, y) => y.matchScore - x.matchScore);
+
+    const failures = [];
+    for (const candidate of candidates) {
+      const providerLabel = LIBRARY_PROVIDERS[candidate.provider]?.label || candidate.provider;
+      if (status) status.textContent = `Verifying ${providerLabel}: ${candidate.title}…`;
+
+      try {
+        const loaded = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(candidate.provider)}&id=${encodeURIComponent(candidate.id)}`);
+        const text = String(loaded.text || '').trim();
+        const words = splitWords(text).length;
+        if (words < 1000) throw new Error('Returned text was only an excerpt or catalog description.');
+
+        const validation = typeof validateGreatBookPrimaryText === 'function'
+          ? validateGreatBookPrimaryText(reference, candidate, loaded)
+          : { ok: true };
+        if (!validation.ok) throw new Error(validation.reason);
+
+        const record = {
+          key: readingCacheKey(item),
+          itemId: item.id,
+          title: loaded.title || candidate.title || item.title,
+          author: loaded.author || candidate.author || item.author || '',
+          text,
+          source: {
+            type: candidate.provider,
+            id: candidate.id,
+            sourceUrl: loaded.sourceUrl || candidate.externalUrl || '',
+            author: loaded.author || candidate.author || item.author || ''
+          },
+          provider: candidate.provider,
+          savedAt: new Date().toISOString()
+        };
+
+        const saved = await cacheReadingBook(record);
+        if (status) {
+          status.className = saved ? 'status success' : 'status';
+          status.textContent = saved
+            ? `${record.title} was downloaded and saved locally.`
+            : `${record.title} opened, but browser storage could not retain a local copy.`;
+        }
+        return record;
+      } catch (error) {
+        failures.push(`${providerLabel}: ${error.message}`);
+      }
+    }
+
+    throw new Error(candidates.length
+      ? `Matching results were found, but none contained a verified full text. ${failures.slice(0, 3).join(' · ')}`
+      : 'No verified readable full-text edition was found in the connected open sources.');
+  }
+
+  async function openReadingListItem(item, { force = false } = {}) {
+    const status = app.querySelector('#reading-list-status-message');
     try {
-      const loaded = await loadApiPayload(`/api/gutenberg/books/${Number(id)}/text`);
-      const author = loaded.authors?.length ? ` — ${loaded.authors.join(', ')}` : '';
-      renderReaderWithText(`${loaded.title}${author}`, loaded.text, { type: 'gutenberg', id: loaded.id, sourceUrl: loaded.sourceUrl });
+      const record = force
+        ? await findAndCacheReadingBook(item, { force: true })
+        : (await getCachedReadingBook(readingCacheKey(item))) || await findAndCacheReadingBook(item);
+      if (!record?.text) throw new Error('No readable text is available.');
+      renderReaderWithText(
+        `${record.title}${record.author ? ` — ${record.author}` : ''}`,
+        record.text,
+        record.source || { type: 'saved-library' }
+      );
     } catch (error) {
-      if (status) { status.className = 'status error'; status.textContent = error?.message || 'The free text could not be loaded.'; }
+      if (status) {
+        status.className = 'status error';
+        status.textContent = error.message || 'The full text could not be opened.';
+      }
+      await resolveFreeTextForItem(item);
     }
   }
 
   items.forEach((item) => resolveFreeTextForItem(item));
-  app.querySelector('.reading-list-page')?.addEventListener('click', (event) => {
-    const target = event.target.closest('[data-free-gutenberg-id]');
-    if (target) openGutenbergFromReadingList(target.dataset.freeGutenbergId);
+  bindMyReadingTabs();
+  bindListPresentationControls({
+    key:'my-reading-list',
+    root:'.reading-list-groups',
+    itemSelector:'.reading-list-item',
+    groupSelector:'.reading-list-group',
+    defaultView:'list'
+  });
+
+  app.querySelector('.reading-list-page')?.addEventListener('click', async (event) => {
+    const cachedTarget = event.target.closest('[data-open-cached-reading]');
+    const findTarget = event.target.closest('[data-find-reading]');
+    const refreshTarget = event.target.closest('[data-refresh-reading]');
+    const id = cachedTarget?.dataset.openCachedReading || findTarget?.dataset.findReading || refreshTarget?.dataset.refreshReading;
+    if (!id) return;
+    const item = getReadingList().find((entry) => entry.id === id);
+    if (!item) return;
+    if (refreshTarget) await removeCachedReadingBook(readingCacheKey(item));
+    await openReadingListItem(item, { force: Boolean(refreshTarget) });
   });
 
   const addItem = (title, author = '', status = 'want-to-read', note = '', source = null) => {
@@ -2321,8 +4515,16 @@ function renderReadingList() {
     const updated = getReadingList().map((item) => item.id === select.dataset.readingStatus ? { ...item, status: select.value, updatedAt: new Date().toISOString() } : item);
     saveReadingList(updated); renderReadingList();
   }));
-  app.querySelectorAll('[data-remove-reading]').forEach((button) => button.addEventListener('click', () => {
-    saveReadingList(getReadingList().filter((item) => item.id !== button.dataset.removeReading)); renderReadingList();
+  app.querySelectorAll('[data-remove-reading]').forEach((button) => button.addEventListener('click', async () => {
+    const removed = getReadingList().find((item) => item.id === button.dataset.removeReading);
+    saveReadingList(getReadingList().filter((item) => item.id !== button.dataset.removeReading));
+
+    if (removed) {
+      await removeCachedReadingBook(readingCacheKey(removed));
+      await clearRemovedBookReferences(removed);
+    }
+
+    renderReadingList();
   }));
 }
 
@@ -2817,6 +5019,841 @@ function renderWeather() {
 }
 
 
+
+
+const BOOK_DIFFICULTY_CACHE_KEY = 'markSetGoReadingProfileV2';
+
+const BOOK_DIFFICULTY_LEVELS = [
+  { max: 24, label: 'Accessible', className: 'accessible' },
+  { max: 42, label: 'Moderate', className: 'moderate' },
+  { max: 61, label: 'Challenging', className: 'challenging' },
+  { max: 79, label: 'Advanced', className: 'advanced' },
+  { max: 100, label: 'Expert', className: 'expert' }
+];
+
+function clampDifficulty(value) {
+  return Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
+}
+
+function difficultyLevel(score) {
+  const normalized = clampDifficulty(score);
+  return BOOK_DIFFICULTY_LEVELS.find((item) => normalized <= item.max)
+    || BOOK_DIFFICULTY_LEVELS[BOOK_DIFFICULTY_LEVELS.length - 1];
+}
+
+function difficultyCache() {
+  try { return JSON.parse(localStorage.getItem(BOOK_DIFFICULTY_CACHE_KEY) || '{}') || {}; }
+  catch { return {}; }
+}
+
+function difficultyKey({ documentId = '', title = '', author = '', provider = '', id = '' } = {}) {
+  return [documentId, provider, id, title, author]
+    .map((value) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
+    .filter(Boolean)
+    .join('|') || 'unknown-book';
+}
+
+function sampleBookText(text, maximumCharacters = 110000) {
+  const raw = String(text || '').replace(/\r/g, '');
+  if (raw.length <= maximumCharacters) return raw;
+
+  const segments = 9;
+  const perSegment = Math.floor(maximumCharacters / segments);
+  const samples = [];
+
+  for (let segment = 0; segment < segments; segment += 1) {
+    const center = Math.floor((segment / Math.max(1, segments - 1)) * (raw.length - 1));
+    let start = Math.max(0, Math.min(raw.length - perSegment, center - Math.floor(perSegment / 2)));
+    let end = Math.min(raw.length, start + perSegment);
+
+    const paragraphStart = raw.lastIndexOf('\n\n', start);
+    if (paragraphStart >= Math.max(0, start - 500)) start = paragraphStart + 2;
+    const paragraphEnd = raw.indexOf('\n\n', end);
+    if (paragraphEnd > 0 && paragraphEnd <= end + 500) end = paragraphEnd;
+
+    samples.push(raw.slice(start, end));
+  }
+
+  return samples.join('\n\n');
+}
+
+function readingProfileLevels(profile) {
+  return {
+    textual: difficultyLevel(profile.textualDifficulty),
+    interpretation: difficultyLevel(profile.interpretationDifficulty),
+    contextual: difficultyLevel(profile.contextualDifficulty),
+    literary: difficultyLevel(profile.literaryComplexity)
+  };
+}
+
+function summarizeReadingProfile(profile) {
+  const levels = readingProfileLevels(profile);
+  const reading = levels.textual.label;
+  const interpretation = levels.interpretation.label;
+
+  if (reading === interpretation) return `${reading} to read and interpret`;
+  return `${reading} to read · ${interpretation} to interpret`;
+}
+
+function sentenceStatistics(text) {
+  const normalized = String(text || '')
+    .replace(/\[(?:PDF Page|Page)\s+\d+\]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const sentences = normalized
+    .match(/[^.!?]+(?:[.!?]+["'”’)]*|$)/g)
+    ?.map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 3) || [];
+
+  const lengths = sentences
+    .map((sentence) => (sentence.match(/[A-Za-zÀ-ÖØ-öø-ÿĀ-ž'’-]+|\d+/g) || []).length)
+    .filter((length) => length > 0 && length < 250);
+
+  const average = lengths.reduce((sum, value) => sum + value, 0) / Math.max(1, lengths.length);
+  const sorted = [...lengths].sort((x, y) => x - y);
+  const percentile90 = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * .9))] || average;
+  const longRatio = lengths.filter((length) => length >= 30).length / Math.max(1, lengths.length);
+  const veryLongRatio = lengths.filter((length) => length >= 45).length / Math.max(1, lengths.length);
+
+  return { sentences, lengths, average, percentile90, longRatio, veryLongRatio };
+}
+
+function analyzeBookTextDifficulty(text, metadata = {}) {
+  const sampleText = sampleBookText(text);
+  const words = sampleText.match(/[A-Za-zÀ-ÖØ-öø-ÿĀ-ž'’-]+|\d+/g) || [];
+  if (words.length < 120) return estimateBookDifficulty(metadata);
+
+  const sentenceStats = sentenceStatistics(sampleText);
+  const wordLengths = words
+    .map((word) => word.replace(/[^A-Za-zÀ-ÖØ-öø-ÿĀ-ž]/g, '').length)
+    .filter(Boolean);
+
+  const averageWordLength = wordLengths.reduce((sum, value) => sum + value, 0) / Math.max(1, wordLengths.length);
+  const longWordRatio = wordLengths.filter((length) => length >= 9).length / Math.max(1, wordLengths.length);
+  const veryLongWordRatio = wordLengths.filter((length) => length >= 12).length / Math.max(1, wordLengths.length);
+  const complexPunctuation = (sampleText.match(/[;:—–()[\]]/g) || []).length / Math.max(1, words.length);
+  const paragraphCount = Math.max(1, sampleText.split(/\n\s*\n/).filter(Boolean).length);
+  const dialogueParagraphs = sampleText.split(/\n\s*\n/)
+    .filter((paragraph) => /^[\s"'“‘—-]/.test(paragraph.trim())).length;
+  const dialogueRatio = dialogueParagraphs / paragraphCount;
+  const properNameRatio = words.filter((word, index) => index > 0 && /^[A-Z][a-z]{2,}/.test(word)).length / Math.max(1, words.length);
+  const foreignRatio = words.filter((word) => /[À-ÖØ-öø-ÿĀ-ž]/.test(word)).length / Math.max(1, words.length);
+  const numeralRatio = words.filter((word) => /^\d+$/.test(word)).length / Math.max(1, words.length);
+  const questionRatio = (sampleText.match(/\?/g) || []).length / Math.max(1, sentenceStats.sentences.length);
+  const firstPersonRatio = (sampleText.match(/\b(?:I|me|my|mine|we|our|ours)\b/gi) || []).length / Math.max(1, words.length);
+  const abstractTerms = (sampleText.match(/\b(?:truth|justice|freedom|faith|meaning|morality|conscience|existence|virtue|beauty|reason|soul|death|identity|memory|desire|power|society)\b/gi) || []).length / Math.max(1, words.length);
+
+  const estimate = estimateBookDifficulty(metadata);
+
+  const vocabulary = clampDifficulty(
+    7 + (averageWordLength - 4.1) * 12 + longWordRatio * 145 + veryLongWordRatio * 150 + foreignRatio * 135
+  );
+
+  const syntax = clampDifficulty(
+    4
+    + Math.max(0, sentenceStats.average - 11) * 1.75
+    + Math.max(0, sentenceStats.percentile90 - 22) * .65
+    + sentenceStats.longRatio * 115
+    + sentenceStats.veryLongRatio * 130
+    + complexPunctuation * 310
+  );
+
+  /*
+    Dialogue is not narrative complexity. The previous model treated quotation
+    marks as complexity, which unfairly raised direct, dialogue-heavy writers.
+  */
+  const narrative = clampDifficulty(
+    9
+    + properNameRatio * 145
+    + Math.max(0, properNameRatio - .035) * 350
+    + estimate.signals.experimentalNarrative * 38
+    + estimate.signals.epicScale * 18
+  );
+
+  const specialized = clampDifficulty(
+    7 + numeralRatio * 360 + veryLongWordRatio * 90 + estimate.signals.specializedSubject * 38
+  );
+
+  const contextual = clampDifficulty(
+    estimate.dimensions.backgroundKnowledge * .42
+    + estimate.dimensions.culturalDistance * .34
+    + estimate.dimensions.specializedKnowledge * .24
+  );
+
+  const allusive = clampDifficulty(
+    estimate.dimensions.allusions * .72
+    + estimate.dimensions.backgroundKnowledge * .18
+    + estimate.dimensions.culturalDistance * .10
+  );
+
+  const conceptual = clampDifficulty(
+    abstractTerms * 1550
+    + questionRatio * 28
+    + syntax * .15
+    + specialized * .18
+    + estimate.dimensions.conceptualDensity * .45
+  );
+
+  /*
+    Interpretation is separate from mechanical readability. Sparse, direct
+    prose can be easy to decode while still requiring inference. We keep this
+    cautious because subtext cannot be measured reliably from punctuation alone.
+  */
+  const inferredSubtext = clampDifficulty(
+    estimate.signals.interpretiveDepth * 42
+    + Math.min(.035, dialogueRatio) * 300
+    + Math.min(.045, firstPersonRatio) * 180
+    + abstractTerms * 650
+  );
+
+  const textualDifficulty = clampDifficulty(vocabulary * .46 + syntax * .54);
+  const contextualDifficulty = contextual;
+  const literaryComplexity = clampDifficulty(narrative * .65 + estimate.signals.experimentalNarrative * 35);
+  const interpretationDifficulty = clampDifficulty(
+    conceptual * .30 + allusive * .23 + inferredSubtext * .32 + literaryComplexity * .15
+  );
+
+  const dimensions = {
+    vocabulary,
+    syntax,
+    conceptualDensity: conceptual,
+    backgroundKnowledge: estimate.dimensions.backgroundKnowledge,
+    allusions: allusive,
+    culturalDistance: estimate.dimensions.culturalDistance,
+    narrativeComplexity: narrative,
+    specializedKnowledge: specialized
+  };
+
+  const overallScore = clampDifficulty(
+    textualDifficulty * .42
+    + contextualDifficulty * .27
+    + literaryComplexity * .13
+    + interpretationDifficulty * .18
+  );
+  const level = difficultyLevel(overallScore);
+
+  const profile = {
+    score: overallScore,
+    level: level.label,
+    className: level.className,
+    textualDifficulty,
+    interpretationDifficulty,
+    contextualDifficulty,
+    literaryComplexity,
+    confidence: words.length >= 5000 ? 'Analyzed' : 'Sample analyzed',
+    basis: `${words.length.toLocaleString()} sampled words from the actual text`,
+    dimensions,
+    evidence: {
+      averageSentenceLength: Number(sentenceStats.average.toFixed(1)),
+      longSentencePercent: Math.round(sentenceStats.longRatio * 100),
+      averageWordLength: Number(averageWordLength.toFixed(1)),
+      longWordPercent: Math.round(longWordRatio * 100),
+      dialoguePercent: Math.round(dialogueRatio * 100),
+      properNamePercent: Number((properNameRatio * 100).toFixed(1))
+    },
+    reasons: topDifficultyReasons(dimensions),
+    recommendations: difficultyRecommendations(overallScore, dimensions, {
+      textualDifficulty,
+      interpretationDifficulty,
+      contextualDifficulty,
+      literaryComplexity
+    }),
+    timeline: buildDifficultyTimeline(String(text || ''), metadata)
+  };
+
+  profile.summary = summarizeReadingProfile(profile);
+  return profile;
+}
+
+function estimateBookDifficulty(book = {}) {
+  const searchable = [book.title, book.author, book.description, book.subjects, book.year, book.language]
+    .flat().filter(Boolean).join(' ').toLowerCase();
+  const year = Number(String(book.year || '').match(/\d{4}/)?.[0]) || 0;
+  const oldText = year && year < 1800 ? 18 : year && year < 1920 ? 8 : 0;
+  const ancient = /(homer|plato|aristotle|aeschylus|sophocles|euripides|virgil|dante|augustine|aquinas|classics|ancient|medieval)/.test(searchable);
+  const philosophy = /(philosoph|metaphys|epistem|ethic|theolog|treatise|critique|dialectic|political theory)/.test(searchable);
+  const science = /(physics|mathemat|medicine|biology|chemistry|engineering|economics|law|technical|scientific)/.test(searchable);
+  const experimentalNarrative = /(joyce|woolf|faulkner|proust|stream of consciousness|experimental|nonlinear|multiple narrators)/.test(searchable);
+  const epicScale = /(epic|odyssey|iliad|divine comedy|paradise lost|war and peace|brothers karamazov|crime and punishment)/.test(searchable);
+  const interpretiveDepth = /(symbolism|allegory|subtext|existential|modernist|literary fiction|psychological|tragedy)/.test(searchable);
+  const foreign = /(russian|french|german|greek|roman|japanese|chinese|african|indian|translation|translated)/.test(searchable) || (book.language && !/^en/i.test(book.language));
+  const children = /(children|juvenile|young reader|fairy tale|picture book)/.test(searchable);
+  const specializedSubject = science || philosophy;
+
+  const dimensions = {
+    vocabulary: clampDifficulty(23 + oldText + (philosophy ? 16 : 0) + (science ? 13 : 0) + (experimentalNarrative ? 8 : 0) - (children ? 18 : 0)),
+    syntax: clampDifficulty(21 + oldText + (philosophy ? 15 : 0) + (experimentalNarrative ? 28 : 0) + (epicScale ? 6 : 0) - (children ? 15 : 0)),
+    conceptualDensity: clampDifficulty(20 + (philosophy ? 34 : 0) + (science ? 27 : 0) + (ancient ? 9 : 0) - (children ? 15 : 0)),
+    backgroundKnowledge: clampDifficulty(19 + (ancient ? 30 : 0) + (philosophy ? 21 : 0) + (science ? 24 : 0) + oldText * .6),
+    allusions: clampDifficulty(16 + (ancient ? 38 : 0) + (epicScale ? 20 : 0) + (philosophy ? 11 : 0)),
+    culturalDistance: clampDifficulty(14 + (foreign ? 32 : 0) + (ancient ? 28 : 0) + oldText),
+    narrativeComplexity: clampDifficulty(18 + (experimentalNarrative ? 44 : 0) + (epicScale ? 20 : 0) - (children ? 12 : 0)),
+    specializedKnowledge: clampDifficulty(14 + (science ? 43 : 0) + (philosophy ? 27 : 0))
+  };
+
+  const textualDifficulty = clampDifficulty(dimensions.vocabulary * .46 + dimensions.syntax * .54);
+  const contextualDifficulty = clampDifficulty(
+    dimensions.backgroundKnowledge * .44
+    + dimensions.culturalDistance * .34
+    + dimensions.specializedKnowledge * .22
+  );
+  const literaryComplexity = dimensions.narrativeComplexity;
+  const interpretationDifficulty = clampDifficulty(
+    dimensions.conceptualDensity * .34
+    + dimensions.allusions * .25
+    + literaryComplexity * .17
+    + interpretiveDepth * 24
+  );
+
+  const score = clampDifficulty(
+    textualDifficulty * .42
+    + contextualDifficulty * .27
+    + literaryComplexity * .13
+    + interpretationDifficulty * .18
+  );
+  const level = difficultyLevel(score);
+
+  const profile = {
+    score,
+    level: level.label,
+    className: level.className,
+    textualDifficulty,
+    interpretationDifficulty,
+    contextualDifficulty,
+    literaryComplexity,
+    confidence: book.description || book.subjects ? 'Estimated' : 'Predicted',
+    basis: book.description || book.subjects
+      ? 'Estimated from catalog metadata'
+      : 'Predicted from title, author, era, and available metadata',
+    dimensions,
+    signals: {
+      experimentalNarrative: experimentalNarrative ? 1 : 0,
+      epicScale: epicScale ? 1 : 0,
+      interpretiveDepth: interpretiveDepth ? 1 : 0,
+      specializedSubject: specializedSubject ? 1 : 0
+    },
+    evidence: null,
+    reasons: topDifficultyReasons(dimensions),
+    recommendations: difficultyRecommendations(score, dimensions, {
+      textualDifficulty,
+      interpretationDifficulty,
+      contextualDifficulty,
+      literaryComplexity
+    }),
+    timeline: []
+  };
+
+  profile.summary = summarizeReadingProfile(profile);
+  return profile;
+}
+
+function buildDifficultyTimeline(text, metadata = {}) {
+  const raw = String(text || '');
+  if (raw.length < 5000) return [];
+
+  const sections = raw
+    .split(/\n\s*(?=(?:chapter|book|part|canto)\s+(?:[ivxlcdm]+|\d+|[a-z]+)\b)/i)
+    .filter((section) => section.trim().length > 500);
+
+  const chunks = sections.length >= 3
+    ? sections.slice(0, 16)
+    : Array.from({ length: 8 }, (_, index) => {
+        const start = Math.floor((index / 8) * raw.length);
+        const end = Math.floor(((index + 1) / 8) * raw.length);
+        return raw.slice(start, end);
+      });
+
+  return chunks.map((chunk, index) => {
+    const stats = sentenceStatistics(chunk);
+    const words = chunk.match(/[A-Za-zÀ-ÖØ-öø-ÿĀ-ž'’-]+|\d+/g) || [];
+    const lengths = words.map((word) => word.replace(/[^A-Za-zÀ-ÖØ-öø-ÿĀ-ž]/g, '').length).filter(Boolean);
+    const longWords = lengths.filter((length) => length >= 9).length / Math.max(1, lengths.length);
+    const score = clampDifficulty(
+      8
+      + Math.max(0, stats.average - 11) * 1.7
+      + stats.longRatio * 120
+      + longWords * 145
+    );
+    return {
+      label: sections.length >= 3 ? `Section ${index + 1}` : `${Math.round((index / chunks.length) * 100)}–${Math.round(((index + 1) / chunks.length) * 100)}%`,
+      score,
+      level: difficultyLevel(score).label
+    };
+  });
+}
+
+function topDifficultyReasons(dimensions) {
+  const labels = {
+    vocabulary: 'uncommon or demanding vocabulary',
+    syntax: 'long or structurally complex sentences',
+    conceptualDensity: 'dense ideas, arguments, or implications',
+    backgroundKnowledge: 'historical or subject background',
+    allusions: 'literary, biblical, or classical allusions',
+    culturalDistance: 'unfamiliar cultures, geography, or institutions',
+    narrativeComplexity: 'characters, viewpoints, chronology, or narrative form',
+    specializedKnowledge: 'technical or specialized knowledge'
+  };
+
+  return Object.entries(dimensions)
+    .filter(([, value]) => value >= 35)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4)
+    .map(([key]) => labels[key]);
+}
+
+function difficultyRecommendations(score, dimensions, profile = {}) {
+  const recommendations = [];
+  if (profile.textualDifficulty >= 70) recommendations.push('Begin around 180–220 WPM and increase gradually.');
+  else if (profile.textualDifficulty >= 50) recommendations.push('Begin around 220–270 WPM.');
+  else recommendations.push('Your usual reading speed should be a reasonable starting point.');
+
+  if (profile.contextualDifficulty >= 50) recommendations.push('Use Prepare Me for historical, geographical, and cultural orientation.');
+  if (dimensions.vocabulary >= 50) recommendations.push('Keep definitions available and save unfamiliar terms.');
+  if (profile.literaryComplexity >= 50) recommendations.push('Use a character, chronology, or viewpoint guide.');
+  if (profile.interpretationDifficulty >= 50) recommendations.push('Pause after each section to note subtext, symbols, or unresolved questions.');
+  return recommendations.slice(0, 4);
+}
+
+function prepareMeTopics(profile, book = {}) {
+  const topics = [];
+  if (profile.dimensions.backgroundKnowledge >= 35) topics.push('Historical setting and timeline');
+  if (profile.dimensions.culturalDistance >= 35) topics.push('Places, customs, institutions, and geography');
+  if (profile.dimensions.allusions >= 35) topics.push('Important literary, biblical, and classical references');
+  if (profile.dimensions.specializedKnowledge >= 35) topics.push('Essential subject vocabulary and concepts');
+  if (profile.literaryComplexity >= 35) topics.push('Characters, narrators, chronology, and structure');
+  if (profile.interpretationDifficulty >= 35) topics.push('Themes, symbols, subtext, and questions to watch');
+  if (!topics.length) topics.push('Author, setting, central themes, and major characters');
+  return topics;
+}
+
+function getBookDifficulty(book = {}, text = '') {
+  const key = difficultyKey(book);
+  const cache = difficultyCache();
+  const signature = text
+    ? `v2:${text.length}:${String(text).slice(0, 80)}`
+    : `v2:${JSON.stringify([book.title, book.author, book.year, book.description]).slice(0, 240)}`;
+
+  if (cache[key]?.signature === signature) return cache[key].profile;
+
+  const profile = text ? analyzeBookTextDifficulty(text, book) : estimateBookDifficulty(book);
+  cache[key] = { signature, profile, savedAt: Date.now() };
+  try { localStorage.setItem(BOOK_DIFFICULTY_CACHE_KEY, JSON.stringify(cache)); } catch {}
+  return profile;
+}
+
+function difficultyBadge(profile, book = {}) {
+  const payload = encodeURIComponent(JSON.stringify({
+    profile,
+    book: { title: book.title || 'Untitled', author: book.author || '' }
+  }));
+  const readingLevel = difficultyLevel(profile.textualDifficulty || profile.score);
+  const interpretationLevel = difficultyLevel(profile.interpretationDifficulty || profile.score);
+
+  return `<button class="book-difficulty-badge difficulty-${escapeHtml(readingLevel.className)}" type="button"
+      data-book-difficulty="${payload}" title="Open Reading Profile">
+    <span>${escapeHtml(readingLevel.label)} to read</span>
+    <small>${escapeHtml(interpretationLevel.label)} to interpret · ${escapeHtml(profile.confidence)}</small>
+  </button>`;
+}
+
+function profileDimensionCard(icon, title, score, description) {
+  const level = difficultyLevel(score);
+  return `<article class="reading-profile-dimension">
+    <span class="reading-profile-icon" aria-hidden="true">${icon}</span>
+    <div>
+      <small>${escapeHtml(title)}</small>
+      <strong>${escapeHtml(level.label)}</strong>
+      <p>${escapeHtml(description)}</p>
+    </div>
+    <span class="reading-profile-score">${clampDifficulty(score)}</span>
+  </article>`;
+}
+
+
+function currentBookTextForProfile(book = {}) {
+  if (state?.title && state?.currentText && sameBookIdentity(state.title, book.title)) {
+    return state.currentText;
+  }
+
+  const progress = readStoredObject(READING_PROGRESS_KEY);
+  const match = Object.values(progress).find((item) =>
+    sameBookIdentity(item?.title, book.title)
+    && (!book.author || !item?.author || sameBookIdentity(item.author, book.author))
+  );
+
+  if (match?.documentId) {
+    try {
+      const stored = localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${match.documentId}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        return parsed?.text || parsed?.currentText || '';
+      }
+    } catch {}
+  }
+  return '';
+}
+
+function boundedAiBookSample(text, maximumCharacters = 28000) {
+  const sampled = sampleBookText(text, maximumCharacters);
+  return sampled.replace(/\s+/g, ' ').trim().slice(0, maximumCharacters);
+}
+
+function mergeHybridReadingProfile(localProfile, aiProfile) {
+  const blend = (localValue, aiValue, localWeight = .55) =>
+    clampDifficulty((Number(localValue) || 0) * localWeight + (Number(aiValue) || 0) * (1 - localWeight));
+
+  const enhanced = {
+    ...localProfile,
+    textualDifficulty: blend(localProfile.textualDifficulty, aiProfile.textualDifficulty, .68),
+    interpretationDifficulty: blend(localProfile.interpretationDifficulty, aiProfile.interpretationDifficulty, .28),
+    contextualDifficulty: blend(localProfile.contextualDifficulty, aiProfile.contextualDifficulty, .35),
+    literaryComplexity: blend(localProfile.literaryComplexity, aiProfile.literaryComplexity, .40),
+    confidence: `Hybrid AI + linguistic · ${aiProfile.confidence || 'medium'} confidence`,
+    aiEnhanced: true,
+    aiSummary: aiProfile.summary || '',
+    aiEvidence: Array.isArray(aiProfile.evidence) ? aiProfile.evidence : [],
+    preparationTopics: Array.isArray(aiProfile.preparationTopics) ? aiProfile.preparationTopics : [],
+    interpretiveFeatures: Array.isArray(aiProfile.interpretiveFeatures) ? aiProfile.interpretiveFeatures : [],
+    cautions: Array.isArray(aiProfile.cautions) ? aiProfile.cautions : []
+  };
+
+  enhanced.score = clampDifficulty(
+    enhanced.textualDifficulty * .42
+    + enhanced.contextualDifficulty * .27
+    + enhanced.literaryComplexity * .13
+    + enhanced.interpretationDifficulty * .18
+  );
+  const level = difficultyLevel(enhanced.score);
+  enhanced.level = level.label;
+  enhanced.className = level.className;
+  enhanced.summary = summarizeReadingProfile(enhanced);
+  return enhanced;
+}
+
+function readingProfileCacheKey(book = {}) {
+  return `markSetGoHybridProfile:${difficultyKey(book)}`;
+}
+
+function savedHybridReadingProfile(book = {}) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(readingProfileCacheKey(book)) || 'null');
+    return stored?.profile || null;
+  } catch {
+    return null;
+  }
+}
+
+function saveHybridReadingProfile(book, profile) {
+  try {
+    localStorage.setItem(readingProfileCacheKey(book), JSON.stringify({
+      profile,
+      savedAt: new Date().toISOString()
+    }));
+  } catch {}
+}
+
+function bookGuideCacheKey(book = {}, spoilerMode = 'none') {
+  return `markSetGoBookGuide:${spoilerMode}:${difficultyKey(book)}`;
+}
+
+function savedBookGuide(book = {}, spoilerMode = 'none') {
+  try {
+    return JSON.parse(localStorage.getItem(bookGuideCacheKey(book, spoilerMode)) || 'null');
+  } catch {
+    return null;
+  }
+}
+
+function saveBookGuide(book, spoilerMode, guide) {
+  try {
+    localStorage.setItem(bookGuideCacheKey(book, spoilerMode), JSON.stringify({
+      guide,
+      savedAt: new Date().toISOString()
+    }));
+  } catch {}
+}
+
+function renderQuickBookGuide(dialog, guide, book, spoilerMode) {
+  let guidePanel = dialog.querySelector('#quick-book-guide-output');
+  if (!guidePanel) {
+    guidePanel = document.createElement('section');
+    guidePanel.id = 'quick-book-guide-output';
+    guidePanel.className = 'quick-book-guide-output';
+    dialog.querySelector('.difficulty-disclaimer')?.before(guidePanel);
+  }
+
+  guidePanel.innerHTML = `
+    <div class="quick-guide-heading">
+      <div><span class="source-category">Quick Book Guide</span><h3>${escapeHtml(book?.title || 'Untitled')}</h3></div>
+      <span>${escapeHtml(spoilerMode === 'none' ? 'Spoiler-free' : spoilerMode === 'light' ? 'Light spoilers' : 'Full guide')}</span>
+    </div>
+    <p class="quick-guide-overview">${escapeHtml(guide.overview || '')}</p>
+    <div class="quick-guide-grid">
+      <section><h4>Setting</h4><p>${escapeHtml(guide.setting || 'Not available.')}</p></section>
+      <section><h4>Structure</h4><p>${escapeHtml(guide.structure || 'Not available.')}</p></section>
+      <section><h4>Main characters</h4><ul>${(guide.characters || []).map((item) => `<li><strong>${escapeHtml(item.name)}</strong> — ${escapeHtml(item.role)}</li>`).join('') || '<li>No character list available.</li>'}</ul></section>
+      <section><h4>Major themes</h4><ul>${(guide.themes || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></section>
+      <section><h4>Helpful context</h4><ul>${(guide.context || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('') || '<li>No special background required.</li>'}</ul></section>
+      <section><h4>Symbols and motifs</h4><ul>${(guide.symbolsAndMotifs || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('') || '<li>No major motifs listed.</li>'}</ul></section>
+    </div>
+    <section class="quick-guide-tips"><h4>Reading tips</h4><ul>${(guide.readingTips || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></section>
+    <p class="quick-guide-spoiler-note">${escapeHtml(guide.spoilerNote || '')}</p>`;
+  guidePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function enhanceReadingProfileWithAi({ dialog, book, localProfile, button }) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Analyzing with AI…';
+
+  try {
+    const text = currentBookTextForProfile(book);
+    const response = await fetch('/api/reading-profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        book,
+        localProfile,
+        sample: boundedAiBookSample(text)
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+
+    const hybrid = mergeHybridReadingProfile(localProfile, payload.profile || {});
+    saveHybridReadingProfile(book, hybrid);
+    dialog.close();
+    showBookDifficultyDialog(encodeURIComponent(JSON.stringify({ profile: hybrid, book })));
+  } catch (error) {
+    window.alert(`AI Reading Profile unavailable: ${error.message}`);
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
+async function requestQuickBookGuide({ dialog, book, spoilerMode, button }) {
+  const cached = savedBookGuide(book, spoilerMode);
+  if (cached?.guide) {
+    renderQuickBookGuide(dialog, cached.guide, book, spoilerMode);
+    return;
+  }
+
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Creating guide…';
+
+  try {
+    const text = currentBookTextForProfile(book);
+    const response = await fetch('/api/book-guide', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        book,
+        spoilerMode,
+        sample: boundedAiBookSample(text, 22000)
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+
+    saveBookGuide(book, spoilerMode, payload.guide);
+    renderQuickBookGuide(dialog, payload.guide, book, spoilerMode);
+  } catch (error) {
+    window.alert(`Quick Book Guide unavailable: ${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
+function showBookDifficultyDialog(payload) {
+  let data = null;
+  try { data = JSON.parse(decodeURIComponent(payload || '')); } catch {}
+  if (!data?.profile) return;
+
+  let { profile, book } = data;
+  profile = savedHybridReadingProfile(book) || profile;
+  const dimensions = profile.dimensions || {};
+  const evidence = profile.evidence || {};
+  const topics = prepareMeTopics(profile, book);
+
+  let dialog = document.querySelector('#book-difficulty-dialog');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'book-difficulty-dialog';
+    dialog.className = 'book-difficulty-dialog reading-profile-dialog';
+    document.body.append(dialog);
+  }
+
+  const evidenceItems = [
+    evidence.averageSentenceLength != null ? `Average sentence: ${evidence.averageSentenceLength} words` : null,
+    evidence.longSentencePercent != null ? `Long sentences: ${evidence.longSentencePercent}%` : null,
+    evidence.averageWordLength != null ? `Average word length: ${evidence.averageWordLength} letters` : null,
+    evidence.longWordPercent != null ? `Long words: ${evidence.longWordPercent}%` : null,
+    evidence.dialoguePercent != null ? `Dialogue-like paragraphs: ${evidence.dialoguePercent}%` : null,
+    evidence.properNamePercent != null ? `Proper-name density: ${evidence.properNamePercent}%` : null
+  ].filter(Boolean);
+
+  dialog.innerHTML = `<div class="difficulty-dialog-header">
+      <div>
+        <span class="source-category">Reading Profile</span>
+        <h2>${escapeHtml(book?.title || 'Untitled')}</h2>
+        ${book?.author ? `<p>${escapeHtml(book.author)}</p>` : ''}
+      </div>
+      <button type="button" data-close-difficulty aria-label="Close">×</button>
+    </div>
+
+    <div class="reading-profile-summary">
+      <strong>${escapeHtml(profile.summary || summarizeReadingProfile(profile))}</strong>
+      <small>${escapeHtml(profile.confidence)} · ${escapeHtml(profile.basis)}</small>
+    </div>
+
+    <div class="reading-profile-dimension-grid">
+      ${profileDimensionCard('📖', 'Textual difficulty', profile.textualDifficulty, 'Vocabulary, sentences, grammar, and decoding effort.')}
+      ${profileDimensionCard('🧠', 'Interpretive difficulty', profile.interpretationDifficulty, 'Subtext, symbolism, ambiguity, themes, and implied meaning.')}
+      ${profileDimensionCard('🌍', 'Contextual knowledge', profile.contextualDifficulty, 'History, geography, culture, institutions, and subject knowledge.')}
+      ${profileDimensionCard('📚', 'Literary structure', profile.literaryComplexity, 'Narrators, chronology, viewpoints, characters, and formal experimentation.')}
+    </div>
+
+    <details class="reading-profile-details" open>
+      <summary>Why these ratings?</summary>
+      <div class="difficulty-dimensions">
+        ${[
+          ['Vocabulary', dimensions.vocabulary],
+          ['Syntax', dimensions.syntax],
+          ['Conceptual density', dimensions.conceptualDensity],
+          ['Background knowledge', dimensions.backgroundKnowledge],
+          ['Allusions', dimensions.allusions],
+          ['Cultural distance', dimensions.culturalDistance],
+          ['Narrative complexity', dimensions.narrativeComplexity],
+          ['Specialized knowledge', dimensions.specializedKnowledge]
+        ].map(([label, value]) => `<div>
+          <span>${escapeHtml(label)}</span>
+          <div class="difficulty-meter"><i style="width:${clampDifficulty(value)}%"></i></div>
+          <strong>${clampDifficulty(value)}</strong>
+        </div>`).join('')}
+      </div>
+
+      ${evidenceItems.length ? `<div class="reading-profile-evidence">
+        ${evidenceItems.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}
+      </div>` : ''}
+
+      ${(profile.reasons || []).length ? `<section>
+        <h3>What may require extra effort</h3>
+        <ul>${profile.reasons.map((reason) => `<li>${escapeHtml(reason)}</li>`).join('')}</ul>
+      </section>` : `<p class="difficulty-disclaimer">No major mechanical barriers were detected from the available text or metadata.</p>`}
+    </details>
+
+    <details class="reading-profile-details" ${profile.aiEnhanced ? 'open' : ''}>
+      <summary>Hybrid AI analysis</summary>
+      <div class="hybrid-profile-panel">
+        ${profile.aiEnhanced ? `
+          <p>${escapeHtml(profile.aiSummary || 'AI interpretation has been combined with the local linguistic analysis.')}</p>
+          ${(profile.aiEvidence || []).length ? `<ul>${profile.aiEvidence.map((item) => `<li><strong>${escapeHtml(item.dimension.replace('_',' '))}:</strong> ${escapeHtml(item.finding)} <small>(${escapeHtml(item.basis.replaceAll('_',' '))})</small></li>`).join('')}</ul>` : ''}
+          ${(profile.interpretiveFeatures || []).length ? `<p><strong>Interpretive features:</strong> ${escapeHtml(profile.interpretiveFeatures.join('; '))}</p>` : ''}
+          ${(profile.cautions || []).length ? `<p><strong>Cautions:</strong> ${escapeHtml(profile.cautions.join('; '))}</p>` : ''}
+        ` : `
+          <p>Combine the transparent linguistic measurements with AI analysis of subtext, symbolism, historical context, literary form, and established characteristics of the work.</p>
+          <button class="primary" type="button" data-enhance-reading-profile>Enhance with AI</button>
+        `}
+      </div>
+    </details>
+
+    <details class="reading-profile-details">
+      <summary>Quick Book Guide</summary>
+      <div class="quick-guide-request">
+        <p>Generate a concise, Cliffs-style orientation only when requested. Choose how much plot information to include.</p>
+        <label for="book-guide-spoilers">Spoiler level</label>
+        <select id="book-guide-spoilers">
+          <option value="none">Spoiler-free</option>
+          <option value="light">Light spoilers</option>
+          <option value="full">Full-work guide</option>
+        </select>
+        <button class="primary" type="button" data-create-book-guide>Create Quick Book Guide</button>
+      </div>
+    </details>
+
+    <details class="reading-profile-details">
+      <summary>Prepare me for this book</summary>
+      <div class="prepare-me-panel">
+        <p>A short orientation should cover:</p>
+        <ul>${topics.map((topic) => `<li>${escapeHtml(topic)}</li>`).join('')}</ul>
+        <button class="primary" type="button" data-prepare-book="${encodeURIComponent(JSON.stringify({book, topics}))}">Open in AI Companion</button>
+      </div>
+    </details>
+
+    ${profile.timeline?.length ? `<details class="reading-profile-details">
+      <summary>Difficulty through the book</summary>
+      <div class="difficulty-timeline">
+        ${profile.timeline.map((item) => `<div title="${escapeHtml(`${item.label}: ${item.level}`)}">
+          <span style="height:${Math.max(8, item.score)}%"></span>
+          <small>${escapeHtml(item.label)}</small>
+        </div>`).join('')}
+      </div>
+    </details>` : ''}
+
+    <section>
+      <h3>Recommended approach</h3>
+      <ul>${(profile.recommendations || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+    </section>
+
+    <p class="difficulty-disclaimer">
+      Reading ease and interpretive depth are intentionally separated. A book may use simple prose while remaining profound or difficult to interpret. Metadata-only profiles are estimates and become stronger after a readable edition is opened.
+    </p>`;
+
+  dialog.querySelector('[data-enhance-reading-profile]')?.addEventListener('click', (event) => {
+    enhanceReadingProfileWithAi({
+      dialog,
+      book,
+      localProfile: profile,
+      button: event.currentTarget
+    });
+  });
+
+  dialog.querySelector('[data-create-book-guide]')?.addEventListener('click', (event) => {
+    requestQuickBookGuide({
+      dialog,
+      book,
+      spoilerMode: dialog.querySelector('#book-guide-spoilers')?.value || 'none',
+      button: event.currentTarget
+    });
+  });
+
+  dialog.querySelector('[data-close-difficulty]')?.addEventListener('click', () => dialog.close(), { once: true });
+  dialog.querySelector('[data-prepare-book]')?.addEventListener('click', (event) => {
+    let request = null;
+    try { request = JSON.parse(decodeURIComponent(event.currentTarget.dataset.prepareBook || '')); } catch {}
+    if (!request) return;
+    dialog.close();
+    ReaderContinuity?.saveBeforeNavigation?.();
+    renderAiCenter();
+    window.setTimeout(() => {
+      const input = app.querySelector('textarea, input[type="text"]');
+      if (input) {
+        input.value = `Prepare me to read ${request.book?.title || 'this book'}${request.book?.author ? ` by ${request.book.author}` : ''}. Cover: ${(request.topics || []).join('; ')}. Keep it concise and avoid spoilers.`;
+        input.focus();
+      }
+    }, 0);
+  });
+
+  dialog.addEventListener('click', (event) => {
+    if (event.target === dialog) dialog.close();
+  }, { once: true });
+
+  dialog.showModal();
+}
+
+document.addEventListener('click', (event) => {
+  const trigger = event.target.closest('[data-book-difficulty]');
+  if (!trigger) return;
+  event.preventDefault();
+  event.stopPropagation();
+  showBookDifficultyDialog(trigger.dataset.bookDifficulty);
+});
+
 const LIBRARY_PROVIDERS = {
   standardebooks: { label: 'Standard Ebooks', icon: 'S', note: 'Carefully produced public-domain EPUB editions.' },
   internetarchive: { label: 'Internet Archive', icon: 'IA', note: 'Digitized books in EPUB, text, and OCR formats.' },
@@ -2830,6 +5867,7 @@ function unifiedBookCard(book) {
   const canRead = Boolean(book.readable);
   const author = book.author || 'Unknown author';
   const details = [book.year, book.language, book.format].filter(Boolean).join(' · ');
+  const difficulty = getBookDifficulty(book);
   return `
     <article class="unified-book-card">
       <div class="unified-cover-wrap">
@@ -2840,6 +5878,7 @@ function unifiedBookCard(book) {
         <h2>${escapeHtml(book.title || 'Untitled')}</h2>
         <p class="unified-author">${escapeHtml(author)}</p>
         ${details ? `<p class="unified-meta">${escapeHtml(details)}</p>` : ''}
+        ${difficultyBadge(difficulty, book)}
         ${book.description ? `<p class="unified-description">${escapeHtml(book.description)}</p>` : ''}
         <div class="unified-actions">
           ${canRead ? `<button class="primary" type="button" data-library-read="${escapeHtml(book.provider)}" data-library-id="${escapeHtml(book.id)}">▸ Read now</button>` : ''}
@@ -2871,11 +5910,20 @@ async function renderUnifiedLibrary(initial = {}) {
         </select>
         <button class="primary" type="submit">Search</button>
       </form>
-      <p id="unified-library-status" class="status">Enter a title or author to search all libraries.</p>
-      <div id="unified-library-results" class="unified-results" aria-live="polite"></div>
+      <div class="list-toolbar-row">
+        <p id="unified-library-status" class="status">Enter a title or author to search all libraries.</p>
+        ${listPresentationControls('all-libraries', { collapsible:false, defaultView:'tiles' })}
+      </div>
+      <div id="unified-library-results" class="unified-results presentation-tiles" aria-live="polite"></div>
       <p class="library-note">Availability differs by source and country. Open Library may link to borrowing or preview pages rather than provide downloadable text.</p>
     </section>`;
 
+  bindListPresentationControls({
+    key:'all-libraries',
+    root:'#unified-library-results',
+    itemSelector:'.unified-book-card',
+    defaultView:'tiles'
+  });
   const form = app.querySelector('#unified-library-search');
   const status = app.querySelector('#unified-library-status');
   const results = app.querySelector('#unified-library-results');
@@ -2892,6 +5940,12 @@ async function renderUnifiedLibrary(initial = {}) {
       status.textContent = books.length ? `${books.length} result${books.length === 1 ? '' : 's'} found.` : 'No books found. Try a broader search.';
       results.innerHTML = books.length ? books.map(unifiedBookCard).join('') : '<div class="empty-library"><h2>No results</h2><p>Try another title, author, or source.</p></div>';
       bindUnifiedLibraryActions(results);
+      bindListPresentationControls({
+        key:'all-libraries',
+        root:results,
+        itemSelector:'.unified-book-card',
+        defaultView:'tiles'
+      });
     } catch (error) {
       status.className = 'status error';
       status.textContent = error.message;
@@ -2934,37 +5988,49 @@ function bindUnifiedLibraryActions(container) {
 
 async function renderReader(kind) {
   stopReader();
-  if (kind === 'frankenstein-demo') return loadBuiltInIllustratedDemo();
-  if (kind === 'url') return renderUrlImporter();
-  if (kind === 'upload') return renderUpload();
-  if (kind === 'illustrated-upload') return renderIllustratedUpload();
-  if (kind === 'unified-library') return renderUnifiedLibrary();
-  if (kind === 'gutenberg') return renderGutenbergLibrary();
-  if (kind === 'great-books') return renderGreatBooksLibrary();
-  if (kind === 'syntopicon') return renderSyntopicon();
-  if (kind === 'bible') return renderBibleStudy();
-  if (kind === 'current-reading') return renderCurrentReading();
-  if (kind === 'weather') return renderWeather();
+
+  // Backward-compatible aliases for older cached markup and early empty-reader
+  // buttons. Navigation destinations must never fall through to the generic
+  // "Reading unavailable" error.
+  const normalizedKind = ({
+    import: 'upload',
+    all: 'unified-library',
+    library: 'my-library'
+  })[kind] || kind;
+
+  if (normalizedKind === 'my-library') return renderMyLibraryHub();
+  if (normalizedKind === 'frankenstein-demo') return loadBuiltInIllustratedDemo();
+  if (normalizedKind === 'url') return renderUrlImporter();
+  if (normalizedKind === 'upload') return renderUpload();
+  if (normalizedKind === 'illustrated-upload') return renderIllustratedUpload();
+  if (normalizedKind === 'unified-library') return renderUnifiedLibrary();
+  if (normalizedKind === 'gutenberg') return renderGutenbergLibrary();
+  if (normalizedKind === 'great-books') return renderGreatBooksLibrary();
+  if (normalizedKind === 'syntopicon') return renderSyntopicon();
+  if (normalizedKind === 'bible') return renderBibleStudy();
+  if (normalizedKind === 'current-reading') return renderCurrentReading();
+  if (normalizedKind === 'weather') return renderWeather();
 
   app.innerHTML = `<section class="panel"><h1>Loading…</h1><p class="status">Preparing your text.</p></section>`;
   try {
     let title;
     let text;
-    if (sources[kind]) {
-      ({ title, text } = await loadLocalText(kind));
-    } else if (kind === 'news') {
+    if (sources[normalizedKind]) {
+      ({ title, text } = await loadLocalText(normalizedKind));
+    } else if (normalizedKind === 'news') {
       title = "Today's News";
       text = await loadApiText('/api/news');
     } else {
       throw new Error('Unknown reading selection.');
     }
-    renderReaderWithText(title, text, { type: sources[kind] ? 'built-in' : kind, key: kind });
+    renderReaderWithText(title, text, { type: sources[normalizedKind] ? 'built-in' : normalizedKind, key: normalizedKind });
   } catch (error) {
     renderError('Reading unavailable', error.message);
   }
 }
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
+  app.dataset.viewKey = 'reader';
   const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });
   const isStructuredBible = Boolean(source?.type === 'bible' || source?.type === 'bible-book');
   let structure = isStructuredBible && Array.isArray(source?.documentStructure)
@@ -3032,7 +6098,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   if (!state.words.length) return renderError('No readable text', 'The selected source did not contain readable words.');
 
   app.innerHTML = `
-    <section class="panel">
+    <section class="panel reader-page-panel">
       <div class="reader-title-row">
         <div class="reader-title-copy">
           <h1>${escapeHtml(title)}</h1>
@@ -3060,6 +6126,20 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <option value="digital-sign">Digital Sign</option>
                 <option value="auto-scroll">Auto Scroll</option>
               </select>
+            </div>
+            <div class="control pointer-style-control">
+              <label for="pointer-style">Pointer style</label>
+              <select id="pointer-style">
+                <option value="hand">Hand</option>
+                <option value="underline">Underline</option>
+                <option value="caret">Caret</option>
+                <option value="bar">Reading bar</option>
+                <option value="mark">Mark pointing</option>
+              </select>
+            </div>
+            <div class="control pointer-style-control">
+              <label for="pointer-color">Pointer color</label>
+              <input id="pointer-color" type="color" value="#20a866" aria-label="Pointer color">
             </div>
             <div class="control"><label for="speed">Speed</label><div class="input-suffix"><input id="speed" type="number" min="30" max="900" value="${Math.min(900, state.wpm)}"><span>WPM</span></div></div>
             <div class="control"><label for="word-count">Words shown</label><input id="word-count" type="number" min="1" max="10" value="1"></div>
@@ -3129,6 +6209,16 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                     <option value="highlight">Highlight</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
                     <option value="digital-sign">Digital Sign</option><option value="auto-scroll">Auto Scroll</option>
                   </select></label>
+                  <label>Pointer<select id="fs-pointer-style">
+                    <option value="hand">Hand</option>
+                    <option value="underline">Underline</option>
+                    <option value="caret">Caret</option>
+                    <option value="bar">Reading bar</option>
+                    <option value="mark">Mark pointing</option>
+                  </select></label>
+                  <label class="pointer-style-control">Pointer color
+                    <input id="fs-pointer-color" type="color" value="#20a866" aria-label="Pointer color">
+                  </label>
                   <label>Speed<div class="input-suffix"><input id="fs-speed" type="number" min="30" max="900"><span>WPM</span></div></label>
                   <label>Words shown<input id="fs-word-count" type="number" min="1" max="10"></label>
                 </div>
@@ -3205,6 +6295,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
           </div>
           <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
           <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text" title="Click a word to move the reading position; click empty space to pause or resume"></article>
+          </div>
+          <div class="reader-viewer-footer" aria-label="Reader pace">
+            <span id="viewer-wpm-badge" class="viewer-wpm-badge" aria-label="Selected reading speed">${Math.round(Number(state.wpm) || 0).toLocaleString()} WPM</span>
           </div>
         </div>
         <div id="right-pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize right pane" tabindex="0"></div>
@@ -3411,6 +6504,26 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     updateModeControls(mode);
     restoreCapturedReaderLocation(snapshot, { rerendered: true });
   });
+  app.querySelector('#pointer-style')?.addEventListener('change', (event) => {
+    const snapshot = captureReaderLocation();
+    state.pointerStyle = event.target.value || 'hand';
+    if (getSelectedMode() === 'pointing-guide') {
+      stopReader();
+      state.index = snapshot.anchorIndex;
+      prepareReaderView('pointing-guide', Number(app.querySelector('#word-count')?.value) || 1);
+      updateModeControls('pointing-guide');
+      restoreCapturedReaderLocation(snapshot, { rerendered: true });
+    }
+    persistReaderSession({ immediate: true });
+  });
+
+  app.querySelector('#pointer-color')?.addEventListener('input', (event) => {
+    state.pointerColor = event.target.value || '#20a866';
+    const reader = app.querySelector('#reader');
+    reader?.style.setProperty('--pointer-color', state.pointerColor);
+    persistReaderSession({ immediate: true });
+  });
+
   app.querySelector('#focus-anchor-font-size')?.addEventListener('change', (event) => {
     const snapshot = captureReaderLocation();
     state.focusAnchorFontSize = Number(event.target.value) || 24;
@@ -3436,15 +6549,75 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
 
   app.querySelector('#focus-anchor').addEventListener('change', (event) => {
     const snapshot = captureReaderLocation();
-    stopReader();
-    state.focusAnchor = event.target.checked;
+    const reader = app.querySelector('#reader');
+    const savedScrollTop = reader?.scrollTop || 0;
+    const savedScrollLeft = reader?.scrollLeft || 0;
+
+    /*
+      Focus Anchor is an overlay; enabling it must not rebuild the underlying
+      reader. The earlier implementation called prepareReaderView(), which
+      recreated the virtualized text and could temporarily reset state.index
+      to zero before the asynchronous restore completed.
+    */
+    state.focusAnchor = Boolean(event.target.checked);
     state.index = snapshot.anchorIndex;
-    const mode = getSelectedMode();
-    const count = Number(app.querySelector('#word-count')?.value) || 1;
-    prepareReaderView(mode, count);
-    updateModeControls(mode);
     updateFocusAnchorOverlay();
-    restoreCapturedReaderLocation(snapshot, { rerendered: true });
+    refreshFocusAnchorStyle();
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const activeReader = app.querySelector('#reader');
+        if (!activeReader) return;
+
+        state.index = snapshot.anchorIndex;
+
+        if (state.bookPages) {
+          const spread = bookSpreadForWordIndex(activeReader, snapshot.anchorIndex);
+          if (spread != null) {
+            goToBookSpread(spread, {
+              behavior: 'auto',
+              ensureRendered: true,
+              syncReaderPosition: false
+            });
+          }
+        } else {
+          // Preserve the existing viewport first, then ensure the canonical word
+          // remains available if the document is virtualized.
+          activeReader.scrollTop = savedScrollTop;
+          activeReader.scrollLeft = savedScrollLeft;
+
+          const mode = state.renderedMode || getSelectedMode();
+          const count = Math.max(1, Number(app.querySelector('#word-count')?.value) || 1);
+
+          if (
+            state.virtualized
+            && snapshot.anchorIndex >= 0
+            && (
+              snapshot.anchorIndex < state.renderedWordStart
+              || snapshot.anchorIndex >= state.renderedWordEnd
+            )
+          ) {
+            virtualRenderer.renderWindowAround(
+              activeReader,
+              mode,
+              count,
+              snapshot.anchorIndex
+            );
+            restoreReadingAnchor(activeReader, mode, count, snapshot.anchorIndex);
+          }
+        }
+
+        state.index = snapshot.anchorIndex;
+        updateReaderStatus();
+        persistReaderSession({ immediate: true });
+
+        // The overlay can be enabled while playback is active. Since the text
+        // renderer was not rebuilt, playback can continue from the same word.
+        if (snapshot.wasRunning && !isReaderRunning()) {
+          startReader();
+        }
+      });
+    });
   });
   app.querySelector('#meaningful-chunks').addEventListener('change', (event) => {
     const snapshot = captureReaderLocation();
@@ -3474,7 +6647,12 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   updateHiddenIllustrationControls();
   app.querySelector('#translate-text').addEventListener('click', translateCurrentText);
   app.querySelector('#restore-english').addEventListener('click', restoreEnglish);
-  app.querySelectorAll('#mode-select, #speed, #word-count, #meaningful-chunks, #focus-anchor, #focus-anchor-font-size, #focus-anchor-color, #focus-anchor-bold, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
+  const speedBadgeInput = app.querySelector('#speed');
+  speedBadgeInput?.addEventListener('input', updateViewerWpmBadge);
+  speedBadgeInput?.addEventListener('change', updateViewerWpmBadge);
+  updateViewerWpmBadge();
+
+  app.querySelectorAll('#mode-select, #speed, #word-count, #pointer-style, #pointer-color, #meaningful-chunks, #focus-anchor-font-size, #focus-anchor-color, #focus-anchor-bold, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
     control.addEventListener('change', () => persistReaderSession());
     control.addEventListener('input', () => persistReaderSession());
   });
@@ -3501,6 +6679,22 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
 
 
 function bindFullscreenOptions(readerFrame) {
+  // The reader view can be rebuilt many times during one browser session.
+  // Tear down document-level fullscreen bindings from the previous instance so
+  // detached readers cannot keep observers/listeners alive or repeat work.
+  if (state.fullscreenOptionsKeyHandler) {
+    document.removeEventListener('keydown', state.fullscreenOptionsKeyHandler);
+    state.fullscreenOptionsKeyHandler = null;
+  }
+  if (state.fullscreenOptionsChangeHandler) {
+    document.removeEventListener('fullscreenchange', state.fullscreenOptionsChangeHandler);
+    state.fullscreenOptionsChangeHandler = null;
+  }
+  if (state.fullscreenOptionsObserver) {
+    state.fullscreenOptionsObserver.disconnect();
+    state.fullscreenOptionsObserver = null;
+  }
+
   const strip = app.querySelector('#fullscreen-control-strip');
   const toggle = app.querySelector('#fullscreen-options-toggle');
   const close = app.querySelector('#fullscreen-controls-close');
@@ -3511,6 +6705,8 @@ function bindFullscreenOptions(readerFrame) {
     ['#fs-mode-select', '#mode-select'],
     ['#fs-speed', '#speed'],
     ['#fs-word-count', '#word-count'],
+    ['#fs-pointer-style', '#pointer-style'],
+    ['#fs-pointer-color', '#pointer-color'],
     ['#fs-font-family', '#font-family'],
     ['#fs-font-size', '#font-size'],
     ['#fs-theme-select', '#theme-select'],
@@ -3643,16 +6839,17 @@ function bindFullscreenOptions(readerFrame) {
     }
   });
 
-  document.addEventListener('keydown', (event) => {
+  state.fullscreenOptionsKeyHandler = (event) => {
     if (!isFullscreen() || event.key.toLowerCase() !== 'o') return;
     event.preventDefault();
     strip.classList.remove('controls-hidden');
     readerFrame.classList.remove('fullscreen-controls-hidden');
     if (menu.hidden) openMenu();
     else closeMenu();
-  });
+  };
+  document.addEventListener('keydown', state.fullscreenOptionsKeyHandler);
 
-  document.addEventListener('fullscreenchange', () => {
+  state.fullscreenOptionsChangeHandler = () => {
     if (document.fullscreenElement === readerFrame) {
       strip.classList.remove('controls-hidden');
       readerFrame.classList.remove('fullscreen-controls-hidden');
@@ -3664,9 +6861,15 @@ function bindFullscreenOptions(readerFrame) {
       strip.classList.remove('controls-hidden');
       readerFrame.classList.remove('fullscreen-controls-hidden');
     }
-  });
+  };
+  document.addEventListener('fullscreenchange', state.fullscreenOptionsChangeHandler);
 
-  const observer = new MutationObserver(() => {
+  state.fullscreenOptionsObserver = new MutationObserver(() => {
+    if (!readerFrame.isConnected) {
+      state.fullscreenOptionsObserver?.disconnect();
+      state.fullscreenOptionsObserver = null;
+      return;
+    }
     if (readerFrame.classList.contains('fullscreen-fallback')) {
       strip.classList.remove('controls-hidden');
       readerFrame.classList.remove('fullscreen-controls-hidden');
@@ -3674,7 +6877,7 @@ function bindFullscreenOptions(readerFrame) {
       syncFromMain();
     }
   });
-  observer.observe(readerFrame, { attributes: true, attributeFilter: ['class'] });
+  state.fullscreenOptionsObserver.observe(readerFrame, { attributes: true, attributeFilter: ['class'] });
 
   closeMenu();
   syncFromMain();
@@ -3889,8 +7092,21 @@ function scheduleBookPageReflow({ delay = 0, anchorIndex = null } = {}) {
 function bindReaderFullscreen(readerFrame, button) {
   if (!readerFrame || !button) return;
 
+  // Loading another book rebuilds the Reader. Remove document-level listeners
+  // from the previous Reader instance so detached frames cannot alter the
+  // current global reading position during later fullscreen transitions.
+  if (state.fullscreenChangeHandler) {
+    document.removeEventListener('fullscreenchange', state.fullscreenChangeHandler);
+  }
+  if (state.fullscreenKeyHandler) {
+    document.removeEventListener('keydown', state.fullscreenKeyHandler);
+  }
+
   const label = button.querySelector('.fullscreen-label');
   const icon = button.querySelector('.fullscreen-icon');
+  let transitionSnapshot = null;
+  let transitionOwnedByButton = false;
+  let restoreSequence = 0;
 
   const isViewerFullscreen = () => document.fullscreenElement === readerFrame
     || readerFrame.classList.contains('fullscreen-fallback');
@@ -3901,6 +7117,106 @@ function bindReaderFullscreen(readerFrame, button) {
     button.title = active ? 'Minimize text viewer' : 'Full screen text viewer';
     if (label) label.textContent = active ? 'Minimize' : 'Full screen';
     if (icon) icon.textContent = active ? '🗗' : '⛶';
+  };
+
+  const positionPointerAtWord = (wordIndex) => {
+    const reader = app.querySelector('#reader');
+    const mode = state.renderedMode || getSelectedMode();
+    if (!reader || mode !== 'pointing-guide') return;
+
+    const count = Math.max(1, Number(app.querySelector('#word-count')?.value) || 1);
+    ensureWordsRendered(
+      reader,
+      mode,
+      count,
+      Math.min(state.words.length, Number(wordIndex) + 1000)
+    );
+
+    const step = getPointingLineStep(reader, Number(wordIndex), count);
+    if (!step) return;
+
+    scrollPointingStep(reader, step);
+    requestAnimationFrame(() => {
+      const refreshed = getPointingLineStep(reader, Number(wordIndex), Math.max(1, step.nextIndex - Number(wordIndex)));
+      if (refreshed) moveReadingGuide(reader, refreshed, 0);
+    });
+  };
+
+  const restoreAfterFullscreenLayout = (snapshot) => {
+    if (!snapshot) return;
+    const sequence = ++restoreSequence;
+    const anchorIndex = Math.max(
+      0,
+      Math.min(Math.max(0, state.words.length - 1), Number(snapshot.anchorIndex) || 0)
+    );
+
+    state.index = anchorIndex;
+
+    // Fullscreen changes only the frame dimensions; the reader DOM stays intact.
+    // Restore on the next paint instead of blocking the browser with a fixed
+    // settling delay, a full session serialization, or an eager virtual rebuild.
+    requestAnimationFrame(() => {
+      if (sequence !== restoreSequence) return;
+      const reader = app.querySelector('#reader');
+      if (!reader) return;
+
+      const mode = state.renderedMode || getSelectedMode();
+      const groupSize = Math.max(1, Number(app.querySelector('#word-count')?.value) || 1);
+      state.index = anchorIndex;
+
+      restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
+
+      if (state.bookPages) {
+        const spread = bookSpreadForWordIndex(reader, anchorIndex);
+        if (spread != null) {
+          goToBookSpread(spread, {
+            behavior: 'auto',
+            ensureRendered: false,
+            syncReaderPosition: false
+          });
+        }
+      }
+
+      state.index = anchorIndex;
+      positionPointerAtWord(anchorIndex);
+      updateReaderStatus();
+
+      const start = app.querySelector('#start-reader');
+      const pause = app.querySelector('#pause-reader');
+      if (start) {
+        start.disabled = false;
+        start.textContent = anchorIndex ? 'Resume' : 'Start';
+      }
+      if (pause) pause.disabled = true;
+
+      // Use the normal debounced save. Immediate persistence serializes the
+      // complete book and can freeze the main thread during fullscreen entry.
+      persistReaderSession();
+
+      if (snapshot.wasRunning && mode !== 'two-column') {
+        requestAnimationFrame(() => {
+          if (sequence !== restoreSequence) return;
+          state.index = anchorIndex;
+          startReader();
+        });
+      }
+
+      // Only rebuild a missing virtual window during idle time. In normal
+      // fullscreen transitions the anchor remains rendered, so this does no work.
+      if (!state.bookPages
+          && !['flash', 'digital-sign', 'two-column'].includes(mode)
+          && state.virtualized
+          && (anchorIndex < state.renderedWordStart || anchorIndex >= state.renderedWordEnd)) {
+        const recover = () => {
+          if (sequence !== restoreSequence || !reader.isConnected) return;
+          virtualRenderer.renderWindowAround(reader, mode, groupSize, anchorIndex);
+          restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
+          positionPointerAtWord(anchorIndex);
+        };
+        if ('requestIdleCallback' in window) window.requestIdleCallback(recover, { timeout: 180 });
+        else window.setTimeout(recover, 0);
+      }
+    });
   };
 
   const enterFullscreen = async () => {
@@ -3932,30 +7248,72 @@ function bindReaderFullscreen(readerFrame, button) {
   button.addEventListener('click', async (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const anchorIndex = state.bookPages ? Math.max(0, Number(state.index) || 0) : null;
+
+    transitionOwnedByButton = true;
+    transitionSnapshot = captureReaderLocation();
+    const anchorIndex = transitionSnapshot.anchorIndex;
+
+    stopReader();
+    state.index = anchorIndex;
+
     if (isViewerFullscreen()) await exitFullscreen();
     else await enterFullscreen();
-    if (state.bookPages) scheduleBookPageReflow({ delay: 80, anchorIndex });
+
+    if (state.bookPages) {
+      scheduleBookPageReflow({ delay: 70, anchorIndex });
+    }
+
+    restoreAfterFullscreenLayout(transitionSnapshot);
+    transitionSnapshot = null;
+    transitionOwnedByButton = false;
   });
 
-  document.addEventListener('fullscreenchange', () => {
+  state.fullscreenChangeHandler = () => {
+    // Ignore events belonging to an explicit button transition; the button
+    // owns its already-captured snapshot and performs exactly one restore.
+    if (transitionOwnedByButton) {
+      updateButton();
+      return;
+    }
+
+    // This path covers browser-controlled exits such as Escape. state.index is
+    // the canonical timed-reader position and does not depend on DOM geometry.
+    const snapshot = {
+      anchorIndex: Math.max(0, Number(state.index) || 0),
+      wasRunning: isReaderRunning()
+    };
+
+    stopReader();
+    state.index = snapshot.anchorIndex;
+
     if (document.fullscreenElement !== readerFrame) {
       readerFrame.classList.remove('fullscreen-fallback');
       document.body.classList.remove('viewer-fullscreen-open');
     }
-    updateButton();
-    scheduleBookPageReflow({ delay: 60, anchorIndex: pendingBookPageAnchorIndex ?? state.index });
-  });
 
-  document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape' && readerFrame.classList.contains('fullscreen-fallback')) {
-      exitFullscreen();
+    updateButton();
+
+    if (state.bookPages) {
+      scheduleBookPageReflow({ delay: 60, anchorIndex: snapshot.anchorIndex });
     }
-  });
+
+    restoreAfterFullscreenLayout(snapshot);
+  };
+
+  state.fullscreenKeyHandler = (event) => {
+    if (event.key === 'Escape' && readerFrame.classList.contains('fullscreen-fallback')) {
+      const snapshot = captureReaderLocation();
+      stopReader();
+      state.index = snapshot.anchorIndex;
+      exitFullscreen().then(() => restoreAfterFullscreenLayout(snapshot));
+    }
+  };
+
+  document.addEventListener('fullscreenchange', state.fullscreenChangeHandler);
+  document.addEventListener('keydown', state.fullscreenKeyHandler);
 
   updateButton();
 }
-
 function getBookPageMetrics(reader) {
   const styles = window.getComputedStyle(reader);
   const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
@@ -4170,7 +7528,19 @@ function turnBookPages(direction) {
   });
 }
 
+
+function updatePointerStyleVisibility(mode = getSelectedMode()) {
+  const visible = mode === 'pointing-guide';
+  app.querySelectorAll('.pointer-style-control').forEach((control) => {
+    control.hidden = !visible;
+  });
+  app.querySelectorAll('#pointer-style, #fs-pointer-style').forEach((select) => {
+    const wrapper = select.closest('label, .control');
+    if (wrapper) wrapper.hidden = !visible;
+  });
+}
 function updateModeControls(mode) {
+  updatePointerStyleVisibility(mode);
   const countInput = app.querySelector('#word-count');
   const speedInput = app.querySelector('#speed');
   const start = app.querySelector('#start-reader');
@@ -4695,8 +8065,11 @@ function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
   if (!snapshot) return;
   const anchorIndex = Math.max(0, Math.min(state.words.length - 1, Number(snapshot.anchorIndex) || 0));
   state.index = anchorIndex;
+  const restoreToken = (state.readerRestoreToken || 0) + 1;
+  state.readerRestoreToken = restoreToken;
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
+      if (restoreToken !== state.readerRestoreToken) return;
       const reader = app.querySelector('#reader');
       if (!reader) return;
       const mode = state.renderedMode || getSelectedMode();
@@ -4728,20 +8101,30 @@ function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
 
 function switchReadingMode(nextMode) {
   if (nextMode === 'two-column') nextMode = 'highlight';
-  const reader = app.querySelector('#reader');
-  if (!reader) return;
+  state.pendingReadingMode = nextMode;
 
-  // Capture the logical reading position BEFORE the renderer is replaced.
-  // This is intentionally shared with every other layout-changing option so
-  // mode changes cannot fall back to the first DOM word.
-  const snapshot = captureReaderLocation();
-  const groupSize = Number(app.querySelector('#word-count')?.value) || 1;
+  // A fullscreen select can emit several closely spaced input/change events.
+  // Coalesce them into one render on the next frame instead of rebuilding the
+  // word DOM repeatedly while the browser is still painting the menu.
+  if (state.modeChangeFrame) cancelAnimationFrame(state.modeChangeFrame);
+  state.modeChangeFrame = requestAnimationFrame(() => {
+    state.modeChangeFrame = null;
+    const mode = state.pendingReadingMode || nextMode;
+    state.pendingReadingMode = null;
+    const reader = app.querySelector('#reader');
+    if (!reader || state.renderedMode === mode) {
+      updateModeControls(mode);
+      return;
+    }
 
-  stopReader();
-  state.index = snapshot.anchorIndex;
-  prepareReaderView(nextMode, groupSize);
-  updateModeControls(nextMode);
-  restoreCapturedReaderLocation(snapshot, { rerendered: true });
+    const snapshot = captureReaderLocation();
+    const groupSize = Number(app.querySelector('#word-count')?.value) || 1;
+    stopReader();
+    state.index = snapshot.anchorIndex;
+    prepareReaderView(mode, groupSize);
+    updateModeControls(mode);
+    restoreCapturedReaderLocation(snapshot, { rerendered: true });
+  });
 }
 
 function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-count')?.value) || 1) {
@@ -4798,10 +8181,22 @@ function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-cou
     reader.prepend(marker);
   }
   if (mode === 'pointing-guide') {
+    const style = app.querySelector('#pointer-style')?.value || state.pointerStyle || 'hand';
+    state.pointerStyle = style;
+    state.pointerColor = app.querySelector('#pointer-color')?.value || state.pointerColor || '#20a866';
+    reader.dataset.pointerStyle = style;
+    reader.style.setProperty('--pointer-color', state.pointerColor);
     const guide = document.createElement('span');
-    guide.className = 'reading-guide-marker';
+    guide.className = `reading-guide-marker pointer-${style}`;
+    guide.dataset.pointerStyle = style;
     guide.setAttribute('aria-hidden', 'true');
-    guide.textContent = '☝';
+    guide.textContent = style === 'hand'
+      ? '☝'
+      : style === 'caret'
+        ? '▲'
+        : style === 'mark'
+          ? 'Mark 👉'
+          : '';
     reader.prepend(guide);
   }
 }
@@ -4914,12 +8309,29 @@ function moveReadingGuide(reader, step, tickMs) {
   const readerRect = reader.getBoundingClientRect();
   const firstRect = step.first.getBoundingClientRect();
   const lastRect = step.last.getBoundingClientRect();
+  const style = guide.dataset.pointerStyle || state.pointerStyle || 'hand';
   const guideWidth = guide.offsetWidth || 22;
   const phraseLeft = firstRect.left;
   const phraseRight = lastRect.right;
-  const phraseCenter = phraseLeft + ((phraseRight - phraseLeft) / 2);
-  const left = phraseCenter - readerRect.left + reader.scrollLeft - (guideWidth / 2);
-  const top = Math.max(firstRect.bottom, lastRect.bottom) - readerRect.top + reader.scrollTop + 2;
+  const phraseWidth = Math.max(12, phraseRight - phraseLeft);
+  const phraseCenter = phraseLeft + (phraseWidth / 2);
+
+  let left = phraseCenter - readerRect.left + reader.scrollLeft - (guideWidth / 2);
+  let top = Math.max(firstRect.bottom, lastRect.bottom) - readerRect.top + reader.scrollTop + 2;
+
+  guide.style.setProperty('--pointer-phrase-width', `${phraseWidth}px`);
+
+  if (style === 'underline' || style === 'bar') {
+    left = phraseLeft - readerRect.left + reader.scrollLeft;
+    top = style === 'bar'
+      ? firstRect.top - readerRect.top + reader.scrollTop - 2
+      : Math.max(firstRect.bottom, lastRect.bottom) - readerRect.top + reader.scrollTop + 1;
+  } else if (style === 'caret') {
+    top = Math.max(firstRect.bottom, lastRect.bottom) - readerRect.top + reader.scrollTop + 1;
+  } else if (style === 'mark') {
+    left = phraseLeft - readerRect.left + reader.scrollLeft - Math.max(58, guideWidth) - 7;
+    top = firstRect.top - readerRect.top + reader.scrollTop + Math.max(0, (firstRect.height - (guide.offsetHeight || 22)) / 2);
+  }
 
   if (guide.dataset.ready === 'true') {
     guide.style.transitionDuration = `${Math.max(100, tickMs * 0.86)}ms`;
@@ -4932,10 +8344,41 @@ function moveReadingGuide(reader, step, tickMs) {
   guide.classList.add('visible');
 }
 
-function updateReaderStatus(message) {
+let lastReaderStatusPaintAt = 0;
+let lastReaderStatusText = '';
+let lastViewerWpmText = '';
+
+function updateViewerWpmBadge() {
+  const badge = app.querySelector('#viewer-wpm-badge');
+  if (!badge) return;
+  const inputSpeed = Number(app.querySelector('#speed')?.value);
+  const speed = Math.max(0, Math.round(Number.isFinite(inputSpeed) && inputSpeed > 0 ? inputSpeed : Number(state.wpm) || 0));
+  const nextText = `${speed.toLocaleString()} WPM`;
+  if (nextText === lastViewerWpmText && badge.textContent === nextText) return;
+  lastViewerWpmText = nextText;
+  badge.textContent = nextText;
+  badge.setAttribute('aria-label', `Selected reading speed: ${speed.toLocaleString()} words per minute`);
+}
+
+function updateReaderStatus(message, { force = false } = {}) {
+  const now = performance.now();
+  // Animated modes may call this once per animation frame. Painting status text
+  // four times per second is visually indistinguishable but avoids continuous
+  // layout/paint work across a large fullscreen surface.
+  if (!force && !message && now - lastReaderStatusPaintAt < 250) return;
+
   const status = app.querySelector('#reader-status');
+  updateViewerWpmBadge();
   if (!status) return;
-  status.textContent = message || `${state.index.toLocaleString()} of ${state.words.length.toLocaleString()} words`;
+
+  const nextText = message || `${state.index.toLocaleString()} of ${state.words.length.toLocaleString()} words`;
+  if (force || nextText !== lastReaderStatusText || status.textContent !== nextText) {
+    status.textContent = nextText;
+    lastReaderStatusText = nextText;
+  }
+  const nextTitle = `Selected speed: ${Math.round(Number(state.wpm) || 0)} WPM. Viewer size does not change the word clock.`;
+  if (status.title !== nextTitle) status.title = nextTitle;
+  lastReaderStatusPaintAt = now;
 }
 
 
@@ -4969,24 +8412,70 @@ function fillTickerBuffer(stage, reader) {
   }
 }
 
+
+function createWpmClock(startIndex, speed, carriedWords = 0) {
+  return {
+    startIndex: Math.max(0, Number(startIndex) || 0),
+    speed: Math.max(1, Number(speed) || 1),
+    startedAt: performance.now(),
+    carriedWords: Math.max(0, Number(carriedWords) || 0)
+  };
+}
+
+function wordsDueFromClock(clock, now = performance.now()) {
+  if (!clock) return 0;
+  const elapsedMinutes = Math.max(0, now - clock.startedAt) / 60000;
+  return clock.carriedWords + (elapsedMinutes * clock.speed);
+}
+
+function targetWordFromClock(clock, now = performance.now()) {
+  return Math.min(
+    state.words.length,
+    clock.startIndex + Math.floor(wordsDueFromClock(clock, now))
+  );
+}
+
+function wordElementForIndex(reader, index) {
+  if (!reader) return null;
+  return reader.querySelector(`.reader-word[data-index="${Math.max(0, Math.trunc(index))}"]`)
+    || reader.querySelector(`.reader-group[data-start-index="${Math.max(0, Math.trunc(index))}"]`);
+}
+
+function scrollWordToReadingLine(reader, index) {
+  const element = wordElementForIndex(reader, index);
+  if (!element) return false;
+
+  const readerRect = reader.getBoundingClientRect();
+  const elementRect = element.getBoundingClientRect();
+  const desiredTop = Math.max(16, reader.clientHeight * 0.32);
+  const currentTop = elementRect.top - readerRect.top;
+  const delta = currentTop - desiredTop;
+
+  if (Math.abs(delta) >= 1) {
+    reader.scrollTop = Math.max(0, reader.scrollTop + delta);
+  }
+  return true;
+}
 function startDigitalSignReader({ reader, speed, start, pause }) {
   const stage = reader.querySelector('.digital-sign-stage');
   if (!stage || state.index >= state.words.length) return;
 
   const token = ++state.runToken;
   const isResume = state.tickerPaused && stage.children.length > 0;
+  const resumeIndex = Math.max(0, state.index);
 
   if (!isResume) {
     stage.replaceChildren();
-    state.tickerStartIndex = state.index;
-    state.tickerNextWordIndex = state.index;
+    state.tickerStartIndex = resumeIndex;
+    state.tickerNextWordIndex = resumeIndex;
     state.tickerLoadedWords = 0;
-    state.tickerOffset = Math.max(1, reader.clientWidth);
     fillTickerBuffer(stage, reader);
   }
 
+  // The word clock is authoritative. Pixel movement is only a visualization.
+  const clock = createWpmClock(resumeIndex, speed);
   state.tickerPaused = false;
-  state.tickerLastAt = performance.now();
+  state.tickerLastAt = clock.startedAt;
 
   const frame = (now) => {
     if (token !== state.runToken || state.tickerPaused) {
@@ -4994,39 +8483,49 @@ function startDigitalSignReader({ reader, speed, start, pause }) {
       return;
     }
 
-    const elapsedSeconds = Math.min(0.05, Math.max(0, (now - state.tickerLastAt) / 1000));
-    state.tickerLastAt = now;
+    const targetIndex = targetWordFromClock(clock, now);
+    state.index = Math.max(resumeIndex, targetIndex);
 
-    const loadedWords = Math.max(1, state.tickerLoadedWords);
-    const averagePixelsPerWord = Math.max(4, stage.scrollWidth / loadedWords);
-    const pixelsPerSecond = Math.max(8, averagePixelsPerWord * speed / 60);
-    state.tickerOffset -= pixelsPerSecond * elapsedSeconds;
-
-    // Recycle chunks only after they have completely passed the left edge.
-    // Correcting the offset by the removed width keeps the remaining text in
-    // exactly the same visual position, so there is no jump or phrase break.
-    let first = stage.firstElementChild;
-    while (first) {
-      const style = getComputedStyle(first);
-      const removedWidth = first.getBoundingClientRect().width
-        + parseFloat(style.marginRight || '0');
-      if (state.tickerOffset + removedWidth > 0) break;
-
-      const passedEnd = Number(first.dataset.end) || state.index;
-      state.index = Math.max(state.index, passedEnd);
-      state.tickerOffset += removedWidth;
-      state.tickerLoadedWords -= Math.max(0, passedEnd - (Number(first.dataset.start) || passedEnd));
-      first.remove();
+    // Keep enough upcoming text buffered.
+    while (state.tickerNextWordIndex < Math.min(state.words.length, state.index + 300)) {
       fillTickerBuffer(stage, reader);
-      first = stage.firstElementChild;
-      updateReaderStatus();
+      if (state.tickerNextWordIndex >= state.words.length) break;
     }
 
-    stage.style.transform = `translate3d(${state.tickerOffset}px, 0, 0)`;
+    // Remove chunks that are entirely behind the authoritative target word.
+    let first = stage.firstElementChild;
+    while (first && Number(first.dataset.end) <= state.index) {
+      state.tickerLoadedWords -= Math.max(
+        0,
+        (Number(first.dataset.end) || 0) - (Number(first.dataset.start) || 0)
+      );
+      first.remove();
+      first = stage.firstElementChild;
+      fillTickerBuffer(stage, reader);
+    }
 
-    if (!stage.firstElementChild && state.tickerNextWordIndex >= state.words.length) {
+    /*
+      Position the currently due word near the horizontal reading anchor.
+      This calculation is repeated from the current viewport dimensions, so a
+      resize changes only where the word appears—not how many words are due.
+    */
+    const anchorX = Math.max(24, reader.clientWidth * 0.35);
+    const currentChunk = stage.firstElementChild;
+    if (currentChunk) {
+      const chunkStart = Number(currentChunk.dataset.start) || state.index;
+      const chunkEnd = Math.max(chunkStart + 1, Number(currentChunk.dataset.end) || chunkStart + 1);
+      const chunkWords = Math.max(1, chunkEnd - chunkStart);
+      const chunkWidth = Math.max(1, currentChunk.getBoundingClientRect().width);
+      const localWords = Math.max(0, Math.min(chunkWords, state.index - chunkStart));
+      const localOffset = (localWords / chunkWords) * chunkWidth;
+      state.tickerOffset = anchorX - localOffset;
+      stage.style.transform = `translate3d(${state.tickerOffset}px, 0, 0)`;
+    }
+
+    updateReaderStatus();
+
+    if (state.index >= state.words.length) {
       state.tickerFrame = null;
-      state.index = state.words.length;
       state.tickerPaused = false;
       if (start) { start.disabled = false; start.textContent = 'Start'; }
       if (pause) pause.disabled = true;
@@ -5034,58 +8533,53 @@ function startDigitalSignReader({ reader, speed, start, pause }) {
       return;
     }
 
-    fillTickerBuffer(stage, reader);
     state.tickerFrame = requestAnimationFrame(frame);
   };
 
-  stage.style.transform = `translate3d(${state.tickerOffset}px, 0, 0)`;
   state.tickerFrame = requestAnimationFrame(frame);
   start.disabled = true;
   pause.disabled = false;
 }
-
 function startAutoScrollReader({ reader, speed, start, pause }) {
   const token = ++state.runToken;
-  state.autoScrollLastAt = performance.now();
-  state.autoScrollCarry = 0;
+  const startIndex = Math.max(0, state.index);
+  const clock = createWpmClock(startIndex, speed);
+  state.autoScrollLastAt = clock.startedAt;
+  let lastTarget = startIndex;
 
   const step = (now) => {
     if (token !== state.runToken) return;
-    const elapsedSeconds = Math.min(.1, Math.max(0, (now - state.autoScrollLastAt) / 1000));
-    state.autoScrollLastAt = now;
 
-    if (reader.scrollTop + reader.clientHeight >= reader.scrollHeight - 900 && state.renderedWordEnd < state.words.length) {
-      ensureWordsRendered(reader, 'auto-scroll', 1, state.renderedWordEnd + 800);
+    const targetIndex = targetWordFromClock(clock, now);
+
+    if (targetIndex > lastTarget) {
+      ensureWordsRendered(
+        reader,
+        'auto-scroll',
+        1,
+        Math.min(state.words.length, targetIndex + 1000)
+      );
+
+      // The logical reading position comes from elapsed time, never pixels.
+      state.index = targetIndex;
+      scrollWordToReadingLine(reader, targetIndex);
+      lastTarget = targetIndex;
+      updateReaderStatus();
     }
 
-    const measuredWords = Math.max(1, state.renderedWordEnd);
-    const pixelsPerWord = Math.max(.2, reader.scrollHeight / measuredWords);
-    const pixelsPerSecond = pixelsPerWord * speed / 60;
-    state.autoScrollCarry += pixelsPerSecond * elapsedSeconds;
-    const wholePixels = Math.floor(state.autoScrollCarry);
-    if (wholePixels > 0) {
-      reader.scrollTop += wholePixels;
-      state.autoScrollCarry -= wholePixels;
-    }
-
-    state.index = Math.min(state.words.length, Math.round(reader.scrollTop / pixelsPerWord));
-    updateReaderStatus();
-
-    const atDocumentEnd = state.renderedWordEnd >= state.words.length
-      && reader.scrollTop + reader.clientHeight >= reader.scrollHeight - 2;
-    if (atDocumentEnd) {
+    if (targetIndex >= state.words.length) {
       stopReader();
       if (start) { start.disabled = false; start.textContent = 'Start'; }
       if (pause) pause.disabled = true;
       updateReaderStatus('Finished.');
       return;
     }
+
     state.interval = window.setTimeout(() => step(performance.now()), 16);
   };
 
   step(performance.now());
 }
-
 function startReader() {
   const selectedMode = getSelectedMode();
   if (selectedMode === 'two-column') return;
@@ -6757,7 +10251,7 @@ function renderGreatBooksLibrary() {
   app.innerHTML = `
     <section class="panel curated-library great-books-study-library">
       <div class="library-heading">
-        <div><span class="source-category">Discover · Study</span><h1>Great Books of the Western World</h1><p>The 1990 60-volume reading list, organized for primary-text reading, study, and syntopical exploration.</p></div>
+        <div><span class="source-category">Browse · Study</span><h1>Great Books of the Western World</h1><p>The 1990 60-volume framework expanded into individual works, plus the Bible collection referenced by the Syntopicon tradition.</p></div>
         <div class="source-actions"><button class="secondary" type="button" data-read="gutenberg">Search Gutenberg</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
       </div>
       <div class="study-language-bar">
@@ -6765,12 +10259,15 @@ function renderGreatBooksLibrary() {
         <select id="great-books-study-language">${studyLanguageOptions(getStudyLanguage())}</select>
       </div>
       <div class="great-books-study-intro">
-        <article><strong>${greatBooksCatalog.length}</strong><span>works / author groups</span></article>
+        <article><strong>${greatBooksCatalog.length}</strong><span>individual works / collections</span></article>
         <article><strong>60</strong><span>volume framework</span></article>
         <article><strong>AI</strong><span>Great Ideas study guides</span></article>
       </div>
-      <label class="curated-filter">Filter works, authors, volumes, or ideas<input id="great-books-filter" type="search" placeholder="Plato, justice, Shakespeare, science…"></label>
-      <div id="great-books-groups" class="curated-groups great-books-volumes">
+      <div class="list-toolbar-row">
+        <label class="curated-filter">Filter works, authors, volumes, or ideas<input id="great-books-filter" type="search" placeholder="Plato, justice, Shakespeare, science…"></label>
+        ${listPresentationControls('great-books', { collapsible:true, defaultView:'tiles' })}
+      </div>
+      <div id="great-books-groups" class="curated-groups great-books-volumes presentation-tiles">
         ${Object.entries(grouped).sort((a,b)=>Number(a[0])-Number(b[0])).map(([volume, books]) => `
           <details class="curated-era" ${Number(volume) <= 6 ? 'open' : ''}>
             <summary>Volume ${escapeHtml(volume)} · ${escapeHtml(books[0]?.era || '')} <span>${books.length}</span></summary>
@@ -6790,6 +10287,13 @@ function renderGreatBooksLibrary() {
       <p class="library-note">The reading list follows the 1990 edition’s contents. Find & Import searches all connected public book sources—Standard Ebooks, Internet Archive, Open Library, Wikisource, and Project Gutenberg—and opens only a verified primary/full-text edition. Summaries, excerpts, study guides, and weak title matches are rejected automatically. It may not find works that remain copyrighted or lack a suitable open digital edition. This app does not reproduce Britannica’s copyrighted Syntopicon commentary; its Great Ideas study guides are newly generated for syntopical reading.</p>
     </section>`;
 
+  bindListPresentationControls({
+    key:'great-books',
+    root:'#great-books-groups',
+    itemSelector:'[data-great-book-card]',
+    groupSelector:'.curated-era',
+    defaultView:'tiles'
+  });
   app.querySelector('#great-books-study-language')?.addEventListener('change', (event) => setStudyLanguage(event.target.value));
   const filter = app.querySelector('#great-books-filter');
   filter.addEventListener('input', () => {
@@ -6909,14 +10413,23 @@ async function renderCurrentReading(category = 'all') {
     app.innerHTML = `
       <section class="panel current-reading-library">
         <div class="library-heading"><div><h1>News, Sports & Interests</h1><p>Browse recent headlines and topic feeds, then read a feed summary or request a readable article.</p></div></div>
-        <div class="category-tabs" role="tablist">${Object.entries(categories).map(([key, label]) => `<button type="button" class="${key === category ? 'active' : ''}" data-current-category="${key}">${label}</button>`).join('')}</div>
-        <div class="source-grid">${sources.filter((source) => category === 'all' || source.category === category).map((source) => `
+        <div class="list-toolbar-row">
+          <div class="category-tabs" role="tablist">${Object.entries(categories).map(([key, label]) => `<button type="button" class="${key === category ? 'active' : ''}" data-current-category="${key}">${label}</button>`).join('')}</div>
+          ${listPresentationControls('current-sources', { collapsible:false, defaultView:'tiles' })}
+        </div>
+        <div class="source-grid presentation-tiles">${sources.filter((source) => category === 'all' || source.category === category).map((source) => `
           <article class="source-card">
             <div><span class="source-category">${escapeHtml(categories[source.category] || source.category)}</span><h2>${escapeHtml(source.name)}</h2><p>${escapeHtml(source.description)}</p></div>
             <div class="source-actions"><button class="primary" type="button" data-open-feed="${escapeHtml(source.id)}">Browse headlines</button><a class="secondary button-link" href="${escapeHtml(source.siteUrl)}" target="_blank" rel="noopener noreferrer">Visit site</a></div>
           </article>`).join('')}</div>
         <p class="library-note">Some hobby feeds use Google News topic searches. Publisher terms, paywalls, and automated-access rules still apply to individual articles.</p>
       </section>`;
+    bindListPresentationControls({
+      key:'current-sources',
+      root:'.source-grid',
+      itemSelector:'.source-card',
+      defaultView:'tiles'
+    });
     app.querySelectorAll('[data-current-category]').forEach((button) => button.addEventListener('click', () => renderCurrentReading(button.dataset.currentCategory)));
     app.querySelectorAll('[data-open-feed]').forEach((button) => button.addEventListener('click', () => renderCurrentFeed(button.dataset.openFeed)));
   } catch (error) {
@@ -7118,6 +10631,26 @@ function cleanEpubText(value) {
   return String(value || '').replace(/\u00ad/g, '').replace(/\s+/g, ' ').trim();
 }
 
+function bytesToDataUrl(bytes, mediaType = 'application/octet-stream') {
+  const chunkSize = 0x8000;
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return `data:${mediaType};base64,${btoa(binary)}`;
+}
+
+function epubImageElements(doc) {
+  const body = doc.body || firstXmlLocal(doc, 'body') || doc.documentElement;
+  return Array.from(body.querySelectorAll?.('img[src], image[href], image') || [])
+    .filter((element) =>
+      element.hasAttribute('src') ||
+      element.hasAttribute('href') ||
+      element.hasAttribute('xlink:href') ||
+      element.getAttributeNS?.('http://www.w3.org/1999/xlink', 'href')
+    );
+}
+
 function epubContentLines(doc) {
   const body = doc.body || firstXmlLocal(doc, 'body') || doc.documentElement;
   const candidates = Array.from(body.querySelectorAll?.('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,figcaption') || []);
@@ -7254,6 +10787,11 @@ async function parseEpubFile(file) {
   const fileStart = new Map();
   const anchorStart = new Map();
   const headingStart = new Map();
+  const illustrations = [];
+  const imageDataCache = new Map();
+  const manifestByPath = new Map(
+    Array.from(manifest.values()).map((item) => [resolveArchivePath(opfPath, item.href), item])
+  );
   let wordIndex = 0;
 
   for (const idref of spineIds) {
@@ -7265,6 +10803,39 @@ async function parseEpubFile(file) {
     const chapterDoc = new DOMParser().parseFromString(chapterText, 'text/html');
     const lines = epubContentLines(chapterDoc);
     fileStart.set(chapterPath, wordIndex);
+
+    // Preserve embedded EPUB artwork by converting archive-relative image
+    // references into browser-safe data URLs. The existing illustration system
+    // places them at chapter openings without changing tokenization or position.
+    const navForFile = navEntries.find((entry) => entry.path === chapterPath);
+    const firstHeading = lines.find((line) => line.kind === 'heading')?.text || '';
+    const illustrationHeading = navForFile?.title || firstHeading || `Section ${illustrations.length + 1}`;
+    for (const imageElement of epubImageElements(chapterDoc)) {
+      const rawSrc = imageElement.getAttribute('src') || imageElement.getAttribute('href') || imageElement.getAttribute('xlink:href') || '';
+      if (!rawSrc || /^data:/i.test(rawSrc) || /^(https?:)?\/\//i.test(rawSrc)) continue;
+      const imagePath = resolveArchivePath(chapterPath, rawSrc.split('#')[0]);
+      if (!archive.entries.has(imagePath)) continue;
+      try {
+        let image = imageDataCache.get(imagePath);
+        if (!image) {
+          const manifestItem = manifestByPath.get(imagePath);
+          const extension = imagePath.split('.').pop()?.toLowerCase();
+          const mediaType = manifestItem?.mediaType || ({ jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml' }[extension] || 'application/octet-stream');
+          image = bytesToDataUrl(await archive.read(imagePath), mediaType);
+          imageDataCache.set(imagePath, image);
+        }
+        illustrations.push({
+          heading: illustrationHeading,
+          image,
+          alt: cleanEpubText(imageElement.getAttribute('alt')) || `${illustrationHeading} illustration`,
+          caption: cleanEpubText(imageElement.getAttribute('title')) || illustrationHeading,
+          sourcePath: imagePath,
+          wordIndex
+        });
+      } catch (error) {
+        console.warn(`EPUB image ${imagePath} could not be imported.`, error);
+      }
+    }
     for (const line of lines) {
       for (const id of line.ids) anchorStart.set(`${chapterPath}#${id}`, wordIndex);
       if (line.kind === 'heading') {
@@ -7320,7 +10891,209 @@ async function parseEpubFile(file) {
       name: file.name,
       epubTitle: title,
       author: creator,
-      epubToc
+      epubToc,
+      illustrations,
+      embeddedImageCount: illustrations.length
+    }
+  };
+}
+
+
+let pdfJsModulePromise = null;
+
+async function loadPdfJs() {
+  if (!pdfJsModulePromise) {
+    pdfJsModulePromise = import('https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.149/build/pdf.min.mjs')
+      .then((pdfjsLib) => {
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdn.jsdelivr.net/npm/pdfjs-dist@5.4.149/build/pdf.worker.min.mjs';
+        return pdfjsLib;
+      })
+      .catch((error) => {
+        pdfJsModulePromise = null;
+        throw new Error(`PDF support could not be loaded. Check the internet connection and try again. ${error?.message || ''}`.trim());
+      });
+  }
+  return pdfJsModulePromise;
+}
+
+function normalizePdfPageText(items) {
+  const lines = [];
+  let currentLine = '';
+  let previousY = null;
+  let previousEndX = null;
+
+  for (const item of items || []) {
+    const value = String(item?.str || '').replace(/\s+/g, ' ').trim();
+    if (!value) {
+      if (item?.hasEOL && currentLine.trim()) {
+        lines.push(currentLine.trim());
+        currentLine = '';
+        previousY = null;
+        previousEndX = null;
+      }
+      continue;
+    }
+
+    const transform = item.transform || [];
+    const x = Number(transform[4]) || 0;
+    const y = Number(transform[5]) || 0;
+    const width = Number(item.width) || 0;
+    const changedLine = previousY !== null && Math.abs(y - previousY) > 3;
+    const largeGap = previousEndX !== null && x - previousEndX > Math.max(8, (Number(item.height) || 10) * .8);
+
+    if (changedLine && currentLine.trim()) {
+      lines.push(currentLine.trim());
+      currentLine = '';
+    }
+
+    if (currentLine && (largeGap || !/[-–—/]$/.test(currentLine))) {
+      currentLine += ' ';
+    }
+
+    currentLine += value;
+    previousY = y;
+    previousEndX = x + width;
+
+    if (item.hasEOL && currentLine.trim()) {
+      lines.push(currentLine.trim());
+      currentLine = '';
+      previousY = null;
+      previousEndX = null;
+    }
+  }
+
+  if (currentLine.trim()) lines.push(currentLine.trim());
+
+  return lines
+    .join('\n')
+    .replace(/(\w)-\n(\w)/g, '$1$2')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function pdfOutlineToToc(outline = [], pageRefs = new Map(), depth = 0) {
+  const entries = [];
+  for (const item of outline || []) {
+    const title = String(item?.title || '').trim();
+    let pageNumber = null;
+    const destination = item?.dest;
+    if (Array.isArray(destination) && destination[0]) {
+      pageNumber = pageRefs.get(destination[0]?.num) || null;
+    }
+    if (title) entries.push({ title, pageNumber, depth });
+    if (item?.items?.length) entries.push(...pdfOutlineToToc(item.items, pageRefs, depth + 1));
+  }
+  return entries;
+}
+
+async function parsePdfFile(file, onProgress = () => {}) {
+  if (!file) throw new Error('Choose a PDF file first.');
+  if (file.size > 100 * 1024 * 1024) {
+    throw new Error('This PDF is larger than 100 MB. Use a smaller or optimized copy.');
+  }
+
+  const pdfjsLib = await loadPdfJs();
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const loadingTask = pdfjsLib.getDocument({
+    data: bytes,
+    useSystemFonts: true,
+    isEvalSupported: false
+  });
+
+  loadingTask.onPassword = (updatePassword, reason) => {
+    const password = window.prompt(
+      reason === pdfjsLib.PasswordResponses?.INCORRECT_PASSWORD
+        ? 'That password was incorrect. Enter the PDF password again:'
+        : 'This PDF is password protected. Enter its password:'
+    );
+    if (password === null) {
+      loadingTask.destroy();
+      return;
+    }
+    updatePassword(password);
+  };
+
+  loadingTask.onProgress = ({ loaded, total }) => {
+    if (total) onProgress(Math.min(15, Math.round((loaded / total) * 15)), 'Loading PDF…');
+  };
+
+  const pdf = await loadingTask.promise;
+  const metadata = await pdf.getMetadata().catch(() => null);
+  const pageRefs = new Map();
+  const pages = [];
+  let extractedCharacters = 0;
+  let textPages = 0;
+
+  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    const page = await pdf.getPage(pageNumber);
+    try {
+      if (page.ref?.num) pageRefs.set(page.ref.num, pageNumber);
+      const content = await page.getTextContent({
+        includeMarkedContent: false,
+        disableNormalization: false
+      });
+      const pageText = normalizePdfPageText(content.items);
+      if (pageText.length >= 20) textPages += 1;
+      extractedCharacters += pageText.length;
+      pages.push({
+        pageNumber,
+        text: pageText,
+        width: page.view?.[2] || null,
+        height: page.view?.[3] || null
+      });
+    } finally {
+      page.cleanup();
+    }
+
+    const percent = 15 + Math.round((pageNumber / pdf.numPages) * 80);
+    onProgress(percent, `Extracting page ${pageNumber} of ${pdf.numPages}…`);
+  }
+
+  const outline = await pdf.getOutline().catch(() => null);
+  const toc = pdfOutlineToToc(outline || [], pageRefs);
+  const title =
+    String(metadata?.info?.Title || '').trim()
+    || file.name.replace(/\.pdf$/i, '')
+    || 'Imported PDF';
+
+  const text = pages
+    .map((page) => `\n\n[PDF Page ${page.pageNumber}]\n\n${page.text}`)
+    .join('')
+    .trim();
+
+  const textCoverage = pdf.numPages ? textPages / pdf.numPages : 0;
+  const likelyScanned = extractedCharacters < Math.max(200, pdf.numPages * 35)
+    || textCoverage < .2;
+
+  await loadingTask.destroy().catch(() => {});
+  onProgress(100, 'PDF ready.');
+
+  if (likelyScanned) {
+    throw new Error(
+      'This PDF appears to be scanned or image-only. Very little selectable text was found. OCR support will be needed for this file.'
+    );
+  }
+
+  return {
+    title,
+    text,
+    source: {
+      type: 'pdf',
+      name: file.name,
+      fileSize: file.size,
+      pageCount: pdf.numPages,
+      importedAt: new Date().toISOString(),
+      toc,
+      pages: pages.map(({ pageNumber, width, height }) => ({ pageNumber, width, height })),
+      textCoverage
+    },
+    stats: {
+      pageCount: pdf.numPages,
+      textPages,
+      extractedCharacters,
+      tocEntries: toc.length
     }
   };
 }
@@ -7328,34 +11101,535 @@ async function parseEpubFile(file) {
 function renderUpload() {
   stopReader();
   app.innerHTML = `
-    <section class="panel">
-      <h1>Upload Book or Text</h1>
-      <p>Select an EPUB/EPUB3 or UTF-8 text file. EPUB books are unpacked and parsed locally in your browser; the EPUB itself is not uploaded to the server. Mark, Set, Go! uses the EPUB's built-in reading order and table of contents when available.</p>
-      <div class="controls"><input id="text-file" type="file" accept=".epub,application/epub+zip,.txt,text/plain"><span id="upload-status" class="status"></span></div>
+    <section class="panel import-book-page">
+      <header class="import-book-header">
+        <div>
+          <span class="source-category">Import</span>
+          <h1>Import a Book or Document</h1>
+          <p>Open EPUB, PDF, or UTF-8 text files. Processing happens locally in your browser; the original file is not uploaded to the Mark, Set, Go! server.</p>
+        </div>
+      </header>
+
+      <div class="import-format-grid" aria-label="Supported formats">
+        <article><span class="import-format-icon epub">E</span><div><strong>EPUB / EPUB3</strong><small>Preserves reading order and table of contents when available.</small></div></article>
+        <article><span class="import-format-icon pdf">PDF</span><div><strong>Text-based PDF</strong><small>Extracts selectable text and preserves PDF page markers.</small></div></article>
+        <article><span class="import-format-icon text">TXT</span><div><strong>Plain Text</strong><small>Imports UTF-8 text directly into the Reader.</small></div></article>
+      </div>
+
+      <label class="import-drop-zone" for="text-file">
+        <span class="import-upload-icon">⇧</span>
+        <strong>Choose EPUB, PDF, or TXT</strong>
+        <small>PDF files up to 100 MB. Scanned PDFs require OCR and are detected automatically.</small>
+        <input id="text-file" type="file"
+          accept=".epub,application/epub+zip,.pdf,application/pdf,.txt,text/plain">
+      </label>
+
+      <div id="pdf-import-progress" class="pdf-import-progress" hidden>
+        <div class="pdf-progress-heading">
+          <strong id="pdf-progress-label">Preparing PDF…</strong>
+          <span id="pdf-progress-percent">0%</span>
+        </div>
+        <div class="pdf-progress-track"><span id="pdf-progress-bar"></span></div>
+      </div>
+
+      <div id="upload-status" class="status import-status" role="status" aria-live="polite"></div>
+
+      <aside class="pdf-import-note">
+        <strong>About PDF imports</strong>
+        <p>Modern PDFs with selectable text work best. Page labels such as <em>PDF Page 12</em> are inserted into the extracted text so notes, AI questions, and reading progress retain a connection to the source pages. Image-only scans are not silently imported as blank documents.</p>
+      </aside>
     </section>`;
+
   app.querySelector('#text-file').addEventListener('change', async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
     const status = app.querySelector('#upload-status');
+    const progress = app.querySelector('#pdf-import-progress');
+    const progressLabel = app.querySelector('#pdf-progress-label');
+    const progressPercent = app.querySelector('#pdf-progress-percent');
+    const progressBar = app.querySelector('#pdf-progress-bar');
+    const input = event.currentTarget;
+
+    const setProgress = (percent, label) => {
+      progress.hidden = false;
+      const value = Math.max(0, Math.min(100, Number(percent) || 0));
+      progressBar.style.width = `${value}%`;
+      progressPercent.textContent = `${Math.round(value)}%`;
+      progressLabel.textContent = label || 'Processing PDF…';
+    };
+
+    input.disabled = true;
+    status.className = 'status import-status';
+    status.textContent = '';
+
     try {
       const isEpub = /\.epub$/i.test(file.name) || file.type === 'application/epub+zip';
+      const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
+
       if (isEpub) {
-        status.className = 'status';
+        progress.hidden = true;
         status.textContent = 'Opening EPUB…';
         const book = await parseEpubFile(file);
         renderReaderWithText(book.title, book.text, book.source);
-      } else {
-        const text = await file.text();
-        renderReaderWithText(file.name, text, { type: 'upload', name: file.name });
+        return;
       }
+
+      if (isPdf) {
+        setProgress(1, 'Loading PDF support…');
+        const book = await parsePdfFile(file, setProgress);
+        status.className = 'status success import-status';
+        status.textContent = `${book.stats.pageCount} pages extracted. Opening ${book.title}…`;
+        window.setTimeout(() => renderReaderWithText(book.title, book.text, book.source), 250);
+        return;
+      }
+
+      progress.hidden = true;
+      status.textContent = 'Opening text file…';
+      const text = await file.text();
+      if (!text.trim()) throw new Error('This text file is empty.');
+      renderReaderWithText(file.name.replace(/\.txt$/i, ''), text, {
+        type: 'upload',
+        name: file.name,
+        fileSize: file.size,
+        importedAt: new Date().toISOString()
+      });
     } catch (error) {
       console.error('Book import failed.', error);
-      status.className = 'status error';
+      progress.hidden = true;
+      status.className = 'status error import-status';
       status.textContent = error?.message || 'The file could not be read.';
+      input.disabled = false;
+      input.value = '';
     }
   });
 }
 
+function renderBrowseHub() {
+  stopReader();
+
+  const progress = Object.values(readStoredObject(READING_PROGRESS_KEY));
+  const readingList = getReadingList();
+  const recentTitles = progress
+    .sort((x, y) => new Date(y.lastReadAt || 0) - new Date(x.lastReadAt || 0))
+    .slice(0, 6);
+
+  const recommended = [
+    { title:'The Republic', author:'Plato', query:'The Republic Plato', reason:'Justice and society.' },
+    { title:'Meditations', author:'Marcus Aurelius', query:'Meditations Marcus Aurelius', reason:'Character and discipline.' },
+    { title:'The Brothers Karamazov', author:'Fyodor Dostoevsky', query:'Brothers Karamazov Dostoevsky', reason:'Faith and moral choice.' },
+    { title:'The Federalist Papers', author:'Hamilton, Madison, and Jay', query:'Federalist Papers', reason:'Political philosophy.' },
+    { title:'The Confessions', author:'Augustine', query:'Confessions Augustine', reason:'Faith and memory.' },
+    { title:'On the Origin of Species', author:'Charles Darwin', query:'Origin of Species Darwin', reason:'Foundational science.' }
+  ];
+
+  const collections = [
+    ['Ancient Greece','Plato Aristotle Homer Sophocles'],
+    ['Roman Classics','Cicero Virgil Marcus Aurelius Tacitus'],
+    ['Founding & Republic','Federalist Papers Constitution Tocqueville'],
+    ['Faith & Theology','Augustine Aquinas Bunyan Bible'],
+    ['Science & Discovery','Darwin Newton Galileo Faraday'],
+    ['Adventure','Odyssey Treasure Island Robinson Crusoe'],
+    ['Mystery','Sherlock Holmes Wilkie Collins Poe'],
+    ['Biography & History','Plutarch Boswell Gibbon']
+  ];
+
+  app.innerHTML = `
+    <section class="platform-page browse-hub">
+      <header class="platform-hero">
+        <div>
+          <span class="source-category">Browse</span>
+          <h1>What would you like to discover?</h1>
+          <p>Find books, collections, and readable editions.</p>
+        </div>
+        <button class="secondary" type="button" data-action="reader">Return to Reader</button>
+      </header>
+
+      <form id="browse-global-search" class="browse-search">
+        <span aria-hidden="true">⌕</span>
+        <input id="browse-global-query" type="search" required placeholder="Search titles, authors, subjects, or ideas across all libraries">
+        <button class="primary" type="submit">Search All Libraries</button>
+      </form>
+
+      <section class="browse-section">
+        <div class="section-heading"><div><h2>Popular libraries</h2><p>Choose a source or search everything.</p></div></div>
+        <div class="platform-tile-grid library-source-tiles">
+          <button class="platform-tile featured" type="button" data-read="unified-library"><span class="browse-icon icon-search">⌕</span><strong>Search All Libraries</strong><small>Search every source</small></button>
+          <button class="platform-tile" type="button" data-read="gutenberg"><span class="browse-icon icon-gutenberg">G</span><strong>Project Gutenberg</strong><small>Public-domain classics</small></button>
+          <button class="platform-tile" type="button" data-browse-search="provider:internet-archive"><span class="browse-icon icon-archive">◎</span><strong>Internet Archive</strong><small>Digitized editions</small></button>
+          <button class="platform-tile" type="button" data-browse-search="provider:open-library"><span class="browse-icon icon-openlibrary">▤</span><strong>Open Library</strong><small>Discovery and borrowing</small></button>
+          <button class="platform-tile" type="button" data-browse-search="provider:wikisource"><span class="browse-icon icon-wikisource">W</span><strong>Wikisource</strong><small>Primary texts</small></button>
+          <button class="platform-tile" type="button" data-read="great-books"><span class="browse-icon icon-greatbooks">★</span><strong>Great Books</strong><small>Classic works and ideas</small></button>
+        </div>
+      </section>
+
+      <section class="browse-section">
+        <div class="section-heading"><div><h2>Collections</h2><p>Explore by theme.</p></div></div>
+        <div class="collection-strip">
+          ${collections.map(([title, query]) => `<button type="button" class="collection-card" data-collection-query="${escapeHtml(query)}"><strong>${escapeHtml(title)}</strong><span>Explore collection →</span></button>`).join('')}
+        </div>
+      </section>
+
+      <section class="browse-section">
+        <div class="section-heading"><div><h2>Recommended starting points</h2><p>Suggested starting points.</p></div></div>
+        <div class="platform-book-grid">
+          ${recommended.map((book) => `<article class="platform-book-card">
+            <div class="book-spine" aria-hidden="true">${escapeHtml(book.title.slice(0,1))}</div>
+            <div><h3>${escapeHtml(book.title)}</h3><p>${escapeHtml(book.author)}</p><small>${escapeHtml(book.reason)}</small></div>
+            <button class="primary" type="button" data-browse-title="${escapeHtml(book.query)}">Find full text</button>
+          </article>`).join('')}
+        </div>
+      </section>
+
+      <section class="browse-section">
+        <div class="section-heading"><div><h2>Continue exploring</h2><p>Pick up where you left off.</p></div></div>
+        <div class="continue-exploring-grid">
+          ${recentTitles.length ? recentTitles.map((item) => `<button type="button" class="continue-card" data-progress-open="${escapeHtml(item.documentId)}"><span>${Math.min(100, Math.round(((Number(item.furthestWord)||0)/Math.max(1,Number(item.totalWords)||1))*100))}%</span><strong>${escapeHtml(item.title || 'Untitled')}</strong><small>Resume recorded text</small></button>`).join('') : '<p class="navigation-empty">Your recent books will appear here after you begin reading.</p>'}
+          ${readingList.slice(0,3).map((item) => `<button type="button" class="continue-card" data-action="my-reading"><span>List</span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.status || 'Saved')}</small></button>`).join('')}
+        </div>
+      </section>
+
+      <section class="browse-section browse-daily">
+        <article><span class="source-category">Today</span><h2>Great Idea: Justice</h2><p>Compare how Plato, Aristotle, Cicero, Augustine, Aquinas, and the biblical tradition understand justice.</p><button class="secondary" type="button" data-read="syntopicon">Explore Great Ideas</button></article>
+        <article><span class="source-category">Study</span><h2>Bible reading</h2><p>Open Bible Study for parallel translations, commentary, cross references, and structured reading.</p><button class="secondary" type="button" data-read="bible">Open Bible Study</button></article>
+        <article><span class="source-category">Current</span><h2>News & interests</h2><p>Use current articles as shorter reading practice and comprehension material.</p><button class="secondary" type="button" data-read="current-reading">Browse current reading</button></article>
+      </section>
+    </section>`;
+
+  const search = (query) => {
+    localStorage.setItem('markSetGoPendingLibrarySearch', query);
+    renderUnifiedLibrary();
+    requestAnimationFrame(() => {
+      const input = app.querySelector('#unified-library-query');
+      const form = app.querySelector('#unified-library-search');
+      if (input) input.value = query;
+      form?.requestSubmit();
+    });
+  };
+
+  app.querySelector('#browse-global-search')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    search(app.querySelector('#browse-global-query')?.value || '');
+  });
+  app.querySelectorAll('[data-collection-query]').forEach((button) => button.addEventListener('click', () => search(button.dataset.collectionQuery)));
+  app.querySelectorAll('[data-browse-title]').forEach((button) => button.addEventListener('click', () => search(button.dataset.browseTitle)));
+  app.querySelectorAll('[data-browse-search]').forEach((button) => button.addEventListener('click', () => renderUnifiedLibrary()));
+
+  app.querySelectorAll('[data-progress-open]').forEach((button) => button.addEventListener('click', () => {
+    const documentId = button.dataset.progressOpen;
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+    if (!data?.text) return renderReadingList();
+    renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
+    const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
+    requestAnimationFrame(() => jumpToWordIndex(record?.lastWord || 0));
+  }));
+}
+
+
+function libraryRecencyClass(lastReadAt) {
+  if (!lastReadAt) return 'recency-undated';
+
+  const readDate = new Date(lastReadAt);
+  if (Number.isNaN(readDate.getTime())) return 'recency-undated';
+
+  const now = new Date();
+  const today = startOfDay(now);
+  const readDay = startOfDay(readDate);
+  const ageDays = Math.floor((today - readDay) / 86400000);
+
+  if (ageDays <= 0) return 'recency-today';
+  if (ageDays <= 7) return 'recency-week';
+  if (ageDays <= 30) return 'recency-month';
+  if (ageDays <= 90) return 'recency-quarter';
+  return 'recency-older';
+}
+
+function libraryRecencyLabel(lastReadAt) {
+  const recency = libraryRecencyClass(lastReadAt);
+  return ({
+    'recency-today': 'Read today',
+    'recency-week': 'Read this week',
+    'recency-month': 'Read this month',
+    'recency-quarter': 'Read in the last 3 months',
+    'recency-older': 'Read more than 3 months ago',
+    'recency-undated': 'No reading date'
+  })[recency];
+}
+
+function renderMyLibraryHub() {
+  finalizeReadingSession();
+  stopReader();
+
+  const readingList = getReadingList();
+  const progress = Object.values(readStoredObject(READING_PROGRESS_KEY))
+    .sort((a, b) => new Date(b.lastReadAt || 0) - new Date(a.lastReadAt || 0));
+  const activity = readStoredArray(READING_ACTIVITY_KEY);
+  const comprehension = getComprehensionResults();
+  const bookmarks = getBookmarks();
+  const notes = getNotes();
+  const definitions = getSavedDefinitions();
+  const annualGoal = getAnnualReadingGoal();
+  const completed = completedBooksThisYear(progress, readingList);
+  const streak = readingStreak(activity);
+  const totalSeconds = activity.reduce((sum, item) => sum + (Number(item.seconds) || 0), 0);
+  const todayKey = dateKey(new Date());
+  const todaySeconds = activity
+    .filter((item) => dateKey(item.endedAt) === todayKey)
+    .reduce((sum, item) => sum + (Number(item.seconds) || 0), 0);
+  const averageComprehension = comprehension.length
+    ? Math.round(comprehension.reduce((sum, item) => sum + (Number(item.scorePercent) || 0), 0) / comprehension.length)
+    : null;
+  const goalPercent = Math.min(100, Math.round((completed / Math.max(1, annualGoal)) * 100));
+  const primaryBook = progress[0] || null;
+  const primaryPercent = primaryBook?.totalWords
+    ? Math.min(100, Math.round((Number(primaryBook.furthestWord) || 0) / primaryBook.totalWords * 100))
+    : 0;
+  const storedDifficultyForProgress = (item) => {
+    if (!item) return null;
+    let document = null;
+    try { document = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${item.documentId}`) || 'null'); } catch {}
+    return getBookDifficulty({ documentId:item.documentId, title:item.title, author:document?.source?.author || '', year:document?.source?.year || '', description:document?.source?.description || '' }, document?.text || '');
+  };
+  const primaryDifficulty = storedDifficultyForProgress(primaryBook);
+
+  const openStoredDocument = (documentId, wordIndex = null) => {
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+    if (!data?.text) {
+      window.alert('This text is not currently stored in this browser.');
+      return;
+    }
+    renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
+    const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
+    requestAnimationFrame(() => jumpToWordIndex(
+      Number.isFinite(Number(wordIndex)) ? Number(wordIndex) : (record?.lastWord || 0)
+    ));
+  };
+
+  const continueCards = progress.slice(0, 6).map((item, index) => {
+    const difficulty = storedDifficultyForProgress(item);
+    const percent = item.totalWords
+      ? Math.min(100, Math.round((Number(item.furthestWord) || 0) / item.totalWords * 100))
+      : 0;
+    const lastRead = item.lastReadAt
+      ? new Date(item.lastReadAt).toLocaleDateString(undefined, { month:'short', day:'numeric' })
+      : 'Recently';
+    return `<article class="library-continue-card ${index === 0 ? 'featured' : ''}">
+      <button type="button" class="continue-cover ${libraryRecencyClass(item.lastReadAt)}" data-library-document="${escapeHtml(item.documentId)}" aria-label="Resume ${escapeHtml(item.title || 'book')} · ${escapeHtml(libraryRecencyLabel(item.lastReadAt))}">
+        <span class="${libraryRecencyClass(item.lastReadAt)}" title="${escapeHtml(libraryRecencyLabel(item.lastReadAt))}">${escapeHtml((item.title || 'B').slice(0, 1).toUpperCase())}</span>
+      </button>
+      <div class="continue-card-copy">
+        <span class="source-category">${index === 0 ? 'Continue reading' : 'Recent'}</span>
+        <h3>${escapeHtml(item.title || 'Untitled')}</h3>
+        <p>${percent}% complete · Last read ${escapeHtml(lastRead)}</p>
+        ${difficulty ? difficultyBadge(difficulty, {title:item.title}) : ''}
+        <div class="library-progress-track"><span style="width:${percent}%"></span></div>
+        <button class="${index === 0 ? 'primary' : 'secondary'}" type="button" data-library-document="${escapeHtml(item.documentId)}">Resume reading</button>
+      </div>
+    </article>`;
+  }).join('');
+
+  app.innerHTML = `
+    <section class="platform-page my-library-hub library-refresh">
+      <header class="library-welcome">
+        <div>
+          <span class="source-category">My Library</span>
+          <h1>Welcome back.</h1>
+          <p>Continue your reading journey and manage your personal collection.</p>
+        </div>
+
+        <div class="library-header-actions">
+          <button class="secondary" type="button" data-action="browse">Browse books</button>
+          <button class="primary" type="button" data-action="reader">Open Reader</button>
+        </div>
+      </header>
+
+      <section class="library-focus-grid">
+        <article class="library-primary-focus">
+          ${primaryBook ? `
+            <div class="focus-book-cover ${libraryRecencyClass(primaryBook.lastReadAt)}" aria-label="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}" title="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}">${escapeHtml((primaryBook.title || 'B').slice(0,1).toUpperCase())}</div>
+            <div class="focus-book-copy">
+              <span class="source-category">Your next step</span>
+              <h2>${escapeHtml(primaryBook.title || 'Continue reading')}</h2>
+              <p>${primaryPercent}% complete. Pick up at the exact place you left off.</p>
+              ${primaryDifficulty ? difficultyBadge(primaryDifficulty, {title:primaryBook.title}) : ''}
+              <div class="library-progress-track large"><span style="width:${primaryPercent}%"></span></div>
+              <div class="focus-actions">
+                <button class="primary" type="button" data-library-document="${escapeHtml(primaryBook.documentId)}">Resume reading</button>
+                <button class="secondary" type="button" data-action="reader">Open Reader</button>
+              </div>
+            </div>
+          ` : `
+            <div class="focus-book-cover empty" aria-hidden="true">＋</div>
+            <div class="focus-book-copy">
+              <span class="source-category">Start a reading journey</span>
+              <h2>Your library is ready.</h2>
+              <p>Browse public libraries, import a book, or open a supported URL.</p>
+              <div class="focus-actions">
+                <button class="primary" type="button" data-action="browse">Browse books</button>
+                <button class="secondary" type="button" data-read="upload">Import a book</button>
+              </div>
+            </div>
+          `}
+        </article>
+
+        <article class="library-year-card">
+          <div class="year-card-heading">
+            <div><span class="source-category">This year</span><h2>${completed} of ${annualGoal} books</h2></div>
+            <strong>${goalPercent}%</strong>
+          </div>
+          <div class="annual-goal-meter"><span style="width:${goalPercent}%"></span></div>
+          <div class="year-stat-row">
+            <div><strong>${streak}</strong><span>day streak</span></div>
+            <div><strong>${formatDuration(todaySeconds)}</strong><span>today</span></div>
+            <div><strong>${averageComprehension === null ? '—' : `${averageComprehension}%`}</strong><span>comprehension</span></div>
+          </div>
+          <button class="subtle-link library-insights-link" type="button" data-action="progress-awards">View progress and awards →</button>
+        </article>
+      </section>
+
+      <details class="library-section library-continue-section" open>
+        <summary>
+          <span><strong>Continue reading</strong><small>Recently active books and documents</small></span>
+          <span class="library-section-count">${progress.length}</span>
+        </summary>
+        <div class="library-section-body">
+          <div class="library-continue-grid">
+            ${continueCards || '<div class="library-empty-state"><span>📚</span><h3>No recent reading yet</h3><p>Books you open will appear here automatically.</p><button class="primary" type="button" data-action="browse">Find a book</button></div>'}
+          </div>
+        </div>
+      </details>
+
+    </section>`;
+
+  app.querySelectorAll('[data-library-document]').forEach((button) => {
+    button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
+  });
+}
+function renderLibraryRecords(kind) {
+  stopReader();
+  const isNotes = kind === 'notes';
+  const items = isNotes ? getNotes() : getBookmarks();
+  const title = isNotes ? 'Notes' : 'Bookmarks';
+  const description = isNotes
+    ? 'Personal observations collected across your reading.'
+    : 'Saved positions collected across your books and documents.';
+
+  app.innerHTML = `<section class="platform-page library-records">
+    <header class="platform-hero"><div><span class="source-category">My Library</span><h1>${title}</h1><p>${description}</p></div><button class="secondary" type="button" data-action="my-library">Back to My Library</button></header>
+    <div class="record-toolbar">${listPresentationControls(`library-${kind}`, {collapsible:false, defaultView:'list'})}</div>
+    <div id="library-record-list" class="record-list presentation-list">
+      ${items.length ? items.map((item) => `<article class="record-card">
+        <div><h2>${escapeHtml(item.title || 'Untitled')}</h2><p>${isNotes ? escapeHtml(item.note || item.text || '') : `Saved at word ${Number(item.wordIndex || 0).toLocaleString()}`}</p><small>${new Date(item.createdAt || Date.now()).toLocaleString()}</small></div>
+        <button class="secondary" type="button" data-record-document="${escapeHtml(item.documentId || '')}" data-record-index="${Number(item.wordIndex || 0)}">Open source</button>
+      </article>`).join('') : `<p class="navigation-empty">No ${title.toLowerCase()} have been saved yet.</p>`}
+    </div>
+  </section>`;
+
+  bindListPresentationControls({key:`library-${kind}`, root:'#library-record-list', itemSelector:'.record-card', defaultView:'list'});
+  app.querySelectorAll('[data-record-document]').forEach((button) => button.addEventListener('click', () => {
+    const id = button.dataset.recordDocument;
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${id}`) || 'null'); } catch {}
+    if (!data?.text) return window.alert('The source text is not stored in this browser.');
+    renderReaderWithText(data.title, data.text, data.source || {type:'saved'});
+    requestAnimationFrame(() => jumpToWordIndex(Number(button.dataset.recordIndex)||0));
+  }));
+}
+
+function renderAiCenter() {
+  stopReader();
+  const hasBook = Boolean(state.title && state.currentText && state.words?.length);
+  const notes = getNotes().length;
+  const definitions = getSavedDefinitions().length;
+  const comprehension = getComprehensionResults().length;
+
+  app.innerHTML = `<section class="platform-page ai-center">
+    <header class="platform-hero">
+      <div><span class="source-category">AI Center</span><h1>Turn reading into understanding</h1><p>Use focused learning tools for the active text, then connect ideas across your wider library.</p></div>
+      <button class="secondary" type="button" data-action="reader">Return to Reader</button>
+    </header>
+
+    <section class="ai-active-context ${hasBook ? '' : 'empty'}">
+      <div><span class="source-category">Active context</span><h2>${hasBook ? escapeHtml(state.title) : 'No active text'}</h2><p>${hasBook ? `${state.words.length.toLocaleString()} words available for study tools.` : 'Open a book in the Reader before using passage-specific AI tools.'}</p></div>
+      ${hasBook ? '<button class="primary" type="button" data-action="reader">Open active text</button>' : '<button class="primary" type="button" data-action="browse">Browse books</button>'}
+    </section>
+
+    <div class="ai-tool-grid">
+      <button type="button" class="ai-tool-card" data-ai-tool="comprehension" ${hasBook?'':'disabled'}><span>?</span><h2>Quiz Me</h2><p>Generate recall, main-idea, inference, and deeper-understanding questions.</p></button>
+      <button type="button" class="ai-tool-card" data-ai-tool="summary" ${hasBook?'':'disabled'}><span>≡</span><h2>Summarize</h2><p>Create a concise explanation of the current reading context.</p></button>
+      <button type="button" class="ai-tool-card" data-ai-tool="explain" ${hasBook?'':'disabled'}><span>💡</span><h2>Explain a Passage</h2><p>Return to the Reader and select difficult words or passages for explanation.</p></button>
+      <button type="button" class="ai-tool-card" data-ai-tool="flashcards"><span>▣</span><h2>Flashcards</h2><p>Build review material from ${definitions} saved definitions and notes.</p></button>
+      <button type="button" class="ai-tool-card" data-action="knowledge-graph"><span>◎</span><h2>Knowledge Graph</h2><p>Connect books, authors, notes, vocabulary, and Great Ideas.</p></button>
+      <button type="button" class="ai-tool-card" data-read="syntopicon"><span>⚖</span><h2>Compare Great Ideas</h2><p>Study recurring ideas across authors, traditions, and texts.</p></button>
+      <button type="button" class="ai-tool-card" data-action="progress-awards"><span>↗</span><h2>AI Reading Coach</h2><p>Analyze ${comprehension} comprehension checks and recorded progress.</p></button>
+      <button type="button" class="ai-tool-card" data-read="bible"><span>✦</span><h2>Bible Study Assistant</h2><p>Translations, commentary, cross references, and structured study.</p></button>
+    </div>
+
+    <section id="ai-center-output" class="ai-center-output" hidden></section>
+  </section>`;
+
+  app.querySelector('[data-ai-tool="comprehension"]')?.addEventListener('click', () => {
+    renderCurrentReader();
+    requestAnimationFrame(() => app.querySelector('#check-comprehension')?.click());
+  });
+  app.querySelector('[data-ai-tool="explain"]')?.addEventListener('click', renderCurrentReader);
+  app.querySelector('[data-ai-tool="flashcards"]')?.addEventListener('click', renderVocabularyBuilder);
+  app.querySelector('[data-ai-tool="summary"]')?.addEventListener('click', () => {
+    const output = app.querySelector('#ai-center-output');
+    const sample = state.words.slice(Math.max(0,(state.index||0)-400), Math.min(state.words.length,(state.index||0)+200)).join(' ');
+    output.hidden = false;
+    output.innerHTML = `<h2>Current-context summary workspace</h2><p>The AI summary action will use a bounded section around the current reading position rather than sending the entire book. Return to the Reader, position the text, and use the Learn controls for passage-based analysis.</p><blockquote>${escapeHtml(sample.slice(0,700))}${sample.length>700?'…':''}</blockquote><button class="primary" type="button" data-action="reader">Return to Reader</button>`;
+  });
+}
+
+function renderKnowledgeGraph() {
+  stopReader();
+
+  const progress = Object.values(readStoredObject(READING_PROGRESS_KEY)).slice(0, 12);
+  const notes = getNotes().slice(0, 14);
+  const definitions = getSavedDefinitions().slice(0, 14);
+  const ideas = ['Justice','Truth','Courage','Freedom','Love','Faith','Knowledge','Beauty'];
+
+  app.innerHTML = `<section class="platform-page knowledge-graph-page">
+    <header class="platform-hero">
+      <div><span class="source-category">Knowledge Graph</span><h1>Your connected reading life</h1><p>An initial map connecting books, notes, vocabulary, and Great Ideas. As the library grows, these relationships can become increasingly personalized.</p></div>
+      <button class="secondary" type="button" data-action="ai-center">Back to AI Center</button>
+    </header>
+
+    <div class="knowledge-layout">
+      <aside class="knowledge-filters">
+        <h2>Show connections</h2>
+        <label><input type="checkbox" checked data-graph-filter="book"> Books</label>
+        <label><input type="checkbox" checked data-graph-filter="idea"> Great Ideas</label>
+        <label><input type="checkbox" checked data-graph-filter="note"> Notes</label>
+        <label><input type="checkbox" checked data-graph-filter="word"> Vocabulary</label>
+        <p>Select a node to see what is connected to it.</p>
+      </aside>
+      <div class="knowledge-canvas" id="knowledge-canvas" role="img" aria-label="Knowledge graph of books, ideas, notes, and vocabulary">
+        <div class="knowledge-center graph-node idea" data-node="center"><strong>My Learning</strong></div>
+        ${ideas.map((idea,index)=>`<button type="button" class="graph-node idea orbit-${index%8}" data-node="${escapeHtml(idea)}" data-kind="idea">${escapeHtml(idea)}</button>`).join('')}
+        ${progress.slice(0,8).map((item,index)=>`<button type="button" class="graph-node book book-${index}" data-node="${escapeHtml(item.title||'Book')}" data-kind="book">${escapeHtml((item.title||'Book').slice(0,28))}</button>`).join('')}
+        ${notes.slice(0,6).map((item,index)=>`<button type="button" class="graph-node note note-${index}" data-node="${escapeHtml(item.note||item.text||'Note')}" data-kind="note">Note ${index+1}</button>`).join('')}
+        ${definitions.slice(0,6).map((item,index)=>`<button type="button" class="graph-node word word-${index}" data-node="${escapeHtml(item.word||'Word')}" data-kind="word">${escapeHtml(item.word||'Word')}</button>`).join('')}
+      </div>
+      <aside class="knowledge-detail" id="knowledge-detail">
+        <span class="source-category">Selected node</span>
+        <h2>My Learning</h2>
+        <p>This central node represents the growing body of knowledge built from your reading.</p>
+      </aside>
+    </div>
+  </section>`;
+
+  app.querySelectorAll('.graph-node[data-kind]').forEach((node) => node.addEventListener('click', () => {
+    const detail = app.querySelector('#knowledge-detail');
+    detail.innerHTML = `<span class="source-category">${escapeHtml(node.dataset.kind)}</span><h2>${escapeHtml(node.dataset.node)}</h2><p>This node is part of your developing knowledge graph. Future versions can connect it to exact passages, related notes, authors, Bible references, and Great Ideas.</p>`;
+  }));
+  app.querySelectorAll('[data-graph-filter]').forEach((input) => input.addEventListener('change', () => {
+    app.querySelectorAll(`.graph-node.${input.dataset.graphFilter}`).forEach((node) => node.hidden = !input.checked);
+  }));
+}
 function renderHelp() {
   stopReader();
   const sections = [
@@ -7629,29 +11903,167 @@ function renderError(title, message) {
   app.querySelector('[data-action="home"]')?.addEventListener('click', renderHome);
 }
 
+
+function closeTopNavigationMenus(except = null) {
+  document.querySelectorAll('.site-header nav > details[open]').forEach((menu) => {
+    if (menu !== except) menu.removeAttribute('open');
+  });
+}
+
+document.addEventListener('click', (event) => {
+  const selectedNavigationItem = event.target.closest(
+    '.site-header .menu-popover button[data-action], .site-header .menu-popover button[data-read], .site-header .menu-popover button[data-test], .site-header .menu-popover button[data-music-quick]'
+  );
+
+  if (selectedNavigationItem) {
+    window.setTimeout(() => closeTopNavigationMenus(), 0);
+    return;
+  }
+
+  const activeMenu = event.target.closest('.site-header nav > details');
+  if (activeMenu) {
+    if (event.target.closest('summary')) closeTopNavigationMenus(activeMenu);
+    return;
+  }
+
+  closeTopNavigationMenus();
+});
+
 document.addEventListener('click', (event) => {
   const test = event.target.closest('[data-test]');
   const read = event.target.closest('[data-read]');
   const action = event.target.closest('[data-action]');
   const quickMusic = event.target.closest('[data-music-quick]');
-  if (test) { rememberReaderForReturn(); closeMenus(); renderWpmTest(test.dataset.test); }
-  if (read) { rememberReaderForReturn(); closeMenus(); renderReader(read.dataset.read); }
+  if (!test && !read && !action && !quickMusic) return;
+
+  captureCurrentViewPosition();
+
+  const targetView = navigationViewKey({
+    action: action?.dataset.action,
+    read: read?.dataset.read,
+    test: test?.dataset.test
+  });
+
+  if (test) {
+    ReaderContinuity.saveBeforeNavigation();
+    closeMenus();
+    renderWpmTest(test.dataset.test);
+    restoreViewPosition(targetView);
+    return;
+  }
+
+  if (read) {
+    ReaderContinuity.saveBeforeNavigation();
+    closeMenus();
+    renderReader(read.dataset.read);
+    restoreViewPosition(targetView);
+    return;
+  }
+
   if (quickMusic) {
     closeMenus();
     const choice = musicChoices.find((item) => item.id === quickMusic.dataset.musicQuick);
-    if (choice) playMusic(choice);
+    if (choice) {
+      if (choice.id === 'lofi-study' && choice.searchQuery) playYouTubeSearch(choice.searchQuery, choice.title);
+      else playMusic(choice);
+    }
+    return;
   }
-  if (action) {
-    if (action.dataset.action !== 'reader') rememberReaderForReturn();
-    closeMenus();
-    if (action.dataset.action === 'reader') renderCurrentReader();
-    if (action.dataset.action === 'home') renderHome();
-    if (action.dataset.action === 'help') renderHelp();
-    if (action.dataset.action === 'about') renderAbout();
-    if (action.dataset.action === 'music') renderMusicLibrary();
-    if (action.dataset.action === 'reading-list') renderReadingList();
-    if (action.dataset.action === 'progress-dashboard') renderProgressDashboard();
-    if (action.dataset.action === 'vocabulary-builder') renderVocabularyBuilder();
+
+  const actionName = action.dataset.action;
+  if (actionName !== 'reader') ReaderContinuity.saveBeforeNavigation();
+  closeMenus();
+
+  if (actionName === 'reader') {
+    renderCurrentReader();
+    app.dataset.viewKey = 'reader';
+    return;
+  }
+  if (actionName === 'home') renderHome();
+  if (actionName === 'browse') renderBrowseHub();
+  if (actionName === 'my-library') renderMyLibraryHub();
+  if (actionName === 'ai-center') renderAiCenter();
+  if (actionName === 'knowledge-graph') renderKnowledgeGraph();
+  if (actionName === 'library-bookmarks') renderLibraryRecords('bookmarks');
+  if (actionName === 'library-notes') renderLibraryRecords('notes');
+  if (actionName === 'help') renderHelp();
+  if (actionName === 'about') renderAbout();
+  if (actionName === 'music') renderMusicLibrary();
+  if (actionName === 'my-reading' || actionName === 'reading-list') renderReadingList();
+  if (actionName === 'progress-dashboard' || actionName === 'progress-awards') renderProgressDashboard();
+  if (actionName === 'vocabulary-builder') renderVocabularyBuilder();
+
+  restoreViewPosition(targetView);
+});
+
+
+document.addEventListener('change', (event) => {
+  const control = event.target.closest?.(ReaderContinuity.protectedControlSelector);
+  if (!control || !app.querySelector('#reader')) return;
+
+  const snapshot = ReaderContinuity.capture();
+  if (!snapshot) return;
+
+  const transition = ++ReaderContinuity.transitionId;
+  const anchorIndex = snapshot.index;
+  const wasRunning = snapshot.wasRunning;
+
+  window.setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (transition !== ReaderContinuity.transitionId || !app.querySelector('#reader')) return;
+
+    const reader = app.querySelector('#reader');
+    const mode = state.renderedMode || getSelectedMode();
+    const groupSize = Math.max(1, Number(app.querySelector('#word-count')?.value) || 1);
+
+    state.index = anchorIndex;
+
+    if (
+      !state.bookPages
+      && !['flash', 'digital-sign', 'two-column'].includes(mode)
+      && state.virtualized
+      && (anchorIndex < state.renderedWordStart || anchorIndex >= state.renderedWordEnd)
+    ) {
+      virtualRenderer.renderWindowAround(reader, mode, groupSize, anchorIndex);
+    }
+
+    restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
+
+    if (state.bookPages) {
+      const spread = bookSpreadForWordIndex(reader, anchorIndex);
+      if (spread != null) {
+        goToBookSpread(spread, {
+          behavior: 'auto',
+          ensureRendered: true,
+          syncReaderPosition: false
+        });
+      }
+    }
+
+    state.index = anchorIndex;
+    updateReaderStatus();
+
+    const corrected = buildReaderSessionSnapshot() || snapshot;
+    corrected.index = anchorIndex;
+    corrected.wasRunning = wasRunning;
+    corrected.controls = { ...(corrected.controls || {}), ...captureReaderControls() };
+    ReaderContinuity.commit(corrected, { immediate: true });
+
+    if (wasRunning && !isReaderRunning() && mode !== 'two-column') {
+      state.index = anchorIndex;
+      startReader();
+    }
+  })), 0);
+}, true);
+
+window.addEventListener('pagehide', () => {
+  captureCurrentViewPosition();
+  ReaderContinuity.saveBeforeNavigation();
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    captureCurrentViewPosition();
+    ReaderContinuity.saveBeforeNavigation();
   }
 });
 
@@ -7682,11 +12094,26 @@ try {
   }
 } catch {}
 
+function persistReaderProgressMetadata() {
+  if (!state.words.length || !app.querySelector('#reader')) return;
+  try {
+    localStorage.setItem(READER_SESSION_META_KEY, JSON.stringify({
+      documentId: state.documentId || '',
+      title: state.title || 'Untitled',
+      index: Math.max(0, Number(state.index) || 0),
+      totalWords: Math.max(0, Number(state.words.length) || 0),
+      savedAt: new Date().toISOString()
+    }));
+  } catch {}
+}
+
 window.setInterval(() => {
-  // Only persist while the actual reader is mounted. Otherwise state may still
-  // contain the previous large book while the user is in Bible Study/Library.
-  if (state.words.length && app.querySelector('#reader')) persistReaderSession();
-}, 10000);
+  // Do not serialize the full book on a timer. Large EPUB/PDF texts caused a
+  // visible main-thread pause every ten seconds, especially in fullscreen.
+  // Full snapshots are still written on controls, navigation, pause, pagehide,
+  // and visibility changes; this heartbeat stores only the small resume marker.
+  persistReaderProgressMetadata();
+}, 15000);
 let bookPageResizeTimer = null;
 window.addEventListener('resize', () => {
   if (!state.bookPages) return;
@@ -7702,16 +12129,26 @@ window.addEventListener('resize', () => {
 // useful window resize event. Observe the actual reader box and rebuild the
 // two-page geometry while preserving the same logical spread.
 let observedBookReader = null;
+let observedBookReaderWidth = 0;
+let observedBookReaderHeight = 0;
 const bookPageResizeObserver = typeof ResizeObserver === 'function'
-  ? new ResizeObserver(() => {
+  ? new ResizeObserver((entries) => {
       if (!state.bookPages) return;
+      const entry = entries?.[entries.length - 1];
+      const width = Math.round(entry?.contentRect?.width || 0);
+      const height = Math.round(entry?.contentRect?.height || 0);
+      if (Math.abs(width - observedBookReaderWidth) < 2
+          && Math.abs(height - observedBookReaderHeight) < 2) return;
+      observedBookReaderWidth = width;
+      observedBookReaderHeight = height;
+
       const anchorIndex = Number.isFinite(Number(pendingBookPageAnchorIndex))
         ? Number(pendingBookPageAnchorIndex)
         : Math.max(0, Number(state.index) || 0);
       window.clearTimeout(bookPageResizeTimer);
       bookPageResizeTimer = window.setTimeout(
         () => scheduleBookPageReflow({ anchorIndex }),
-        70
+        140
       );
     })
   : null;

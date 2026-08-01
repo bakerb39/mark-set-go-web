@@ -1,16 +1,15 @@
 {
   "name": "mark-set-go-web",
-  "version": "5.46.0",
+  "version": "7.0.13",
   "private": true,
   "description": "Unified public-library reader and reading accelerator with guided highlighting, imports, progress, music, and illustrated books.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js",
-    "check": "node --check server.js && node --check public/app.js && node --check public/reader/VirtualRenderer.js && node --check public/reader/SessionManager.js"
+    "dev": "node --watch server.js"
   },
   "engines": {
-    "node": ">=20 <23"
+    "node": ">=20"
   },
   "dependencies": {
     "cheerio": "^1.0.0",
