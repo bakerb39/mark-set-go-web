@@ -1,5 +1,32 @@
 'use strict';
 
+/*
+ * Mark, Set, Go! core bootstrap.
+ *
+ * v7.2.0 begins a staged modular refactor. Shared state, routing, the primary
+ * reader renderer, imports, library features, and application initialization
+ * remain here. Independent feature blocks now live under /modules.
+ */
+const REQUIRED_FEATURE_FUNCTIONS = [
+  'startDigitalSignReader',
+  'startPacmanReader',
+  'renderHelp',
+  'renderAbout',
+  'renderContact',
+  'renderPrivacy',
+  'renderTerms'
+];
+
+const missingFeatureFunctions = REQUIRED_FEATURE_FUNCTIONS.filter(
+  (name) => typeof window[name] !== 'function'
+);
+
+if (missingFeatureFunctions.length) {
+  throw new Error(
+    `Feature modules failed to load: ${missingFeatureFunctions.join(', ')}`
+  );
+}
+
 const app = document.querySelector('#app');
 app.dataset.viewKey = 'home';
 
@@ -22,6 +49,7 @@ const virtualRenderer = new VirtualRenderer({
   updateBookPageStatus: () => updateBookPageStatus()
 });
 let readerSessionSaveTimer = null;
+let readerReturnCheckpointTimer = null;
 const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
 // The top Reader button must return only to a reader explicitly opened during
 // this browser/app session. Persistent IndexedDB is reserved for Home > Resume.
@@ -62,6 +90,7 @@ const ReaderContinuity = {
     snapshot.index = location.anchorIndex;
     snapshot.wasRunning = location.wasRunning;
     snapshot.controls = { ...(snapshot.controls || {}), ...captureReaderControls() };
+    snapshot.viewport = captureReaderViewport(location.anchorIndex);
     return snapshot;
   },
 
@@ -84,18 +113,56 @@ const ReaderContinuity = {
 
     try {
       const totalWords = state.words?.length || splitWords(snapshot.currentText || '').length;
+      const documentId = snapshot.documentId || state.documentId || '';
+      const savedAt = new Date().toISOString();
       localStorage.setItem(READER_SESSION_META_KEY, JSON.stringify({
-        documentId: snapshot.documentId || state.documentId || '',
+        documentId,
         title: snapshot.title || state.title || 'Untitled',
         index: activeReaderSnapshot.index,
         totalWords,
-        savedAt: new Date().toISOString()
+        savedAt
       }));
+
+      // Keep the My Library resume record synchronized with the live reader
+      // checkpoint. Previously this record was updated only after a timed
+      // reading session ended, so manual scrolling or clicking could leave
+      // lastWord at 0 and Resume Reading reopened the document at the top.
+      if (documentId) {
+        const progress = readStoredObject(READING_PROGRESS_KEY);
+        const existing = progress[documentId] || {};
+        progress[documentId] = {
+          ...existing,
+          documentId,
+          title: snapshot.title || state.title || existing.title || 'Untitled',
+          totalWords,
+          furthestWord: Math.max(Number(existing.furthestWord) || 0, activeReaderSnapshot.index),
+          lastWord: activeReaderSnapshot.index,
+          lastReadAt: savedAt,
+          source: snapshot.source || state.source || existing.source
+        };
+        localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progress));
+      }
     } catch {}
     writeReaderSession(activeReaderSnapshot);
   },
 
+  scheduleCheckpoint({ immediate = false } = {}) {
+    if (!this.hasActiveReader()) return;
+    if (readerReturnCheckpointTimer) clearTimeout(readerReturnCheckpointTimer);
+    const save = () => {
+      readerReturnCheckpointTimer = null;
+      const snapshot = this.capture();
+      if (snapshot) this.commit(snapshot, { immediate: true });
+    };
+    if (immediate) save();
+    else readerReturnCheckpointTimer = window.setTimeout(save, 180);
+  },
+
   saveBeforeNavigation() {
+    if (readerReturnCheckpointTimer) {
+      clearTimeout(readerReturnCheckpointTimer);
+      readerReturnCheckpointTimer = null;
+    }
     const snapshot = this.capture();
     if (snapshot) this.commit(snapshot, { immediate: true });
     return snapshot;
@@ -280,6 +347,50 @@ const musicChoices = [
 
 
 const preferredMusicStorageKey = 'markSetGoPreferredMusic';
+const bookMusicStorageKey = 'markSetGoBookMusicV1';
+
+function currentBookMusicKey() {
+  const title = String(state?.title || '').trim();
+  if (!title) return '';
+  return title.toLocaleLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
+}
+
+function getBookMusicMap() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(bookMusicStorageKey) || '{}');
+    return saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+  } catch { return {}; }
+}
+
+function getBookMusic(bookKey = currentBookMusicKey()) {
+  if (!bookKey) return [];
+  const value = getBookMusicMap()[bookKey];
+  return Array.isArray(value) ? value : [];
+}
+
+function setBookMusic(bookKey, ids) {
+  if (!bookKey) return;
+  const map = getBookMusicMap();
+  map[bookKey] = [...new Set((ids || []).filter(Boolean))].slice(0, 25);
+  try { localStorage.setItem(bookMusicStorageKey, JSON.stringify(map)); } catch {}
+}
+
+function attachMusicToCurrentBook(id) {
+  const key = currentBookMusicKey();
+  if (!key || !id) return false;
+  const ids = getBookMusic(key);
+  if (ids.includes(id)) return false;
+  ids.push(id);
+  setBookMusic(key, ids);
+  return true;
+}
+
+function detachMusicFromCurrentBook(id) {
+  const key = currentBookMusicKey();
+  if (!key) return;
+  setBookMusic(key, getBookMusic(key).filter((itemId) => itemId !== id));
+}
+
 
 function getPreferredMusic() {
   try {
@@ -340,7 +451,7 @@ function playPreferredMusic(id) {
     const choice = musicChoices.find((candidate) => candidate.id === item.choiceId);
     if (choice) return playMusic(choice);
   }
-  if (item.src) return playMusic({ title: item.title, source: item.source || 'Preferred music', src: item.src });
+  if (item.src) return playMusic({ title: item.title, source: item.source || 'Preferred music', provider: item.provider, src: item.src });
 }
 
 function bindPreferredMusicSelectors() {
@@ -532,6 +643,39 @@ function youtubeEmbedFromChoice(choice) {
   return `https://www.youtube-nocookie.com/embed/${encodeURIComponent(choice.youtubeId)}?playsinline=1&rel=0`;
 }
 
+function parseSpotifyInput(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) throw new Error('Paste a Spotify playlist, album, track, artist, show, or episode link.');
+  let parsed;
+  try { parsed = new URL(raw); } catch { throw new Error('Enter a valid Spotify URL.'); }
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  if (host !== 'open.spotify.com') throw new Error('Only open.spotify.com links can be embedded.');
+  const parts = parsed.pathname.split('/').filter(Boolean);
+  const offset = parts[0]?.startsWith('intl-') ? 1 : 0;
+  const type = parts[offset];
+  const id = parts[offset + 1];
+  const allowed = new Set(['playlist', 'album', 'track', 'artist', 'show', 'episode']);
+  if (!allowed.has(type) || !id || !/^[A-Za-z0-9]+$/.test(id)) {
+    throw new Error('That Spotify link is not a supported playlist, album, track, artist, show, or episode.');
+  }
+  const labels = { playlist: 'Spotify playlist', album: 'Spotify album', track: 'Spotify track', artist: 'Spotify artist', show: 'Spotify show', episode: 'Spotify episode' };
+  return {
+    title: labels[type],
+    provider: 'spotify',
+    source: 'Spotify',
+    originalUrl: `https://open.spotify.com/${type}/${id}`,
+    src: `https://open.spotify.com/embed/${type}/${id}?utm_source=generator&theme=0`
+  };
+}
+
+function parseMusicInput(rawValue) {
+  const raw = String(rawValue || '').trim();
+  if (!raw) throw new Error('Paste a Spotify or YouTube link.');
+  let host = '';
+  try { host = new URL(raw).hostname.toLowerCase(); } catch { throw new Error('Enter a valid Spotify or YouTube URL.'); }
+  return host.includes('spotify.com') ? parseSpotifyInput(raw) : parseYouTubeInput(raw);
+}
+
 function parseYouTubeInput(rawValue) {
   const raw = String(rawValue || '').trim();
   if (!raw) throw new Error('Paste a YouTube video or playlist link.');
@@ -601,12 +745,12 @@ function playMusic(choiceOrParsed) {
   const isChoice = Boolean(choiceOrParsed?.youtubeId);
   const src = isChoice ? youtubeEmbedFromChoice(choiceOrParsed) : choiceOrParsed.src;
   musicNowTitle.textContent = choiceOrParsed.title || 'Music';
-  musicNowSource.textContent = isChoice ? choiceOrParsed.category : (choiceOrParsed.source || 'YouTube');
+  musicNowSource.textContent = isChoice ? choiceOrParsed.category : (choiceOrParsed.source || (choiceOrParsed.provider === 'spotify' ? 'Spotify' : 'YouTube'));
   musicPlayer.src = src;
   musicDock.hidden = false;
   musicDock.classList.remove('minimized');
   musicPlayerWrap.hidden = false;
-  try { localStorage.setItem('markSetGoMusic', JSON.stringify({ title: musicNowTitle.textContent, source: musicNowSource.textContent, src })); } catch {}
+  try { localStorage.setItem('markSetGoMusic', JSON.stringify({ title: musicNowTitle.textContent, source: musicNowSource.textContent, provider: choiceOrParsed.provider || (isChoice ? 'youtube' : ''), src })); } catch {}
 }
 
 function stopMusic() {
@@ -621,36 +765,52 @@ function renderMusicLibrary() {
   stopReader();
   const categories = [...new Set(musicChoices.map((item) => item.category))];
   const preferred = getPreferredMusic();
+  const bookKey = currentBookMusicKey();
+  const bookIds = getBookMusic(bookKey);
+  const bookItems = bookIds.map((id) => preferred.find((item) => item.id === id)).filter(Boolean);
+  const currentBookLabel = state?.title ? `“${escapeHtml(state.title)}”` : 'the current book';
   app.innerHTML = `
     <section class="panel music-library">
-      <div class="library-heading"><div><h1>Music</h1><p>Choose background music from YouTube, save favorites, and switch among them quickly while reading.</p></div></div>
-      <section class="music-category preferred-music-library">
-        <div class="library-heading"><div><h2>Preferred Music</h2><p>Music saved here appears in the Preferred Music dropdown in both the reader and fullscreen controls.</p></div></div>
+      <div class="library-heading"><div><h1>Music &amp; Focus</h1><p>Listen through official Spotify embeds or the YouTube player, save favorites, and associate playlists with individual books.</p></div></div>
+      <nav class="music-section-nav" aria-label="Music sections"><a href="#add-music">Add music</a><a href="#book-music">Book music</a><a href="#preferred-music">My music</a><a href="#focus-music">Focus selections</a></nav>
+
+      <section id="add-music" class="music-category music-add-service">
+        <div class="library-heading"><div><h2>Add Spotify or YouTube</h2><p>Paste a public Spotify or YouTube URL. Playback remains hosted by the selected service.</p></div></div>
+        <form id="music-url-form" class="music-url-form">
+          <label>Spotify or YouTube URL<input id="music-service-url" type="url" placeholder="https://open.spotify.com/playlist/… or https://youtube.com/playlist?list=…"></label>
+          <label>Name (optional)<input id="music-service-name" type="text" maxlength="80" placeholder="My reading playlist"></label>
+          <div class="music-url-actions"><button class="primary" type="submit">Load player</button><button id="save-music-preferred" class="secondary" type="button">Save to My Music</button></div>
+          <span id="music-service-status" class="status" aria-live="polite"></span>
+        </form>
+      </section>
+
+      <section id="book-music" class="music-category preferred-music-library">
+        <div class="library-heading"><div><h2>Music for ${currentBookLabel}</h2><p>${bookKey ? 'These selections will be shown as book-specific choices whenever this book is open.' : 'Open a book first, then return here to associate music with it.'}</p></div></div>
+        <div class="preferred-music-list">
+          ${bookItems.length ? bookItems.map((item) => `
+            <article class="preferred-music-item">
+              <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}</span></div>
+              <div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-detach-book-music="${escapeHtml(item.id)}">Remove from book</button></div>
+            </article>`).join('') : `<p class="library-note">${bookKey ? 'No music has been attached to this book yet.' : 'No book is currently open.'}</p>`}
+        </div>
+      </section>
+
+      <section id="preferred-music" class="music-category preferred-music-library">
+        <div class="library-heading"><div><h2>My Music</h2><p>Saved selections appear in reader music controls and can be assigned to books.</p></div></div>
         <div id="preferred-music-list" class="preferred-music-list">
           ${preferred.length ? preferred.map((item) => `
             <article class="preferred-music-item">
-              <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'YouTube')}</span></div>
-              <div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-remove-preferred="${escapeHtml(item.id)}">Remove</button></div>
-            </article>`).join('') : '<p class="library-note">No preferred music yet. Add selections below.</p>'}
+              <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}${bookIds.includes(item.id) ? ' · Attached to current book' : ''}</span></div>
+              <div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button>${bookKey ? `<button class="secondary" type="button" data-attach-book-music="${escapeHtml(item.id)}">${bookIds.includes(item.id) ? 'Attached ✓' : 'Add to book'}</button>` : ''}<button class="secondary" type="button" data-remove-preferred="${escapeHtml(item.id)}">Remove</button></div>
+            </article>`).join('') : '<p class="library-note">No saved music yet. Add a Spotify or YouTube selection above.</p>'}
         </div>
       </section>
-      <form id="youtube-music-form" class="music-url-form">
-        <label>YouTube video or playlist URL<input id="youtube-music-url" type="url" placeholder="https://www.youtube.com/watch?v=…"></label>
-        <label>Preferred name (optional)<input id="youtube-music-name" type="text" maxlength="80" placeholder="My reading playlist"></label>
-        <div class="music-url-actions"><button class="primary" type="submit">Load player</button><button id="save-youtube-preferred" class="secondary" type="button">Add to Preferred</button></div>
-        <span id="youtube-music-status" class="status"></span>
-      </form>
-      ${categories.map((category) => `
-        <section class="music-category"><h2>${escapeHtml(category)}</h2><div class="music-card-grid">
-          ${musicChoices.filter((item) => item.category === category).map((item) => `
-            <article class="music-card"><div class="music-card-icon" aria-hidden="true">♫</div><div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.description)}</p><div class="music-card-links"><a href="${escapeHtml(musicWatchUrl(item))}" target="_blank" rel="noopener noreferrer">Open on YouTube</a><a href="${escapeHtml(youtubeSearchUrl(musicSearchQuery(item)))}" target="_blank" rel="noopener noreferrer">Find alternative</a></div></div><div class="music-card-actions"><button class="primary" type="button" data-play-music="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-save-music="${escapeHtml(item.id)}">Add to Preferred</button></div></article>`).join('')}
-        </div></section>`).join('')}
-      <section class="music-category billboard-section">
-        <div class="library-heading"><div><h2>Billboard Hot 100 — Top 25</h2><p>The current chart is loaded from a public chart page. Choose a song to search for its official version on YouTube.</p></div><a class="secondary button-link" href="https://www.billboard.com/charts/hot-100/" target="_blank" rel="noopener noreferrer">View Billboard</a></div>
-        <p id="billboard-status" class="status">Loading chart…</p>
-        <ol id="billboard-list" class="billboard-list"></ol>
-      </section>
-      <p class="library-note">YouTube playback remains subject to YouTube availability, regional restrictions, ads, and the uploader's embedding settings. Playback begins only after user interaction.</p>
+
+      <section id="focus-music" class="music-category"><h2>Focus selections</h2><div class="music-card-grid">
+        ${categories.map((category) => musicChoices.filter((item) => item.category === category).map((item) => `
+          <article class="music-card"><div class="music-card-icon" aria-hidden="true">♫</div><div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.description)}</p><div class="music-card-links"><a href="${escapeHtml(musicWatchUrl(item))}" target="_blank" rel="noopener noreferrer">Open on YouTube</a><a href="${escapeHtml(youtubeSearchUrl(musicSearchQuery(item)))}" target="_blank" rel="noopener noreferrer">Find alternative</a></div></div><div class="music-card-actions"><button class="primary" type="button" data-play-music="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-save-music="${escapeHtml(item.id)}">Save</button></div></article>`).join('')).join('')}
+      </div></section>
+      <p class="library-note">Spotify and YouTube control availability, advertising, regional restrictions, sign-in requirements, and whether particular media can be embedded. Mark, Set, Go! stores links and book associations, not audio files.</p>
     </section>`;
 
   app.querySelectorAll('[data-play-music]').forEach((button) => button.addEventListener('click', () => {
@@ -660,45 +820,61 @@ function renderMusicLibrary() {
   app.querySelectorAll('[data-save-music]').forEach((button) => button.addEventListener('click', () => {
     const choice = musicChoices.find((item) => item.id === button.dataset.saveMusic);
     if (!choice) return;
-    const added = addPreferredMusic({ title: choice.title, source: choice.category, choiceId: choice.id });
+    const added = addPreferredMusic({ title: choice.title, source: choice.category, provider: 'youtube', choiceId: choice.id });
     button.textContent = added ? 'Saved ✓' : 'Already saved';
     button.disabled = true;
   }));
   app.querySelectorAll('[data-play-preferred]').forEach((button) => button.addEventListener('click', () => playPreferredMusic(button.dataset.playPreferred)));
   app.querySelectorAll('[data-remove-preferred]').forEach((button) => button.addEventListener('click', () => {
-    removePreferredMusic(button.dataset.removePreferred);
+    const id = button.dataset.removePreferred;
+    removePreferredMusic(id);
+    const map = getBookMusicMap();
+    Object.keys(map).forEach((key) => { map[key] = (map[key] || []).filter((itemId) => itemId !== id); });
+    try { localStorage.setItem(bookMusicStorageKey, JSON.stringify(map)); } catch {}
     renderMusicLibrary();
   }));
-  app.querySelector('#youtube-music-form')?.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const status = app.querySelector('#youtube-music-status');
-    try {
-      playMusic(parseYouTubeInput(app.querySelector('#youtube-music-url').value));
-      status.className = 'status';
-      status.textContent = 'Loaded in the music player.';
-    } catch (error) {
-      status.className = 'status error';
-      status.textContent = error.message;
-    }
-  });
-  app.querySelector('#save-youtube-preferred')?.addEventListener('click', () => {
-    const status = app.querySelector('#youtube-music-status');
-    try {
-      const parsed = parseYouTubeInput(app.querySelector('#youtube-music-url').value);
-      const customName = app.querySelector('#youtube-music-name')?.value.trim();
-      const title = customName || parsed.title;
-      const added = addPreferredMusic({ title, source: 'YouTube', src: parsed.src });
-      status.className = 'status';
-      status.textContent = added ? `Added “${title}” to Preferred Music.` : 'That music is already in Preferred Music.';
-      if (added) window.setTimeout(renderMusicLibrary, 450);
-    } catch (error) {
-      status.className = 'status error';
-      status.textContent = error.message;
-    }
-  });
-  loadBillboardSongs();
-}
+  app.querySelectorAll('[data-attach-book-music]').forEach((button) => button.addEventListener('click', () => {
+    attachMusicToCurrentBook(button.dataset.attachBookMusic);
+    renderMusicLibrary();
+  }));
+  app.querySelectorAll('[data-detach-book-music]').forEach((button) => button.addEventListener('click', () => {
+    detachMusicFromCurrentBook(button.dataset.detachBookMusic);
+    renderMusicLibrary();
+  }));
 
+  const parseFormMusic = () => {
+    const parsed = parseMusicInput(app.querySelector('#music-service-url')?.value);
+    const customName = app.querySelector('#music-service-name')?.value.trim();
+    if (customName) parsed.title = customName;
+    return parsed;
+  };
+  app.querySelector('#music-url-form')?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const status = app.querySelector('#music-service-status');
+    try {
+      const parsed = parseFormMusic();
+      playMusic(parsed);
+      status.className = 'status';
+      status.textContent = `Loaded ${parsed.source}.`;
+    } catch (error) {
+      status.className = 'status error';
+      status.textContent = error.message;
+    }
+  });
+  app.querySelector('#save-music-preferred')?.addEventListener('click', () => {
+    const status = app.querySelector('#music-service-status');
+    try {
+      const parsed = parseFormMusic();
+      const added = addPreferredMusic({ title: parsed.title, source: parsed.source, provider: parsed.provider || 'youtube', src: parsed.src, originalUrl: parsed.originalUrl || '' });
+      status.className = 'status';
+      status.textContent = added ? `Saved “${parsed.title}” to My Music.` : 'That selection is already saved.';
+      if (added) window.setTimeout(renderMusicLibrary, 350);
+    } catch (error) {
+      status.className = 'status error';
+      status.textContent = error.message;
+    }
+  });
+}
 async function loadBillboardSongs() {
   const status = app.querySelector('#billboard-status');
   const list = app.querySelector('#billboard-list');
@@ -2745,18 +2921,48 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
     }
   });
 
-  window.setTimeout(() => {
+  const restoreSavedViewport = () => {
     const activeReader = app.querySelector('#reader');
-    if (activeReader && !state.bookPages) {
-      ensureWordsRendered(activeReader, mode, wordCount, state.index + 100);
-      const target =
-        activeReader.querySelector(`.reader-word[data-index="${state.index}"]`) ||
-        activeReader.querySelector(`.reader-group[data-start-index="${state.index}"]`);
-      target?.scrollIntoView({ block: 'center', inline: 'nearest' });
+    if (!activeReader || state.bookPages) return;
+
+    ensureWordsRendered(activeReader, mode, wordCount, state.index + 100);
+
+    // The exact viewport is the most reliable source for a same-document
+    // return from My Library. Earlier versions saved scrollTop but ignored it,
+    // then tried to reconstruct the location from a word index. When the
+    // virtual renderer reported index 0, Resume Reading always opened at the
+    // top even though the correct viewport had been saved.
+    const savedScrollTop = Number(snapshot.viewport?.scrollTop);
+    const savedScrollLeft = Number(snapshot.viewport?.scrollLeft);
+    if (Number.isFinite(savedScrollTop) && savedScrollTop > 0) {
+      activeReader.scrollTop = Math.max(0, savedScrollTop);
+      if (Number.isFinite(savedScrollLeft)) activeReader.scrollLeft = Math.max(0, savedScrollLeft);
+      return;
     }
+
+    const target =
+      activeReader.querySelector(`.reader-word[data-index="${state.index}"]`) ||
+      activeReader.querySelector(`.reader-group[data-start-index="${state.index}"]`);
+    if (target) {
+      const readerRect = activeReader.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const desiredOffset = Number(snapshot.viewport?.anchorOffsetTop);
+      const offset = Number.isFinite(desiredOffset) ? desiredOffset : 24;
+      activeReader.scrollTop = Math.max(0, activeReader.scrollTop + targetRect.top - readerRect.top - offset);
+      if (Number.isFinite(savedScrollLeft)) activeReader.scrollLeft = Math.max(0, savedScrollLeft);
+    }
+  };
+
+  // Restore after the immediate render and again after delayed layout work.
+  // The second pass prevents font/image/virtual-render layout from moving the
+  // viewport back to the beginning after Resume Reading is clicked.
+  requestAnimationFrame(() => requestAnimationFrame(restoreSavedViewport));
+  window.setTimeout(restoreSavedViewport, 80);
+  window.setTimeout(() => {
+    restoreSavedViewport();
     updateReaderStatus(`Resumed at word ${(state.index + 1).toLocaleString()}.`);
     if (resumePlayback && snapshot.wasRunning) startReader();
-  }, 0);
+  }, 220);
 
   activeReaderSnapshot = {
     ...snapshot,
@@ -2910,6 +3116,20 @@ function renderHome() {
           <button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Forget Saved Reading</button>` : ''}
         </section>
       </div>
+
+      <section class="home-business-strip" aria-label="Company and product information">
+        <div>
+          <strong>Independent reading and learning platform</strong>
+          <span>Designed and developed by Brian Baker.</span>
+        </div>
+        <nav aria-label="Business information">
+          <button type="button" data-action="about">About</button>
+          <button type="button" data-action="contact">Contact</button>
+          <button type="button" data-action="privacy">Privacy</button>
+          <button type="button" data-action="terms">Terms</button>
+        </nav>
+        <small>© 2026 Brian Baker. All rights reserved. Mark, Set, Go! is an independent software project.</small>
+      </section>
     </section>`;
 
   app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));
@@ -8187,6 +8407,9 @@ function bindDictionaryMenu(reader) {
   document.addEventListener('click', closeDictionaryMenu);
   window.addEventListener('blur', closeDictionaryMenu);
   reader.addEventListener('scroll', closeDictionaryMenu, { passive: true });
+  reader.addEventListener('scroll', () => ReaderContinuity.scheduleCheckpoint(), { passive: true });
+  reader.addEventListener('pointerup', () => ReaderContinuity.scheduleCheckpoint());
+  reader.addEventListener('keyup', () => ReaderContinuity.scheduleCheckpoint());
 }
 
 
@@ -8448,20 +8671,43 @@ function restoreReadingAnchor(reader, mode, groupSize, wordIndex) {
   return virtualRenderer.restoreReadingAnchor(reader, mode, groupSize, wordIndex);
 }
 
+function captureReaderViewport(anchorIndex = state.index) {
+  const reader = app.querySelector('#reader');
+  if (!reader) return null;
+  const target = reader.querySelector(`.reader-word[data-index="${Number(anchorIndex)}"]`)
+    || Array.from(reader.querySelectorAll('.reader-group[data-start-index]')).find((group) =>
+      Number(group.dataset.startIndex) <= Number(anchorIndex)
+      && Number(group.dataset.endIndex) > Number(anchorIndex));
+  const readerRect = reader.getBoundingClientRect();
+  const targetRect = target?.getBoundingClientRect();
+  return {
+    scrollTop: Number(reader.scrollTop) || 0,
+    scrollLeft: Number(reader.scrollLeft) || 0,
+    anchorOffsetTop: targetRect ? targetRect.top - readerRect.top : 24,
+    anchorOffsetLeft: targetRect ? targetRect.left - readerRect.left : 0
+  };
+}
+
 function captureReaderLocation() {
   const reader = app.querySelector('#reader');
   const mode = state.renderedMode || getSelectedMode();
+  const wasRunning = isReaderRunning();
 
-  // The reader engine's word index is the canonical reading position for all
-  // timed/guided modes.  Earlier builds tried to infer the position from the
-  // first visible DOM word during option/mode changes.  That is unreliable
-  // while a virtualized document is being rebuilt and can resolve to word 0,
-  // which is why toggling Focus Anchor or changing modes jumped to the start.
+  /*
+    During active playback, the reader engine index is the canonical location.
+    During manual reading or while paused, however, the user may scroll many
+    paragraphs without changing state.index. Saving only the engine index made
+    navigation back from Action Center, Progress, Music, and other app sections
+    restore an older position. In document-style modes, save the word currently
+    visible near the top of the reader instead.
+  */
   let anchorIndex;
+  const engineOnlyModes = new Set(['flash', 'digital-sign', 'pacman']);
+
   if (mode === 'two-column') {
-    // Two-column is self-paced, so there is no continuously maintained engine
-    // index. Estimate from the visible scroll position when leaving that mode.
-    anchorIndex = currentReadingPosition();
+    anchorIndex = reader ? visibleReadingAnchor(reader, currentReadingPosition()) : currentReadingPosition();
+  } else if (reader && !wasRunning && !engineOnlyModes.has(mode)) {
+    anchorIndex = visibleReadingAnchor(reader, state.index);
   } else {
     anchorIndex = Number(state.index);
     if (!Number.isFinite(anchorIndex) || anchorIndex < 0) {
@@ -8469,10 +8715,10 @@ function captureReaderLocation() {
     }
   }
 
-  return {
-    anchorIndex: Math.max(0, Math.min(Math.max(0, state.words.length - 1), Number(anchorIndex) || 0)),
-    wasRunning: isReaderRunning()
-  };
+  anchorIndex = Math.max(0, Math.min(Math.max(0, state.words.length - 1), Number(anchorIndex) || 0));
+  state.index = anchorIndex;
+
+  return { anchorIndex, wasRunning };
 }
 
 function bookSpreadForWordIndex(reader, wordIndex) {
@@ -8608,6 +8854,7 @@ function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-cou
     pacman.className = 'pacman-chomper';
     pacman.setAttribute('aria-hidden', 'true');
     reader.prepend(pacman);
+    initializePacmanMode(reader);
     return;
   }
 
@@ -8825,175 +9072,9 @@ function updateReaderStatus(message, { force = false } = {}) {
 }
 
 
-function createTickerChunk(startIndex, chunkSize = 80) {
-  const endIndex = Math.min(state.words.length, startIndex + chunkSize);
-  if (endIndex <= startIndex) return null;
 
-  const chunk = document.createElement('span');
-  chunk.className = 'digital-sign-chunk';
-  chunk.dataset.start = String(startIndex);
-  chunk.dataset.end = String(endIndex);
-  renderPhrase(chunk, state.words.slice(startIndex, endIndex));
-  return { chunk, endIndex, wordCount: endIndex - startIndex };
-}
+/* Feature block moved to /modules/reading/digital-sign-mode.js */
 
-function fillTickerBuffer(stage, reader, { maxChunks = 4 } = {}) {
-  // Keep only a bounded amount of upcoming text in the DOM. Return the number
-  // of words actually added so callers can stop immediately when the visual
-  // buffer is already wide enough.
-  const targetWidth = Math.max(reader.clientWidth * 2.5, 1800);
-  const startingWordIndex = state.tickerNextWordIndex;
-  let guard = 0;
-
-  while (state.tickerNextWordIndex < state.words.length
-      && (stage.scrollWidth < targetWidth || stage.children.length < 3)
-      && guard < Math.max(1, maxChunks)) {
-    const result = createTickerChunk(state.tickerNextWordIndex);
-    if (!result || result.endIndex <= state.tickerNextWordIndex) break;
-    stage.append(result.chunk);
-    state.tickerNextWordIndex = result.endIndex;
-    state.tickerLoadedWords += result.wordCount;
-    guard += 1;
-  }
-
-  return Math.max(0, state.tickerNextWordIndex - startingWordIndex);
-}
-
-
-function createWpmClock(startIndex, speed, carriedWords = 0) {
-  return {
-    startIndex: Math.max(0, Number(startIndex) || 0),
-    speed: Math.max(1, Number(speed) || 1),
-    startedAt: performance.now(),
-    carriedWords: Math.max(0, Number(carriedWords) || 0)
-  };
-}
-
-function wordsDueFromClock(clock, now = performance.now()) {
-  if (!clock) return 0;
-  const elapsedMinutes = Math.max(0, now - clock.startedAt) / 60000;
-  return clock.carriedWords + (elapsedMinutes * clock.speed);
-}
-
-function targetWordFromClock(clock, now = performance.now()) {
-  return Math.min(
-    state.words.length,
-    clock.startIndex + Math.floor(wordsDueFromClock(clock, now))
-  );
-}
-
-function wordElementForIndex(reader, index) {
-  if (!reader) return null;
-  return reader.querySelector(`.reader-word[data-index="${Math.max(0, Math.trunc(index))}"]`)
-    || reader.querySelector(`.reader-group[data-start-index="${Math.max(0, Math.trunc(index))}"]`);
-}
-
-function scrollWordToReadingLine(reader, index) {
-  const element = wordElementForIndex(reader, index);
-  if (!element) return false;
-
-  const readerRect = reader.getBoundingClientRect();
-  const elementRect = element.getBoundingClientRect();
-  const desiredTop = Math.max(16, reader.clientHeight * 0.32);
-  const currentTop = elementRect.top - readerRect.top;
-  const delta = currentTop - desiredTop;
-
-  if (Math.abs(delta) >= 1) {
-    reader.scrollTop = Math.max(0, reader.scrollTop + delta);
-  }
-  return true;
-}
-function startDigitalSignReader({ reader, speed, start, pause }) {
-  const stage = reader.querySelector('.digital-sign-stage');
-  if (!stage || state.index >= state.words.length) return;
-
-  const token = ++state.runToken;
-  const isResume = state.tickerPaused && stage.children.length > 0;
-  const resumeIndex = Math.max(0, state.index);
-
-  if (!isResume) {
-    stage.replaceChildren();
-    state.tickerStartIndex = resumeIndex;
-    state.tickerNextWordIndex = resumeIndex;
-    state.tickerLoadedWords = 0;
-    fillTickerBuffer(stage, reader);
-  }
-
-  // The word clock is authoritative. Pixel movement is only a visualization.
-  const clock = createWpmClock(resumeIndex, speed);
-  state.tickerPaused = false;
-  state.tickerLastAt = clock.startedAt;
-
-  const frame = (now) => {
-    if (token !== state.runToken || state.tickerPaused) {
-      state.tickerFrame = null;
-      return;
-    }
-
-    const targetIndex = targetWordFromClock(clock, now);
-    state.index = Math.max(resumeIndex, targetIndex);
-
-    // Keep enough upcoming text buffered, but never spin when the visual
-    // buffer is already sufficiently wide. At most two small fill attempts are
-    // allowed in one animation frame.
-    const desiredWordIndex = Math.min(state.words.length, state.index + 300);
-    let fillAttempts = 0;
-    while (state.tickerNextWordIndex < desiredWordIndex && fillAttempts < 2) {
-      const addedWords = fillTickerBuffer(stage, reader, { maxChunks: 2 });
-      fillAttempts += 1;
-      if (addedWords <= 0 || state.tickerNextWordIndex >= state.words.length) break;
-    }
-
-    // Remove chunks that are entirely behind the authoritative target word.
-    let first = stage.firstElementChild;
-    let removedChunks = 0;
-    while (first && Number(first.dataset.end) <= state.index && removedChunks < 6) {
-      state.tickerLoadedWords -= Math.max(
-        0,
-        (Number(first.dataset.end) || 0) - (Number(first.dataset.start) || 0)
-      );
-      first.remove();
-      removedChunks += 1;
-      first = stage.firstElementChild;
-    }
-    if (removedChunks > 0) fillTickerBuffer(stage, reader, { maxChunks: 3 });
-
-    /*
-      Position the currently due word near the horizontal reading anchor.
-      This calculation is repeated from the current viewport dimensions, so a
-      resize changes only where the word appears—not how many words are due.
-    */
-    const anchorX = Math.max(24, reader.clientWidth * 0.35);
-    const currentChunk = stage.firstElementChild;
-    if (currentChunk) {
-      const chunkStart = Number(currentChunk.dataset.start) || state.index;
-      const chunkEnd = Math.max(chunkStart + 1, Number(currentChunk.dataset.end) || chunkStart + 1);
-      const chunkWords = Math.max(1, chunkEnd - chunkStart);
-      const chunkWidth = Math.max(1, currentChunk.getBoundingClientRect().width);
-      const localWords = Math.max(0, Math.min(chunkWords, state.index - chunkStart));
-      const localOffset = (localWords / chunkWords) * chunkWidth;
-      state.tickerOffset = anchorX - localOffset;
-      stage.style.transform = `translate3d(${state.tickerOffset}px, 0, 0)`;
-    }
-
-    updateReaderStatus();
-
-    if (state.index >= state.words.length) {
-      state.tickerFrame = null;
-      state.tickerPaused = false;
-      if (start) { start.disabled = false; start.textContent = 'Start'; }
-      if (pause) pause.disabled = true;
-      updateReaderStatus('Finished.');
-      return;
-    }
-
-    state.tickerFrame = requestAnimationFrame(frame);
-  };
-
-  state.tickerFrame = requestAnimationFrame(frame);
-  start.disabled = true;
-  pause.disabled = false;
-}
 function startAutoScrollReader({ reader, speed, start, pause }) {
   const token = ++state.runToken;
   const startIndex = Math.max(0, state.index);
@@ -9035,119 +9116,8 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
   step(performance.now());
 }
 
-function restorePacmanWord(element) {
-  if (!element) return;
-  const original = element.dataset.pacmanOriginal;
-  if (original != null) {
-    element.textContent = original;
-    delete element.dataset.pacmanOriginal;
-  }
-  element.classList.remove('pacman-current-word', 'pacman-eaten-word');
-}
 
-function resetPacmanRenderedWords(reader) {
-  reader?.querySelectorAll('.reader-word[data-pacman-original]').forEach(restorePacmanWord);
-  reader?.querySelectorAll('.reader-word.pacman-eaten-word').forEach((element) => {
-    element.classList.remove('pacman-eaten-word');
-  });
-}
-
-function preparePacmanCharacters(wordElement) {
-  if (!wordElement) return [];
-  restorePacmanWord(wordElement);
-  const text = wordElement.textContent || '';
-  wordElement.dataset.pacmanOriginal = text;
-  wordElement.textContent = '';
-  wordElement.classList.add('pacman-current-word');
-
-  return Array.from(text).map((character) => {
-    const span = document.createElement('span');
-    span.className = 'pacman-character';
-    span.textContent = character;
-    wordElement.append(span);
-    return span;
-  });
-}
-
-function movePacmanToCharacter(reader, marker, characterElement, fallbackWord) {
-  if (!reader || !marker) return;
-  const target = characterElement || fallbackWord;
-  if (!target) return;
-
-  const readerRect = reader.getBoundingClientRect();
-  const targetRect = target.getBoundingClientRect();
-  const left = targetRect.left - readerRect.left + reader.scrollLeft - marker.offsetWidth * .72;
-  const top = targetRect.top - readerRect.top + reader.scrollTop
-    + (targetRect.height - marker.offsetHeight) / 2;
-
-  marker.style.transform = `translate3d(${Math.max(0, left)}px, ${Math.max(0, top)}px, 0)`;
-  marker.classList.add('visible');
-}
-
-function startPacmanReader({ reader, speed, start, pause }) {
-  const marker = reader.querySelector('.pacman-chomper');
-  if (!marker) return;
-
-  resetPacmanRenderedWords(reader);
-  const token = ++state.runToken;
-  const consumeNextWord = () => {
-    if (token !== state.runToken) return;
-
-    if (state.index >= state.words.length) {
-      pauseReader();
-      marker.classList.remove('visible');
-      updateReaderStatus('Pac-Man finished the book!');
-      return;
-    }
-
-    ensureWordsRendered(reader, 'pacman', 1, Math.min(state.words.length, state.index + 1000));
-    const wordIndex = state.index;
-    const wordElement = reader.querySelector(`.reader-word[data-index="${wordIndex}"]`);
-
-    if (!wordElement) {
-      state.interval = window.setTimeout(consumeNextWord, 30);
-      return;
-    }
-
-    scrollWordToReadingLine(reader, wordIndex);
-    const characters = preparePacmanCharacters(wordElement);
-    const wordDuration = Math.max(80, 60000 / speed);
-    const visibleCharacters = characters.length || 1;
-    const characterDuration = Math.max(22, wordDuration / visibleCharacters);
-    let characterIndex = 0;
-
-    const chompCharacter = () => {
-      if (token !== state.runToken) return;
-
-      const character = characters[characterIndex];
-      movePacmanToCharacter(reader, marker, character, wordElement);
-
-      if (character) {
-        character.classList.add('pacman-eaten-character');
-      }
-
-      characterIndex += 1;
-      if (characterIndex < characters.length) {
-        state.interval = window.setTimeout(chompCharacter, characterDuration);
-        return;
-      }
-
-      wordElement.classList.remove('pacman-current-word');
-      wordElement.classList.add('pacman-eaten-word');
-      state.index = Math.min(state.words.length, wordIndex + 1);
-      updateFocusAnchorOverlay(state.words.slice(wordIndex, wordIndex + 1));
-      updateReaderStatus();
-
-      const elapsedForCharacters = characterDuration * Math.max(1, characters.length);
-      const remaining = Math.max(0, wordDuration - elapsedForCharacters);
-      state.interval = window.setTimeout(consumeNextWord, remaining);
-    };
-
-    chompCharacter();
-  };
-
-  consumeNextWord();
-}
+/* Feature block moved to /modules/reading/pacman-mode.js */
 
 function startReader() {
   const selectedMode = getSelectedMode();
@@ -11972,18 +11942,58 @@ function renderMyLibraryHub() {
   };
   const primaryDifficulty = storedDifficultyForProgress(primaryBook);
 
-  const openStoredDocument = (documentId, wordIndex = null) => {
+  const openStoredDocument = async (documentId, wordIndex = null) => {
     let data = null;
     try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
     if (!data?.text) {
       window.alert('This text is not currently stored in this browser.');
       return;
     }
-    renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
+
+    // My Library's Resume Reading must behave exactly like Return to Reader
+    // when the selected item is already the active reading session. Reloading
+    // the stored document rebuilds the reader and can reset its viewport before
+    // a saved position is reapplied. Return to Reader is reliable because it
+    // restores the existing in-memory snapshot directly, so use that same path.
+    const activeDocumentMatches = Boolean(
+      activeReaderSnapshot?.title
+      && activeReaderSnapshot?.currentText
+      && (
+        activeReaderSnapshot.documentId === documentId
+        || (
+          String(activeReaderSnapshot.title || '').trim() === String(data.title || '').trim()
+          && String(activeReaderSnapshot.currentText || '') === String(data.text || '')
+        )
+      )
+    );
+    if (activeDocumentMatches) {
+      renderCurrentReader();
+      app.dataset.viewKey = 'reader';
+      return;
+    }
+
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
-    requestAnimationFrame(() => jumpToWordIndex(
-      Number.isFinite(Number(wordIndex)) ? Number(wordIndex) : (record?.lastWord || 0)
-    ));
+    let resumeIndex = Number.isFinite(Number(wordIndex)) ? Number(wordIndex) : Number(record?.lastWord) || 0;
+    let matchingSnapshot = null;
+
+    // Prefer the live checkpoint when this is the same document. This protects
+    // Resume Reading even if the library progress write has not completed yet.
+    if (activeReaderSnapshot?.documentId === documentId) {
+      matchingSnapshot = activeReaderSnapshot;
+    } else {
+      try {
+        const saved = await readReaderSession();
+        if (saved?.documentId === documentId) matchingSnapshot = saved;
+      } catch {}
+    }
+
+    if (matchingSnapshot) {
+      resumeIndex = Math.max(0, Number(matchingSnapshot.index) || resumeIndex);
+      if (applyReaderSessionSnapshot(matchingSnapshot, { resumePlayback: false })) return;
+    }
+
+    renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
+    requestAnimationFrame(() => requestAnimationFrame(() => jumpToWordIndex(resumeIndex)));
   };
 
   const continueCards = progress.slice(0, 6).map((item, index) => {
@@ -12247,106 +12257,11 @@ function renderKnowledgeGraph() {
     app.querySelectorAll(`.graph-node.${input.dataset.graphFilter}`).forEach((node) => node.hidden = !input.checked);
   }));
 }
-function renderHelp() {
-  try {
-    stopReader();
-  } catch (error) {
-    console.warn('Reader cleanup skipped while opening Help:', error);
-  }
-  app.dataset.viewKey='help';
-  const sections=[
-    ['start','Quick Start'],['mark','Ask Mark Reading Companion'],['notebook','Notebook'],
-    ['reader','Reader & Position'],['fullscreen','Fullscreen'],['imports','PDF, EPUB & Text'],
-    ['profiles','Reading Profiles'],['library','Library & Browse'],['shortcuts','Shortcuts'],
-    ['storage','Storage & Privacy'],['about','About'],['troubleshooting','Troubleshooting']
-  ];
-  const helpTocHtml = sections
-    .map(([id,label]) => `<a href="#help-${id}">${label}</a>`)
-    .join('');
-  app.innerHTML=`<section class="panel help-page">
-    <div class="help-hero"><div><span class="help-eyebrow">Mark, Set, Go! Guide</span><h1>Help</h1><p>Current guidance for reading, selecting passages, asking Mark, saving insights, importing books, and protecting your place.</p></div>
-    <label class="help-search"><span>Search Help</span><input id="help-search-input" type="search" placeholder="Try “Mark”, “notebook”, “PDF”, “fullscreen”…"></label></div>
-    <div class="help-layout">
-      <aside class="help-toc"><strong>On this page</strong>${helpTocHtml}</aside>
-      <div class="help-content" id="help-content">
-        <section class="help-section" id="help-start" data-help-section><h2>Quick Start</h2><ol class="help-steps">
-          <li>Use <strong>Browse</strong> to search public libraries or <strong>Import Book</strong> for PDF, EPUB, or TXT.</li>
-          <li>Open <strong>Reader Tools</strong> to choose a mode, speed, pointer, typography, Book Pages, and Focus Anchor.</li>
-          <li>Press Start or Space to read. The app saves the canonical word so layout and navigation changes should not lose your place.</li>
-          <li>Highlight any passage to pause reading and open the yellow text selection toolbar.</li>
-          <li>Choose Explain, Summarize, Analyze, or open <strong>Ask Mark</strong> for additional help.</li>
-        </ol></section>
 
-        <section class="help-section" id="help-mark" data-help-section><h2>Ask Mark Reading Companion</h2>
-          <p>Mark is the app’s contextual reading companion. Highlight any arbitrary text—even when paragraph formatting is poor. Reading pauses automatically, and selected text appears yellow with black characters.</p>
-          <div class="help-card-grid"><article><h3>Selection</h3><p>Explain, summarize, analyze, simplify, translate, request context, find related ideas, or ask a custom question.</p></article><article><h3>Bounded context</h3><p>Mark receives the selected passage plus a limited surrounding window rather than the entire book.</p></article><article><h3>No automatic charge</h3><p>Highlighting alone does not call AI. A request occurs only after you choose an action.</p></article></div>
-          <div class="help-tip"><strong>Optional paragraph shortcut:</strong> Alt + double-click a well-formatted paragraph. Ordinary drag selection remains the recommended method.</div>
-        </section>
+/* Feature block moved to /modules/pages/help-page.js */
 
-        <section class="help-section" id="help-notebook" data-help-section><h2>Notebook</h2>
-          <p>The notebook now stores the complete selected passage, the full response from Ask Mark, key points, cautions, your own note, book title, chapter, date, and reading location.</p>
-          <ul><li>Open a book’s notebook from the Ask Mark panel.</li><li>Open the global notebook from the top <strong>Mark</strong> menu.</li><li>Add or edit personal thoughts on any saved entry.</li><li>Use <strong>Save as text</strong> for one entry or export the entire notebook as a <code>.txt</code> file.</li><li>Use Return to passage when the original book is still stored locally.</li></ul>
-        </section>
 
-        <section class="help-section" id="help-reader" data-help-section><h2>Reader & Position</h2>
-          <p>Reader position is based on the current word, not a fragile page number. Font changes, panel changes, fullscreen, Focus Anchor, reading modes, and page reflow should restore that word.</p>
-          <p><strong>Reader Tools</strong> and <strong>Ask Mark</strong> are separate buttons. Reader Tools opens settings; Mark opens the current passage and notebook.</p>
-        </section>
-
-        <section class="help-section" id="help-fullscreen" data-help-section><h2>Fullscreen</h2>
-          <p>Fullscreen has separate <strong>Options</strong> and <strong>Ask Mark</strong> controls. Opening one closes the other. Highlighting still pauses reading and the fullscreen Mark drawer shares the same notebook and history.</p>
-          <p>Press <kbd>O</kbd> for Options and <kbd>M</kbd> for Ask Mark.</p>
-        </section>
-
-        <section class="help-section" id="help-imports" data-help-section><h2>PDF, EPUB & Text</h2>
-          <ul><li><strong>EPUB:</strong> imports text, navigation, structure, and supported embedded images.</li><li><strong>PDF:</strong> extracts text locally with page markers. Password-protected PDFs are supported.</li><li><strong>Scanned PDF:</strong> image-only documents require OCR and are detected rather than opened as blank text.</li><li><strong>TXT:</strong> imports UTF-8 plain text.</li></ul>
-        </section>
-
-        <section class="help-section" id="help-profiles" data-help-section><h2>Reading Profiles</h2>
-          <p>Profiles separate textual difficulty, interpretive difficulty, contextual knowledge, and literary structure. A book can therefore be accessible to read but challenging to interpret.</p>
-          <p>Local linguistic measurements are available without AI. AI enhancement and Quick Book Guides run only when requested.</p>
-        </section>
-
-        <section class="help-section" id="help-library" data-help-section><h2>Library & Browse</h2>
-          <p><strong>My Library</strong> contains saved books and reading activity. <strong>Browse</strong> searches connected public sources, Great Books, Bible Study, imports, and Mark.</p>
-        </section>
-
-        <section class="help-section" id="help-shortcuts" data-help-section><h2>Shortcuts</h2>
-          <div class="help-shortcut-grid"><span><kbd>Space</kbd> Start or pause</span><span><kbd>O</kbd> Fullscreen Options</span><span><kbd>M</kbd> Fullscreen Ask Mark</span><span><kbd>Alt</kbd> + double-click Select paragraph</span></div>
-        </section>
-
-        <section class="help-section" id="help-storage" data-help-section><h2>Storage & Privacy</h2>
-          <p>Books, reading position, notebook entries, history, and cached guides are primarily stored in the current browser. Export notebook text for an independent backup. Clearing site data can remove locally stored material.</p>
-        </section>
-
-        <section class="help-section" id="help-about" data-help-section><h2>About Mark, Set, Go!</h2>
-          <p>Mark, Set, Go! is a reading and learning platform created by Brian Baker. It combines configurable reading tools, comprehension practice, reading analytics, public-domain library search, book imports, Reading Profiles, and Mark—the contextual reading companion.</p>
-        </section>
-
-        <section class="help-section" id="help-troubleshooting" data-help-section><h2>Troubleshooting</h2>
-          <details><summary>A selection does not appear</summary><p>Ensure the selection begins and ends inside the Reader. Flash and Digital Sign modes may not expose continuous selectable text.</p></details>
-          <details><summary>Mark does not answer</summary><p>Confirm the server has an OPENAI_API_KEY and that the request limit has not been reached.</p></details>
-          <details><summary>A book loses its place</summary><p>Pause, return to the exact word, and refresh once. Report which control caused the movement so that transition can be corrected.</p></details>
-          <details><summary>A PDF has no readable text</summary><p>It may be scanned or image-only. OCR is not yet included.</p></details>
-        </section>
-      </div>
-    </div>
-  </section>`;
-
-  const search=app.querySelector('#help-search-input');
-  search?.addEventListener('input',()=>{
-    const query=search.value.trim().toLowerCase();
-    app.querySelectorAll('[data-help-section]').forEach(section=>section.hidden=Boolean(query&&!section.textContent.toLowerCase().includes(query)));
-  });
-}function renderAbout() {
-  stopReader();
-  app.innerHTML = `
-    <section class="panel">
-      <h1>About</h1>
-      <p>Created by Brian Baker for a Harvard CS50 final project.</p>
-      <p>This browser edition was converted from the original Python and guizero desktop application.</p>
-    </section>`;
-}
+/* Feature block moved to /modules/pages/business-pages.js */
 
 function renderError(title, message) {
   stopReader();
@@ -12354,6 +12269,303 @@ function renderError(title, message) {
   app.querySelector('[data-action="home"]')?.addEventListener('click', renderHome);
 }
 
+
+
+/* Action Center v7.4.0 -----------------------------------------------------
+   Local-first application layer. Actions remain tied to reading context and
+   can later sync to the server without changing the UI data contract.
+*/
+const ACTION_CENTER_KEY = 'markSetGoActionsV1';
+const ACTION_NOTIFICATION_SETTINGS_KEY = 'markSetGoActionNotificationSettingsV1';
+const ACTION_NOTIFICATION_LOG_KEY = 'markSetGoActionNotificationLogV1';
+
+function readActionNotificationSettings() {
+  const defaults = { inApp: true, browser: false, quietStart: '22:00', quietEnd: '07:00' };
+  try { return { ...defaults, ...(JSON.parse(localStorage.getItem(ACTION_NOTIFICATION_SETTINGS_KEY) || '{}')) }; }
+  catch { return defaults; }
+}
+
+function writeActionNotificationSettings(settings) {
+  localStorage.setItem(ACTION_NOTIFICATION_SETTINGS_KEY, JSON.stringify(settings));
+}
+
+function readActionNotificationLog() {
+  try { return JSON.parse(localStorage.getItem(ACTION_NOTIFICATION_LOG_KEY) || '{}') || {}; }
+  catch { return {}; }
+}
+
+function writeActionNotificationLog(log) {
+  localStorage.setItem(ACTION_NOTIFICATION_LOG_KEY, JSON.stringify(log));
+}
+
+function reminderTimeForAction(action) {
+  if (!action?.dueAt || action.reminder === 'none') return null;
+  const due = new Date(action.dueAt);
+  if (Number.isNaN(due.getTime())) return null;
+  const offsets = { at_time: 0, min10: 10, min30: 30, hour1: 60, day1: 1440 };
+  return new Date(due.getTime() - ((offsets[action.reminder] ?? 0) * 60000));
+}
+
+function isActionQuietTime(date = new Date()) {
+  const { quietStart, quietEnd } = readActionNotificationSettings();
+  if (!quietStart || !quietEnd || quietStart === quietEnd) return false;
+  const minutes = date.getHours() * 60 + date.getMinutes();
+  const parse = (value) => { const [h,m] = value.split(':').map(Number); return h * 60 + m; };
+  const start = parse(quietStart), end = parse(quietEnd);
+  return start < end ? minutes >= start && minutes < end : minutes >= start || minutes < end;
+}
+
+function actionNotificationMessage(action) {
+  const due = actionLocalDate(action.dueAt);
+  return `${action.title}${due ? ` · Due ${due}` : ''}`;
+}
+
+function showActionToast(action) {
+  document.querySelector('.action-notification-toast')?.remove();
+  const toast = document.createElement('aside');
+  toast.className = 'action-notification-toast';
+  toast.innerHTML = `<div><strong>Action reminder</strong><p>${escapeHtml(actionNotificationMessage(action))}</p></div><div class="action-toast-buttons"><button type="button" class="secondary" data-toast-snooze>Snooze 15m</button><button type="button" class="primary" data-toast-open>Open</button><button type="button" class="icon-button" data-toast-close aria-label="Dismiss">×</button></div>`;
+  document.body.appendChild(toast);
+  toast.querySelector('[data-toast-open]')?.addEventListener('click', () => { toast.remove(); renderActionCenter(); });
+  toast.querySelector('[data-toast-close]')?.addEventListener('click', () => toast.remove());
+  toast.querySelector('[data-toast-snooze]')?.addEventListener('click', () => {
+    const actions = readActions(); const item = actions.find((entry) => entry.id === action.id);
+    if (item) { item.snoozedUntil = new Date(Date.now() + 15 * 60000).toISOString(); writeActions(actions); }
+    toast.remove();
+  });
+}
+
+async function requestActionBrowserNotifications() {
+  if (!('Notification' in window)) return 'unsupported';
+  if (Notification.permission === 'granted') return 'granted';
+  return Notification.requestPermission();
+}
+
+function checkActionNotifications() {
+  const settings = readActionNotificationSettings();
+  const now = new Date();
+  if (isActionQuietTime(now)) return;
+  const log = readActionNotificationLog();
+  let changed = false;
+  readActions().filter((action) => action.status !== 'completed').forEach((action) => {
+    const notifyAt = reminderTimeForAction(action);
+    if (!notifyAt || notifyAt > now) return;
+    if (action.snoozedUntil && new Date(action.snoozedUntil) > now) return;
+    const signature = `${action.updatedAt || action.createdAt || ''}|${action.dueAt}|${action.reminder}`;
+    if (log[action.id] === signature) return;
+    if (settings.inApp) showActionToast(action);
+    if (settings.browser && 'Notification' in window && Notification.permission === 'granted') {
+      const notification = new Notification('Mark, Set, Go! action reminder', { body: actionNotificationMessage(action), tag: `msg-action-${action.id}` });
+      notification.onclick = () => { window.focus(); renderActionCenter(); notification.close(); };
+    }
+    log[action.id] = signature; changed = true;
+  });
+  if (changed) writeActionNotificationLog(log);
+}
+
+
+function readActions() {
+  try {
+    const value = JSON.parse(localStorage.getItem(ACTION_CENTER_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch (error) {
+    console.warn('Could not read saved actions:', error);
+    return [];
+  }
+}
+
+function writeActions(actions) {
+  localStorage.setItem(ACTION_CENTER_KEY, JSON.stringify(actions));
+}
+
+function actionLocalDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function currentActionSource() {
+  return state?.title || state?.bookTitle || state?.documentTitle || 'Current reading';
+}
+
+function renderActionCenter() {
+  stopReader();
+  const actions = readActions();
+  const active = actions.filter((item) => item.status !== 'completed');
+  const completed = actions.filter((item) => item.status === 'completed');
+  const due = active.filter((item) => item.dueAt && new Date(item.dueAt) <= new Date());
+  const rate = actions.length ? Math.round((completed.length / actions.length) * 100) : 0;
+  const sourceCount = new Set(actions.map((item) => item.sourceTitle).filter(Boolean)).size;
+
+  app.innerHTML = `<section class="panel action-center-page">
+    <header class="action-center-hero">
+      <div><span class="source-category">Understanding into action</span><h1>Action Center</h1><p>Turn ideas from your reading into specific commitments, reviews, habits, and reflections.</p></div>
+      <button class="secondary" type="button" data-action="reader">Return to Reader</button>
+    </header>
+
+    <div class="action-kpi-grid">
+      <article><span>Active</span><strong>${active.length}</strong><small>open commitments</small></article>
+      <article><span>Due now</span><strong>${due.length}</strong><small>need attention</small></article>
+      <article><span>Completed</span><strong>${completed.length}</strong><small>ideas applied</small></article>
+      <article><span>Application rate</span><strong>${rate}%</strong><small>completed / created</small></article>
+      <article><span>Books applied</span><strong>${sourceCount}</strong><small>sources with actions</small></article>
+    </div>
+
+    <section class="action-notification-settings">
+      <div class="section-heading"><div><h2>Notifications</h2><p>In-app reminders work while Mark, Set, Go! is open. Browser alerts also require permission.</p></div><button class="secondary" type="button" id="test-action-notification">Test reminder</button></div>
+      <div class="action-notification-grid">
+        <label class="toggle-setting"><input id="action-inapp-notifications" type="checkbox"> <span>In-app reminders</span></label>
+        <label class="toggle-setting"><input id="action-browser-notifications" type="checkbox"> <span>Browser notifications</span></label>
+        <label>Quiet hours start<input id="action-quiet-start" type="time"></label>
+        <label>Quiet hours end<input id="action-quiet-end" type="time"></label>
+      </div>
+      <p class="status" id="action-notification-status"></p>
+    </section>
+
+    <div class="action-center-layout">
+      <form id="action-form" class="action-composer">
+        <div class="section-heading"><div><h2>Create an action</h2><p>Make the next step concrete and small enough to complete.</p></div></div>
+        <input id="action-edit-id" type="hidden">
+        <label>What will you do?<input id="action-title" required maxlength="160" placeholder="Example: Walk for 20 minutes after lunch"></label>
+        <div class="action-form-grid">
+          <label>Type<select id="action-type"><option value="task">Task</option><option value="habit">Habit</option><option value="review">Review</option><option value="reflection">Reflection</option><option value="experiment">Experiment</option><option value="discussion">Discussion</option></select></label>
+          <label>Due date and time<input id="action-due" type="datetime-local"></label>
+          <label>Priority<select id="action-priority"><option value="normal">Normal</option><option value="high">High</option><option value="low">Low</option></select></label>
+          <label>Repeat<select id="action-repeat"><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+          <label>Reminder<select id="action-reminder"><option value="none">No reminder</option><option value="at_time">At due time</option><option value="min10">10 minutes before</option><option value="min30">30 minutes before</option><option value="hour1">1 hour before</option><option value="day1">1 day before</option></select></label>
+        </div>
+        <label>Book or source<input id="action-source" maxlength="180" value="${escapeHtml(currentActionSource())}"></label>
+        <label>Supporting passage or note<textarea id="action-note" rows="4" maxlength="1200" placeholder="Paste the idea, quotation, or reason for this action"></textarea></label>
+        <div class="action-form-actions"><button class="primary" type="submit" id="save-action">Save action</button><button class="secondary" type="button" id="cancel-action-edit" hidden>Cancel edit</button></div>
+        <p class="status" id="action-status"></p>
+      </form>
+
+      <section class="action-list-panel">
+        <div class="section-heading"><div><h2>My actions</h2><p>Complete, reschedule, edit, or remove commitments.</p></div>
+          <label class="compact-label">Show<select id="action-filter"><option value="active">Active</option><option value="all">All</option><option value="completed">Completed</option></select></label>
+        </div>
+        <div id="action-list"></div>
+      </section>
+    </div>
+  </section>`;
+
+  const renderList = () => {
+    const filter = app.querySelector('#action-filter')?.value || 'active';
+    const all = readActions().sort((a,b) => {
+      if (a.status !== b.status) return a.status === 'completed' ? 1 : -1;
+      return new Date(a.dueAt || '2999-12-31') - new Date(b.dueAt || '2999-12-31');
+    });
+    const visible = all.filter((item) => filter === 'all' || (filter === 'completed' ? item.status === 'completed' : item.status !== 'completed'));
+    const container = app.querySelector('#action-list');
+    container.innerHTML = visible.length ? visible.map((item) => {
+      const overdue = item.status !== 'completed' && item.dueAt && new Date(item.dueAt) <= new Date();
+      return `<article class="action-card ${item.status === 'completed' ? 'completed' : ''} ${overdue ? 'overdue' : ''}">
+        <button class="action-check" type="button" data-action-toggle="${escapeHtml(item.id)}" aria-label="${item.status === 'completed' ? 'Reopen' : 'Complete'} action">${item.status === 'completed' ? '✓' : ''}</button>
+        <div class="action-card-copy"><div class="action-card-meta"><span>${escapeHtml(item.type || 'task')}</span><span>${escapeHtml(item.priority || 'normal')}</span>${item.repeat && item.repeat !== 'none' ? `<span>${escapeHtml(item.repeat)}</span>` : ''}${item.reminder && item.reminder !== 'none' ? `<span>🔔 ${escapeHtml(item.reminder.replace('_',' '))}</span>` : ''}</div>
+          <h3>${escapeHtml(item.title)}</h3>
+          <p>${escapeHtml(item.note || 'No supporting note')}</p>
+          <small>${item.sourceTitle ? `From ${escapeHtml(item.sourceTitle)}` : 'No source'}${item.dueAt ? ` · ${overdue ? 'Due ' : ''}${escapeHtml(actionLocalDate(item.dueAt))}` : ''}</small>
+        </div>
+        <div class="action-card-buttons"><button class="secondary" type="button" data-action-edit="${escapeHtml(item.id)}">Edit</button><button class="secondary danger-text" type="button" data-action-delete="${escapeHtml(item.id)}">Delete</button></div>
+      </article>`;
+    }).join('') : '<div class="empty-library"><h3>No actions here yet</h3><p>Create one small action from something you are reading.</p></div>';
+  };
+
+  const resetForm = () => {
+    app.querySelector('#action-form').reset();
+    app.querySelector('#action-edit-id').value = '';
+    app.querySelector('#action-source').value = currentActionSource();
+    app.querySelector('#save-action').textContent = 'Save action';
+    app.querySelector('#cancel-action-edit').hidden = true;
+  };
+
+  app.querySelector('#action-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const title = app.querySelector('#action-title').value.trim();
+    if (!title) return;
+    const actions = readActions();
+    const editId = app.querySelector('#action-edit-id').value;
+    const existing = actions.find((item) => item.id === editId);
+    const record = {
+      id: existing?.id || `action_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+      title,
+      type: app.querySelector('#action-type').value,
+      dueAt: app.querySelector('#action-due').value || '',
+      priority: app.querySelector('#action-priority').value,
+      repeat: app.querySelector('#action-repeat').value,
+      reminder: app.querySelector('#action-reminder').value,
+      sourceTitle: app.querySelector('#action-source').value.trim(),
+      note: app.querySelector('#action-note').value.trim(),
+      status: existing?.status || 'active',
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      completedAt: existing?.completedAt || null
+    };
+    if (existing) actions[actions.indexOf(existing)] = record; else actions.push(record);
+    writeActions(actions);
+    resetForm();
+    renderActionCenter();
+  });
+
+  const notificationSettings = readActionNotificationSettings();
+  app.querySelector('#action-inapp-notifications').checked = notificationSettings.inApp;
+  app.querySelector('#action-browser-notifications').checked = notificationSettings.browser && 'Notification' in window && Notification.permission === 'granted';
+  app.querySelector('#action-quiet-start').value = notificationSettings.quietStart || '22:00';
+  app.querySelector('#action-quiet-end').value = notificationSettings.quietEnd || '07:00';
+  const saveNotificationSettings = async (event) => {
+    const status = app.querySelector('#action-notification-status');
+    let browser = app.querySelector('#action-browser-notifications').checked;
+    if (event?.target?.id === 'action-browser-notifications' && browser) {
+      const permission = await requestActionBrowserNotifications();
+      browser = permission === 'granted';
+      app.querySelector('#action-browser-notifications').checked = browser;
+      status.textContent = browser ? 'Browser notifications enabled.' : permission === 'unsupported' ? 'This browser does not support notifications.' : 'Browser notification permission was not granted.';
+    }
+    writeActionNotificationSettings({
+      inApp: app.querySelector('#action-inapp-notifications').checked,
+      browser,
+      quietStart: app.querySelector('#action-quiet-start').value,
+      quietEnd: app.querySelector('#action-quiet-end').value
+    });
+  };
+  ['#action-inapp-notifications','#action-browser-notifications','#action-quiet-start','#action-quiet-end'].forEach((selector) => app.querySelector(selector)?.addEventListener('change', saveNotificationSettings));
+  app.querySelector('#test-action-notification')?.addEventListener('click', () => showActionToast({ id: 'test', title: 'This is how an action reminder will appear.', dueAt: new Date().toISOString() }));
+
+  app.querySelector('#cancel-action-edit').addEventListener('click', resetForm);
+  app.querySelector('#action-filter').addEventListener('change', renderList);
+  app.querySelector('#action-list').addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-action-toggle]');
+    const edit = event.target.closest('[data-action-edit]');
+    const remove = event.target.closest('[data-action-delete]');
+    const actions = readActions();
+    if (toggle) {
+      const item = actions.find((entry) => entry.id === toggle.dataset.actionToggle);
+      if (item) { item.status = item.status === 'completed' ? 'active' : 'completed'; item.completedAt = item.status === 'completed' ? new Date().toISOString() : null; writeActions(actions); renderActionCenter(); }
+    }
+    if (remove) {
+      const item = actions.find((entry) => entry.id === remove.dataset.actionDelete);
+      if (item && window.confirm(`Delete “${item.title}”?`)) { writeActions(actions.filter((entry) => entry.id !== item.id)); renderActionCenter(); }
+    }
+    if (edit) {
+      const item = actions.find((entry) => entry.id === edit.dataset.actionEdit);
+      if (!item) return;
+      app.querySelector('#action-edit-id').value = item.id;
+      app.querySelector('#action-title').value = item.title || '';
+      app.querySelector('#action-type').value = item.type || 'task';
+      app.querySelector('#action-due').value = item.dueAt || '';
+      app.querySelector('#action-priority').value = item.priority || 'normal';
+      app.querySelector('#action-repeat').value = item.repeat || 'none';
+      app.querySelector('#action-reminder').value = item.reminder || 'none';
+      app.querySelector('#action-source').value = item.sourceTitle || '';
+      app.querySelector('#action-note').value = item.note || '';
+      app.querySelector('#save-action').textContent = 'Update action';
+      app.querySelector('#cancel-action-edit').hidden = false;
+      app.querySelector('#action-title').focus();
+      app.querySelector('#action-form').scrollIntoView({behavior:'smooth', block:'start'});
+    }
+  });
+  renderList();
+}
 
 function closeTopNavigationMenus(except = null) {
   document.querySelectorAll('.site-header nav > details[open]').forEach((menu) => {
@@ -12468,9 +12680,13 @@ document.addEventListener('click', (event) => {
   if (actionName === 'library-bookmarks') renderLibraryRecords('bookmarks');
   if (actionName === 'library-notes') renderLibraryRecords('notes');
   if (actionName === 'about') renderAbout();
+  if (actionName === 'contact') renderContact();
+  if (actionName === 'privacy') renderPrivacy();
+  if (actionName === 'terms') renderTerms();
   if (actionName === 'music') renderMusicLibrary();
   if (actionName === 'my-reading' || actionName === 'reading-list') renderReadingList();
   if (actionName === 'progress-dashboard' || actionName === 'progress-awards') renderProgressDashboard();
+  if (actionName === 'action-center') renderActionCenter();
   if (actionName === 'vocabulary-builder') renderVocabularyBuilder();
 
   restoreViewPosition(targetView);
@@ -12649,6 +12865,11 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+// Check local reminders while the app is open or running in a background tab.
+window.setInterval(checkActionNotifications, 30000);
+window.setTimeout(checkActionNotifications, 1500);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkActionNotifications(); });
+
 // v5.16: startup stays lightweight. The last book is restored only after an explicit Resume action.
 renderHome();
 
@@ -12680,3 +12901,9 @@ renderHome();
     }
   });
 })();
+
+window.addEventListener('pagehide', () => ReaderContinuity.scheduleCheckpoint({ immediate: true }));
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') ReaderContinuity.scheduleCheckpoint({ immediate: true });
+});
+

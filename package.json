@@ -1,8 +1,8 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.1.12",
+  "version": "7.4.5",
   "private": true,
-  "description": "Unified public-library reader and reading accelerator with guided highlighting, imports, progress, music, and illustrated books.",
+  "description": "Reading accelerator with guided modes, imports, progress, music, and a local-first reading Action Center.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

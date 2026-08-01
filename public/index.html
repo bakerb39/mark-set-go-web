@@ -6,12 +6,16 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=7.1.12" rel="stylesheet"/>
+<link href="/styles.css?v=7.4.0" rel="stylesheet"/>
 <script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/SessionManager.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/ReaderEngine.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/VirtualRenderer.js?v=3.2.1-stable-recovery"></script>
-<script defer src="/app.js?v=7.1.12"></script>
+  <script defer src="/modules/reading/digital-sign-mode.js?v=7.2.1"></script>
+  <script defer src="/modules/reading/pacman-mode.js?v=7.2.2"></script>
+  <script defer src="/modules/pages/help-page.js?v=7.2.1"></script>
+  <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
+  <script defer src="/app.js?v=7.4.5"></script>
 </head>
 <body>
 <header class="site-header">
@@ -63,6 +67,11 @@
     <span class="menu-icon icon-progress">↗</span>
     <span class="menu-copy"><strong>Progress &amp; Awards</strong><small>Statistics, goals, coaching, and trophies</small></span>
   </button>
+
+  <button data-action="action-center" type="button" role="menuitem">
+    <span class="menu-icon icon-actions">✓</span>
+    <span class="menu-copy"><strong>Action Center</strong><small>Turn reading insights into scheduled action</small></span>
+  </button>
 </div>
 </details>
 
@@ -81,25 +90,25 @@
 <details>
 <summary><span class="nav-icon" aria-hidden="true">↗</span> Learn</summary>
 <div class="menu-popover">
-<button data-read="syntopicon" type="button"><span class="menu-icon">◎</span> Great Ideas</button>
-<button data-test="wpm" type="button"><span class="menu-icon">⏱</span> WPM Test</button>
-<button data-action="vocabulary-builder" type="button"><span class="menu-icon">Aa</span> Vocabulary Builder</button>
-<button data-action="progress-awards" type="button"><span class="menu-icon">🏆</span> Progress &amp; Awards</button>
+<button data-read="syntopicon" type="button"><span class="menu-icon menu-icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M8.2 14.2A6 6 0 1 1 15.8 14.2C14.7 15.1 14 16.2 14 18h-4c0-1.8-.7-2.9-1.8-3.8Z"/></svg></span><span>Great Ideas</span></button>
+<button data-test="wpm" type="button"><span class="menu-icon menu-icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/><path d="M12 2v3"/></svg></span><span>WPM Test</span></button>
+<button data-action="vocabulary-builder" type="button"><span class="menu-icon menu-icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22Z"/><path d="M20 5.5A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22Z"/></svg></span><span>Vocabulary Builder</span></button>
 </div>
 </details>
 
 <button class="top-level-nav-button" data-action="ai-center" type="button"><span class="nav-icon" aria-hidden="true">✦</span> Ask Mark</button>
 
-<details>
-<summary><span class="nav-icon" aria-hidden="true">♫</span> Music</summary>
+<button class="top-level-nav-button" data-action="music" type="button"><span class="nav-icon" aria-hidden="true">♫</span> Music &amp; Focus</button>
+
+<details class="company-menu">
+<summary><span class="nav-icon" aria-hidden="true">ⓘ</span> Company</summary>
 <div class="menu-popover">
-<button data-action="music" type="button"><span class="menu-icon">♫</span> Music Library</button>
-<button data-music-quick="lofi-study" type="button">LoFi Music</button>
-<button data-music-quick="classical-reading" type="button">Classical Reading</button>
-<button data-music-quick="rain-focus" type="button">Rain &amp; Focus</button>
+<button data-action="about" type="button"><span class="menu-icon">ⓘ</span> About</button>
+<button data-action="contact" type="button"><span class="menu-icon">✉</span> Contact &amp; Support</button>
+<button data-action="privacy" type="button"><span class="menu-icon">▣</span> Privacy</button>
+<button data-action="terms" type="button"><span class="menu-icon">§</span> Terms</button>
 </div>
 </details>
-
 <button id="top-help-button" class="top-level-nav-button" data-action="help" type="button" aria-label="Open Help"><span class="nav-icon" aria-hidden="true">?</span> Help</button>
 </nav>
 </header>
@@ -114,9 +123,19 @@
 </div>
 </div>
 <div class="music-player-wrap" id="music-player-wrap">
-<iframe allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen="" id="music-player" title="YouTube music player"></iframe>
+<iframe allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen="" loading="lazy" id="music-player" referrerpolicy="strict-origin-when-cross-origin" title="Spotify or YouTube music player"></iframe>
 </div>
 </aside>
-<footer>Reading practice tool · Browser edition</footer>
+<footer class="site-footer">
+<div class="site-footer-brand"><strong>Mark, Set, Go!</strong><span>Independent reading and lifelong-learning software by Brian Baker.</span></div>
+<nav aria-label="Footer links">
+<button type="button" data-action="about">About</button>
+<button type="button" data-action="contact">Contact</button>
+<button type="button" data-action="privacy">Privacy</button>
+<button type="button" data-action="terms">Terms</button>
+<button type="button" data-action="help">Help</button>
+</nav>
+<small>© 2026 Brian Baker. All rights reserved. Version 7.4.5.</small>
+</footer>
 </body>
 </html>
