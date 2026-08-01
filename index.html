@@ -6,12 +6,12 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=7.0.0" rel="stylesheet"/>
+<link href="/styles.css?v=7.1.12" rel="stylesheet"/>
 <script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/SessionManager.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/ReaderEngine.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/VirtualRenderer.js?v=3.2.1-stable-recovery"></script>
-<script defer src="/app.js?v=7.0.0"></script>
+<script defer src="/app.js?v=7.1.12"></script>
 </head>
 <body>
 <header class="site-header">
@@ -73,7 +73,8 @@
 <button data-read="great-books" type="button"><span class="menu-icon">★</span> Great Books</button>
 <button data-read="bible" type="button"><span class="menu-icon">✦</span> Bible Study</button>
 <button data-read="upload" type="button"><span class="menu-icon">⇧</span> Import Book</button>
-<button data-action="ai-center" type="button"><span class="menu-icon">AI</span> AI Companion</button>
+<button data-action="ai-center" type="button"><span class="menu-icon">✦</span> Ask Mark</button>
+<button data-action="mark-notebook" type="button"><span class="menu-icon">▤</span> Ask Mark Notebook</button>
 </div>
 </details>
 
@@ -87,7 +88,7 @@
 </div>
 </details>
 
-<button class="top-level-nav-button" data-action="ai-center" type="button"><span class="nav-icon" aria-hidden="true">✦</span> AI</button>
+<button class="top-level-nav-button" data-action="ai-center" type="button"><span class="nav-icon" aria-hidden="true">✦</span> Ask Mark</button>
 
 <details>
 <summary><span class="nav-icon" aria-hidden="true">♫</span> Music</summary>
@@ -99,13 +100,7 @@
 </div>
 </details>
 
-<details>
-<summary><span class="nav-icon" aria-hidden="true">?</span> Help</summary>
-<div class="menu-popover">
-<button data-action="help" type="button"><span class="menu-icon">?</span> Help</button>
-<button data-action="about" type="button"><span class="menu-icon">ⓘ</span> About</button>
-</div>
-</details>
+<button id="top-help-button" class="top-level-nav-button" data-action="help" type="button" aria-label="Open Help"><span class="nav-icon" aria-hidden="true">?</span> Help</button>
 </nav>
 </header>
 <main aria-live="polite" class="app-shell" id="app" tabindex="-1"></main>

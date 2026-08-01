@@ -5781,7 +5781,7 @@ function showBookDifficultyDialog(payload) {
       <div class="prepare-me-panel">
         <p>A short orientation should cover:</p>
         <ul>${topics.map((topic) => `<li>${escapeHtml(topic)}</li>`).join('')}</ul>
-        <button class="primary" type="button" data-prepare-book="${encodeURIComponent(JSON.stringify({book, topics}))}">Open in AI Companion</button>
+        <button class="primary" type="button" data-prepare-book="${encodeURIComponent(JSON.stringify({book, topics}))}">Open with Ask Mark</button>
       </div>
     </details>
 
@@ -6029,6 +6029,355 @@ async function renderReader(kind) {
   }
 }
 
+
+const MARK_INSIGHTS_KEY = 'markSetGoMarkInsightsV1';
+const MARK_HISTORY_KEY = 'markSetGoMarkHistoryV1';
+
+function getMarkRecords(key) {
+  try { const value=JSON.parse(localStorage.getItem(key)||'[]'); return Array.isArray(value)?value:[]; }
+  catch { return []; }
+}
+function saveMarkRecords(key, records) { try { localStorage.setItem(key,JSON.stringify(records.slice(0,300))); } catch {} }
+function markRecordsForCurrentBook(key) { return getMarkRecords(key).filter(item=>item.documentId===state.documentId); }
+
+function nearestWordIndexForSelection(selectedText) {
+  const selectedWords=splitWords(String(selectedText||'')).slice(0,12).map(w=>String(w).toLowerCase().replace(/[^\p{L}\p{N}'’-]+/gu,''));
+  if(!selectedWords.length) return Math.max(0,Number(state.index)||0);
+  const normalize=w=>String(w||'').toLowerCase().replace(/[^\p{L}\p{N}'’-]+/gu,'');
+  const center=Math.max(0,Number(state.index)||0), radius=Math.min(state.words.length,12000);
+  const start=Math.max(0,center-radius), end=Math.min(state.words.length,center+radius);
+  for(let i=start;i<end-selectedWords.length;i++){
+    let ok=true;
+    for(let j=0;j<selectedWords.length;j++){ if(normalize(state.words[i+j])!==selectedWords[j]) { ok=false; break; } }
+    if(ok) return i;
+  }
+  return center;
+}
+
+function captureMarkSelection() {
+  const reader=app.querySelector('#reader');
+  const selection=window.getSelection();
+  if(!reader||!selection||selection.rangeCount===0||selection.isCollapsed) return null;
+  const range=selection.getRangeAt(0);
+  if(!reader.contains(range.commonAncestorContainer)) return null;
+  const text=selection.toString().replace(/\s+/g,' ').trim();
+  if(!text) return null;
+  const startElement=(range.startContainer.nodeType===Node.ELEMENT_NODE?range.startContainer:range.startContainer.parentElement)?.closest?.('.reader-word[data-index], .reader-group[data-start-index]');
+  let startIndex=Number(startElement?.dataset.index ?? startElement?.dataset.startIndex);
+  if(!Number.isFinite(startIndex)) startIndex=nearestWordIndexForSelection(text);
+  const selectedWordCount=Math.max(1,splitWords(text).length);
+  const beforeStart=Math.max(0,startIndex-220), afterEnd=Math.min(state.words.length,startIndex+selectedWordCount+220);
+  return {text,startIndex,endIndex:Math.min(state.words.length,startIndex+selectedWordCount),before:state.words.slice(beforeStart,startIndex).join(' '),after:state.words.slice(startIndex+selectedWordCount,afterEnd).join(' '),title:state.title,chapter:currentTocTitle?.()||'',documentId:state.documentId,createdAt:new Date().toISOString()};
+}
+function currentTocTitle(){
+  const items=Array.isArray(state.toc)?state.toc:[]; let current='';
+  for(const item of items){ if(Number(item.index)<=Number(state.index)) current=item.title||current; else break; }
+  return current;
+}
+function showMarkToolbar(selectionData, rect) {
+  const bar=app.querySelector('#mark-selection-toolbar'); if(!bar) return;
+  state.markSelection=selectionData;
+  bar.hidden=false;
+  const width=bar.offsetWidth||540;
+  bar.style.left=`${Math.max(8,Math.min(window.innerWidth-width-8,rect.left+rect.width/2-width/2))}px`;
+  bar.style.top=`${Math.max(8,rect.top-52)}px`;
+}
+function hideMarkToolbar(){ const bar=app.querySelector('#mark-selection-toolbar'); if(bar) bar.hidden=true; }
+function openMarkPanel(tab='selection'){
+  const layout=app.querySelector('#reader-layout');
+  const reader=app.querySelector('#reader');
+  const anchorIndex=Math.max(0,Number(state.index)||0);
+  const wasRunning=isReaderRunning();
+  const mode=state.renderedMode||getSelectedMode();
+  const groupSize=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);
+
+  if(layout) layout.classList.remove('word-panel-hidden');
+
+  const toolsToggle=app.querySelector('#toggle-word-panel');
+  const markToggle=app.querySelector('#toggle-mark-panel');
+
+  if(toolsToggle){
+    toolsToggle.setAttribute('aria-pressed',String(tab==='tools'));
+    toolsToggle.classList.remove('pane-closed');
+  }
+  if(markToggle){
+    markToggle.setAttribute('aria-pressed',String(tab!=='tools'));
+    markToggle.classList.remove('pane-closed');
+  }
+  activateMarkTab(tab);
+
+  /*
+    Opening a side panel can change the Reader's width and pagination geometry.
+    Preserve the canonical word and running state; only selecting text pauses.
+  */
+  if(reader){
+    window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
+      state.index=Math.max(0,Math.min(state.words.length-1,anchorIndex));
+      if(state.bookPages){
+        scheduleBookPageReflow({delay:0,anchorIndex});
+      }else{
+        restoreReadingAnchor(reader,mode,groupSize,anchorIndex);
+      }
+      if(wasRunning&&!isReaderRunning()) startReader();
+      persistReaderSession({immediate:true});
+    }));
+  }
+}
+function activateMarkTab(tab){
+  app.querySelectorAll('[data-mark-tab]').forEach(b=>b.classList.toggle('active',b.dataset.markTab===tab));
+  app.querySelectorAll('[data-mark-panel]').forEach(p=>p.hidden=p.dataset.markPanel!==tab);
+  if(tab==='history') renderMarkHistory();
+  if(tab==='notebook') renderMarkNotebook();
+}
+function renderMarkSelectionCard(){
+  const panel=app.querySelector('#mark-selection-panel'); if(!panel) return;
+  const selected=state.markSelection;
+  if(!selected){ panel.innerHTML='<div class="mark-empty"><strong>Hi, I’m Ask Mark.</strong><p>Highlight any passage—or use the paragraph shortcut—and I’ll help you understand it without moving your reading position.</p></div>'; return; }
+  panel.innerHTML=`<div class="mark-selection-card"><span>Current selection · ${splitWords(selected.text).length} words</span><blockquote>${escapeHtml(selected.text.slice(0,1300))}${selected.text.length>1300?'…':''}</blockquote></div>
+  <div class="mark-action-grid">${[['explain','💡','Explain'],['summarize','≡','Summarize'],['analyze','🧠','Analyze'],['simplify','A','Simplify'],['context','🏛','Context'],['related','🔗','Related ideas'],['translate','🌍','Translate'],['save','★','Save insight']].map(([id,icon,label])=>`<button type="button" data-mark-action="${id}"><span>${icon}</span>${label}</button>`).join('')}</div>
+  <form id="mark-question-form" class="mark-question-form"><label for="mark-question">Ask Mark about this passage</label><div><input id="mark-question" type="text" maxlength="1200" placeholder="What does this mean here?"><button class="primary" type="submit">Ask</button></div></form>
+  <div id="mark-response" class="mark-response" hidden></div>`;
+  bindMarkPanelActions();
+}
+function renderMarkResult(result, action){
+  const panels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean); if(!panels.length)return;
+  panels.forEach(panel=>{panel.hidden=false;panel.innerHTML=`<div class="mark-response-heading"><span>Ask Mark</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<button type="button" class="secondary" data-save-mark-response>Save to notebook</button>`;panel.querySelector('[data-save-mark-response]')?.addEventListener('click',()=>saveMarkInsight({action,result}));});
+}
+function saveMarkInsight(extra={}){
+  const selected=state.markSelection;
+  const selectionText=selected?.text || String(extra.selection || '').trim();
+  const noteText=String(extra.note || '').trim();
+  if(!selectionText && !noteText && !extra.result?.response) return;
+
+  const record={
+    id:`mark-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    recordType:extra.recordType || (extra.result ? 'mark-response' : noteText ? 'personal-note' : 'passage'),
+    documentId:selected?.documentId || state.documentId || extra.documentId || '',
+    title:selected?.title || state.title || extra.title || app.querySelector('h1')?.textContent?.trim() || 'Mark, Set, Go!',
+    selection:selectionText,
+    startIndex:Number.isFinite(Number(selected?.startIndex)) ? Number(selected.startIndex) : (Number(extra.startIndex) || 0),
+    chapter:selected?.chapter || extra.chapter || '',
+    note:noteText,
+    pageContext:extra.pageContext || app.dataset.viewKey || 'app',
+    createdAt:new Date().toISOString(),
+    ...extra
+  };
+
+  saveMarkRecords(MARK_INSIGHTS_KEY,[record,...getMarkRecords(MARK_INSIGHTS_KEY)]);
+  renderMarkNotebook();
+  renderFullscreenMarkNotebook();
+  renderGlobalNotebookEntries();
+  updateReaderStatus?.('Saved to Mark’s notebook.');
+}
+async function runMarkAction(action,question=''){
+  const selected=state.markSelection; if(!selected) return;
+  if(action==='save'){saveMarkInsight({action:'selection'});return;}
+  if(action==='define' && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false); return; }
+  const responsePanels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean);responsePanels.forEach(p=>{p.hidden=false;p.innerHTML='<p class="status">Ask Mark is reading the selection…</p>';});
+  try{
+    const targetLanguage=action==='translate'?(window.prompt('Translate into which language?','Spanish')||'').trim():''; if(action==='translate'&&!targetLanguage)return;
+    const response=await fetch('/api/mark-selection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...selected,selection:selected.text,action,question,targetLanguage})});
+    const payload=await response.json().catch(()=>({})); if(!response.ok) throw new Error(payload.error||payload.detail||`HTTP ${response.status}`);
+    const record={id:`history-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,documentId:state.documentId,title:state.title,selection:selected.text,startIndex:selected.startIndex,chapter:selected.chapter,action,question,result:payload.result,createdAt:new Date().toISOString()};
+    saveMarkRecords(MARK_HISTORY_KEY,[record,...getMarkRecords(MARK_HISTORY_KEY)]); renderMarkResult(payload.result,action);
+  } catch(error){responsePanels.forEach(p=>{p.innerHTML=`<p class="status error">${escapeHtml(error.message)}</p>`;});}
+}
+function bindMarkPanelActions(){
+  app.querySelectorAll('[data-mark-action]').forEach(button=>button.addEventListener('click',()=>runMarkAction(button.dataset.markAction)));
+  app.querySelector('#mark-question-form')?.addEventListener('submit',e=>{e.preventDefault();const q=app.querySelector('#mark-question')?.value.trim();if(q)runMarkAction('ask',q);});
+}
+function notebookRecordFullText(item) {
+  const parts = [item.title || 'Untitled'];
+  if (item.chapter) parts.push(`Chapter/section: ${item.chapter}`);
+  parts.push(`Saved: ${new Date(item.createdAt || Date.now()).toLocaleString()}`);
+  if (item.selection) parts.push(`\nRelevant passage:\n${item.selection}`);
+  if (item.note) parts.push(`\nMy note:\n${item.note}`);
+  if (item.question) parts.push(`\nQuestion for Ask Mark:\n${item.question}`);
+  if (item.result?.heading) parts.push(`\nAsk Mark — ${item.result.heading}`);
+  if (item.result?.response) parts.push(item.result.response);
+  if (item.result?.keyPoints?.length) parts.push(`\nKey points:\n${item.result.keyPoints.map(x=>`- ${x}`).join('\n')}`);
+  if (item.result?.cautions?.length) parts.push(`\nNotes and cautions:\n${item.result.cautions.map(x=>`- ${x}`).join('\n')}`);
+  return parts.join('\n');
+}
+
+function downloadTextFile(filename, text) {
+  const blob=new Blob([String(text||'')],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url;link.download=filename;
+  document.body.append(link);link.click();link.remove();
+  window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+function safeNotebookFilename(value) {
+  return String(value||'mark-notebook').replace(/[<>:"/\\|?*\u0000-\u001f]+/g,'-').replace(/\s+/g,' ').trim().slice(0,90)||'mark-notebook';
+}
+
+function exportNotebookRecords(records,label='Mark Notebook') {
+  if(!records?.length)return window.alert('There are no notebook entries to export.');
+  const header=`${label}\nExported ${new Date().toLocaleString()}\n${'='.repeat(72)}\n`;
+  const body=[...records].reverse().map((item,index)=>`\nENTRY ${index+1}\n${'-'.repeat(72)}\n${notebookRecordFullText(item)}`).join('\n');
+  downloadTextFile(`${safeNotebookFilename(label)}.txt`,`${header}${body}\n`);
+}
+
+function notebookEntryMarkup(item) {
+  const response=item.result?.response||'';
+  return `<article class="mark-record expanded-notebook-record">
+    <header class="notebook-record-header">
+      <div><strong>${escapeHtml(item.title||'Untitled')}</strong><small>${escapeHtml(item.chapter||item.pageContext||'Notebook entry')} · ${escapeHtml(new Date(item.createdAt||Date.now()).toLocaleString())}</small></div>
+      <span>${item.result?'Ask Mark insight':item.recordType==='personal-note'?'Personal note':'Passage'}</span>
+    </header>
+    ${item.selection?`<section class="notebook-passage"><h4>Relevant passage</h4><blockquote>${escapeHtml(item.selection)}</blockquote></section>`:''}
+    ${item.note?`<section class="notebook-personal-note"><h4>My note</h4><p>${escapeHtml(item.note)}</p></section>`:''}
+    ${item.question?`<section><h4>Question</h4><p>${escapeHtml(item.question)}</p></section>`:''}
+    ${response?`<section class="notebook-mark-response"><h4>${escapeHtml(item.result?.heading||'Ask Mark’s response')}</h4><p>${escapeHtml(response)}</p></section>`:''}
+    ${item.result?.keyPoints?.length?`<section><h4>Key points</h4><ul>${item.result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section>`:''}
+    ${item.result?.cautions?.length?`<section><h4>Notes and cautions</h4><ul>${item.result.cautions.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section>`:''}
+    <details class="notebook-plain-text"><summary>View as plain text</summary><pre>${escapeHtml(notebookRecordFullText(item))}</pre></details>
+    <div class="notebook-record-actions">
+      ${item.documentId?`<button type="button" data-mark-jump="${Number(item.startIndex)||0}">Return to passage</button>`:''}
+      <button type="button" data-export-notebook-record="${escapeHtml(item.id)}">Save as text</button>
+      <button type="button" data-edit-notebook-note="${escapeHtml(item.id)}">Add/Edit my note</button>
+      <button type="button" data-mark-delete="${escapeHtml(item.id)}">Delete</button>
+    </div>
+  </article>`;
+}
+
+function bindExpandedNotebookButtons(panel,records,key=MARK_INSIGHTS_KEY) {
+  bindMarkRecordButtons(panel,key);
+  panel.querySelectorAll('[data-export-notebook-record]').forEach(button=>button.addEventListener('click',()=>{
+    const item=records.find(x=>x.id===button.dataset.exportNotebookRecord);
+    if(item)exportNotebookRecords([item],`${item.title||'Book'} - Notebook Entry`);
+  }));
+  panel.querySelectorAll('[data-edit-notebook-note]').forEach(button=>button.addEventListener('click',()=>{
+    const current=getMarkRecords(MARK_INSIGHTS_KEY);
+    const item=current.find(x=>x.id===button.dataset.editNotebookNote);
+    if(!item)return;
+    const note=window.prompt('Add or edit your personal note:',item.note||'');
+    if(note===null)return;
+    saveMarkRecords(MARK_INSIGHTS_KEY,current.map(x=>x.id===item.id?{...x,note:note.trim(),updatedAt:new Date().toISOString()}:x));
+    renderMarkNotebook();renderFullscreenMarkNotebook();renderGlobalNotebookEntries();
+  }));
+}
+
+function renderNotebookCollection(panel,records,{title='Ask Mark Notebook',includeExport=true}={}) {
+  if(!panel)return;
+  panel.innerHTML=`<div class="mark-list-heading notebook-list-heading">
+    <div><strong>${escapeHtml(title)}</strong><small>${records.length} saved ${records.length===1?'entry':'entries'}</small></div>
+    ${includeExport?'<button type="button" data-export-notebook-all>Save notebook as text</button>':''}
+  </div>
+  ${records.length?records.map(notebookEntryMarkup).join(''):'<p class="mark-empty-note">Capture a passage, a response from Ask Mark, or one of your own thoughts to begin the notebook.</p>'}`;
+  panel.querySelector('[data-export-notebook-all]')?.addEventListener('click',()=>exportNotebookRecords(records,title));
+  bindExpandedNotebookButtons(panel,records);
+}
+
+function renderMarkNotebook(){
+  const panel=app.querySelector('#mark-notebook-panel');
+  if(!panel)return;
+  renderNotebookCollection(panel,markRecordsForCurrentBook(MARK_INSIGHTS_KEY),{title:`${state.title||'Current Book'} Notebook`});
+}
+function renderMarkHistory(){
+  const panel=app.querySelector('#mark-history-panel'); if(!panel)return; const items=markRecordsForCurrentBook(MARK_HISTORY_KEY);
+  panel.innerHTML=`<div class="mark-list-heading"><strong>Conversation History</strong><small>${items.length} requests</small></div>${items.length?items.map(item=>`<article class="mark-record"><span>${escapeHtml(item.action)}${item.question?` · ${escapeHtml(item.question)}`:''}</span><blockquote>${escapeHtml(item.selection.slice(0,280))}${item.selection.length>280?'…':''}</blockquote><p>${escapeHtml(item.result?.response?.slice(0,500)||'')}</p><div><button type="button" data-mark-jump="${item.startIndex}">Return to passage</button></div></article>`).join(''):'<p class="mark-empty-note">Your requests to Ask Mark for this book will appear here.</p>'}`; bindMarkRecordButtons(panel,MARK_HISTORY_KEY);
+}
+function bindMarkRecordButtons(panel,key){
+  panel.querySelectorAll('[data-mark-jump]').forEach(b=>b.addEventListener('click',()=>{const index=Number(b.dataset.markJump)||0;state.index=index;const reader=app.querySelector('#reader');const mode=state.renderedMode||getSelectedMode();const count=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);restoreReadingAnchor(reader,mode,count,index);updateReaderStatus();}));
+  panel.querySelectorAll('[data-mark-delete]').forEach(b=>b.addEventListener('click',()=>{saveMarkRecords(key,getMarkRecords(key).filter(x=>x.id!==b.dataset.markDelete));key===MARK_INSIGHTS_KEY?renderMarkNotebook():renderMarkHistory();}));
+}
+function selectReaderParagraphFromEvent(event){
+  const reader=app.querySelector('#reader'); if(!reader)return;
+  let node=event.target.closest?.('p, .reader-paragraph, .reading-paragraph, .reader-group');
+  if(!node) return;
+  const range=document.createRange();
+  range.selectNodeContents(node);
+  const sel=window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  const data=captureMarkSelection();
+  if(data){
+    if(isReaderRunning()){
+      stopReader();
+      const start=app.querySelector('#start-reader');
+      const pause=app.querySelector('#pause-reader');
+      if(start){start.disabled=false;start.textContent=state.index?'Resume':'Start';}
+      if(pause) pause.disabled=true;
+      persistReaderSession({immediate:true});
+      updateReaderStatus('Paused for selected passage.');
+    }
+    showMarkToolbar(data,range.getBoundingClientRect());
+    renderMarkSelectionCard();
+    openMarkPanel('selection');
+  }
+}
+function bindMarkCompanion(reader){
+  const toolbar=app.querySelector('#mark-selection-toolbar'); if(!reader||!toolbar)return;
+  const handleSelection=()=>{window.setTimeout(()=>{
+    const data=captureMarkSelection();
+    if(!data) return hideMarkToolbar();
+
+    /*
+      Selecting a passage is an intentional study interruption. Pause every
+      timed reading mode at its canonical word before displaying Mark tools.
+      The reader remains paused until the user explicitly presses Resume.
+    */
+    if(isReaderRunning()){
+      stopReader();
+      const start=app.querySelector('#start-reader');
+      const pause=app.querySelector('#pause-reader');
+      if(start){start.disabled=false;start.textContent=state.index?'Resume':'Start';}
+      if(pause) pause.disabled=true;
+      persistReaderSession({immediate:true});
+      updateReaderStatus('Paused for selected passage.');
+    }
+
+    const selection=window.getSelection();
+    showMarkToolbar(data,selection.getRangeAt(0).getBoundingClientRect());
+    renderMarkSelectionCard();
+    if(!app.querySelector('#fullscreen-mark-drawer')?.hidden)renderFullscreenMarkSelection();
+  },0);};
+  reader.addEventListener('mouseup',handleSelection);reader.addEventListener('keyup',handleSelection);
+  reader.addEventListener('dblclick',event=>{if(event.altKey)selectReaderParagraphFromEvent(event);});
+  toolbar.addEventListener('mousedown',e=>e.preventDefault());
+  toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();runMarkAction(b.dataset.markToolbarAction);}));
+  toolbar.querySelector('[data-mark-more]')?.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();});
+  app.querySelector('#toggle-mark-panel')?.addEventListener('click',()=>{
+    const layout=app.querySelector('#reader-layout');
+    const hidden=layout?.classList.contains('word-panel-hidden');
+    const markActive=app.querySelector('[data-mark-tab="selection"]')?.classList.contains('active');
+
+    if(!hidden && markActive){
+      const reader=app.querySelector('#reader');
+      const anchorIndex=Math.max(0,Number(state.index)||0);
+      const mode=state.renderedMode||getSelectedMode();
+      const groupSize=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);
+      const wasRunning=isReaderRunning();
+
+      layout.classList.add('word-panel-hidden');
+      const markButton=app.querySelector('#toggle-mark-panel');
+      const toolsButton=app.querySelector('#toggle-word-panel');
+      markButton?.setAttribute('aria-pressed','false');
+      toolsButton?.setAttribute('aria-pressed','false');
+      markButton?.classList.add('pane-closed');
+      toolsButton?.classList.add('pane-closed');
+
+      if(reader){
+        window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
+          state.index=Math.max(0,Math.min(state.words.length-1,anchorIndex));
+          if(state.bookPages) scheduleBookPageReflow({delay:0,anchorIndex});
+          else restoreReadingAnchor(reader,mode,groupSize,anchorIndex);
+          if(wasRunning&&!isReaderRunning()) startReader();
+          persistReaderSession({immediate:true});
+        }));
+      }
+    } else {
+      openMarkPanel('selection');
+      renderMarkSelectionCard();
+    }
+  });
+  app.querySelectorAll('[data-mark-tab]').forEach(b=>b.addEventListener('click',()=>activateMarkTab(b.dataset.markTab)));
+  document.addEventListener('mousedown',event=>{if(!event.target.closest('#mark-selection-toolbar')&&!event.target.closest('#word-panel')&&!reader.contains(event.target))hideMarkToolbar();});
+  renderMarkSelectionCard();
+}
 function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.dataset.viewKey = 'reader';
   const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });
@@ -6125,6 +6474,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <option value="flash">Flash</option>
                 <option value="digital-sign">Digital Sign</option>
                 <option value="auto-scroll">Auto Scroll</option>
+                <option value="pacman">Pac-Man Chomp</option>
               </select>
             </div>
             <div class="control pointer-style-control">
@@ -6181,7 +6531,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       <div class="reader-pane-controls" aria-label="Reading area layout controls">
         <div class="reader-pane-buttons">
           <button id="toggle-navigation-pane" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="navigation-pane"><span aria-hidden="true">☰</span> Marks &amp; Contents</button>
-          <button id="toggle-word-panel" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="word-panel"><span aria-hidden="true">⚙</span> Reader Controls</button>
+          <button id="toggle-word-panel" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="word-panel"><span aria-hidden="true">⚙</span> Reader Tools</button>
+          <button id="toggle-mark-panel" class="secondary pane-toggle reader-side-toggle mark-pane-button" type="button" aria-pressed="false" aria-controls="word-panel"><span aria-hidden="true">✦</span> Ask Mark</button>
         </div>
         <button id="toggle-reader-fullscreen" class="viewer-fullscreen-button" type="button" aria-label="Enter text viewer fullscreen" title="Full screen text viewer">
           <span class="fullscreen-icon" aria-hidden="true">⛶</span>
@@ -6195,6 +6546,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
           <div id="reader-frame" class="reader-frame">
           <div id="fullscreen-control-strip" class="fullscreen-control-strip" aria-label="Fullscreen reader controls">
             <button id="fullscreen-options-toggle" class="fullscreen-options-toggle" type="button" aria-expanded="false" aria-controls="fullscreen-options-menu">Options ▾</button>
+            <button id="fullscreen-mark-toggle" class="fullscreen-mark-toggle" type="button" aria-expanded="false" aria-controls="fullscreen-mark-drawer"><span aria-hidden="true">✦</span> Ask Mark</button>
             <button id="fullscreen-controls-close" class="fullscreen-controls-close" type="button" aria-label="Hide fullscreen controls" title="Hide controls">×</button>
             <section id="fullscreen-options-menu" class="fullscreen-options-menu" hidden>
               <div class="fullscreen-options-header">
@@ -6207,7 +6559,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <div class="fullscreen-options-grid fullscreen-options-grid-reading">
                   <label>Mode<select id="fs-mode-select">
                     <option value="highlight">Highlight</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
-                    <option value="digital-sign">Digital Sign</option><option value="auto-scroll">Auto Scroll</option>
+                    <option value="digital-sign">Digital Sign</option><option value="auto-scroll">Auto Scroll</option><option value="pacman">Pac-Man Chomp</option>
                   </select></label>
                   <label>Pointer<select id="fs-pointer-style">
                     <option value="hand">Hand</option>
@@ -6283,20 +6635,37 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
               <p class="fullscreen-options-hint">Click text or press <kbd>Space</kbd> to pause/resume. Press <kbd>O</kbd> to restore hidden controls.</p>
             </section>
           </div>
-          <div id="book-page-controls" class="book-page-controls" hidden>
-            <button id="book-page-prev" type="button" aria-label="Previous page spread">‹</button>
-            <label class="book-page-jump" for="book-page-input">
-              <span>Page</span>
-              <input id="book-page-input" type="number" min="1" step="1" inputmode="numeric" value="1" aria-label="Go to page number">
-              <span id="book-page-total">of 1</span>
-            </label>
-            <span id="book-page-status" class="book-page-spread-label">Pages 1–2</span>
-            <button id="book-page-next" type="button" aria-label="Next page spread">›</button>
-          </div>
           <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
+
+            <aside id="fullscreen-mark-drawer" class="fullscreen-mark-drawer" hidden aria-label="Ask Mark reading companion">
+              <header class="fullscreen-mark-header">
+                <div><span>Reading companion</span><strong>Ask Mark</strong></div>
+                <button id="fullscreen-mark-close" type="button" aria-label="Close Mark">×</button>
+              </header>
+              <nav class="fullscreen-mark-tabs" aria-label="Ask Mark fullscreen tabs">
+                <button type="button" data-fs-mark-tab="selection" class="active">Selection</button>
+                <button type="button" data-fs-mark-tab="notebook">Notebook</button>
+                <button type="button" data-fs-mark-tab="history">History</button>
+              </nav>
+              <div id="fullscreen-mark-selection" data-fs-mark-panel="selection"></div>
+              <div id="fullscreen-mark-notebook" data-fs-mark-panel="notebook" hidden></div>
+              <div id="fullscreen-mark-history" data-fs-mark-panel="history" hidden></div>
+            </aside>
           <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text" title="Click a word to move the reading position; click empty space to pause or resume"></article>
           </div>
-          <div class="reader-viewer-footer" aria-label="Reader pace">
+          <div class="reader-viewer-footer" aria-label="Reader pace and page navigation">
+            <div id="book-page-controls-home" class="book-page-controls-home">
+              <div id="book-page-controls" class="book-page-controls" hidden>
+                <button id="book-page-prev" type="button" aria-label="Previous page spread">‹</button>
+                <label class="book-page-jump" for="book-page-input">
+                  <span>Page</span>
+                  <input id="book-page-input" type="number" min="1" step="1" inputmode="numeric" value="1" aria-label="Go to page number">
+                  <span id="book-page-total">of 1</span>
+                </label>
+                <span id="book-page-status" class="book-page-spread-label">Pages 1–2</span>
+                <button id="book-page-next" type="button" aria-label="Next page spread">›</button>
+              </div>
+            </div>
             <span id="viewer-wpm-badge" class="viewer-wpm-badge" aria-label="Selected reading speed">${Math.round(Number(state.wpm) || 0).toLocaleString()} WPM</span>
           </div>
         </div>
@@ -6324,6 +6693,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         </aside>
       </div>
 
+      <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
+        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="analyze">🧠 Analyze</button><button type="button" data-mark-toolbar-action="define">Aa Define</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-more>••• Ask Mark</button>
+      </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
         <button type="button" data-dictionary-action="save" role="menuitem">Save definition</button>
@@ -6349,6 +6721,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   bindReaderFullscreen(readerFrame, fullscreenButton);
   bindFullscreenOptions(readerFrame);
   bindReaderPaneControls();
+  bindMarkCompanion(reader);
   bindReaderResize(readerFrame, reader);
   observeBookPageReader();
   renderNavigationPane();
@@ -6678,6 +7051,63 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
 }
 
 
+
+function fullscreenMarkResultContainer() {
+  const drawer = app.querySelector('#fullscreen-mark-drawer');
+  return drawer && !drawer.hidden ? app.querySelector('#fullscreen-mark-response') : null;
+}
+
+function renderFullscreenMarkSelection() {
+  const panel = app.querySelector('#fullscreen-mark-selection');
+  if (!panel) return;
+  const selected = state.markSelection;
+  if (!selected) {
+    panel.innerHTML = '<div class="mark-empty fullscreen-mark-empty"><strong>Highlight a passage to begin.</strong><p>Reading pauses automatically when you select text.</p></div>';
+    return;
+  }
+  panel.innerHTML = `<div class="fullscreen-mark-selection-card"><span>${splitWords(selected.text).length} selected words${selected.chapter?` · ${escapeHtml(selected.chapter)}`:''}</span><blockquote>${escapeHtml(selected.text.slice(0,1000))}${selected.text.length>1000?'…':''}</blockquote></div>
+  <div class="fullscreen-mark-actions">${[['explain','💡','Explain'],['summarize','≡','Summarize'],['analyze','🧠','Analyze'],['simplify','A','Simplify'],['context','🏛','Context'],['related','🔗','Related'],['translate','🌍','Translate'],['save','★','Save']].map(([id,icon,label])=>`<button type="button" data-fs-mark-action="${id}"><span>${icon}</span>${label}</button>`).join('')}</div>
+  <form id="fullscreen-mark-question-form" class="fullscreen-mark-question-form"><label for="fullscreen-mark-question">Ask Mark</label><div><input id="fullscreen-mark-question" type="text" maxlength="1200" placeholder="Ask about this passage…"><button class="primary" type="submit">Ask</button></div></form>
+  <div id="fullscreen-mark-response" class="mark-response fullscreen-mark-response" hidden></div>`;
+  panel.querySelectorAll('[data-fs-mark-action]').forEach(b=>b.addEventListener('click',()=>runMarkAction(b.dataset.fsMarkAction)));
+  panel.querySelector('#fullscreen-mark-question-form')?.addEventListener('submit',e=>{e.preventDefault();const q=panel.querySelector('#fullscreen-mark-question')?.value.trim();if(q)runMarkAction('ask',q);});
+}
+function renderFullscreenMarkNotebook() {
+  const panel=app.querySelector('#fullscreen-mark-notebook');
+  if(!panel)return;
+  renderNotebookCollection(panel,markRecordsForCurrentBook(MARK_INSIGHTS_KEY),{title:`${state.title||'Current Book'} Notebook`});
+}
+function renderFullscreenMarkHistory() {
+  const panel=app.querySelector('#fullscreen-mark-history'); if(!panel)return;
+  const items=markRecordsForCurrentBook(MARK_HISTORY_KEY);
+  panel.innerHTML=`<div class="mark-list-heading"><strong>Conversation History</strong><small>${items.length} requests</small></div>${items.length?items.map(item=>`<article class="mark-record"><span>${escapeHtml(item.action)}${item.question?` · ${escapeHtml(item.question)}`:''}</span><blockquote>${escapeHtml(item.selection.slice(0,250))}${item.selection.length>250?'…':''}</blockquote><p>${escapeHtml(item.result?.response?.slice(0,420)||'')}</p><div><button type="button" data-mark-jump="${item.startIndex}">Return to passage</button></div></article>`).join(''):'<p class="mark-empty-note">Your Ask Mark requests will appear here.</p>'}`;
+  bindMarkRecordButtons(panel,MARK_HISTORY_KEY);
+}
+function activateFullscreenMarkTab(tab='selection'){
+  app.querySelectorAll('[data-fs-mark-tab]').forEach(b=>b.classList.toggle('active',b.dataset.fsMarkTab===tab));
+  app.querySelectorAll('[data-fs-mark-panel]').forEach(p=>p.hidden=p.dataset.fsMarkPanel!==tab);
+  if(tab==='selection')renderFullscreenMarkSelection();
+  if(tab==='notebook')renderFullscreenMarkNotebook();
+  if(tab==='history')renderFullscreenMarkHistory();
+}
+
+function syncBookPageControlsPlacement(readerFrame=app.querySelector('#reader-frame')) {
+  const controls=app.querySelector('#book-page-controls');
+  const home=app.querySelector('#book-page-controls-home');
+  const reader=app.querySelector('#reader');
+  if(!controls||!home||!readerFrame||!reader)return;
+
+  const fullscreenActive = document.fullscreenElement === readerFrame
+    || readerFrame.classList.contains('fullscreen-fallback');
+
+  if(fullscreenActive){
+    if(controls.parentElement!==readerFrame) readerFrame.insertBefore(controls,reader);
+    controls.classList.add('book-page-controls-fullscreen');
+  }else{
+    if(controls.parentElement!==home) home.append(controls);
+    controls.classList.remove('book-page-controls-fullscreen');
+  }
+}
 function bindFullscreenOptions(readerFrame) {
   // The reader view can be rebuilt many times during one browser session.
   // Tear down document-level fullscreen bindings from the previous instance so
@@ -6697,9 +7127,12 @@ function bindFullscreenOptions(readerFrame) {
 
   const strip = app.querySelector('#fullscreen-control-strip');
   const toggle = app.querySelector('#fullscreen-options-toggle');
+  const markToggle = app.querySelector('#fullscreen-mark-toggle');
+  const markDrawer = app.querySelector('#fullscreen-mark-drawer');
+  const markClose = app.querySelector('#fullscreen-mark-close');
   const close = app.querySelector('#fullscreen-controls-close');
   const menu = app.querySelector('#fullscreen-options-menu');
-  if (!readerFrame || !strip || !toggle || !close || !menu) return;
+  if (!readerFrame || !strip || !toggle || !markToggle || !markDrawer || !markClose || !close || !menu) return;
 
   const pairs = [
     ['#fs-mode-select', '#mode-select'],
@@ -6746,7 +7179,10 @@ function bindFullscreenOptions(readerFrame) {
     }
   };
 
+  const closeMarkDrawer=()=>{markDrawer.hidden=true;markToggle.setAttribute('aria-expanded','false');markToggle.classList.remove('active');readerFrame.classList.remove('fullscreen-mark-open');};
+  const openMarkDrawer=()=>{closeMenu();strip.classList.remove('controls-hidden');readerFrame.classList.remove('fullscreen-controls-hidden');markDrawer.hidden=false;markToggle.setAttribute('aria-expanded','true');markToggle.classList.add('active');readerFrame.classList.add('fullscreen-mark-open');activateFullscreenMarkTab('selection');};
   const openMenu = () => {
+    closeMarkDrawer();
     strip.classList.remove('controls-hidden');
     readerFrame.classList.remove('fullscreen-controls-hidden');
     menu.hidden = false;
@@ -6754,7 +7190,6 @@ function bindFullscreenOptions(readerFrame) {
     toggle.textContent = 'Options ▴';
     syncFromMain();
   };
-
   const closeMenu = () => {
     menu.hidden = true;
     toggle.setAttribute('aria-expanded', 'false');
@@ -6767,11 +7202,15 @@ function bindFullscreenOptions(readerFrame) {
     if (menu.hidden) openMenu();
     else closeMenu();
   });
+  markToggle.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();if(markDrawer.hidden)openMarkDrawer();else closeMarkDrawer();});
+  markClose.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();closeMarkDrawer();});
+  app.querySelectorAll('[data-fs-mark-tab]').forEach(b=>b.addEventListener('click',()=>activateFullscreenMarkTab(b.dataset.fsMarkTab)));
 
   close.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
     closeMenu();
+    closeMarkDrawer();
     strip.classList.add('controls-hidden');
     readerFrame.classList.add('fullscreen-controls-hidden');
   });
@@ -6840,12 +7279,10 @@ function bindFullscreenOptions(readerFrame) {
   });
 
   state.fullscreenOptionsKeyHandler = (event) => {
-    if (!isFullscreen() || event.key.toLowerCase() !== 'o') return;
-    event.preventDefault();
-    strip.classList.remove('controls-hidden');
-    readerFrame.classList.remove('fullscreen-controls-hidden');
-    if (menu.hidden) openMenu();
-    else closeMenu();
+    if (!isFullscreen()) return;
+    const key=event.key.toLowerCase(); if(key!=='o'&&key!=='m')return;
+    event.preventDefault();strip.classList.remove('controls-hidden');readerFrame.classList.remove('fullscreen-controls-hidden');
+    if(key==='o'){if(menu.hidden)openMenu();else closeMenu();}else{if(markDrawer.hidden)openMarkDrawer();else closeMarkDrawer();}
   };
   document.addEventListener('keydown', state.fullscreenOptionsKeyHandler);
 
@@ -6854,10 +7291,12 @@ function bindFullscreenOptions(readerFrame) {
       strip.classList.remove('controls-hidden');
       readerFrame.classList.remove('fullscreen-controls-hidden');
       closeMenu();
+      closeMarkDrawer();
       syncFromMain();
       requestAnimationFrame(refreshFocusAnchorFullscreenLayout);
     } else if (!readerFrame.classList.contains('fullscreen-fallback')) {
       closeMenu();
+      closeMarkDrawer();
       strip.classList.remove('controls-hidden');
       readerFrame.classList.remove('fullscreen-controls-hidden');
     }
@@ -6874,12 +7313,15 @@ function bindFullscreenOptions(readerFrame) {
       strip.classList.remove('controls-hidden');
       readerFrame.classList.remove('fullscreen-controls-hidden');
       closeMenu();
+      closeMarkDrawer();
       syncFromMain();
     }
   });
   state.fullscreenOptionsObserver.observe(readerFrame, { attributes: true, attributeFilter: ['class'] });
 
   closeMenu();
+  closeMarkDrawer();
+  syncBookPageControlsPlacement(readerFrame);
   syncFromMain();
 }
 
@@ -6887,52 +7329,24 @@ function bindFullscreenOptions(readerFrame) {
 
 
 function arrangeReaderSidePanels() {
-  const wordPanel = app.querySelector('#word-panel');
-  const toolbar = app.querySelector('.reader-toolbar');
-  const media = app.querySelector('.reader-music-actions');
-  const comprehension = app.querySelector('#check-comprehension');
-  const translation = app.querySelector('.translation-tools');
-  const wordResult = app.querySelector('#word-result');
-  if (!wordPanel || !toolbar) return;
-
-  wordPanel.classList.add('reader-control-panel');
-  wordPanel.setAttribute('aria-label', 'Reader controls');
-
-  const shell = document.createElement('div');
-  shell.className = 'reader-control-shell';
-  shell.innerHTML = `
-    <div class="reader-control-header">
-      <div><span>Reader</span><strong>Controls</strong></div>
-      <button id="close-reader-controls" class="reader-panel-close" type="button" aria-label="Close reader controls">×</button>
+  const wordPanel=app.querySelector('#word-panel'), toolbar=app.querySelector('.reader-toolbar'), media=app.querySelector('.reader-music-actions'), comprehension=app.querySelector('#check-comprehension'), translation=app.querySelector('.translation-tools'), wordResult=app.querySelector('#word-result');
+  if(!wordPanel||!toolbar)return;
+  wordPanel.classList.add('reader-control-panel','mark-companion-panel');wordPanel.setAttribute('aria-label','Mark and reader tools');
+  const shell=document.createElement('div');shell.className='reader-control-shell mark-shell';shell.innerHTML=`
+    <div class="reader-control-header"><div><span>Reading companion</span><strong>Ask Mark</strong></div><button id="close-reader-controls" class="reader-panel-close" type="button" aria-label="Close right pane">×</button></div>
+    <nav class="mark-tabs" aria-label="Reader tools and Mark tabs"><button type="button" data-mark-tab="tools" class="active">Reader Tools</button><button type="button" data-mark-tab="selection">Mark</button><button type="button" data-mark-tab="notebook">Notebook</button><button type="button" data-mark-tab="history">History</button></nav>
+    <div id="mark-tools-panel" data-mark-panel="tools" class="mark-panel-view">
+      <div id="reader-control-core" class="reader-control-section"></div>
+      <details class="reader-control-group"><summary>Learn</summary><div id="reader-control-learn" class="reader-control-group-body"><p class="reader-control-help">Check how well you understood the passage you just read.</p></div></details>
+      <details class="reader-control-group"><summary>Media</summary><div id="reader-control-media" class="reader-control-group-body"></div></details>
+      <details class="reader-control-group" open><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
     </div>
-    <div id="reader-control-core" class="reader-control-section"></div>
-    <details class="reader-control-group" open>
-      <summary>Learn</summary>
-      <div id="reader-control-learn" class="reader-control-group-body">
-        <p class="reader-control-help">Check how well you understood the passage you just read.</p>
-      </div>
-    </details>
-    <details class="reader-control-group">
-      <summary>Media</summary>
-      <div id="reader-control-media" class="reader-control-group-body"></div>
-    </details>
-    <details class="reader-control-group">
-      <summary>Language &amp; Words</summary>
-      <div id="reader-control-language" class="reader-control-group-body"></div>
-    </details>`;
-
-  wordPanel.replaceChildren(shell);
-  shell.querySelector('#reader-control-core')?.appendChild(toolbar);
-  if (comprehension) shell.querySelector('#reader-control-learn')?.appendChild(comprehension);
-  if (media) shell.querySelector('#reader-control-media')?.appendChild(media);
-  if (translation) shell.querySelector('#reader-control-language')?.appendChild(translation);
-  if (wordResult) shell.querySelector('#reader-control-language')?.appendChild(wordResult);
-
-  shell.querySelector('#close-reader-controls')?.addEventListener('click', () => {
-    app.querySelector('#toggle-word-panel')?.click();
-  });
+    <div id="mark-selection-panel" data-mark-panel="selection" class="mark-panel-view" hidden></div>
+    <div id="mark-notebook-panel" data-mark-panel="notebook" class="mark-panel-view" hidden></div>
+    <div id="mark-history-panel" data-mark-panel="history" class="mark-panel-view" hidden></div>`;
+  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(comprehension)shell.querySelector('#reader-control-learn')?.appendChild(comprehension);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
+  shell.querySelector('#close-reader-controls')?.addEventListener('click',()=>app.querySelector('#toggle-word-panel')?.click());
 }
-
 function bindReaderPaneControls() {
   const layout = app.querySelector('#reader-layout');
   const navigationButton = app.querySelector('#toggle-navigation-pane');
@@ -6960,7 +7374,23 @@ function bindReaderPaneControls() {
   });
   wordButton.addEventListener('click', () => {
     const anchorIndex = state.bookPages ? Math.max(0, Number(state.index) || 0) : null;
-    setPane('word', layout.classList.contains('word-panel-hidden'));
+    const hidden = layout.classList.contains('word-panel-hidden');
+    const toolsActive = app.querySelector('[data-mark-tab="tools"]')?.classList.contains('active');
+
+    if (hidden) {
+      setPane('word', true);
+      activateMarkTab('tools');
+    } else if (!toolsActive) {
+      activateMarkTab('tools');
+    } else {
+      setPane('word', false);
+    }
+
+    const markButton = app.querySelector('#toggle-mark-panel');
+    if (markButton) {
+      markButton.setAttribute('aria-pressed', 'false');
+      markButton.classList.toggle('pane-closed', layout.classList.contains('word-panel-hidden'));
+    }
     if (state.bookPages) scheduleBookPageReflow({ delay: 40, anchorIndex });
   });
 }
@@ -7468,6 +7898,7 @@ function updateBookPageStatus(forcedSpread = null) {
 }
 
 function updateBookPageControls() {
+  syncBookPageControlsPlacement();
   const controls = app.querySelector('#book-page-controls');
   const reader = app.querySelector('#reader');
   if (!controls || !reader) return;
@@ -7546,7 +7977,7 @@ function updateModeControls(mode) {
   const start = app.querySelector('#start-reader');
   const pause = app.querySelector('#pause-reader');
   const staticMode = mode === 'two-column';
-  const countUnused = mode === 'digital-sign' || mode === 'two-column' || mode === 'auto-scroll';
+  const countUnused = mode === 'digital-sign' || mode === 'two-column' || mode === 'auto-scroll' || mode === 'pacman';
   const meaningfulInput = app.querySelector('#meaningful-chunks');
   const meaningfulSupported = modeSupportsMeaningfulChunks(mode);
   const bookPagesInput = app.querySelector('#book-pages');
@@ -7578,7 +8009,9 @@ function updateModeControls(mode) {
     meaningfulInput.disabled = !meaningfulSupported;
     meaningfulInput.title = meaningfulSupported
       ? 'Uses punctuation and common phrase boundaries. Words shown becomes the maximum chunk size.'
-      : 'Meaningful chunks is not used in this continuous or self-paced mode.';
+      : (mode === 'pacman'
+        ? 'Pac-Man consumes one word at a time, character by character.'
+        : 'Meaningful chunks is not used in this continuous or self-paced mode.');
   }
 
   if (countInput) {
@@ -8130,7 +8563,7 @@ function switchReadingMode(nextMode) {
 function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-count')?.value) || 1) {
   const reader = app.querySelector('#reader');
   if (!reader) return;
-  reader.classList.remove('flash', 'highlight-mode', 'bold-focus-mode', 'smooth-glide-mode', 'pointing-guide-mode', 'marquee-mode', 'digital-sign-mode', 'two-column-mode', 'auto-scroll-mode', 'reading-guide-enabled', 'book-pages-layout', 'illustrated-reading');
+  reader.classList.remove('flash', 'highlight-mode', 'bold-focus-mode', 'smooth-glide-mode', 'pointing-guide-mode', 'marquee-mode', 'digital-sign-mode', 'two-column-mode', 'auto-scroll-mode', 'pacman-mode', 'reading-guide-enabled', 'book-pages-layout', 'illustrated-reading');
   state.renderedMode = mode;
   updateFocusAnchorOverlay();
   state.bookPages = Boolean(app.querySelector('#book-pages')?.checked) && modeSupportsBookPages(mode);
@@ -8165,6 +8598,16 @@ function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-cou
   if (mode === 'auto-scroll') {
     reader.classList.add('auto-scroll-mode');
     renderWordDocument(reader, mode, 1);
+    return;
+  }
+
+  if (mode === 'pacman') {
+    reader.classList.add('pacman-mode');
+    renderWordDocument(reader, mode, 1);
+    const pacman = document.createElement('span');
+    pacman.className = 'pacman-chomper';
+    pacman.setAttribute('aria-hidden', 'true');
+    reader.prepend(pacman);
     return;
   }
 
@@ -8394,22 +8837,26 @@ function createTickerChunk(startIndex, chunkSize = 80) {
   return { chunk, endIndex, wordCount: endIndex - startIndex };
 }
 
-function fillTickerBuffer(stage, reader) {
-  // Keep only a few hundred words in the DOM. The previous implementation put
-  // the entire remaining book into one animated element, which could lock the
-  // browser in fullscreen because every frame repainted an enormous layer.
+function fillTickerBuffer(stage, reader, { maxChunks = 4 } = {}) {
+  // Keep only a bounded amount of upcoming text in the DOM. Return the number
+  // of words actually added so callers can stop immediately when the visual
+  // buffer is already wide enough.
   const targetWidth = Math.max(reader.clientWidth * 2.5, 1800);
+  const startingWordIndex = state.tickerNextWordIndex;
   let guard = 0;
+
   while (state.tickerNextWordIndex < state.words.length
       && (stage.scrollWidth < targetWidth || stage.children.length < 3)
-      && guard < 8) {
+      && guard < Math.max(1, maxChunks)) {
     const result = createTickerChunk(state.tickerNextWordIndex);
-    if (!result) break;
+    if (!result || result.endIndex <= state.tickerNextWordIndex) break;
     stage.append(result.chunk);
     state.tickerNextWordIndex = result.endIndex;
     state.tickerLoadedWords += result.wordCount;
     guard += 1;
   }
+
+  return Math.max(0, state.tickerNextWordIndex - startingWordIndex);
 }
 
 
@@ -8486,23 +8933,30 @@ function startDigitalSignReader({ reader, speed, start, pause }) {
     const targetIndex = targetWordFromClock(clock, now);
     state.index = Math.max(resumeIndex, targetIndex);
 
-    // Keep enough upcoming text buffered.
-    while (state.tickerNextWordIndex < Math.min(state.words.length, state.index + 300)) {
-      fillTickerBuffer(stage, reader);
-      if (state.tickerNextWordIndex >= state.words.length) break;
+    // Keep enough upcoming text buffered, but never spin when the visual
+    // buffer is already sufficiently wide. At most two small fill attempts are
+    // allowed in one animation frame.
+    const desiredWordIndex = Math.min(state.words.length, state.index + 300);
+    let fillAttempts = 0;
+    while (state.tickerNextWordIndex < desiredWordIndex && fillAttempts < 2) {
+      const addedWords = fillTickerBuffer(stage, reader, { maxChunks: 2 });
+      fillAttempts += 1;
+      if (addedWords <= 0 || state.tickerNextWordIndex >= state.words.length) break;
     }
 
     // Remove chunks that are entirely behind the authoritative target word.
     let first = stage.firstElementChild;
-    while (first && Number(first.dataset.end) <= state.index) {
+    let removedChunks = 0;
+    while (first && Number(first.dataset.end) <= state.index && removedChunks < 6) {
       state.tickerLoadedWords -= Math.max(
         0,
         (Number(first.dataset.end) || 0) - (Number(first.dataset.start) || 0)
       );
       first.remove();
+      removedChunks += 1;
       first = stage.firstElementChild;
-      fillTickerBuffer(stage, reader);
     }
+    if (removedChunks > 0) fillTickerBuffer(stage, reader, { maxChunks: 3 });
 
     /*
       Position the currently due word near the horizontal reading anchor.
@@ -8580,6 +9034,121 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 
   step(performance.now());
 }
+
+function restorePacmanWord(element) {
+  if (!element) return;
+  const original = element.dataset.pacmanOriginal;
+  if (original != null) {
+    element.textContent = original;
+    delete element.dataset.pacmanOriginal;
+  }
+  element.classList.remove('pacman-current-word', 'pacman-eaten-word');
+}
+
+function resetPacmanRenderedWords(reader) {
+  reader?.querySelectorAll('.reader-word[data-pacman-original]').forEach(restorePacmanWord);
+  reader?.querySelectorAll('.reader-word.pacman-eaten-word').forEach((element) => {
+    element.classList.remove('pacman-eaten-word');
+  });
+}
+
+function preparePacmanCharacters(wordElement) {
+  if (!wordElement) return [];
+  restorePacmanWord(wordElement);
+  const text = wordElement.textContent || '';
+  wordElement.dataset.pacmanOriginal = text;
+  wordElement.textContent = '';
+  wordElement.classList.add('pacman-current-word');
+
+  return Array.from(text).map((character) => {
+    const span = document.createElement('span');
+    span.className = 'pacman-character';
+    span.textContent = character;
+    wordElement.append(span);
+    return span;
+  });
+}
+
+function movePacmanToCharacter(reader, marker, characterElement, fallbackWord) {
+  if (!reader || !marker) return;
+  const target = characterElement || fallbackWord;
+  if (!target) return;
+
+  const readerRect = reader.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const left = targetRect.left - readerRect.left + reader.scrollLeft - marker.offsetWidth * .72;
+  const top = targetRect.top - readerRect.top + reader.scrollTop
+    + (targetRect.height - marker.offsetHeight) / 2;
+
+  marker.style.transform = `translate3d(${Math.max(0, left)}px, ${Math.max(0, top)}px, 0)`;
+  marker.classList.add('visible');
+}
+
+function startPacmanReader({ reader, speed, start, pause }) {
+  const marker = reader.querySelector('.pacman-chomper');
+  if (!marker) return;
+
+  resetPacmanRenderedWords(reader);
+  const token = ++state.runToken;
+  const consumeNextWord = () => {
+    if (token !== state.runToken) return;
+
+    if (state.index >= state.words.length) {
+      pauseReader();
+      marker.classList.remove('visible');
+      updateReaderStatus('Pac-Man finished the book!');
+      return;
+    }
+
+    ensureWordsRendered(reader, 'pacman', 1, Math.min(state.words.length, state.index + 1000));
+    const wordIndex = state.index;
+    const wordElement = reader.querySelector(`.reader-word[data-index="${wordIndex}"]`);
+
+    if (!wordElement) {
+      state.interval = window.setTimeout(consumeNextWord, 30);
+      return;
+    }
+
+    scrollWordToReadingLine(reader, wordIndex);
+    const characters = preparePacmanCharacters(wordElement);
+    const wordDuration = Math.max(80, 60000 / speed);
+    const visibleCharacters = characters.length || 1;
+    const characterDuration = Math.max(22, wordDuration / visibleCharacters);
+    let characterIndex = 0;
+
+    const chompCharacter = () => {
+      if (token !== state.runToken) return;
+
+      const character = characters[characterIndex];
+      movePacmanToCharacter(reader, marker, character, wordElement);
+
+      if (character) {
+        character.classList.add('pacman-eaten-character');
+      }
+
+      characterIndex += 1;
+      if (characterIndex < characters.length) {
+        state.interval = window.setTimeout(chompCharacter, characterDuration);
+        return;
+      }
+
+      wordElement.classList.remove('pacman-current-word');
+      wordElement.classList.add('pacman-eaten-word');
+      state.index = Math.min(state.words.length, wordIndex + 1);
+      updateFocusAnchorOverlay(state.words.slice(wordIndex, wordIndex + 1));
+      updateReaderStatus();
+
+      const elapsedForCharacters = characterDuration * Math.max(1, characters.length);
+      const remaining = Math.max(0, wordDuration - elapsedForCharacters);
+      state.interval = window.setTimeout(consumeNextWord, remaining);
+    };
+
+    chompCharacter();
+  };
+
+  consumeNextWord();
+}
+
 function startReader() {
   const selectedMode = getSelectedMode();
   if (selectedMode === 'two-column') return;
@@ -8599,7 +9168,7 @@ function startReader() {
   const mode = getSelectedMode();
 
   const speed = Math.min(900, Math.max(30, Number(speedInput.value) || 300));
-  const count = (mode === 'digital-sign' || mode === 'auto-scroll')
+  const count = (mode === 'digital-sign' || mode === 'auto-scroll' || mode === 'pacman')
     ? 1
     : Math.min(10, Math.max(1, Number(countInput.value) || 1));
   speedInput.value = speed;
@@ -8625,6 +9194,11 @@ function startReader() {
 
   if (mode === 'auto-scroll') {
     startAutoScrollReader({ reader, speed, start, pause });
+    return;
+  }
+
+  if (mode === 'pacman') {
+    startPacmanReader({ reader, speed, start, pause });
     return;
   }
 
@@ -8752,6 +9326,11 @@ function startReader() {
 }
 
 function stopReader() {
+  if (state.renderedMode === 'pacman') {
+    const reader = app.querySelector('#reader');
+    const current = reader?.querySelector('.reader-word.pacman-current-word');
+    if (current) restorePacmanWord(current);
+  }
   finalizeReadingSession();
   state.runToken += 1;
   if (state.interval) window.clearTimeout(state.interval);
@@ -8787,7 +9366,7 @@ function pauseReader() {
   const start = app.querySelector('#start-reader');
   const pause = app.querySelector('#pause-reader');
   if (speed) speed.disabled = false;
-  if (count) count.disabled = ['digital-sign', 'two-column', 'auto-scroll'].includes(state.renderedMode);
+  if (count) count.disabled = ['digital-sign', 'two-column', 'auto-scroll', 'pacman'].includes(state.renderedMode);
   if (speed) speed.disabled = state.renderedMode === 'two-column';
   if (start) {
     start.disabled = false;
@@ -11538,6 +12117,44 @@ function renderLibraryRecords(kind) {
   }));
 }
 
+
+function renderGlobalNotebookEntries(){
+  const panel=app.querySelector('#global-notebook-entries');
+  if(!panel)return;
+  const query=(app.querySelector('#global-notebook-search')?.value||'').trim().toLowerCase();
+  const records=getMarkRecords(MARK_INSIGHTS_KEY).filter(item=>!query||[
+    item.title,item.chapter,item.selection,item.note,item.question,item.result?.heading,item.result?.response
+  ].filter(Boolean).join(' ').toLowerCase().includes(query));
+  renderNotebookCollection(panel,records,{title:'All Notebook Entries'});
+}
+
+function renderGlobalNotebook(){
+  stopReader();
+  app.dataset.viewKey='mark-notebook';
+  app.innerHTML=`<section class="platform-page global-notebook-page">
+    <header class="platform-hero">
+      <div><span class="source-category">Ask Mark</span><h1>Notebook</h1><p>Keep passages, Mark’s full responses, and your own thoughts together across every book and page in the app.</p></div>
+      <div class="global-notebook-actions"><button class="primary" type="button" id="add-global-notebook-note">＋ New note</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
+    </header>
+    <div class="global-notebook-toolbar">
+      <label>Search notebook<input id="global-notebook-search" type="search" placeholder="Book, passage, thought, theme…"></label>
+      <p>Notebook entries are stored locally in this browser. Export important work as text for backup or use elsewhere.</p>
+    </div>
+    <div id="global-notebook-entries"></div>
+  </section>`;
+
+  app.querySelector('#global-notebook-search')?.addEventListener('input',renderGlobalNotebookEntries);
+  app.querySelector('#add-global-notebook-note')?.addEventListener('click',()=>{
+    const title=window.prompt('Note title or subject:',app.querySelector('h1')?.textContent||'Personal Note');
+    if(title===null)return;
+    const note=window.prompt('Write your note:','');
+    if(!note?.trim())return;
+    saveMarkInsight({recordType:'personal-note',title:title.trim()||'Personal Note',note:note.trim(),selection:'',documentId:'',pageContext:'Mark Notebook'});
+    renderGlobalNotebookEntries();
+  });
+  renderGlobalNotebookEntries();
+}
+
 function renderAiCenter() {
   stopReader();
   const hasBook = Boolean(state.title && state.currentText && state.words?.length);
@@ -11547,7 +12164,7 @@ function renderAiCenter() {
 
   app.innerHTML = `<section class="platform-page ai-center">
     <header class="platform-hero">
-      <div><span class="source-category">AI Center</span><h1>Turn reading into understanding</h1><p>Use focused learning tools for the active text, then connect ideas across your wider library.</p></div>
+      <div><span class="source-category">Ask Mark</span><h1>Your reading companion</h1><p>Use focused learning tools for the active text, then connect ideas across your wider library.</p></div>
       <button class="secondary" type="button" data-action="reader">Return to Reader</button>
     </header>
 
@@ -11563,8 +12180,8 @@ function renderAiCenter() {
       <button type="button" class="ai-tool-card" data-ai-tool="flashcards"><span>▣</span><h2>Flashcards</h2><p>Build review material from ${definitions} saved definitions and notes.</p></button>
       <button type="button" class="ai-tool-card" data-action="knowledge-graph"><span>◎</span><h2>Knowledge Graph</h2><p>Connect books, authors, notes, vocabulary, and Great Ideas.</p></button>
       <button type="button" class="ai-tool-card" data-read="syntopicon"><span>⚖</span><h2>Compare Great Ideas</h2><p>Study recurring ideas across authors, traditions, and texts.</p></button>
-      <button type="button" class="ai-tool-card" data-action="progress-awards"><span>↗</span><h2>AI Reading Coach</h2><p>Analyze ${comprehension} comprehension checks and recorded progress.</p></button>
-      <button type="button" class="ai-tool-card" data-read="bible"><span>✦</span><h2>Bible Study Assistant</h2><p>Translations, commentary, cross references, and structured study.</p></button>
+      <button type="button" class="ai-tool-card" data-action="progress-awards"><span>↗</span><h2>Ask Mark’s Reading Coach</h2><p>Analyze ${comprehension} comprehension checks and recorded progress.</p></button>
+      <button type="button" class="ai-tool-card" data-read="bible"><span>✦</span><h2>Bible Study with Ask Mark</h2><p>Translations, commentary, cross references, and structured study.</p></button>
     </div>
 
     <section id="ai-center-output" class="ai-center-output" hidden></section>
@@ -11595,7 +12212,7 @@ function renderKnowledgeGraph() {
   app.innerHTML = `<section class="platform-page knowledge-graph-page">
     <header class="platform-hero">
       <div><span class="source-category">Knowledge Graph</span><h1>Your connected reading life</h1><p>An initial map connecting books, notes, vocabulary, and Great Ideas. As the library grows, these relationships can become increasingly personalized.</p></div>
-      <button class="secondary" type="button" data-action="ai-center">Back to AI Center</button>
+      <button class="secondary" type="button" data-action="ai-center">Back to Ask Mark</button>
     </header>
 
     <div class="knowledge-layout">
@@ -11631,263 +12248,97 @@ function renderKnowledgeGraph() {
   }));
 }
 function renderHelp() {
-  stopReader();
-  const sections = [
-    ['getting-started', 'Getting Started'],
-    ['navigation', 'Navigation'],
-    ['library', 'Library & Imports'],
-    ['reader', 'Reader Basics'],
-    ['modes', 'Reading Modes'],
-    ['focus', 'Focus Anchor'],
-    ['pages', 'Book Pages'],
-    ['panels', 'Side Panels'],
-    ['comprehension', 'Comprehension'],
-    ['words', 'Dictionary, Notes & Vocabulary'],
-    ['media', 'Music & Media Match'],
-    ['translation', 'Translation'],
-    ['fullscreen', 'Fullscreen'],
-    ['shortcuts', 'Shortcuts'],
-    ['progress', 'Reading Progress'],
-    ['privacy', 'Storage & Privacy'],
-    ['troubleshooting', 'Troubleshooting']
+  try {
+    stopReader();
+  } catch (error) {
+    console.warn('Reader cleanup skipped while opening Help:', error);
+  }
+  app.dataset.viewKey='help';
+  const sections=[
+    ['start','Quick Start'],['mark','Ask Mark Reading Companion'],['notebook','Notebook'],
+    ['reader','Reader & Position'],['fullscreen','Fullscreen'],['imports','PDF, EPUB & Text'],
+    ['profiles','Reading Profiles'],['library','Library & Browse'],['shortcuts','Shortcuts'],
+    ['storage','Storage & Privacy'],['about','About'],['troubleshooting','Troubleshooting']
   ];
+  const helpTocHtml = sections
+    .map(([id,label]) => `<a href="#help-${id}">${label}</a>`)
+    .join('');
+  app.innerHTML=`<section class="panel help-page">
+    <div class="help-hero"><div><span class="help-eyebrow">Mark, Set, Go! Guide</span><h1>Help</h1><p>Current guidance for reading, selecting passages, asking Mark, saving insights, importing books, and protecting your place.</p></div>
+    <label class="help-search"><span>Search Help</span><input id="help-search-input" type="search" placeholder="Try “Mark”, “notebook”, “PDF”, “fullscreen”…"></label></div>
+    <div class="help-layout">
+      <aside class="help-toc"><strong>On this page</strong>${helpTocHtml}</aside>
+      <div class="help-content" id="help-content">
+        <section class="help-section" id="help-start" data-help-section><h2>Quick Start</h2><ol class="help-steps">
+          <li>Use <strong>Browse</strong> to search public libraries or <strong>Import Book</strong> for PDF, EPUB, or TXT.</li>
+          <li>Open <strong>Reader Tools</strong> to choose a mode, speed, pointer, typography, Book Pages, and Focus Anchor.</li>
+          <li>Press Start or Space to read. The app saves the canonical word so layout and navigation changes should not lose your place.</li>
+          <li>Highlight any passage to pause reading and open the yellow text selection toolbar.</li>
+          <li>Choose Explain, Summarize, Analyze, or open <strong>Ask Mark</strong> for additional help.</li>
+        </ol></section>
 
-  app.innerHTML = `
-    <section class="panel help-page">
-      <div class="help-hero">
-        <div>
-          <span class="help-eyebrow">Mark, Set, Go! Guide</span>
-          <h1>Help</h1>
-          <p>Everything you need to import a book, configure the reader, practice comprehension, save what matters, and troubleshoot common issues.</p>
-        </div>
-        <label class="help-search">
-          <span>Search Help</span>
-          <input id="help-search-input" type="search" placeholder="Try “EPUB”, “focus anchor”, “comprehension”…" autocomplete="off">
-        </label>
+        <section class="help-section" id="help-mark" data-help-section><h2>Ask Mark Reading Companion</h2>
+          <p>Mark is the app’s contextual reading companion. Highlight any arbitrary text—even when paragraph formatting is poor. Reading pauses automatically, and selected text appears yellow with black characters.</p>
+          <div class="help-card-grid"><article><h3>Selection</h3><p>Explain, summarize, analyze, simplify, translate, request context, find related ideas, or ask a custom question.</p></article><article><h3>Bounded context</h3><p>Mark receives the selected passage plus a limited surrounding window rather than the entire book.</p></article><article><h3>No automatic charge</h3><p>Highlighting alone does not call AI. A request occurs only after you choose an action.</p></article></div>
+          <div class="help-tip"><strong>Optional paragraph shortcut:</strong> Alt + double-click a well-formatted paragraph. Ordinary drag selection remains the recommended method.</div>
+        </section>
+
+        <section class="help-section" id="help-notebook" data-help-section><h2>Notebook</h2>
+          <p>The notebook now stores the complete selected passage, the full response from Ask Mark, key points, cautions, your own note, book title, chapter, date, and reading location.</p>
+          <ul><li>Open a book’s notebook from the Ask Mark panel.</li><li>Open the global notebook from the top <strong>Mark</strong> menu.</li><li>Add or edit personal thoughts on any saved entry.</li><li>Use <strong>Save as text</strong> for one entry or export the entire notebook as a <code>.txt</code> file.</li><li>Use Return to passage when the original book is still stored locally.</li></ul>
+        </section>
+
+        <section class="help-section" id="help-reader" data-help-section><h2>Reader & Position</h2>
+          <p>Reader position is based on the current word, not a fragile page number. Font changes, panel changes, fullscreen, Focus Anchor, reading modes, and page reflow should restore that word.</p>
+          <p><strong>Reader Tools</strong> and <strong>Ask Mark</strong> are separate buttons. Reader Tools opens settings; Mark opens the current passage and notebook.</p>
+        </section>
+
+        <section class="help-section" id="help-fullscreen" data-help-section><h2>Fullscreen</h2>
+          <p>Fullscreen has separate <strong>Options</strong> and <strong>Ask Mark</strong> controls. Opening one closes the other. Highlighting still pauses reading and the fullscreen Mark drawer shares the same notebook and history.</p>
+          <p>Press <kbd>O</kbd> for Options and <kbd>M</kbd> for Ask Mark.</p>
+        </section>
+
+        <section class="help-section" id="help-imports" data-help-section><h2>PDF, EPUB & Text</h2>
+          <ul><li><strong>EPUB:</strong> imports text, navigation, structure, and supported embedded images.</li><li><strong>PDF:</strong> extracts text locally with page markers. Password-protected PDFs are supported.</li><li><strong>Scanned PDF:</strong> image-only documents require OCR and are detected rather than opened as blank text.</li><li><strong>TXT:</strong> imports UTF-8 plain text.</li></ul>
+        </section>
+
+        <section class="help-section" id="help-profiles" data-help-section><h2>Reading Profiles</h2>
+          <p>Profiles separate textual difficulty, interpretive difficulty, contextual knowledge, and literary structure. A book can therefore be accessible to read but challenging to interpret.</p>
+          <p>Local linguistic measurements are available without AI. AI enhancement and Quick Book Guides run only when requested.</p>
+        </section>
+
+        <section class="help-section" id="help-library" data-help-section><h2>Library & Browse</h2>
+          <p><strong>My Library</strong> contains saved books and reading activity. <strong>Browse</strong> searches connected public sources, Great Books, Bible Study, imports, and Mark.</p>
+        </section>
+
+        <section class="help-section" id="help-shortcuts" data-help-section><h2>Shortcuts</h2>
+          <div class="help-shortcut-grid"><span><kbd>Space</kbd> Start or pause</span><span><kbd>O</kbd> Fullscreen Options</span><span><kbd>M</kbd> Fullscreen Ask Mark</span><span><kbd>Alt</kbd> + double-click Select paragraph</span></div>
+        </section>
+
+        <section class="help-section" id="help-storage" data-help-section><h2>Storage & Privacy</h2>
+          <p>Books, reading position, notebook entries, history, and cached guides are primarily stored in the current browser. Export notebook text for an independent backup. Clearing site data can remove locally stored material.</p>
+        </section>
+
+        <section class="help-section" id="help-about" data-help-section><h2>About Mark, Set, Go!</h2>
+          <p>Mark, Set, Go! is a reading and learning platform created by Brian Baker. It combines configurable reading tools, comprehension practice, reading analytics, public-domain library search, book imports, Reading Profiles, and Mark—the contextual reading companion.</p>
+        </section>
+
+        <section class="help-section" id="help-troubleshooting" data-help-section><h2>Troubleshooting</h2>
+          <details><summary>A selection does not appear</summary><p>Ensure the selection begins and ends inside the Reader. Flash and Digital Sign modes may not expose continuous selectable text.</p></details>
+          <details><summary>Mark does not answer</summary><p>Confirm the server has an OPENAI_API_KEY and that the request limit has not been reached.</p></details>
+          <details><summary>A book loses its place</summary><p>Pause, return to the exact word, and refresh once. Report which control caused the movement so that transition can be corrected.</p></details>
+          <details><summary>A PDF has no readable text</summary><p>It may be scanned or image-only. OCR is not yet included.</p></details>
+        </section>
       </div>
+    </div>
+  </section>`;
 
-      <div class="help-layout">
-        <aside class="help-toc" aria-label="Help topics">
-          <strong>On this page</strong>
-          ${sections.map(([id, label]) => `<a href="#help-${id}" data-help-link="${id}">${label}</a>`).join('')}
-        </aside>
-
-        <div class="help-content" id="help-content">
-          <section class="help-section" id="help-getting-started" data-help-section data-help-keywords="start begin first book quick start">
-            <h2>Getting Started</h2>
-            <ol class="help-steps">
-              <li><strong>Find or import something to read.</strong> Use <em>Library</em> for your own books and files, or <em>Discover</em> for Gutenberg, Great Books, news, weather, and other sources.</li>
-              <li><strong>Open the Reader.</strong> Your book loads into the central reading canvas. The left and right slide panels stay closed until you need them.</li>
-              <li><strong>Choose a mode and pace.</strong> Open <strong>⚙ Reader Controls</strong> and set the reading mode, WPM, words shown, display options, and Focus Anchor.</li>
-              <li><strong>Start reading.</strong> Use Start/Pause, press Space, or click the reading area in supported modes.</li>
-              <li><strong>Check understanding.</strong> Open Reader Controls → Learn → <strong>Comprehension</strong> after you have read at least about 120 words.</li>
-            </ol>
-            <div class="help-tip"><strong>Tip:</strong> Mark, Set, Go! opens to a lightweight home screen instead of rebuilding your previous book automatically. Use <strong>Resume Last Reading</strong> when you want to restore the saved reader session.</div>
-          </section>
-
-          <section class="help-section" id="help-navigation" data-help-section data-help-keywords="menu library discover learn music help about navigation">
-            <h2>Navigation</h2>
-            <div class="help-card-grid">
-              <article><h3>Library</h3><p>Your reading list, reading progress, imported EPUB/TXT content, illustrated books, and URL imports.</p></article>
-              <article><h3>Discover</h3><p>Find new material through Search All Libraries, Project Gutenberg, Great Books, Bible Study, news, weather, and other feeds.</p></article>
-              <article><h3>Learn</h3><p>Reader-training tools such as WPM tests and Vocabulary Builder. Comprehension checks are available inside the Reader Controls panel.</p></article>
-              <article><h3>Music</h3><p>Manage reading music and launch quick reading playlists. Reader-specific Media Match options are also available in the Reader Controls panel.</p></article>
-              <article><h3>Help</h3><p>This guide and About information.</p></article>
-            </div>
-          </section>
-
-          <section class="help-section" id="help-library" data-help-section data-help-keywords="library epub epub3 txt upload import url gutenberg reading list">
-            <h2>Library & Imports</h2>
-            <h3>Import Book / Text</h3>
-            <p>Use <strong>Library → Import Book / Text</strong> for TXT and EPUB/EPUB3 files. EPUB files are unpacked locally in your browser rather than interpreted as raw text. Great Books uses the unified public-library search and tries readable editions across all connected sources rather than relying on Project Gutenberg alone.</p>
-            <h3>EPUB navigation</h3>
-            <p>When available, the app uses the EPUB’s own navigation document and reading spine to preserve chapter order and build a cleaner table of contents. Older EPUBs can fall back to NCX navigation.</p>
-            <h3>Read from URL</h3>
-            <p>Use this for supported web content. Some sites block automated article extraction; if a page cannot be fetched, open the original page or paste/import readable text instead.</p>
-            <div class="help-note"><strong>Kindle:</strong> DRM-protected Kindle purchases cannot be imported directly. DRM-free EPUBs and personal documents are appropriate import sources.</div>
-          </section>
-
-          <section class="help-section" id="help-reader" data-help-section data-help-keywords="reader start pause reset speed wpm words shown position">
-            <h2>Reader Basics</h2>
-            <p>The central reader is designed to remain uncluttered. Start, Pause, Reset, fullscreen, and page controls stay close to the text. Less-frequent controls live in the right drawer.</p>
-            <dl class="help-definition-list">
-              <div><dt>Speed / WPM</dt><dd>Controls the target words per minute for timed reading modes.</dd></div>
-              <div><dt>Words shown</dt><dd>Controls how many words are presented as a group in compatible modes.</dd></div>
-              <div><dt>Meaningful chunks</dt><dd>Uses punctuation and phrase boundaries to form more natural groups up to the selected word maximum.</dd></div>
-              <div><dt>Position preservation</dt><dd>Changing a reading mode or layout option should keep the same logical word position rather than restarting the book.</dd></div>
-            </dl>
-          </section>
-
-          <section class="help-section" id="help-modes" data-help-section data-help-keywords="highlight bold focus smooth glide pointing guide marquee flash digital sign auto scroll two columns">
-            <h2>Reading Modes</h2>
-            <div class="help-card-grid help-modes">
-              <article><h3>Highlight</h3><p>Keeps the full passage visible while highlighting the active word group.</p></article>
-              <article><h3>Bold Focus</h3><p>Keeps the passage visible and emphasizes the active group with typography instead of a colored highlight.</p></article>
-              <article><h3>Smooth Glide</h3><p>Moves a soft visual focus guide continuously through the text.</p></article>
-              <article><h3>Pointing Guide</h3><p>Uses a pointer beneath the current group to guide the eye.</p></article>
-              <article><h3>Marquee</h3><p>Advances through the passage progressively while following the reading position.</p></article>
-              <article><h3>Flash</h3><p>Presents a limited number of words at a fixed reading point for RSVP-style practice.</p></article>
-              <article><h3>Digital Sign</h3><p>Moves text continuously across the display.</p></article>
-              <article><h3>Auto Scroll</h3><p>Scrolls through normal text at a controlled pace.</p></article>
-              <article><h3>Two Columns</h3><p>Formats text in a two-column reading layout.</p></article>
-            </div>
-            <div class="help-tip"><strong>Start conservatively:</strong> choose a comfortable speed and increase it only when comprehension stays strong.</div>
-          </section>
-
-          <section class="help-section" id="help-focus" data-help-section data-help-keywords="focus anchor center green color bold line overlay size">
-            <h2>Focus Anchor</h2>
-            <p>The Focus Anchor provides a stable recognition point while the current word or phrase changes around it.</p>
-            <ul>
-              <li><strong>Anchor size</strong> is independent of the normal book font size.</li>
-              <li><strong>Anchor color</strong> can be changed; green is the default.</li>
-              <li><strong>Bold anchor letter</strong> is optional if normal weight feels less visually disruptive.</li>
-              <li>Short guide markers above and below the recognition point help keep the eyes centered.</li>
-              <li>In normal reading, the anchor can be repositioned. In fullscreen, it occupies a dedicated upper band so the book text begins below it.</li>
-            </ul>
-          </section>
-
-          <section class="help-section" id="help-pages" data-help-section data-help-keywords="book pages pagination page spread wheel previous next fullscreen">
-            <h2>Book Pages</h2>
-            <p>Book Pages creates a two-page spread using the available reader width. Spreads advance in pairs: 1–2, 3–4, 5–6, and so on.</p>
-            <ul>
-              <li>Use the page arrows or page indicator to navigate spreads.</li>
-              <li>The mouse wheel can change spreads while Book Pages is active.</li>
-              <li>Entering or leaving fullscreen recalculates the usable page geometry while preserving the logical reading position.</li>
-              <li>The highlighter should remain within the visible spread rather than horizontally nudging the page.</li>
-            </ul>
-          </section>
-
-          <section class="help-section" id="help-panels" data-help-section data-help-keywords="left right side panel marks contents bookmarks definitions notes reader controls">
-            <h2>Left & Right Side Panels</h2>
-            <h3>☰ Marks & Contents — left</h3>
-            <p>This drawer exposes the features connected to the text itself:</p>
-            <ul><li>Contents</li><li>Bookmarks</li><li>Saved Definitions</li><li>Notes</li></ul>
-            <h3>⚙ Reader Controls — right</h3>
-            <p>This is the reader control center. Settings are stacked vertically and grouped into Reading, Display, Learn, Media, and Language/Words. Both drawers normally stay closed so the book gets the maximum available space.</p>
-          </section>
-
-          <section class="help-section" id="help-comprehension" data-help-section data-help-keywords="comprehension ai quiz openai effective wpm questions recall main idea inference">
-            <h2>Comprehension Checks</h2>
-            <p>Open <strong>Reader Controls → Learn → Comprehension</strong> after reading a passage. The app sends only the bounded passage being tested to your server, which requests four structured questions from the configured OpenAI model.</p>
-            <p>The quiz contains:</p>
-            <ol><li>Factual recall</li><li>Main idea</li><li>Inference</li><li>Deeper understanding</li></ol>
-            <p>After scoring, Mark, Set, Go! stores the comprehension percentage and calculates <strong>effective WPM</strong>:</p>
-            <div class="help-formula">Effective WPM = Reading WPM × Comprehension Rate</div>
-            <p>Results appear in Reading Progress. A check requires at least about 120 newly read words and normally uses the passage read since the previous check, within a safe size limit.</p>
-            <div class="help-note"><strong>API setup:</strong> local/server comprehension requires <code>OPENAI_API_KEY</code> in the Node server environment. The key must never be stored in browser JavaScript.</div>
-          </section>
-
-          <section class="help-section" id="help-words" data-help-section data-help-keywords="dictionary definition note bookmark vocabulary word lookup save">
-            <h2>Dictionary, Notes & Vocabulary</h2>
-            <p>Use the word context menu to look up a word, save its definition, or attach a note. Saved definitions and notes for the current document appear in the left Marks & Contents drawer.</p>
-            <p>The Vocabulary Builder under Learn is intended for reviewing saved words and building longer-term recall.</p>
-          </section>
-
-          <section class="help-section" id="help-media" data-help-section data-help-keywords="music media match score mood preferred news video youtube">
-            <h2>Music & Media Match</h2>
-            <p>The top-level Music menu manages general reading music. Inside the Reader Controls panel, Media Match adapts to the current content:</p>
-            <ul>
-              <li><strong>Music Score</strong> searches for an appropriate soundtrack/ambient score for books and general text.</li>
-              <li><strong>News Video</strong> is useful for headlines/articles and looks for video coverage related to the current story.</li>
-              <li><strong>Reading Mood</strong> searches for music matching the tone of the current reading.</li>
-              <li><strong>Preferred Music</strong> lets readers quickly reuse music they previously saved from the Music page.</li>
-            </ul>
-          </section>
-
-          <section class="help-section" id="help-translation" data-help-section data-help-keywords="translation browser translator language translate restore english">
-            <h2>Translation</h2>
-            <p>Choose a target language under Reader Controls → Language & Words. The app can use supported browser translation capabilities when available and retains server-side fallback behavior where configured.</p>
-            <p>After a passage is translated, supported word interactions can show English meanings. Use <strong>Restore English</strong> to return to the source text.</p>
-          </section>
-
-          <section class="help-section" id="help-fullscreen" data-help-section data-help-keywords="fullscreen full screen options controls focus">
-            <h2>Fullscreen Reading</h2>
-            <p>Fullscreen removes surrounding page distractions. The compact Options panel contains fullscreen versions of the reading, focus, display, media, and translation controls.</p>
-            <p>Press <kbd>O</kbd> to restore hidden fullscreen controls if needed. Focus Anchor uses a dedicated top band in fullscreen so it does not cover the beginning of the book text.</p>
-          </section>
-
-          <section class="help-section" id="help-shortcuts" data-help-section data-help-keywords="keyboard shortcuts space o mouse wheel click">
-            <h2>Shortcuts & Interaction</h2>
-            <table class="help-table">
-              <thead><tr><th>Action</th><th>Shortcut / Interaction</th></tr></thead>
-              <tbody>
-                <tr><td>Pause / resume</td><td><kbd>Space</kbd> in compatible reader modes</td></tr>
-                <tr><td>Move reading position</td><td>Click a word in supported full-text modes</td></tr>
-                <tr><td>Restore fullscreen controls</td><td><kbd>O</kbd></td></tr>
-                <tr><td>Turn Book Pages</td><td>Page arrows / indicator / mouse wheel while Book Pages is active</td></tr>
-                <tr><td>Resize side panes</td><td>Drag a divider when the pane is open; double-click the divider to reset its stored width</td></tr>
-              </tbody>
-            </table>
-          </section>
-
-          <section class="help-section" id="help-progress" data-help-section data-help-keywords="progress sessions comprehension effective wpm streak">
-            <h2>Reading Progress</h2>
-            <p>Library → Reading Progress summarizes reading time, words, pace, streaks, book/document progress, comprehension results, and effective WPM when comprehension checks have been completed.</p>
-            <p>Progress is currently stored in the browser, so clearing browser storage can remove history unless the feature is later migrated to an account-backed database.</p>
-          </section>
-
-          <section class="help-section" id="help-privacy" data-help-section data-help-keywords="privacy local storage indexeddb server openai data">
-            <h2>Storage & Privacy</h2>
-            <ul>
-              <li>Reader sessions may use IndexedDB with a Local Storage fallback.</li>
-              <li>Reading progress, notes, bookmarks, definitions, vocabulary, and comprehension history are currently stored locally in the browser.</li>
-              <li>EPUB parsing occurs in the browser.</li>
-              <li>Comprehension sends only the bounded passage being tested to the server/OpenAI request; it does not require sending the entire book.</li>
-              <li>API keys belong on the server only.</li>
-            </ul>
-          </section>
-
-          <section class="help-section" id="help-troubleshooting" data-help-section data-help-keywords="troubleshooting fetch failed 502 certificate node system ca frozen cache ctrl f5">
-            <h2>Troubleshooting</h2>
-            <details open><summary>External features return “Fetch failed” or 502 locally</summary>
-              <p>If Node reports <code>UNABLE_TO_GET_ISSUER_CERT_LOCALLY</code> on a managed Windows computer, start Node with the Windows system certificate store:</p>
-              <pre><code>$env:NODE_OPTIONS="--use-system-ca"
-npm start</code></pre>
-            </details>
-            <details><summary>Comprehension says AI is not configured</summary>
-              <p>Ensure <code>OPENAI_API_KEY</code> is set in the same PowerShell/server environment before starting Node. API usage also requires an API account with available billing/credits.</p>
-            </details>
-            <details><summary>The browser appears to show an older interface</summary>
-              <p>Use <kbd>Ctrl</kbd>+<kbd>F5</kbd> once after installing a new build so cached JavaScript and CSS are replaced.</p>
-            </details>
-            <details><summary>A previous large book makes startup slow</summary>
-              <p>Current builds open a lightweight home screen. The full saved reader session is reconstructed only after you explicitly choose Resume Last Reading.</p>
-            </details>
-            <details><summary>An EPUB looks like gibberish</summary>
-              <p>Use Import Book / Text in a build with EPUB support. EPUB is a ZIP-based ebook package and cannot be treated as a normal TXT file.</p>
-            </details>
-          </section>
-
-          <p id="help-no-results" class="navigation-empty help-no-results" hidden>No Help topics matched your search.</p>
-        </div>
-      </div>
-    </section>`;
-
-  const input = app.querySelector('#help-search-input');
-  const helpSections = Array.from(app.querySelectorAll('[data-help-section]'));
-  const noResults = app.querySelector('#help-no-results');
-
-  input?.addEventListener('input', () => {
-    const query = input.value.trim().toLowerCase();
-    let visible = 0;
-    helpSections.forEach((section) => {
-      const haystack = `${section.textContent} ${section.dataset.helpKeywords || ''}`.toLowerCase();
-      const matches = !query || haystack.includes(query);
-      section.hidden = !matches;
-      if (matches) visible += 1;
-    });
-    noResults.hidden = visible !== 0;
+  const search=app.querySelector('#help-search-input');
+  search?.addEventListener('input',()=>{
+    const query=search.value.trim().toLowerCase();
+    app.querySelectorAll('[data-help-section]').forEach(section=>section.hidden=Boolean(query&&!section.textContent.toLowerCase().includes(query)));
   });
-
-  app.querySelectorAll('[data-help-link]').forEach((link) => {
-    link.addEventListener('click', (event) => {
-      event.preventDefault();
-      app.querySelector(`#help-${CSS.escape(link.dataset.helpLink)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  });
-}
-
-function renderAbout() {
+}function renderAbout() {
   stopReader();
   app.innerHTML = `
     <section class="panel">
@@ -11928,6 +12379,35 @@ document.addEventListener('click', (event) => {
 
   closeTopNavigationMenus();
 });
+
+/*
+  Help is a direct top-level destination. Handle it before the shared navigation
+  pipeline so clicks on either the icon or label cannot be swallowed by menu,
+  continuity, or reader-state logic.
+*/
+document.addEventListener('click', (event) => {
+  const helpButton = event.target.closest?.('[data-action="help"]');
+  if (!helpButton) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+
+  try {
+    captureCurrentViewPosition();
+    ReaderContinuity.saveBeforeNavigation();
+  } catch (error) {
+    console.warn('Help navigation could not save the current view:', error);
+  }
+
+  closeMenus();
+  renderHelp();
+  app.dataset.viewKey = 'help';
+
+  window.requestAnimationFrame(() => {
+    app.scrollIntoView({ block: 'start' });
+    app.querySelector('#help-search-input')?.focus({ preventScroll: true });
+  });
+}, true);
 
 document.addEventListener('click', (event) => {
   const test = event.target.closest('[data-test]');
@@ -11983,10 +12463,10 @@ document.addEventListener('click', (event) => {
   if (actionName === 'browse') renderBrowseHub();
   if (actionName === 'my-library') renderMyLibraryHub();
   if (actionName === 'ai-center') renderAiCenter();
+  if (actionName === 'mark-notebook') renderGlobalNotebook();
   if (actionName === 'knowledge-graph') renderKnowledgeGraph();
   if (actionName === 'library-bookmarks') renderLibraryRecords('bookmarks');
   if (actionName === 'library-notes') renderLibraryRecords('notes');
-  if (actionName === 'help') renderHelp();
   if (actionName === 'about') renderAbout();
   if (actionName === 'music') renderMusicLibrary();
   if (actionName === 'my-reading' || actionName === 'reading-list') renderReadingList();

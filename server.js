@@ -497,6 +497,55 @@ Keep each section compact and useful before or during reading.`;
   }
 });
 
+
+app.post('/api/mark-selection', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error: 'Mark is not configured. Add OPENAI_API_KEY to the server environment.' });
+
+  const action = String(req.body?.action || 'explain').trim();
+  const allowed = new Set(['explain','summarize','analyze','simplify','context','related','ask','translate']);
+  if (!allowed.has(action)) return res.status(400).json({ error: 'Unsupported Mark action.' });
+
+  const selection = String(req.body?.selection || '').replace(/\s+/g,' ').trim().slice(0,12000);
+  const before = String(req.body?.before || '').replace(/\s+/g,' ').trim().slice(-5000);
+  const after = String(req.body?.after || '').replace(/\s+/g,' ').trim().slice(0,5000);
+  const question = String(req.body?.question || '').trim().slice(0,1200);
+  const title = String(req.body?.title || 'Untitled').trim().slice(0,300);
+  const chapter = String(req.body?.chapter || '').trim().slice(0,300);
+  const targetLanguage = String(req.body?.targetLanguage || '').trim().slice(0,80);
+  if (!selection || selection.split(/\s+/).length > 1800) return res.status(400).json({ error: 'Select between 1 and 1,800 words.' });
+
+  const actionInstructions = {
+    explain: 'Explain the selected passage clearly. Clarify what it says, what is implied, and any difficult references. Avoid unnecessary plot spoilers.',
+    summarize: 'Summarize only the selected passage concisely. Preserve its central idea, movement, and important qualifications.',
+    analyze: 'Analyze the selected passage as literature or argument. Discuss structure, tone, imagery, rhetoric, subtext, and significance only where supported.',
+    simplify: 'Rewrite the meaning in plain modern English without flattening important distinctions. Do not quote more than a few words.',
+    context: 'Provide only the historical, cultural, geographical, philosophical, theological, scientific, or literary context genuinely needed to understand this passage.',
+    related: 'Identify up to five relevant ideas, works, traditions, or passages that illuminate this selection. Explain each connection briefly and avoid invented relationships.',
+    ask: 'Answer the reader question about the selected passage. Ground the answer in the selection and surrounding context; distinguish inference from fact.',
+    translate: `Translate the selected passage into ${targetLanguage || 'the requested language'}. Preserve paragraphing, tone, names, and meaning. Add only a very brief note for unavoidable ambiguity.`
+  };
+
+  const schema={type:'object',additionalProperties:false,required:['heading','response','keyPoints','cautions'],properties:{
+    heading:{type:'string'}, response:{type:'string'},
+    keyPoints:{type:'array',minItems:0,maxItems:6,items:{type:'string'}},
+    cautions:{type:'array',minItems:0,maxItems:4,items:{type:'string'}}
+  }};
+  const prompt=`You are Mark, a careful reading companion inside an e-reader. ${actionInstructions[action]}
+Use the surrounding text only to disambiguate the selection. Never summarize or reveal later plot beyond the supplied context. Do not invent facts, allusions, authorial intentions, or quotations. State uncertainty plainly. Keep the response useful and proportionate to the selection.`;
+  try {
+    const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({
+      model:COMPREHENSION_MODEL,reasoning:{effort:action==='analyze'||action==='related'?'medium':'low'},store:false,
+      input:[{role:'developer',content:[{type:'input_text',text:prompt}]},{role:'user',content:[{type:'input_text',text:JSON.stringify({title,chapter,question:question||null,before,selection,after})}]}],
+      text:{format:{type:'json_schema',name:'mark_selection_response',strict:true,schema}}
+    })});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok) return res.status(502).json({error:'Mark could not complete the request.',detail:payload?.error?.message||`HTTP ${response.status}`});
+    const outputText=extractOpenAIOutputText(payload); if(!outputText) throw new Error('No response text.');
+    res.json({model:COMPREHENSION_MODEL,action,result:JSON.parse(outputText)});
+  } catch(error){ console.error('Mark selection failed:',error); res.status(502).json({error:'Mark could not complete the request.'}); }
+});
+
 app.post('/api/progress-recommendations', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) {
