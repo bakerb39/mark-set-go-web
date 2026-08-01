@@ -10,6 +10,7 @@ const AdmZip = require('adm-zip');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_TRANSLATION_CHARS = 120000;
 const MAX_GUTENBERG_BOOK_BYTES = 12 * 1024 * 1024;
@@ -68,7 +69,7 @@ async function fetchFeedItems(source) {
 app.disable('x-powered-by');
 app.use(express.json({ limit: '150kb' }));
 
-const COMPREHENSION_MODEL = process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
+const COMPREHENSION_MODEL = process.env.OPENAI_COMPREHENSION_MODEL || process.env.OPENAI_MODEL || 'gpt-5';
 
 function extractOpenAIOutputText(payload) {
   for (const item of Array.isArray(payload?.output) ? payload.output : []) {
@@ -236,7 +237,7 @@ Write the entire response in ${language}.`;
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna',
+        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_MODEL || COMPREHENSION_MODEL,
         reasoning: { effort: 'low' },
         store: false,
         input: [
@@ -506,7 +507,7 @@ Write the entire response in ${language}.`;
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna',
+        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_MODEL || COMPREHENSION_MODEL,
         reasoning: { effort: 'medium' },
         store: false,
         input: [
@@ -525,6 +526,15 @@ Write the entire response in ${language}.`;
     console.error('Syntopicon generation failed:', error);
     res.status(502).json({ error: 'Unable to create syntopical analysis.' });
   }
+});
+
+app.get('/healthz', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'mark-set-go-web',
+    version: require('./package.json').version,
+    aiConfigured: Boolean(String(process.env.OPENAI_API_KEY || '').trim())
+  });
 });
 
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -1966,4 +1976,17 @@ app.get('/api/library/read', async (req, res) => {
 });
 
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.listen(PORT, () => console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`));
+
+const httpServer = app.listen(PORT, HOST, () => {
+  console.log(`Mark, Set, Go! is listening on ${HOST}:${PORT}`);
+  console.log(`OpenAI features: ${String(process.env.OPENAI_API_KEY || '').trim() ? 'configured' : 'not configured'}`);
+});
+
+function shutdown(signal) {
+  console.log(`${signal} received; closing HTTP server.`);
+  httpServer.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 10000).unref();
+}
+
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

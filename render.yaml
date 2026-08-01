@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: mark-set-go-web
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-5
+      - key: OPENAI_COMPREHENSION_MODEL
+        value: gpt-5
+      - key: OPENAI_STUDY_MODEL
+        value: gpt-5
+      - key: GUTENBERG_MIRROR_BASES
+        value: https://gutenberg.pglaf.org,https://mirrors.xmission.com/gutenberg
