@@ -163,9 +163,9 @@ app.get('/api/account', async (req, res) => {
 app.get('/api/health', async (_req, res) => {
   try {
     const database = await checkDatabase();
-    res.json({ ok: true, version: '7.7.15.1', database, betaAccessEnabled: BETA_ACCESS_ENABLED });
+    res.json({ ok: true, version: '7.7.15.2.2', database, betaAccessEnabled: BETA_ACCESS_ENABLED });
   } catch (error) {
-    res.status(503).json({ ok: false, version: '7.7.15.1', database: { configured: databaseConfigured(), connected: false, error: error.message }, betaAccessEnabled: BETA_ACCESS_ENABLED });
+    res.status(503).json({ ok: false, version: '7.7.15.2.2', database: { configured: databaseConfigured(), connected: false, error: error.message }, betaAccessEnabled: BETA_ACCESS_ENABLED });
   }
 });
 

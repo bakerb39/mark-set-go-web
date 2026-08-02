@@ -291,7 +291,16 @@
       for (const word of words) {
         const rect = word.getBoundingClientRect();
         if (rect.bottom < readerRect.top || rect.top > readerRect.bottom) continue;
-        const distance = Math.abs(rect.top - readerRect.top - 24);
+
+        // Book Pages scrolls horizontally. A word on an earlier/later spread can
+        // still overlap the reader vertically, so vertical visibility alone can
+        // incorrectly select a page-1 word after the user has moved much farther
+        // into the book. Require horizontal visibility and choose the word nearest
+        // the visible spread's upper-left reading edge.
+        if (state.bookPages && (rect.right < readerRect.left || rect.left > readerRect.right)) continue;
+        const distance = state.bookPages
+          ? Math.hypot(rect.left - readerRect.left - 24, rect.top - readerRect.top - 24)
+          : Math.abs(rect.top - readerRect.top - 24);
         if (distance < nearestDistance) {
           nearest = word;
           nearestDistance = distance;
