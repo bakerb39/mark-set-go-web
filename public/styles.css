@@ -8575,3 +8575,15 @@ body.light .comprehension-actions,
 .notebook-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:.35rem;flex-wrap:wrap}
 .notebook-heading-actions button{min-height:30px;padding:.35rem .58rem;font-size:.74rem}
 @media (max-width:640px){.notebook-list-heading{align-items:flex-start}.notebook-heading-actions{width:100%;justify-content:flex-start}}
+
+
+/* v7.7.0 authentication controls */
+.auth-controls{display:inline-flex;align-items:center;gap:.4rem;margin-left:.15rem;white-space:nowrap}
+.auth-nav-button{border:1px solid var(--border,#cfd8d3);background:#fff;color:inherit;border-radius:8px;padding:.42rem .65rem;font:inherit;font-size:.82rem;cursor:pointer}
+.auth-nav-button:hover{background:#f2f7f4}
+.auth-nav-primary{background:#176b4d;color:#fff;border-color:#176b4d}
+.auth-nav-primary:hover{background:#10563d}
+.auth-status{font-size:.78rem;color:#66736d;padding:.35rem .4rem}
+.auth-plan-badge{font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#e7f4ed;color:#176b4d;border:1px solid #b9d9c8;border-radius:999px;padding:.2rem .42rem}
+#clerk-user-button{display:inline-flex;align-items:center}
+@media (max-width:900px){.auth-nav-button{padding:.36rem .48rem}.auth-nav-primary{display:none}.auth-plan-badge{display:none}}

@@ -7,7 +7,17 @@ const net = require('node:net');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const AdmZip = require('adm-zip');
-const { checkDatabase, databaseConfigured, closeDatabase } = require('./db');
+const { checkDatabase, databaseConfigured, closeDatabase, query } = require('./db');
+
+const CLERK_PUBLISHABLE_KEY = String(process.env.CLERK_PUBLISHABLE_KEY || '').trim();
+const CLERK_SECRET_KEY = String(process.env.CLERK_SECRET_KEY || '').trim();
+const clerkConfigured = Boolean(CLERK_PUBLISHABLE_KEY && CLERK_SECRET_KEY);
+let clerkMiddleware = null;
+let getAuth = null;
+let clerkClient = null;
+if (clerkConfigured) {
+  ({ clerkMiddleware, getAuth, clerkClient } = require('@clerk/express'));
+}
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -68,13 +78,82 @@ async function fetchFeedItems(source) {
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '150kb' }));
+if (clerkConfigured) app.use(clerkMiddleware());
+
+
+app.get('/api/auth/config', (_req, res) => {
+  res.json({
+    configured: clerkConfigured,
+    publishableKey: clerkConfigured ? CLERK_PUBLISHABLE_KEY : '',
+    provider: 'clerk'
+  });
+});
+
+function unauthenticatedSession() {
+  return { authenticated: false, user: null, planCode: 'guest' };
+}
+
+app.get('/api/auth/session', async (req, res) => {
+  if (!clerkConfigured) return res.json({ ...unauthenticatedSession(), configured: false });
+  const auth = getAuth(req);
+  if (!auth?.isAuthenticated || !auth.userId) return res.json({ ...unauthenticatedSession(), configured: true });
+  if (!databaseConfigured()) return res.status(503).json({ error: 'The account database is not configured.' });
+
+  try {
+    const clerkUser = await clerkClient.users.getUser(auth.userId);
+    const primaryEmail = clerkUser.emailAddresses?.find((entry) => entry.id === clerkUser.primaryEmailAddressId)?.emailAddress
+      || clerkUser.emailAddresses?.[0]?.emailAddress
+      || null;
+    const displayName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ').trim()
+      || clerkUser.username
+      || primaryEmail
+      || 'Reader';
+    const result = await query(`
+      insert into app_users (auth_provider, auth_subject, email, display_name, last_seen_at, updated_at)
+      values ('clerk', $1, $2, $3, now(), now())
+      on conflict (auth_subject) do update set
+        email = excluded.email,
+        display_name = excluded.display_name,
+        last_seen_at = now(),
+        updated_at = now()
+      returning id, email, display_name, plan_code, status, created_at
+    `, [auth.userId, primaryEmail, displayName]);
+    const user = result.rows[0];
+    res.json({
+      configured: true,
+      authenticated: true,
+      user: {
+        id: user.id,
+        authSubject: auth.userId,
+        email: user.email,
+        displayName: user.display_name,
+        planCode: user.plan_code,
+        status: user.status,
+        createdAt: user.created_at
+      },
+      planCode: user.plan_code
+    });
+  } catch (error) {
+    console.error('Authentication session sync failed:', error);
+    res.status(500).json({ error: 'Unable to load the signed-in account.' });
+  }
+});
+
+app.get('/api/account', async (req, res) => {
+  if (!clerkConfigured) return res.status(503).json({ error: 'Authentication is not configured.' });
+  const auth = getAuth(req);
+  if (!auth?.isAuthenticated || !auth.userId) return res.status(401).json({ error: 'Sign in is required.' });
+  const result = await query('select id, email, display_name, plan_code, status, created_at, last_seen_at from app_users where auth_subject = $1', [auth.userId]);
+  if (!result.rows[0]) return res.status(404).json({ error: 'Account profile has not been initialized.' });
+  res.json({ account: result.rows[0] });
+});
 
 app.get('/api/health', async (_req, res) => {
   try {
     const database = await checkDatabase();
-    res.json({ ok: true, version: '7.6.9', database });
+    res.json({ ok: true, version: '7.7.0', database });
   } catch (error) {
-    res.status(503).json({ ok: false, version: '7.6.9', database: { configured: databaseConfigured(), connected: false, error: error.message } });
+    res.status(503).json({ ok: false, version: '7.7.0', database: { configured: databaseConfigured(), connected: false, error: error.message } });
   }
 });
 
