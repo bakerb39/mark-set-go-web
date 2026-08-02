@@ -7139,8 +7139,46 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         stopReader();
         state.index = group?.start ?? clickedIndex;
         updateReaderStatus(`Reading position moved to word ${(state.index + 1).toLocaleString()}.`);
-        startReader();
-        if (!wasRunning) window.setTimeout(pauseReader, 0);
+
+        if (wasRunning) {
+          // Continue active playback from the position deliberately selected by
+          // the reader. stopReader() invalidated every older playback token.
+          startReader();
+        } else {
+          // A paused reader must remain paused. Earlier code restarted playback
+          // and paused it on a zero-delay timer, allowing the first playback
+          // paint to replace the position the reader had just selected.
+          const selectedIndex = state.index;
+          const selectedToken = state.runToken;
+          const count = Math.max(1, Number(app.querySelector('#word-count')?.value) || 1);
+
+          ensureWordsRendered(
+            reader,
+            mode,
+            count,
+            Math.min(state.words.length, selectedIndex + 1000)
+          );
+
+          if (mode === 'pointing-guide') {
+            const step = getPointingLineStep(reader, selectedIndex, count);
+            if (step) {
+              scrollPointingStep(reader, step);
+              requestAnimationFrame(() => {
+                if (selectedToken !== state.runToken || state.index !== selectedIndex) return;
+                const refreshed = getPointingLineStep(
+                  reader,
+                  selectedIndex,
+                  Math.max(1, step.nextIndex - selectedIndex)
+                );
+                if (refreshed) moveReadingGuide(reader, refreshed, 0);
+              });
+            }
+          } else {
+            restoreReadingAnchor(reader, mode, count, selectedIndex);
+          }
+
+          ReaderContinuity.scheduleCheckpoint();
+        }
       }
       return;
     }
