@@ -8576,7 +8576,6 @@ body.light .comprehension-actions,
 .notebook-heading-actions button{min-height:30px;padding:.35rem .58rem;font-size:.74rem}
 @media (max-width:640px){.notebook-list-heading{align-items:flex-start}.notebook-heading-actions{width:100%;justify-content:flex-start}}
 
-
 /* v7.7.0 authentication controls */
 .auth-controls{display:inline-flex;align-items:center;gap:.4rem;margin-left:.15rem;white-space:nowrap}
 .auth-nav-button{border:1px solid var(--border,#cfd8d3);background:#fff;color:inherit;border-radius:8px;padding:.42rem .65rem;font:inherit;font-size:.82rem;cursor:pointer}
