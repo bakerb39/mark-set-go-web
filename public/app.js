@@ -56,6 +56,109 @@ const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
 let activeReaderSnapshot = null;
 
 
+// Cloud reading-state adapter. This stays outside the Reader Engine so the
+// protected playback-cursor / viewport-anchor architecture remains unchanged.
+const cloudReadingState = {
+  timer: null,
+  bookIds: new Map(),
+  pendingSnapshot: null,
+  async resolveBook(snapshot) {
+    const api = window.MarkSetGoCloud;
+    const documentId = String(snapshot?.documentId || state.documentId || '').trim();
+    if (!api?.library || !documentId || !snapshot?.title) return null;
+    if (this.bookIds.has(documentId)) return this.bookIds.get(documentId);
+    const payload = await api.library.save({
+      clientRecordId: documentId,
+      title: snapshot.title,
+      author: snapshot.source?.author || state.source?.author || '',
+      sourceType: snapshot.source?.type || state.source?.type || 'reader',
+      sourceId: snapshot.source?.id || snapshot.source?.key || state.source?.id || state.source?.key || '',
+      sourceUrl: snapshot.source?.url || state.source?.url || '',
+      coverUrl: snapshot.source?.coverUrl || state.source?.coverUrl || '',
+      metadata: {
+        documentId,
+        totalWords: Array.isArray(state.words) ? state.words.length : splitWords(snapshot.currentText || '').length,
+        source: snapshot.source || state.source || null
+      }
+    });
+    const bookId = payload?.book?.id;
+    if (bookId) this.bookIds.set(documentId, bookId);
+    return bookId || null;
+  },
+  schedule(snapshot) {
+    if (!snapshot?.title || !snapshot?.documentId || !window.MarkSetGoCloud?.library) return;
+    this.pendingSnapshot = {
+      ...snapshot,
+      controls: { ...(snapshot.controls || {}) },
+      viewport: snapshot.viewport ? { ...snapshot.viewport } : null
+    };
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.flush(), 900);
+  },
+  async flush() {
+    clearTimeout(this.timer);
+    this.timer = null;
+    const snapshot = this.pendingSnapshot;
+    this.pendingSnapshot = null;
+    if (!snapshot) return;
+    try {
+      const bookId = await this.resolveBook(snapshot);
+      if (!bookId) return;
+      const totalWords = Array.isArray(state.words) ? state.words.length : splitWords(snapshot.currentText || '').length;
+      const playbackIndex = Math.max(0, Number(snapshot.playbackIndex ?? snapshot.index) || 0);
+      const viewportAnchorIndex = Math.max(0, Number(snapshot.viewportAnchorIndex ?? snapshot.viewport?.anchorIndex ?? playbackIndex) || 0);
+      await window.MarkSetGoCloud.library.saveProgress(bookId, {
+        mode: snapshot.controls?.mode || state.renderedMode || 'highlight',
+        playbackIndex,
+        viewportAnchorIndex,
+        viewportOffsetPx: Number(snapshot.viewport?.offsetPx) || 0,
+        scrollRatio: totalWords ? Math.min(1, playbackIndex / totalWords) : 0,
+        pageNumber: state.bookPages ? Math.max(1, Number(state.currentBookPage) || 1) : null,
+        positionData: {
+          documentId: snapshot.documentId,
+          title: snapshot.title,
+          totalWords,
+          lastReadAt: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.warn('Cloud reading progress sync failed:', error);
+    }
+  },
+  async clearProgress(documentId) {
+    const api = window.MarkSetGoCloud;
+    if (!api?.library || !documentId) return;
+    try {
+      let bookId = this.bookIds.get(documentId) || null;
+      if (!bookId) {
+        const payload = await api.library.list();
+        const record = (payload?.books || []).find((book) =>
+          String(book.client_record_id || book.metadata?.documentId || '') === String(documentId)
+        );
+        bookId = record?.id || null;
+      }
+      if (bookId) await api.library.clearProgress(bookId);
+    } catch (error) {
+      console.warn('Cloud resume-position clear failed:', error);
+    }
+  }
+};
+
+function clearActiveReaderPane() {
+  stopReader();
+  activeReaderSnapshot = null;
+  try { readerEngine.reset?.(); } catch {}
+  state.title = '';
+  state.currentText = '';
+  state.originalText = '';
+  state.words = [];
+  state.index = 0;
+  state.viewportAnchorIndex = 0;
+  state.documentId = '';
+  state.source = null;
+}
+
+
 const APP_VIEW_STATE_KEY = 'markSetGoViewStateV1';
 
 const ReaderContinuity = {
@@ -147,6 +250,7 @@ const ReaderContinuity = {
       }
     } catch {}
     writeReaderSession(activeReaderSnapshot);
+    cloudReadingState.schedule(activeReaderSnapshot);
   },
 
   scheduleCheckpoint({ immediate = false } = {}) {
@@ -766,83 +870,54 @@ function stopMusic() {
 
 function renderMusicLibrary() {
   stopReader();
+  const categories = [...new Set(musicChoices.map((item) => item.category))];
   const preferred = getPreferredMusic();
   const bookKey = currentBookMusicKey();
   const bookIds = getBookMusic(bookKey);
   const bookItems = bookIds.map((id) => preferred.find((item) => item.id === id)).filter(Boolean);
-  const currentBookLabel = state?.title ? `“${escapeHtml(state.title)}”` : 'No book open';
-  const quickChoices = musicChoices.slice(0, 6);
-
+  const currentBookLabel = state?.title ? `“${escapeHtml(state.title)}”` : 'the current book';
   app.innerHTML = `
-    <section class="panel music-library music-simple-page">
-      <div class="library-heading music-page-heading">
-        <div>
-          <h1>Music &amp; Focus</h1>
-          <p>Choose something to listen to while you read. You can save it for later or connect it to the current book.</p>
-        </div>
-      </div>
+    <section class="panel music-library">
+      <div class="library-heading"><div><h1>Music &amp; Focus</h1><p>Listen through official Spotify embeds or the YouTube player, save favorites, and associate playlists with individual books.</p></div></div>
+      <nav class="music-section-nav" aria-label="Music sections"><a href="#add-music">Add music</a><a href="#book-music">Book music</a><a href="#preferred-music">My music</a><a href="#focus-music">Focus selections</a></nav>
 
-      <section class="music-current-book" aria-label="Current book">
-        <span>Current book</span>
-        <strong>${currentBookLabel}</strong>
-        ${bookKey ? `<small>${bookItems.length ? `${bookItems.length} saved music ${bookItems.length === 1 ? 'selection' : 'selections'}` : 'No music saved for this book yet'}</small>` : '<small>Open a book to save music specifically for it.</small>'}
-      </section>
-
-      <section class="music-primary-section">
-        <div class="music-section-heading">
-          <div><span class="music-step">1</span><h2>Start listening</h2></div>
-          <p>Pick a focus option or paste a Spotify or YouTube link.</p>
-        </div>
-
-        <div class="music-quick-picks">
-          ${quickChoices.map((item) => `<button class="music-quick-button" type="button" data-play-music="${escapeHtml(item.id)}"><span aria-hidden="true">♫</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.category)}</small></span></button>`).join('')}
-        </div>
-
-        <div class="music-or"><span>or use your own music</span></div>
-
-        <form id="music-url-form" class="music-simple-form">
-          <label for="music-service-url">Spotify or YouTube link</label>
-          <div class="music-link-row">
-            <input id="music-service-url" type="url" required placeholder="Paste a playlist, album, track, or video link">
-            <button class="primary" type="submit">Play</button>
-          </div>
-          <details class="music-optional-name">
-            <summary>Add a custom name</summary>
-            <label for="music-service-name" class="sr-only">Custom name</label>
-            <input id="music-service-name" type="text" maxlength="80" placeholder="Example: Dracula reading soundtrack">
-          </details>
-          <div class="music-save-row">
-            <button id="save-music-preferred" class="secondary" type="button">Save to My Music</button>
-            ${bookKey ? '<button id="save-music-to-book" class="secondary" type="button">Save for this book</button>' : ''}
-          </div>
+      <section id="add-music" class="music-category music-add-service">
+        <div class="library-heading"><div><h2>Add Spotify or YouTube</h2><p>Paste a public Spotify or YouTube URL. Playback remains hosted by the selected service.</p></div></div>
+        <form id="music-url-form" class="music-url-form">
+          <label>Spotify or YouTube URL<input id="music-service-url" type="url" placeholder="https://open.spotify.com/playlist/… or https://youtube.com/playlist?list=…"></label>
+          <label>Name (optional)<input id="music-service-name" type="text" maxlength="80" placeholder="My reading playlist"></label>
+          <div class="music-url-actions"><button class="primary" type="submit">Load player</button><button id="save-music-preferred" class="secondary" type="button">Save to My Music</button></div>
           <span id="music-service-status" class="status" aria-live="polite"></span>
         </form>
       </section>
 
-      <section class="music-secondary-section">
-        <div class="music-section-heading">
-          <div><span class="music-step">2</span><h2>Your saved music</h2></div>
-          <p>Play a saved selection or connect it to ${bookKey ? currentBookLabel : 'a book later'}.</p>
-        </div>
-        <div id="preferred-music-list" class="preferred-music-list music-saved-list">
-          ${preferred.length ? preferred.map((item) => `
-            <article class="preferred-music-item music-saved-item">
-              <div class="music-saved-info"><span class="music-provider-badge">${escapeHtml(item.provider === 'spotify' ? 'Spotify' : 'YouTube')}</span><strong>${escapeHtml(item.title)}</strong>${bookIds.includes(item.id) ? '<small>Saved for this book</small>' : ''}</div>
-              <div class="preferred-music-actions"><button class="primary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button>${bookKey ? `<button class="secondary" type="button" data-attach-book-music="${escapeHtml(item.id)}">${bookIds.includes(item.id) ? 'Remove from book' : 'Save for book'}</button>` : ''}<button class="text-button danger-text" type="button" data-remove-preferred="${escapeHtml(item.id)}">Delete</button></div>
-            </article>`).join('') : '<div class="music-empty-state"><strong>No saved music yet</strong><span>Play a link above, then choose “Save to My Music.”</span></div>'}
+      <section id="book-music" class="music-category preferred-music-library">
+        <div class="library-heading"><div><h2>Music for ${currentBookLabel}</h2><p>${bookKey ? 'These selections will be shown as book-specific choices whenever this book is open.' : 'Open a book first, then return here to associate music with it.'}</p></div></div>
+        <div class="preferred-music-list">
+          ${bookItems.length ? bookItems.map((item) => `
+            <article class="preferred-music-item">
+              <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}</span></div>
+              <div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-detach-book-music="${escapeHtml(item.id)}">Remove from book</button></div>
+            </article>`).join('') : `<p class="library-note">${bookKey ? 'No music has been attached to this book yet.' : 'No book is currently open.'}</p>`}
         </div>
       </section>
 
-      ${bookKey && bookItems.length ? `<details class="music-book-details"><summary>Music saved for ${currentBookLabel} <span>${bookItems.length}</span></summary><div class="preferred-music-list">${bookItems.map((item) => `<article class="preferred-music-item"><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}</span></div><div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button><button class="text-button" type="button" data-detach-book-music="${escapeHtml(item.id)}">Remove</button></div></article>`).join('')}</div></details>` : ''}
-
-      <details class="music-browse-details">
-        <summary>Browse more focus music <span>${musicChoices.length}</span></summary>
-        <div class="music-browse-list">
-          ${musicChoices.map((item) => `<article><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.description)}</span></div><div><button class="secondary" type="button" data-play-music="${escapeHtml(item.id)}">Play</button><button class="text-button" type="button" data-save-music="${escapeHtml(item.id)}">Save</button></div></article>`).join('')}
+      <section id="preferred-music" class="music-category preferred-music-library">
+        <div class="library-heading"><div><h2>My Music</h2><p>Saved selections appear in reader music controls and can be assigned to books.</p></div></div>
+        <div id="preferred-music-list" class="preferred-music-list">
+          ${preferred.length ? preferred.map((item) => `
+            <article class="preferred-music-item">
+              <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}${bookIds.includes(item.id) ? ' · Attached to current book' : ''}</span></div>
+              <div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button>${bookKey ? `<button class="secondary" type="button" data-attach-book-music="${escapeHtml(item.id)}">${bookIds.includes(item.id) ? 'Attached ✓' : 'Add to book'}</button>` : ''}<button class="secondary" type="button" data-remove-preferred="${escapeHtml(item.id)}">Remove</button></div>
+            </article>`).join('') : '<p class="library-note">No saved music yet. Add a Spotify or YouTube selection above.</p>'}
         </div>
-      </details>
+      </section>
 
-      <p class="library-note music-service-note">Playback is provided by Spotify or YouTube. Mark, Set, Go! stores only links and book associations.</p>
+      <section id="focus-music" class="music-category"><h2>Focus selections</h2><div class="music-card-grid">
+        ${categories.map((category) => musicChoices.filter((item) => item.category === category).map((item) => `
+          <article class="music-card"><div class="music-card-icon" aria-hidden="true">♫</div><div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.description)}</p><div class="music-card-links"><a href="${escapeHtml(musicWatchUrl(item))}" target="_blank" rel="noopener noreferrer">Open on YouTube</a><a href="${escapeHtml(youtubeSearchUrl(musicSearchQuery(item)))}" target="_blank" rel="noopener noreferrer">Find alternative</a></div></div><div class="music-card-actions"><button class="primary" type="button" data-play-music="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-save-music="${escapeHtml(item.id)}">Save</button></div></article>`).join('')).join('')}
+      </div></section>
+      <p class="library-note">Spotify and YouTube control availability, advertising, regional restrictions, sign-in requirements, and whether particular media can be embedded. Mark, Set, Go! stores links and book associations, not audio files.</p>
     </section>`;
 
   app.querySelectorAll('[data-play-music]').forEach((button) => button.addEventListener('click', () => {
@@ -853,7 +928,7 @@ function renderMusicLibrary() {
     const choice = musicChoices.find((item) => item.id === button.dataset.saveMusic);
     if (!choice) return;
     const added = addPreferredMusic({ title: choice.title, source: choice.category, provider: 'youtube', choiceId: choice.id });
-    button.textContent = added ? 'Saved ✓' : 'Saved';
+    button.textContent = added ? 'Saved ✓' : 'Already saved';
     button.disabled = true;
   }));
   app.querySelectorAll('[data-play-preferred]').forEach((button) => button.addEventListener('click', () => playPreferredMusic(button.dataset.playPreferred)));
@@ -866,9 +941,7 @@ function renderMusicLibrary() {
     renderMusicLibrary();
   }));
   app.querySelectorAll('[data-attach-book-music]').forEach((button) => button.addEventListener('click', () => {
-    const id = button.dataset.attachBookMusic;
-    if (bookIds.includes(id)) detachMusicFromCurrentBook(id);
-    else attachMusicToCurrentBook(id);
+    attachMusicToCurrentBook(button.dataset.attachBookMusic);
     renderMusicLibrary();
   }));
   app.querySelectorAll('[data-detach-book-music]').forEach((button) => button.addEventListener('click', () => {
@@ -882,23 +955,6 @@ function renderMusicLibrary() {
     if (customName) parsed.title = customName;
     return parsed;
   };
-  const saveFormMusic = (attachToBook = false) => {
-    const status = app.querySelector('#music-service-status');
-    try {
-      const parsed = parseFormMusic();
-      const before = getPreferredMusic();
-      const added = addPreferredMusic({ title: parsed.title, source: parsed.source, provider: parsed.provider || 'youtube', src: parsed.src, originalUrl: parsed.originalUrl || '' });
-      const after = getPreferredMusic();
-      const saved = after.find((item) => !before.some((oldItem) => oldItem.id === item.id)) || after.find((item) => item.src === parsed.src || item.originalUrl === parsed.originalUrl);
-      if (attachToBook && saved && bookKey) attachMusicToCurrentBook(saved.id);
-      status.className = 'status';
-      status.textContent = attachToBook ? `Saved “${parsed.title}” for this book.` : (added ? `Saved “${parsed.title}” to My Music.` : 'That selection is already saved.');
-      window.setTimeout(renderMusicLibrary, 500);
-    } catch (error) {
-      status.className = 'status error';
-      status.textContent = error.message;
-    }
-  };
   app.querySelector('#music-url-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const status = app.querySelector('#music-service-status');
@@ -906,16 +962,26 @@ function renderMusicLibrary() {
       const parsed = parseFormMusic();
       playMusic(parsed);
       status.className = 'status';
-      status.textContent = `Now playing ${parsed.title}.`;
+      status.textContent = `Loaded ${parsed.source}.`;
     } catch (error) {
       status.className = 'status error';
       status.textContent = error.message;
     }
   });
-  app.querySelector('#save-music-preferred')?.addEventListener('click', () => saveFormMusic(false));
-  app.querySelector('#save-music-to-book')?.addEventListener('click', () => saveFormMusic(true));
+  app.querySelector('#save-music-preferred')?.addEventListener('click', () => {
+    const status = app.querySelector('#music-service-status');
+    try {
+      const parsed = parseFormMusic();
+      const added = addPreferredMusic({ title: parsed.title, source: parsed.source, provider: parsed.provider || 'youtube', src: parsed.src, originalUrl: parsed.originalUrl || '' });
+      status.className = 'status';
+      status.textContent = added ? `Saved “${parsed.title}” to My Music.` : 'That selection is already saved.';
+      if (added) window.setTimeout(renderMusicLibrary, 350);
+    } catch (error) {
+      status.className = 'status error';
+      status.textContent = error.message;
+    }
+  });
 }
-
 async function loadBillboardSongs() {
   const status = app.querySelector('#billboard-status');
   const list = app.querySelector('#billboard-list');
@@ -3144,21 +3210,20 @@ function renderHome() {
               <span><strong>WPM Test</strong><small>Measure your natural reading speed</small></span>
             </button>
 
-            <button class="secondary home-large-action" id="resume-last-reading" type="button">
+            ${resumeMeta?.title ? `<button class="secondary home-large-action home-continue-reading" id="resume-last-reading" type="button">
               <span aria-hidden="true">↩</span>
-              <span><strong>Resume Last Reading</strong><small>${resumeMeta?.title ? escapeHtml(resumeMeta.title) : 'No saved reading yet'}</small></span>
-            </button>
+              <span>
+                <strong>Continue Reading</strong>
+                <small>${escapeHtml(resumeMeta.title)}${resumePercent === null ? '' : ` · ${resumePercent}% complete`}</small>
+                ${resumePercent === null ? '' : `<span class="progress-meter" aria-hidden="true"><span style="width:${resumePercent}%"></span></span>`}
+              </span>
+            </button>` : `<button class="secondary home-large-action" id="resume-last-reading" type="button" disabled>
+              <span aria-hidden="true">↩</span>
+              <span><strong>Continue Reading</strong><small>No saved reading yet</small></span>
+            </button>`}
           </div>
 
-          ${resumeMeta?.title ? `<article class="resume-reading-card home-simple-resume">
-            <div>
-              <span class="resume-reading-kicker">Last reading</span>
-              <strong>${escapeHtml(resumeMeta.title)}</strong>
-              <small>${resumePercent === null ? 'Saved reading position' : `${resumePercent}% complete`} · opens only when you choose Resume</small>
-            </div>
-            ${resumePercent === null ? '' : `<div class="progress-meter"><span style="width:${resumePercent}%"></span></div>`}
-          </article>
-          <button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Forget Saved Reading</button>` : ''}
+          ${resumeMeta?.title ? `<button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Clear Resume Position</button>` : ''}
         </section>
       </div>
 
@@ -3207,8 +3272,14 @@ function renderHome() {
     }
   });
   app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
+    let documentId = '';
+    try {
+      const meta = JSON.parse(localStorage.getItem(READER_SESSION_META_KEY) || 'null');
+      documentId = String(meta?.documentId || activeReaderSnapshot?.documentId || state.documentId || '');
+    } catch {}
     await clearReaderSession();
-    activeReaderSnapshot = null;
+    await cloudReadingState.clearProgress(documentId);
+    clearActiveReaderPane();
     renderHome();
   });
 

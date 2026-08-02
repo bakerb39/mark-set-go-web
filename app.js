@@ -56,6 +56,109 @@ const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
 let activeReaderSnapshot = null;
 
 
+// Cloud reading-state adapter. This stays outside the Reader Engine so the
+// protected playback-cursor / viewport-anchor architecture remains unchanged.
+const cloudReadingState = {
+  timer: null,
+  bookIds: new Map(),
+  pendingSnapshot: null,
+  async resolveBook(snapshot) {
+    const api = window.MarkSetGoCloud;
+    const documentId = String(snapshot?.documentId || state.documentId || '').trim();
+    if (!api?.library || !documentId || !snapshot?.title) return null;
+    if (this.bookIds.has(documentId)) return this.bookIds.get(documentId);
+    const payload = await api.library.save({
+      clientRecordId: documentId,
+      title: snapshot.title,
+      author: snapshot.source?.author || state.source?.author || '',
+      sourceType: snapshot.source?.type || state.source?.type || 'reader',
+      sourceId: snapshot.source?.id || snapshot.source?.key || state.source?.id || state.source?.key || '',
+      sourceUrl: snapshot.source?.url || state.source?.url || '',
+      coverUrl: snapshot.source?.coverUrl || state.source?.coverUrl || '',
+      metadata: {
+        documentId,
+        totalWords: Array.isArray(state.words) ? state.words.length : splitWords(snapshot.currentText || '').length,
+        source: snapshot.source || state.source || null
+      }
+    });
+    const bookId = payload?.book?.id;
+    if (bookId) this.bookIds.set(documentId, bookId);
+    return bookId || null;
+  },
+  schedule(snapshot) {
+    if (!snapshot?.title || !snapshot?.documentId || !window.MarkSetGoCloud?.library) return;
+    this.pendingSnapshot = {
+      ...snapshot,
+      controls: { ...(snapshot.controls || {}) },
+      viewport: snapshot.viewport ? { ...snapshot.viewport } : null
+    };
+    clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.flush(), 900);
+  },
+  async flush() {
+    clearTimeout(this.timer);
+    this.timer = null;
+    const snapshot = this.pendingSnapshot;
+    this.pendingSnapshot = null;
+    if (!snapshot) return;
+    try {
+      const bookId = await this.resolveBook(snapshot);
+      if (!bookId) return;
+      const totalWords = Array.isArray(state.words) ? state.words.length : splitWords(snapshot.currentText || '').length;
+      const playbackIndex = Math.max(0, Number(snapshot.playbackIndex ?? snapshot.index) || 0);
+      const viewportAnchorIndex = Math.max(0, Number(snapshot.viewportAnchorIndex ?? snapshot.viewport?.anchorIndex ?? playbackIndex) || 0);
+      await window.MarkSetGoCloud.library.saveProgress(bookId, {
+        mode: snapshot.controls?.mode || state.renderedMode || 'highlight',
+        playbackIndex,
+        viewportAnchorIndex,
+        viewportOffsetPx: Number(snapshot.viewport?.offsetPx) || 0,
+        scrollRatio: totalWords ? Math.min(1, playbackIndex / totalWords) : 0,
+        pageNumber: state.bookPages ? Math.max(1, Number(state.currentBookPage) || 1) : null,
+        positionData: {
+          documentId: snapshot.documentId,
+          title: snapshot.title,
+          totalWords,
+          lastReadAt: new Date().toISOString()
+        }
+      });
+    } catch (error) {
+      console.warn('Cloud reading progress sync failed:', error);
+    }
+  },
+  async clearProgress(documentId) {
+    const api = window.MarkSetGoCloud;
+    if (!api?.library || !documentId) return;
+    try {
+      let bookId = this.bookIds.get(documentId) || null;
+      if (!bookId) {
+        const payload = await api.library.list();
+        const record = (payload?.books || []).find((book) =>
+          String(book.client_record_id || book.metadata?.documentId || '') === String(documentId)
+        );
+        bookId = record?.id || null;
+      }
+      if (bookId) await api.library.clearProgress(bookId);
+    } catch (error) {
+      console.warn('Cloud resume-position clear failed:', error);
+    }
+  }
+};
+
+function clearActiveReaderPane() {
+  stopReader();
+  activeReaderSnapshot = null;
+  try { readerEngine.reset?.(); } catch {}
+  state.title = '';
+  state.currentText = '';
+  state.originalText = '';
+  state.words = [];
+  state.index = 0;
+  state.viewportAnchorIndex = 0;
+  state.documentId = '';
+  state.source = null;
+}
+
+
 const APP_VIEW_STATE_KEY = 'markSetGoViewStateV1';
 
 const ReaderContinuity = {
@@ -147,6 +250,7 @@ const ReaderContinuity = {
       }
     } catch {}
     writeReaderSession(activeReaderSnapshot);
+    cloudReadingState.schedule(activeReaderSnapshot);
   },
 
   scheduleCheckpoint({ immediate = false } = {}) {
@@ -3106,21 +3210,20 @@ function renderHome() {
               <span><strong>WPM Test</strong><small>Measure your natural reading speed</small></span>
             </button>
 
-            <button class="secondary home-large-action" id="resume-last-reading" type="button">
+            ${resumeMeta?.title ? `<button class="secondary home-large-action home-continue-reading" id="resume-last-reading" type="button">
               <span aria-hidden="true">↩</span>
-              <span><strong>Resume Last Reading</strong><small>${resumeMeta?.title ? escapeHtml(resumeMeta.title) : 'No saved reading yet'}</small></span>
-            </button>
+              <span>
+                <strong>Continue Reading</strong>
+                <small>${escapeHtml(resumeMeta.title)}${resumePercent === null ? '' : ` · ${resumePercent}% complete`}</small>
+                ${resumePercent === null ? '' : `<span class="progress-meter" aria-hidden="true"><span style="width:${resumePercent}%"></span></span>`}
+              </span>
+            </button>` : `<button class="secondary home-large-action" id="resume-last-reading" type="button" disabled>
+              <span aria-hidden="true">↩</span>
+              <span><strong>Continue Reading</strong><small>No saved reading yet</small></span>
+            </button>`}
           </div>
 
-          ${resumeMeta?.title ? `<article class="resume-reading-card home-simple-resume">
-            <div>
-              <span class="resume-reading-kicker">Last reading</span>
-              <strong>${escapeHtml(resumeMeta.title)}</strong>
-              <small>${resumePercent === null ? 'Saved reading position' : `${resumePercent}% complete`} · opens only when you choose Resume</small>
-            </div>
-            ${resumePercent === null ? '' : `<div class="progress-meter"><span style="width:${resumePercent}%"></span></div>`}
-          </article>
-          <button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Forget Saved Reading</button>` : ''}
+          ${resumeMeta?.title ? `<button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Clear Resume Position</button>` : ''}
         </section>
       </div>
 
@@ -3169,8 +3272,14 @@ function renderHome() {
     }
   });
   app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
+    let documentId = '';
+    try {
+      const meta = JSON.parse(localStorage.getItem(READER_SESSION_META_KEY) || 'null');
+      documentId = String(meta?.documentId || activeReaderSnapshot?.documentId || state.documentId || '');
+    } catch {}
     await clearReaderSession();
-    activeReaderSnapshot = null;
+    await cloudReadingState.clearProgress(documentId);
+    clearActiveReaderPane();
     renderHome();
   });
 

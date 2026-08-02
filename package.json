@@ -1,8 +1,8 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.7.15",
+  "version": "7.7.16",
   "private": true,
-  "description": "Mark, Set, Go! cloud-first account preferences UI integration with PostgreSQL-backed defaults and protected reader architecture.",
+  "description": "Mark, Set, Go! unified Continue Reading card, clear-resume behavior, and cloud library/progress sync.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

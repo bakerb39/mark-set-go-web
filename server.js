@@ -163,9 +163,9 @@ app.get('/api/account', async (req, res) => {
 app.get('/api/health', async (_req, res) => {
   try {
     const database = await checkDatabase();
-    res.json({ ok: true, version: '7.7.15', database, betaAccessEnabled: BETA_ACCESS_ENABLED });
+    res.json({ ok: true, version: '7.7.16', database, betaAccessEnabled: BETA_ACCESS_ENABLED });
   } catch (error) {
-    res.status(503).json({ ok: false, version: '7.7.15', database: { configured: databaseConfigured(), connected: false, error: error.message }, betaAccessEnabled: BETA_ACCESS_ENABLED });
+    res.status(503).json({ ok: false, version: '7.7.16', database: { configured: databaseConfigured(), connected: false, error: error.message }, betaAccessEnabled: BETA_ACCESS_ENABLED });
   }
 });
 
@@ -434,6 +434,23 @@ app.put('/api/account/library/:bookId/progress', async (req, res) => {
     client?.release();
   }
 });
+
+
+app.delete('/api/account/library/:bookId/progress', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query(
+      'delete from reading_positions where user_id = $1 and book_id = $2 returning book_id',
+      [user.id, req.params.bookId]
+    );
+    res.json({ cleared: true, bookId: req.params.bookId, hadProgress: Boolean(result.rows[0]) });
+  } catch (error) {
+    console.error('Reading progress clear failed:', error);
+    res.status(500).json({ error: 'Unable to clear reading progress.' });
+  }
+});
+
 
 
 /* Email delivery v7.5.1 ----------------------------------------------------
