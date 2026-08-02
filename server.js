@@ -82,7 +82,7 @@ async function fetchFeedItems(source) {
 
 
 app.disable('x-powered-by');
-app.use(express.json({ limit: '150kb' }));
+app.use(express.json({ limit: '8mb' }));
 if (clerkConfigured) app.use(clerkMiddleware());
 
 
@@ -557,6 +557,64 @@ const PUBLIC_APP_URL = String(process.env.PUBLIC_APP_URL || '').replace(/\/$/, '
 
 function validEmail(value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim()); }
 function emailConfigured() { return Boolean(String(process.env.RESEND_API_KEY || '').trim()); }
+
+/* Random Notes cloud service v7.7.16 --------------------------------------
+   Independent from the protected reader runtime.
+*/
+function cleanNoteHtml(value) {
+  const html = String(value || '');
+  if (Buffer.byteLength(html, 'utf8') > 6 * 1024 * 1024) throw new Error('Random note is too large.');
+  return html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*(["']).*?\1/gi, '');
+}
+app.get('/api/account/random-notes', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res); if (!user) return;
+    const result = await query(`select id,title,content_html,content_text,tags,pinned,favorite,related_book_ids,created_at,updated_at from random_notes where user_id=$1 order by pinned desc, updated_at desc`, [user.id]);
+    res.json({ notes: result.rows });
+  } catch (error) { console.error('Random notes load failed:', error); res.status(500).json({ error: 'Unable to load Random Notes.' }); }
+});
+app.post('/api/account/random-notes', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res); if (!user) return;
+    const html = cleanNoteHtml(req.body?.contentHtml);
+    const text = cleanText(req.body?.contentText, 500000);
+    const title = cleanText(req.body?.title, 240) || 'Untitled note';
+    const result = await query(`insert into random_notes(user_id,title,content_html,content_text,tags,pinned,favorite,related_book_ids) values($1,$2,$3,$4,$5::jsonb,$6,$7,$8::jsonb) returning *`, [user.id,title,html,text,JSON.stringify(Array.isArray(req.body?.tags)?req.body.tags.slice(0,30):[]),Boolean(req.body?.pinned),Boolean(req.body?.favorite),JSON.stringify(Array.isArray(req.body?.relatedBookIds)?req.body.relatedBookIds.slice(0,50):[])]);
+    res.status(201).json({ note: result.rows[0] });
+  } catch (error) { console.error('Random note create failed:', error); res.status(/too large/i.test(error.message)?413:500).json({ error: error.message || 'Unable to save Random Note.' }); }
+});
+app.put('/api/account/random-notes/:id', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res); if (!user) return;
+    const html = cleanNoteHtml(req.body?.contentHtml);
+    const result = await query(`update random_notes set title=$3,content_html=$4,content_text=$5,tags=$6::jsonb,pinned=$7,favorite=$8,related_book_ids=$9::jsonb,updated_at=now() where id=$2 and user_id=$1 returning *`, [user.id,req.params.id,cleanText(req.body?.title,240)||'Untitled note',html,cleanText(req.body?.contentText,500000),JSON.stringify(Array.isArray(req.body?.tags)?req.body.tags.slice(0,30):[]),Boolean(req.body?.pinned),Boolean(req.body?.favorite),JSON.stringify(Array.isArray(req.body?.relatedBookIds)?req.body.relatedBookIds.slice(0,50):[])]);
+    if (!result.rows[0]) return res.status(404).json({ error:'Random Note not found.' });
+    res.json({ note: result.rows[0] });
+  } catch (error) { console.error('Random note update failed:', error); res.status(/too large/i.test(error.message)?413:500).json({ error:error.message || 'Unable to update Random Note.' }); }
+});
+app.delete('/api/account/random-notes/:id', async (req, res) => {
+  try { const user=await requireAccountUser(req,res); if(!user)return; const result=await query('delete from random_notes where id=$2 and user_id=$1 returning id',[user.id,req.params.id]); if(!result.rows[0])return res.status(404).json({error:'Random Note not found.'}); res.json({ok:true}); }
+  catch(error){console.error('Random note delete failed:',error);res.status(500).json({error:'Unable to delete Random Note.'});}
+});
+function randomNoteAttachments(html) {
+  const matches=[...String(html||'').matchAll(/<img[^>]+src=["']data:(image\/(?:png|jpeg|gif|webp));base64,([^"']+)["'][^>]*>/gi)].slice(0,5);
+  return matches.map((m,i)=>({ filename:`random-note-image-${i+1}.${m[1].split('/')[1].replace('jpeg','jpg')}`, content:m[2] }));
+}
+app.post('/api/account/random-notes/email', async (req,res)=>{
+  try {
+    const user=await requireAccountUser(req,res); if(!user)return;
+    const pref=await query('select * from user_email_preferences where user_id=$1 and active=true',[user.id]);
+    const email=pref.rows[0]?.email || user.email;
+    if(!email) return res.status(400).json({error:'Save an email address first.'});
+    const ids=Array.isArray(req.body?.ids)?req.body.ids.slice(0,100):[];
+    const result=await query(`select * from random_notes where user_id=$1 and ($2::uuid[] is null or id=any($2::uuid[])) order by updated_at desc`,[user.id,ids.length?ids:null]);
+    if(!result.rows.length)return res.status(400).json({error:'There are no Random Notes to email.'});
+    const attachments=[]; const items=result.rows.map((n)=>{attachments.push(...randomNoteAttachments(n.content_html));return `<li style="margin-bottom:20px"><strong>${escapeEmail(n.title)}</strong><div style="font-size:12px;color:#667">Updated ${escapeEmail(new Date(n.updated_at).toLocaleString())}</div><div style="white-space:pre-wrap;margin-top:8px">${escapeEmail(n.content_text)}</div></li>`}).join('');
+    await sendResendEmail({to:email,subject:`Your ${result.rows.length} Random ${result.rows.length===1?'Note':'Notes'} from Mark, Set, Go!`,html:emailFrame('Random Notes',`<ol>${items}</ol>`,''),text:result.rows.map(n=>`${n.title}\n${n.content_text}`).join('\n\n---\n\n'),attachments:attachments.slice(0,10)});
+    res.json({ok:true,count:result.rows.length,attachments:attachments.length});
+  } catch(error){console.error('Random notes email failed:',error);res.status(503).json({error:error.message});}
+});
+
 function rateLimitEmail(req, key, limit = 8, windowMs = 3600000) {
   const id = `${req.ip}|${key}`; const now = Date.now();
   const recent = (emailRateLimits.get(id) || []).filter((time) => now - time < windowMs);
@@ -564,10 +622,10 @@ function rateLimitEmail(req, key, limit = 8, windowMs = 3600000) {
   recent.push(now); emailRateLimits.set(id, recent); return true;
 }
 function escapeEmail(value) { return String(value || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-async function sendResendEmail({ to, subject, html, text }) {
+async function sendResendEmail({ to, subject, html, text, attachments = [] }) {
   const apiKey = String(process.env.RESEND_API_KEY || '').trim();
   if (!apiKey) throw new Error('Email is not configured. Add RESEND_API_KEY.');
-  const response = await fetch('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:`Bearer ${apiKey}`, 'Content-Type':'application/json' }, body:JSON.stringify({ from:EMAIL_FROM, to:[to], subject, html, text }) });
+  const response = await fetch('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:`Bearer ${apiKey}`, 'Content-Type':'application/json' }, body:JSON.stringify({ from:EMAIL_FROM, to:[to], subject, html, text, ...(attachments.length ? { attachments } : {}) }) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.message || `Email provider returned HTTP ${response.status}.`);
   return payload;
@@ -579,11 +637,17 @@ function emailFrame(title, body, clientId) {
 }
 
 app.get('/api/email/status', (_req, res) => res.json({ configured:emailConfigured(), provider:'Resend', from:EMAIL_FROM, durable:false }));
-app.post('/api/email/preferences', (req, res) => {
+app.get('/api/email/preferences', async (req,res)=>{
+  try { const user=await requireAccountUser(req,res); if(!user)return; const result=await query('select email,reminders,newsletter,notes,notes_frequency,timezone,active,updated_at from user_email_preferences where user_id=$1',[user.id]); res.json({preferences:result.rows[0]||null,configured:emailConfigured()}); }
+  catch(error){console.error('Email preference load failed:',error);res.status(500).json({error:'Unable to load email preferences.'});}
+});
+app.post('/api/email/preferences', async (req, res) => {
   const clientId=String(req.body?.clientId||'').trim().slice(0,100); const email=String(req.body?.email||'').trim().toLowerCase();
   if (!clientId || !validEmail(email)) return res.status(400).json({error:'Enter a valid email address.'});
   const record={ ...(emailSubscriptions.get(clientId)||{}), clientId, email, newsletter:Boolean(req.body?.newsletter), reminders:Boolean(req.body?.reminders), notes:Boolean(req.body?.notes), notesFrequency:['daily','weekly','monthly'].includes(req.body?.notesFrequency)?req.body.notesFrequency:'weekly', timezone:String(req.body?.timezone||'America/New_York').slice(0,80), active:true, updatedAt:new Date().toISOString() };
-  emailSubscriptions.set(clientId, record); res.json({ok:true, configured:emailConfigured(), preferences:record});
+  emailSubscriptions.set(clientId, record);
+  try { const user=await requireAccountUser(req,res); if(!user)return; const result=await query(`insert into user_email_preferences(user_id,email,reminders,newsletter,notes,notes_frequency,timezone,active,updated_at) values($1,$2,$3,$4,$5,$6,$7,true,now()) on conflict(user_id) do update set email=excluded.email,reminders=excluded.reminders,newsletter=excluded.newsletter,notes=excluded.notes,notes_frequency=excluded.notes_frequency,timezone=excluded.timezone,active=true,updated_at=now() returning *`,[user.id,email,record.reminders,record.newsletter,record.notes,record.notesFrequency,record.timezone]); res.json({ok:true,configured:emailConfigured(),preferences:record,durable:true,updatedAt:result.rows[0].updated_at}); }
+  catch(error){console.error('Email preference save failed:',error);res.status(500).json({error:'Unable to save email preferences.'});}
 });
 app.post('/api/email/sync-actions', (req, res) => {
   const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);

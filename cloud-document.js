@@ -115,7 +115,7 @@
       card.insertAdjacentHTML('beforeend', controls(book));
       const heading = card.querySelector('h3');
       if (book.documentStored && heading && !heading.querySelector('.cloud-document-badge')) {
-        heading.insertAdjacentHTML('beforeend', '<span class="cloud-document-badge">Text stored</span>');
+        heading.insertAdjacentHTML('beforeend', '<span class="cloud-document-badge">Document saved to account</span>');
       }
     });
     bind(root);
