@@ -7141,12 +7141,28 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         const group = findReadingGroup(clickedIndex);
         stopReader();
         state.index = group?.start ?? clickedIndex;
-        // A deliberate word click becomes the authoritative resume point.
-        // Save it before playback/setup work can reuse an older rendered anchor.
+        // Preserve the word's current screen position for the first playback
+        // frame after a deliberate seek. Normal guide scrolling resumes after
+        // that frame instead of snapping the pointer to the top reading line.
+        state.preserveManualSeekViewportOnce = true;
         persistReaderSession({ immediate: true, explicitIndex: state.index });
         updateReaderStatus(`Reading position moved to word ${(state.index + 1).toLocaleString()}.`);
-        startReader();
-        if (!wasRunning) window.setTimeout(pauseReader, 0);
+
+        if (wasRunning) {
+          startReader();
+        } else {
+          // A paused seek must not briefly start and stop playback. Place the
+          // guide at the selected word and leave Resume ready at that position.
+          if (mode === 'pointing-guide') {
+            const requestedCount = Math.max(1, Number(app.querySelector('#word-count')?.value) || 1);
+            const step = getPointingLineStep(reader, state.index, requestedCount);
+            if (step) moveReadingGuide(reader, step, 0);
+          }
+          const startButton = app.querySelector('#start-reader');
+          const pauseButton = app.querySelector('#pause-reader');
+          if (startButton) { startButton.disabled = false; startButton.textContent = 'Resume'; }
+          if (pauseButton) pauseButton.disabled = true;
+        }
       }
       return;
     }
@@ -9205,6 +9221,8 @@ function startReader() {
     0,
     Math.min(Math.max(0, state.words.length - 1), Number(state.index) || 0)
   );
+  let preserveManualSeekViewportOnce = Boolean(state.preserveManualSeekViewportOnce);
+  state.preserveManualSeekViewportOnce = false;
   const currentTickerStage = app.querySelector('.digital-sign-stage');
   const canResumeTicker = selectedMode === 'digital-sign'
     && state.tickerPaused
@@ -9330,7 +9348,10 @@ function startReader() {
         if (mode === 'marquee') group.classList.remove('pending-group');
       }
       if (mode === 'pointing-guide' && pointingStep) {
-        scrollPointingStep(reader, pointingStep);
+        // A deliberate seek already placed the selected word where the user
+        // chose it. Do not recenter that first frame to the top guide line.
+        if (!preserveManualSeekViewportOnce) scrollPointingStep(reader, pointingStep);
+        preserveManualSeekViewportOnce = false;
         const stepStart = startIndex;
         const stepEnd = nextIndex;
         window.requestAnimationFrame(() => {
