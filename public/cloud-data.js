@@ -61,9 +61,6 @@
       loadProgress: (bookId) => request(`/api/account/library/${encodeURIComponent(bookId)}/progress`),
       saveProgress: (bookId, progress) => request(`/api/account/library/${encodeURIComponent(bookId)}/progress`, {
         method: 'PUT', body: JSON.stringify(progress)
-      }),
-      clearProgress: (bookId) => request(`/api/account/library/${encodeURIComponent(bookId)}/progress`, {
-        method: 'DELETE'
       })
     }
   };
