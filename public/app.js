@@ -12077,8 +12077,47 @@ function renderMyLibraryHub() {
   const primaryDifficulty = storedDifficultyForProgress(primaryBook);
 
   const openStoredDocument = async (documentId, wordIndex = null) => {
+    const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
     let data = null;
     try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+
+    // Reproducible Bible sources can be rebuilt when their browser-only text
+    // cache is missing. This keeps the existing local-document path intact and
+    // only adds a source-based fallback for saved Bible chapters.
+    if (!data?.text && record?.source?.type === 'bible') {
+      const source = record.source;
+      try {
+        const payload = await loadApiPayload(
+          `/api/bible/${encodeURIComponent(source.translation)}/${encodeURIComponent(source.book)}/${encodeURIComponent(source.chapter)}`
+        );
+        const rebuilt = buildBibleReaderDocument(payload, {
+          bookName: String(record.title || '').replace(/\s+[—-]\s+[^—-]+$/, '') || source.book,
+          chapterNumber: Number(source.chapter),
+          includeChapterHeading: true
+        });
+        if (!rebuilt?.text || !splitWords(rebuilt.text).length) {
+          throw new Error('The saved Bible chapter did not contain readable text.');
+        }
+        data = {
+          title: record.title,
+          text: rebuilt.text,
+          source: {
+            ...source,
+            author: source.author || 'Bible',
+            documentStructure: rebuilt.structure,
+            documentToc: rebuilt.toc,
+            paragraphBreaks: rebuilt.paragraphBreaks,
+            verseNumberIndexes: rebuilt.verseNumberIndexes
+          }
+        };
+        localStorage.setItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`, JSON.stringify(data));
+      } catch (error) {
+        console.warn('Saved Bible chapter could not be rebuilt.', error);
+        window.alert(`This Bible chapter could not be reloaded: ${error.message}`);
+        return;
+      }
+    }
+
     if (!data?.text) {
       window.alert('This text is not currently stored in this browser.');
       return;
@@ -12106,7 +12145,6 @@ function renderMyLibraryHub() {
       return;
     }
 
-    const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
     let resumeIndex = Number.isFinite(Number(wordIndex)) ? Number(wordIndex) : Number(record?.lastWord) || 0;
     let matchingSnapshot = null;
 
