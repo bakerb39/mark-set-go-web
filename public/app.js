@@ -3621,12 +3621,27 @@ function finalizeReadingSession() {
 
   const progress = readStoredObject(READING_PROGRESS_KEY);
   const existing = progress[state.documentId] || {};
+
+  // Session finalization is a secondary persistence path. The continuity
+  // checkpoint may already contain a newer, accurate position (for example,
+  // after a Bible chapter or another source rebuilds the reader and state.index
+  // temporarily returns to zero). Never let that transient zero erase a valid
+  // resumable position. Non-zero end positions remain authoritative so users
+  // can still intentionally move backward in a document.
+  const checkpointIndex = activeReaderSnapshot?.documentId === state.documentId
+    ? Math.max(0, Number(activeReaderSnapshot.index) || 0)
+    : 0;
+  const existingLastWord = Math.max(0, Number(existing.lastWord) || 0);
+  const resumableEndIndex = endIndex === 0
+    ? Math.max(checkpointIndex, existingLastWord)
+    : endIndex;
+
   progress[state.documentId] = {
     documentId: state.documentId,
     title: state.title,
     totalWords: state.words.length,
-    furthestWord: Math.max(Number(existing.furthestWord) || 0, endIndex),
-    lastWord: endIndex,
+    furthestWord: Math.max(Number(existing.furthestWord) || 0, resumableEndIndex),
+    lastWord: resumableEndIndex,
     totalSeconds: (Number(existing.totalSeconds) || 0) + seconds,
     totalWordsRead: (Number(existing.totalWordsRead) || 0) + wordsRead,
     sessions: (Number(existing.sessions) || 0) + 1,
@@ -9437,6 +9452,11 @@ function stopReader() {
 }
 
 function pauseReader() {
+  // Capture the live playback cursor before stopReader/finalization or a
+  // pending viewport checkpoint can observe a reset/stale index. This keeps
+  // Resume Reading aligned with the exact word visible when Pause is pressed.
+  ReaderContinuity.scheduleCheckpoint({ immediate: true });
+
   if (state.renderedMode === 'digital-sign' && state.tickerFrame) {
     cancelAnimationFrame(state.tickerFrame);
     state.tickerFrame = null;
