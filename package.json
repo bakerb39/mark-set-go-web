@@ -1,6 +1,6 @@
 {
   "name": "mark-set-go-web",
-  "version": "8.0.0",
+  "version": "8.0.1",
   "private": true,
   "description": "Mark, Set, Go! unified document manager with cloud/local document resolution and protected reader architecture.",
   "main": "server.js",

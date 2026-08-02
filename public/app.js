@@ -4874,16 +4874,27 @@ function persistCurrentDocument() {
   if (!state.documentId || !state.currentText) return false;
   const key = `${DOCUMENT_STORAGE_PREFIX}${state.documentId}`;
   try {
-    if (!localStorage.getItem(key)) {
-      localStorage.setItem(key, JSON.stringify({
-        title: state.title,
-        text: state.currentText,
-        source: state.source
-      }));
+    const next = {
+      title: state.title,
+      text: state.currentText,
+      source: state.source
+    };
+    const existingRaw = localStorage.getItem(key);
+    let shouldWrite = !existingRaw;
+    if (existingRaw) {
+      try {
+        const existing = JSON.parse(existingRaw);
+        shouldWrite = existing?.title !== next.title
+          || existing?.text !== next.text
+          || JSON.stringify(existing?.source || {}) !== JSON.stringify(next.source || {});
+      } catch {
+        shouldWrite = true;
+      }
     }
+    if (shouldWrite) localStorage.setItem(key, JSON.stringify(next));
     return true;
   } catch (error) {
-    console.warn('Document could not be stored for bookmarks.', error);
+    console.warn('Document could not be stored in this browser.', error);
     return false;
   }
 }
@@ -6787,6 +6798,14 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   state.uploadedIllustrations = Array.isArray(source?.illustrations) ? source.illustrations : [];
   state.illustrationMode = state.uploadedIllustrations.length ? 'chapter' : 'off';
   if (!state.words.length) return renderError('No readable text', 'The selected source did not contain readable words.');
+
+  // Every successful import/open must create the local document payload immediately.
+  // Previously the text was only persisted after actions such as adding a bookmark,
+  // allowing cloud metadata to sync while the actual document remained unavailable.
+  persistCurrentDocument();
+  document.dispatchEvent(new CustomEvent('marksetgo:document-available', {
+    detail: { documentId: state.documentId, title: state.title }
+  }));
 
   app.innerHTML = `
     <section class="panel reader-page-panel">

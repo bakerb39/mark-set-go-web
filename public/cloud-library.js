@@ -5,6 +5,8 @@
   const READING_LIST_KEY = 'markSetGoReadingListV1';
   const DOCUMENT_PREFIX = 'markSetGoDocumentV1:';
   const SYNC_INTERVAL_MS = 20000;
+  const MAX_ACCOUNT_DOCUMENT_BYTES = 5 * 1024 * 1024;
+  const encoder = new TextEncoder();
 
   const state = {
     authenticated: false,
@@ -181,9 +183,21 @@
         const signature = stableSignature(record);
         if (!force && state.signatures.get(record.clientRecordId) === signature) continue;
         const payload = await api.save(record);
-        const saved = normalizeCloudBook(payload?.book || {});
+        let saved = normalizeCloudBook(payload?.book || {});
         state.signatures.set(record.clientRecordId, signature);
         if (saved.clientRecordId) state.byClientId.set(saved.clientRecordId, saved);
+
+        // Signed-in imports should save the readable text with the library entry.
+        // This removes the old hidden/manual “Save text to account” requirement.
+        const localDocument = readDocument(record.clientRecordId);
+        if (saved.id && !saved.documentStored && localDocument?.text) {
+          const text = String(localDocument.text);
+          if (encoder.encode(text).byteLength <= MAX_ACCOUNT_DOCUMENT_BYTES) {
+            await api.saveDocument(saved.id, text);
+            saved = { ...saved, documentStored: true };
+            state.byClientId.set(record.clientRecordId, saved);
+          }
+        }
       }
       await loadCloudLibrary();
     } catch (error) {
@@ -356,6 +370,10 @@
     setBooks(books);
     scheduleSync(250);
     startPolling();
+  });
+
+  document.addEventListener('marksetgo:document-available', () => {
+    if (state.authenticated) void syncLocalMetadata({ force: true });
   });
 
   document.addEventListener('visibilitychange', () => {

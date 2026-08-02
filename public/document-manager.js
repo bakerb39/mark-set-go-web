@@ -71,10 +71,10 @@
 
     const book = cloudBookForDocument(id);
     if (!book) {
-      throw new Error('This library entry is not connected to an account document. Re-import the text, then choose “Save text to account.”');
+      throw new Error('This library entry does not have readable text yet. Re-import the book once; the app will now save the text automatically.');
     }
     if (!book.documentStored) {
-      throw new Error('Only the library entry is saved. The document text has not been saved to your account yet. Re-import the text and choose “Save text to account.”');
+      throw new Error('Only the library entry was saved by an earlier version. Re-import the book once; the text will now be saved automatically to your account.');
     }
     return openCloudDocument(book, options);
   }
