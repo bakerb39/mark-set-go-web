@@ -54,6 +54,10 @@ const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
 // The top Reader button must return only to a reader explicitly opened during
 // this browser/app session. Persistent IndexedDB is reserved for Home > Resume.
 let activeReaderSnapshot = null;
+// True only while an existing reader session is being restored. This prevents
+// renderReaderWithText() from persisting its temporary index 0 before the
+// saved cursor and viewport have been reapplied.
+let readerSessionRestoreInProgress = false;
 
 
 const APP_VIEW_STATE_KEY = 'markSetGoViewStateV1';
@@ -277,10 +281,15 @@ function captureReaderControls() {
 }
 
 function buildReaderSessionSnapshot() {
-  return readerEngine.snapshot({
+  const snapshot = readerEngine.snapshot({
     controls: captureReaderControls(),
     wasRunning: isReaderRunning()
   });
+  if (!snapshot) return null;
+  return {
+    ...snapshot,
+    documentId: snapshot.documentId || state.documentId || ''
+  };
 }
 
 function persistReaderSession({ immediate = false } = {}) {
@@ -2816,7 +2825,12 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   if (!snapshot?.title || !snapshot?.currentText) return false;
   const controls = snapshot.controls || {};
 
-  renderReaderWithText(snapshot.title, snapshot.currentText, snapshot.source || { type: 'restored' });
+  readerSessionRestoreInProgress = true;
+  try {
+    renderReaderWithText(snapshot.title, snapshot.currentText, snapshot.source || { type: 'restored' });
+  } finally {
+    readerSessionRestoreInProgress = false;
+  }
 
   state.originalText = snapshot.originalText || snapshot.currentText;
   state.currentText = snapshot.currentText;
@@ -3009,12 +3023,17 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
 
   activeReaderSnapshot = {
     ...snapshot,
+    documentId: snapshot.documentId || state.documentId || '',
     index: state.index,
     playbackIndex: state.index,
     viewportAnchorIndex: state.viewportAnchorIndex ?? state.index,
     wasRunning: Boolean(snapshot.wasRunning),
     controls: { ...(snapshot.controls || {}), ...(state.returnControls || {}) }
   };
+
+  // Persist only after the saved cursor has been restored. The temporary
+  // index 0 created by loadBook() must never become the durable checkpoint.
+  ReaderContinuity.commit(activeReaderSnapshot, { immediate: true });
   return true;
 }
 
@@ -3196,9 +3215,11 @@ function renderHome() {
       // A saved session can occasionally retain a stale top-of-document index
       // even though the matching progress record has a valid resume position.
       // Reconcile only that narrow case before the existing restore path runs.
+      const savedDocumentId = saved.documentId || documentIdFor(saved.title, saved.currentText);
+      saved = { ...saved, documentId: savedDocumentId };
       const savedSessionIndex = Math.max(0, Number(saved.playbackIndex ?? saved.index) || 0);
-      const progressRecord = saved.documentId
-        ? readStoredObject(READING_PROGRESS_KEY)[saved.documentId]
+      const progressRecord = savedDocumentId
+        ? readStoredObject(READING_PROGRESS_KEY)[savedDocumentId]
         : null;
       const progressLastWord = Math.max(0, Number(progressRecord?.lastWord) || 0);
 
@@ -7405,26 +7426,29 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     control.addEventListener('change', () => persistReaderSession());
     control.addEventListener('input', () => persistReaderSession());
   });
-  // Bible chapters/books are typically small enough to save immediately, and
-  // doing so guarantees Resume Last Reading points at the passage just opened.
-  // This document is now the explicit current reader for the top Reader button.
-  activeReaderSnapshot = buildReaderSessionSnapshot() || {
-    title: state.title,
-    currentText: state.currentText,
-    originalText: state.originalText,
-    source: state.source,
-    language: state.language,
-    index: state.index,
-    playbackIndex: state.index,
-    viewportAnchorIndex: state.viewportAnchorIndex ?? state.index,
-    wasRunning: false,
-    controls: captureReaderControls()
-  };
+  // This document becomes the explicit current reader only when it is being
+  // opened as a new reading. During session restoration, loadBook() temporarily
+  // sets index 0; persisting here would overwrite the valid saved checkpoint.
+  if (!readerSessionRestoreInProgress) {
+    activeReaderSnapshot = buildReaderSessionSnapshot() || {
+      title: state.title,
+      currentText: state.currentText,
+      originalText: state.originalText,
+      source: state.source,
+      language: state.language,
+      documentId: state.documentId || '',
+      index: state.index,
+      playbackIndex: state.index,
+      viewportAnchorIndex: state.viewportAnchorIndex ?? state.index,
+      wasRunning: false,
+      controls: captureReaderControls()
+    };
 
-  if (source?.type === 'bible' || source?.type === 'bible-book') {
-    persistReaderSession({ immediate: true });
-  } else {
-    persistReaderSession();
+    if (source?.type === 'bible' || source?.type === 'bible-book') {
+      persistReaderSession({ immediate: true });
+    } else {
+      persistReaderSession();
+    }
   }
 }
 
