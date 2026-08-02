@@ -1,8 +1,8 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.7.13",
+  "version": "7.7.15",
   "private": true,
-  "description": "Mark, Set, Go! cloud-first authenticated account API foundation with PostgreSQL-backed preferences, library, and independent reader progress positions.",
+  "description": "Mark, Set, Go! cloud-first account preferences UI integration with PostgreSQL-backed defaults and protected reader architecture.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

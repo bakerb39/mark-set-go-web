@@ -5080,7 +5080,14 @@ function jumpToWordIndex(wordIndex) {
     const reader = app.querySelector('#reader');
     if (!reader) return;
     if (!['flash', 'digital-sign'].includes(mode)) {
-      ensureWordsRendered(reader, mode, groupSize, index + 100);
+      const distantTocJump = !state.bookPages
+        && (index < Number(state.renderedWordStart || 0)
+          || index > Number(state.renderedWordEnd || 0) + 1600);
+      if (distantTocJump) {
+        virtualRenderer.renderWindowAround(reader, mode, groupSize, index);
+      } else {
+        ensureWordsRendered(reader, mode, groupSize, index + 100);
+      }
       const target = reader.querySelector(`.reader-word[data-index="${index}"]`)
         || reader.querySelector(`.reader-group[data-start-index="${index}"]`);
       if (target) {
