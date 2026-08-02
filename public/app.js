@@ -4380,6 +4380,24 @@ function collectEmailNotes() {
   }).slice(0,200);
 }
 
+
+function collectNotebookEmailNotes() {
+  const seen = new Set();
+  return getMarkRecords(MARK_INSIGHTS_KEY).map((item) => ({
+    id: item.id,
+    title: item.title || 'Notebook entry',
+    body: notebookRecordFullText(item),
+    context: item.chapter || item.pageContext || 'Mark Notebook',
+    type: item.recordType || 'notebook-entry',
+    updatedAt: item.updatedAt || item.createdAt
+  })).filter((item) => {
+    const body = String(item.body || '').trim();
+    if (!body || seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  }).slice(0, 200);
+}
+
 function notesForCurrentDocument() {
   return getNotes().filter((item) => item.documentId === state.documentId);
 }
@@ -6503,6 +6521,28 @@ function exportNotebookRecords(records,label='Mark Notebook') {
   downloadTextFile(`${safeNotebookFilename(label)}.txt`,`${header}${body}\n`);
 }
 
+async function emailNotebookRecords(records,label='Mark Notebook') {
+  if(!records?.length) return window.alert('There are no notebook entries to email.');
+  const prefs=readEmailPreferences();
+  if(!prefs.email) return window.alert('Add and save your email address in Action Center first.');
+  if(!prefs.notes) return window.alert('Enable “Email my saved notes and reading digest” in Action Center first.');
+  const notes=records.map((item)=>({
+    id:item.id,
+    title:item.title||'Notebook entry',
+    body:notebookRecordFullText(item),
+    context:item.chapter||item.pageContext||label,
+    type:item.recordType||'notebook-entry',
+    updatedAt:item.updatedAt||item.createdAt
+  })).filter((item)=>String(item.body||'').trim());
+  if(!notes.length) return window.alert('There are no notebook contents to email.');
+  try {
+    const result=await emailApi('/api/email/send-notes',{clientId:emailClientId(),notes});
+    window.alert(`${result.count} notebook ${result.count===1?'entry was':'entries were'} emailed to ${prefs.email}.`);
+  } catch(error) {
+    window.alert(error.message);
+  }
+}
+
 function notebookEntryMarkup(item) {
   const response=item.result?.response||'';
   return `<article class="mark-record expanded-notebook-record">
@@ -6547,9 +6587,13 @@ function renderNotebookCollection(panel,records,{title='Ask Mark Notebook',inclu
   if(!panel)return;
   panel.innerHTML=`<div class="mark-list-heading notebook-list-heading">
     <div><strong>${escapeHtml(title)}</strong><small>${records.length} saved ${records.length===1?'entry':'entries'}</small></div>
-    ${includeExport?'<button type="button" data-export-notebook-all>Save notebook as text</button>':''}
+    <div class="notebook-heading-actions">
+      <button type="button" data-email-notebook-all>Email notes</button>
+      ${includeExport?'<button type="button" data-export-notebook-all>Save as text</button>':''}
+    </div>
   </div>
   ${records.length?records.map(notebookEntryMarkup).join(''):'<p class="mark-empty-note">Capture a passage, a response from Ask Mark, or one of your own thoughts to begin the notebook.</p>'}`;
+  panel.querySelector('[data-email-notebook-all]')?.addEventListener('click',()=>emailNotebookRecords(records,title));
   panel.querySelector('[data-export-notebook-all]')?.addEventListener('click',()=>exportNotebookRecords(records,title));
   bindExpandedNotebookButtons(panel,records);
 }
@@ -12508,9 +12552,9 @@ function renderActionCenter() {
         <label class="toggle-setting"><input id="action-email-notes" type="checkbox"> <span>Email my saved notes and reading digest</span></label>
         <label>Notes frequency<select id="action-email-notes-frequency"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
       </div>
-      <div class="action-email-buttons"><button class="primary" type="button" id="save-action-email">Save email preferences</button><button class="secondary" type="button" id="send-action-notes">Email my notes now</button><button class="secondary" type="button" id="send-newsletter-preview">Send newsletter preview</button></div>
+      <div class="action-email-buttons"><button class="primary" type="button" id="save-action-email">Save email preferences</button><button class="secondary" type="button" id="send-action-notes">Email all notes</button><button class="secondary" type="button" id="send-action-notebook">Email Mark’s Notebook</button><button class="secondary" type="button" id="send-newsletter-preview">Send newsletter preview</button></div>
       <p class="status" id="action-email-status"></p>
-      <p class="fine-print">Newsletter, reminders, and notes are separate subscriptions. “Email my notes now” includes reader notes and Mark’s Notebook. The newsletter preview verifies delivery; recurring newsletter editions still require published content.</p>
+      <p class="fine-print">Newsletter, reminders, and notes are separate subscriptions. “Email all notes” includes reader notes and Mark’s Notebook. “Email Mark’s Notebook” sends notebook entries only. The newsletter preview verifies delivery; recurring newsletter editions still require published content.</p>
     </section>
 
     <div class="action-center-layout">
@@ -12633,6 +12677,7 @@ function renderActionCenter() {
   app.querySelector('#save-action-email')?.addEventListener('click',async()=>{const prefs=currentEmailForm();emailStatus.textContent='Saving email preferences…';try{const result=await emailApi('/api/email/preferences',{clientId:emailClientId(),...prefs,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone});writeEmailPreferences(prefs);await syncEmailActions();const noteCount=await syncEmailNotes();emailStatus.textContent=result.configured?`Email preferences saved.${prefs.notes?` ${noteCount} note${noteCount===1?'':'s'} synced.`:''}`:'Preferences saved, but outgoing email is not configured on the server yet.';}catch(error){emailStatus.textContent=error.message;emailStatus.classList.add('error');}});
   app.querySelector('#test-action-email')?.addEventListener('click',async()=>{emailStatus.textContent='Sending test email…';try{await emailApi('/api/email/test',{clientId:emailClientId()});emailStatus.textContent='Test email sent. Check your inbox and spam folder.';}catch(error){emailStatus.textContent=error.message;emailStatus.classList.add('error');}});
   app.querySelector('#send-action-notes')?.addEventListener('click',async()=>{const notes=collectEmailNotes();emailStatus.textContent=`Preparing ${notes.length} note${notes.length===1?'':'s'}…`;try{const result=await emailApi('/api/email/send-notes',{clientId:emailClientId(),notes});emailStatus.textContent=`${result.count} note${result.count===1?' was':'s were'} emailed.`;}catch(error){emailStatus.textContent=error.message;emailStatus.classList.add('error');}});
+  app.querySelector('#send-action-notebook')?.addEventListener('click',async()=>{const notes=collectNotebookEmailNotes();emailStatus.textContent=`Preparing ${notes.length} notebook entr${notes.length===1?'y':'ies'}…`;try{const result=await emailApi('/api/email/send-notes',{clientId:emailClientId(),notes});emailStatus.textContent=`${result.count} notebook entr${result.count===1?'y was':'ies were'} emailed.`;}catch(error){emailStatus.textContent=error.message;emailStatus.classList.add('error');}});
   app.querySelector('#send-newsletter-preview')?.addEventListener('click',async()=>{emailStatus.textContent='Sending newsletter preview…';try{await emailApi('/api/email/newsletter-preview',{clientId:emailClientId()});emailStatus.textContent='Newsletter preview sent. Check your inbox.';}catch(error){emailStatus.textContent=error.message;emailStatus.classList.add('error');}});
 
 

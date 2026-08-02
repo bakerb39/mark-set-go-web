@@ -8569,3 +8569,9 @@ body.light .comprehension-actions,
   .action-notification-grid,.action-email-grid{grid-template-columns:1fr !important}
   .action-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important}
 }
+
+
+/* v7.6.5 — notebook email actions */
+.notebook-heading-actions{display:flex;align-items:center;justify-content:flex-end;gap:.35rem;flex-wrap:wrap}
+.notebook-heading-actions button{min-height:30px;padding:.35rem .58rem;font-size:.74rem}
+@media (max-width:640px){.notebook-list-heading{align-items:flex-start}.notebook-heading-actions{width:100%;justify-content:flex-start}}
