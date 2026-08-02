@@ -7138,6 +7138,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         const group = findReadingGroup(clickedIndex);
         stopReader();
         state.index = group?.start ?? clickedIndex;
+        // A deliberate word click becomes the authoritative resume point.
+        // Save it before playback/setup work can reuse an older rendered anchor.
+        persistReaderSession({ immediate: true });
         updateReaderStatus(`Reading position moved to word ${(state.index + 1).toLocaleString()}.`);
         startReader();
         if (!wasRunning) window.setTimeout(pauseReader, 0);
@@ -9191,6 +9194,14 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 function startReader() {
   const selectedMode = getSelectedMode();
   if (selectedMode === 'two-column') return;
+
+  // Resume must continue from the live logical position, including a position
+  // selected by clicking within the document. Capture it before stop/setup
+  // work and restore it after any view preparation below.
+  const requestedResumeIndex = Math.max(
+    0,
+    Math.min(Math.max(0, state.words.length - 1), Number(state.index) || 0)
+  );
   const currentTickerStage = app.querySelector('.digital-sign-stage');
   const canResumeTicker = selectedMode === 'digital-sign'
     && state.tickerPaused
@@ -9225,6 +9236,10 @@ function startReader() {
       || state.renderedMeaningfulChunks !== expectedMeaningful) {
     prepareReaderView(mode, count);
   }
+
+  // View preparation may rebuild DOM groups, but it must never replace the
+  // current resume point with an older visible/rendered anchor.
+  state.index = requestedResumeIndex;
 
   if (mode === 'digital-sign') {
     startDigitalSignReader({ reader, speed, start, pause });
