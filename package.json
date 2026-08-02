@@ -1,8 +1,8 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.7.3",
+  "version": "7.6.9",
   "private": true,
-  "description": "Reading accelerator with Clerk authentication and PostgreSQL account foundation.",
+  "description": "Reading accelerator with a PostgreSQL-ready account data foundation, email reminders, newsletters, and reading-note delivery.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -16,7 +16,6 @@
     "cheerio": "^1.0.0",
     "express": "^4.21.2",
     "adm-zip": "^0.5.16",
-    "pg": "^8.16.3",
-    "@clerk/express": "^2.1.47"
+    "pg": "^8.16.3"
   }
 }
