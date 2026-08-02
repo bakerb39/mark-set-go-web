@@ -8514,7 +8514,14 @@ function bindDictionaryMenu(reader) {
   document.addEventListener('click', closeDictionaryMenu);
   window.addEventListener('blur', closeDictionaryMenu);
   reader.addEventListener('scroll', closeDictionaryMenu, { passive: true });
-  reader.addEventListener('scroll', () => ReaderContinuity.scheduleCheckpoint(), { passive: true });
+  reader.addEventListener('scroll', () => {
+    // Timed reading scrolls the viewer programmatically. Serializing the full
+    // book after those scrolls can block the main thread, especially in
+    // fullscreen, and produces a stop-start cadence. Navigation still captures
+    // the current position synchronously; only manual/paused scrolling needs a
+    // delayed checkpoint here.
+    if (!isReaderRunning()) ReaderContinuity.scheduleCheckpoint();
+  }, { passive: true });
   reader.addEventListener('pointerup', () => ReaderContinuity.scheduleCheckpoint());
   reader.addEventListener('keyup', () => ReaderContinuity.scheduleCheckpoint());
 }
@@ -8813,7 +8820,11 @@ function captureReaderLocation() {
 
   if (mode === 'two-column') {
     anchorIndex = reader ? visibleReadingAnchor(reader, currentReadingPosition()) : currentReadingPosition();
-  } else if (reader && !wasRunning && !engineOnlyModes.has(mode)) {
+  } else if (reader && !engineOnlyModes.has(mode)) {
+    // In document-style modes, the visible text is the user's true location
+    // whether playback is paused or running. Using only the timer index while
+    // running caused a manual scroll followed by navigation to restore an older
+    // position near the top of the reader.
     anchorIndex = visibleReadingAnchor(reader, state.index);
   } else {
     anchorIndex = Number(state.index);
