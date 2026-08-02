@@ -7,6 +7,7 @@ const net = require('node:net');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const AdmZip = require('adm-zip');
+const { checkDatabase, databaseConfigured, closeDatabase } = require('./db');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -67,6 +68,15 @@ async function fetchFeedItems(source) {
 
 app.disable('x-powered-by');
 app.use(express.json({ limit: '150kb' }));
+
+app.get('/api/health', async (_req, res) => {
+  try {
+    const database = await checkDatabase();
+    res.json({ ok: true, version: '7.6.9', database });
+  } catch (error) {
+    res.status(503).json({ ok: false, version: '7.6.9', database: { configured: databaseConfigured(), connected: false, error: error.message } });
+  }
+});
 
 
 
@@ -2543,4 +2553,14 @@ app.get('/api/library/read', async (req, res) => {
 });
 
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-app.listen(PORT, () => console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`));
+const server = app.listen(PORT, () => console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`));
+
+async function shutdown(signal) {
+  console.log(`${signal} received; shutting down.`);
+  server.close(async () => {
+    await closeDatabase().catch((error) => console.error('Database shutdown error:', error.message));
+    process.exit(0);
+  });
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

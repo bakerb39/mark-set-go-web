@@ -1,12 +1,13 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.5.3",
+  "version": "7.6.9",
   "private": true,
-  "description": "Reading accelerator with Action Center, browser and configurable email reminders, newsletters, and reading-note delivery.",
+  "description": "Reading accelerator with a PostgreSQL-ready account data foundation, email reminders, newsletters, and reading-note delivery.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "db:migrate": "node scripts/migrate.js"
   },
   "engines": {
     "node": ">=20"
@@ -14,6 +15,7 @@
   "dependencies": {
     "cheerio": "^1.0.0",
     "express": "^4.21.2",
-    "adm-zip": "^0.5.16"
+    "adm-zip": "^0.5.16",
+    "pg": "^8.16.3"
   }
 }
