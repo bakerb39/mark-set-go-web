@@ -1,8 +1,8 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.7.12",
+  "version": "7.7.15",
   "private": true,
-  "description": "Mark, Set, Go! with separated Pointing Guide playback cursor and viewport anchor, Clerk authentication, private beta access, and PostgreSQL foundation.",
+  "description": "Mark, Set, Go! database-backed account state migration with PostgreSQL persistence and protected reader architecture.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

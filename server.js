@@ -7,7 +7,7 @@ const net = require('node:net');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const AdmZip = require('adm-zip');
-const { checkDatabase, databaseConfigured, closeDatabase, query } = require('./db');
+const { pool, checkDatabase, databaseConfigured, closeDatabase, query } = require('./db');
 
 const CLERK_PUBLISHABLE_KEY = String(process.env.CLERK_PUBLISHABLE_KEY || '').trim();
 const CLERK_SECRET_KEY = String(process.env.CLERK_SECRET_KEY || '').trim();
@@ -80,7 +80,7 @@ async function fetchFeedItems(source) {
 
 
 app.disable('x-powered-by');
-app.use(express.json({ limit: '150kb' }));
+app.use(express.json({ limit: '6mb' }));
 if (clerkConfigured) app.use(clerkMiddleware());
 
 
@@ -163,9 +163,9 @@ app.get('/api/account', async (req, res) => {
 app.get('/api/health', async (_req, res) => {
   try {
     const database = await checkDatabase();
-    res.json({ ok: true, version: '7.7.3', database, betaAccessEnabled: BETA_ACCESS_ENABLED });
+    res.json({ ok: true, version: '7.7.13', database, betaAccessEnabled: BETA_ACCESS_ENABLED });
   } catch (error) {
-    res.status(503).json({ ok: false, version: '7.7.3', database: { configured: databaseConfigured(), connected: false, error: error.message }, betaAccessEnabled: BETA_ACCESS_ENABLED });
+    res.status(503).json({ ok: false, version: '7.7.13', database: { configured: databaseConfigured(), connected: false, error: error.message }, betaAccessEnabled: BETA_ACCESS_ENABLED });
   }
 });
 
@@ -187,6 +187,322 @@ app.use('/api', async (req, res, next) => {
   } catch (error) {
     console.error('Beta access check failed:', error);
     res.status(500).json({ error: 'Unable to verify beta access.' });
+  }
+});
+
+
+/* Cloud-first account data v7.7.13 ---------------------------------------
+   PostgreSQL is the persistent source of truth for authenticated users.
+   The protected reader runtime is not modified here. Playback cursor and
+   viewport anchor are persisted as independent values.
+*/
+function clampInteger(value, minimum = 0, maximum = 2147483647) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return minimum;
+  return Math.min(maximum, Math.max(minimum, parsed));
+}
+
+function cleanText(value, maximum = 500) {
+  return String(value ?? '').trim().slice(0, maximum);
+}
+
+function cleanJsonObject(value, maximumBytes = 50000) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const serialized = JSON.stringify(value);
+  if (Buffer.byteLength(serialized, 'utf8') > maximumBytes) throw new Error('JSON payload is too large.');
+  return value;
+}
+
+async function requireAccountUser(req, res) {
+  if (!clerkConfigured) {
+    res.status(503).json({ error: 'Authentication is not configured.' });
+    return null;
+  }
+  if (!databaseConfigured()) {
+    res.status(503).json({ error: 'The account database is not configured.' });
+    return null;
+  }
+  const auth = getAuth(req);
+  if (!auth?.isAuthenticated || !auth.userId) {
+    res.status(401).json({ error: 'Sign in is required.' });
+    return null;
+  }
+  const result = await query(
+    'select id, email, display_name, plan_code, status from app_users where auth_subject = $1',
+    [auth.userId]
+  );
+  if (!result.rows[0]) {
+    res.status(409).json({ error: 'Account session must be initialized before account data can be used.' });
+    return null;
+  }
+  return result.rows[0];
+}
+
+app.get('/api/account/bootstrap', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const [preferencesResult, booksResult, appStateResult] = await Promise.all([
+      query('select preferences, updated_at from user_preferences where user_id = $1', [user.id]),
+      query(`
+        select b.id, b.client_record_id, b.title, b.author, b.source_type, b.source_id,
+               b.source_url, b.cover_url, b.metadata, b.added_at, b.updated_at,
+               p.mode, p.playback_index, p.viewport_anchor_index, p.viewport_offset_px,
+               p.word_index, p.scroll_ratio, p.page_number, p.position_data,
+               p.updated_at as progress_updated_at
+        from library_books b
+        left join reading_positions p on p.user_id = b.user_id and p.book_id = b.id
+        where b.user_id = $1
+        order by coalesce(p.updated_at, b.updated_at) desc
+      `, [user.id]),
+      query('select state_key, state_value, updated_at from user_app_state where user_id = $1 order by state_key', [user.id])
+    ]);
+    res.json({
+      account: { id: user.id, email: user.email, displayName: user.display_name, planCode: user.plan_code },
+      preferences: preferencesResult.rows[0]?.preferences || {},
+      preferencesUpdatedAt: preferencesResult.rows[0]?.updated_at || null,
+      library: booksResult.rows,
+      appState: Object.fromEntries(appStateResult.rows.map((row) => [row.state_key, row.state_value])),
+      appStateUpdatedAt: appStateResult.rows.reduce((latest, row) => !latest || row.updated_at > latest ? row.updated_at : latest, null)
+    });
+  } catch (error) {
+    console.error('Account bootstrap failed:', error);
+    res.status(500).json({ error: 'Unable to load account data.' });
+  }
+});
+
+
+app.get('/api/account/state', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query(
+      'select state_key, state_value, updated_at from user_app_state where user_id = $1 order by state_key',
+      [user.id]
+    );
+    res.json({
+      state: Object.fromEntries(result.rows.map((row) => [row.state_key, row.state_value])),
+      updatedAt: result.rows.reduce((latest, row) => !latest || row.updated_at > latest ? row.updated_at : latest, null)
+    });
+  } catch (error) {
+    console.error('Account state load failed:', error);
+    res.status(500).json({ error: 'Unable to load account state.' });
+  }
+});
+
+app.put('/api/account/state', async (req, res) => {
+  const client = await pool?.connect().catch(() => null);
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    if (!client) return res.status(503).json({ error: 'The account database is unavailable.' });
+    const entries = req.body?.entries;
+    if (!entries || typeof entries !== 'object' || Array.isArray(entries)) {
+      return res.status(400).json({ error: 'State entries must be an object.' });
+    }
+    const pairs = Object.entries(entries);
+    if (pairs.length > 500) return res.status(413).json({ error: 'Too many state entries.' });
+    await client.query('begin');
+    for (const [rawKey, rawValue] of pairs) {
+      const key = cleanText(rawKey, 500);
+      if (!key) continue;
+      const value = String(rawValue ?? '');
+      if (Buffer.byteLength(value, 'utf8') > 5242880) throw new Error(`State value is too large: ${key}`);
+      await client.query(`
+        insert into user_app_state (user_id, state_key, state_value, created_at, updated_at)
+        values ($1, $2, $3, now(), now())
+        on conflict (user_id, state_key) do update set state_value = excluded.state_value, updated_at = now()
+      `, [user.id, key, value]);
+    }
+    await client.query('commit');
+    res.json({ saved: true, keys: pairs.map(([key]) => key), updatedAt: new Date().toISOString() });
+  } catch (error) {
+    if (client) await client.query('rollback').catch(() => {});
+    const status = /too large|too many/i.test(error.message) ? 413 : 500;
+    console.error('Account state save failed:', error);
+    res.status(status).json({ error: status === 413 ? error.message : 'Unable to save account state.' });
+  } finally {
+    client?.release();
+  }
+});
+
+app.delete('/api/account/state/:stateKey', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const key = cleanText(req.params.stateKey, 500);
+    await query('delete from user_app_state where user_id = $1 and state_key = $2', [user.id, key]);
+    res.json({ deleted: true, key });
+  } catch (error) {
+    console.error('Account state delete failed:', error);
+    res.status(500).json({ error: 'Unable to delete account state.' });
+  }
+});
+
+app.get('/api/account/preferences', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query('select preferences, updated_at from user_preferences where user_id = $1', [user.id]);
+    res.json({ preferences: result.rows[0]?.preferences || {}, updatedAt: result.rows[0]?.updated_at || null });
+  } catch (error) {
+    console.error('Preference load failed:', error);
+    res.status(500).json({ error: 'Unable to load preferences.' });
+  }
+});
+
+app.put('/api/account/preferences', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const preferences = cleanJsonObject(req.body?.preferences, 75000);
+    const result = await query(`
+      insert into user_preferences (user_id, preferences, created_at, updated_at)
+      values ($1, $2::jsonb, now(), now())
+      on conflict (user_id) do update set preferences = excluded.preferences, updated_at = now()
+      returning preferences, updated_at
+    `, [user.id, JSON.stringify(preferences)]);
+    res.json({ preferences: result.rows[0].preferences, updatedAt: result.rows[0].updated_at });
+  } catch (error) {
+    const status = /too large/i.test(error.message) ? 413 : 500;
+    console.error('Preference save failed:', error);
+    res.status(status).json({ error: status === 413 ? error.message : 'Unable to save preferences.' });
+  }
+});
+
+app.get('/api/account/library', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query(`
+      select b.id, b.client_record_id, b.title, b.author, b.source_type, b.source_id,
+             b.source_url, b.cover_url, b.metadata, b.added_at, b.updated_at,
+             p.mode, p.playback_index, p.viewport_anchor_index, p.viewport_offset_px,
+             p.word_index, p.scroll_ratio, p.page_number, p.position_data,
+             p.updated_at as progress_updated_at
+      from library_books b
+      left join reading_positions p on p.user_id = b.user_id and p.book_id = b.id
+      where b.user_id = $1
+      order by coalesce(p.updated_at, b.updated_at) desc
+    `, [user.id]);
+    res.json({ books: result.rows });
+  } catch (error) {
+    console.error('Library load failed:', error);
+    res.status(500).json({ error: 'Unable to load the library.' });
+  }
+});
+
+app.post('/api/account/library', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const title = cleanText(req.body?.title, 500);
+    if (!title) return res.status(400).json({ error: 'A book title is required.' });
+    const clientRecordId = cleanText(req.body?.clientRecordId, 200) || null;
+    const metadata = cleanJsonObject(req.body?.metadata, 100000);
+    const result = await query(`
+      insert into library_books
+        (user_id, client_record_id, title, author, source_type, source_id, source_url, cover_url, metadata, added_at, updated_at)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, now(), now())
+      on conflict (user_id, client_record_id) do update set
+        title = excluded.title,
+        author = excluded.author,
+        source_type = excluded.source_type,
+        source_id = excluded.source_id,
+        source_url = excluded.source_url,
+        cover_url = excluded.cover_url,
+        metadata = excluded.metadata,
+        updated_at = now()
+      returning *
+    `, [
+      user.id, clientRecordId, title, cleanText(req.body?.author, 300) || null,
+      cleanText(req.body?.sourceType, 80) || null, cleanText(req.body?.sourceId, 300) || null,
+      cleanText(req.body?.sourceUrl, 2000) || null, cleanText(req.body?.coverUrl, 2000) || null,
+      JSON.stringify(metadata)
+    ]);
+    res.status(201).json({ book: result.rows[0] });
+  } catch (error) {
+    const status = /too large/i.test(error.message) ? 413 : 500;
+    console.error('Library save failed:', error);
+    res.status(status).json({ error: status === 413 ? error.message : 'Unable to save the book.' });
+  }
+});
+
+app.delete('/api/account/library/:bookId', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query('delete from library_books where id = $1 and user_id = $2 returning id', [req.params.bookId, user.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Book not found.' });
+    res.json({ deleted: true, bookId: result.rows[0].id });
+  } catch (error) {
+    console.error('Library delete failed:', error);
+    res.status(500).json({ error: 'Unable to delete the book.' });
+  }
+});
+
+app.get('/api/account/library/:bookId/progress', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query(`
+      select mode, playback_index, viewport_anchor_index, viewport_offset_px,
+             word_index, scroll_ratio, page_number, position_data, updated_at
+      from reading_positions where user_id = $1 and book_id = $2
+    `, [user.id, req.params.bookId]);
+    res.json({ progress: result.rows[0] || null });
+  } catch (error) {
+    console.error('Reading progress load failed:', error);
+    res.status(500).json({ error: 'Unable to load reading progress.' });
+  }
+});
+
+app.put('/api/account/library/:bookId/progress', async (req, res) => {
+  const client = await pool?.connect().catch(() => null);
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    if (!client) return res.status(503).json({ error: 'The account database is unavailable.' });
+    const bookCheck = await client.query('select id from library_books where id = $1 and user_id = $2', [req.params.bookId, user.id]);
+    if (!bookCheck.rows[0]) return res.status(404).json({ error: 'Book not found.' });
+
+    const playbackIndex = clampInteger(req.body?.playbackIndex ?? req.body?.wordIndex);
+    const viewportAnchorIndex = clampInteger(req.body?.viewportAnchorIndex ?? playbackIndex);
+    const viewportOffsetPx = clampInteger(req.body?.viewportOffsetPx, -100000, 100000);
+    const positionData = cleanJsonObject(req.body?.positionData, 75000);
+    const scrollRatioRaw = Number(req.body?.scrollRatio);
+    const scrollRatio = Number.isFinite(scrollRatioRaw) ? Math.max(0, Math.min(1, scrollRatioRaw)) : 0;
+    const pageNumber = req.body?.pageNumber == null ? null : clampInteger(req.body.pageNumber, 1);
+
+    const result = await client.query(`
+      insert into reading_positions
+        (user_id, book_id, mode, word_index, playback_index, viewport_anchor_index,
+         viewport_offset_px, scroll_ratio, page_number, position_data, updated_at)
+      values ($1, $2, $3, $4, $4, $5, $6, $7, $8, $9::jsonb, now())
+      on conflict (user_id, book_id) do update set
+        mode = excluded.mode,
+        word_index = excluded.word_index,
+        playback_index = excluded.playback_index,
+        viewport_anchor_index = excluded.viewport_anchor_index,
+        viewport_offset_px = excluded.viewport_offset_px,
+        scroll_ratio = excluded.scroll_ratio,
+        page_number = excluded.page_number,
+        position_data = excluded.position_data,
+        updated_at = now()
+      returning mode, playback_index, viewport_anchor_index, viewport_offset_px,
+                word_index, scroll_ratio, page_number, position_data, updated_at
+    `, [
+      user.id, req.params.bookId, cleanText(req.body?.mode, 80) || null,
+      playbackIndex, viewportAnchorIndex, viewportOffsetPx, scrollRatio, pageNumber,
+      JSON.stringify(positionData)
+    ]);
+    res.json({ progress: result.rows[0] });
+  } catch (error) {
+    const status = /too large/i.test(error.message) ? 413 : 500;
+    console.error('Reading progress save failed:', error);
+    res.status(status).json({ error: status === 413 ? error.message : 'Unable to save reading progress.' });
+  } finally {
+    client?.release();
   }
 });
 
