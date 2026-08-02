@@ -55,6 +55,20 @@ const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
 // this browser/app session. Persistent IndexedDB is reserved for Home > Resume.
 let activeReaderSnapshot = null;
 
+function clearActiveReaderPane() {
+  stopReader();
+  activeReaderSnapshot = null;
+  try { readerEngine.reset?.(); } catch {}
+  state.title = '';
+  state.currentText = '';
+  state.originalText = '';
+  state.words = [];
+  state.index = 0;
+  state.viewportAnchorIndex = 0;
+  state.documentId = '';
+  state.source = null;
+}
+
 
 const APP_VIEW_STATE_KEY = 'markSetGoViewStateV1';
 
@@ -3132,21 +3146,20 @@ function renderHome() {
               <span><strong>WPM Test</strong><small>Measure your natural reading speed</small></span>
             </button>
 
-            <button class="secondary home-large-action" id="resume-last-reading" type="button">
+            ${resumeMeta?.title ? `<button class="secondary home-large-action home-continue-reading" id="resume-last-reading" type="button">
               <span aria-hidden="true">↩</span>
-              <span><strong>Resume Last Reading</strong><small>${resumeMeta?.title ? escapeHtml(resumeMeta.title) : 'No saved reading yet'}</small></span>
-            </button>
+              <span>
+                <strong>Continue Reading</strong>
+                <small>${escapeHtml(resumeMeta.title)}${resumePercent === null ? '' : ` · ${resumePercent}% complete`}</small>
+                ${resumePercent === null ? '' : `<span class="progress-meter" aria-hidden="true"><span style="width:${resumePercent}%"></span></span>`}
+              </span>
+            </button>` : `<button class="secondary home-large-action" id="resume-last-reading" type="button" disabled>
+              <span aria-hidden="true">↩</span>
+              <span><strong>Continue Reading</strong><small>No saved reading yet</small></span>
+            </button>`}
           </div>
 
-          ${resumeMeta?.title ? `<article class="resume-reading-card home-simple-resume">
-            <div>
-              <span class="resume-reading-kicker">Last reading</span>
-              <strong>${escapeHtml(resumeMeta.title)}</strong>
-              <small>${resumePercent === null ? 'Saved reading position' : `${resumePercent}% complete`} · opens only when you choose Resume</small>
-            </div>
-            ${resumePercent === null ? '' : `<div class="progress-meter"><span style="width:${resumePercent}%"></span></div>`}
-          </article>
-          <button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Forget Saved Reading</button>` : ''}
+          ${resumeMeta?.title ? `<button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Clear Resume Position</button>` : ''}
         </section>
       </div>
 
@@ -3196,7 +3209,7 @@ function renderHome() {
   });
   app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
     await clearReaderSession();
-    activeReaderSnapshot = null;
+    clearActiveReaderPane();
     renderHome();
   });
 
