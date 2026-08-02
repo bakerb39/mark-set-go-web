@@ -9327,6 +9327,11 @@ function startReader() {
         const stepStart = startIndex;
         const stepEnd = nextIndex;
         window.requestAnimationFrame(() => {
+          // Ignore a frame queued by an older playback run. A click-to-seek,
+          // pause, mode change, or restart invalidates the previous run token.
+          // Without this guard, the stale frame could move the guide back to
+          // its former word immediately after the user deliberately relocated it.
+          if (token !== state.runToken) return;
           // Re-read the element positions after any automatic scroll so the
           // hand lands beneath the visible words rather than their old screen
           // coordinates.
