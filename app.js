@@ -3330,14 +3330,44 @@ function bindAppearance(reader) {
   };
   bookPages?.addEventListener('change', () => {
     const snapshot = captureReaderLocation();
+    const anchorIndex = Math.max(0, Number(snapshot?.anchorIndex) || 0);
+    const wasRunning = Boolean(snapshot?.wasRunning);
+
+    // Book Pages owns this transition. Preserve the canonical word before any
+    // column geometry, resize observer, or control-placement work can run.
     stopReader();
+    state.index = anchorIndex;
+    pendingBookPageAnchorIndex = anchorIndex;
+
     applyBookPages();
     const mode = getSelectedMode();
     const count = Number(app.querySelector('#word-count')?.value) || 1;
-    state.index = snapshot.anchorIndex;
+    state.index = anchorIndex;
     prepareReaderView(mode, count);
     updateModeControls(mode);
-    restoreCapturedReaderLocation(snapshot, { rerendered: true });
+
+    if (!state.bookPages) {
+      restoreCapturedReaderLocation({ ...snapshot, anchorIndex, wasRunning }, { rerendered: true });
+      return;
+    }
+
+    // Do not use the generic control restore for Book Pages. It can race the
+    // page-layout observer and briefly restore the old spread. Recalculate the
+    // spread directly from the preserved word after the new columns exist.
+    const restoreToken = (state.readerRestoreToken || 0) + 1;
+    state.readerRestoreToken = restoreToken;
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (restoreToken !== state.readerRestoreToken || !state.bookPages) return;
+      restoreBookPageWordAnchor(anchorIndex);
+      state.index = anchorIndex;
+      pendingBookPageAnchorIndex = null;
+      updateReaderStatus();
+      persistReaderSession();
+      if (wasRunning && mode !== 'two-column') {
+        state.index = anchorIndex;
+        startReader();
+      }
+    }));
   });
   applyBookPages();
 
@@ -12985,6 +13015,11 @@ document.addEventListener('click', (event) => {
 document.addEventListener('change', (event) => {
   const control = event.target.closest?.(ReaderContinuity.protectedControlSelector);
   if (!control || !app.querySelector('#reader')) return;
+
+  // The Book Pages checkbox has a dedicated, anchor-first transition above.
+  // Running the generic continuity restore as well creates two competing
+  // asynchronous restores and can send the reader back to the previous spread.
+  if (control.matches('#book-pages, #fs-book-pages')) return;
 
   const snapshot = ReaderContinuity.capture();
   if (!snapshot) return;

@@ -1,6 +1,6 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.7.5",
+  "version": "7.7.6",
   "private": true,
   "description": "Reading accelerator with Clerk authentication and PostgreSQL account foundation.",
   "main": "server.js",
