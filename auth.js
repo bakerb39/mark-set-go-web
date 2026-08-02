@@ -18,7 +18,7 @@
     }
   }
 
-  function loadScript(src) {
+  function loadScript(src, attributes = {}) {
     return new Promise((resolve, reject) => {
       const existing = document.querySelector(`script[src="${src}"]`);
       if (existing) {
@@ -29,6 +29,9 @@
       }
       const script = document.createElement('script');
       script.src = src;
+      Object.entries(attributes).forEach(([name, value]) => {
+        if (value != null && value !== '') script.setAttribute(name, String(value));
+      });
       script.async = true;
       script.crossOrigin = 'anonymous';
       script.addEventListener('load', () => { script.dataset.loaded = 'true'; resolve(); }, { once: true });
@@ -76,7 +79,10 @@
       const domain = deriveClerkDomain(state.config.publishableKey);
       if (!domain) throw new Error('The Clerk publishable key is invalid.');
       await loadScript(`https://${domain}/npm/@clerk/ui@1/dist/ui.browser.js`);
-      await loadScript(`https://${domain}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`);
+      await loadScript(
+        `https://${domain}/npm/@clerk/clerk-js@6/dist/clerk.browser.js`,
+        { 'data-clerk-publishable-key': state.config.publishableKey }
+      );
       if (!window.Clerk) throw new Error('Clerk did not initialize.');
 
       state.clerk = window.Clerk;

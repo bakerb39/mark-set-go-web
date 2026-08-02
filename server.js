@@ -151,9 +151,9 @@ app.get('/api/account', async (req, res) => {
 app.get('/api/health', async (_req, res) => {
   try {
     const database = await checkDatabase();
-    res.json({ ok: true, version: '7.7.0', database });
+    res.json({ ok: true, version: '7.7.1', database });
   } catch (error) {
-    res.status(503).json({ ok: false, version: '7.7.0', database: { configured: databaseConfigured(), connected: false, error: error.message } });
+    res.status(503).json({ ok: false, version: '7.7.1', database: { configured: databaseConfigured(), connected: false, error: error.message } });
   }
 });
 
