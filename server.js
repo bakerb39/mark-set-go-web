@@ -6,6 +6,7 @@ const dns = require('node:dns').promises;
 const net = require('node:net');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 const AdmZip = require('adm-zip');
 const { pool, checkDatabase, databaseConfigured, closeDatabase, query } = require('./db');
 
@@ -27,6 +28,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_TRANSLATION_CHARS = 120000;
 const MAX_GUTENBERG_BOOK_BYTES = 12 * 1024 * 1024;
+const MAX_ACCOUNT_DOCUMENT_BYTES = 5 * 1024 * 1024;
 const GUTENDEX_BASE = 'https://gutendex.com';
 const GUTENBERG_MIRROR_BASES = (process.env.GUTENBERG_MIRROR_BASES || process.env.GUTENBERG_MIRROR_BASE || 'https://gutenberg.pglaf.org,https://mirrors.xmission.com/gutenberg').split(',').map((value) => value.trim().replace(/\/+$/, '')).filter(Boolean);
 
@@ -308,9 +310,12 @@ app.get('/api/account/library', async (req, res) => {
              b.source_url, b.cover_url, b.metadata, b.added_at, b.updated_at,
              p.mode, p.playback_index, p.viewport_anchor_index, p.viewport_offset_px,
              p.word_index, p.scroll_ratio, p.page_number, p.position_data,
-             p.updated_at as progress_updated_at
+             p.updated_at as progress_updated_at,
+             (d.book_id is not null) as document_stored, d.raw_bytes as document_raw_bytes,
+             d.compressed_bytes as document_compressed_bytes, d.updated_at as document_updated_at
       from library_books b
       left join reading_positions p on p.user_id = b.user_id and p.book_id = b.id
+      left join account_documents d on d.user_id = b.user_id and d.book_id = b.id
       where b.user_id = $1
       order by coalesce(p.updated_at, b.updated_at) desc
     `, [user.id]);
@@ -367,6 +372,110 @@ app.delete('/api/account/library/:bookId', async (req, res) => {
   } catch (error) {
     console.error('Library delete failed:', error);
     res.status(500).json({ error: 'Unable to delete the book.' });
+  }
+});
+
+app.get('/api/account/library/:bookId/document/info', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query(`
+      select d.raw_bytes, d.compressed_bytes, d.content_sha256, d.updated_at
+      from account_documents d
+      join library_books b on b.id = d.book_id and b.user_id = d.user_id
+      where d.user_id = $1 and d.book_id = $2
+    `, [user.id, req.params.bookId]);
+    res.json({ document: result.rows[0] || null, maxRawBytes: MAX_ACCOUNT_DOCUMENT_BYTES });
+  } catch (error) {
+    console.error('Document info load failed:', error);
+    res.status(500).json({ error: 'Unable to load document storage information.' });
+  }
+});
+
+app.get('/api/account/library/:bookId/document', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query(`
+      select d.content_gzip, d.raw_bytes, d.compressed_bytes, d.content_sha256, d.updated_at,
+             b.title, b.author, b.source_type, b.source_id, b.source_url, b.metadata
+      from account_documents d
+      join library_books b on b.id = d.book_id and b.user_id = d.user_id
+      where d.user_id = $1 and d.book_id = $2
+    `, [user.id, req.params.bookId]);
+    const row = result.rows[0];
+    if (!row) return res.status(404).json({ error: 'Cloud document not found.' });
+    const text = zlib.gunzipSync(row.content_gzip).toString('utf8');
+    res.json({
+      document: {
+        text,
+        rawBytes: row.raw_bytes,
+        compressedBytes: row.compressed_bytes,
+        sha256: row.content_sha256,
+        updatedAt: row.updated_at,
+        title: row.title,
+        author: row.author,
+        source: {
+          type: row.source_type,
+          id: row.source_id,
+          url: row.source_url,
+          ...(row.metadata?.source || {})
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Document load failed:', error);
+    res.status(500).json({ error: 'Unable to load the cloud document.' });
+  }
+});
+
+app.put('/api/account/library/:bookId/document', express.text({ type: 'text/plain', limit: '6mb' }), async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const owned = await query('select id from library_books where id = $1 and user_id = $2', [req.params.bookId, user.id]);
+    if (!owned.rows[0]) return res.status(404).json({ error: 'Book not found.' });
+    const text = typeof req.body === 'string' ? req.body : '';
+    const raw = Buffer.from(text, 'utf8');
+    if (!raw.length) return res.status(400).json({ error: 'Document text is required.' });
+    if (raw.length > MAX_ACCOUNT_DOCUMENT_BYTES) {
+      return res.status(413).json({
+        error: `This document is too large for database storage (${raw.length.toLocaleString()} bytes). The current limit is ${MAX_ACCOUNT_DOCUMENT_BYTES.toLocaleString()} bytes.`,
+        maxRawBytes: MAX_ACCOUNT_DOCUMENT_BYTES
+      });
+    }
+    const compressed = zlib.gzipSync(raw, { level: 9 });
+    const sha256 = crypto.createHash('sha256').update(raw).digest('hex');
+    const result = await query(`
+      insert into account_documents
+        (user_id, book_id, content_gzip, raw_bytes, compressed_bytes, content_sha256, updated_at)
+      values ($1, $2, $3, $4, $5, $6, now())
+      on conflict (user_id, book_id) do update set
+        content_gzip = excluded.content_gzip,
+        raw_bytes = excluded.raw_bytes,
+        compressed_bytes = excluded.compressed_bytes,
+        content_sha256 = excluded.content_sha256,
+        updated_at = now()
+      returning raw_bytes, compressed_bytes, content_sha256, updated_at
+    `, [user.id, req.params.bookId, compressed, raw.length, compressed.length, sha256]);
+    res.json({ document: result.rows[0], maxRawBytes: MAX_ACCOUNT_DOCUMENT_BYTES });
+  } catch (error) {
+    const status = error?.type === 'entity.too.large' ? 413 : 500;
+    console.error('Document save failed:', error);
+    res.status(status).json({ error: status === 413 ? 'The document exceeds the upload limit.' : 'Unable to save the cloud document.' });
+  }
+});
+
+app.delete('/api/account/library/:bookId/document', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query('delete from account_documents where user_id = $1 and book_id = $2 returning book_id', [user.id, req.params.bookId]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Cloud document not found.' });
+    res.json({ deleted: true, bookId: result.rows[0].book_id });
+  } catch (error) {
+    console.error('Document delete failed:', error);
+    res.status(500).json({ error: 'Unable to delete the cloud document.' });
   }
 });
 

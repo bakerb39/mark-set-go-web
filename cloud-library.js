@@ -145,6 +145,10 @@
       coverUrl: book?.cover_url || book?.coverUrl || '',
       addedAt: book?.added_at || book?.addedAt || null,
       updatedAt: book?.updated_at || book?.updatedAt || null,
+      documentStored: Boolean(book?.document_stored ?? book?.documentStored),
+      documentRawBytes: Number(book?.document_raw_bytes ?? book?.documentRawBytes) || 0,
+      documentCompressedBytes: Number(book?.document_compressed_bytes ?? book?.documentCompressedBytes) || 0,
+      documentUpdatedAt: book?.document_updated_at || book?.documentUpdatedAt || null,
       metadata
     };
   }

@@ -1,8 +1,8 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.7.15.4",
+  "version": "7.7.15.5",
   "private": true,
-  "description": "Mark, Set, Go! cloud library metadata adapter with PostgreSQL-backed account records and protected reader architecture.",
+  "description": "Mark, Set, Go! cost-controlled cloud document adapter with protected reader architecture.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

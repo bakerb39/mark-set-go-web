@@ -61,7 +61,15 @@
       loadProgress: (bookId) => request(`/api/account/library/${encodeURIComponent(bookId)}/progress`),
       saveProgress: (bookId, progress) => request(`/api/account/library/${encodeURIComponent(bookId)}/progress`, {
         method: 'PUT', body: JSON.stringify(progress)
-      })
+      }),
+      documentInfo: (bookId) => request(`/api/account/library/${encodeURIComponent(bookId)}/document/info`),
+      loadDocument: (bookId) => request(`/api/account/library/${encodeURIComponent(bookId)}/document`),
+      saveDocument: (bookId, text) => request(`/api/account/library/${encodeURIComponent(bookId)}/document`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+        body: String(text || '')
+      }),
+      removeDocument: (bookId) => request(`/api/account/library/${encodeURIComponent(bookId)}/document`, { method: 'DELETE' })
     }
   };
 
