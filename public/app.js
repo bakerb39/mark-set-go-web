@@ -280,10 +280,13 @@ function buildReaderSessionSnapshot() {
   });
 }
 
-function persistReaderSession({ immediate = false } = {}) {
+function persistReaderSession({ immediate = false, explicitIndex = null } = {}) {
   const save = () => {
     readerSessionSaveTimer = null;
     const snapshot = buildReaderSessionSnapshot();
+    if (snapshot && Number.isFinite(Number(explicitIndex))) {
+      snapshot.index = Math.max(0, Math.min(Math.max(0, state.words.length - 1), Number(explicitIndex)));
+    }
     if (snapshot) {
       try {
         const totalWords = Array.isArray(state.words) ? state.words.length : splitWords(snapshot.currentText || '').length;
@@ -7178,7 +7181,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         state.index = group?.start ?? clickedIndex;
         // A deliberate word click becomes the authoritative resume point.
         // Save it before playback/setup work can reuse an older rendered anchor.
-        persistReaderSession({ immediate: true });
+        persistReaderSession({ immediate: true, explicitIndex: state.index });
         updateReaderStatus(`Reading position moved to word ${(state.index + 1).toLocaleString()}.`);
         startReader();
         if (!wasRunning) window.setTimeout(pauseReader, 0);
