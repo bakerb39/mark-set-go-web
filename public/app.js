@@ -3184,13 +3184,38 @@ function renderHome() {
     button.disabled = true;
     button.textContent = 'Loading saved reading…';
     try {
-      const saved = await readReaderSession();
+      let saved = await readReaderSession();
       if (!saved?.title || !saved?.currentText) {
         await clearReaderSession();
         window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
         button.disabled = false;
         button.textContent = original;
         return;
+      }
+
+      // A saved session can occasionally retain a stale top-of-document index
+      // even though the matching progress record has a valid resume position.
+      // Reconcile only that narrow case before the existing restore path runs.
+      const savedSessionIndex = Math.max(0, Number(saved.playbackIndex ?? saved.index) || 0);
+      const progressRecord = saved.documentId
+        ? readStoredObject(READING_PROGRESS_KEY)[saved.documentId]
+        : null;
+      const progressLastWord = Math.max(0, Number(progressRecord?.lastWord) || 0);
+
+      if (savedSessionIndex === 0 && progressLastWord > 0) {
+        saved = {
+          ...saved,
+          index: progressLastWord,
+          playbackIndex: progressLastWord,
+          viewportAnchorIndex: progressLastWord,
+          viewport: {
+            ...(saved.viewport || {}),
+            scrollTop: 0,
+            scrollLeft: 0,
+            anchorIndex: progressLastWord,
+            anchorOffsetTop: 24
+          }
+        };
       }
 
       if (!applyReaderSessionSnapshot(saved, { resumePlayback: false })) {
