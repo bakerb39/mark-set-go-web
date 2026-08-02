@@ -12402,6 +12402,19 @@ function checkActionNotifications() {
 }
 
 
+
+
+/* Email preferences v7.5.1 ------------------------------------------------ */
+const EMAIL_PREFS_KEY='markSetGoEmailPreferencesV1';
+const EMAIL_CLIENT_KEY='markSetGoEmailClientIdV1';
+function emailClientId(){let id=localStorage.getItem(EMAIL_CLIENT_KEY);if(!id){id=`msg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;localStorage.setItem(EMAIL_CLIENT_KEY,id);}return id;}
+function readEmailPreferences(){try{return {email:'',newsletter:false,reminders:false,notes:false,notesFrequency:'weekly',...(JSON.parse(localStorage.getItem(EMAIL_PREFS_KEY)||'{}'))};}catch{return {email:'',newsletter:false,reminders:false,notes:false,notesFrequency:'weekly'};}}
+function writeEmailPreferences(value){localStorage.setItem(EMAIL_PREFS_KEY,JSON.stringify(value));}
+async function emailApi(path,body){const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||`Request failed (${response.status}).`);return payload;}
+async function syncEmailActions(){const prefs=readEmailPreferences();if(!prefs.email||!prefs.reminders)return;try{await emailApi('/api/email/sync-actions',{clientId:emailClientId(),actions:readActions()});}catch(error){console.warn('Could not sync email actions:',error.message);}}
+const originalWriteActions=writeActions;
+writeActions=function(actions){originalWriteActions(actions);window.clearTimeout(window.__msgEmailSyncTimer);window.__msgEmailSyncTimer=window.setTimeout(syncEmailActions,500);};
+
 function readActions() {
   try {
     const value = JSON.parse(localStorage.getItem(ACTION_CENTER_KEY) || '[]');
@@ -12449,7 +12462,7 @@ function renderActionCenter() {
       <article><span>Books applied</span><strong>${sourceCount}</strong><small>sources with actions</small></article>
     </div>
 
-    <section class="action-notification-settings">
+    <section class="action-notification-settings app-section-card app-section-notifications">
       <div class="section-heading"><div><h2>Notifications</h2><p>In-app reminders work while Mark, Set, Go! is open. Browser alerts also require permission.</p></div><button class="secondary" type="button" id="test-action-notification">Test reminder</button></div>
       <div class="action-notification-grid">
         <label class="toggle-setting"><input id="action-inapp-notifications" type="checkbox"> <span>In-app reminders</span></label>
@@ -12460,8 +12473,22 @@ function renderActionCenter() {
       <p class="status" id="action-notification-status"></p>
     </section>
 
+    <section class="action-email-settings app-section-card app-section-email">
+      <div class="section-heading"><div><h2>Email & subscriptions</h2><p>Choose exactly what Mark, Set, Go! may send. Email reminders can arrive while the app is closed when the server email provider is configured.</p></div><button class="secondary" type="button" id="test-action-email">Send test email</button></div>
+      <div class="action-email-grid">
+        <label>Email address<input id="action-email-address" type="email" autocomplete="email" placeholder="you@example.com"></label>
+        <label class="toggle-setting"><input id="action-email-reminders" type="checkbox"> <span>Email my action reminders</span></label>
+        <label class="toggle-setting"><input id="action-email-newsletter" type="checkbox"> <span>Receive the Mark, Set, Go! newsletter</span></label>
+        <label class="toggle-setting"><input id="action-email-notes" type="checkbox"> <span>Email my saved notes and reading digest</span></label>
+        <label>Notes frequency<select id="action-email-notes-frequency"><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>
+      </div>
+      <div class="action-email-buttons"><button class="primary" type="button" id="save-action-email">Save email preferences</button><button class="secondary" type="button" id="send-action-notes">Email my notes now</button></div>
+      <p class="status" id="action-email-status"></p>
+      <p class="fine-print">Newsletter, reminders, and notes are separate subscriptions. Users can disable any category independently or unsubscribe from all email.</p>
+    </section>
+
     <div class="action-center-layout">
-      <form id="action-form" class="action-composer">
+      <form id="action-form" class="action-composer app-section-card app-section-create">
         <div class="section-heading"><div><h2>Create an action</h2><p>Make the next step concrete and small enough to complete.</p></div></div>
         <input id="action-edit-id" type="hidden">
         <label>What will you do?<input id="action-title" required maxlength="160" placeholder="Example: Walk for 20 minutes after lunch"></label>
@@ -12478,7 +12505,7 @@ function renderActionCenter() {
         <p class="status" id="action-status"></p>
       </form>
 
-      <section class="action-list-panel">
+      <section class="action-list-panel app-section-card app-section-actions">
         <div class="section-heading"><div><h2>My actions</h2><p>Complete, reschedule, edit, or remove commitments.</p></div>
           <label class="compact-label">Show<select id="action-filter"><option value="active">Active</option><option value="all">All</option><option value="completed">Completed</option></select></label>
         </div>
@@ -12568,6 +12595,19 @@ function renderActionCenter() {
   };
   ['#action-inapp-notifications','#action-browser-notifications','#action-quiet-start','#action-quiet-end'].forEach((selector) => app.querySelector(selector)?.addEventListener('change', saveNotificationSettings));
   app.querySelector('#test-action-notification')?.addEventListener('click', () => showActionToast({ id: 'test', title: 'This is how an action reminder will appear.', dueAt: new Date().toISOString() }));
+
+  const emailPrefs=readEmailPreferences();
+  app.querySelector('#action-email-address').value=emailPrefs.email||'';
+  app.querySelector('#action-email-reminders').checked=Boolean(emailPrefs.reminders);
+  app.querySelector('#action-email-newsletter').checked=Boolean(emailPrefs.newsletter);
+  app.querySelector('#action-email-notes').checked=Boolean(emailPrefs.notes);
+  app.querySelector('#action-email-notes-frequency').value=emailPrefs.notesFrequency||'weekly';
+  const emailStatus=app.querySelector('#action-email-status');
+  const currentEmailForm=()=>({email:app.querySelector('#action-email-address').value.trim(),reminders:app.querySelector('#action-email-reminders').checked,newsletter:app.querySelector('#action-email-newsletter').checked,notes:app.querySelector('#action-email-notes').checked,notesFrequency:app.querySelector('#action-email-notes-frequency').value});
+  app.querySelector('#save-action-email')?.addEventListener('click',async()=>{const prefs=currentEmailForm();emailStatus.textContent='Saving email preferences…';try{const result=await emailApi('/api/email/preferences',{clientId:emailClientId(),...prefs,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone});writeEmailPreferences(prefs);await syncEmailActions();emailStatus.textContent=result.configured?'Email preferences saved.':'Preferences saved, but outgoing email is not configured on the server yet.';}catch(error){emailStatus.textContent=error.message;emailStatus.classList.add('error');}});
+  app.querySelector('#test-action-email')?.addEventListener('click',async()=>{emailStatus.textContent='Sending test email…';try{await emailApi('/api/email/test',{clientId:emailClientId()});emailStatus.textContent='Test email sent. Check your inbox and spam folder.';}catch(error){emailStatus.textContent=error.message;emailStatus.classList.add('error');}});
+  app.querySelector('#send-action-notes')?.addEventListener('click',async()=>{emailStatus.textContent='Preparing your notes…';try{await emailApi('/api/email/send-notes',{clientId:emailClientId(),notes:getNotes().slice(0,50)});emailStatus.textContent='Your notes were emailed.';}catch(error){emailStatus.textContent=error.message;emailStatus.classList.add('error');}});
+
 
   app.querySelector('#cancel-action-edit').addEventListener('click', resetForm);
   app.querySelector('#action-filter').addEventListener('change', renderList);
@@ -12659,6 +12699,128 @@ document.addEventListener('click', (event) => {
   });
 }, true);
 
+
+const MY_LINKS_STORAGE_KEY = 'markSetGoMyLinksV1';
+
+function normalizeUserLinkUrl(value) {
+  const raw = String(value || '').trim();
+  if (!raw) throw new Error('Enter a website address.');
+  const candidate = /^[a-z][a-z0-9+.-]*:\/\//i.test(raw) ? raw : `https://${raw}`;
+  const parsed = new URL(candidate);
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('Only http and https links are supported.');
+  return parsed.href;
+}
+
+function readMyLinks() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(MY_LINKS_STORAGE_KEY) || 'null');
+    if (Array.isArray(saved)) return saved;
+  } catch (_) {}
+  const starter = [{ id: 'athenaeum-books', title: 'Athenaeum Books', url: 'https://athenaeumbooks.com/', createdAt: new Date().toISOString() }];
+  localStorage.setItem(MY_LINKS_STORAGE_KEY, JSON.stringify(starter));
+  return starter;
+}
+
+function writeMyLinks(links) {
+  localStorage.setItem(MY_LINKS_STORAGE_KEY, JSON.stringify(links));
+}
+
+function renderMyLinks(selectedId = '') {
+  stopReader();
+  const links = readMyLinks();
+  const selected = links.find((item) => item.id === selectedId) || links[0] || null;
+  app.dataset.viewKey = 'my-links';
+  app.innerHTML = `
+    <section class="panel platform-page my-links-page">
+      <header class="platform-hero compact-hero">
+        <div><span class="source-category">Browse</span><h1>My Links</h1><p>Save useful reading and research websites and open them without leaving Mark, Set, Go!</p></div>
+        <button class="secondary" type="button" data-action="reader">Return to Reader</button>
+      </header>
+
+      <div class="my-links-layout">
+        <aside class="my-links-sidebar app-section-card section-accent-blue">
+          <div class="section-heading"><span class="section-icon" aria-hidden="true">↗</span><div><h2>Saved websites</h2><p>Add, edit, and organize your links.</p></div></div>
+          <form id="my-links-form" class="my-links-form">
+            <input id="my-link-id" type="hidden">
+            <label>Name<input id="my-link-title" type="text" maxlength="80" placeholder="Athenaeum Books" required></label>
+            <label>Website address<input id="my-link-url" type="url" placeholder="https://athenaeumbooks.com" required></label>
+            <div class="my-links-form-actions">
+              <button class="primary" type="submit">Save link</button>
+              <button class="secondary" id="my-link-cancel" type="button" hidden>Cancel edit</button>
+            </div>
+          </form>
+          <div id="my-links-list" class="my-links-list">
+            ${links.length ? links.map((item) => `
+              <article class="my-link-row ${selected?.id === item.id ? 'is-active' : ''}" data-link-id="${escapeHtml(item.id)}">
+                <button class="my-link-open" type="button" data-open-link="${escapeHtml(item.id)}">
+                  <strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(new URL(item.url).hostname)}</small>
+                </button>
+                <div class="my-link-row-actions">
+                  <button class="icon-button" type="button" data-edit-link="${escapeHtml(item.id)}" title="Edit ${escapeHtml(item.title)}">✎</button>
+                  <button class="icon-button danger" type="button" data-delete-link="${escapeHtml(item.id)}" title="Remove ${escapeHtml(item.title)}">×</button>
+                </div>
+              </article>`).join('') : '<p class="empty-state">No saved websites yet.</p>'}
+          </div>
+        </aside>
+
+        <section class="my-links-viewer app-section-card section-accent-green">
+          <div class="section-heading">
+            <span class="section-icon" aria-hidden="true">⌕</span>
+            <div><h2 id="my-links-viewer-title">${selected ? escapeHtml(selected.title) : 'Website viewer'}</h2><p id="my-links-viewer-url">${selected ? escapeHtml(selected.url) : 'Choose or add a website.'}</p></div>
+            ${selected ? `<a class="secondary button-link" href="${escapeHtml(selected.url)}" target="_blank" rel="noopener noreferrer">Open in new tab</a>` : ''}
+          </div>
+          <div class="iframe-notice"><strong>Some websites block embedded viewing.</strong> When a page is blank or shows a refusal message, use “Open in new tab.”</div>
+          <div class="my-links-frame-wrap">
+            ${selected ? `<iframe id="my-links-frame" title="${escapeHtml(selected.title)}" src="${escapeHtml(selected.url)}" loading="eager" referrerpolicy="strict-origin-when-cross-origin" allow="clipboard-read; clipboard-write; fullscreen" allowfullscreen></iframe>` : '<div class="my-links-empty-viewer">Add a website to begin.</div>'}
+          </div>
+        </section>
+      </div>
+    </section>`;
+
+  const form = app.querySelector('#my-links-form');
+  const idInput = app.querySelector('#my-link-id');
+  const titleInput = app.querySelector('#my-link-title');
+  const urlInput = app.querySelector('#my-link-url');
+  const cancelButton = app.querySelector('#my-link-cancel');
+
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    try {
+      const title = titleInput.value.trim();
+      if (!title) throw new Error('Enter a name for this link.');
+      const url = normalizeUserLinkUrl(urlInput.value);
+      const current = readMyLinks();
+      const editingId = idInput.value;
+      let id = editingId;
+      if (editingId) {
+        const item = current.find((entry) => entry.id === editingId);
+        if (item) { item.title = title; item.url = url; item.updatedAt = new Date().toISOString(); }
+      } else {
+        id = `link-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        current.push({ id, title, url, createdAt: new Date().toISOString() });
+      }
+      writeMyLinks(current);
+      renderMyLinks(id);
+    } catch (error) { window.alert(error.message); }
+  });
+
+  cancelButton?.addEventListener('click', () => renderMyLinks(selected?.id || ''));
+  app.querySelectorAll('[data-open-link]').forEach((button) => button.addEventListener('click', () => renderMyLinks(button.dataset.openLink)));
+  app.querySelectorAll('[data-edit-link]').forEach((button) => button.addEventListener('click', () => {
+    const item = readMyLinks().find((entry) => entry.id === button.dataset.editLink);
+    if (!item) return;
+    idInput.value = item.id; titleInput.value = item.title; urlInput.value = item.url;
+    cancelButton.hidden = false; titleInput.focus();
+  }));
+  app.querySelectorAll('[data-delete-link]').forEach((button) => button.addEventListener('click', () => {
+    const item = readMyLinks().find((entry) => entry.id === button.dataset.deleteLink);
+    if (!item || !window.confirm(`Remove “${item.title}”?`)) return;
+    const remaining = readMyLinks().filter((entry) => entry.id !== item.id);
+    writeMyLinks(remaining);
+    renderMyLinks(remaining[0]?.id || '');
+  }));
+}
+
 document.addEventListener('click', (event) => {
   const test = event.target.closest('[data-test]');
   const read = event.target.closest('[data-read]');
@@ -12711,6 +12873,7 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'home') renderHome();
   if (actionName === 'browse') renderBrowseHub();
+  if (actionName === 'my-links') renderMyLinks();
   if (actionName === 'my-library') renderMyLibraryHub();
   if (actionName === 'ai-center') renderAiCenter();
   if (actionName === 'mark-notebook') renderGlobalNotebook();

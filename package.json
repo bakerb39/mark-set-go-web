@@ -1,8 +1,8 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.4.5",
+  "version": "7.5.3",
   "private": true,
-  "description": "Reading accelerator with guided modes, imports, progress, music, and a local-first reading Action Center.",
+  "description": "Reading accelerator with Action Center, browser and configurable email reminders, newsletters, and reading-note delivery.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

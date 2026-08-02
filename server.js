@@ -68,6 +68,87 @@ async function fetchFeedItems(source) {
 app.disable('x-powered-by');
 app.use(express.json({ limit: '150kb' }));
 
+
+
+/* Email delivery v7.5.1 ----------------------------------------------------
+   Provider: Resend. Configure RESEND_API_KEY, EMAIL_FROM, and PUBLIC_APP_URL.
+   This local-first prototype keeps subscriptions in server memory; production
+   should replace the Map with PostgreSQL before relying on durable delivery.
+*/
+const emailSubscriptions = new Map();
+const emailRateLimits = new Map();
+const EMAIL_FROM = String(process.env.EMAIL_FROM || 'Mark, Set, Go! <onboarding@resend.dev>').trim();
+const PUBLIC_APP_URL = String(process.env.PUBLIC_APP_URL || '').replace(/\/$/, '');
+
+function validEmail(value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim()); }
+function emailConfigured() { return Boolean(String(process.env.RESEND_API_KEY || '').trim()); }
+function rateLimitEmail(req, key, limit = 8, windowMs = 3600000) {
+  const id = `${req.ip}|${key}`; const now = Date.now();
+  const recent = (emailRateLimits.get(id) || []).filter((time) => now - time < windowMs);
+  if (recent.length >= limit) return false;
+  recent.push(now); emailRateLimits.set(id, recent); return true;
+}
+function escapeEmail(value) { return String(value || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+async function sendResendEmail({ to, subject, html, text }) {
+  const apiKey = String(process.env.RESEND_API_KEY || '').trim();
+  if (!apiKey) throw new Error('Email is not configured. Add RESEND_API_KEY.');
+  const response = await fetch('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:`Bearer ${apiKey}`, 'Content-Type':'application/json' }, body:JSON.stringify({ from:EMAIL_FROM, to:[to], subject, html, text }) });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload?.message || `Email provider returned HTTP ${response.status}.`);
+  return payload;
+}
+function unsubscribeUrl(clientId) { return PUBLIC_APP_URL ? `${PUBLIC_APP_URL}/api/email/unsubscribe?clientId=${encodeURIComponent(clientId)}` : ''; }
+function emailFrame(title, body, clientId) {
+  const unsub = unsubscribeUrl(clientId);
+  return `<!doctype html><html><body style="font-family:Arial,sans-serif;background:#f4f7f6;padding:24px"><main style="max-width:620px;margin:auto;background:white;border-radius:14px;padding:28px"><h1 style="font-size:24px">${escapeEmail(title)}</h1>${body}<hr style="border:0;border-top:1px solid #ddd;margin:28px 0"><p style="font-size:12px;color:#666">Mark, Set, Go!${unsub ? ` · <a href="${unsub}">Unsubscribe</a>` : ''}</p></main></body></html>`;
+}
+
+app.get('/api/email/status', (_req, res) => res.json({ configured:emailConfigured(), provider:'Resend', from:EMAIL_FROM, durable:false }));
+app.post('/api/email/preferences', (req, res) => {
+  const clientId=String(req.body?.clientId||'').trim().slice(0,100); const email=String(req.body?.email||'').trim().toLowerCase();
+  if (!clientId || !validEmail(email)) return res.status(400).json({error:'Enter a valid email address.'});
+  const record={ ...(emailSubscriptions.get(clientId)||{}), clientId, email, newsletter:Boolean(req.body?.newsletter), reminders:Boolean(req.body?.reminders), notes:Boolean(req.body?.notes), notesFrequency:['daily','weekly','monthly'].includes(req.body?.notesFrequency)?req.body.notesFrequency:'weekly', timezone:String(req.body?.timezone||'America/New_York').slice(0,80), active:true, updatedAt:new Date().toISOString() };
+  emailSubscriptions.set(clientId, record); res.json({ok:true, configured:emailConfigured(), preferences:record});
+});
+app.post('/api/email/sync-actions', (req, res) => {
+  const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
+  if (!record?.active) return res.status(404).json({error:'Save email preferences first.'});
+  record.actions=(Array.isArray(req.body?.actions)?req.body.actions:[]).slice(0,200).map(a=>({id:String(a.id||'').slice(0,100),title:String(a.title||'').slice(0,180),dueAt:a.dueAt||'',reminder:a.reminder||'none',status:a.status||'active',sourceTitle:String(a.sourceTitle||'').slice(0,180),updatedAt:a.updatedAt||'',lastEmailSignature:a.lastEmailSignature||''}));
+  record.updatedAt=new Date().toISOString(); emailSubscriptions.set(clientId,record); res.json({ok:true,count:record.actions.length});
+});
+app.post('/api/email/test', async (req,res)=>{
+  const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
+  if (!record?.active) return res.status(404).json({error:'Save email preferences first.'});
+  if (!rateLimitEmail(req,`test:${record.email}`,3)) return res.status(429).json({error:'Too many test emails. Try again later.'});
+  try { await sendResendEmail({to:record.email,subject:'Your Mark, Set, Go! email is ready',html:emailFrame('Email notifications are ready','<p>You can now receive reading reminders, newsletter updates, and scheduled notes according to your preferences.</p>',clientId),text:'Your Mark, Set, Go! email notifications are ready.'}); res.json({ok:true}); }
+  catch(error){ res.status(503).json({error:error.message}); }
+});
+app.post('/api/email/send-notes', async (req,res)=>{
+  const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
+  if (!record?.active || !record.notes) return res.status(400).json({error:'Notes email is not enabled.'});
+  const notes=(Array.isArray(req.body?.notes)?req.body.notes:[]).slice(0,50);
+  if (!notes.length) return res.status(400).json({error:'There are no notes to email.'});
+  const items=notes.map(n=>`<li style="margin-bottom:14px"><strong>${escapeEmail(n.title||n.documentTitle||'Reading note')}</strong><br>${escapeEmail(n.note||n.text||'')}</li>`).join('');
+  try { await sendResendEmail({to:record.email,subject:'Your reading notes from Mark, Set, Go!',html:emailFrame('Your reading notes',`<p>Here are the notes you asked to receive:</p><ul>${items}</ul>`,clientId),text:notes.map(n=>`${n.title||'Reading note'}: ${n.note||n.text||''}`).join('\n\n')}); res.json({ok:true,count:notes.length}); }
+  catch(error){ res.status(503).json({error:error.message}); }
+});
+app.get('/api/email/unsubscribe', (req,res)=>{ const id=String(req.query.clientId||''); const record=emailSubscriptions.get(id); if(record){record.active=false;record.newsletter=false;record.reminders=false;record.notes=false;} res.type('html').send('<h1>You are unsubscribed</h1><p>You will no longer receive Mark, Set, Go! emails.</p>'); });
+
+setInterval(async()=>{
+  if(!emailConfigured()) return; const now=Date.now(); const offsets={at_time:0,min10:10,min30:30,hour1:60,day1:1440};
+  for(const record of emailSubscriptions.values()){
+    if(!record.active||!record.reminders) continue;
+    for(const action of record.actions||[]){
+      if(action.status==='completed'||!action.dueAt||action.reminder==='none') continue;
+      const due=Date.parse(action.dueAt); if(!Number.isFinite(due)) continue;
+      const notifyAt=due-(offsets[action.reminder]??0)*60000; const signature=`${action.id}|${action.dueAt}|${action.reminder}|${action.updatedAt}`;
+      if(now<notifyAt||now-notifyAt>10*60000||action.lastEmailSignature===signature) continue;
+      try { await sendResendEmail({to:record.email,subject:`Reminder: ${action.title}`,html:emailFrame('Reading action reminder',`<p><strong>${escapeEmail(action.title)}</strong></p><p>Due ${escapeEmail(new Date(due).toLocaleString())}${action.sourceTitle?` · ${escapeEmail(action.sourceTitle)}`:''}</p>`,record.clientId),text:`Reminder: ${action.title}. Due ${new Date(due).toLocaleString()}.`}); action.lastEmailSignature=signature; }
+      catch(error){ console.error('Email reminder failed:',error.message); }
+    }
+  }
+},60000).unref();
+
 const COMPREHENSION_MODEL = process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
 
 function extractOpenAIOutputText(payload) {
