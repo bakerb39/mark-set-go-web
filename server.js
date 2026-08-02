@@ -12,6 +12,9 @@ const { checkDatabase, databaseConfigured, closeDatabase, query } = require('./d
 const CLERK_PUBLISHABLE_KEY = String(process.env.CLERK_PUBLISHABLE_KEY || '').trim();
 const CLERK_SECRET_KEY = String(process.env.CLERK_SECRET_KEY || '').trim();
 const clerkConfigured = Boolean(CLERK_PUBLISHABLE_KEY && CLERK_SECRET_KEY);
+const BETA_ACCESS_ENABLED = /^(1|true|yes|on)$/i.test(String(process.env.BETA_ACCESS_ENABLED || '').trim());
+const BETA_ALLOWED_EMAILS = new Set(String(process.env.BETA_ALLOWED_EMAILS || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean));
+const BETA_ALLOWED_USER_IDS = new Set(String(process.env.BETA_ALLOWED_USER_IDS || '').split(',').map((value) => value.trim()).filter(Boolean));
 let clerkMiddleware = null;
 let getAuth = null;
 let clerkClient = null;
@@ -85,12 +88,20 @@ app.get('/api/auth/config', (_req, res) => {
   res.json({
     configured: clerkConfigured,
     publishableKey: clerkConfigured ? CLERK_PUBLISHABLE_KEY : '',
-    provider: 'clerk'
+    provider: 'clerk',
+    betaAccessEnabled: BETA_ACCESS_ENABLED
   });
 });
 
+function betaAccessFor(authSubject, email) {
+  if (!BETA_ACCESS_ENABLED) return { enabled: false, granted: true };
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const granted = BETA_ALLOWED_USER_IDS.has(String(authSubject || '')) || (normalizedEmail && BETA_ALLOWED_EMAILS.has(normalizedEmail));
+  return { enabled: true, granted: Boolean(granted) };
+}
+
 function unauthenticatedSession() {
-  return { authenticated: false, user: null, planCode: 'guest' };
+  return { authenticated: false, user: null, planCode: 'guest', betaAccess: { enabled: BETA_ACCESS_ENABLED, granted: false } };
 }
 
 app.get('/api/auth/session', async (req, res) => {
@@ -131,7 +142,8 @@ app.get('/api/auth/session', async (req, res) => {
         status: user.status,
         createdAt: user.created_at
       },
-      planCode: user.plan_code
+      planCode: user.plan_code,
+      betaAccess: betaAccessFor(auth.userId, user.email)
     });
   } catch (error) {
     console.error('Authentication session sync failed:', error);
@@ -151,12 +163,32 @@ app.get('/api/account', async (req, res) => {
 app.get('/api/health', async (_req, res) => {
   try {
     const database = await checkDatabase();
-    res.json({ ok: true, version: '7.7.1', database });
+    res.json({ ok: true, version: '7.7.2', database, betaAccessEnabled: BETA_ACCESS_ENABLED });
   } catch (error) {
-    res.status(503).json({ ok: false, version: '7.7.1', database: { configured: databaseConfigured(), connected: false, error: error.message } });
+    res.status(503).json({ ok: false, version: '7.7.2', database: { configured: databaseConfigured(), connected: false, error: error.message }, betaAccessEnabled: BETA_ACCESS_ENABLED });
   }
 });
 
+// While private beta access is enabled, protect every application API after the
+// public health/config/session endpoints. The browser gate improves UX; this
+// middleware is the actual server-side enforcement boundary.
+app.use('/api', async (req, res, next) => {
+  if (!BETA_ACCESS_ENABLED) return next();
+  if (!clerkConfigured) return res.status(503).json({ error: 'Beta access requires Clerk authentication.' });
+  const auth = getAuth(req);
+  if (!auth?.isAuthenticated || !auth.userId) return res.status(401).json({ error: 'Sign in is required during the private beta.' });
+  try {
+    const clerkUser = await clerkClient.users.getUser(auth.userId);
+    const email = clerkUser.emailAddresses?.find((entry) => entry.id === clerkUser.primaryEmailAddressId)?.emailAddress
+      || clerkUser.emailAddresses?.[0]?.emailAddress
+      || '';
+    if (!betaAccessFor(auth.userId, email).granted) return res.status(403).json({ error: 'This account is not approved for the private beta.' });
+    next();
+  } catch (error) {
+    console.error('Beta access check failed:', error);
+    res.status(500).json({ error: 'Unable to verify beta access.' });
+  }
+});
 
 
 /* Email delivery v7.5.1 ----------------------------------------------------

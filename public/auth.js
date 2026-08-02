@@ -1,12 +1,70 @@
 (() => {
   'use strict';
 
-  const state = { clerk: null, config: null, session: null };
+  const state = { clerk: null, config: null, session: null, gate: null };
   const controls = () => document.getElementById('auth-controls');
 
   function setControls(html) {
     const node = controls();
     if (node) node.innerHTML = html;
+  }
+
+
+  function ensureGate() {
+    if (state.gate) return state.gate;
+    const gate = document.createElement('div');
+    gate.id = 'beta-access-gate';
+    gate.className = 'beta-access-gate';
+    gate.innerHTML = `
+      <section class="beta-access-card" role="dialog" aria-modal="true" aria-labelledby="beta-access-title">
+        <div class="beta-access-mark">Mark, Set, Go!</div>
+        <h1 id="beta-access-title">Private beta</h1>
+        <p id="beta-access-message">Checking your access…</p>
+        <div class="beta-access-actions" id="beta-access-actions"></div>
+      </section>`;
+    document.body.appendChild(gate);
+    document.body.classList.add('beta-gate-active');
+    state.gate = gate;
+    return gate;
+  }
+
+  function showGate(message, actionsHtml = '') {
+    const gate = ensureGate();
+    const messageNode = gate.querySelector('#beta-access-message');
+    const actionsNode = gate.querySelector('#beta-access-actions');
+    if (messageNode) messageNode.textContent = message;
+    if (actionsNode) actionsNode.innerHTML = actionsHtml;
+  }
+
+  function closeGate() {
+    state.gate?.remove();
+    state.gate = null;
+    document.body.classList.remove('beta-gate-active');
+  }
+
+  function bindGateGuestActions() {
+    document.getElementById('beta-gate-sign-in')?.addEventListener('click', () => state.clerk?.openSignIn());
+    document.getElementById('beta-gate-sign-up')?.addEventListener('click', () => state.clerk?.openSignUp());
+  }
+
+  function renderGateForGuest() {
+    showGate('Sign in with an approved account to enter the private beta.', `
+      <button class="auth-nav-button auth-nav-primary" id="beta-gate-sign-in" type="button">Sign in</button>
+      <button class="auth-nav-button" id="beta-gate-sign-up" type="button">Create account</button>`);
+    bindGateGuestActions();
+  }
+
+  function renderGateDenied() {
+    showGate('This account is signed in but has not been approved for the private beta.', `
+      <button class="auth-nav-button auth-nav-primary" id="beta-gate-sign-out" type="button">Sign out</button>`);
+    document.getElementById('beta-gate-sign-out')?.addEventListener('click', () => state.clerk?.signOut({ redirectUrl: '/' }));
+  }
+
+  function applyBetaGate(session) {
+    if (!state.config?.betaAccessEnabled) return closeGate();
+    if (!session?.authenticated) return renderGateForGuest();
+    if (!session?.betaAccess?.granted) return renderGateDenied();
+    closeGate();
   }
 
   function deriveClerkDomain(key) {
@@ -47,6 +105,7 @@
     state.session = payload;
     window.MarkSetGoAuth = { clerk: state.clerk, session: payload, refresh: fetchSession };
     document.dispatchEvent(new CustomEvent('marksetgo:auth-changed', { detail: payload }));
+    applyBetaGate(payload);
     return payload;
   }
 
@@ -70,9 +129,12 @@
     try {
       const response = await fetch('/api/auth/config', { credentials: 'same-origin' });
       state.config = await response.json();
+      if (state.config.betaAccessEnabled) showGate('Checking your access…');
       if (!state.config.configured || !state.config.publishableKey) {
         setControls('<span class="auth-status" title="Authentication has not been configured">Guest</span>');
         window.MarkSetGoAuth = { clerk: null, session: { authenticated: false, planCode: 'guest' }, refresh: fetchSession };
+        if (state.config.betaAccessEnabled) showGate('Private beta access is unavailable because authentication is not configured.');
+        else closeGate();
         return;
       }
 
@@ -94,6 +156,7 @@
         state.session = { authenticated: false, planCode: 'guest' };
         window.MarkSetGoAuth = { clerk: state.clerk, session: state.session, refresh: fetchSession };
         renderGuestControls();
+        applyBetaGate(state.session);
       }
 
       state.clerk.addListener(async ({ user }) => {
@@ -104,12 +167,14 @@
           state.session = { authenticated: false, planCode: 'guest' };
           window.MarkSetGoAuth = { clerk: state.clerk, session: state.session, refresh: fetchSession };
           renderGuestControls();
+          applyBetaGate(state.session);
           document.dispatchEvent(new CustomEvent('marksetgo:auth-changed', { detail: state.session }));
         }
       });
     } catch (error) {
       console.error('Authentication startup failed:', error);
       setControls('<button class="auth-nav-button" id="auth-retry" type="button">Account unavailable</button>');
+      if (state.config?.betaAccessEnabled) showGate('Account access could not be initialized. Retry after checking the authentication configuration.');
       document.getElementById('auth-retry')?.addEventListener('click', initialize, { once: true });
     }
   }

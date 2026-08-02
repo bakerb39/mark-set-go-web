@@ -8587,3 +8587,14 @@ body.light .comprehension-actions,
 .auth-plan-badge{font-size:.68rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:#e7f4ed;color:#176b4d;border:1px solid #b9d9c8;border-radius:999px;padding:.2rem .42rem}
 #clerk-user-button{display:inline-flex;align-items:center}
 @media (max-width:900px){.auth-nav-button{padding:.36rem .48rem}.auth-nav-primary{display:none}.auth-plan-badge{display:none}}
+
+
+/* Private beta access gate v7.7.2 */
+.beta-gate-active{overflow:hidden!important}
+.beta-access-gate{position:fixed;inset:0;z-index:2147483000;display:grid;place-items:center;padding:1rem;background:linear-gradient(145deg,rgba(12,28,24,.98),rgba(24,63,49,.96));backdrop-filter:blur(8px)}
+.beta-access-card{width:min(440px,calc(100vw - 2rem));background:#fff;border:1px solid rgba(23,107,77,.2);border-radius:18px;padding:2rem;box-shadow:0 24px 70px rgba(0,0,0,.35);text-align:center}
+.beta-access-mark{font-size:.78rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#176b4d;margin-bottom:.55rem}
+.beta-access-card h1{margin:.1rem 0 .65rem;font-size:1.65rem;color:#18352b}
+.beta-access-card p{margin:0;color:#53645d;line-height:1.55}
+.beta-access-actions{display:flex;justify-content:center;gap:.65rem;flex-wrap:wrap;margin-top:1.35rem}
+.beta-access-actions .auth-nav-button{min-width:120px}
