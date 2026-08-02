@@ -87,7 +87,10 @@ const ReaderContinuity = {
     const location = captureReaderLocation();
     const snapshot = buildReaderSessionSnapshot();
     if (!snapshot) return null;
-    snapshot.index = location.anchorIndex;
+    // Keep the playback cursor independent from the viewport anchor.
+    snapshot.index = location.cursorIndex;
+    snapshot.playbackIndex = location.cursorIndex;
+    snapshot.viewportAnchorIndex = location.anchorIndex;
     snapshot.wasRunning = location.wasRunning;
     snapshot.controls = { ...(snapshot.controls || {}), ...captureReaderControls() };
     snapshot.viewport = captureReaderViewport(location.anchorIndex);
@@ -280,13 +283,10 @@ function buildReaderSessionSnapshot() {
   });
 }
 
-function persistReaderSession({ immediate = false, explicitIndex = null } = {}) {
+function persistReaderSession({ immediate = false } = {}) {
   const save = () => {
     readerSessionSaveTimer = null;
     const snapshot = buildReaderSessionSnapshot();
-    if (snapshot && Number.isFinite(Number(explicitIndex))) {
-      snapshot.index = Math.max(0, Math.min(Math.max(0, state.words.length - 1), Number(explicitIndex)));
-    }
     if (snapshot) {
       try {
         const totalWords = Array.isArray(state.words) ? state.words.length : splitWords(snapshot.currentText || '').length;
@@ -2838,9 +2838,11 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   const fontSize = Math.max(10, Number(controls.fontSize ?? 14));
   const fontFamily = controls.fontFamily || 'system';
   const theme = controls.theme || 'dark';
-  const savedIndex = Math.max(0, Number(snapshot.index) || 0);
+  const savedIndex = Math.max(0, Number(snapshot.playbackIndex ?? snapshot.index) || 0);
+  const savedViewportAnchor = Math.max(0, Number(snapshot.viewportAnchorIndex ?? savedIndex) || 0);
 
   state.returnIndex = savedIndex;
+  state.viewportAnchorIndex = savedViewportAnchor;
   state.returnMode = mode;
   state.returnWasRunning = Boolean(snapshot.wasRunning);
   state.returnControls = {
@@ -3008,6 +3010,8 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   activeReaderSnapshot = {
     ...snapshot,
     index: state.index,
+    playbackIndex: state.index,
+    viewportAnchorIndex: state.viewportAnchorIndex ?? state.index,
     wasRunning: Boolean(snapshot.wasRunning),
     controls: { ...(snapshot.controls || {}), ...(state.returnControls || {}) }
   };
@@ -7179,28 +7183,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         const group = findReadingGroup(clickedIndex);
         stopReader();
         state.index = group?.start ?? clickedIndex;
-        // Preserve the word's current screen position for the first playback
-        // frame after a deliberate seek. Normal guide scrolling resumes after
-        // that frame instead of snapping the pointer to the top reading line.
-        state.preserveManualSeekViewportOnce = true;
-        persistReaderSession({ immediate: true, explicitIndex: state.index });
+        state.viewportAnchorIndex = state.index;
+        persistReaderSession({ immediate: true });
         updateReaderStatus(`Reading position moved to word ${(state.index + 1).toLocaleString()}.`);
-
-        if (wasRunning) {
-          startReader();
-        } else {
-          // A paused seek must not briefly start and stop playback. Place the
-          // guide at the selected word and leave Resume ready at that position.
-          if (mode === 'pointing-guide') {
-            const requestedCount = Math.max(1, Number(app.querySelector('#word-count')?.value) || 1);
-            const step = getPointingLineStep(reader, state.index, requestedCount);
-            if (step) moveReadingGuide(reader, step, 0);
-          }
-          const startButton = app.querySelector('#start-reader');
-          const pauseButton = app.querySelector('#pause-reader');
-          if (startButton) { startButton.disabled = false; startButton.textContent = 'Resume'; }
-          if (pauseButton) pauseButton.disabled = true;
-        }
+        startReader();
+        if (!wasRunning) window.setTimeout(pauseReader, 0);
       }
       return;
     }
@@ -7388,6 +7375,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     source: state.source,
     language: state.language,
     index: state.index,
+    playbackIndex: state.index,
+    viewportAnchorIndex: state.viewportAnchorIndex ?? state.index,
     wasRunning: false,
     controls: captureReaderControls()
   };
@@ -8821,33 +8810,25 @@ function captureReaderLocation() {
   const reader = app.querySelector('#reader');
   const mode = state.renderedMode || getSelectedMode();
   const wasRunning = isReaderRunning();
+  const maxIndex = Math.max(0, state.words.length - 1);
 
-  /*
-    During active playback, the reader engine index is the canonical location.
-    During manual reading or while paused, however, the user may scroll many
-    paragraphs without changing state.index. Saving only the engine index made
-    navigation back from Action Center, Progress, Music, and other app sections
-    restore an older position. In document-style modes, save the word currently
-    visible near the top of the reader instead.
-  */
-  let anchorIndex;
+  // state.index belongs exclusively to the timed-reader playback cursor.
+  // Viewport inspection must never rewrite it. This prevents a paused
+  // Pointing Guide from resuming at the top visible word.
+  let cursorIndex = Math.max(0, Math.min(maxIndex, Number(state.index) || 0));
+  let anchorIndex = cursorIndex;
   const engineOnlyModes = new Set(['flash', 'digital-sign', 'pacman']);
 
   if (mode === 'two-column') {
     anchorIndex = reader ? visibleReadingAnchor(reader, currentReadingPosition()) : currentReadingPosition();
   } else if (reader && !wasRunning && !engineOnlyModes.has(mode)) {
-    anchorIndex = visibleReadingAnchor(reader, state.index);
-  } else {
-    anchorIndex = Number(state.index);
-    if (!Number.isFinite(anchorIndex) || anchorIndex < 0) {
-      anchorIndex = reader ? visibleReadingAnchor(reader, 0) : 0;
-    }
+    anchorIndex = visibleReadingAnchor(reader, state.viewportAnchorIndex ?? cursorIndex);
   }
 
-  anchorIndex = Math.max(0, Math.min(Math.max(0, state.words.length - 1), Number(anchorIndex) || 0));
-  state.index = anchorIndex;
+  anchorIndex = Math.max(0, Math.min(maxIndex, Number(anchorIndex) || 0));
+  state.viewportAnchorIndex = anchorIndex;
 
-  return { anchorIndex, wasRunning };
+  return { anchorIndex, cursorIndex, wasRunning };
 }
 
 function bookSpreadForWordIndex(reader, wordIndex) {
@@ -8871,8 +8852,11 @@ function bookSpreadForWordIndex(reader, wordIndex) {
 
 function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
   if (!snapshot) return;
-  const anchorIndex = Math.max(0, Math.min(state.words.length - 1, Number(snapshot.anchorIndex) || 0));
-  state.index = anchorIndex;
+  const maxIndex = Math.max(0, state.words.length - 1);
+  const anchorIndex = Math.max(0, Math.min(maxIndex, Number(snapshot.anchorIndex) || 0));
+  const cursorIndex = Math.max(0, Math.min(maxIndex, Number(snapshot.cursorIndex ?? snapshot.playbackIndex ?? snapshot.anchorIndex) || 0));
+  state.viewportAnchorIndex = anchorIndex;
+  state.index = cursorIndex;
   const restoreToken = (state.readerRestoreToken || 0) + 1;
   state.readerRestoreToken = restoreToken;
   window.requestAnimationFrame(() => {
@@ -8897,10 +8881,11 @@ function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
         const spread = bookSpreadForWordIndex(reader, anchorIndex);
         if (spread != null) goToBookSpread(spread, { behavior: 'auto', ensureRendered: true, syncReaderPosition: false });
       }
-      state.index = anchorIndex;
+      state.viewportAnchorIndex = anchorIndex;
+      state.index = cursorIndex;
       updateReaderStatus();
       const start = app.querySelector('#start-reader');
-      if (start && mode !== 'two-column') start.textContent = anchorIndex ? 'Resume' : 'Start';
+      if (start && mode !== 'two-column') start.textContent = cursorIndex ? 'Resume' : 'Start';
       if (snapshot.wasRunning && mode !== 'two-column') startReader();
       persistReaderSession();
     });
@@ -9251,16 +9236,6 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 function startReader() {
   const selectedMode = getSelectedMode();
   if (selectedMode === 'two-column') return;
-
-  // Resume must continue from the live logical position, including a position
-  // selected by clicking within the document. Capture it before stop/setup
-  // work and restore it after any view preparation below.
-  const requestedResumeIndex = Math.max(
-    0,
-    Math.min(Math.max(0, state.words.length - 1), Number(state.index) || 0)
-  );
-  let preserveManualSeekViewportOnce = Boolean(state.preserveManualSeekViewportOnce);
-  state.preserveManualSeekViewportOnce = false;
   const currentTickerStage = app.querySelector('.digital-sign-stage');
   const canResumeTicker = selectedMode === 'digital-sign'
     && state.tickerPaused
@@ -9295,10 +9270,6 @@ function startReader() {
       || state.renderedMeaningfulChunks !== expectedMeaningful) {
     prepareReaderView(mode, count);
   }
-
-  // View preparation may rebuild DOM groups, but it must never replace the
-  // current resume point with an older visible/rendered anchor.
-  state.index = requestedResumeIndex;
 
   if (mode === 'digital-sign') {
     startDigitalSignReader({ reader, speed, start, pause });
@@ -9386,10 +9357,7 @@ function startReader() {
         if (mode === 'marquee') group.classList.remove('pending-group');
       }
       if (mode === 'pointing-guide' && pointingStep) {
-        // A deliberate seek already placed the selected word where the user
-        // chose it. Do not recenter that first frame to the top guide line.
-        if (!preserveManualSeekViewportOnce) scrollPointingStep(reader, pointingStep);
-        preserveManualSeekViewportOnce = false;
+        scrollPointingStep(reader, pointingStep);
         const stepStart = startIndex;
         const stepEnd = nextIndex;
         window.requestAnimationFrame(() => {

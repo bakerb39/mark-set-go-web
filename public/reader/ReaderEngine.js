@@ -7,7 +7,7 @@
     constructor(initialState = {}) {
       this.book = null;
       this.state = Object.assign({
-        words: [], originalText: '', currentText: '', title: '', language: 'en', index: 0,
+        words: [], originalText: '', currentText: '', title: '', language: 'en', index: 0, viewportAnchorIndex: 0,
         interval: null, runToken: 0, nextTickAt: 0, wordElements: [], activeElements: [], groupElements: [],
         renderedGroupSize: 1, wpm: 300, renderedMode: null, translationCache: new Map(), renderedWordStart: 0, renderedWordEnd: 0, virtualized: false,
         tickerAnimation: null, tickerPaused: false, tickerStatusTimer: null, tickerStartIndex: 0,
@@ -33,6 +33,7 @@
         source: model.source,
         words: model.words,
         index: 0,
+        viewportAnchorIndex: 0,
         renderedMode: null,
         renderedWordStart: 0,
         renderedWordEnd: 0,
@@ -75,6 +76,8 @@
         source: this.state.source,
         language: this.state.language,
         index: this.state.index,
+        playbackIndex: this.state.index,
+        viewportAnchorIndex: Number(this.state.viewportAnchorIndex ?? this.state.index) || 0,
         wasRunning,
         controls
       };
