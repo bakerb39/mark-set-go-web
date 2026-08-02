@@ -1,8 +1,8 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.7.16",
+  "version": "8.0.0",
   "private": true,
-  "description": "Mark, Set, Go! cost-controlled cloud document adapter with protected reader architecture.",
+  "description": "Mark, Set, Go! unified document manager with cloud/local document resolution and protected reader architecture.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
