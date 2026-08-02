@@ -17,6 +17,24 @@
   const nativeSetItem = Storage.prototype.setItem;
   const nativeRemoveItem = Storage.prototype.removeItem;
 
+  function progressSnapshot(value) {
+    const parsed = parseJsonObject(value);
+    const genesis = parsed['1i3fqgy'];
+    return genesis ? {
+      lastWord: genesis.lastWord,
+      furthestWord: genesis.furthestWord,
+      lastReadAt: genesis.lastReadAt,
+      sessions: genesis.sessions
+    } : null;
+  }
+
+  function traceProgress(stage, details = {}) {
+    console.groupCollapsed(`[MSG progress trace] ${stage}`);
+    console.log(details);
+    console.trace('Trace');
+    console.groupEnd();
+  }
+
   function isManagedKey(key) {
     const value = String(key || '');
     return !DEVICE_ONLY_KEYS.has(value) && KEY_PREFIXES.some((prefix) => value.startsWith(prefix));
@@ -158,6 +176,11 @@
   }
 
   Storage.prototype.setItem = function patchedSetItem(key, value) {
+    if (this === localStorage && String(key) === READING_PROGRESS_KEY) {
+      const before = progressSnapshot(localStorage.getItem(READING_PROGRESS_KEY));
+      const after = progressSnapshot(value);
+      traceProgress('localStorage.setItem', { before, after });
+    }
     nativeSetItem.call(this, key, value);
     if (this === localStorage) scheduleFlush(key, value);
   };
@@ -175,6 +198,10 @@
       ? payload.appState
       : (await request('/api/account/state')).state || {};
     const local = localEntries();
+    traceProgress('synchronize: inputs', {
+      local: progressSnapshot(local[READING_PROGRESS_KEY]),
+      cloud: progressSnapshot(cloud[READING_PROGRESS_KEY])
+    });
     const resolved = {};
     const updatesForCloud = {};
     const keys = new Set([...Object.keys(cloud), ...Object.keys(local)]);
@@ -188,9 +215,20 @@
       }
     });
 
+    traceProgress('synchronize: resolved', {
+      resolved: progressSnapshot(resolved[READING_PROGRESS_KEY]),
+      updateForCloud: progressSnapshot(updatesForCloud[READING_PROGRESS_KEY])
+    });
+
     state.applying = true;
     try {
       Object.entries(resolved).forEach(([key, value]) => {
+        if (key === READING_PROGRESS_KEY) {
+          traceProgress('synchronize: hydrate local', {
+            before: progressSnapshot(localStorage.getItem(READING_PROGRESS_KEY)),
+            after: progressSnapshot(value)
+          });
+        }
         nativeSetItem.call(localStorage, key, value);
       });
     } finally {
