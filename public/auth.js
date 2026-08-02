@@ -42,9 +42,46 @@
     document.body.classList.remove('beta-gate-active');
   }
 
+
+  function clerkModalIsPresent() {
+    return Boolean(document.querySelector(
+      '.cl-modalBackdrop, .cl-modalContent, [class*="cl-modal"], [data-clerk-modal], [data-clerk-component="SignIn"], [data-clerk-component="SignUp"]'
+    ));
+  }
+
+  function openClerkAuthDialog(kind) {
+    if (!state.clerk) return;
+    document.body.classList.add('clerk-auth-dialog-open');
+    const open = kind === 'signUp' ? state.clerk.openSignUp?.bind(state.clerk) : state.clerk.openSignIn?.bind(state.clerk);
+    if (!open) {
+      document.body.classList.remove('clerk-auth-dialog-open');
+      return;
+    }
+
+    open();
+
+    let appeared = false;
+    const startedAt = Date.now();
+    const observer = new MutationObserver(() => {
+      const present = clerkModalIsPresent();
+      if (present) appeared = true;
+      if ((appeared && !present) || (!appeared && Date.now() - startedAt > 5000)) {
+        observer.disconnect();
+        document.body.classList.remove('clerk-auth-dialog-open');
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.setTimeout(() => {
+      if (!appeared && !clerkModalIsPresent()) {
+        observer.disconnect();
+        document.body.classList.remove('clerk-auth-dialog-open');
+      }
+    }, 5500);
+  }
+
   function bindGateGuestActions() {
-    document.getElementById('beta-gate-sign-in')?.addEventListener('click', () => state.clerk?.openSignIn());
-    document.getElementById('beta-gate-sign-up')?.addEventListener('click', () => state.clerk?.openSignUp());
+    document.getElementById('beta-gate-sign-in')?.addEventListener('click', () => openClerkAuthDialog('signIn'));
+    document.getElementById('beta-gate-sign-up')?.addEventListener('click', () => openClerkAuthDialog('signUp'));
   }
 
   function renderGateForGuest() {
@@ -114,8 +151,8 @@
       <button class="auth-nav-button" id="auth-sign-in" type="button">Sign in</button>
       <button class="auth-nav-button auth-nav-primary" id="auth-sign-up" type="button">Create account</button>
     `);
-    document.getElementById('auth-sign-in')?.addEventListener('click', () => state.clerk?.openSignIn());
-    document.getElementById('auth-sign-up')?.addEventListener('click', () => state.clerk?.openSignUp());
+    document.getElementById('auth-sign-in')?.addEventListener('click', () => openClerkAuthDialog('signIn'));
+    document.getElementById('auth-sign-up')?.addEventListener('click', () => openClerkAuthDialog('signUp'));
   }
 
   function renderSignedInControls() {

@@ -8598,3 +8598,7 @@ body.light .comprehension-actions,
 .beta-access-card p{margin:0;color:#53645d;line-height:1.55}
 .beta-access-actions{display:flex;justify-content:center;gap:.65rem;flex-wrap:wrap;margin-top:1.35rem}
 .beta-access-actions .auth-nav-button{min-width:120px}
+
+/* v7.7.3: expose Clerk's authentication dialog above the private-beta gate. */
+body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;transition:opacity .12s ease}
+.cl-modalBackdrop,.cl-modalContent,[class*="cl-modal"],[data-clerk-modal]{z-index:2147483647!important}
