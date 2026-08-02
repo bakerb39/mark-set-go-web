@@ -32,6 +32,92 @@
     return entries;
   }
 
+  const READING_PROGRESS_KEY = 'markSetGoReadingProgressV1';
+
+  function parseJsonObject(value) {
+    try {
+      const parsed = JSON.parse(String(value ?? ''));
+      return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function timestamp(value) {
+    const parsed = Date.parse(String(value || ''));
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function finiteNumber(value, fallback = 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+
+  function mergeProgressRecord(localRecord, cloudRecord) {
+    const local = localRecord && typeof localRecord === 'object' ? localRecord : {};
+    const cloud = cloudRecord && typeof cloudRecord === 'object' ? cloudRecord : {};
+    const localTime = timestamp(local.lastReadAt);
+    const cloudTime = timestamp(cloud.lastReadAt);
+    const newest = localTime >= cloudTime ? local : cloud;
+    const older = newest === local ? cloud : local;
+
+    const localLastWord = Math.max(0, finiteNumber(local.lastWord));
+    const cloudLastWord = Math.max(0, finiteNumber(cloud.lastWord));
+    let lastWord = finiteNumber(newest.lastWord);
+
+    // A zero resume point is frequently produced during startup before the
+    // document has been restored. Do not let that transient value erase a
+    // valid checkpoint from the other copy. An explicit reset can later be
+    // represented by a dedicated reset marker rather than an ambiguous zero.
+    if (lastWord <= 0) {
+      lastWord = newest === local ? cloudLastWord : localLastWord;
+    }
+
+    return {
+      ...older,
+      ...newest,
+      documentId: newest.documentId || older.documentId,
+      lastWord: Math.max(0, finiteNumber(lastWord)),
+      furthestWord: Math.max(
+        finiteNumber(local.furthestWord),
+        finiteNumber(cloud.furthestWord),
+        finiteNumber(lastWord)
+      ),
+      totalSeconds: Math.max(finiteNumber(local.totalSeconds), finiteNumber(cloud.totalSeconds)),
+      totalWordsRead: Math.max(finiteNumber(local.totalWordsRead), finiteNumber(cloud.totalWordsRead)),
+      sessions: Math.max(finiteNumber(local.sessions), finiteNumber(cloud.sessions)),
+      lastReadAt: localTime >= cloudTime
+        ? (local.lastReadAt || cloud.lastReadAt)
+        : (cloud.lastReadAt || local.lastReadAt)
+    };
+  }
+
+  function mergeReadingProgress(localValue, cloudValue) {
+    const local = parseJsonObject(localValue);
+    const cloud = parseJsonObject(cloudValue);
+    const merged = {};
+    const documentIds = new Set([...Object.keys(cloud), ...Object.keys(local)]);
+
+    documentIds.forEach((documentId) => {
+      if (!(documentId in local)) {
+        merged[documentId] = cloud[documentId];
+      } else if (!(documentId in cloud)) {
+        merged[documentId] = local[documentId];
+      } else {
+        merged[documentId] = mergeProgressRecord(local[documentId], cloud[documentId]);
+      }
+    });
+
+    return JSON.stringify(merged);
+  }
+
+  function resolveEntry(key, localValue, cloudValue) {
+    if (key === READING_PROGRESS_KEY && localValue != null && cloudValue != null) {
+      return mergeReadingProgress(localValue, cloudValue);
+    }
+    return cloudValue != null ? String(cloudValue) : String(localValue ?? '');
+  }
+
   async function request(path, options = {}) {
     const response = await fetch(path, {
       credentials: 'same-origin',
@@ -89,31 +175,38 @@
       ? payload.appState
       : (await request('/api/account/state')).state || {};
     const local = localEntries();
-    const missingFromCloud = {};
+    const resolved = {};
+    const updatesForCloud = {};
+    const keys = new Set([...Object.keys(cloud), ...Object.keys(local)]);
 
-    Object.entries(local).forEach(([key, value]) => {
-      if (!(key in cloud)) missingFromCloud[key] = value;
+    keys.forEach((key) => {
+      if (!isManagedKey(key)) return;
+      const value = resolveEntry(key, local[key], cloud[key]);
+      resolved[key] = value;
+      if (!(key in cloud) || String(cloud[key] ?? '') !== value) {
+        updatesForCloud[key] = value;
+      }
     });
 
     state.applying = true;
     try {
-      Object.entries(cloud).forEach(([key, value]) => {
-        if (isManagedKey(key)) nativeSetItem.call(localStorage, key, String(value ?? ''));
+      Object.entries(resolved).forEach(([key, value]) => {
+        nativeSetItem.call(localStorage, key, value);
       });
     } finally {
       state.applying = false;
     }
 
-    if (Object.keys(missingFromCloud).length) {
+    if (Object.keys(updatesForCloud).length) {
       await request('/api/account/state', {
         method: 'PUT',
-        body: JSON.stringify({ entries: missingFromCloud })
+        body: JSON.stringify({ entries: updatesForCloud })
       });
     }
 
     state.ready = true;
     document.dispatchEvent(new CustomEvent('marksetgo:state-ready', {
-      detail: { cloudKeys: Object.keys(cloud).length, migratedKeys: Object.keys(missingFromCloud).length }
+      detail: { cloudKeys: Object.keys(cloud).length, migratedKeys: Object.keys(updatesForCloud).length }
     }));
 
     // A one-time refresh lets the existing synchronous reader code initialize
