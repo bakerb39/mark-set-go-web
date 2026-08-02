@@ -123,13 +123,47 @@ app.post('/api/email/test', async (req,res)=>{
   try { await sendResendEmail({to:record.email,subject:'Your Mark, Set, Go! email is ready',html:emailFrame('Email notifications are ready','<p>You can now receive reading reminders, newsletter updates, and scheduled notes according to your preferences.</p>',clientId),text:'Your Mark, Set, Go! email notifications are ready.'}); res.json({ok:true}); }
   catch(error){ res.status(503).json({error:error.message}); }
 });
+function normalizeEmailNotes(input) {
+  return (Array.isArray(input) ? input : []).slice(0, 200).map((note, index) => {
+    const body = String(note?.body || note?.note || note?.text || note?.selection || note?.result?.response || '').trim();
+    return {
+      id: String(note?.id || `email-note-${index}`).slice(0, 120),
+      title: String(note?.title || note?.documentTitle || 'Reading note').trim().slice(0, 220),
+      body: body.slice(0, 12000),
+      context: String(note?.context || note?.chapter || note?.pageContext || note?.word || '').trim().slice(0, 500),
+      type: String(note?.type || note?.recordType || 'note').trim().slice(0, 60),
+      updatedAt: String(note?.updatedAt || note?.createdAt || new Date().toISOString()).slice(0, 50)
+    };
+  }).filter((note) => note.body);
+}
+function notesEmailContent(notes) {
+  const items = notes.map((note) => `<li style="margin-bottom:18px"><strong>${escapeEmail(note.title)}</strong>${note.context ? `<div style="font-size:12px;color:#667;margin:3px 0 7px">${escapeEmail(note.context)}</div>` : ''}<div style="white-space:pre-wrap">${escapeEmail(note.body)}</div></li>`).join('');
+  const text = notes.map((note) => `${note.title}${note.context ? ` — ${note.context}` : ''}\n${note.body}`).join('\n\n---\n\n');
+  return { html: `<p>Here are ${notes.length} saved ${notes.length === 1 ? 'note' : 'notes'}:</p><ol>${items}</ol>`, text };
+}
+app.post('/api/email/sync-notes', (req,res) => {
+  const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
+  if (!record?.active) return res.status(404).json({error:'Save email preferences first.'});
+  record.notesData=normalizeEmailNotes(req.body?.notes);
+  record.updatedAt=new Date().toISOString(); emailSubscriptions.set(clientId,record);
+  res.json({ok:true,count:record.notesData.length});
+});
 app.post('/api/email/send-notes', async (req,res)=>{
   const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
   if (!record?.active || !record.notes) return res.status(400).json({error:'Notes email is not enabled.'});
-  const notes=(Array.isArray(req.body?.notes)?req.body.notes:[]).slice(0,50);
-  if (!notes.length) return res.status(400).json({error:'There are no notes to email.'});
-  const items=notes.map(n=>`<li style="margin-bottom:14px"><strong>${escapeEmail(n.title||n.documentTitle||'Reading note')}</strong><br>${escapeEmail(n.note||n.text||'')}</li>`).join('');
-  try { await sendResendEmail({to:record.email,subject:'Your reading notes from Mark, Set, Go!',html:emailFrame('Your reading notes',`<p>Here are the notes you asked to receive:</p><ul>${items}</ul>`,clientId),text:notes.map(n=>`${n.title||'Reading note'}: ${n.note||n.text||''}`).join('\n\n')}); res.json({ok:true,count:notes.length}); }
+  const notes=normalizeEmailNotes(req.body?.notes?.length ? req.body.notes : record.notesData);
+  if (!notes.length) return res.status(400).json({error:'There are no note contents to email. Save a reader note or a Mark Notebook entry first.'});
+  if (!rateLimitEmail(req,`notes:${record.email}`,8)) return res.status(429).json({error:'Too many note emails. Try again later.'});
+  const content=notesEmailContent(notes);
+  try { await sendResendEmail({to:record.email,subject:`Your ${notes.length} reading ${notes.length === 1 ? 'note' : 'notes'} from Mark, Set, Go!`,html:emailFrame('Your reading notes',content.html,clientId),text:content.text}); record.notesData=notes; record.lastNotesEmailAt=new Date().toISOString(); res.json({ok:true,count:notes.length}); }
+  catch(error){ res.status(503).json({error:error.message}); }
+});
+app.post('/api/email/newsletter-preview', async (req,res)=>{
+  const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
+  if (!record?.active || !record.newsletter) return res.status(400).json({error:'Newsletter subscription is not enabled.'});
+  if (!rateLimitEmail(req,`newsletter:${record.email}`,3)) return res.status(429).json({error:'Too many newsletter previews. Try again later.'});
+  const body='<p>Your newsletter subscription is working.</p><p>Future editions can include reading progress, new Mark, Set, Go! features, recommended books, learning prompts, and practical ways to turn reading into action.</p><p><strong>This is a delivery preview, not a recurring published edition.</strong></p>';
+  try { await sendResendEmail({to:record.email,subject:'Mark, Set, Go! newsletter preview',html:emailFrame('Newsletter preview',body,clientId),text:'Your Mark, Set, Go! newsletter subscription is working. This is a delivery preview, not a recurring published edition.'}); res.json({ok:true}); }
   catch(error){ res.status(503).json({error:error.message}); }
 });
 app.get('/api/email/unsubscribe', (req,res)=>{ const id=String(req.query.clientId||''); const record=emailSubscriptions.get(id); if(record){record.active=false;record.newsletter=false;record.reminders=false;record.notes=false;} res.type('html').send('<h1>You are unsubscribed</h1><p>You will no longer receive Mark, Set, Go! emails.</p>'); });
@@ -148,6 +182,26 @@ setInterval(async()=>{
     }
   }
 },60000).unref();
+
+
+setInterval(async()=>{
+  if(!emailConfigured()) return;
+  const now=Date.now();
+  const intervals={daily:24*60*60*1000,weekly:7*24*60*60*1000,monthly:30*24*60*60*1000};
+  for(const record of emailSubscriptions.values()){
+    if(!record.active||!record.notes||!record.notesData?.length) continue;
+    const interval=intervals[record.notesFrequency]||intervals.weekly;
+    const last=Date.parse(record.lastNotesDigestAt||record.updatedAt||0)||0;
+    if(now-last<interval) continue;
+    const changed=record.notesData.filter(note=>(Date.parse(note.updatedAt)||0)>last);
+    const notes=changed.length?changed:record.notesData;
+    const content=notesEmailContent(notes);
+    try {
+      await sendResendEmail({to:record.email,subject:`Your ${record.notesFrequency} reading notes digest`,html:emailFrame('Reading notes digest',content.html,record.clientId),text:content.text});
+      record.lastNotesDigestAt=new Date().toISOString();
+    } catch(error){ console.error('Notes digest email failed:',error.message); }
+  }
+},15*60*1000).unref();
 
 const COMPREHENSION_MODEL = process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
 
