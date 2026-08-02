@@ -2937,31 +2937,19 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   refreshFocusAnchorStyle();
   updateFocusAnchorOverlay();
 
-  // Book Pages needs a geometry pass after the DOM has its final font, width,
-  // mode and page setting. Merely checking the checkbox is not sufficient.
+  // Protected Book Pages refresh restoration:
+  // restore the visible spread from the saved viewport anchor while keeping
+  // the independent playback cursor at savedIndex.
   requestAnimationFrame(() => {
-    if (state.bookPages) {
-      scheduleBookPageReflow();
-      requestAnimationFrame(() => {
-        const activeReader = app.querySelector('#reader');
-        if (activeReader) {
-          ensureWordsRendered(activeReader, mode, wordCount, state.index + 100);
-          const target =
-            activeReader.querySelector(`.reader-word[data-index="${state.index}"]`) ||
-            activeReader.querySelector(`.reader-group[data-start-index="${state.index}"]`);
-          if (target) {
-            const readerRect = activeReader.getBoundingClientRect();
-            const targetRect = target.getBoundingClientRect();
-            const metrics = applyBookPageMetrics(activeReader);
-            const absoluteLeft = targetRect.left - readerRect.left + activeReader.scrollLeft - metrics.paddingLeft;
-            const pageIndex = Math.max(0, Math.floor(absoluteLeft / Math.max(1, metrics.pagePitch)));
-            goToBookSpread(Math.floor(pageIndex / 2), { behavior: 'auto', ensureRendered: true });
-          } else {
-            updateBookPageStatus();
-          }
-        }
-      });
-    }
+    if (!state.bookPages) return;
+    scheduleBookPageReflow({ anchorIndex: savedViewportAnchor });
+    requestAnimationFrame(() => {
+      restoreBookPageWordAnchor(savedViewportAnchor);
+      state.viewportAnchorIndex = savedViewportAnchor;
+      state.index = savedIndex;
+      readerEngine.setPosition(savedIndex);
+      updateReaderStatus();
+    });
   });
 
   const restoreSavedViewport = () => {
