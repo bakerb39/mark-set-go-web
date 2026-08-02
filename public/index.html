@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=7.6.8" rel="stylesheet"/>
+<link href="/styles.css?v=7.7.0" rel="stylesheet"/>
 <script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/SessionManager.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/ReaderEngine.js?v=3.2.1-stable-recovery"></script>
@@ -15,7 +15,8 @@
   <script defer src="/modules/reading/pacman-mode.js?v=7.2.2"></script>
   <script defer src="/modules/pages/help-page.js?v=7.2.1"></script>
   <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
-  <script defer src="/app.js?v=7.6.8"></script>
+  <script defer src="/auth.js?v=7.7.3"></script>
+  <script defer src="/app.js?v=7.7.0"></script>
 </head>
 <body>
 <header class="site-header">
@@ -114,6 +115,7 @@
 <button data-action="terms" type="button"><span class="menu-icon">§</span> Terms</button>
 </div>
 </details>
+<span id="auth-controls" class="auth-controls" aria-live="polite"><span class="auth-status">Guest</span></span>
 <button id="top-help-button" class="top-level-nav-button" data-action="help" type="button" aria-label="Open Help"><span class="nav-icon" aria-hidden="true">?</span> Help</button>
 </nav>
 </header>
@@ -140,7 +142,7 @@
 <button type="button" data-action="terms">Terms</button>
 <button type="button" data-action="help">Help</button>
 </nav>
-<small>© 2026 Brian Baker. All rights reserved. Version 7.5.9.</small>
+<small>© 2026 Brian Baker. All rights reserved. Version 7.7.0.</small>
 </footer>
 </body>
 </html>
