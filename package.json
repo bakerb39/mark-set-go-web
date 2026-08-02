@@ -1,13 +1,14 @@
 {
   "name": "mark-set-go-web",
-  "version": "7.7.22",
+  "version": "7.7.23",
   "private": true,
   "description": "Mark, Set, Go! database-backed account state migration with PostgreSQL persistence and protected reader architecture.",
   "main": "server.js",
   "scripts": {
     "start": "npm run db:migrate && node server.js",
     "dev": "node --watch server.js",
-    "db:migrate": "node scripts/migrate.js"
+    "db:migrate": "node scripts/migrate.js",
+    "test:book-pages-resume": "node scripts/test-book-pages-resume.js"
   },
   "engines": {
     "node": ">=20"

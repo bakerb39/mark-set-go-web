@@ -2951,31 +2951,19 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   refreshFocusAnchorStyle();
   updateFocusAnchorOverlay();
 
-  // Book Pages needs a geometry pass after the DOM has its final font, width,
-  // mode and page setting. Merely checking the checkbox is not sufficient.
+  // Book Pages must restore by word containment, not only by an exact
+  // group-start match. A saved cursor can sit inside a multi-word group, and
+  // the previous exact selector left those resumes on the first spread. Use
+  // the existing canonical range-aware Book Pages anchor restoration instead.
   requestAnimationFrame(() => {
-    if (state.bookPages) {
-      scheduleBookPageReflow();
-      requestAnimationFrame(() => {
-        const activeReader = app.querySelector('#reader');
-        if (activeReader) {
-          ensureWordsRendered(activeReader, mode, wordCount, state.index + 100);
-          const target =
-            activeReader.querySelector(`.reader-word[data-index="${state.index}"]`) ||
-            activeReader.querySelector(`.reader-group[data-start-index="${state.index}"]`);
-          if (target) {
-            const readerRect = activeReader.getBoundingClientRect();
-            const targetRect = target.getBoundingClientRect();
-            const metrics = applyBookPageMetrics(activeReader);
-            const absoluteLeft = targetRect.left - readerRect.left + activeReader.scrollLeft - metrics.paddingLeft;
-            const pageIndex = Math.max(0, Math.floor(absoluteLeft / Math.max(1, metrics.pagePitch)));
-            goToBookSpread(Math.floor(pageIndex / 2), { behavior: 'auto', ensureRendered: true });
-          } else {
-            updateBookPageStatus();
-          }
-        }
-      });
-    }
+    if (!state.bookPages) return;
+    scheduleBookPageReflow({ anchorIndex: savedViewportAnchor });
+    requestAnimationFrame(() => {
+      restoreBookPageWordAnchor(savedViewportAnchor);
+      state.viewportAnchorIndex = savedViewportAnchor;
+      state.index = savedIndex;
+      updateReaderStatus();
+    });
   });
 
   const restoreSavedViewport = () => {
@@ -5142,17 +5130,17 @@ function jumpToWordIndex(wordIndex) {
     if (!reader) return;
     if (!['flash', 'digital-sign'].includes(mode)) {
       ensureWordsRendered(reader, mode, groupSize, index + 100);
-      const target = reader.querySelector(`.reader-word[data-index="${index}"]`)
-        || reader.querySelector(`.reader-group[data-start-index="${index}"]`);
-      if (target) {
-        if (state.bookPages) {
-          const readerRect = reader.getBoundingClientRect();
-          const targetRect = target.getBoundingClientRect();
-          const metrics = applyBookPageMetrics(reader);
-          const absoluteLeft = targetRect.left - readerRect.left + reader.scrollLeft - metrics.paddingLeft;
-          const pageIndex = Math.max(0, Math.floor((absoluteLeft + Math.min(targetRect.width / 2, metrics.pageWidth / 4)) / metrics.pagePitch));
-          goToBookSpread(Math.floor(pageIndex / 2), { behavior: 'auto', ensureRendered: true });
-        } else {
+      if (state.bookPages) {
+        // Use the same range-aware word-to-spread mapping as session restore.
+        // Exact group-start selectors fail whenever the saved word is inside a
+        // multi-word group rather than at its first index.
+        restoreBookPageWordAnchor(index);
+        state.viewportAnchorIndex = index;
+        state.index = index;
+      } else {
+        const target = reader.querySelector(`.reader-word[data-index="${index}"]`)
+          || reader.querySelector(`.reader-group[data-start-index="${index}"]`);
+        if (target) {
           const readerRect = reader.getBoundingClientRect();
           const targetRect = target.getBoundingClientRect();
           reader.scrollTop = Math.max(0, reader.scrollTop + targetRect.top - readerRect.top - 20);
