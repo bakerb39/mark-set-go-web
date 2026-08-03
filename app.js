@@ -2815,7 +2815,13 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   const fontFamily = controls.fontFamily || 'system';
   const theme = controls.theme || 'dark';
   const savedIndex = Math.max(0, Number(snapshot.playbackIndex ?? snapshot.index) || 0);
-  const savedViewportAnchor = Math.max(0, Number(snapshot.viewportAnchorIndex ?? savedIndex) || 0);
+  const rawSavedViewportAnchor = Math.max(0, Number(snapshot.viewportAnchorIndex ?? savedIndex) || 0);
+  // A transient page-one viewport anchor must not discard a valid saved reading
+  // position. This can occur when account state restores before Book Pages has
+  // completed its column layout. Preserve the proven playback position instead.
+  const savedViewportAnchor = rawSavedViewportAnchor === 0 && savedIndex > 0
+    ? savedIndex
+    : rawSavedViewportAnchor;
 
   state.returnIndex = savedIndex;
   state.viewportAnchorIndex = savedViewportAnchor;
@@ -3338,6 +3344,12 @@ function bindAppearance(reader) {
   };
   bookPages?.addEventListener('change', () => {
     const snapshot = captureReaderLocation();
+    // If the DOM is temporarily showing page one while the canonical playback
+    // cursor is farther into the book, do not let that transient zero become
+    // the Book Pages anchor. This is the narrow regression guard only.
+    if (snapshot.anchorIndex === 0 && snapshot.cursorIndex > 0) {
+      snapshot.anchorIndex = snapshot.cursorIndex;
+    }
     stopReader();
     applyBookPages();
     const mode = getSelectedMode();
