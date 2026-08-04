@@ -5,10 +5,13 @@
   const CAPTURE_KEY = 'markSetGoPendingWebCaptureV1';
   const CAPTURE_STORAGE = window.localStorage;
   const IMPORT_HISTORY_KEY = 'markSetGoImportHistoryV1';
+  const FORMAT_RECORD_PREFIX = 'markSetGoReadAnythingFormatV1:';
+  const DOCUMENT_STORAGE_PREFIX = 'markSetGoDocumentV1:';
   let allowLegacyUpload = false;
   let activeImportedDocument = null;
   let activeImportedVersion = 'original';
   let formatControlAttachTimers = [];
+  let pendingImportedRender = false;
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -36,16 +39,90 @@
     localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(items.slice(0, 30)));
   }
 
+
+
+  function importedDocumentKey(documentRecord) {
+    const source = documentRecord?.source || {};
+    if (source.readAnythingKey) return String(source.readAnythingKey);
+    const identity = `${source.type || 'text'}|${source.url || source.name || ''}|${documentRecord?.title || ''}`;
+    let hash = 2166136261;
+    for (let index = 0; index < identity.length; index += 1) {
+      hash ^= identity.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return `ra-${(hash >>> 0).toString(36)}`;
+  }
+
+  function formatRecordStorageKey(key) {
+    return `${FORMAT_RECORD_PREFIX}${key}`;
+  }
+
+  function saveActiveFormatRecord() {
+    if (!activeImportedDocument) return;
+    const key = activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument);
+    activeImportedDocument.source = { ...(activeImportedDocument.source || {}), readAnything: true, readAnythingKey: key };
+    const record = {
+      key,
+      title: activeImportedDocument.baseTitle || activeImportedDocument.title,
+      author: activeImportedDocument.author || '',
+      source: activeImportedDocument.source,
+      versions: activeImportedDocument.versions || {},
+      selectedVersion: activeImportedVersion || 'original',
+      updatedAt: new Date().toISOString()
+    };
+    try { localStorage.setItem(formatRecordStorageKey(key), JSON.stringify(record)); } catch (error) {
+      console.warn('Imported formatting versions could not be stored.', error);
+    }
+  }
+
+  function restoreImportedFormatRecord(documentId) {
+    let storedDocument = null;
+    try { storedDocument = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+    if (!storedDocument?.source?.readAnything) return false;
+    const key = storedDocument.source.readAnythingKey || importedDocumentKey(storedDocument);
+    let record = null;
+    try { record = JSON.parse(localStorage.getItem(formatRecordStorageKey(key)) || 'null'); } catch {}
+    const readingLevel = storedDocument.source.readingLevel || 'original';
+    activeImportedDocument = {
+      title: record?.title || storedDocument.source.adaptedFrom || storedDocument.title.replace(/\s+—\s+.+$/, ''),
+      baseTitle: record?.title || storedDocument.source.adaptedFrom || storedDocument.title.replace(/\s+—\s+.+$/, ''),
+      author: record?.author || storedDocument.source.author || '',
+      source: { ...(record?.source || storedDocument.source), readAnything: true, readAnythingKey: key },
+      versions: { ...(record?.versions || {}), [readingLevel]: storedDocument.text }
+    };
+    if (!activeImportedDocument.versions.original && readingLevel === 'original') activeImportedDocument.versions.original = storedDocument.text;
+    activeImportedVersion = record?.selectedVersion && activeImportedDocument.versions[record.selectedVersion]
+      ? record.selectedVersion
+      : readingLevel;
+    scheduleFormatControlAttach();
+    return true;
+  }
+
   function splitReadableSentences(value) {
     const text = String(value || '').replace(/\s+/g, ' ').trim();
     if (!text) return [];
     const matches = text.match(/[^.!?]+(?:[.!?]+[”"']?|$)/g);
-    return (matches || [text]).map((sentence) => sentence.trim()).filter(Boolean);
+    const sentences = (matches || [text]).map((sentence) => sentence.trim()).filter(Boolean);
+    const expanded = [];
+    for (const sentence of sentences) {
+      if (sentence.length <= 420) {
+        expanded.push(sentence);
+        continue;
+      }
+      const clauses = sentence
+        .split(/(?<=[;:])\s+(?=[A-Z0-9“"'])/)
+        .map((part) => part.trim())
+        .filter(Boolean);
+      if (clauses.length > 1) expanded.push(...clauses);
+      else expanded.push(sentence);
+    }
+    return expanded;
   }
 
-  function paragraphizeLongText(value, { targetCharacters = 520, maxSentences = 4 } = {}) {
+  function paragraphizeLongText(value, { targetCharacters = 320, maxSentences = 3 } = {}) {
     const sentences = splitReadableSentences(value);
-    if (sentences.length <= 1) return String(value || '').trim();
+    if (!sentences.length) return '';
+    if (sentences.length === 1 && sentences[0].length <= targetCharacters) return sentences[0];
     const paragraphs = [];
     let current = [];
     let length = 0;
@@ -58,6 +135,11 @@
       }
       current.push(sentence);
       length += sentence.length + (current.length > 1 ? 1 : 0);
+      if (sentence.length > targetCharacters * 1.4) {
+        paragraphs.push(current.join(' '));
+        current = [];
+        length = 0;
+      }
     }
     if (current.length) paragraphs.push(current.join(' '));
     return paragraphs.join('\n\n');
@@ -78,23 +160,27 @@
       paragraph = [];
     };
     for (const line of lines) {
-      if (!line) { flush(); continue; }
+      if (!line) {
+        flush();
+        continue;
+      }
       const isHeading = /^(chapter|part|section|article|book)\s+[\divxlcdm]+\b/i.test(line)
         || (/^[A-Z0-9][A-Z0-9 ’'“”"—–:-]{3,90}$/.test(line) && line.split(/\s+/).length < 12);
       const isList = /^[•▪◦*-]\s+/.test(line) || /^\d+[.)]\s+/.test(line);
-      if (isHeading || isList) {
+      const isShortQuote = /^[“"].*[”"]$/.test(line) && line.length < 420;
+      if (isHeading || isList || isShortQuote) {
         flush();
         output.push(line);
         continue;
       }
       paragraph.push(line);
-      if (paragraph.join(' ').length > 1100 || (/[.!?][”"']?$/.test(line) && paragraph.join(' ').length > 650)) flush();
+      const joinedLength = paragraph.join(' ').length;
+      if (joinedLength >= 520 || (/[.!?;:][”"']?$/.test(line) && joinedLength >= 300)) flush();
     }
     flush();
     return output
       .join('\n\n')
       .replace(/\n{3,}/g, '\n\n')
-      .replace(/([^\n])\n(?=[^\n])/g, '$1\n\n')
       .trim();
   }
 
@@ -115,9 +201,12 @@
     const text = activeImportedDocument.versions?.[level];
     if (!text) return;
     activeImportedVersion = level;
+    saveActiveFormatRecord();
     const suffix = level === 'original' ? '' : ` — ${versionLabel(level)}`;
-    window.renderReaderWithText(`${activeImportedDocument.title}${suffix}`, text, {
+    pendingImportedRender = true;
+    window.renderReaderWithText(`${activeImportedDocument.baseTitle || activeImportedDocument.title}${suffix}`, text, {
       ...(activeImportedDocument.source || {}),
+      readAnythingKey: activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument),
       author: activeImportedDocument.author || activeImportedDocument.source?.author || '',
       importedAt: activeImportedDocument.source?.importedAt || new Date().toISOString(),
       readAnything: true,
@@ -153,6 +242,7 @@
         if (!response.ok) throw new Error(payload.detail || payload.error || `Server returned HTTP ${response.status}.`);
         if (!payload.text) throw new Error('The server returned an empty adapted version.');
         activeImportedDocument.versions[level] = payload.text;
+        saveActiveFormatRecord();
         showTransformStatus('');
         renderImportedVersion(level);
         return;
@@ -190,6 +280,7 @@
       if (!response.ok) throw new Error(payload.detail || payload.error || `Server returned HTTP ${response.status}.`);
       if (!payload.text) throw new Error('The server returned an empty summary.');
       activeImportedDocument.versions.summary = payload.text;
+      saveActiveFormatRecord();
       showTransformStatus('');
       renderImportedVersion('summary');
     } catch (error) {
@@ -228,7 +319,10 @@
       const levelButton = event.target.closest('[data-level]');
       if (levelButton) {
         const level = levelButton.dataset.level;
-        if (level === 'clean' && !activeImportedDocument.versions.clean) activeImportedDocument.versions.clean = cleanFormatText(activeImportedDocument.versions.original);
+        if (level === 'clean' && !activeImportedDocument.versions.clean) {
+          activeImportedDocument.versions.clean = cleanFormatText(activeImportedDocument.versions.original);
+          saveActiveFormatRecord();
+        }
         renderImportedVersion(level);
         return;
       }
@@ -256,11 +350,17 @@
     if (!text) throw new Error('No readable text was found.');
     if (typeof window.renderReaderWithText !== 'function') throw new Error('The reader is not ready.');
     addHistory({ ...documentRecord, title, text });
+    const readAnythingKey = importedDocumentKey({ ...documentRecord, title });
     activeImportedDocument = {
-      ...documentRecord, title, author: documentRecord.author || documentRecord.source?.author || '',
+      ...documentRecord,
+      title,
+      baseTitle: title,
+      author: documentRecord.author || documentRecord.source?.author || '',
+      source: { ...(documentRecord.source || {}), readAnything: true, readAnythingKey },
       versions: { original: text, clean: cleanFormatText(text) }
     };
     activeImportedVersion = 'original';
+    saveActiveFormatRecord();
     renderImportedVersion('original');
   }
 
@@ -434,6 +534,18 @@
       if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
     }
   }
+
+  document.addEventListener('marksetgo:document-available', (event) => {
+    const documentId = event?.detail?.documentId;
+    if (!documentId) return;
+    if (pendingImportedRender && activeImportedDocument) {
+      pendingImportedRender = false;
+      saveActiveFormatRecord();
+      scheduleFormatControlAttach();
+      return;
+    }
+    restoreImportedFormatRecord(documentId);
+  });
 
   document.addEventListener('click', (event) => {
     const target = event.target.closest?.('[data-read="upload"],[data-action="read-anything"]');

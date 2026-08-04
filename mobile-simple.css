@@ -21,7 +21,6 @@
   }
 
   .site-header,
-  .site-footer,
   .music-dock {
     display: none !important;
   }
@@ -89,7 +88,7 @@
     overscroll-behavior-y: contain;
   }
 
-  #msg-mobile-nav {
+  #msg-shared-bottom {
     position: fixed;
     inset: auto 0 0 0;
     z-index: 10020;
@@ -103,7 +102,7 @@
     -webkit-backdrop-filter: blur(14px);
   }
 
-  #msg-mobile-nav button {
+  #msg-shared-bottom button {
     border: 0;
     border-radius: 12px;
     background: transparent;
@@ -119,12 +118,12 @@
     font-size: 11px;
   }
 
-  #msg-mobile-nav button span:first-child {
+  #msg-shared-bottom nav button span:first-child {
     font-size: 21px;
     line-height: 1;
   }
 
-  #msg-mobile-nav button.active {
+  #msg-shared-bottom nav button.active {
     color: #1769aa;
     background: #eaf3fb;
     font-weight: 700;
@@ -355,7 +354,7 @@
   #app,
   #app.app-shell,
   #msg-mobile-header,
-  #msg-mobile-nav {
+  #msg-shared-bottom {
     box-sizing: border-box;
     width: 100% !important;
     max-width: 100% !important;
@@ -365,7 +364,7 @@
 
   #app *,
   #msg-mobile-header *,
-  #msg-mobile-nav * {
+  #msg-shared-bottom * {
     box-sizing: border-box;
     min-width: 0;
     max-width: 100%;
@@ -604,24 +603,108 @@
   }
 }
 
-/* v8.5.8: one consistent mobile bottom area. Keep only the native shell navigation. */
+
+
+/* v8.5.9: one shared bottom section for desktop and mobile. */
+.shared-bottom-section nav button span[aria-hidden="true"] {
+  display: none;
+}
+
+@media (min-width: 701px) {
+  .shared-bottom-section {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px 28px;
+  }
+
+  .shared-bottom-section nav {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .shared-bottom-section nav button {
+    min-height: 38px;
+  }
+
+  .shared-bottom-section small {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 700px) {
+  #msg-shared-bottom {
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    z-index: 10020 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: calc(var(--msg-mobile-nav) + env(safe-area-inset-bottom, 0)) !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 5px 8px env(safe-area-inset-bottom, 0) !important;
+    display: block !important;
+    border: 0 !important;
+    border-top: 1px solid rgba(20, 33, 61, .12) !important;
+    border-radius: 0 !important;
+    background: rgba(255,255,255,.98) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    overflow: hidden !important;
+  }
+
+  #msg-shared-bottom .site-footer-brand,
+  #msg-shared-bottom > small {
+    display: none !important;
+  }
+
+  #msg-shared-bottom nav {
+    width: 100%;
+    height: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  #msg-shared-bottom nav button {
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: #52606d;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 4px;
+    font: inherit;
+    font-size: 11px;
+  }
+
+  #msg-shared-bottom nav button span[aria-hidden="true"] {
+    display: inline;
+    font-size: 21px;
+    line-height: 1;
+  }
+
+  #msg-shared-bottom nav button.active {
+    color: #1769aa;
+    background: #eaf3fb;
+    font-weight: 700;
+  }
+
   #app .mobile-bottom-nav,
   #app .bottom-navigation,
   #app .bottom-nav,
   #app .sticky-bottom-bar,
   #app .page-bottom-actions,
   #app .library-quick-actions,
-  #app .reader-viewer-footer,
-  body > .site-footer {
+  #app .reader-viewer-footer {
     display: none !important;
-  }
-
-  #msg-mobile-nav {
-    display: grid !important;
-  }
-
-  #app.msg-mobile-list-screen > * {
-    padding-bottom: 12px !important;
   }
 }

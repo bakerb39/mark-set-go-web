@@ -1,9 +1,29 @@
 (() => {
   const mq = window.matchMedia('(max-width: 700px)');
-  if (!mq.matches) return;
-
   const app = document.getElementById('app');
   if (!app) return;
+
+  const sharedNav = document.querySelector('#msg-shared-bottom nav');
+  if (sharedNav && !sharedNav.dataset.sharedBound) {
+    sharedNav.dataset.sharedBound = 'true';
+    sharedNav.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-shared-route]');
+      if (!button) return;
+      const route = button.dataset.sharedRoute;
+      if (route === 'import') {
+        window.MarkSetGoReadAnything?.render?.();
+        return;
+      }
+      const source = route === 'library'
+        ? document.querySelector('[data-action="my-library"]')
+        : route === 'browse'
+          ? document.querySelector('[data-action="browse"]')
+          : document.querySelector('[data-action="reader"]');
+      source?.click();
+    });
+  }
+
+  if (!mq.matches) return;
 
   let lastScreen = '';
   let scheduled = false;
@@ -46,34 +66,6 @@
       header.id = 'msg-mobile-header';
       header.innerHTML = '<span class="msg-mobile-mark">Mark, Set, Go!</span><strong id="msg-mobile-title">My Library</strong>';
       document.body.appendChild(header);
-    }
-
-    if (!document.getElementById('msg-mobile-nav')) {
-      const nav = document.createElement('nav');
-      nav.id = 'msg-mobile-nav';
-      nav.setAttribute('aria-label', 'Mobile navigation');
-      nav.innerHTML = `
-        <button type="button" data-mobile-route="library"><span aria-hidden="true">▥</span><span>Library</span></button>
-        <button type="button" data-mobile-route="browse"><span aria-hidden="true">⌕</span><span>Browse</span></button>
-        <button type="button" data-mobile-route="import"><span aria-hidden="true">⇧</span><span>Import</span></button>
-        <button type="button" data-mobile-route="reader"><span aria-hidden="true">▤</span><span>Reader</span></button>`;
-      nav.addEventListener('click', (event) => {
-        const button = event.target.closest('[data-mobile-route]');
-        if (!button) return;
-        const route = button.dataset.mobileRoute;
-        if (route === 'import') {
-          window.MarkSetGoReadAnything?.render?.();
-          scheduleUpdate();
-          return;
-        }
-        const source = route === 'library'
-          ? document.querySelector('[data-action="my-library"]')
-          : route === 'browse'
-            ? document.querySelector('[data-action="browse"]')
-            : document.querySelector('[data-action="reader"]');
-        source?.click();
-      });
-      document.body.appendChild(nav);
     }
   }
 
@@ -226,8 +218,8 @@
         : screen === 'browse' ? 'Browse' : screen === 'import' ? 'Read Anything' : 'My Library';
     }
 
-    document.querySelectorAll('#msg-mobile-nav [data-mobile-route]').forEach((button) => {
-      button.classList.toggle('active', button.dataset.mobileRoute === screen);
+    document.querySelectorAll('#msg-shared-bottom [data-shared-route]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.sharedRoute === screen);
     });
 
     if (screen === 'reader') configureReader();
