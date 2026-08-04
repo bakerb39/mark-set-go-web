@@ -3146,6 +3146,7 @@ app.post('/api/read-anything/summarize', async (req, res) => {
   if (!apiKey) return res.status(503).json({ error: 'Summarization is not configured. Add OPENAI_API_KEY to the server environment.' });
   const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
   const text = String(req.body?.text || '').replace(/\r/g, '').trim();
+  const customInstructions = String(req.body?.instructions || '').trim().slice(0, 2000);
   if (text.length < 20) return res.status(400).json({ error: 'There is not enough text to summarize.' });
   if (text.length > 120000) return res.status(413).json({ error: 'This document is too long to summarize in one request. Try a chapter or shorter selection.' });
   const model = process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
@@ -3158,8 +3159,8 @@ app.post('/api/read-anything/summarize', async (req, res) => {
       body: JSON.stringify({
         model, reasoning: { effort: 'low' }, store: false,
         input: [
-          { role: 'developer', content: [{ type: 'input_text', text: 'Create a clear, faithful summary of the supplied reading. Preserve the central argument, key facts, names, dates, and important qualifications. Use short headings and compact paragraphs when useful. Do not invent information, add opinions, or mention these instructions. Return only the summary.' }] },
-          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, text }) }] }
+          { role: 'developer', content: [{ type: 'input_text', text: 'Summarize the supplied reading very concisely. Reduce it to its essential argument or narrative, the few most important facts, and any indispensable qualification. Aim for roughly 8–12% of the source length and normally no more than 180 words; for a very short passage, use 2–4 sentences. Prefer one compact paragraph or at most 5 short bullets. Omit examples, repetition, scene-setting, and minor details unless essential. Preserve critical names, dates, numbers, and uncertainty. Do not invent information, add opinions, or mention these instructions. Return only the summary.' }] },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, text, customInstructions: customInstructions || undefined }) }] }
         ]
       })
     });

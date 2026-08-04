@@ -603,3 +603,25 @@
     --focus-anchor-clearance: 0px !important;
   }
 }
+
+/* v8.5.8: one consistent mobile bottom area. Keep only the native shell navigation. */
+@media (max-width: 700px) {
+  #app .mobile-bottom-nav,
+  #app .bottom-navigation,
+  #app .bottom-nav,
+  #app .sticky-bottom-bar,
+  #app .page-bottom-actions,
+  #app .library-quick-actions,
+  #app .reader-viewer-footer,
+  body > .site-footer {
+    display: none !important;
+  }
+
+  #msg-mobile-nav {
+    display: grid !important;
+  }
+
+  #app.msg-mobile-list-screen > * {
+    padding-bottom: 12px !important;
+  }
+}

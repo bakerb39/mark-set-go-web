@@ -36,22 +36,66 @@
     localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(items.slice(0, 30)));
   }
 
+  function splitReadableSentences(value) {
+    const text = String(value || '').replace(/\s+/g, ' ').trim();
+    if (!text) return [];
+    const matches = text.match(/[^.!?]+(?:[.!?]+[”"']?|$)/g);
+    return (matches || [text]).map((sentence) => sentence.trim()).filter(Boolean);
+  }
+
+  function paragraphizeLongText(value, { targetCharacters = 520, maxSentences = 4 } = {}) {
+    const sentences = splitReadableSentences(value);
+    if (sentences.length <= 1) return String(value || '').trim();
+    const paragraphs = [];
+    let current = [];
+    let length = 0;
+    for (const sentence of sentences) {
+      const nextLength = length + sentence.length + (current.length ? 1 : 0);
+      if (current.length && (current.length >= maxSentences || nextLength > targetCharacters)) {
+        paragraphs.push(current.join(' '));
+        current = [];
+        length = 0;
+      }
+      current.push(sentence);
+      length += sentence.length + (current.length > 1 ? 1 : 0);
+    }
+    if (current.length) paragraphs.push(current.join(' '));
+    return paragraphs.join('\n\n');
+  }
+
   function cleanFormatText(value) {
-    const lines = String(value || '').replace(/\r/g, '').split('\n').map((line) => line.replace(/[ \t]+/g, ' ').trim());
+    const lines = String(value || '')
+      .replace(/\r/g, '')
+      .replace(/[ \t]+\n/g, '\n')
+      .split('\n')
+      .map((line) => line.replace(/[ \t]+/g, ' ').trim());
     const output = [];
     let paragraph = [];
-    const flush = () => { if (paragraph.length) { output.push(paragraph.join(' ').replace(/\s+/g, ' ').trim()); paragraph = []; } };
+    const flush = () => {
+      if (!paragraph.length) return;
+      const joined = paragraph.join(' ').replace(/\s+/g, ' ').trim();
+      if (joined) output.push(paragraphizeLongText(joined));
+      paragraph = [];
+    };
     for (const line of lines) {
       if (!line) { flush(); continue; }
-      if (/^(chapter|part|section)\s+[\divxlcdm]+\b/i.test(line) || (/^[A-Z0-9][A-Z0-9 ’'“”"—–:-]{3,90}$/.test(line) && line.split(/\s+/).length < 12)) {
-        flush(); output.push(line); continue;
+      const isHeading = /^(chapter|part|section|article|book)\s+[\divxlcdm]+\b/i.test(line)
+        || (/^[A-Z0-9][A-Z0-9 ’'“”"—–:-]{3,90}$/.test(line) && line.split(/\s+/).length < 12);
+      const isList = /^[•▪◦*-]\s+/.test(line) || /^\d+[.)]\s+/.test(line);
+      if (isHeading || isList) {
+        flush();
+        output.push(line);
+        continue;
       }
-      if (/^[•▪◦*-]\s+/.test(line) || /^\d+[.)]\s+/.test(line)) { flush(); output.push(line); continue; }
       paragraph.push(line);
-      if (/[.!?][”"']?$/.test(line) && paragraph.join(' ').length > 420) flush();
+      if (paragraph.join(' ').length > 1100 || (/[.!?][”"']?$/.test(line) && paragraph.join(' ').length > 650)) flush();
     }
     flush();
-    return output.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+    return output
+      .join('\n\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/([^\n])\n(?=[^\n])/g, '$1\n\n')
+      .trim();
   }
 
   function versionLabel(level) {
