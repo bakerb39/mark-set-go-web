@@ -8,7 +8,7 @@
   let allowLegacyUpload = false;
   let activeImportedDocument = null;
   let activeImportedVersion = 'original';
-  let formatControlObserver = null;
+  let formatControlAttachTimers = [];
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -80,9 +80,7 @@
       adaptedFrom: activeImportedDocument.title,
       readingLevel: level
     });
-    window.setTimeout(installFormatControl, 0);
-    window.setTimeout(installFormatControl, 100);
-    window.setTimeout(installFormatControl, 500);
+    scheduleFormatControlAttach();
   }
 
   async function requestReadingLevel(level) {
@@ -127,18 +125,20 @@
       : lastError?.message || 'The reading-level version could not be created.');
   }
 
-  function ensureFormatControlObserver() {
-    if (formatControlObserver || !document.body) return;
-    formatControlObserver = new MutationObserver(() => {
-      if (!activeImportedDocument) return;
-      window.requestAnimationFrame(installFormatControl);
+  function scheduleFormatControlAttach() {
+    formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
+    formatControlAttachTimers = [];
+    [0, 50, 150, 400, 900].forEach((delay) => {
+      const timer = window.setTimeout(() => {
+        if (!activeImportedDocument) return;
+        installFormatControl();
+      }, delay);
+      formatControlAttachTimers.push(timer);
     });
-    formatControlObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   function installFormatControl() {
     if (!activeImportedDocument) return;
-    ensureFormatControlObserver();
     const titleRow = document.querySelector('.reader-title-row');
     if (!titleRow || titleRow.querySelector('#read-anything-format-control')) return;
     const control = document.createElement('details');

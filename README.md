@@ -1,20 +1,15 @@
-# v8.4.2 My Library responsiveness fix
+# Mark, Set, Go! v8.4.3 — My Library Freeze Fix
 
 Replace only:
 
-- `app.js`
-- `public/app.js`
+- `read-anything.js`
+- `public/read-anything.js`
 
-The change is limited to `renderMyLibraryHub()`.
-
-## Cause
-
-My Library synchronously parsed the complete stored text for the primary item and up to six recent items, then ran reading-difficulty analysis before the page's click handlers were attached. Large EPUB/PDF books and multiple web imports could block the browser main thread.
+## Root cause
+The Format-control fix created a `MutationObserver` on the entire document and left it active after navigating away from an imported reader. My Library performs many DOM updates, so the observer repeatedly queued format-control work and could saturate the browser main thread indefinitely.
 
 ## Fix
-
-My Library now displays only reading-profile badges already present in the profile cache. It no longer parses or analyzes complete documents while opening the library. Missing profiles can still be generated through the existing Reading Profile feature.
-
-## Reader protection
-
-No pagination, playback, cursor, viewport, pause/resume, Book Pages, or renderer function was modified.
+- Removes the global document observer.
+- Uses a small, bounded set of attachment attempts only after an imported document renders.
+- Performs no ongoing monitoring on My Library or other pages.
+- Does not change the reader engine, pagination, playback, resume, viewport, or Book Pages.
