@@ -8,7 +8,7 @@
   let lastScreen = '';
   let scheduled = false;
   let startedOnce = false;
-  const ANCHOR_POSITION_KEY = 'markSetGoMobileAnchorPositionV1';
+  const MOBILE_TEXT_SIZE_KEY = 'markSetGoMobileTextSizeV1';
   const configuredReaders = new WeakSet();
 
   function dispatchChange(el) {
@@ -82,7 +82,9 @@
         <button type="button" class="msg-play" data-mobile-reader="play" aria-label="Start or pause reading">▶</button>
       </div>
       <div class="msg-control-row msg-option-row">
-        <button type="button" class="msg-anchor-position" data-mobile-reader="anchor-position">Anchor: Top</button>
+        <button type="button" data-mobile-reader="text-smaller" aria-label="Decrease text size">A−</button>
+        <div class="msg-text-size"><span id="msg-mobile-text-size">14</span>&nbsp;px</div>
+        <button type="button" data-mobile-reader="text-larger" aria-label="Increase text size">A+</button>
         <button type="button" class="msg-theme" data-mobile-reader="theme">Light</button>
       </div>`;
     controls.addEventListener('click', (event) => {
@@ -98,10 +100,17 @@
         speed.value = String(Math.min(2000, Number(speed.value || 300) + 25));
         dispatchChange(speed);
       }
-      if (action === 'anchor-position') {
-        const next = currentAnchorPosition() === 'top' ? 'center' : 'top';
-        localStorage.setItem(ANCHOR_POSITION_KEY, next);
-        applyAnchorPosition();
+      if (action === 'text-smaller' || action === 'text-larger') {
+        const fontSize = app.querySelector('#font-size');
+        if (fontSize) {
+          const current = Math.round(Number(fontSize.value) || 14);
+          const next = action === 'text-smaller'
+            ? Math.max(12, current - 1)
+            : Math.min(24, current + 1);
+          localStorage.setItem(MOBILE_TEXT_SIZE_KEY, String(next));
+          setValue('#font-size', next);
+          setValue('#fs-font-size', next);
+        }
       }
       if (action === 'play') {
         const pause = app.querySelector('#pause-reader');
@@ -121,18 +130,11 @@
     panel.appendChild(controls);
   }
 
-  function currentAnchorPosition() {
-    return localStorage.getItem(ANCHOR_POSITION_KEY) === 'center' ? 'center' : 'top';
-  }
-
-  function applyAnchorPosition() {
+  function applyFixedTopAnchor() {
     const frame = app.querySelector('#reader-frame');
     if (!frame) return;
-    const position = currentAnchorPosition();
-    frame.classList.toggle('msg-anchor-top', position === 'top');
-    frame.classList.toggle('msg-anchor-center', position === 'center');
-    const button = document.querySelector('[data-mobile-reader="anchor-position"]');
-    if (button) button.textContent = position === 'top' ? 'Anchor: Top' : 'Anchor: Center';
+    frame.classList.add('msg-anchor-top');
+    frame.classList.remove('msg-anchor-center');
   }
 
   function configureReader() {
@@ -145,7 +147,8 @@
       setValue('#mode-select', 'highlight');
       setValue('#word-count', 1);
       setChecked('#meaningful-chunks', false);
-      setValue('#font-size', 14);
+      const savedTextSize = Math.min(24, Math.max(12, Number(localStorage.getItem(MOBILE_TEXT_SIZE_KEY)) || 14));
+      setValue('#font-size', savedTextSize);
       setChecked('#focus-anchor', true);
       setValue('#focus-anchor-font-size', 36);
       setValue('#focus-anchor-color', '#d94b4b');
@@ -153,13 +156,13 @@
       setChecked('#book-pages', false);
       setValue('#fs-mode-select', 'highlight');
       setValue('#fs-word-count', 1);
-      setValue('#fs-font-size', 14);
+      setValue('#fs-font-size', savedTextSize);
       setChecked('#fs-focus-anchor', true);
       setValue('#fs-focus-anchor-font-size', 36);
       setValue('#fs-focus-anchor-color', '#d94b4b');
       setChecked('#fs-book-pages', false);
     }
-    applyAnchorPosition();
+    applyFixedTopAnchor();
     refreshReaderControlLabels();
   }
 
@@ -175,7 +178,10 @@
     const theme = app.querySelector('#theme-select');
     const themeButton = document.querySelector('[data-mobile-reader="theme"]');
     if (themeButton && theme) themeButton.textContent = theme.value === 'light' ? 'Dark' : 'Light';
-    applyAnchorPosition();
+    const fontSize = app.querySelector('#font-size');
+    const textSize = document.getElementById('msg-mobile-text-size');
+    if (textSize && fontSize) textSize.textContent = String(Math.round(Number(fontSize.value) || 14));
+    applyFixedTopAnchor();
   }
 
   function detectScreen() {
