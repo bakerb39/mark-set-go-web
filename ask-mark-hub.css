@@ -1,0 +1,91 @@
+
+/* Ask Mark hub — reader UI only; does not change reader rendering or pagination. */
+.reader-pane-controls.ask-mark-toolbar .reader-pane-buttons {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.reader-pane-controls.ask-mark-toolbar #toggle-navigation-pane {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding-inline: .35rem;
+}
+.reader-pane-controls.ask-mark-toolbar #toggle-word-panel[hidden] { display: none !important; }
+.reader-pane-controls.ask-mark-toolbar #toggle-mark-panel {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-weight: 750;
+  padding-inline: .45rem;
+}
+.reader-pane-controls.ask-mark-toolbar #toggle-mark-panel:hover,
+.reader-pane-controls.ask-mark-toolbar #toggle-navigation-pane:hover { text-decoration: underline; }
+.ask-mark-book-icon { margin-right: .2rem; }
+#read-anything-format-control { display: none !important; }
+
+.mark-companion-panel .reader-control-header,
+.mark-companion-panel .mark-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+}
+.mark-companion-panel .mark-tabs {
+  top: var(--ask-mark-header-height, 52px);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+.mark-companion-panel .mark-tabs button { min-width: 0; padding: .55rem .25rem; }
+.ask-mark-current-view {
+  margin: 0 0 .65rem;
+  padding: .45rem .55rem;
+  border-radius: .55rem;
+  background: color-mix(in srgb, var(--accent, #2f7de1) 9%, transparent);
+  font-size: .78rem;
+}
+.ask-mark-compact-section { margin-bottom: .75rem; }
+.ask-mark-section-label {
+  display: block;
+  margin-bottom: .35rem;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  opacity: .78;
+}
+.ask-mark-choice-row { display: flex; flex-wrap: wrap; gap: .35rem; }
+.ask-mark-choice-row button,
+.ask-mark-study-grid button,
+.ask-mark-prompt-chips button {
+  border: 1px solid var(--border, #d3d8df);
+  border-radius: .55rem;
+  background: var(--surface, #fff);
+  padding: .42rem .55rem;
+  font: inherit;
+  font-size: .8rem;
+  cursor: pointer;
+}
+.ask-mark-choice-row button.active { font-weight: 800; outline: 2px solid color-mix(in srgb, var(--accent, #2f7de1) 45%, transparent); }
+.ask-mark-language-label select { width: 100%; margin-top: .1rem; }
+.ask-mark-translate-button { width: 100%; margin-top: .4rem; }
+.ask-mark-reader-controls { margin-top: .8rem; }
+.ask-mark-reader-controls > summary { font-weight: 750; cursor: pointer; }
+.ask-mark-study-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+.ask-mark-study-grid button { text-align: left; }
+.ask-mark-document-chat {
+  margin-bottom: .85rem;
+  padding-bottom: .85rem;
+  border-bottom: 1px solid var(--border, #d3d8df);
+}
+.ask-mark-prompt-chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .55rem; }
+.ask-mark-document-chat textarea { width: 100%; resize: vertical; min-height: 4.5rem; }
+.ask-mark-document-chat .primary { width: 100%; margin-top: .4rem; }
+
+@media (max-width: 700px) {
+  .reader-pane-controls.ask-mark-toolbar #toggle-mark-panel { margin-left: auto; }
+  .mark-companion-panel .mark-tabs button { font-size: .76rem; }
+  .ask-mark-study-grid { grid-template-columns: 1fr; }
+}
