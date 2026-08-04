@@ -1,15 +1,7 @@
-# Mark, Set, Go! v8.4.3 — My Library Freeze Fix
+# v8.4.4 My Library infinite-loop fix
 
-Replace only:
+Replace `cloud-document.js` and `public/cloud-document.js`.
 
-- `read-anything.js`
-- `public/read-anything.js`
+The previous global MutationObserver watched the entire app while `decorate()` itself removed and inserted DOM nodes. Each decoration therefore scheduled another decoration indefinitely. This update removes the global observer and refreshes cloud-document controls only from bounded application events.
 
-## Root cause
-The Format-control fix created a `MutationObserver` on the entire document and left it active after navigating away from an imported reader. My Library performs many DOM updates, so the observer repeatedly queued format-control work and could saturate the browser main thread indefinitely.
-
-## Fix
-- Removes the global document observer.
-- Uses a small, bounded set of attachment attempts only after an imported document renders.
-- Performs no ongoing monitoring on My Library or other pages.
-- Does not change the reader engine, pagination, playback, resume, viewport, or Book Pages.
+No reader-engine, pagination, resume, or Book Pages files are changed.

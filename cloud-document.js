@@ -121,9 +121,21 @@
     bind(root);
   }
 
-  document.addEventListener('marksetgo:cloud-library-ready', decorate);
-  const observer = new MutationObserver(() => requestAnimationFrame(decorate));
-  observer.observe(document.getElementById('app') || document.body, { childList: true, subtree: true });
+  let decorateFrame = 0;
 
-  window.MarkSetGoCloudDocuments = Object.freeze({ saveText, openText, removeText, refresh });
+  function scheduleDecorate() {
+    if (decorateFrame) return;
+    decorateFrame = requestAnimationFrame(() => {
+      decorateFrame = 0;
+      decorate();
+    });
+  }
+
+  // My Library explicitly announces when its cloud records are ready.
+  // Avoid observing the entire application DOM: decorate() itself changes the
+  // library cards, which previously retriggered the observer indefinitely.
+  document.addEventListener('marksetgo:cloud-library-ready', scheduleDecorate);
+  document.addEventListener('marksetgo:library-rendered', scheduleDecorate);
+
+  window.MarkSetGoCloudDocuments = Object.freeze({ saveText, openText, removeText, refresh, decorate: scheduleDecorate });
 })();
