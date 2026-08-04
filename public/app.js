@@ -55,6 +55,20 @@ const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
 // this browser/app session. Persistent IndexedDB is reserved for Home > Resume.
 let activeReaderSnapshot = null;
 
+function clearActiveReaderPane() {
+  stopReader();
+  activeReaderSnapshot = null;
+  try { readerEngine.reset?.(); } catch {}
+  state.title = '';
+  state.currentText = '';
+  state.originalText = '';
+  state.words = [];
+  state.index = 0;
+  state.viewportAnchorIndex = 0;
+  state.documentId = '';
+  state.source = null;
+}
+
 
 const APP_VIEW_STATE_KEY = 'markSetGoViewStateV1';
 
@@ -2937,31 +2951,19 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   refreshFocusAnchorStyle();
   updateFocusAnchorOverlay();
 
-  // Book Pages needs a geometry pass after the DOM has its final font, width,
-  // mode and page setting. Merely checking the checkbox is not sufficient.
+  // Protected Book Pages refresh restoration:
+  // restore the visible spread from the saved viewport anchor while keeping
+  // the independent playback cursor at savedIndex.
   requestAnimationFrame(() => {
-    if (state.bookPages) {
-      scheduleBookPageReflow();
-      requestAnimationFrame(() => {
-        const activeReader = app.querySelector('#reader');
-        if (activeReader) {
-          ensureWordsRendered(activeReader, mode, wordCount, state.index + 100);
-          const target =
-            activeReader.querySelector(`.reader-word[data-index="${state.index}"]`) ||
-            activeReader.querySelector(`.reader-group[data-start-index="${state.index}"]`);
-          if (target) {
-            const readerRect = activeReader.getBoundingClientRect();
-            const targetRect = target.getBoundingClientRect();
-            const metrics = applyBookPageMetrics(activeReader);
-            const absoluteLeft = targetRect.left - readerRect.left + activeReader.scrollLeft - metrics.paddingLeft;
-            const pageIndex = Math.max(0, Math.floor(absoluteLeft / Math.max(1, metrics.pagePitch)));
-            goToBookSpread(Math.floor(pageIndex / 2), { behavior: 'auto', ensureRendered: true });
-          } else {
-            updateBookPageStatus();
-          }
-        }
-      });
-    }
+    if (!state.bookPages) return;
+    scheduleBookPageReflow({ anchorIndex: savedViewportAnchor });
+    requestAnimationFrame(() => {
+      restoreBookPageWordAnchor(savedViewportAnchor);
+      state.viewportAnchorIndex = savedViewportAnchor;
+      state.index = savedIndex;
+      readerEngine.setPosition(savedIndex);
+      updateReaderStatus();
+    });
   });
 
   const restoreSavedViewport = () => {
@@ -3144,21 +3146,20 @@ function renderHome() {
               <span><strong>WPM Test</strong><small>Measure your natural reading speed</small></span>
             </button>
 
-            <button class="secondary home-large-action" id="resume-last-reading" type="button">
+            ${resumeMeta?.title ? `<button class="secondary home-large-action home-continue-reading" id="resume-last-reading" type="button">
               <span aria-hidden="true">↩</span>
-              <span><strong>Resume Last Reading</strong><small>${resumeMeta?.title ? escapeHtml(resumeMeta.title) : 'No saved reading yet'}</small></span>
-            </button>
+              <span>
+                <strong>Continue Reading</strong>
+                <small>${escapeHtml(resumeMeta.title)}${resumePercent === null ? '' : ` · ${resumePercent}% complete`}</small>
+                ${resumePercent === null ? '' : `<span class="progress-meter" aria-hidden="true"><span style="width:${resumePercent}%"></span></span>`}
+              </span>
+            </button>` : `<button class="secondary home-large-action" id="resume-last-reading" type="button" disabled>
+              <span aria-hidden="true">↩</span>
+              <span><strong>Continue Reading</strong><small>No saved reading yet</small></span>
+            </button>`}
           </div>
 
-          ${resumeMeta?.title ? `<article class="resume-reading-card home-simple-resume">
-            <div>
-              <span class="resume-reading-kicker">Last reading</span>
-              <strong>${escapeHtml(resumeMeta.title)}</strong>
-              <small>${resumePercent === null ? 'Saved reading position' : `${resumePercent}% complete`} · opens only when you choose Resume</small>
-            </div>
-            ${resumePercent === null ? '' : `<div class="progress-meter"><span style="width:${resumePercent}%"></span></div>`}
-          </article>
-          <button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Forget Saved Reading</button>` : ''}
+          ${resumeMeta?.title ? `<button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Clear Resume Position</button>` : ''}
         </section>
       </div>
 
@@ -3208,7 +3209,7 @@ function renderHome() {
   });
   app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
     await clearReaderSession();
-    activeReaderSnapshot = null;
+    clearActiveReaderPane();
     renderHome();
   });
 
@@ -4873,16 +4874,27 @@ function persistCurrentDocument() {
   if (!state.documentId || !state.currentText) return false;
   const key = `${DOCUMENT_STORAGE_PREFIX}${state.documentId}`;
   try {
-    if (!localStorage.getItem(key)) {
-      localStorage.setItem(key, JSON.stringify({
-        title: state.title,
-        text: state.currentText,
-        source: state.source
-      }));
+    const next = {
+      title: state.title,
+      text: state.currentText,
+      source: state.source
+    };
+    const existingRaw = localStorage.getItem(key);
+    let shouldWrite = !existingRaw;
+    if (existingRaw) {
+      try {
+        const existing = JSON.parse(existingRaw);
+        shouldWrite = existing?.title !== next.title
+          || existing?.text !== next.text
+          || JSON.stringify(existing?.source || {}) !== JSON.stringify(next.source || {});
+      } catch {
+        shouldWrite = true;
+      }
     }
+    if (shouldWrite) localStorage.setItem(key, JSON.stringify(next));
     return true;
   } catch (error) {
-    console.warn('Document could not be stored for bookmarks.', error);
+    console.warn('Document could not be stored in this browser.', error);
     return false;
   }
 }
@@ -5080,7 +5092,14 @@ function jumpToWordIndex(wordIndex) {
     const reader = app.querySelector('#reader');
     if (!reader) return;
     if (!['flash', 'digital-sign'].includes(mode)) {
-      ensureWordsRendered(reader, mode, groupSize, index + 100);
+      const distantTocJump = !state.bookPages
+        && (index < Number(state.renderedWordStart || 0)
+          || index > Number(state.renderedWordEnd || 0) + 1600);
+      if (distantTocJump) {
+        virtualRenderer.renderWindowAround(reader, mode, groupSize, index);
+      } else {
+        ensureWordsRendered(reader, mode, groupSize, index + 100);
+      }
       const target = reader.querySelector(`.reader-word[data-index="${index}"]`)
         || reader.querySelector(`.reader-group[data-start-index="${index}"]`);
       if (target) {
@@ -6779,6 +6798,14 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   state.uploadedIllustrations = Array.isArray(source?.illustrations) ? source.illustrations : [];
   state.illustrationMode = state.uploadedIllustrations.length ? 'chapter' : 'off';
   if (!state.words.length) return renderError('No readable text', 'The selected source did not contain readable words.');
+
+  // Every successful import/open must create the local document payload immediately.
+  // Previously the text was only persisted after actions such as adding a bookmark,
+  // allowing cloud metadata to sync while the actual document remained unavailable.
+  persistCurrentDocument();
+  document.dispatchEvent(new CustomEvent('marksetgo:document-available', {
+    detail: { documentId: state.documentId, title: state.title }
+  }));
 
   app.innerHTML = `
     <section class="panel reader-page-panel">

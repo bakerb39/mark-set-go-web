@@ -6,8 +6,9 @@ const dns = require('node:dns').promises;
 const net = require('node:net');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const zlib = require('node:zlib');
 const AdmZip = require('adm-zip');
-const { checkDatabase, databaseConfigured, closeDatabase, query } = require('./db');
+const { pool, checkDatabase, databaseConfigured, closeDatabase, query } = require('./db');
 
 const CLERK_PUBLISHABLE_KEY = String(process.env.CLERK_PUBLISHABLE_KEY || '').trim();
 const CLERK_SECRET_KEY = String(process.env.CLERK_SECRET_KEY || '').trim();
@@ -27,6 +28,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 const MAX_TRANSLATION_CHARS = 120000;
 const MAX_GUTENBERG_BOOK_BYTES = 12 * 1024 * 1024;
+const MAX_ACCOUNT_DOCUMENT_BYTES = 5 * 1024 * 1024;
 const GUTENDEX_BASE = 'https://gutendex.com';
 const GUTENBERG_MIRROR_BASES = (process.env.GUTENBERG_MIRROR_BASES || process.env.GUTENBERG_MIRROR_BASE || 'https://gutenberg.pglaf.org,https://mirrors.xmission.com/gutenberg').split(',').map((value) => value.trim().replace(/\/+$/, '')).filter(Boolean);
 
@@ -80,7 +82,8 @@ async function fetchFeedItems(source) {
 
 
 app.disable('x-powered-by');
-app.use(express.json({ limit: '150kb' }));
+app.use(express.json({ limit: '8mb' }));
+app.use(express.urlencoded({ extended: false, limit: '8mb' }));
 if (clerkConfigured) app.use(clerkMiddleware());
 
 
@@ -163,9 +166,9 @@ app.get('/api/account', async (req, res) => {
 app.get('/api/health', async (_req, res) => {
   try {
     const database = await checkDatabase();
-    res.json({ ok: true, version: '7.7.3', database, betaAccessEnabled: BETA_ACCESS_ENABLED });
+    res.json({ ok: true, version: '7.7.15.4', database, betaAccessEnabled: BETA_ACCESS_ENABLED });
   } catch (error) {
-    res.status(503).json({ ok: false, version: '7.7.3', database: { configured: databaseConfigured(), connected: false, error: error.message }, betaAccessEnabled: BETA_ACCESS_ENABLED });
+    res.status(503).json({ ok: false, version: '7.7.15.4', database: { configured: databaseConfigured(), connected: false, error: error.message }, betaAccessEnabled: BETA_ACCESS_ENABLED });
   }
 });
 
@@ -191,6 +194,358 @@ app.use('/api', async (req, res, next) => {
 });
 
 
+/* Cloud-first account data v7.7.13 ---------------------------------------
+   PostgreSQL is the persistent source of truth for authenticated users.
+   The protected reader runtime is not modified here. Playback cursor and
+   viewport anchor are persisted as independent values.
+*/
+function clampInteger(value, minimum = 0, maximum = 2147483647) {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return minimum;
+  return Math.min(maximum, Math.max(minimum, parsed));
+}
+
+function cleanText(value, maximum = 500) {
+  return String(value ?? '').trim().slice(0, maximum);
+}
+
+function cleanJsonObject(value, maximumBytes = 50000) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const serialized = JSON.stringify(value);
+  if (Buffer.byteLength(serialized, 'utf8') > maximumBytes) throw new Error('JSON payload is too large.');
+  return value;
+}
+
+async function requireAccountUser(req, res) {
+  if (!clerkConfigured) {
+    res.status(503).json({ error: 'Authentication is not configured.' });
+    return null;
+  }
+  if (!databaseConfigured()) {
+    res.status(503).json({ error: 'The account database is not configured.' });
+    return null;
+  }
+  const auth = getAuth(req);
+  if (!auth?.isAuthenticated || !auth.userId) {
+    res.status(401).json({ error: 'Sign in is required.' });
+    return null;
+  }
+  const result = await query(
+    'select id, email, display_name, plan_code, status from app_users where auth_subject = $1',
+    [auth.userId]
+  );
+  if (!result.rows[0]) {
+    res.status(409).json({ error: 'Account session must be initialized before account data can be used.' });
+    return null;
+  }
+  return result.rows[0];
+}
+
+app.get('/api/account/bootstrap', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const [preferencesResult, booksResult] = await Promise.all([
+      query('select preferences, updated_at from user_preferences where user_id = $1', [user.id]),
+      query(`
+        select b.id, b.client_record_id, b.title, b.author, b.source_type, b.source_id,
+               b.source_url, b.cover_url, b.metadata, b.added_at, b.updated_at,
+               p.mode, p.playback_index, p.viewport_anchor_index, p.viewport_offset_px,
+               p.word_index, p.scroll_ratio, p.page_number, p.position_data,
+               p.updated_at as progress_updated_at
+        from library_books b
+        left join reading_positions p on p.user_id = b.user_id and p.book_id = b.id
+        where b.user_id = $1
+        order by coalesce(p.updated_at, b.updated_at) desc
+      `, [user.id])
+    ]);
+    res.json({
+      account: { id: user.id, email: user.email, displayName: user.display_name, planCode: user.plan_code },
+      preferences: preferencesResult.rows[0]?.preferences || {},
+      preferencesUpdatedAt: preferencesResult.rows[0]?.updated_at || null,
+      library: booksResult.rows
+    });
+  } catch (error) {
+    console.error('Account bootstrap failed:', error);
+    res.status(500).json({ error: 'Unable to load account data.' });
+  }
+});
+
+app.get('/api/account/preferences', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query('select preferences, updated_at from user_preferences where user_id = $1', [user.id]);
+    res.json({ preferences: result.rows[0]?.preferences || {}, updatedAt: result.rows[0]?.updated_at || null });
+  } catch (error) {
+    console.error('Preference load failed:', error);
+    res.status(500).json({ error: 'Unable to load preferences.' });
+  }
+});
+
+app.put('/api/account/preferences', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const preferences = cleanJsonObject(req.body?.preferences, 75000);
+    const result = await query(`
+      insert into user_preferences (user_id, preferences, created_at, updated_at)
+      values ($1, $2::jsonb, now(), now())
+      on conflict (user_id) do update set preferences = excluded.preferences, updated_at = now()
+      returning preferences, updated_at
+    `, [user.id, JSON.stringify(preferences)]);
+    res.json({ preferences: result.rows[0].preferences, updatedAt: result.rows[0].updated_at });
+  } catch (error) {
+    const status = /too large/i.test(error.message) ? 413 : 500;
+    console.error('Preference save failed:', error);
+    res.status(status).json({ error: status === 413 ? error.message : 'Unable to save preferences.' });
+  }
+});
+
+app.get('/api/account/library', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query(`
+      select b.id, b.client_record_id, b.title, b.author, b.source_type, b.source_id,
+             b.source_url, b.cover_url, b.metadata, b.added_at, b.updated_at,
+             p.mode, p.playback_index, p.viewport_anchor_index, p.viewport_offset_px,
+             p.word_index, p.scroll_ratio, p.page_number, p.position_data,
+             p.updated_at as progress_updated_at,
+             (d.book_id is not null) as document_stored, d.raw_bytes as document_raw_bytes,
+             d.compressed_bytes as document_compressed_bytes, d.updated_at as document_updated_at
+      from library_books b
+      left join reading_positions p on p.user_id = b.user_id and p.book_id = b.id
+      left join account_documents d on d.user_id = b.user_id and d.book_id = b.id
+      where b.user_id = $1
+      order by coalesce(p.updated_at, b.updated_at) desc
+    `, [user.id]);
+    res.json({ books: result.rows });
+  } catch (error) {
+    console.error('Library load failed:', error);
+    res.status(500).json({ error: 'Unable to load the library.' });
+  }
+});
+
+app.post('/api/account/library', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const title = cleanText(req.body?.title, 500);
+    if (!title) return res.status(400).json({ error: 'A book title is required.' });
+    const clientRecordId = cleanText(req.body?.clientRecordId, 200) || null;
+    const metadata = cleanJsonObject(req.body?.metadata, 100000);
+    const result = await query(`
+      insert into library_books
+        (user_id, client_record_id, title, author, source_type, source_id, source_url, cover_url, metadata, added_at, updated_at)
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, now(), now())
+      on conflict (user_id, client_record_id) do update set
+        title = excluded.title,
+        author = excluded.author,
+        source_type = excluded.source_type,
+        source_id = excluded.source_id,
+        source_url = excluded.source_url,
+        cover_url = excluded.cover_url,
+        metadata = excluded.metadata,
+        updated_at = now()
+      returning *
+    `, [
+      user.id, clientRecordId, title, cleanText(req.body?.author, 300) || null,
+      cleanText(req.body?.sourceType, 80) || null, cleanText(req.body?.sourceId, 300) || null,
+      cleanText(req.body?.sourceUrl, 2000) || null, cleanText(req.body?.coverUrl, 2000) || null,
+      JSON.stringify(metadata)
+    ]);
+    res.status(201).json({ book: result.rows[0] });
+  } catch (error) {
+    const status = /too large/i.test(error.message) ? 413 : 500;
+    console.error('Library save failed:', error);
+    res.status(status).json({ error: status === 413 ? error.message : 'Unable to save the book.' });
+  }
+});
+
+app.delete('/api/account/library/:bookId', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query('delete from library_books where id = $1 and user_id = $2 returning id', [req.params.bookId, user.id]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Book not found.' });
+    res.json({ deleted: true, bookId: result.rows[0].id });
+  } catch (error) {
+    console.error('Library delete failed:', error);
+    res.status(500).json({ error: 'Unable to delete the book.' });
+  }
+});
+
+app.get('/api/account/library/:bookId/document/info', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query(`
+      select d.raw_bytes, d.compressed_bytes, d.content_sha256, d.updated_at
+      from account_documents d
+      join library_books b on b.id = d.book_id and b.user_id = d.user_id
+      where d.user_id = $1 and d.book_id = $2
+    `, [user.id, req.params.bookId]);
+    res.json({ document: result.rows[0] || null, maxRawBytes: MAX_ACCOUNT_DOCUMENT_BYTES });
+  } catch (error) {
+    console.error('Document info load failed:', error);
+    res.status(500).json({ error: 'Unable to load document storage information.' });
+  }
+});
+
+app.get('/api/account/library/:bookId/document', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query(`
+      select d.content_gzip, d.raw_bytes, d.compressed_bytes, d.content_sha256, d.updated_at,
+             b.title, b.author, b.source_type, b.source_id, b.source_url, b.metadata
+      from account_documents d
+      join library_books b on b.id = d.book_id and b.user_id = d.user_id
+      where d.user_id = $1 and d.book_id = $2
+    `, [user.id, req.params.bookId]);
+    const row = result.rows[0];
+    if (!row) return res.status(404).json({ error: 'Cloud document not found.' });
+    const text = zlib.gunzipSync(row.content_gzip).toString('utf8');
+    res.json({
+      document: {
+        text,
+        rawBytes: row.raw_bytes,
+        compressedBytes: row.compressed_bytes,
+        sha256: row.content_sha256,
+        updatedAt: row.updated_at,
+        title: row.title,
+        author: row.author,
+        source: {
+          type: row.source_type,
+          id: row.source_id,
+          url: row.source_url,
+          ...(row.metadata?.source || {})
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Document load failed:', error);
+    res.status(500).json({ error: 'Unable to load the cloud document.' });
+  }
+});
+
+app.put('/api/account/library/:bookId/document', express.text({ type: 'text/plain', limit: '6mb' }), async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const owned = await query('select id from library_books where id = $1 and user_id = $2', [req.params.bookId, user.id]);
+    if (!owned.rows[0]) return res.status(404).json({ error: 'Book not found.' });
+    const text = typeof req.body === 'string' ? req.body : '';
+    const raw = Buffer.from(text, 'utf8');
+    if (!raw.length) return res.status(400).json({ error: 'Document text is required.' });
+    if (raw.length > MAX_ACCOUNT_DOCUMENT_BYTES) {
+      return res.status(413).json({
+        error: `This document is too large for database storage (${raw.length.toLocaleString()} bytes). The current limit is ${MAX_ACCOUNT_DOCUMENT_BYTES.toLocaleString()} bytes.`,
+        maxRawBytes: MAX_ACCOUNT_DOCUMENT_BYTES
+      });
+    }
+    const compressed = zlib.gzipSync(raw, { level: 9 });
+    const sha256 = crypto.createHash('sha256').update(raw).digest('hex');
+    const result = await query(`
+      insert into account_documents
+        (user_id, book_id, content_gzip, raw_bytes, compressed_bytes, content_sha256, updated_at)
+      values ($1, $2, $3, $4, $5, $6, now())
+      on conflict (user_id, book_id) do update set
+        content_gzip = excluded.content_gzip,
+        raw_bytes = excluded.raw_bytes,
+        compressed_bytes = excluded.compressed_bytes,
+        content_sha256 = excluded.content_sha256,
+        updated_at = now()
+      returning raw_bytes, compressed_bytes, content_sha256, updated_at
+    `, [user.id, req.params.bookId, compressed, raw.length, compressed.length, sha256]);
+    res.json({ document: result.rows[0], maxRawBytes: MAX_ACCOUNT_DOCUMENT_BYTES });
+  } catch (error) {
+    const status = error?.type === 'entity.too.large' ? 413 : 500;
+    console.error('Document save failed:', error);
+    res.status(status).json({ error: status === 413 ? 'The document exceeds the upload limit.' : 'Unable to save the cloud document.' });
+  }
+});
+
+app.delete('/api/account/library/:bookId/document', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query('delete from account_documents where user_id = $1 and book_id = $2 returning book_id', [user.id, req.params.bookId]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Cloud document not found.' });
+    res.json({ deleted: true, bookId: result.rows[0].book_id });
+  } catch (error) {
+    console.error('Document delete failed:', error);
+    res.status(500).json({ error: 'Unable to delete the cloud document.' });
+  }
+});
+
+app.get('/api/account/library/:bookId/progress', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    const result = await query(`
+      select mode, playback_index, viewport_anchor_index, viewport_offset_px,
+             word_index, scroll_ratio, page_number, position_data, updated_at
+      from reading_positions where user_id = $1 and book_id = $2
+    `, [user.id, req.params.bookId]);
+    res.json({ progress: result.rows[0] || null });
+  } catch (error) {
+    console.error('Reading progress load failed:', error);
+    res.status(500).json({ error: 'Unable to load reading progress.' });
+  }
+});
+
+app.put('/api/account/library/:bookId/progress', async (req, res) => {
+  const client = await pool?.connect().catch(() => null);
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    if (!client) return res.status(503).json({ error: 'The account database is unavailable.' });
+    const bookCheck = await client.query('select id from library_books where id = $1 and user_id = $2', [req.params.bookId, user.id]);
+    if (!bookCheck.rows[0]) return res.status(404).json({ error: 'Book not found.' });
+
+    const playbackIndex = clampInteger(req.body?.playbackIndex ?? req.body?.wordIndex);
+    const viewportAnchorIndex = clampInteger(req.body?.viewportAnchorIndex ?? playbackIndex);
+    const viewportOffsetPx = clampInteger(req.body?.viewportOffsetPx, -100000, 100000);
+    const positionData = cleanJsonObject(req.body?.positionData, 75000);
+    const scrollRatioRaw = Number(req.body?.scrollRatio);
+    const scrollRatio = Number.isFinite(scrollRatioRaw) ? Math.max(0, Math.min(1, scrollRatioRaw)) : 0;
+    const pageNumber = req.body?.pageNumber == null ? null : clampInteger(req.body.pageNumber, 1);
+
+    const result = await client.query(`
+      insert into reading_positions
+        (user_id, book_id, mode, word_index, playback_index, viewport_anchor_index,
+         viewport_offset_px, scroll_ratio, page_number, position_data, updated_at)
+      values ($1, $2, $3, $4, $4, $5, $6, $7, $8, $9::jsonb, now())
+      on conflict (user_id, book_id) do update set
+        mode = excluded.mode,
+        word_index = excluded.word_index,
+        playback_index = excluded.playback_index,
+        viewport_anchor_index = excluded.viewport_anchor_index,
+        viewport_offset_px = excluded.viewport_offset_px,
+        scroll_ratio = excluded.scroll_ratio,
+        page_number = excluded.page_number,
+        position_data = excluded.position_data,
+        updated_at = now()
+      returning mode, playback_index, viewport_anchor_index, viewport_offset_px,
+                word_index, scroll_ratio, page_number, position_data, updated_at
+    `, [
+      user.id, req.params.bookId, cleanText(req.body?.mode, 80) || null,
+      playbackIndex, viewportAnchorIndex, viewportOffsetPx, scrollRatio, pageNumber,
+      JSON.stringify(positionData)
+    ]);
+    res.json({ progress: result.rows[0] });
+  } catch (error) {
+    const status = /too large/i.test(error.message) ? 413 : 500;
+    console.error('Reading progress save failed:', error);
+    res.status(status).json({ error: status === 413 ? error.message : 'Unable to save reading progress.' });
+  } finally {
+    client?.release();
+  }
+});
+
+
 /* Email delivery v7.5.1 ----------------------------------------------------
    Provider: Resend. Configure RESEND_API_KEY, EMAIL_FROM, and PUBLIC_APP_URL.
    This local-first prototype keeps subscriptions in server memory; production
@@ -203,6 +558,64 @@ const PUBLIC_APP_URL = String(process.env.PUBLIC_APP_URL || '').replace(/\/$/, '
 
 function validEmail(value) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim()); }
 function emailConfigured() { return Boolean(String(process.env.RESEND_API_KEY || '').trim()); }
+
+/* Random Notes cloud service v7.7.16 --------------------------------------
+   Independent from the protected reader runtime.
+*/
+function cleanNoteHtml(value) {
+  const html = String(value || '');
+  if (Buffer.byteLength(html, 'utf8') > 6 * 1024 * 1024) throw new Error('Random note is too large.');
+  return html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+\s*=\s*(["']).*?\1/gi, '');
+}
+app.get('/api/account/random-notes', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res); if (!user) return;
+    const result = await query(`select id,title,content_html,content_text,tags,pinned,favorite,related_book_ids,created_at,updated_at from random_notes where user_id=$1 order by pinned desc, updated_at desc`, [user.id]);
+    res.json({ notes: result.rows });
+  } catch (error) { console.error('Random notes load failed:', error); res.status(500).json({ error: 'Unable to load Random Notes.' }); }
+});
+app.post('/api/account/random-notes', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res); if (!user) return;
+    const html = cleanNoteHtml(req.body?.contentHtml);
+    const text = cleanText(req.body?.contentText, 500000);
+    const title = cleanText(req.body?.title, 240) || 'Untitled note';
+    const result = await query(`insert into random_notes(user_id,title,content_html,content_text,tags,pinned,favorite,related_book_ids) values($1,$2,$3,$4,$5::jsonb,$6,$7,$8::jsonb) returning *`, [user.id,title,html,text,JSON.stringify(Array.isArray(req.body?.tags)?req.body.tags.slice(0,30):[]),Boolean(req.body?.pinned),Boolean(req.body?.favorite),JSON.stringify(Array.isArray(req.body?.relatedBookIds)?req.body.relatedBookIds.slice(0,50):[])]);
+    res.status(201).json({ note: result.rows[0] });
+  } catch (error) { console.error('Random note create failed:', error); res.status(/too large/i.test(error.message)?413:500).json({ error: error.message || 'Unable to save Random Note.' }); }
+});
+app.put('/api/account/random-notes/:id', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res); if (!user) return;
+    const html = cleanNoteHtml(req.body?.contentHtml);
+    const result = await query(`update random_notes set title=$3,content_html=$4,content_text=$5,tags=$6::jsonb,pinned=$7,favorite=$8,related_book_ids=$9::jsonb,updated_at=now() where id=$2 and user_id=$1 returning *`, [user.id,req.params.id,cleanText(req.body?.title,240)||'Untitled note',html,cleanText(req.body?.contentText,500000),JSON.stringify(Array.isArray(req.body?.tags)?req.body.tags.slice(0,30):[]),Boolean(req.body?.pinned),Boolean(req.body?.favorite),JSON.stringify(Array.isArray(req.body?.relatedBookIds)?req.body.relatedBookIds.slice(0,50):[])]);
+    if (!result.rows[0]) return res.status(404).json({ error:'Random Note not found.' });
+    res.json({ note: result.rows[0] });
+  } catch (error) { console.error('Random note update failed:', error); res.status(/too large/i.test(error.message)?413:500).json({ error:error.message || 'Unable to update Random Note.' }); }
+});
+app.delete('/api/account/random-notes/:id', async (req, res) => {
+  try { const user=await requireAccountUser(req,res); if(!user)return; const result=await query('delete from random_notes where id=$2 and user_id=$1 returning id',[user.id,req.params.id]); if(!result.rows[0])return res.status(404).json({error:'Random Note not found.'}); res.json({ok:true}); }
+  catch(error){console.error('Random note delete failed:',error);res.status(500).json({error:'Unable to delete Random Note.'});}
+});
+function randomNoteAttachments(html) {
+  const matches=[...String(html||'').matchAll(/<img[^>]+src=["']data:(image\/(?:png|jpeg|gif|webp));base64,([^"']+)["'][^>]*>/gi)].slice(0,5);
+  return matches.map((m,i)=>({ filename:`random-note-image-${i+1}.${m[1].split('/')[1].replace('jpeg','jpg')}`, content:m[2] }));
+}
+app.post('/api/account/random-notes/email', async (req,res)=>{
+  try {
+    const user=await requireAccountUser(req,res); if(!user)return;
+    const pref=await query('select * from user_email_preferences where user_id=$1 and active=true',[user.id]);
+    const email=pref.rows[0]?.email || user.email;
+    if(!email) return res.status(400).json({error:'Save an email address first.'});
+    const ids=Array.isArray(req.body?.ids)?req.body.ids.slice(0,100):[];
+    const result=await query(`select * from random_notes where user_id=$1 and ($2::uuid[] is null or id=any($2::uuid[])) order by updated_at desc`,[user.id,ids.length?ids:null]);
+    if(!result.rows.length)return res.status(400).json({error:'There are no Random Notes to email.'});
+    const attachments=[]; const items=result.rows.map((n)=>{attachments.push(...randomNoteAttachments(n.content_html));return `<li style="margin-bottom:20px"><strong>${escapeEmail(n.title)}</strong><div style="font-size:12px;color:#667">Updated ${escapeEmail(new Date(n.updated_at).toLocaleString())}</div><div style="white-space:pre-wrap;margin-top:8px">${escapeEmail(n.content_text)}</div></li>`}).join('');
+    await sendResendEmail({to:email,subject:`Your ${result.rows.length} Random ${result.rows.length===1?'Note':'Notes'} from Mark, Set, Go!`,html:emailFrame('Random Notes',`<ol>${items}</ol>`,''),text:result.rows.map(n=>`${n.title}\n${n.content_text}`).join('\n\n---\n\n'),attachments:attachments.slice(0,10)});
+    res.json({ok:true,count:result.rows.length,attachments:attachments.length});
+  } catch(error){console.error('Random notes email failed:',error);res.status(503).json({error:error.message});}
+});
+
 function rateLimitEmail(req, key, limit = 8, windowMs = 3600000) {
   const id = `${req.ip}|${key}`; const now = Date.now();
   const recent = (emailRateLimits.get(id) || []).filter((time) => now - time < windowMs);
@@ -210,10 +623,10 @@ function rateLimitEmail(req, key, limit = 8, windowMs = 3600000) {
   recent.push(now); emailRateLimits.set(id, recent); return true;
 }
 function escapeEmail(value) { return String(value || '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-async function sendResendEmail({ to, subject, html, text }) {
+async function sendResendEmail({ to, subject, html, text, attachments = [] }) {
   const apiKey = String(process.env.RESEND_API_KEY || '').trim();
   if (!apiKey) throw new Error('Email is not configured. Add RESEND_API_KEY.');
-  const response = await fetch('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:`Bearer ${apiKey}`, 'Content-Type':'application/json' }, body:JSON.stringify({ from:EMAIL_FROM, to:[to], subject, html, text }) });
+  const response = await fetch('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:`Bearer ${apiKey}`, 'Content-Type':'application/json' }, body:JSON.stringify({ from:EMAIL_FROM, to:[to], subject, html, text, ...(attachments.length ? { attachments } : {}) }) });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.message || `Email provider returned HTTP ${response.status}.`);
   return payload;
@@ -225,11 +638,17 @@ function emailFrame(title, body, clientId) {
 }
 
 app.get('/api/email/status', (_req, res) => res.json({ configured:emailConfigured(), provider:'Resend', from:EMAIL_FROM, durable:false }));
-app.post('/api/email/preferences', (req, res) => {
+app.get('/api/email/preferences', async (req,res)=>{
+  try { const user=await requireAccountUser(req,res); if(!user)return; const result=await query('select email,reminders,newsletter,notes,notes_frequency,timezone,active,updated_at from user_email_preferences where user_id=$1',[user.id]); res.json({preferences:result.rows[0]||null,configured:emailConfigured()}); }
+  catch(error){console.error('Email preference load failed:',error);res.status(500).json({error:'Unable to load email preferences.'});}
+});
+app.post('/api/email/preferences', async (req, res) => {
   const clientId=String(req.body?.clientId||'').trim().slice(0,100); const email=String(req.body?.email||'').trim().toLowerCase();
   if (!clientId || !validEmail(email)) return res.status(400).json({error:'Enter a valid email address.'});
   const record={ ...(emailSubscriptions.get(clientId)||{}), clientId, email, newsletter:Boolean(req.body?.newsletter), reminders:Boolean(req.body?.reminders), notes:Boolean(req.body?.notes), notesFrequency:['daily','weekly','monthly'].includes(req.body?.notesFrequency)?req.body.notesFrequency:'weekly', timezone:String(req.body?.timezone||'America/New_York').slice(0,80), active:true, updatedAt:new Date().toISOString() };
-  emailSubscriptions.set(clientId, record); res.json({ok:true, configured:emailConfigured(), preferences:record});
+  emailSubscriptions.set(clientId, record);
+  try { const user=await requireAccountUser(req,res); if(!user)return; const result=await query(`insert into user_email_preferences(user_id,email,reminders,newsletter,notes,notes_frequency,timezone,active,updated_at) values($1,$2,$3,$4,$5,$6,$7,true,now()) on conflict(user_id) do update set email=excluded.email,reminders=excluded.reminders,newsletter=excluded.newsletter,notes=excluded.notes,notes_frequency=excluded.notes_frequency,timezone=excluded.timezone,active=true,updated_at=now() returning *`,[user.id,email,record.reminders,record.newsletter,record.notes,record.notesFrequency,record.timezone]); res.json({ok:true,configured:emailConfigured(),preferences:record,durable:true,updatedAt:result.rows[0].updated_at}); }
+  catch(error){console.error('Email preference save failed:',error);res.status(500).json({error:'Unable to save email preferences.'});}
 });
 app.post('/api/email/sync-actions', (req, res) => {
   const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
@@ -2105,13 +2524,68 @@ app.get('/api/dictionary/:word', async (req, res) => {
   }
 });
 
+
+
+function decodeXmlEntities(value) {
+  return String(value || '')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+}
+
+function docxBufferToDocument(buffer) {
+  const zip = new AdmZip(buffer);
+  const documentEntry = zip.getEntry('word/document.xml');
+  if (!documentEntry) throw new Error('This DOCX file does not contain word/document.xml.');
+  const xml = documentEntry.getData().toString('utf8');
+  const text = decodeXmlEntities(xml
+    .replace(/<w:tab\b[^>]*\/>/gi, '\t')
+    .replace(/<w:br\b[^>]*\/>/gi, '\n')
+    .replace(/<\/w:p>/gi, '\n\n')
+    .replace(/<\/w:tr>/gi, '\n')
+    .replace(/<\/w:tc>/gi, '\t')
+    .replace(/<[^>]+>/g, ''))
+    .replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+  if (text.length < 20) throw new Error('The Word document did not contain enough readable text.');
+  let title = '';
+  const core = zip.getEntry('docProps/core.xml');
+  if (core) {
+    const coreXml = core.getData().toString('utf8');
+    title = decodeXmlEntities(coreXml.match(/<dc:title[^>]*>([\s\S]*?)<\/dc:title>/i)?.[1] || '').replace(/<[^>]+>/g, '').trim();
+  }
+  return { title, text };
+}
+
+app.post('/api/import/docx', express.raw({
+  type: ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/octet-stream'],
+  limit: '25mb'
+}), (req, res) => {
+  try {
+    if (!Buffer.isBuffer(req.body) || !req.body.length) return res.status(400).json({ error: 'Choose a DOCX file.' });
+    return res.json(docxBufferToDocument(req.body));
+  } catch (error) {
+    return res.status(400).json({ error: error?.message || 'The Word document could not be imported.' });
+  }
+});
+
+app.post('/capture', (req, res) => {
+  const payload = {
+    title: String(req.body?.title || 'Web Article').trim().slice(0, 500),
+    author: String(req.body?.author || '').trim().slice(0, 300),
+    url: String(req.body?.url || '').trim().slice(0, 4000),
+    text: String(req.body?.text || '').trim().slice(0, 5_000_000)
+  };
+  if (!payload.text) return res.status(400).send('No readable webpage text was received.');
+  const serialized = JSON.stringify(payload).replace(/</g, '\\u003c');
+  res.type('html').send(`<!doctype html><meta charset="utf-8"><title>Opening Mark, Set, Go!</title><p>Opening the captured page in Mark, Set, Go!…</p><script>sessionStorage.setItem('markSetGoPendingWebCaptureV1',${JSON.stringify(serialized)});location.replace('/?read-anything-capture=1');<\/script>`);
+});
+
 app.post('/api/fetch-text', async (req, res) => {
   const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
   if (!url) return res.status(400).json({ error: 'A URL is required.' });
   try {
     const text = await fetchReadableText(url);
     if (!text) return res.status(422).json({ error: 'No readable text was found on that page.' });
-    return res.json({ text: text.slice(0, 500000) });
+    return res.json({ title: new URL(url).hostname, author: '', text: text.slice(0, 500000), sourceUrl: url });
   } catch (error) {
     const message = error?.name === 'AbortError' ? 'The website took too long to respond.' : error?.message || 'The page could not be imported.';
     return res.status(400).json({ error: message });

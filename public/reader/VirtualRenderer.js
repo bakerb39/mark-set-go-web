@@ -23,10 +23,14 @@
       this.scrollHandlers = new WeakMap();
       this.renderFrames = new WeakMap();
 
-      // Stable incremental rendering: keep rendered content in the DOM and
-      // append additional chunks near the end. This intentionally avoids
-      // spacer-based viewport virtualization and DOM recycling.
+      // Stable incremental rendering remains the default. Distant TOC jumps
+      // may opt into a bounded window so the browser never has to create every
+      // preceding word node synchronously.
       this.chunkWords = 800;
+      this.windowWords = 2400;
+      this.windowShiftWords = 800;
+      this.edgePixels = 700;
+      this.averagePixelsPerWord = 2;
     }
 
     state() {
@@ -132,6 +136,13 @@
 
     renderVirtualRange(reader, mode, groupSize, requestedStart, requestedEnd, anchorIndex = null) {
       const state = this.state();
+      const renderedCount = Math.max(1, Number(state.renderedWordEnd || 0) - Number(state.renderedWordStart || 0));
+      if (!state.virtualized && reader?.scrollHeight > 0 && renderedCount > 0) {
+        const estimate = reader.scrollHeight / renderedCount;
+        if (Number.isFinite(estimate) && estimate > 0.25 && estimate < 20) {
+          this.averagePixelsPerWord = estimate;
+        }
+      }
       const { start, end } = this.alignRange(requestedStart, requestedEnd);
       const oldAnchor = Number.isFinite(anchorIndex)
         ? anchorIndex
@@ -213,6 +224,12 @@
 
     ensureWordsRendered(reader, mode, groupSize, requiredWordEnd) {
       const state = this.state();
+      const requiredIndex = Math.max(0, Math.min(state.words.length - 1, Number(requiredWordEnd) - 1 || 0));
+      if (state.virtualized) {
+        if (requiredIndex >= state.renderedWordStart && requiredIndex < state.renderedWordEnd) return;
+        this.renderWindowAround(reader, mode, groupSize, requiredIndex);
+        return;
+      }
       if (requiredWordEnd <= state.renderedWordEnd) return;
       const target = Math.min(state.words.length, Math.max(requiredWordEnd, state.renderedWordEnd + this.chunkWords));
       this.appendWordDocumentChunk(reader, mode, groupSize, target);
@@ -246,6 +263,10 @@
       const previousHandler = this.scrollHandlers.get(reader);
       if (previousHandler) reader.removeEventListener('scroll', previousHandler);
       const handler = () => {
+        if (state.virtualized && !state.bookPages) {
+          this.scheduleWindowShift(reader, mode, safeGroupSize);
+          return;
+        }
         const nearEnd = state.bookPages
           ? reader.scrollLeft + reader.clientWidth >= reader.scrollWidth - Math.max(600, reader.clientWidth)
           : reader.scrollTop + reader.clientHeight >= reader.scrollHeight - 600;
@@ -270,7 +291,16 @@
       for (const word of words) {
         const rect = word.getBoundingClientRect();
         if (rect.bottom < readerRect.top || rect.top > readerRect.bottom) continue;
-        const distance = Math.abs(rect.top - readerRect.top - 24);
+
+        // Book Pages scrolls horizontally. A word on an earlier/later spread can
+        // still overlap the reader vertically, so vertical visibility alone can
+        // incorrectly select a page-1 word after the user has moved much farther
+        // into the book. Require horizontal visibility and choose the word nearest
+        // the visible spread's upper-left reading edge.
+        if (state.bookPages && (rect.right < readerRect.left || rect.left > readerRect.right)) continue;
+        const distance = state.bookPages
+          ? Math.hypot(rect.left - readerRect.left - 24, rect.top - readerRect.top - 24)
+          : Math.abs(rect.top - readerRect.top - 24);
         if (distance < nearestDistance) {
           nearest = word;
           nearestDistance = distance;
