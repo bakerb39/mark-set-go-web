@@ -8,6 +8,7 @@
   let allowLegacyUpload = false;
   let activeImportedDocument = null;
   let activeImportedVersion = 'original';
+  let formatControlObserver = null;
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -80,6 +81,8 @@
       readingLevel: level
     });
     window.setTimeout(installFormatControl, 0);
+    window.setTimeout(installFormatControl, 100);
+    window.setTimeout(installFormatControl, 500);
   }
 
   async function requestReadingLevel(level) {
@@ -97,8 +100,18 @@
     renderImportedVersion(level);
   }
 
+  function ensureFormatControlObserver() {
+    if (formatControlObserver || !document.body) return;
+    formatControlObserver = new MutationObserver(() => {
+      if (!activeImportedDocument) return;
+      window.requestAnimationFrame(installFormatControl);
+    });
+    formatControlObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
   function installFormatControl() {
     if (!activeImportedDocument) return;
+    ensureFormatControlObserver();
     const titleRow = document.querySelector('.reader-title-row');
     if (!titleRow || titleRow.querySelector('#read-anything-format-control')) return;
     const control = document.createElement('details');
