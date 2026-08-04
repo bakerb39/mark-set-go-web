@@ -12075,11 +12075,17 @@ function renderMyLibraryHub() {
   const primaryPercent = primaryBook?.totalWords
     ? Math.min(100, Math.round((Number(primaryBook.furthestWord) || 0) / primaryBook.totalWords * 100))
     : 0;
+  // My Library must become interactive before any expensive reading-profile
+  // analysis. Parsing several full stored books and sampling up to 110,000
+  // characters from each one blocked the main thread and delayed click handlers.
+  // Show an already-cached profile when available; otherwise omit the badge here.
+  // A profile will still be calculated normally when the user opens its dedicated
+  // Reading Profile flow, where the analysis is expected and intentional.
+  const libraryDifficultyCache = difficultyCache();
   const storedDifficultyForProgress = (item) => {
     if (!item) return null;
-    let document = null;
-    try { document = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${item.documentId}`) || 'null'); } catch {}
-    return getBookDifficulty({ documentId:item.documentId, title:item.title, author:document?.source?.author || '', year:document?.source?.year || '', description:document?.source?.description || '' }, document?.text || '');
+    const key = difficultyKey({ documentId:item.documentId, title:item.title });
+    return libraryDifficultyCache[key]?.profile || null;
   };
   const primaryDifficulty = storedDifficultyForProgress(primaryBook);
 
