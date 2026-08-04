@@ -225,8 +225,19 @@
       .trim();
   }
 
+  function paragraphBreakIndexes(value) {
+    const blocks = String(value || '').replace(/\r/g, '').split(/\n\s*\n+/).map((block) => block.trim()).filter(Boolean);
+    const indexes = [];
+    let wordIndex = 0;
+    blocks.forEach((block, index) => {
+      if (index > 0) indexes.push(wordIndex);
+      wordIndex += block.replace(/\s+/g, ' ').trim().split(' ').filter(Boolean).length;
+    });
+    return indexes;
+  }
+
   function versionLabel(level) {
-    return ({ original: 'Original', clean: 'Clean Format', summary: 'Summary', college: 'College Level', highschool: 'High School Level', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
+    return ({ original: 'Original', clean: 'Readable', summaryQuick: 'Quick Summary', summaryStudy: 'Study Summary', summaryDetailed: 'Detailed Summary', custom: 'Custom Transform', college: 'College Level', highschool: 'High School Level', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
   }
 
   function showTransformStatus(message, isError = false) {
@@ -243,10 +254,12 @@
     if (!text) return;
     activeImportedVersion = level;
     saveActiveFormatRecord();
-    const suffix = level === 'original' ? '' : ` — ${versionLabel(level)}`;
+    app.classList.toggle('read-anything-paragraph-spacing', level === 'clean' || level.startsWith('summary') || level === 'custom');
+    const suffix = '';
     pendingImportedRender = true;
     window.renderReaderWithText(`${activeImportedDocument.baseTitle || activeImportedDocument.title}${suffix}`, text, {
       ...(activeImportedDocument.source || {}),
+      paragraphBreaks: paragraphBreakIndexes(text),
       readAnythingKey: activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument),
       author: activeImportedDocument.author || activeImportedDocument.source?.author || '',
       importedAt: activeImportedDocument.source?.importedAt || new Date().toISOString(),
@@ -301,10 +314,11 @@
   }
 
 
-  async function requestSummary() {
+  async function requestSummary(style = 'quick') {
     if (!activeImportedDocument) return;
-    if (activeImportedDocument.versions.summary) return renderImportedVersion('summary');
-    showTransformStatus('Creating summary…');
+    const versionKey = `summary${style.charAt(0).toUpperCase()}${style.slice(1)}`;
+    if (activeImportedDocument.versions[versionKey]) return renderImportedVersion(versionKey);
+    showTransformStatus(`Creating ${style} summary…`);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 90000);
     try {
@@ -313,22 +327,59 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: activeImportedDocument.title,
-          text: activeImportedDocument.versions.clean || activeImportedDocument.versions.original
+          text: activeImportedDocument.versions.clean || activeImportedDocument.versions.original,
+          style
         }),
         signal: controller.signal
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.detail || payload.error || `Server returned HTTP ${response.status}.`);
       if (!payload.text) throw new Error('The server returned an empty summary.');
-      activeImportedDocument.versions.summary = payload.text;
+      activeImportedDocument.versions[versionKey] = payload.text;
       saveActiveFormatRecord();
       showTransformStatus('');
-      renderImportedVersion('summary');
+      renderImportedVersion(versionKey);
     } catch (error) {
       if (error?.name === 'AbortError') throw new Error('The summary took too long. Try a shorter article or passage.');
       throw new Error(error?.message === 'Failed to fetch'
         ? 'The summary connection was interrupted. Try again.'
         : error?.message || 'The summary could not be created.');
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  async function requestCustomTransform(instructions) {
+    if (!activeImportedDocument) return;
+    const prompt = String(instructions || '').trim();
+    if (!prompt) throw new Error('Enter an instruction for the transformation.');
+    showTransformStatus('Applying custom transformation…');
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 115000);
+    try {
+      const response = await fetch('/api/read-anything/transform', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: activeImportedDocument.title,
+          text: activeImportedDocument.versions.clean || activeImportedDocument.versions.original,
+          instructions: prompt
+        }),
+        signal: controller.signal
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || payload.error || `Server returned HTTP ${response.status}.`);
+      if (!payload.text) throw new Error('The server returned an empty transformation.');
+      activeImportedDocument.versions.custom = payload.text;
+      activeImportedDocument.customInstruction = prompt;
+      saveActiveFormatRecord();
+      showTransformStatus('');
+      renderImportedVersion('custom');
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new Error('The transformation took too long. Try a shorter article or passage.');
+      throw new Error(error?.message === 'Failed to fetch'
+        ? 'The transformation connection was interrupted. Try again.'
+        : error?.message || 'The transformation could not be created.');
     } finally {
       window.clearTimeout(timeout);
     }
@@ -370,16 +421,18 @@
     existing?.remove();
     const control = document.createElement('details');
     control.id = 'read-anything-format-control';
-    control.className = 'read-anything-format-control';
-    control.innerHTML = `<summary>Format</summary><div class="read-anything-format-menu"><div class="read-anything-format-menu-head"><strong>Format text</strong><button type="button" data-action="close-format" aria-label="Close format menu">×</button></div><div class="read-anything-format-actions"><button type="button" data-level="original">Original</button><button type="button" data-level="clean">Clean</button><button type="button" data-action="summarize">Summarize</button></div><label>Reading level<select id="read-anything-level"><option value="original">Original</option><option value="college">College</option><option value="highschool">High school</option><option value="grade8">Grade 8</option><option value="grade6">Grade 6</option><option value="grade4">Grade 4</option></select></label><button type="button" class="primary" data-action="apply-level">Apply level</button><small>Original text is always preserved.</small><div id="read-anything-transform-status" class="status" hidden></div></div>`;
+    control.className = 'read-anything-format-control read-anything-transform-control';
+    control.innerHTML = `<summary><span class="transform-label">Transform</span><span class="transform-state">${escapeHtml(versionLabel(activeImportedVersion))}</span></summary><div class="read-anything-format-menu read-anything-transform-menu"><div class="read-anything-format-menu-head"><div><strong>Transform</strong><small>Change the document view without leaving the reader.</small></div><button type="button" data-action="close-format" aria-label="Close transform menu">×</button></div><section><span class="transform-section-label">Reading</span><div class="read-anything-format-actions transform-reading-actions"><button type="button" data-level="original">Original</button><button type="button" data-level="clean">Readable</button></div></section><section><span class="transform-section-label">Summary</span><div class="read-anything-format-actions transform-summary-actions"><button type="button" data-summary-style="quick">Quick</button><button type="button" data-summary-style="study">Study</button><button type="button" data-summary-style="detailed">Detailed</button></div></section><section><label><span class="transform-section-label">Reading level</span><select id="read-anything-level"><option value="original">Original</option><option value="college">College</option><option value="highschool">High school</option><option value="grade8">Grade 8</option><option value="grade6">Grade 6</option><option value="grade4">Grade 4</option></select></label><button type="button" class="primary transform-apply-level" data-action="apply-level">Apply level</button></section><section class="transform-custom"><label><span class="transform-section-label">Custom AI</span><textarea id="read-anything-custom-instruction" rows="3" placeholder="Example: Turn this into a concise study guide with headings and questions."></textarea></label><button type="button" class="primary" data-action="apply-custom">Apply instruction</button></section><small class="transform-preserve-note">The original text is always preserved.</small><div id="read-anything-transform-status" class="status" hidden></div></div>`;
     titleRow.appendChild(control);
     if (window.matchMedia('(max-width: 700px)').matches) control.classList.add('read-anything-format-control-mobile');
-    control.querySelector('#read-anything-level').value = activeImportedVersion;
+    control.querySelector('#read-anything-level').value = ['college','highschool','grade8','grade6','grade4'].includes(activeImportedVersion) ? activeImportedVersion : 'original';
+    control.querySelectorAll('[data-level]').forEach((button) => button.classList.toggle('active', button.dataset.level === activeImportedVersion));
+    control.querySelector(`[data-summary-style="${activeImportedVersion.replace('summary','').toLowerCase()}"]`)?.classList.add('active');
     control.addEventListener('click', async (event) => {
       const levelButton = event.target.closest('[data-level]');
       if (levelButton) {
         const level = levelButton.dataset.level;
-        if (level === 'clean' && !activeImportedDocument.versions.clean) {
+        if (level === 'clean') {
           activeImportedDocument.versions.clean = cleanFormatText(activeImportedDocument.versions.original);
           saveActiveFormatRecord();
         }
@@ -390,8 +443,14 @@
         control.open = false;
         return;
       }
-      if (event.target.closest('[data-action="summarize"]')) {
-        try { await requestSummary(); } catch (error) { showTransformStatus(error.message, true); }
+      const summaryButton = event.target.closest('[data-summary-style]');
+      if (summaryButton) {
+        try { await requestSummary(summaryButton.dataset.summaryStyle); } catch (error) { showTransformStatus(error.message, true); }
+        return;
+      }
+      if (event.target.closest('[data-action="apply-custom"]')) {
+        const instructions = control.querySelector('#read-anything-custom-instruction').value;
+        try { await requestCustomTransform(instructions); } catch (error) { showTransformStatus(error.message, true); }
         return;
       }
       if (event.target.closest('[data-action="apply-level"]')) {

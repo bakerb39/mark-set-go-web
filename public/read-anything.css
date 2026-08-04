@@ -117,3 +117,63 @@
     padding: 3px 5px !important;
   }
 }
+
+/* v8.6.6 — compact Format labels and visible imported paragraph spacing. */
+.read-anything-format-actions button {
+  font-size: .68rem;
+  line-height: 1.05;
+  padding-inline: .3rem;
+  white-space: nowrap;
+}
+#app.read-anything-paragraph-spacing .reader-paragraph-break {
+  height: 1.15em;
+}
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen .read-anything-format-actions button {
+    font-size: 10px !important;
+    line-height: 1 !important;
+    padding: 5px 3px !important;
+  }
+}
+
+
+/* v8.7.0 — integrated Transform control and compact in-reader workspace. */
+.read-anything-transform-control > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  text-transform: none;
+  font-size: .75rem;
+  letter-spacing: 0;
+}
+.read-anything-transform-control .transform-state {
+  display: inline-flex;
+  align-items: center;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: .18rem .38rem;
+  border-radius: 999px;
+  background: rgba(127,127,127,.16);
+  font-size: .67rem;
+  font-weight: 650;
+}
+.read-anything-transform-menu { width: min(340px, calc(100vw - 1rem)); gap: .7rem; }
+.read-anything-transform-menu section { display: grid; gap: .4rem; padding-top: .55rem; border-top: 1px solid #e4e9ee; }
+.read-anything-transform-menu section:first-of-type { border-top: 0; padding-top: 0; }
+.read-anything-format-menu-head > div { display: grid; gap: .12rem; }
+.read-anything-format-menu-head > div small { font-size: .7rem; }
+.transform-section-label { display: block; font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #647887; }
+.transform-reading-actions { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.transform-summary-actions { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.read-anything-transform-menu button.active { border-color: #276ca7; background: #eaf4fc; color: #174f7e; }
+.transform-apply-level { width: 100%; }
+.transform-custom textarea { width: 100%; resize: vertical; min-height: 74px; max-height: 150px; padding: .5rem; border: 1px solid #bdcbd6; border-radius: 8px; font: inherit; }
+.transform-preserve-note { display: block; }
+@media (max-width:700px) {
+  #app.msg-mobile-reader-screen .read-anything-transform-control > summary { gap: 3px !important; text-transform: none !important; }
+  #app.msg-mobile-reader-screen .read-anything-transform-control .transform-label { font-size: 10px; }
+  #app.msg-mobile-reader-screen .read-anything-transform-control .transform-state { display: none; }
+  #app.msg-mobile-reader-screen .read-anything-transform-menu { width: min(330px,calc(100vw - 16px)) !important; }
+}

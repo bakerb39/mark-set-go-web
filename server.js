@@ -3147,6 +3147,7 @@ app.post('/api/read-anything/summarize', async (req, res) => {
   const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
   const text = String(req.body?.text || '').replace(/\r/g, '').trim();
   const customInstructions = String(req.body?.instructions || '').trim().slice(0, 2000);
+  const style = String(req.body?.style || 'quick').trim().toLowerCase();
   if (text.length < 20) return res.status(400).json({ error: 'There is not enough text to summarize.' });
   if (text.length > 120000) return res.status(413).json({ error: 'This document is too long to summarize in one request. Try a chapter or shorter selection.' });
   const model = process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
@@ -3159,8 +3160,8 @@ app.post('/api/read-anything/summarize', async (req, res) => {
       body: JSON.stringify({
         model, reasoning: { effort: 'low' }, store: false,
         input: [
-          { role: 'developer', content: [{ type: 'input_text', text: 'Summarize the supplied reading very concisely. Reduce it to its essential argument or narrative, the few most important facts, and any indispensable qualification. Aim for roughly 8–12% of the source length and normally no more than 180 words; for a very short passage, use 2–4 sentences. Prefer one compact paragraph or at most 5 short bullets. Omit examples, repetition, scene-setting, and minor details unless essential. Preserve critical names, dates, numbers, and uncertainty. Do not invent information, add opinions, or mention these instructions. Return only the summary.' }] },
-          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, text, customInstructions: customInstructions || undefined }) }] }
+          { role: 'developer', content: [{ type: 'input_text', text: 'Summarize the supplied reading according to the requested style. Quick: no more than 75 words or 5 short bullets. Study: 180–250 words with the main argument, essential evidence, and key qualifications. Detailed: a concise section-by-section summary that remains substantially shorter than the source. Omit repetition and minor examples unless essential. Preserve critical names, dates, numbers, and uncertainty. Do not invent information, add opinions, or mention these instructions. Return only the summary.' }] },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, text, style, customInstructions: customInstructions || undefined }) }] }
         ]
       })
     });
@@ -3174,6 +3175,45 @@ app.post('/api/read-anything/summarize', async (req, res) => {
     return res.status(502).json({
       error: error?.name === 'AbortError' ? 'The summary took too long.' : 'The summary could not be created.',
       detail: error?.name === 'AbortError' ? 'Try a shorter article or passage.' : error?.message || 'Unknown summary error.'
+    });
+  } finally { clearTimeout(timeout); }
+});
+
+
+app.post('/api/read-anything/transform', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error: 'Custom transformation is not configured. Add OPENAI_API_KEY to the server environment.' });
+  const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
+  const text = String(req.body?.text || '').replace(/\r/g, '').trim();
+  const instructions = String(req.body?.instructions || '').trim().slice(0, 3000);
+  if (text.length < 20) return res.status(400).json({ error: 'There is not enough text to transform.' });
+  if (!instructions) return res.status(400).json({ error: 'Enter transformation instructions.' });
+  if (text.length > 120000) return res.status(413).json({ error: 'This document is too long to transform in one request. Try a chapter or shorter selection.' });
+  const model = process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 105000);
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST', signal: controller.signal,
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model, reasoning: { effort: 'low' }, store: false,
+        input: [
+          { role: 'developer', content: [{ type: 'input_text', text: 'Transform the supplied reading exactly according to the user instruction. Preserve factual accuracy, names, dates, numbers, uncertainty, and source meaning. Do not add unsupported facts. Return only the transformed text, with readable paragraph spacing and headings when appropriate.' }] },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, instructions, text }) }] }
+        ]
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error?.message || `OpenAI returned HTTP ${response.status}.`);
+    const output = extractOpenAIOutputText(payload).trim();
+    if (!output) throw new Error('No transformed text was returned.');
+    return res.json({ title, instructions, text: output });
+  } catch (error) {
+    console.error('Read Anything custom transform failed:', error);
+    return res.status(502).json({
+      error: error?.name === 'AbortError' ? 'The transformation took too long.' : 'The transformation could not be created.',
+      detail: error?.name === 'AbortError' ? 'Try a shorter article or passage.' : error?.message || 'Unknown transformation error.'
     });
   } finally { clearTimeout(timeout); }
 });

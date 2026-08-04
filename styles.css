@@ -8689,3 +8689,55 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
     padding: 7px 10px calc(7px + env(safe-area-inset-bottom, 0));
   }
 }
+
+/* v8.6.5 — desktop footer uses left information and right links/version. */
+.site-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "copy nav"
+    "copy version";
+  column-gap: 24px;
+  row-gap: 2px;
+  align-items: end;
+  justify-items: stretch;
+  text-align: left;
+}
+.site-footer-copy {
+  grid-area: copy;
+  justify-self: start;
+  align-self: center;
+}
+.site-footer nav {
+  grid-area: nav;
+  justify-self: end;
+  justify-content: flex-end;
+  text-align: right;
+}
+.site-footer-version {
+  grid-area: version;
+  justify-self: end;
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .site-footer {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "copy"
+      "nav"
+      "version";
+    justify-items: start;
+    align-items: start;
+    column-gap: 0;
+    row-gap: 2px;
+    text-align: left;
+  }
+  .site-footer-copy,
+  .site-footer nav,
+  .site-footer-version {
+    justify-self: start;
+    text-align: left;
+  }
+  .site-footer nav { justify-content: flex-start; }
+}
