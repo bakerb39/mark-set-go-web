@@ -89,15 +89,42 @@
     if (!activeImportedDocument) return;
     if (activeImportedDocument.versions[level]) return renderImportedVersion(level);
     showTransformStatus(`Creating ${versionLabel(level)} version…`);
-    const response = await fetch('/api/read-anything/adapt', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: activeImportedDocument.title, text: activeImportedDocument.versions.clean || activeImportedDocument.versions.original, level })
+    const requestBody = JSON.stringify({
+      title: activeImportedDocument.title,
+      text: activeImportedDocument.versions.clean || activeImportedDocument.versions.original,
+      level
     });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || payload.detail || 'The reading-level version could not be created.');
-    activeImportedDocument.versions[level] = payload.text;
-    showTransformStatus('');
-    renderImportedVersion(level);
+
+    let lastError = null;
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = window.setTimeout(() => controller.abort(), 115000);
+      try {
+        if (attempt > 1) showTransformStatus(`Retrying ${versionLabel(level)} version…`);
+        const response = await fetch('/api/read-anything/adapt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: requestBody,
+          signal: controller.signal
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.detail || payload.error || `Server returned HTTP ${response.status}.`);
+        if (!payload.text) throw new Error('The server returned an empty adapted version.');
+        activeImportedDocument.versions[level] = payload.text;
+        showTransformStatus('');
+        renderImportedVersion(level);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (error?.name === 'AbortError') lastError = new Error('The adaptation took too long. Try a shorter article or section.');
+        if (attempt < 2 && error?.name !== 'AbortError') await new Promise((resolve) => window.setTimeout(resolve, 1200));
+      } finally {
+        window.clearTimeout(timeout);
+      }
+    }
+    throw new Error(lastError?.message === 'Failed to fetch'
+      ? 'The adaptation connection was interrupted. Try again, or use a shorter article.'
+      : lastError?.message || 'The reading-level version could not be created.');
   }
 
   function ensureFormatControlObserver() {

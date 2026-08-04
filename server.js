@@ -3153,43 +3153,69 @@ app.post('/api/read-anything/adapt', async (req, res) => {
   if (!instructions[level]) return res.status(400).json({ error: 'Choose a supported reading level.' });
   const text = String(req.body?.text || '').replace(/\r/g, '').trim();
   if (text.length < 20) return res.status(400).json({ error: 'There is not enough text to adapt.' });
-  if (text.length > 180000) return res.status(413).json({ error: 'This document is too long to adapt in one request. Try a chapter or shorter article.' });
+  if (text.length > 120000) return res.status(413).json({ error: 'This document is too long to adapt reliably in one request. Try a chapter or shorter article.' });
 
   const paragraphs = text.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
   const chunks = [];
   let current = '';
   for (const paragraph of paragraphs) {
-    if (current && current.length + paragraph.length + 2 > 14000) { chunks.push(current); current = ''; }
+    if (current && current.length + paragraph.length + 2 > 9000) { chunks.push(current); current = ''; }
     current += `${current ? '\n\n' : ''}${paragraph}`;
   }
   if (current) chunks.push(current);
   if (chunks.length > 14) return res.status(413).json({ error: 'This document produces too many adaptation sections. Try a chapter or shorter selection.' });
 
-  try {
-    const adapted = [];
-    for (let index = 0; index < chunks.length; index += 1) {
-      const prompt = `You adapt reading material without changing its meaning. ${instructions[level]}\nPreserve names, dates, numbers, factual qualifications, sequence, headings, and paragraph breaks. Do not summarize, omit claims, add opinions, invent facts, or mention these instructions. Keep direct quotations unchanged when practical. Return only the adapted text for this section.`;
+  const prompt = `You adapt reading material without changing its meaning. ${instructions[level]}\nPreserve names, dates, numbers, factual qualifications, sequence, headings, and paragraph breaks. Do not summarize, omit claims, add opinions, invent facts, or mention these instructions. Keep direct quotations unchanged when practical. Return only the adapted text for this section.`;
+  const model = process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
+
+  async function adaptChunk(chunk, index) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 65000);
+    try {
       const response = await fetch('https://api.openai.com/v1/responses', {
-        method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        method: 'POST',
+        signal: controller.signal,
+        headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna',
-          reasoning: { effort: 'low' }, store: false,
+          model,
+          reasoning: { effort: 'low' },
+          store: false,
           input: [
             { role: 'developer', content: [{ type: 'input_text', text: prompt }] },
-            { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, section: index + 1, totalSections: chunks.length, text: chunks[index] }) }] }
+            { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, section: index + 1, totalSections: chunks.length, text: chunk }) }] }
           ]
         })
       });
       const payload = await response.json().catch(() => ({}));
-      if (!response.ok) return res.status(502).json({ error: 'The reading-level version could not be created.', detail: payload?.error?.message || `OpenAI returned HTTP ${response.status}.` });
+      if (!response.ok) throw new Error(payload?.error?.message || `OpenAI returned HTTP ${response.status}.`);
       const output = extractOpenAIOutputText(payload);
       if (!output) throw new Error(`No adapted text was returned for section ${index + 1}.`);
-      adapted.push(output.trim());
+      return output.trim();
+    } finally {
+      clearTimeout(timeout);
     }
-    return res.json({ level, title, text: adapted.join('\n\n'), sections: chunks.length });
+  }
+
+  try {
+    const results = new Array(chunks.length);
+    let nextIndex = 0;
+    const workerCount = Math.min(3, chunks.length);
+    async function worker() {
+      while (nextIndex < chunks.length) {
+        const index = nextIndex;
+        nextIndex += 1;
+        results[index] = await adaptChunk(chunks[index], index);
+      }
+    }
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+    return res.json({ level, title, text: results.join('\n\n'), sections: chunks.length });
   } catch (error) {
     console.error('Read Anything adaptation failed:', error);
-    return res.status(502).json({ error: 'The reading-level version could not be created.', detail: error?.message || 'Unknown adaptation error.' });
+    const timedOut = error?.name === 'AbortError';
+    return res.status(502).json({
+      error: timedOut ? 'The reading-level adaptation took too long.' : 'The reading-level version could not be created.',
+      detail: timedOut ? 'Try a shorter article or section.' : error?.message || 'Unknown adaptation error.'
+    });
   }
 });
 
