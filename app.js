@@ -12043,13 +12043,58 @@ function renderMyLibraryHub() {
   // Show an already-cached profile when available; otherwise omit the badge here.
   // A profile will still be calculated normally when the user opens its dedicated
   // Reading Profile flow, where the analysis is expected and intentional.
-  const libraryDifficultyCache = difficultyCache();
+  const mobileSimpleLibrary = window.matchMedia?.('(max-width: 760px)')?.matches;
+  // Mobile intentionally excludes reading profiles. Desktop displays only an
+  // already-cached browser profile and never analyzes book text while opening
+  // My Library.
+  const libraryDifficultyCache = mobileSimpleLibrary ? null : difficultyCache();
   const storedDifficultyForProgress = (item) => {
-    if (!item) return null;
+    if (!item || mobileSimpleLibrary || !libraryDifficultyCache) return null;
     const key = difficultyKey({ documentId:item.documentId, title:item.title });
     return libraryDifficultyCache[key]?.profile || null;
   };
   const primaryDifficulty = storedDifficultyForProgress(primaryBook);
+
+  const deleteStoredDocument = async (documentId, title = 'this book') => {
+    if (!documentId) return;
+    const confirmed = window.confirm(`Delete “${title}” from My Library? This removes its saved text, progress, bookmarks, notes, cached reading profile, and signed-in cloud copy.`);
+    if (!confirmed) return;
+
+    const progressRecords = readStoredObject(READING_PROGRESS_KEY);
+    const removed = progressRecords[documentId] || { documentId, title };
+
+    try {
+      const cloudBook = window.MarkSetGoCloudLibrary?.list?.().find((book) => String(book.clientRecordId || '') === String(documentId));
+      if (cloudBook?.id && window.MarkSetGoCloud?.library?.remove) {
+        await window.MarkSetGoCloud.library.remove(cloudBook.id);
+      }
+    } catch (error) {
+      const continueLocal = window.confirm(`The cloud copy could not be deleted (${error?.message || 'unknown error'}). Delete the local copy anyway?`);
+      if (!continueLocal) return;
+    }
+
+    delete progressRecords[documentId];
+    localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progressRecords));
+    localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`);
+
+    const readingList = getReadingList().filter((item) => String(item.documentId || '') !== String(documentId));
+    saveReadingList(readingList);
+    saveBookmarks(getBookmarks().filter((item) => String(item.documentId || '') !== String(documentId)));
+    saveNotes(getNotes().filter((item) => String(item.documentId || '') !== String(documentId)));
+
+    const profileKey = difficultyKey({ documentId, title });
+    const profiles = difficultyCache();
+    if (profiles[profileKey]) {
+      delete profiles[profileKey];
+      localStorage.setItem(BOOK_DIFFICULTY_CACHE_KEY, JSON.stringify(profiles));
+    }
+    localStorage.removeItem(readingProfileCacheKey({ documentId, title }));
+    ['none', 'light', 'full'].forEach((mode) => localStorage.removeItem(bookGuideCacheKey({ documentId, title }, mode)));
+
+    await clearRemovedBookReferences({ ...removed, documentId, title });
+    await window.MarkSetGoCloudLibrary?.refresh?.().catch?.(() => {});
+    renderMyLibraryHub();
+  };
 
   const openStoredDocument = async (documentId, wordIndex = null) => {
     let data = null;
@@ -12123,7 +12168,10 @@ function renderMyLibraryHub() {
         <p>${percent}% complete · Last read ${escapeHtml(lastRead)}</p>
         ${difficulty ? difficultyBadge(difficulty, {title:item.title}) : ''}
         <div class="library-progress-track"><span style="width:${percent}%"></span></div>
-        <button class="${index === 0 ? 'primary' : 'secondary'}" type="button" data-library-document="${escapeHtml(item.documentId)}">Resume reading</button>
+        <div class="library-book-actions">
+          <button class="${index === 0 ? 'primary' : 'secondary'}" type="button" data-library-document="${escapeHtml(item.documentId)}">Resume reading</button>
+          <button class="secondary library-delete-book" type="button" data-library-delete="${escapeHtml(item.documentId)}" data-library-title="${escapeHtml(item.title || 'Untitled')}" aria-label="Delete ${escapeHtml(item.title || 'book')}">Delete</button>
+        </div>
       </div>
     </article>`;
   }).join('');
@@ -12156,6 +12204,7 @@ function renderMyLibraryHub() {
               <div class="focus-actions">
                 <button class="primary" type="button" data-library-document="${escapeHtml(primaryBook.documentId)}">Resume reading</button>
                 <button class="secondary" type="button" data-action="reader">Open Reader</button>
+                <button class="secondary library-delete-book" type="button" data-library-delete="${escapeHtml(primaryBook.documentId)}" data-library-title="${escapeHtml(primaryBook.title || 'Untitled')}">Delete</button>
               </div>
             </div>
           ` : `
@@ -12204,6 +12253,10 @@ function renderMyLibraryHub() {
   app.querySelectorAll('[data-library-document]').forEach((button) => {
     button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
   });
+  app.querySelectorAll('[data-library-delete]').forEach((button) => {
+    button.addEventListener('click', () => deleteStoredDocument(button.dataset.libraryDelete, button.dataset.libraryTitle || 'this book'));
+  });
+  document.dispatchEvent(new CustomEvent('marksetgo:library-rendered'));
 }
 function renderLibraryRecords(kind) {
   stopReader();

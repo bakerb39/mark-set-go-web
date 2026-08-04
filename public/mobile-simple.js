@@ -8,6 +8,7 @@
   let lastScreen = '';
   let scheduled = false;
   let startedOnce = false;
+  const ANCHOR_POSITION_KEY = 'markSetGoMobileAnchorPositionV1';
   const configuredReaders = new WeakSet();
 
   function dispatchChange(el) {
@@ -45,11 +46,17 @@
       nav.innerHTML = `
         <button type="button" data-mobile-route="library"><span aria-hidden="true">▥</span><span>Library</span></button>
         <button type="button" data-mobile-route="browse"><span aria-hidden="true">⌕</span><span>Browse</span></button>
+        <button type="button" data-mobile-route="import"><span aria-hidden="true">⇧</span><span>Import</span></button>
         <button type="button" data-mobile-route="reader"><span aria-hidden="true">▤</span><span>Reader</span></button>`;
       nav.addEventListener('click', (event) => {
         const button = event.target.closest('[data-mobile-route]');
         if (!button) return;
         const route = button.dataset.mobileRoute;
+        if (route === 'import') {
+          window.MarkSetGoReadAnything?.render?.();
+          scheduleUpdate();
+          return;
+        }
         const source = route === 'library'
           ? document.querySelector('[data-action="my-library"]')
           : route === 'browse'
@@ -68,10 +75,16 @@
     controls.id = 'msg-mobile-reader-controls';
     controls.setAttribute('aria-label', 'Simplified reader controls');
     controls.innerHTML = `
-      <button type="button" data-mobile-reader="slower" aria-label="Decrease speed">−</button>
-      <div class="msg-speed"><span id="msg-mobile-wpm">300</span>&nbsp;WPM</div>
-      <button type="button" class="msg-play" data-mobile-reader="play" aria-label="Start or pause reading">▶</button>
-      <button type="button" class="msg-theme" data-mobile-reader="theme">Light</button>`;
+      <div class="msg-control-row msg-speed-row">
+        <button type="button" data-mobile-reader="slower" aria-label="Decrease speed">−</button>
+        <div class="msg-speed"><span id="msg-mobile-wpm">300</span>&nbsp;WPM</div>
+        <button type="button" data-mobile-reader="faster" aria-label="Increase speed">+</button>
+        <button type="button" class="msg-play" data-mobile-reader="play" aria-label="Start or pause reading">▶</button>
+      </div>
+      <div class="msg-control-row msg-option-row">
+        <button type="button" class="msg-anchor-position" data-mobile-reader="anchor-position">Anchor: Top</button>
+        <button type="button" class="msg-theme" data-mobile-reader="theme">Light</button>
+      </div>`;
     controls.addEventListener('click', (event) => {
       const button = event.target.closest('[data-mobile-reader]');
       if (!button) return;
@@ -80,6 +93,15 @@
       if (action === 'slower' && speed) {
         speed.value = String(Math.max(30, Number(speed.value || 300) - 25));
         dispatchChange(speed);
+      }
+      if (action === 'faster' && speed) {
+        speed.value = String(Math.min(2000, Number(speed.value || 300) + 25));
+        dispatchChange(speed);
+      }
+      if (action === 'anchor-position') {
+        const next = currentAnchorPosition() === 'top' ? 'center' : 'top';
+        localStorage.setItem(ANCHOR_POSITION_KEY, next);
+        applyAnchorPosition();
       }
       if (action === 'play') {
         const pause = app.querySelector('#pause-reader');
@@ -97,6 +119,20 @@
       refreshReaderControlLabels();
     });
     panel.appendChild(controls);
+  }
+
+  function currentAnchorPosition() {
+    return localStorage.getItem(ANCHOR_POSITION_KEY) === 'center' ? 'center' : 'top';
+  }
+
+  function applyAnchorPosition() {
+    const frame = app.querySelector('#reader-frame');
+    if (!frame) return;
+    const position = currentAnchorPosition();
+    frame.classList.toggle('msg-anchor-top', position === 'top');
+    frame.classList.toggle('msg-anchor-center', position === 'center');
+    const button = document.querySelector('[data-mobile-reader="anchor-position"]');
+    if (button) button.textContent = position === 'top' ? 'Anchor: Top' : 'Anchor: Center';
   }
 
   function configureReader() {
@@ -123,6 +159,7 @@
       setValue('#fs-focus-anchor-color', '#d94b4b');
       setChecked('#fs-book-pages', false);
     }
+    applyAnchorPosition();
     refreshReaderControlLabels();
   }
 
@@ -138,10 +175,12 @@
     const theme = app.querySelector('#theme-select');
     const themeButton = document.querySelector('[data-mobile-reader="theme"]');
     if (themeButton && theme) themeButton.textContent = theme.value === 'light' ? 'Dark' : 'Light';
+    applyAnchorPosition();
   }
 
   function detectScreen() {
     if (app.querySelector('#reader.interactive-reader')) return 'reader';
+    if (app.querySelector('.read-anything-page')) return 'import';
     const text = (app.querySelector('h1,h2')?.textContent || '').toLowerCase();
     if (/library|my reading|continue reading/.test(text) || app.querySelector('.library-home-page,.my-library-page')) return 'library';
     if (/browse|discover|search libraries/.test(text) || app.querySelector('.browse-page')) return 'browse';
@@ -160,7 +199,7 @@
     if (title) {
       title.textContent = screen === 'reader'
         ? (app.querySelector('.reader-title-copy h1')?.textContent || 'Reader')
-        : screen === 'browse' ? 'Browse' : 'My Library';
+        : screen === 'browse' ? 'Browse' : screen === 'import' ? 'Read Anything' : 'My Library';
     }
 
     document.querySelectorAll('#msg-mobile-nav [data-mobile-route]').forEach((button) => {

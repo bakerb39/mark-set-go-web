@@ -3,7 +3,7 @@
   :root {
     --msg-mobile-header: 52px;
     --msg-mobile-nav: 64px;
-    --msg-mobile-reader-controls: 58px;
+    --msg-mobile-reader-controls: 104px;
   }
 
   html, body {
@@ -95,7 +95,7 @@
     z-index: 10020;
     height: calc(var(--msg-mobile-nav) + env(safe-area-inset-bottom, 0));
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     padding: 5px 8px env(safe-area-inset-bottom, 0);
     border-top: 1px solid rgba(20, 33, 61, .12);
     background: rgba(255,255,255,.98);
@@ -219,13 +219,27 @@
 
   #app.msg-mobile-reader-screen #msg-mobile-reader-controls {
     display: grid;
-    grid-template-columns: 44px minmax(86px, 1fr) 54px minmax(88px, 1fr);
-    align-items: center;
-    gap: 8px;
+    grid-template-rows: 48px 40px;
+    gap: 6px;
     height: var(--msg-mobile-reader-controls);
     padding: 7px 10px;
     border-top: 1px solid rgba(255,255,255,.10);
     background: #111820;
+  }
+
+  #msg-mobile-reader-controls .msg-control-row {
+    display: grid;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  #msg-mobile-reader-controls .msg-speed-row {
+    grid-template-columns: 44px minmax(86px, 1fr) 44px 54px;
+  }
+
+  #msg-mobile-reader-controls .msg-option-row {
+    grid-template-columns: minmax(0, 1fr) minmax(88px, .65fr);
   }
 
   #msg-mobile-reader-controls button {
@@ -255,8 +269,50 @@
     white-space: nowrap;
   }
 
-  #msg-mobile-reader-controls .msg-theme {
+  #msg-mobile-reader-controls .msg-theme,
+  #msg-mobile-reader-controls .msg-anchor-position {
+    min-height: 38px;
     font-size: 12px;
+  }
+
+  /* Top anchor mode reserves a dedicated band so the overlay never covers text. */
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top .focus-anchor-overlay {
+    top: 8px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100% - 24px) !important;
+    max-width: 46rem;
+    cursor: default !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader {
+    padding-top: 96px !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-center .focus-anchor-overlay {
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-center #reader {
+    padding-top: 18px !important;
+  }
+
+  /* Read Anything is a contained mobile screen; only its content area scrolls. */
+  #app.msg-mobile-list-screen .read-anything-page {
+    min-height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 14px !important;
+  }
+
+  #app.msg-mobile-list-screen .read-anything-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  #app.msg-mobile-list-screen .read-anything-promise {
+    display: none !important;
   }
 
   /* Simplify library and browse cards without changing their behavior. */
@@ -279,4 +335,13 @@
   #app.msg-mobile-list-screen [data-action="action-center"] {
     display: none !important;
   }
+}
+
+
+/* v8.5.2: Mobile library actions are compact; reading-profile badges are excluded. */
+@media (max-width: 760px) {
+  .my-library-hub .difficulty-badge,
+  .my-library-hub [class*="difficulty-"] { display: none !important; }
+  .library-book-actions { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
+  .library-delete-book { min-height: 40px; }
 }
