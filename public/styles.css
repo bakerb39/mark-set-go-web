@@ -8631,37 +8631,35 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
   opacity: .72;
 }
 
-/* v8.6.2 — one compact shared footer on desktop and mobile. */
+/* v8.6.3 — one compact, left-aligned shared footer everywhere. */
 .site-footer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: 4px 18px;
+  grid-template-columns: 1fr;
+  justify-items: start;
+  align-items: start;
+  gap: 2px;
+  width: 100%;
   margin: 0;
-  padding: 10px max(18px, calc((100vw - 1500px) / 2));
+  padding: 9px max(18px, calc((100vw - 1500px) / 2));
   border-top: 1px solid rgba(100,116,139,.18);
   background: rgba(248,250,252,.96);
+  text-align: left;
 }
 .site-footer-copy {
   display: grid;
-  gap: 2px;
+  justify-items: start;
+  gap: 1px;
   min-width: 0;
 }
-.site-footer-copy strong {
-  font-size: .82rem;
-  line-height: 1.15;
-}
+.site-footer-copy strong { font-size: .82rem; line-height: 1.15; }
 .site-footer-copy small,
-.site-footer-version {
-  font-size: .62rem;
-  line-height: 1.15;
-  opacity: .7;
-}
+.site-footer-version { font-size: .62rem; line-height: 1.15; opacity: .7; }
 .site-footer nav {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 .site-footer nav button {
   min-height: 0;
@@ -8670,56 +8668,24 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
   background: transparent;
   font-size: .68rem;
 }
-.site-footer-version {
-  white-space: nowrap;
-  text-align: right;
-}
+.site-footer-version { white-space: nowrap; text-align: left; }
 
-/* v8.6.2 — restore deterministic facing-page geometry on desktop only.
-   This does not change cursor, rendering, or pagination JavaScript. */
+/* v8.6.3 — preserve the established Book Pages multicolumn engine.
+   Only allow surrounding desktop containers to shrink; do not add CSS
+   containment or width limits to generated columns. */
 @media (min-width: 701px) {
-  .reader-frame,
   .reader-layout,
-  .reader-main-pane,
-  .reader-viewer-shell,
-  .reader-viewer {
-    min-width: 0;
-  }
-
+  .reader-center-column,
+  .reader-frame { min-width: 0; }
   #reader.reader.book-pages-layout {
-    --book-page-gap: clamp(2rem, 5vw, 5rem);
-    --book-page-width: calc((100% - var(--book-page-gap)) / 2);
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: clamp(360px, calc(100vh - 330px), 690px) !important;
-    min-height: 360px;
-    overflow: hidden !important;
-    column-width: var(--book-page-width) !important;
-    column-count: auto !important;
-    column-gap: var(--book-page-gap) !important;
-    column-fill: auto !important;
-    contain: layout paint;
-  }
-
-  #reader.reader.book-pages-layout > * {
-    max-width: var(--book-page-width);
+    width: 100%;
+    max-width: 100%;
   }
 }
 
 @media (max-width: 700px) {
   .site-footer {
     position: static;
-    display: grid;
-    grid-template-columns: 1fr;
-    justify-items: center;
-    gap: 2px;
-    width: 100%;
-    height: auto;
     padding: 7px 10px calc(7px + env(safe-area-inset-bottom, 0));
-    text-align: center;
   }
-  .site-footer-copy { justify-items: center; gap: 1px; }
-  .site-footer nav { justify-content: center; gap: 9px; }
-  .site-footer-version { text-align: center; }
 }

@@ -90,3 +90,30 @@
     font-size: 12px !important;
   }
 }
+
+
+/* v8.6.4 — keep Format visible on the mobile title ribbon. */
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen .reader-title-row {
+    position: relative !important;
+    overflow: visible !important;
+  }
+  #app.msg-mobile-reader-screen .read-anything-format-control,
+  #app.msg-mobile-reader-screen .read-anything-format-control-mobile {
+    display: block !important;
+    position: absolute !important;
+    top: 8px !important;
+    right: 9px !important;
+    left: auto !important;
+    margin: 0 !important;
+    transform: none !important;
+    z-index: 10060 !important;
+  }
+  #app.msg-mobile-reader-screen .read-anything-format-control > summary {
+    display: inline-flex !important;
+    color: #f7f8fa !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    padding: 3px 5px !important;
+  }
+}

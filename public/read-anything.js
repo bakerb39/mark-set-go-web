@@ -6,6 +6,7 @@
   const CAPTURE_STORAGE = window.localStorage;
   const IMPORT_HISTORY_KEY = 'markSetGoImportHistoryV1';
   const FORMAT_RECORD_PREFIX = 'markSetGoReadAnythingFormatV1:';
+  const FORMAT_DOCUMENT_INDEX_KEY = 'markSetGoReadAnythingDocumentIndexV1';
   const DOCUMENT_STORAGE_PREFIX = 'markSetGoDocumentV1:';
   let allowLegacyUpload = false;
   let activeImportedDocument = null;
@@ -57,6 +58,23 @@
     return `${FORMAT_RECORD_PREFIX}${key}`;
   }
 
+
+  function formatDocumentIndex() {
+    try {
+      const value = JSON.parse(localStorage.getItem(FORMAT_DOCUMENT_INDEX_KEY) || '{}');
+      return value && typeof value === 'object' ? value : {};
+    } catch {
+      return {};
+    }
+  }
+
+  function rememberFormatDocument(documentId, key) {
+    if (!documentId || !key) return;
+    const index = formatDocumentIndex();
+    index[String(documentId)] = String(key);
+    try { localStorage.setItem(FORMAT_DOCUMENT_INDEX_KEY, JSON.stringify(index)); } catch {}
+  }
+
   function saveActiveFormatRecord() {
     if (!activeImportedDocument) return;
     const key = activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument);
@@ -75,22 +93,45 @@
     }
   }
 
-  function restoreImportedFormatRecord(documentId) {
+  function restoreImportedFormatRecord(documentId, documentTitle = '') {
     let storedDocument = null;
     try { storedDocument = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
-    if (!storedDocument?.source?.readAnything) return false;
-    const key = storedDocument.source.readAnythingKey || importedDocumentKey(storedDocument);
+    const indexedKey = formatDocumentIndex()[String(documentId)] || '';
+    const sourceKey = storedDocument?.source?.readAnythingKey || '';
+    let key = sourceKey || indexedKey || (storedDocument?.source?.readAnything ? importedDocumentKey(storedDocument) : '');
+    if (!key && documentTitle) {
+      const normalizedTitle = String(documentTitle).replace(/\s+—\s+.+$/, '').trim().toLowerCase();
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const storageKey = localStorage.key(index) || '';
+        if (!storageKey.startsWith(FORMAT_RECORD_PREFIX)) continue;
+        try {
+          const candidate = JSON.parse(localStorage.getItem(storageKey) || 'null');
+          const candidateTitle = String(candidate?.title || '').trim().toLowerCase();
+          if (candidateTitle && candidateTitle === normalizedTitle) {
+            key = storageKey.slice(FORMAT_RECORD_PREFIX.length);
+            rememberFormatDocument(documentId, key);
+            break;
+          }
+        } catch {}
+      }
+    }
+    if (!key) {
+      activeImportedDocument = null;
+      document.querySelector('#read-anything-format-control')?.remove();
+      return false;
+    }
     let record = null;
     try { record = JSON.parse(localStorage.getItem(formatRecordStorageKey(key)) || 'null'); } catch {}
+    if (!record && !storedDocument?.source?.readAnything) return false;
     const readingLevel = storedDocument.source.readingLevel || 'original';
     activeImportedDocument = {
-      title: record?.title || storedDocument.source.adaptedFrom || storedDocument.title.replace(/\s+—\s+.+$/, ''),
-      baseTitle: record?.title || storedDocument.source.adaptedFrom || storedDocument.title.replace(/\s+—\s+.+$/, ''),
-      author: record?.author || storedDocument.source.author || '',
-      source: { ...(record?.source || storedDocument.source), readAnything: true, readAnythingKey: key },
-      versions: { ...(record?.versions || {}), [readingLevel]: storedDocument.text }
+      title: record?.title || storedDocument?.source?.adaptedFrom || String(storedDocument?.title || 'Imported document').replace(/\s+—\s+.+$/, ''),
+      baseTitle: record?.title || storedDocument?.source?.adaptedFrom || String(storedDocument?.title || 'Imported document').replace(/\s+—\s+.+$/, ''),
+      author: record?.author || storedDocument?.source?.author || '',
+      source: { ...(record?.source || storedDocument?.source || {}), readAnything: true, readAnythingKey: key },
+      versions: { ...(record?.versions || {}), ...(storedDocument?.text ? { [readingLevel]: storedDocument.text } : {}) }
     };
-    if (!activeImportedDocument.versions.original && readingLevel === 'original') activeImportedDocument.versions.original = storedDocument.text;
+    if (!activeImportedDocument.versions.original && readingLevel === 'original' && storedDocument?.text) activeImportedDocument.versions.original = storedDocument.text;
     activeImportedVersion = record?.selectedVersion && activeImportedDocument.versions[record.selectedVersion]
       ? record.selectedVersion
       : readingLevel;
@@ -296,10 +337,25 @@
   function scheduleFormatControlAttach() {
     formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
     formatControlAttachTimers = [];
-    [0, 50, 150, 400, 900].forEach((delay) => {
+    let frame = 0;
+    const attachObserver = new MutationObserver(() => {
+      if (!activeImportedDocument) return attachObserver.disconnect();
+      installFormatControl();
+      if (document.querySelector('#read-anything-format-control')) attachObserver.disconnect();
+    });
+    attachObserver.observe(app, { childList: true, subtree: true });
+    window.setTimeout(() => attachObserver.disconnect(), 5000);
+    const attachAfterRender = () => {
+      if (!activeImportedDocument) return;
+      installFormatControl();
+      if (document.querySelector('#read-anything-format-control')) return;
+      frame += 1;
+      if (frame < 180) window.requestAnimationFrame(attachAfterRender);
+    };
+    window.requestAnimationFrame(attachAfterRender);
+    [250, 750, 1500, 3000].forEach((delay) => {
       const timer = window.setTimeout(() => {
-        if (!activeImportedDocument) return;
-        installFormatControl();
+        if (activeImportedDocument) installFormatControl();
       }, delay);
       formatControlAttachTimers.push(timer);
     });
@@ -307,13 +363,17 @@
 
   function installFormatControl() {
     if (!activeImportedDocument) return;
-    const titleRow = document.querySelector('.reader-title-row');
-    if (!titleRow || titleRow.querySelector('#read-anything-format-control')) return;
+    const titleRow = document.querySelector('#app .reader-title-row');
+    if (!titleRow) return;
+    const existing = document.querySelector('#read-anything-format-control');
+    if (existing && existing.parentElement === titleRow) return;
+    existing?.remove();
     const control = document.createElement('details');
     control.id = 'read-anything-format-control';
     control.className = 'read-anything-format-control';
     control.innerHTML = `<summary>Format</summary><div class="read-anything-format-menu"><div class="read-anything-format-menu-head"><strong>Format text</strong><button type="button" data-action="close-format" aria-label="Close format menu">×</button></div><div class="read-anything-format-actions"><button type="button" data-level="original">Original</button><button type="button" data-level="clean">Clean</button><button type="button" data-action="summarize">Summarize</button></div><label>Reading level<select id="read-anything-level"><option value="original">Original</option><option value="college">College</option><option value="highschool">High school</option><option value="grade8">Grade 8</option><option value="grade6">Grade 6</option><option value="grade4">Grade 4</option></select></label><button type="button" class="primary" data-action="apply-level">Apply level</button><small>Original text is always preserved.</small><div id="read-anything-transform-status" class="status" hidden></div></div>`;
     titleRow.appendChild(control);
+    if (window.matchMedia('(max-width: 700px)').matches) control.classList.add('read-anything-format-control-mobile');
     control.querySelector('#read-anything-level').value = activeImportedVersion;
     control.addEventListener('click', async (event) => {
       const levelButton = event.target.closest('[data-level]');
@@ -540,11 +600,13 @@
     if (!documentId) return;
     if (pendingImportedRender && activeImportedDocument) {
       pendingImportedRender = false;
+      const key = activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument);
+      rememberFormatDocument(documentId, key);
       saveActiveFormatRecord();
       scheduleFormatControlAttach();
       return;
     }
-    restoreImportedFormatRecord(documentId);
+    restoreImportedFormatRecord(documentId, event?.detail?.title || '');
   });
 
   document.addEventListener('click', (event) => {

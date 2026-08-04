@@ -10,6 +10,7 @@
   let startedOnce = false;
   const MOBILE_TEXT_SIZE_KEY = 'markSetGoMobileTextSizeV1';
   const configuredReaders = new WeakSet();
+  const sharedFooter = document.getElementById('msg-shared-bottom');
 
   function applyMobileTextSize(value) {
     const size = Math.min(24, Math.max(12, Math.round(Number(value) || 14)));
@@ -46,6 +47,34 @@
       header.id = 'msg-mobile-header';
       header.innerHTML = '<span class="msg-mobile-mark">Mark, Set, Go!</span><strong id="msg-mobile-title">My Library</strong>';
       document.body.appendChild(header);
+    }
+
+    if (!document.getElementById('msg-mobile-nav')) {
+      const nav = document.createElement('nav');
+      nav.id = 'msg-mobile-nav';
+      nav.setAttribute('aria-label', 'Mobile navigation');
+      nav.innerHTML = `
+        <button type="button" data-mobile-route="library"><span aria-hidden="true">▥</span><span>Library</span></button>
+        <button type="button" data-mobile-route="browse"><span aria-hidden="true">⌕</span><span>Browse</span></button>
+        <button type="button" data-mobile-route="import"><span aria-hidden="true">⇧</span><span>Import</span></button>
+        <button type="button" data-mobile-route="reader"><span aria-hidden="true">▤</span><span>Reader</span></button>`;
+      nav.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-mobile-route]');
+        if (!button) return;
+        const route = button.dataset.mobileRoute;
+        if (route === 'import') {
+          window.MarkSetGoReadAnything?.render?.();
+          scheduleUpdate();
+          return;
+        }
+        const source = route === 'library'
+          ? document.querySelector('[data-action="my-library"]')
+          : route === 'browse'
+            ? document.querySelector('[data-action="browse"]')
+            : document.querySelector('[data-action="reader"]');
+        source?.click();
+      });
+      document.body.appendChild(nav);
     }
   }
 
@@ -198,9 +227,19 @@
         : screen === 'browse' ? 'Browse' : screen === 'import' ? 'Read Anything' : 'My Library';
     }
 
-    document.querySelectorAll('#msg-shared-bottom [data-shared-route]').forEach((button) => {
-      button.classList.toggle('active', button.dataset.sharedRoute === screen);
+    document.querySelectorAll('#msg-mobile-nav [data-mobile-route]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.mobileRoute === screen);
     });
+
+    if (sharedFooter) {
+      if (screen === 'reader') {
+        sharedFooter.hidden = true;
+        if (sharedFooter.parentElement !== document.body) document.body.appendChild(sharedFooter);
+      } else {
+        sharedFooter.hidden = false;
+        if (sharedFooter.parentElement !== app) app.appendChild(sharedFooter);
+      }
+    }
 
     if (screen === 'reader') configureReader();
 
