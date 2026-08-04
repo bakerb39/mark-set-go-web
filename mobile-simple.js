@@ -3,26 +3,6 @@
   const app = document.getElementById('app');
   if (!app) return;
 
-  const sharedNav = document.querySelector('#msg-shared-bottom nav');
-  if (sharedNav && !sharedNav.dataset.sharedBound) {
-    sharedNav.dataset.sharedBound = 'true';
-    sharedNav.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-shared-route]');
-      if (!button) return;
-      const route = button.dataset.sharedRoute;
-      if (route === 'import') {
-        window.MarkSetGoReadAnything?.render?.();
-        return;
-      }
-      const source = route === 'library'
-        ? document.querySelector('[data-action="my-library"]')
-        : route === 'browse'
-          ? document.querySelector('[data-action="browse"]')
-          : document.querySelector('[data-action="reader"]');
-      source?.click();
-    });
-  }
-
   if (!mq.matches) return;
 
   let lastScreen = '';

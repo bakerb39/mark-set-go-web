@@ -3125,19 +3125,6 @@ function renderHome() {
         </section>
       </div>
 
-      <section class="home-business-strip" aria-label="Company and product information">
-        <div>
-          <strong>Independent reading and learning platform</strong>
-          <span>Designed and developed by Brian Baker.</span>
-        </div>
-        <nav aria-label="Business information">
-          <button type="button" data-action="about">About</button>
-          <button type="button" data-action="contact">Contact</button>
-          <button type="button" data-action="privacy">Privacy</button>
-          <button type="button" data-action="terms">Terms</button>
-        </nav>
-        <small>© 2026 Brian Baker. All rights reserved. Mark, Set, Go! is an independent software project.</small>
-      </section>
     </section>`;
 
   app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));

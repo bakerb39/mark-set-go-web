@@ -708,3 +708,22 @@
     display: none !important;
   }
 }
+
+/* v8.6.2 — the footer is informational, not a second mobile navigation bar. */
+@media (max-width: 700px) {
+  :root { --msg-mobile-nav: 0px; }
+  #app.app-shell { inset: var(--msg-mobile-header) 0 0 0; }
+  #msg-shared-bottom {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    height: auto !important;
+    display: grid !important;
+  }
+  #msg-shared-bottom .site-footer-copy,
+  #msg-shared-bottom nav,
+  #msg-shared-bottom .site-footer-version {
+    display: grid;
+  }
+  #msg-shared-bottom nav { display: flex; }
+}
