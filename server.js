@@ -3137,6 +3137,62 @@ app.get('/api/library/read', async (req, res) => {
   }
 });
 
+
+app.post('/api/read-anything/adapt', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error: 'Reading-level adaptation is not configured. Add OPENAI_API_KEY to the server environment.' });
+  const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
+  const level = String(req.body?.level || '').trim().toLowerCase();
+  const instructions = {
+    college: 'Rewrite for an adult college-level reader. Preserve nuance and technical accuracy while improving organization and clarity.',
+    highschool: 'Rewrite for a typical high-school reader. Use clear sentences and explain difficult vocabulary without removing important detail.',
+    grade8: 'Rewrite for an eighth-grade reader. Use direct sentences, familiar vocabulary, and short explanations for necessary difficult terms.',
+    grade6: 'Rewrite for a sixth-grade reader. Use shorter sentences, common vocabulary, and clear paragraph structure while preserving all essential facts.',
+    grade4: 'Rewrite for a fourth-grade reader. Use short, concrete sentences and familiar words. Explain essential difficult ideas simply without changing the facts.'
+  };
+  if (!instructions[level]) return res.status(400).json({ error: 'Choose a supported reading level.' });
+  const text = String(req.body?.text || '').replace(/\r/g, '').trim();
+  if (text.length < 20) return res.status(400).json({ error: 'There is not enough text to adapt.' });
+  if (text.length > 180000) return res.status(413).json({ error: 'This document is too long to adapt in one request. Try a chapter or shorter article.' });
+
+  const paragraphs = text.split(/\n{2,}/).map((part) => part.trim()).filter(Boolean);
+  const chunks = [];
+  let current = '';
+  for (const paragraph of paragraphs) {
+    if (current && current.length + paragraph.length + 2 > 14000) { chunks.push(current); current = ''; }
+    current += `${current ? '\n\n' : ''}${paragraph}`;
+  }
+  if (current) chunks.push(current);
+  if (chunks.length > 14) return res.status(413).json({ error: 'This document produces too many adaptation sections. Try a chapter or shorter selection.' });
+
+  try {
+    const adapted = [];
+    for (let index = 0; index < chunks.length; index += 1) {
+      const prompt = `You adapt reading material without changing its meaning. ${instructions[level]}\nPreserve names, dates, numbers, factual qualifications, sequence, headings, and paragraph breaks. Do not summarize, omit claims, add opinions, invent facts, or mention these instructions. Keep direct quotations unchanged when practical. Return only the adapted text for this section.`;
+      const response = await fetch('https://api.openai.com/v1/responses', {
+        method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna',
+          reasoning: { effort: 'low' }, store: false,
+          input: [
+            { role: 'developer', content: [{ type: 'input_text', text: prompt }] },
+            { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, section: index + 1, totalSections: chunks.length, text: chunks[index] }) }] }
+          ]
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) return res.status(502).json({ error: 'The reading-level version could not be created.', detail: payload?.error?.message || `OpenAI returned HTTP ${response.status}.` });
+      const output = extractOpenAIOutputText(payload);
+      if (!output) throw new Error(`No adapted text was returned for section ${index + 1}.`);
+      adapted.push(output.trim());
+    }
+    return res.json({ level, title, text: adapted.join('\n\n'), sections: chunks.length });
+  } catch (error) {
+    console.error('Read Anything adaptation failed:', error);
+    return res.status(502).json({ error: 'The reading-level version could not be created.', detail: error?.message || 'Unknown adaptation error.' });
+  }
+});
+
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 const server = app.listen(PORT, () => console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`));
 

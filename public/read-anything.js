@@ -6,6 +6,8 @@
   const CAPTURE_STORAGE = window.localStorage;
   const IMPORT_HISTORY_KEY = 'markSetGoImportHistoryV1';
   let allowLegacyUpload = false;
+  let activeImportedDocument = null;
+  let activeImportedVersion = 'original';
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -33,18 +35,108 @@
     localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(items.slice(0, 30)));
   }
 
+  function cleanFormatText(value) {
+    const lines = String(value || '').replace(/\r/g, '').split('\n').map((line) => line.replace(/[ \t]+/g, ' ').trim());
+    const output = [];
+    let paragraph = [];
+    const flush = () => { if (paragraph.length) { output.push(paragraph.join(' ').replace(/\s+/g, ' ').trim()); paragraph = []; } };
+    for (const line of lines) {
+      if (!line) { flush(); continue; }
+      if (/^(chapter|part|section)\s+[\divxlcdm]+\b/i.test(line) || (/^[A-Z0-9][A-Z0-9 ’'“”"—–:-]{3,90}$/.test(line) && line.split(/\s+/).length < 12)) {
+        flush(); output.push(line); continue;
+      }
+      if (/^[•▪◦*-]\s+/.test(line) || /^\d+[.)]\s+/.test(line)) { flush(); output.push(line); continue; }
+      paragraph.push(line);
+      if (/[.!?][”"']?$/.test(line) && paragraph.join(' ').length > 420) flush();
+    }
+    flush();
+    return output.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function versionLabel(level) {
+    return ({ original: 'Original', clean: 'Clean Format', college: 'College Level', highschool: 'High School Level', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
+  }
+
+  function showTransformStatus(message, isError = false) {
+    const el = document.querySelector('#read-anything-transform-status');
+    if (!el) return;
+    el.textContent = message;
+    el.classList.toggle('error', isError);
+    el.hidden = !message;
+  }
+
+  function renderImportedVersion(level) {
+    if (!activeImportedDocument) return;
+    const text = activeImportedDocument.versions?.[level];
+    if (!text) return;
+    activeImportedVersion = level;
+    const suffix = level === 'original' ? '' : ` — ${versionLabel(level)}`;
+    window.renderReaderWithText(`${activeImportedDocument.title}${suffix}`, text, {
+      ...(activeImportedDocument.source || {}),
+      author: activeImportedDocument.author || activeImportedDocument.source?.author || '',
+      importedAt: activeImportedDocument.source?.importedAt || new Date().toISOString(),
+      readAnything: true,
+      adaptedFrom: activeImportedDocument.title,
+      readingLevel: level
+    });
+    window.setTimeout(installFormatControl, 0);
+  }
+
+  async function requestReadingLevel(level) {
+    if (!activeImportedDocument) return;
+    if (activeImportedDocument.versions[level]) return renderImportedVersion(level);
+    showTransformStatus(`Creating ${versionLabel(level)} version…`);
+    const response = await fetch('/api/read-anything/adapt', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: activeImportedDocument.title, text: activeImportedDocument.versions.clean || activeImportedDocument.versions.original, level })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || payload.detail || 'The reading-level version could not be created.');
+    activeImportedDocument.versions[level] = payload.text;
+    showTransformStatus('');
+    renderImportedVersion(level);
+  }
+
+  function installFormatControl() {
+    if (!activeImportedDocument) return;
+    const titleRow = document.querySelector('.reader-title-row');
+    if (!titleRow || titleRow.querySelector('#read-anything-format-control')) return;
+    const control = document.createElement('details');
+    control.id = 'read-anything-format-control';
+    control.className = 'read-anything-format-control';
+    control.innerHTML = `<summary>Format</summary><div class="read-anything-format-menu"><strong>Imported text</strong><button type="button" data-level="original">Original wording</button><button type="button" data-level="clean">Clean layout</button><label>Reading level<select id="read-anything-level"><option value="original">Original</option><option value="college">College</option><option value="highschool">High school</option><option value="grade8">Grade 8</option><option value="grade6">Grade 6</option><option value="grade4">Grade 4</option></select></label><button type="button" class="primary" data-action="apply-level">Apply level</button><small>Adapted versions preserve the original and are labeled separately.</small><div id="read-anything-transform-status" class="status" hidden></div></div>`;
+    titleRow.appendChild(control);
+    control.querySelector('#read-anything-level').value = activeImportedVersion;
+    control.addEventListener('click', async (event) => {
+      const levelButton = event.target.closest('[data-level]');
+      if (levelButton) {
+        const level = levelButton.dataset.level;
+        if (level === 'clean' && !activeImportedDocument.versions.clean) activeImportedDocument.versions.clean = cleanFormatText(activeImportedDocument.versions.original);
+        renderImportedVersion(level);
+        return;
+      }
+      if (event.target.closest('[data-action="apply-level"]')) {
+        const level = control.querySelector('#read-anything-level').value;
+        try {
+          if (level === 'original') return renderImportedVersion('original');
+          await requestReadingLevel(level);
+        } catch (error) { showTransformStatus(error.message, true); }
+      }
+    });
+  }
+
   function openDocument(documentRecord) {
     const title = String(documentRecord?.title || 'Untitled').trim();
     const text = String(documentRecord?.text || '').trim();
     if (!text) throw new Error('No readable text was found.');
     if (typeof window.renderReaderWithText !== 'function') throw new Error('The reader is not ready.');
     addHistory({ ...documentRecord, title, text });
-    window.renderReaderWithText(title, text, {
-      ...(documentRecord.source || {}),
-      author: documentRecord.author || documentRecord.source?.author || '',
-      importedAt: documentRecord.source?.importedAt || new Date().toISOString(),
-      readAnything: true
-    });
+    activeImportedDocument = {
+      ...documentRecord, title, author: documentRecord.author || documentRecord.source?.author || '',
+      versions: { original: text, clean: cleanFormatText(text) }
+    };
+    activeImportedVersion = 'original';
+    renderImportedVersion('original');
   }
 
   function markdownToText(markdown) {
@@ -218,6 +310,6 @@
     renderHub();
   }, true);
 
-  window.MarkSetGoReadAnything = Object.freeze({ render: renderHub, openDocument, bookmarkletCode });
+  window.MarkSetGoReadAnything = Object.freeze({ render: renderHub, openDocument, bookmarkletCode, cleanFormatText });
   window.setTimeout(openPendingCapture, 0);
 })();
