@@ -2572,11 +2572,13 @@ app.post('/capture', (req, res) => {
     title: String(req.body?.title || 'Web Article').trim().slice(0, 500),
     author: String(req.body?.author || '').trim().slice(0, 300),
     url: String(req.body?.url || '').trim().slice(0, 4000),
-    text: String(req.body?.text || '').trim().slice(0, 5_000_000)
+    text: String(req.body?.text || '').trim().slice(0, 5_000_000),
+    captureType: req.body?.captureType === 'selection' ? 'selection' : 'page',
+    context: String(req.body?.context || '').trim().slice(0, 10000)
   };
   if (!payload.text) return res.status(400).send('No readable webpage text was received.');
   const serialized = JSON.stringify(payload).replace(/</g, '\\u003c');
-  res.type('html').send(`<!doctype html><meta charset="utf-8"><title>Opening Mark, Set, Go!</title><p>Opening the captured page in Mark, Set, Go!…</p><script>localStorage.setItem('markSetGoPendingWebCaptureV1',${JSON.stringify(serialized)});location.replace('/#read-anything-capture=1');<\/script>`);
+  res.type('html').send(`<!doctype html><meta charset="utf-8"><title>Opening Mark, Set, Go!</title><p>Opening the captured content in Mark, Set, Go!…</p><script>localStorage.setItem('markSetGoPendingWebCaptureV1',${JSON.stringify(serialized)});location.replace('/#read-anything-capture=1');<\/script>`);
 });
 
 app.post('/api/fetch-text', async (req, res) => {

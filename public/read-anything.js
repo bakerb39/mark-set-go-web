@@ -245,7 +245,7 @@
 
   function bookmarkletCode() {
     const target = `${location.origin}/capture`;
-    return `javascript:(()=>{const e=s=>String(s||'').replace(/\\s+/g,' ').trim(),r=document.querySelector('article,main,[role=main]')||document.body,t=e(document.querySelector('meta[property="og:title"]')?.content||document.querySelector('h1')?.innerText||document.title),a=e(document.querySelector('meta[name="author"]')?.content||document.querySelector('[rel=author]')?.innerText),x=[...r.querySelectorAll('h1,h2,h3,p,blockquote,li')].map(n=>e(n.innerText)).filter(v=>v.length>20).filter((v,i,z)=>z.indexOf(v)===i).join('\\n\\n'),f=document.createElement('form');f.method='POST';f.action='${target}';f.target='_blank';[['title',t],['author',a],['url',location.href],['text',x]].forEach(([n,v])=>{const i=document.createElement('textarea');i.name=n;i.value=v;f.appendChild(i)});f.hidden=true;document.body.appendChild(f);f.submit();f.remove()})()`;
+    return `javascript:(()=>{const e=s=>String(s||'').replace(/\s+/g,' ').trim(),s=e(window.getSelection?.().toString()),r=document.querySelector('article,main,[role=main]')||document.body,t=e(document.querySelector('meta[property="og:title"]')?.content||document.querySelector('h1')?.innerText||document.title),a=e(document.querySelector('meta[name="author"]')?.content||document.querySelector('[rel=author]')?.innerText),x=s||[...r.querySelectorAll('h1,h2,h3,p,blockquote,li')].map(n=>e(n.innerText)).filter(v=>v.length>20).filter((v,i,z)=>z.indexOf(v)===i).join('\n\n'),k=s?'selection':'page',c=s?e(window.getSelection()?.anchorNode?.parentElement?.closest('p,blockquote,li')?.innerText||''):'',f=document.createElement('form');f.method='POST';f.action='${target}';f.target='_blank';[['title',t],['author',a],['url',location.href],['text',x],['captureType',k],['context',c]].forEach(([n,v])=>{const i=document.createElement('textarea');i.name=n;i.value=v;f.appendChild(i)});f.hidden=true;document.body.appendChild(f);f.submit();f.remove()})()`;
   }
 
   function renderHub() {
@@ -272,7 +272,7 @@
             <button id="read-anything-paste" class="secondary" type="button">Paste Text</button>
           </section>
           <section class="read-anything-card">
-            <span class="read-anything-icon">🔖</span><h2>Read with Mark</h2><p>Install the bookmarklet and capture the webpage you are viewing.</p>
+            <span class="read-anything-icon">🔖</span><h2>Read with Mark</h2><p>Import a full webpage, or highlight a passage first to send only the selection.</p>
             <button id="read-anything-bookmarklet" class="secondary" type="button">Show Bookmarklet</button>
           </section>
           <section class="read-anything-card">
@@ -316,7 +316,7 @@
       const workspace = app.querySelector('#read-anything-workspace');
       const code = bookmarkletCode();
       workspace.hidden = false;
-      workspace.innerHTML = `<h2>Install “Read with Mark”</h2><p>Drag this button to your bookmarks bar. On iPhone Safari, create a bookmark and replace its address with the code below.</p><p><a class="primary button-link" href="${escapeHtml(code)}">Read with Mark</a></p><label>Bookmark address<textarea id="bookmarklet-code" rows="6" readonly>${escapeHtml(code)}</textarea></label>`;
+      workspace.innerHTML = `<h2>Install “Read with Mark”</h2><p>Drag this button to your bookmarks bar. Highlight text before clicking it to capture only that passage; otherwise it imports the full page. On iPhone Safari, create a bookmark and replace its address with the code below.</p><p><a class="primary button-link" href="${escapeHtml(code)}">Read with Mark</a></p><label>Bookmark address<textarea id="bookmarklet-code" rows="6" readonly>${escapeHtml(code)}</textarea></label>`;
       workspace.querySelector('#bookmarklet-code').addEventListener('focus', (event) => event.currentTarget.select());
     });
   }
@@ -330,11 +330,18 @@
       return;
     }
     try {
+      const isSelection = payload.captureType === 'selection';
       openDocument({
-        title: payload.title || 'Web Article',
+        title: isSelection ? `Selected passage — ${payload.title || 'Web Page'}` : (payload.title || 'Web Article'),
         author: payload.author || '',
         text: payload.text,
-        source: { type: 'bookmarklet', url: payload.url || '', importedAt: new Date().toISOString() }
+        source: {
+          type: isSelection ? 'web-passage' : 'bookmarklet',
+          url: payload.url || '',
+          context: payload.context || '',
+          captureType: payload.captureType || 'page',
+          importedAt: new Date().toISOString()
+        }
       });
       CAPTURE_STORAGE.removeItem(CAPTURE_KEY);
       if (location.hash.includes('read-anything-capture')) history.replaceState({}, '', location.pathname);
