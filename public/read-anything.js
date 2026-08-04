@@ -188,17 +188,39 @@
     });
   }
 
-  function openPendingCapture() {
+  function openPendingCapture(attempt = 0) {
     const params = new URLSearchParams(location.search);
     if (!params.has('read-anything-capture')) return;
     let payload = null;
     try { payload = JSON.parse(sessionStorage.getItem(CAPTURE_KEY) || 'null'); } catch {}
-    sessionStorage.removeItem(CAPTURE_KEY);
-    history.replaceState({}, '', location.pathname + location.hash);
-    if (!payload?.text) return renderHub();
+    if (!payload?.text) {
+      sessionStorage.removeItem(CAPTURE_KEY);
+      history.replaceState({}, '', location.pathname + location.hash);
+      renderHub();
+      return;
+    }
+
+    // Wait until the app's normal startup rendering has completed. Opening the
+    // captured document too early allows the home-page initializer to overwrite it.
+    if (typeof window.renderReaderWithText !== 'function' || attempt < 3) {
+      if (attempt < 20) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
+      else renderHub();
+      return;
+    }
+
     try {
-      openDocument({ title: payload.title || 'Web Article', author: payload.author || '', text: payload.text, source: { type: 'bookmarklet', url: payload.url || '', importedAt: new Date().toISOString() } });
-    } catch { renderHub(); }
+      openDocument({
+        title: payload.title || 'Web Article',
+        author: payload.author || '',
+        text: payload.text,
+        source: { type: 'bookmarklet', url: payload.url || '', importedAt: new Date().toISOString() }
+      });
+      sessionStorage.removeItem(CAPTURE_KEY);
+      history.replaceState({}, '', location.pathname + location.hash);
+    } catch {
+      if (attempt < 20) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
+      else renderHub();
+    }
   }
 
   document.addEventListener('click', (event) => {
