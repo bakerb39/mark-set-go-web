@@ -112,11 +112,14 @@
       if (action === 'text-smaller' || action === 'text-larger') {
         const fontSize = app.querySelector('#font-size');
         if (fontSize) {
-          const current = Math.round(Number(fontSize.value) || 14);
-          const next = action === 'text-smaller'
-            ? Math.max(12, current - 1)
-            : Math.min(24, current + 1);
+          const current = Math.round(Number(getComputedStyle(app.querySelector('#reader')).fontSize.replace('px', '')) || Number(fontSize.value) || 14);
+          const sizes = [12, 14, 16, 18, 20, 22, 24];
+          const index = sizes.reduce((best, value, i) => Math.abs(value - current) < Math.abs(sizes[best] - current) ? i : best, 0);
+          const nextIndex = action === 'text-smaller' ? Math.max(0, index - 1) : Math.min(sizes.length - 1, index + 1);
+          const next = sizes[nextIndex];
           applyMobileTextSize(next);
+          const reader = app.querySelector('#reader');
+          if (reader) reader.style.setProperty('font-size', `${next}px`, 'important');
           setValue('#font-size', next);
           setValue('#fs-font-size', next);
         }
@@ -144,6 +147,12 @@
     if (!frame) return;
     frame.classList.add('msg-anchor-top');
     frame.classList.remove('msg-anchor-center');
+    const overlay = frame.querySelector('#focus-anchor-overlay');
+    if (overlay) {
+      overlay.style.removeProperty('left');
+      overlay.style.removeProperty('top');
+      overlay.style.removeProperty('transform');
+    }
   }
 
   function configureReader() {

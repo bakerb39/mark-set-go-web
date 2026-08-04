@@ -11,6 +11,15 @@
   const MOBILE_TEXT_SIZE_KEY = 'markSetGoMobileTextSizeV1';
   const configuredReaders = new WeakSet();
 
+  function applyMobileTextSize(value) {
+    const size = Math.min(24, Math.max(12, Math.round(Number(value) || 14)));
+    app.style.setProperty('--msg-mobile-reader-font-size', `${size}px`);
+    localStorage.setItem(MOBILE_TEXT_SIZE_KEY, String(size));
+    const label = document.getElementById('msg-mobile-text-size');
+    if (label) label.textContent = String(size);
+    return size;
+  }
+
   function dispatchChange(el) {
     if (!el) return;
     el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -103,11 +112,14 @@
       if (action === 'text-smaller' || action === 'text-larger') {
         const fontSize = app.querySelector('#font-size');
         if (fontSize) {
-          const current = Math.round(Number(fontSize.value) || 14);
-          const next = action === 'text-smaller'
-            ? Math.max(12, current - 1)
-            : Math.min(24, current + 1);
-          localStorage.setItem(MOBILE_TEXT_SIZE_KEY, String(next));
+          const current = Math.round(Number(getComputedStyle(app.querySelector('#reader')).fontSize.replace('px', '')) || Number(fontSize.value) || 14);
+          const sizes = [12, 14, 16, 18, 20, 22, 24];
+          const index = sizes.reduce((best, value, i) => Math.abs(value - current) < Math.abs(sizes[best] - current) ? i : best, 0);
+          const nextIndex = action === 'text-smaller' ? Math.max(0, index - 1) : Math.min(sizes.length - 1, index + 1);
+          const next = sizes[nextIndex];
+          applyMobileTextSize(next);
+          const reader = app.querySelector('#reader');
+          if (reader) reader.style.setProperty('font-size', `${next}px`, 'important');
           setValue('#font-size', next);
           setValue('#fs-font-size', next);
         }
@@ -135,6 +147,12 @@
     if (!frame) return;
     frame.classList.add('msg-anchor-top');
     frame.classList.remove('msg-anchor-center');
+    const overlay = frame.querySelector('#focus-anchor-overlay');
+    if (overlay) {
+      overlay.style.removeProperty('left');
+      overlay.style.removeProperty('top');
+      overlay.style.removeProperty('transform');
+    }
   }
 
   function configureReader() {
@@ -147,7 +165,7 @@
       setValue('#mode-select', 'highlight');
       setValue('#word-count', 1);
       setChecked('#meaningful-chunks', false);
-      const savedTextSize = Math.min(24, Math.max(12, Number(localStorage.getItem(MOBILE_TEXT_SIZE_KEY)) || 14));
+      const savedTextSize = applyMobileTextSize(localStorage.getItem(MOBILE_TEXT_SIZE_KEY) || 14);
       setValue('#font-size', savedTextSize);
       setChecked('#focus-anchor', true);
       setValue('#focus-anchor-font-size', 36);
@@ -180,7 +198,7 @@
     if (themeButton && theme) themeButton.textContent = theme.value === 'light' ? 'Dark' : 'Light';
     const fontSize = app.querySelector('#font-size');
     const textSize = document.getElementById('msg-mobile-text-size');
-    if (textSize && fontSize) textSize.textContent = String(Math.round(Number(fontSize.value) || 14));
+    if (fontSize) applyMobileTextSize(fontSize.value);
     applyFixedTopAnchor();
   }
 

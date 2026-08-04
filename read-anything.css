@@ -20,3 +20,73 @@
   .read-anything-format-control>summary{color:#f7f8fa;font-size:.65rem;padding:.25rem .3rem}
   .read-anything-format-menu{position:fixed;top:calc(var(--msg-mobile-header,52px) + 46px);right:6px;left:auto;bottom:auto;width:min(270px,calc(100vw - 12px));max-height:calc(100dvh - var(--msg-mobile-header,52px) - var(--msg-mobile-nav,62px) - 58px)}
 }
+
+/* v8.5.7 — compact imported-document control on the real mobile title ribbon. */
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen .read-anything-format-control {
+    position: absolute !important;
+    top: 8px !important;
+    right: 10px !important;
+    left: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    margin: 0 !important;
+    z-index: 10050 !important;
+    width: auto !important;
+    max-width: none !important;
+    color: #f7f8fa !important;
+  }
+
+  #app.msg-mobile-reader-screen .read-anything-format-control > summary {
+    display: inline-flex !important;
+    align-items: center !important;
+    min-height: 24px !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 2px 5px !important;
+    border: 0 !important;
+    border-radius: 5px !important;
+    background: transparent !important;
+    color: #f7f8fa !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    letter-spacing: .02em !important;
+    text-transform: uppercase !important;
+  }
+
+  #app.msg-mobile-reader-screen .read-anything-format-control[open] > summary {
+    background: rgba(255,255,255,.14) !important;
+  }
+
+  #app.msg-mobile-reader-screen .read-anything-format-menu {
+    position: fixed !important;
+    top: calc(var(--msg-mobile-header) + 46px) !important;
+    right: 8px !important;
+    bottom: auto !important;
+    left: auto !important;
+    transform: none !important;
+    width: min(276px, calc(100vw - 16px)) !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - var(--msg-mobile-header) - var(--msg-mobile-nav) - 58px) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 8px !important;
+    gap: 6px !important;
+    z-index: 10100 !important;
+  }
+
+  #app.msg-mobile-reader-screen .read-anything-format-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+
+  #app.msg-mobile-reader-screen .read-anything-format-menu button,
+  #app.msg-mobile-reader-screen .read-anything-format-menu select {
+    min-height: 34px !important;
+    padding: 5px 6px !important;
+    font-size: 12px !important;
+  }
+}

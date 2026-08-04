@@ -151,6 +151,8 @@
     background: #111820;
   }
 
+  #app.msg-mobile-reader-screen .reader-title-copy { min-width:0; padding-right:52px; }
+
   #app.msg-mobile-reader-screen .reader-title-copy h1 {
     margin: 0;
     overflow: hidden;
@@ -172,9 +174,7 @@
   #app.msg-mobile-reader-screen #mark-selection-toolbar,
   #app.msg-mobile-reader-screen #word-context-menu,
   #app.msg-mobile-reader-screen .fullscreen-control-strip,
-  #app.msg-mobile-reader-screen .fullscreen-mark-drawer,
-  #app.msg-mobile-reader-screen .format-control,
-  #app.msg-mobile-reader-screen [data-format-control] {
+  #app.msg-mobile-reader-screen .fullscreen-mark-drawer {
     display: none !important;
   }
 
@@ -202,8 +202,9 @@
     padding: 18px 18px 24px !important;
     border: 0 !important;
     border-radius: 0 !important;
-    overflow: hidden !important;
-    font-size: 14px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    font-size: var(--msg-mobile-reader-font-size, 14px) !important;
     line-height: 1.7;
     -webkit-overflow-scrolling: auto;
   }
@@ -458,5 +459,147 @@
     width: 100%;
     max-width: 100%;
     min-width: 0;
+  }
+}
+
+@media (max-width:700px){
+  #app.msg-mobile-list-screen{overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain}
+  #app.msg-mobile-list-screen textarea{resize:none!important;max-width:100%!important}
+  #app.msg-mobile-list-screen input,#app.msg-mobile-list-screen select,#app.msg-mobile-list-screen button{max-width:100%}
+  #app.msg-mobile-reader-screen #reader{overscroll-behavior:contain;scrollbar-gutter:stable}
+}
+
+/* v8.5.6: lock the mobile focus anchor into its own top layout row.
+   The overlay no longer participates in page-position calculations, so a
+   page/virtual-render refresh cannot nudge it downward. Reader text always
+   occupies the separate row below it. */
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top {
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    align-content: stretch !important;
+    overflow: hidden !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top .focus-anchor-overlay:not([hidden]) {
+    position: relative !important;
+    inset: auto !important;
+    grid-row: 1 !important;
+    align-self: start !important;
+    justify-self: center !important;
+    transform: none !important;
+    margin: 8px 12px 4px !important;
+    width: calc(100% - 24px) !important;
+    max-width: 46rem !important;
+    flex: 0 0 auto !important;
+    cursor: default !important;
+    touch-action: auto !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader {
+    grid-row: 2 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding-top: 10px !important;
+    overflow-y: auto !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader.focus-anchor-clearance {
+    padding-top: 10px !important;
+  }
+}
+
+/* v8.5.7 — rebuild the mobile reader against the actual reader DOM. */
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen .reader-page-panel {
+    display: grid !important;
+    grid-template-rows: 42px minmax(0, 1fr) var(--msg-mobile-reader-controls) !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  #app.msg-mobile-reader-screen .reader-title-row {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    padding: 7px 64px 7px 12px !important;
+    overflow: visible !important;
+  }
+
+  #app.msg-mobile-reader-screen .reader-title-copy {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  #app.msg-mobile-reader-screen .reader-layout,
+  #app.msg-mobile-reader-screen .reader-center-column {
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top {
+    position: relative !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    align-content: stretch !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top .focus-anchor-overlay:not([hidden]) {
+    position: relative !important;
+    inset: auto !important;
+    grid-row: 1 !important;
+    align-self: start !important;
+    justify-self: stretch !important;
+    transform: none !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 6px 10px 4px !important;
+    padding: .18em .48em .16em !important;
+    line-height: 1 !important;
+    cursor: default !important;
+    touch-action: pan-y !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top .focus-anchor-overlay .focus-anchor-stage {
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader,
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader.focus-anchor-clearance {
+    position: relative !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 12px 16px 22px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader.focus-anchor-clearance {
+    --focus-anchor-clearance: 0px !important;
   }
 }
