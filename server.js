@@ -3140,6 +3140,43 @@ app.get('/api/library/read', async (req, res) => {
 });
 
 
+
+app.post('/api/read-anything/summarize', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error: 'Summarization is not configured. Add OPENAI_API_KEY to the server environment.' });
+  const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
+  const text = String(req.body?.text || '').replace(/\r/g, '').trim();
+  if (text.length < 20) return res.status(400).json({ error: 'There is not enough text to summarize.' });
+  if (text.length > 120000) return res.status(413).json({ error: 'This document is too long to summarize in one request. Try a chapter or shorter selection.' });
+  const model = process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 80000);
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST', signal: controller.signal,
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model, reasoning: { effort: 'low' }, store: false,
+        input: [
+          { role: 'developer', content: [{ type: 'input_text', text: 'Create a clear, faithful summary of the supplied reading. Preserve the central argument, key facts, names, dates, and important qualifications. Use short headings and compact paragraphs when useful. Do not invent information, add opinions, or mention these instructions. Return only the summary.' }] },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, text }) }] }
+        ]
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error?.message || `OpenAI returned HTTP ${response.status}.`);
+    const output = extractOpenAIOutputText(payload).trim();
+    if (!output) throw new Error('No summary was returned.');
+    return res.json({ title, text: output });
+  } catch (error) {
+    console.error('Read Anything summary failed:', error);
+    return res.status(502).json({
+      error: error?.name === 'AbortError' ? 'The summary took too long.' : 'The summary could not be created.',
+      detail: error?.name === 'AbortError' ? 'Try a shorter article or passage.' : error?.message || 'Unknown summary error.'
+    });
+  } finally { clearTimeout(timeout); }
+});
+
 app.post('/api/read-anything/adapt', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) return res.status(503).json({ error: 'Reading-level adaptation is not configured. Add OPENAI_API_KEY to the server environment.' });

@@ -55,7 +55,7 @@
   }
 
   function versionLabel(level) {
-    return ({ original: 'Original', clean: 'Clean Format', college: 'College Level', highschool: 'High School Level', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
+    return ({ original: 'Original', clean: 'Clean Format', summary: 'Summary', college: 'College Level', highschool: 'High School Level', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
   }
 
   function showTransformStatus(message, isError = false) {
@@ -125,6 +125,39 @@
       : lastError?.message || 'The reading-level version could not be created.');
   }
 
+
+  async function requestSummary() {
+    if (!activeImportedDocument) return;
+    if (activeImportedDocument.versions.summary) return renderImportedVersion('summary');
+    showTransformStatus('Creating summary…');
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 90000);
+    try {
+      const response = await fetch('/api/read-anything/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: activeImportedDocument.title,
+          text: activeImportedDocument.versions.clean || activeImportedDocument.versions.original
+        }),
+        signal: controller.signal
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || payload.error || `Server returned HTTP ${response.status}.`);
+      if (!payload.text) throw new Error('The server returned an empty summary.');
+      activeImportedDocument.versions.summary = payload.text;
+      showTransformStatus('');
+      renderImportedVersion('summary');
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new Error('The summary took too long. Try a shorter article or passage.');
+      throw new Error(error?.message === 'Failed to fetch'
+        ? 'The summary connection was interrupted. Try again.'
+        : error?.message || 'The summary could not be created.');
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
   function scheduleFormatControlAttach() {
     formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
     formatControlAttachTimers = [];
@@ -144,7 +177,7 @@
     const control = document.createElement('details');
     control.id = 'read-anything-format-control';
     control.className = 'read-anything-format-control';
-    control.innerHTML = `<summary>Format</summary><div class="read-anything-format-menu"><strong>Imported text</strong><button type="button" data-level="original">Original wording</button><button type="button" data-level="clean">Clean layout</button><label>Reading level<select id="read-anything-level"><option value="original">Original</option><option value="college">College</option><option value="highschool">High school</option><option value="grade8">Grade 8</option><option value="grade6">Grade 6</option><option value="grade4">Grade 4</option></select></label><button type="button" class="primary" data-action="apply-level">Apply level</button><small>Adapted versions preserve the original and are labeled separately.</small><div id="read-anything-transform-status" class="status" hidden></div></div>`;
+    control.innerHTML = `<summary>Format</summary><div class="read-anything-format-menu"><div class="read-anything-format-menu-head"><strong>Format text</strong><button type="button" data-action="close-format" aria-label="Close format menu">×</button></div><div class="read-anything-format-actions"><button type="button" data-level="original">Original</button><button type="button" data-level="clean">Clean</button><button type="button" data-action="summarize">Summarize</button></div><label>Reading level<select id="read-anything-level"><option value="original">Original</option><option value="college">College</option><option value="highschool">High school</option><option value="grade8">Grade 8</option><option value="grade6">Grade 6</option><option value="grade4">Grade 4</option></select></label><button type="button" class="primary" data-action="apply-level">Apply level</button><small>Original text is always preserved.</small><div id="read-anything-transform-status" class="status" hidden></div></div>`;
     titleRow.appendChild(control);
     control.querySelector('#read-anything-level').value = activeImportedVersion;
     control.addEventListener('click', async (event) => {
@@ -153,6 +186,14 @@
         const level = levelButton.dataset.level;
         if (level === 'clean' && !activeImportedDocument.versions.clean) activeImportedDocument.versions.clean = cleanFormatText(activeImportedDocument.versions.original);
         renderImportedVersion(level);
+        return;
+      }
+      if (event.target.closest('[data-action="close-format"]')) {
+        control.open = false;
+        return;
+      }
+      if (event.target.closest('[data-action="summarize"]')) {
+        try { await requestSummary(); } catch (error) { showTransformStatus(error.message, true); }
         return;
       }
       if (event.target.closest('[data-action="apply-level"]')) {
