@@ -174,6 +174,105 @@
 @media (max-width:700px) {
   #app.msg-mobile-reader-screen .read-anything-transform-control > summary { gap: 3px !important; text-transform: none !important; }
   #app.msg-mobile-reader-screen .read-anything-transform-control .transform-label { font-size: 10px; }
-  #app.msg-mobile-reader-screen .read-anything-transform-control .transform-state { display: none; }
+  #app.msg-mobile-reader-screen .read-anything-transform-control .transform-state { display: inline; }
   #app.msg-mobile-reader-screen .read-anything-transform-menu { width: min(330px,calc(100vw - 16px)) !important; }
+}
+
+
+/* v8.7.2 — integrated reader command bar. */
+#app .reader-pane-controls.read-anything-command-bar {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  min-width: 0;
+}
+#app .read-anything-command-bar .reader-pane-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+#app .read-anything-command-bar .reader-pane-buttons > button {
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: .22rem .62rem;
+  color: inherit;
+  font-size: .82rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+#app .read-anything-command-bar .reader-pane-buttons > button:first-child { padding-left: 0; }
+#app .read-anything-command-bar .reader-pane-buttons > button + button {
+  border-left: 1px solid currentColor;
+}
+#app .read-anything-command-bar .reader-pane-buttons > button:hover,
+#app .read-anything-command-bar .reader-pane-buttons > button:focus-visible {
+  text-decoration: underline;
+  background: transparent;
+}
+#app .read-anything-command-bar .read-anything-transform-control {
+  position: relative;
+  inset: auto;
+  transform: none;
+  margin: 0 0 0 auto;
+  color: inherit;
+  z-index: 30;
+}
+#app .read-anything-command-bar .read-anything-transform-control > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  padding: .25rem .1rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: .82rem;
+  font-weight: 750;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+#app .read-anything-command-bar .read-anything-transform-control > summary:hover,
+#app .read-anything-command-bar .read-anything-transform-control > summary:focus-visible { text-decoration: underline; }
+#app .read-anything-command-bar .transform-state {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: inherit;
+  font-weight: inherit;
+}
+#app .read-anything-command-bar .transform-caret { font-size: .68rem; }
+#app .read-anything-command-bar .read-anything-transform-menu {
+  position: fixed;
+  top: max(56px, calc(env(safe-area-inset-top) + 48px));
+  right: 12px;
+  left: auto;
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100dvh - 76px);
+  overflow-y: auto;
+  z-index: 2147483000;
+}
+#app .read-anything-command-bar .transform-reading-actions { grid-template-columns: repeat(3,minmax(0,1fr)); }
+#app .read-anything-command-bar .transform-level-actions { grid-template-columns: repeat(2,minmax(0,1fr)); }
+#app .read-anything-command-bar .transform-secondary-action { width: 100%; text-align: left; }
+#app .read-anything-command-bar .viewer-fullscreen-button { margin-left: .45rem; }
+@media (max-width:700px) {
+  #app .reader-pane-controls.read-anything-command-bar { gap: .25rem; }
+  #app .read-anything-command-bar .reader-pane-buttons > button { padding: .2rem .38rem; font-size: .68rem; }
+  #app .read-anything-command-bar .read-anything-transform-control > summary { font-size: .68rem; }
+  #app .read-anything-command-bar .transform-state { display: inline; max-width: 72px; }
+  #app .read-anything-command-bar .viewer-fullscreen-button { display: none !important; }
+  #app .read-anything-command-bar .read-anything-transform-menu {
+    top: max(48px, calc(env(safe-area-inset-top) + 42px));
+    right: 8px;
+    width: min(340px, calc(100vw - 16px));
+    max-height: calc(100dvh - 64px);
+  }
 }

@@ -18,6 +18,13 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[char]));
 
+
+  function cleanImportedTitle(value) {
+    return String(value || 'Imported document')
+      .replace(/\s+[—-]\s+(?:Clean Format|Readable|Original|Quick Summary|Study Summary|Detailed Summary|Summary|College Level|High School Level|Grade \d+|Graduate Level|Custom Transform)\s*$/i, '')
+      .trim() || 'Imported document';
+  }
+
   function closeMenus() {
     document.querySelectorAll('.site-header details[open]').forEach((menu) => menu.removeAttribute('open'));
   }
@@ -100,7 +107,7 @@
     const sourceKey = storedDocument?.source?.readAnythingKey || '';
     let key = sourceKey || indexedKey || (storedDocument?.source?.readAnything ? importedDocumentKey(storedDocument) : '');
     if (!key && documentTitle) {
-      const normalizedTitle = String(documentTitle).replace(/\s+—\s+.+$/, '').trim().toLowerCase();
+      const normalizedTitle = cleanImportedTitle(documentTitle).toLowerCase();
       for (let index = 0; index < localStorage.length; index += 1) {
         const storageKey = localStorage.key(index) || '';
         if (!storageKey.startsWith(FORMAT_RECORD_PREFIX)) continue;
@@ -123,10 +130,10 @@
     let record = null;
     try { record = JSON.parse(localStorage.getItem(formatRecordStorageKey(key)) || 'null'); } catch {}
     if (!record && !storedDocument?.source?.readAnything) return false;
-    const readingLevel = storedDocument.source.readingLevel || 'original';
+    const readingLevel = storedDocument?.source?.readingLevel || record?.selectedVersion || 'original';
     activeImportedDocument = {
-      title: record?.title || storedDocument?.source?.adaptedFrom || String(storedDocument?.title || 'Imported document').replace(/\s+—\s+.+$/, ''),
-      baseTitle: record?.title || storedDocument?.source?.adaptedFrom || String(storedDocument?.title || 'Imported document').replace(/\s+—\s+.+$/, ''),
+      title: cleanImportedTitle(record?.title || storedDocument?.source?.adaptedFrom || storedDocument?.title),
+      baseTitle: cleanImportedTitle(record?.title || storedDocument?.source?.adaptedFrom || storedDocument?.title),
       author: record?.author || storedDocument?.source?.author || '',
       source: { ...(record?.source || storedDocument?.source || {}), readAnything: true, readAnythingKey: key },
       versions: { ...(record?.versions || {}), ...(storedDocument?.text ? { [readingLevel]: storedDocument.text } : {}) }
@@ -237,7 +244,23 @@
   }
 
   function versionLabel(level) {
-    return ({ original: 'Original', clean: 'Readable', summaryQuick: 'Quick Summary', summaryStudy: 'Study Summary', summaryDetailed: 'Detailed Summary', custom: 'Custom Transform', college: 'College Level', highschool: 'High School Level', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
+    return ({ original: 'Original', clean: 'Readable', summaryQuick: 'Summary', summaryStudy: 'Study Summary', summaryDetailed: 'Detailed Summary', custom: 'Custom', graduate: 'Graduate', college: 'College', highschool: 'High School', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
+  }
+
+  function transformSourceText() {
+    if (!activeImportedDocument) return '';
+    const versions = activeImportedDocument.versions || {};
+    const candidates = [
+      versions.clean,
+      versions.original,
+      versions[activeImportedVersion],
+      ...Object.values(versions)
+    ];
+    for (const candidate of candidates) {
+      const text = String(candidate || '').trim();
+      if (text.length >= 20) return text;
+    }
+    return '';
   }
 
   function showTransformStatus(message, isError = false) {
@@ -264,7 +287,7 @@
       author: activeImportedDocument.author || activeImportedDocument.source?.author || '',
       importedAt: activeImportedDocument.source?.importedAt || new Date().toISOString(),
       readAnything: true,
-      adaptedFrom: activeImportedDocument.title,
+      adaptedFrom: cleanImportedTitle(activeImportedDocument.baseTitle || activeImportedDocument.title),
       readingLevel: level
     });
     scheduleFormatControlAttach();
@@ -273,10 +296,12 @@
   async function requestReadingLevel(level) {
     if (!activeImportedDocument) return;
     if (activeImportedDocument.versions[level]) return renderImportedVersion(level);
+    const sourceText = transformSourceText();
+    if (sourceText.length < 20) throw new Error('The saved document text is unavailable. Reopen the original item from My Library and try again.');
     showTransformStatus(`Creating ${versionLabel(level)} version…`);
     const requestBody = JSON.stringify({
       title: activeImportedDocument.title,
-      text: activeImportedDocument.versions.clean || activeImportedDocument.versions.original,
+      text: sourceText,
       level
     });
 
@@ -318,6 +343,8 @@
     if (!activeImportedDocument) return;
     const versionKey = `summary${style.charAt(0).toUpperCase()}${style.slice(1)}`;
     if (activeImportedDocument.versions[versionKey]) return renderImportedVersion(versionKey);
+    const sourceText = transformSourceText();
+    if (sourceText.length < 20) throw new Error('The saved document text is unavailable. Reopen the original item from My Library and try again.');
     showTransformStatus(`Creating ${style} summary…`);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 90000);
@@ -327,7 +354,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: activeImportedDocument.title,
-          text: activeImportedDocument.versions.clean || activeImportedDocument.versions.original,
+          text: sourceText,
           style
         }),
         signal: controller.signal
@@ -353,6 +380,8 @@
     if (!activeImportedDocument) return;
     const prompt = String(instructions || '').trim();
     if (!prompt) throw new Error('Enter an instruction for the transformation.');
+    const sourceText = transformSourceText();
+    if (sourceText.length < 20) throw new Error('The saved document text is unavailable. Reopen the original item from My Library and try again.');
     showTransformStatus('Applying custom transformation…');
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 115000);
@@ -362,7 +391,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: activeImportedDocument.title,
-          text: activeImportedDocument.versions.clean || activeImportedDocument.versions.original,
+          text: sourceText,
           instructions: prompt
         }),
         signal: controller.signal
@@ -414,29 +443,56 @@
 
   function installFormatControl() {
     if (!activeImportedDocument) return;
-    const titleRow = document.querySelector('#app .reader-title-row');
-    if (!titleRow) return;
+    const commandBar = document.querySelector('#app .reader-pane-controls');
+    const buttonGroup = commandBar?.querySelector('.reader-pane-buttons');
+    if (!commandBar || !buttonGroup) return;
+
+    commandBar.classList.add('read-anything-command-bar');
+    const contentButton = buttonGroup.querySelector('#toggle-navigation-pane');
+    const readerButton = buttonGroup.querySelector('#toggle-word-panel');
+    const markButton = buttonGroup.querySelector('#toggle-mark-panel');
+    if (contentButton) contentButton.innerHTML = 'Contents';
+    if (readerButton) readerButton.innerHTML = 'Reader Tools';
+    if (markButton) markButton.innerHTML = 'Ask Mark';
+
     const existing = document.querySelector('#read-anything-format-control');
-    if (existing && existing.parentElement === titleRow) return;
+    if (existing && existing.parentElement === commandBar) {
+      existing.querySelector('.transform-state').textContent = versionLabel(activeImportedVersion);
+      return;
+    }
     existing?.remove();
+
     const control = document.createElement('details');
     control.id = 'read-anything-format-control';
     control.className = 'read-anything-format-control read-anything-transform-control';
-    control.innerHTML = `<summary><span class="transform-label">Transform</span><span class="transform-state">${escapeHtml(versionLabel(activeImportedVersion))}</span></summary><div class="read-anything-format-menu read-anything-transform-menu"><div class="read-anything-format-menu-head"><div><strong>Transform</strong><small>Change the document view without leaving the reader.</small></div><button type="button" data-action="close-format" aria-label="Close transform menu">×</button></div><section><span class="transform-section-label">Reading</span><div class="read-anything-format-actions transform-reading-actions"><button type="button" data-level="original">Original</button><button type="button" data-level="clean">Readable</button></div></section><section><span class="transform-section-label">Summary</span><div class="read-anything-format-actions transform-summary-actions"><button type="button" data-summary-style="quick">Quick</button><button type="button" data-summary-style="study">Study</button><button type="button" data-summary-style="detailed">Detailed</button></div></section><section><label><span class="transform-section-label">Reading level</span><select id="read-anything-level"><option value="original">Original</option><option value="college">College</option><option value="highschool">High school</option><option value="grade8">Grade 8</option><option value="grade6">Grade 6</option><option value="grade4">Grade 4</option></select></label><button type="button" class="primary transform-apply-level" data-action="apply-level">Apply level</button></section><section class="transform-custom"><label><span class="transform-section-label">Custom AI</span><textarea id="read-anything-custom-instruction" rows="3" placeholder="Example: Turn this into a concise study guide with headings and questions."></textarea></label><button type="button" class="primary" data-action="apply-custom">Apply instruction</button></section><small class="transform-preserve-note">The original text is always preserved.</small><div id="read-anything-transform-status" class="status" hidden></div></div>`;
-    titleRow.appendChild(control);
+    control.innerHTML = `<summary><span class="transform-label">Transform</span><span aria-hidden="true">·</span><span class="transform-state">${escapeHtml(versionLabel(activeImportedVersion))}</span><span class="transform-caret" aria-hidden="true">▾</span></summary><div class="read-anything-format-menu read-anything-transform-menu"><div class="read-anything-format-menu-head"><strong>Transform</strong><button type="button" data-action="close-format" aria-label="Close transform menu">×</button></div><section><span class="transform-section-label">Reading</span><div class="read-anything-format-actions transform-reading-actions"><button type="button" data-level="original">Original</button><button type="button" data-level="clean">Readable</button><button type="button" data-summary-style="quick">Summary</button></div></section><section><span class="transform-section-label">Reading Level</span><div class="read-anything-format-actions transform-level-actions"><button type="button" data-level-choice="original">Original</button><button type="button" data-level-choice="highschool">High School</button><button type="button" data-level-choice="college">College</button><button type="button" data-level-choice="graduate">Graduate</button></div></section><section class="transform-translate"><span class="transform-section-label">Translate</span><button type="button" class="transform-secondary-action" disabled title="Translation is coming in a future release.">Choose language…</button></section><section class="transform-custom"><label><span class="transform-section-label">Ask Mark</span><textarea id="read-anything-custom-instruction" rows="3" placeholder="Tell Mark how to transform this text…"></textarea></label><button type="button" class="primary" data-action="apply-custom">Apply</button></section><small class="transform-preserve-note">The original text is always preserved.</small><div id="read-anything-transform-status" class="status" hidden></div></div>`;
+
+    const fullscreenButton = commandBar.querySelector('#toggle-reader-fullscreen');
+    commandBar.insertBefore(control, fullscreenButton || null);
     if (window.matchMedia('(max-width: 700px)').matches) control.classList.add('read-anything-format-control-mobile');
-    control.querySelector('#read-anything-level').value = ['college','highschool','grade8','grade6','grade4'].includes(activeImportedVersion) ? activeImportedVersion : 'original';
     control.querySelectorAll('[data-level]').forEach((button) => button.classList.toggle('active', button.dataset.level === activeImportedVersion));
-    control.querySelector(`[data-summary-style="${activeImportedVersion.replace('summary','').toLowerCase()}"]`)?.classList.add('active');
+    if (activeImportedVersion.startsWith('summary')) control.querySelector('[data-summary-style="quick"]')?.classList.add('active');
+    control.querySelectorAll('[data-level-choice]').forEach((button) => button.classList.toggle('active', button.dataset.levelChoice === activeImportedVersion));
+
     control.addEventListener('click', async (event) => {
       const levelButton = event.target.closest('[data-level]');
       if (levelButton) {
         const level = levelButton.dataset.level;
         if (level === 'clean') {
-          activeImportedDocument.versions.clean = cleanFormatText(activeImportedDocument.versions.original);
+          const source = activeImportedDocument.versions.original || transformSourceText();
+          activeImportedDocument.versions.clean = cleanFormatText(source);
           saveActiveFormatRecord();
         }
         renderImportedVersion(level);
+        return;
+      }
+      const levelChoice = event.target.closest('[data-level-choice]');
+      if (levelChoice) {
+        const level = levelChoice.dataset.levelChoice;
+        try {
+          if (level === 'original') return renderImportedVersion('original');
+          await requestReadingLevel(level);
+        } catch (error) { showTransformStatus(error.message, true); }
         return;
       }
       if (event.target.closest('[data-action="close-format"]')) {
@@ -445,26 +501,18 @@
       }
       const summaryButton = event.target.closest('[data-summary-style]');
       if (summaryButton) {
-        try { await requestSummary(summaryButton.dataset.summaryStyle); } catch (error) { showTransformStatus(error.message, true); }
+        try { await requestSummary('quick'); } catch (error) { showTransformStatus(error.message, true); }
         return;
       }
       if (event.target.closest('[data-action="apply-custom"]')) {
         const instructions = control.querySelector('#read-anything-custom-instruction').value;
         try { await requestCustomTransform(instructions); } catch (error) { showTransformStatus(error.message, true); }
-        return;
-      }
-      if (event.target.closest('[data-action="apply-level"]')) {
-        const level = control.querySelector('#read-anything-level').value;
-        try {
-          if (level === 'original') return renderImportedVersion('original');
-          await requestReadingLevel(level);
-        } catch (error) { showTransformStatus(error.message, true); }
       }
     });
   }
 
   function openDocument(documentRecord) {
-    const title = String(documentRecord?.title || 'Untitled').trim();
+    const title = cleanImportedTitle(documentRecord?.title || 'Untitled');
     const text = String(documentRecord?.text || '').trim();
     if (!text) throw new Error('No readable text was found.');
     if (typeof window.renderReaderWithText !== 'function') throw new Error('The reader is not ready.');

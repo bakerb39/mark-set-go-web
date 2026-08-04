@@ -3224,6 +3224,7 @@ app.post('/api/read-anything/adapt', async (req, res) => {
   const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
   const level = String(req.body?.level || '').trim().toLowerCase();
   const instructions = {
+    graduate: 'Rewrite for a graduate-level reader. Preserve all nuance, technical precision, qualifications, and domain terminology while improving organization and scholarly clarity.',
     college: 'Rewrite for an adult college-level reader. Preserve nuance and technical accuracy while improving organization and clarity.',
     highschool: 'Rewrite for a typical high-school reader. Use clear sentences and explain difficult vocabulary without removing important detail.',
     grade8: 'Rewrite for an eighth-grade reader. Use direct sentences, familiar vocabulary, and short explanations for necessary difficult terms.',
