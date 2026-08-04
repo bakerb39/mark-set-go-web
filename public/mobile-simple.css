@@ -345,3 +345,117 @@
   .library-book-actions { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
   .library-delete-book { min-height: 40px; }
 }
+
+/* v8.5.3: harden every mobile screen against horizontal overflow. */
+@media (max-width: 700px) {
+  html,
+  body,
+  #app,
+  #app.app-shell,
+  #msg-mobile-header,
+  #msg-mobile-nav {
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  #app *,
+  #msg-mobile-header *,
+  #msg-mobile-nav * {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #app > *,
+  #app section,
+  #app .panel,
+  #app .card,
+  #app .reader-page-panel,
+  #app .read-anything-page,
+  #app .read-anything-grid,
+  #app .my-library-hub,
+  #app .library-grid,
+  #app .library-list,
+  #app .browse-grid,
+  #app form,
+  #app fieldset {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #app img,
+  #app video,
+  #app canvas,
+  #app svg,
+  #app iframe {
+    max-width: 100% !important;
+    height: auto;
+  }
+
+  #app input,
+  #app select,
+  #app textarea,
+  #app button {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  #app input:not([type="checkbox"]):not([type="radio"]),
+  #app select,
+  #app textarea {
+    width: 100% !important;
+  }
+
+  #app pre,
+  #app code,
+  #app .source-url,
+  #app .book-source,
+  #app .library-book-title,
+  #app .library-book-meta,
+  #app .read-anything-page a,
+  #app .read-anything-page p,
+  #app .read-anything-page label {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  #app .library-book-actions,
+  #app .library-header-actions,
+  #app .library-header-tools,
+  #app .read-anything-actions,
+  #app .button-row,
+  #app .action-row,
+  #app .toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  #app .library-book-actions > *,
+  #app .read-anything-actions > *,
+  #app .button-row > *,
+  #app .action-row > * {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  #app .read-anything-grid,
+  #app .library-grid,
+  #app .browse-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #msg-mobile-reader-controls,
+  #msg-mobile-reader-controls .msg-control-row,
+  #msg-mobile-reader-controls .msg-speed-row,
+  #msg-mobile-reader-controls .msg-option-row {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+}
