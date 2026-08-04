@@ -1,29 +1,11 @@
-# Mark, Set, Go! v8.4.0 — Selected Web Passage Capture
+# v8.4.1 Selected Passage Letter-S Fix
 
-This incremental update extends the existing **Read with Mark** bookmarklet.
+Fixes bookmarklet whitespace normalization so `\\s` remains a whitespace regex in the generated bookmarklet instead of becoming `/s+/g` and replacing every letter s.
 
-## Behavior
+Replace:
+- read-anything.js
+- public/read-anything.js
+- index.html
+- public/index.html
 
-- Highlight text on a webpage and click **Read with Mark** to send only the selected passage.
-- Click the bookmarklet with no selection to import the full page as before.
-- Selected captures retain the source title, URL, author when available, and nearby paragraph context.
-- Selected captures open as `Selected passage — <page title>` and use source type `web-passage`.
-
-## Files to replace
-
-- `server.js`
-- `read-anything.js`
-- `public/read-anything.js`
-- `index.html`
-- `public/index.html`
-
-## Required test steps
-
-1. Commit and deploy this update.
-2. Clear the Render build cache and hard-refresh the app.
-3. Delete the old bookmarklet and reinstall it from **Read Anything**.
-4. Highlight a passage on another webpage and click the bookmarklet.
-5. Confirm only the selected passage opens.
-6. Repeat without highlighting text and confirm the full page still imports.
-
-No protected reader files are included or modified.
+After deployment, delete and reinstall the bookmarklet because the defect is embedded in the previously saved bookmark URL.
