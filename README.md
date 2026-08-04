@@ -1,7 +1,9 @@
-# v8.4.4 My Library infinite-loop fix
+# v8.4.6 Document Manager Loop Fix
 
-Replace `cloud-document.js` and `public/cloud-document.js`.
+Replace only:
+- `document-manager.js`
+- `public/document-manager.js`
 
-The previous global MutationObserver watched the entire app while `decorate()` itself removed and inserted DOM nodes. Each decoration therefore scheduled another decoration indefinitely. This update removes the global observer and refreshes cloud-document controls only from bounded application events.
+The My Library freeze was caused by a third page-wide MutationObserver feedback loop. `decorateDocumentStates()` wrote badge text and removed/reinserted labels on every observer callback, which generated more child-list mutations indefinitely.
 
-No reader-engine, pagination, resume, or Book Pages files are changed.
+This patch makes decoration idempotent, prevents re-entry, and coalesces observer callbacks into one animation-frame update.

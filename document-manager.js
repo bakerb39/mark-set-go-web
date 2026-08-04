@@ -120,43 +120,72 @@
     return 'Local only';
   }
 
+  let decorateScheduled = false;
+  let decorating = false;
+
+  function setTextIfChanged(node, value) {
+    if (node.textContent !== value) node.textContent = value;
+  }
+
+  function setDatasetIfChanged(node, key, value) {
+    if (node.dataset[key] !== value) node.dataset[key] = value;
+  }
+
   function decorateDocumentStates() {
-    const books = cloudBooks();
+    if (decorating) return;
+    decorating = true;
+    try {
+      const books = cloudBooks();
 
-    document.querySelectorAll('[data-library-document]').forEach((button) => {
-      const documentId = button.dataset.libraryDocument;
-      const book = books.find((item) => String(item.clientRecordId || '') === String(documentId || ''));
-      const card = button.closest('.library-primary-focus,.library-continue-card,article,section');
-      if (!card) return;
-      let badge = card.querySelector('.unified-document-state');
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'unified-document-state';
-        const heading = card.querySelector('h2,h3');
-        if (heading) heading.insertAdjacentElement('afterend', badge);
-        else card.prepend(badge);
-      }
-      const label = statusForBook(book, documentId);
-      badge.textContent = label;
-      badge.dataset.state = book?.documentStored ? 'document' : (book ? 'metadata' : 'local');
-      button.title = label;
-    });
+      document.querySelectorAll('[data-library-document]').forEach((button) => {
+        const documentId = button.dataset.libraryDocument;
+        const book = books.find((item) => String(item.clientRecordId || '') === String(documentId || ''));
+        const card = button.closest('.library-primary-focus,.library-continue-card,article,section');
+        if (!card) return;
+        let badge = card.querySelector('.unified-document-state');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'unified-document-state';
+          const heading = card.querySelector('h2,h3');
+          if (heading) heading.insertAdjacentElement('afterend', badge);
+          else card.prepend(badge);
+        }
+        const label = statusForBook(book, documentId);
+        const badgeState = book?.documentStored ? 'document' : (book ? 'metadata' : 'local');
+        setTextIfChanged(badge, label);
+        setDatasetIfChanged(badge, 'state', badgeState);
+        if (button.title !== label) button.title = label;
+      });
 
-    document.querySelectorAll('.cloud-library-account-card').forEach((card) => {
-      const bookId = card.querySelector('[data-cloud-library-remove]')?.dataset.cloudLibraryRemove;
-      const book = books.find((item) => String(item.id) === String(bookId));
-      if (!book) return;
-      card.querySelectorAll('.cloud-document-state,.cloud-saved-badge,.cloud-document-badge').forEach((node) => node.remove());
-      const heading = card.querySelector('h3');
-      if (!heading) return;
-      let badge = card.querySelector('.unified-document-state');
-      if (!badge) {
-        badge = document.createElement('span');
-        badge.className = 'unified-document-state';
-        heading.insertAdjacentElement('afterend', badge);
-      }
-      badge.textContent = statusForBook(book, book.clientRecordId);
-      badge.dataset.state = book.documentStored ? 'document' : 'metadata';
+      document.querySelectorAll('.cloud-library-account-card').forEach((card) => {
+        const bookId = card.querySelector('[data-cloud-library-remove]')?.dataset.cloudLibraryRemove;
+        const book = books.find((item) => String(item.id) === String(bookId));
+        if (!book) return;
+        card.querySelectorAll('.cloud-document-state,.cloud-saved-badge,.cloud-document-badge').forEach((node) => node.remove());
+        const heading = card.querySelector('h3');
+        if (!heading) return;
+        let badge = card.querySelector('.unified-document-state');
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'unified-document-state';
+          heading.insertAdjacentElement('afterend', badge);
+        }
+        const label = statusForBook(book, book.clientRecordId);
+        const badgeState = book.documentStored ? 'document' : 'metadata';
+        setTextIfChanged(badge, label);
+        setDatasetIfChanged(badge, 'state', badgeState);
+      });
+    } finally {
+      decorating = false;
+    }
+  }
+
+  function scheduleDecoration() {
+    if (decorateScheduled || decorating || !document.querySelector('.my-library-hub')) return;
+    decorateScheduled = true;
+    requestAnimationFrame(() => {
+      decorateScheduled = false;
+      decorateDocumentStates();
     });
   }
 
@@ -178,11 +207,11 @@
     if (button) void interceptLibraryOpen(event, button);
   }, true);
 
-  document.addEventListener('marksetgo:cloud-library-ready', decorateDocumentStates);
-  const observer = new MutationObserver(() => requestAnimationFrame(decorateDocumentStates));
+  document.addEventListener('marksetgo:cloud-library-ready', scheduleDecoration);
+  const observer = new MutationObserver(scheduleDecoration);
   observer.observe(document.getElementById('app') || document.body, { childList: true, subtree: true });
   injectStyles();
-  requestAnimationFrame(decorateDocumentStates);
+  scheduleDecoration();
 
   window.MarkSetGoDocumentManager = Object.freeze({ open, openCloudDocument, localDocument, cloudBookForDocument, refreshLabels: decorateDocumentStates });
 })();
