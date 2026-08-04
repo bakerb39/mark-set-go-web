@@ -3,6 +3,7 @@
 
   const app = document.getElementById('app');
   const CAPTURE_KEY = 'markSetGoPendingWebCaptureV1';
+  const CAPTURE_STORAGE = window.localStorage;
   const IMPORT_HISTORY_KEY = 'markSetGoImportHistoryV1';
   let allowLegacyUpload = false;
 
@@ -189,25 +190,13 @@
   }
 
   function openPendingCapture(attempt = 0) {
-    const params = new URLSearchParams(location.search);
-    if (!params.has('read-anything-capture')) return;
     let payload = null;
-    try { payload = JSON.parse(sessionStorage.getItem(CAPTURE_KEY) || 'null'); } catch {}
-    if (!payload?.text) {
-      sessionStorage.removeItem(CAPTURE_KEY);
-      history.replaceState({}, '', location.pathname + location.hash);
-      renderHub();
+    try { payload = JSON.parse(CAPTURE_STORAGE.getItem(CAPTURE_KEY) || 'null'); } catch {}
+    if (!payload?.text) return;
+    if (typeof window.renderReaderWithText !== 'function' || attempt < 4) {
+      if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
       return;
     }
-
-    // Wait until the app's normal startup rendering has completed. Opening the
-    // captured document too early allows the home-page initializer to overwrite it.
-    if (typeof window.renderReaderWithText !== 'function' || attempt < 3) {
-      if (attempt < 20) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
-      else renderHub();
-      return;
-    }
-
     try {
       openDocument({
         title: payload.title || 'Web Article',
@@ -215,11 +204,10 @@
         text: payload.text,
         source: { type: 'bookmarklet', url: payload.url || '', importedAt: new Date().toISOString() }
       });
-      sessionStorage.removeItem(CAPTURE_KEY);
-      history.replaceState({}, '', location.pathname + location.hash);
+      CAPTURE_STORAGE.removeItem(CAPTURE_KEY);
+      if (location.hash.includes('read-anything-capture')) history.replaceState({}, '', location.pathname);
     } catch {
-      if (attempt < 20) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
-      else renderHub();
+      if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
     }
   }
 

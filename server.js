@@ -2576,7 +2576,7 @@ app.post('/capture', (req, res) => {
   };
   if (!payload.text) return res.status(400).send('No readable webpage text was received.');
   const serialized = JSON.stringify(payload).replace(/</g, '\\u003c');
-  res.type('html').send(`<!doctype html><meta charset="utf-8"><title>Opening Mark, Set, Go!</title><p>Opening the captured page in Mark, Set, Go!…</p><script>sessionStorage.setItem('markSetGoPendingWebCaptureV1',${JSON.stringify(serialized)});location.replace('/?read-anything-capture=1');<\/script>`);
+  res.type('html').send(`<!doctype html><meta charset="utf-8"><title>Opening Mark, Set, Go!</title><p>Opening the captured page in Mark, Set, Go!…</p><script>localStorage.setItem('markSetGoPendingWebCaptureV1',${JSON.stringify(serialized)});location.replace('/#read-anything-capture=1');<\/script>`);
 });
 
 app.post('/api/fetch-text', async (req, res) => {
