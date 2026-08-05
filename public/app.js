@@ -5156,11 +5156,17 @@ function renderNavigationPane() {
   const pane = app.querySelector('#navigation-pane');
   if (!pane) return;
   const bookmarks = getBookmarks();
+  const pageBookmarks = getReaderBookmarks().filter((item) => item.documentId === state.documentId);
+  const bookmarkCount = bookmarks.length + pageBookmarks.length;
   const tocMarkup = state.toc.length
     ? state.toc.map((entry, index) => `<button type="button" class="toc-link" data-toc-index="${entry.index}" title="Go to ${escapeHtml(entry.title)}"><span>${index + 1}</span>${escapeHtml(entry.title)}</button>`).join('')
     : '<p class="navigation-empty">No chapter headings were detected.</p>';
-  const bookmarkMarkup = bookmarks.length
-    ? bookmarks.map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-bookmark="${escapeHtml(bookmark.id)}"><strong>${escapeHtml(bookmark.title)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-bookmark="${escapeHtml(bookmark.id)}" aria-label="Delete bookmark">×</button></div>`).join('')
+  const regularBookmarkMarkup = bookmarks.map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-bookmark="${escapeHtml(bookmark.id)}"><strong>${escapeHtml(bookmark.title)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-bookmark="${escapeHtml(bookmark.id)}" aria-label="Delete bookmark">×</button></div>`).join('');
+  const pageBookmarkMarkup = pageBookmarks
+    .sort((a,b)=>Number(a.pageNumber)-Number(b.pageNumber))
+    .map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-reader-bookmark="${escapeHtml(bookmark.id)}"><strong>Page ${Number(bookmark.pageNumber)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-reader-bookmark-list="${escapeHtml(bookmark.id)}" aria-label="Delete page bookmark">×</button></div>`).join('');
+  const bookmarkMarkup = bookmarkCount
+    ? regularBookmarkMarkup + pageBookmarkMarkup
     : '<p class="navigation-empty">No bookmarks saved yet.</p>';
   const definitions = definitionsForCurrentDocument();
   const definitionMarkup = definitions.length
@@ -5178,7 +5184,7 @@ function renderNavigationPane() {
     </div>
     <div class="reader-library-tabs" role="tablist" aria-label="Reading tools">
       <button class="reader-library-tab active" type="button" role="tab" data-reader-tab="contents" aria-selected="true">Contents</button>
-      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="bookmarks" aria-selected="false">Bookmarks <span>${bookmarks.length}</span></button>
+      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="bookmarks" aria-selected="false">Bookmarks <span>${bookmarkCount}</span></button>
       <button class="reader-library-tab" type="button" role="tab" data-reader-tab="definitions" aria-selected="false">Definitions <span>${definitions.length}</span></button>
       <button class="reader-library-tab" type="button" role="tab" data-reader-tab="notes" aria-selected="false">Notes <span>${notes.length}</span></button>
     </div>
@@ -5219,6 +5225,17 @@ function renderNavigationPane() {
   pane.querySelector('#add-bookmark')?.addEventListener('click', addBookmark);
   pane.querySelectorAll('[data-open-bookmark]').forEach((button) => {
     button.addEventListener('click', () => openBookmark(button.dataset.openBookmark));
+  });
+  pane.querySelectorAll('[data-open-reader-bookmark]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const bookmark = getReaderBookmarks().find((item) => item.id === button.dataset.openReaderBookmark);
+      if (!bookmark) return;
+      jumpToWordIndex(bookmark.wordIndex);
+      requestAnimationFrame(updateReaderBookmarkMarkers);
+    });
+  });
+  pane.querySelectorAll('[data-remove-reader-bookmark-list]').forEach((button) => {
+    button.addEventListener('click', () => removeReaderBookmark(button.dataset.removeReaderBookmarkList));
   });
   pane.querySelectorAll('[data-remove-bookmark]').forEach((button) => {
     button.addEventListener('click', () => removeBookmark(button.dataset.removeBookmark));
@@ -6715,34 +6732,41 @@ function selectReaderParagraphFromEvent(event){
 }
 function bindMarkCompanion(reader){
   const toolbar=app.querySelector('#mark-selection-toolbar'); if(!reader||!toolbar)return;
-  state.markSelectionInteraction={active:false,moved:false,wasRunning:false,startX:0,startY:0};
+  state.markSelectionInteraction={active:false,moved:false,paused:false,wasRunning:false,startX:0,startY:0};
   state.markSelectionLocked=false;
   state.markSuppressNextReaderClick=false;
+  state.markSelectionWasRunning=false;
   state.markHighlightObserver?.disconnect?.();
   state.markHighlightObserver=new MutationObserver(()=>{
     if(state.markPersistentSelection) requestAnimationFrame(applyPersistentMarkSelectionHighlight);
   });
   state.markHighlightObserver.observe(reader,{childList:true,subtree:true});
-  const pauseForSelection=()=>{
-    if(!isReaderRunning()) return;
-    pauseReader();
+
+  const pauseForSelection=(interaction)=>{
+    if(interaction?.paused) return;
+    interaction.paused=true;
+    state.markSelectionWasRunning=Boolean(interaction?.wasRunning);
+    if(isReaderRunning()) pauseReader();
     persistReaderSession({immediate:true});
     updateReaderStatus('Paused while selecting a passage.');
   };
+
   const finalizeSelection=()=>window.setTimeout(()=>{
-    const data=captureMarkSelection();
     const interaction=state.markSelectionInteraction||{};
+    if(!interaction.active) return;
     interaction.active=false;
-    if(!data){
-      state.markSelectionLocked=false;
-      return hideMarkToolbar();
+    const data=captureMarkSelection();
+    if(!interaction.moved || !data){
+      // A normal click/reposition is not a selection and must not interrupt playback.
+      if(interaction.paused && interaction.wasRunning && !isReaderRunning()) startReader();
+      return;
     }
 
+    pauseForSelection(interaction);
     state.markSelectionLocked=true;
     state.markSuppressNextReaderClick=true;
-    pauseReader();
     persistReaderSession({immediate:true});
-    updateReaderStatus('Paused for selected passage. Click elsewhere or press Resume to continue.');
+    updateReaderStatus('Paused for selected passage. Click elsewhere in the text to continue.');
 
     const selection=window.getSelection();
     const range=selection?.rangeCount?selection.getRangeAt(0):null;
@@ -6754,25 +6778,39 @@ function bindMarkCompanion(reader){
   reader.addEventListener('pointerdown',(event)=>{
     if(event.button!==undefined && event.button!==0) return;
     if(event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
+
+    // Once a passage is locked, the next ordinary click clears it and resumes
+    // the reader. Let the existing reader click/reposition handler still run.
+    if(state.markSelectionLocked){
+      const shouldResume=Boolean(state.markSelectionWasRunning);
+      clearMarkSelectionForReadingResume();
+      state.markSelectionWasRunning=false;
+      updateReaderStatus('Selection cleared.');
+      if(shouldResume) window.setTimeout(()=>{ if(!isReaderRunning()) startReader(); },0);
+      return;
+    }
+
     const interaction=state.markSelectionInteraction||{};
     interaction.active=true;
     interaction.moved=false;
+    interaction.paused=false;
     interaction.wasRunning=isReaderRunning();
     interaction.startX=Number(event.clientX)||0;
     interaction.startY=Number(event.clientY)||0;
     state.markSelectionInteraction=interaction;
-    pauseForSelection();
   },true);
   reader.addEventListener('pointermove',(event)=>{
     const interaction=state.markSelectionInteraction;
     if(!interaction?.active) return;
-    if(Math.hypot((Number(event.clientX)||0)-interaction.startX,(Number(event.clientY)||0)-interaction.startY)>4){
-      interaction.moved=true;
+    if(Math.hypot((Number(event.clientX)||0)-interaction.startX,(Number(event.clientY)||0)-interaction.startY)>6){
+      if(!interaction.moved){
+        interaction.moved=true;
+        pauseForSelection(interaction);
+      }
     }
   },true);
   reader.addEventListener('pointerup',finalizeSelection,true);
   reader.addEventListener('pointercancel',()=>{if(state.markSelectionInteraction)state.markSelectionInteraction.active=false;},true);
-  reader.addEventListener('mouseup',finalizeSelection);
   reader.addEventListener('keyup',finalizeSelection);
   reader.addEventListener('click',(event)=>{
     if(!state.markSuppressNextReaderClick) return;
@@ -8689,11 +8727,13 @@ function toggleBookmarkForContextWord() {
     updateReaderStatus?.(`Bookmark added to page ${page.pageNumber}.`);
   }
   updateReaderBookmarkMarkers();
+  renderNavigationPane();
 }
 
 function removeReaderBookmark(id) {
   saveReaderBookmarks(getReaderBookmarks().filter((item) => item.id !== id));
   updateReaderBookmarkMarkers();
+  renderNavigationPane();
   updateReaderStatus?.('Bookmark removed.');
 }
 
