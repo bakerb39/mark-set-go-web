@@ -1194,7 +1194,7 @@ app.post('/api/mark-selection', async (req, res) => {
     explain: 'Explain the selected passage clearly. Clarify what it says, what is implied, and any difficult references. Avoid unnecessary plot spoilers.',
     summarize: 'Summarize only the selected passage concisely. Preserve its central idea, movement, and important qualifications.',
     analyze: 'Analyze the selected passage as literature or argument. Discuss structure, tone, imagery, rhetoric, subtext, and significance only where supported.',
-    simplify: 'Rewrite the meaning in plain modern English without flattening important distinctions. Do not quote more than a few words.',
+    simplify: 'Rewrite the meaning at approximately a fifth-grade reading level. Use short, clear sentences and familiar words while preserving the important meaning. Do not quote more than a few words.',
     context: 'Provide only the historical, cultural, geographical, philosophical, theological, scientific, or literary context genuinely needed to understand this passage.',
     related: 'Identify up to five relevant ideas, works, traditions, or passages that illuminate this selection. Explain each connection briefly and avoid invented relationships.',
     ask: 'Answer the reader question about the selected passage. Ground the answer in the selection and surrounding context; distinguish inference from fact.',
