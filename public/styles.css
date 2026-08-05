@@ -8758,56 +8758,21 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
   margin-bottom: -34px !important;
 }
 
-/* Keep the viewer full-screen control above the reader/Ask Mark panes. */
-.reader-frame > .viewer-fullscreen-button {
-  top: -2.45rem;
-}
-
-.reader-frame:fullscreen > .viewer-fullscreen-button,
-.reader-frame.fullscreen-fallback > .viewer-fullscreen-button {
-  top: 1rem;
-}
-
-/* Full screen button: place it in the action row above the reader pane. */
-.reader-frame > .viewer-fullscreen-button {
-  top: -4.65rem !important;
-  right: .65rem !important;
-}
-
-.reader-frame:fullscreen > .viewer-fullscreen-button,
-.reader-frame.fullscreen-fallback > .viewer-fullscreen-button {
-  top: 1rem !important;
-}
-
-/* Correct fullscreen alignment: keep the control in the action row, never over the reader. */
-.reader-pane-controls {
-  position: relative !important;
-  display: flex !important;
+/* Align Full screen with the Contents / Ask Mark command row without changing reader height. */
+.reader-pane-controls.ask-mark-toolbar {
+  flex-wrap: nowrap !important;
   align-items: center !important;
-  justify-content: space-between !important;
-  margin: 0 0 6px !important;
-  padding: 0 !important;
-  min-height: 40px !important;
 }
-
-.reader-pane-controls #toggle-reader-fullscreen.viewer-fullscreen-button {
+.reader-pane-controls.ask-mark-toolbar .reader-pane-buttons {
+  width: auto !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+}
+.reader-pane-controls.ask-mark-toolbar #toggle-reader-fullscreen.viewer-fullscreen-button {
   position: static !important;
   inset: auto !important;
-  top: auto !important;
-  right: auto !important;
-  bottom: auto !important;
-  left: auto !important;
   transform: none !important;
-  margin: 0 0 0 auto !important;
+  align-self: center !important;
   flex: 0 0 auto !important;
-  z-index: 1 !important;
-}
-
-/* Do not pull the reader pane upward underneath the action row. */
-.reader-layout {
-  position: relative !important;
-  top: 0 !important;
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
-  padding-top: 0 !important;
+  margin: 0 0 0 auto !important;
 }
