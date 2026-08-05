@@ -6567,7 +6567,7 @@ async function runMarkAction(action,question=''){
   const selected=state.markSelection; if(!selected) return;
   if(action==='save'){saveMarkInsight({action:'selection'});return;}
   if(action==='related'){openComparisonWorkspace();return;}
-  if(action==='define' && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false); return; }
+  if(action==='define' && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false, 'mark'); return; }
   const responsePanels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean);responsePanels.forEach(p=>{p.hidden=false;p.innerHTML='<p class="status">Ask Mark is reading the selection…</p>';});
   try{
     const targetLanguage=action==='translate'?(window.prompt('Translate into which language?','Spanish')||'').trim():''; if(action==='translate'&&!targetLanguage)return;
@@ -8581,15 +8581,29 @@ function renderTwoColumnDocument(reader) {
 }
 
 
-function showDictionaryResult(word, definition, partOfSpeech = '', example = '', saved = false) {
-  const panel = app.querySelector('#word-result');
-  if (!panel) return;
-  panel.innerHTML = `
+function dictionaryResultMarkup(word, definition, partOfSpeech = '', example = '', saved = false) {
+  return `
+    <div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div>
     <h2>${escapeHtml(word)}</h2>
     ${partOfSpeech ? `<p class="dictionary-part">${escapeHtml(partOfSpeech)}</p>` : ''}
     <p class="word-meaning">${escapeHtml(definition)}</p>
     ${example ? `<p class="dictionary-example">“${escapeHtml(example)}”</p>` : ''}
     ${saved ? '<p class="dictionary-saved-note">Saved under Saved definitions.</p>' : ''}`;
+}
+
+function showDictionaryResult(word, definition, partOfSpeech = '', example = '', saved = false, target = 'tools') {
+  if (target === 'mark') {
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    const panel = app.querySelector('#mark-response');
+    if (!panel) return;
+    panel.hidden = false;
+    panel.innerHTML = dictionaryResultMarkup(word, definition, partOfSpeech, example, saved);
+    return;
+  }
+  const panel = app.querySelector('#word-result');
+  if (!panel) return;
+  panel.innerHTML = dictionaryResultMarkup(word, definition, partOfSpeech, example, saved);
 }
 
 async function lookupDictionaryWord(word) {
@@ -8613,18 +8627,34 @@ function openWordPanelForDictionary() {
   }
 }
 
-async function performDictionaryLookup(saveAfter = false) {
+async function performDictionaryLookup(saveAfter = false, target = 'tools') {
   const context = state.contextWord;
   if (!context) return;
-  openWordPanelForDictionary();
-  const panel = app.querySelector('#word-result');
-  if (panel) panel.innerHTML = `<h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+
+  if (target === 'mark') {
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    const markPanel = app.querySelector('#mark-response');
+    if (markPanel) {
+      markPanel.hidden = false;
+      markPanel.innerHTML = `<div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+    }
+  } else {
+    openWordPanelForDictionary();
+    const toolsPanel = app.querySelector('#word-result');
+    if (toolsPanel) toolsPanel.innerHTML = `<h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+  }
+
   try {
     const result = await lookupDictionaryWord(context.word);
-    showDictionaryResult(result.word, result.definition, result.partOfSpeech, result.example, false);
+    showDictionaryResult(result.word, result.definition, result.partOfSpeech, result.example, false, target);
     if (saveAfter) saveCurrentDefinition(result);
   } catch (error) {
-    if (panel) panel.innerHTML = `<h2>${escapeHtml(context.word)}</h2><p class="status error">${escapeHtml(error.message)}</p>`;
+    const panel = target === 'mark' ? app.querySelector('#mark-response') : app.querySelector('#word-result');
+    if (panel) {
+      panel.hidden = false;
+      panel.innerHTML = `<div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status error">${escapeHtml(error.message)}</p>`;
+    }
   }
 }
 
@@ -8783,7 +8813,29 @@ function bindDictionaryMenu(reader) {
     event.preventDefault();
     event.stopPropagation();
     const index = Number(wordElement.dataset.index);
-    state.contextWord = { word: state.words[index] || wordElement.textContent, index, element: wordElement };
+    const word = state.words[index] || wordElement.textContent;
+    state.contextWord = { word, index, element: wordElement };
+
+    // Treat the right-clicked word as the active Ask Mark selection so it stays
+    // visibly highlighted while the context menu and lookup result are open.
+    const wordSelection = {
+      text: String(word || '').trim(),
+      startIndex: index,
+      endIndex: index + 1,
+      chapter: chapterForWordIndex?.(index)?.title || ''
+    };
+    if (wordSelection.text) {
+      if (isReaderRunning()) {
+        state.markSelectionWasRunning = true;
+        pauseReader();
+      }
+      state.markSelection = wordSelection;
+      state.markSelectionLocked = true;
+      persistMarkSelectionHighlight(wordSelection);
+      renderMarkSelectionCard();
+      updateReaderStatus('Paused on selected word. Click elsewhere in the text to continue.');
+    }
+
     const existingNote = notesForCurrentDocument().find((item) => Number(item.wordIndex) === index);
     const noteButton = menu.querySelector('[data-dictionary-action="note"]');
     if (noteButton) noteButton.textContent = existingNote ? 'Edit note' : 'Add note';
