@@ -780,54 +780,83 @@ function stopMusic() {
 
 function renderMusicLibrary() {
   stopReader();
-  const categories = [...new Set(musicChoices.map((item) => item.category))];
   const preferred = getPreferredMusic();
   const bookKey = currentBookMusicKey();
   const bookIds = getBookMusic(bookKey);
   const bookItems = bookIds.map((id) => preferred.find((item) => item.id === id)).filter(Boolean);
-  const currentBookLabel = state?.title ? `“${escapeHtml(state.title)}”` : 'the current book';
-  app.innerHTML = `
-    <section class="panel music-library">
-      <div class="library-heading"><div><h1>Music &amp; Focus</h1><p>Listen through official Spotify embeds or the YouTube player, save favorites, and associate playlists with individual books.</p></div></div>
-      <nav class="music-section-nav" aria-label="Music sections"><a href="#add-music">Add music</a><a href="#book-music">Book music</a><a href="#preferred-music">My music</a><a href="#focus-music">Focus selections</a></nav>
+  const currentBookLabel = state?.title ? `“${escapeHtml(state.title)}”` : 'No book open';
+  const quickChoices = musicChoices.slice(0, 6);
 
-      <section id="add-music" class="music-category music-add-service">
-        <div class="library-heading"><div><h2>Add Spotify or YouTube</h2><p>Paste a public Spotify or YouTube URL. Playback remains hosted by the selected service.</p></div></div>
-        <form id="music-url-form" class="music-url-form">
-          <label>Spotify or YouTube URL<input id="music-service-url" type="url" placeholder="https://open.spotify.com/playlist/… or https://youtube.com/playlist?list=…"></label>
-          <label>Name (optional)<input id="music-service-name" type="text" maxlength="80" placeholder="My reading playlist"></label>
-          <div class="music-url-actions"><button class="primary" type="submit">Load player</button><button id="save-music-preferred" class="secondary" type="button">Save to My Music</button></div>
+  app.innerHTML = `
+    <section class="panel music-library music-simple-page">
+      <div class="library-heading music-page-heading">
+        <div>
+          <h1>Music &amp; Focus</h1>
+          <p>Choose something to listen to while you read. You can save it for later or connect it to the current book.</p>
+        </div>
+      </div>
+
+      <section class="music-current-book" aria-label="Current book">
+        <span>Current book</span>
+        <strong>${currentBookLabel}</strong>
+        ${bookKey ? `<small>${bookItems.length ? `${bookItems.length} saved music ${bookItems.length === 1 ? 'selection' : 'selections'}` : 'No music saved for this book yet'}</small>` : '<small>Open a book to save music specifically for it.</small>'}
+      </section>
+
+      <section class="music-primary-section">
+        <div class="music-section-heading">
+          <div><span class="music-step">1</span><h2>Start listening</h2></div>
+          <p>Pick a focus option or paste a Spotify or YouTube link.</p>
+        </div>
+
+        <div class="music-quick-picks">
+          ${quickChoices.map((item) => `<button class="music-quick-button" type="button" data-play-music="${escapeHtml(item.id)}"><span aria-hidden="true">♫</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.category)}</small></span></button>`).join('')}
+        </div>
+
+        <div class="music-or"><span>or use your own music</span></div>
+
+        <form id="music-url-form" class="music-simple-form">
+          <label for="music-service-url">Spotify or YouTube link</label>
+          <div class="music-link-row">
+            <input id="music-service-url" type="url" required placeholder="Paste a playlist, album, track, or video link">
+            <button class="primary" type="submit">Play</button>
+          </div>
+          <details class="music-optional-name">
+            <summary>Add a custom name</summary>
+            <label for="music-service-name" class="sr-only">Custom name</label>
+            <input id="music-service-name" type="text" maxlength="80" placeholder="Example: Dracula reading soundtrack">
+          </details>
+          <div class="music-save-row">
+            <button id="save-music-preferred" class="secondary" type="button">Save to My Music</button>
+            ${bookKey ? '<button id="save-music-to-book" class="secondary" type="button">Save for this book</button>' : ''}
+          </div>
           <span id="music-service-status" class="status" aria-live="polite"></span>
         </form>
       </section>
 
-      <section id="book-music" class="music-category preferred-music-library">
-        <div class="library-heading"><div><h2>Music for ${currentBookLabel}</h2><p>${bookKey ? 'These selections will be shown as book-specific choices whenever this book is open.' : 'Open a book first, then return here to associate music with it.'}</p></div></div>
-        <div class="preferred-music-list">
-          ${bookItems.length ? bookItems.map((item) => `
-            <article class="preferred-music-item">
-              <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}</span></div>
-              <div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-detach-book-music="${escapeHtml(item.id)}">Remove from book</button></div>
-            </article>`).join('') : `<p class="library-note">${bookKey ? 'No music has been attached to this book yet.' : 'No book is currently open.'}</p>`}
+      <section class="music-secondary-section">
+        <div class="music-section-heading">
+          <div><span class="music-step">2</span><h2>Your saved music</h2></div>
+          <p>Play a saved selection or connect it to ${bookKey ? currentBookLabel : 'a book later'}.</p>
         </div>
-      </section>
-
-      <section id="preferred-music" class="music-category preferred-music-library">
-        <div class="library-heading"><div><h2>My Music</h2><p>Saved selections appear in reader music controls and can be assigned to books.</p></div></div>
-        <div id="preferred-music-list" class="preferred-music-list">
+        <div id="preferred-music-list" class="preferred-music-list music-saved-list">
           ${preferred.length ? preferred.map((item) => `
-            <article class="preferred-music-item">
-              <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}${bookIds.includes(item.id) ? ' · Attached to current book' : ''}</span></div>
-              <div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button>${bookKey ? `<button class="secondary" type="button" data-attach-book-music="${escapeHtml(item.id)}">${bookIds.includes(item.id) ? 'Attached ✓' : 'Add to book'}</button>` : ''}<button class="secondary" type="button" data-remove-preferred="${escapeHtml(item.id)}">Remove</button></div>
-            </article>`).join('') : '<p class="library-note">No saved music yet. Add a Spotify or YouTube selection above.</p>'}
+            <article class="preferred-music-item music-saved-item">
+              <div class="music-saved-info"><span class="music-provider-badge">${escapeHtml(item.provider === 'spotify' ? 'Spotify' : 'YouTube')}</span><strong>${escapeHtml(item.title)}</strong>${bookIds.includes(item.id) ? '<small>Saved for this book</small>' : ''}</div>
+              <div class="preferred-music-actions"><button class="primary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button>${bookKey ? `<button class="secondary" type="button" data-attach-book-music="${escapeHtml(item.id)}">${bookIds.includes(item.id) ? 'Remove from book' : 'Save for book'}</button>` : ''}<button class="text-button danger-text" type="button" data-remove-preferred="${escapeHtml(item.id)}">Delete</button></div>
+            </article>`).join('') : '<div class="music-empty-state"><strong>No saved music yet</strong><span>Play a link above, then choose “Save to My Music.”</span></div>'}
         </div>
       </section>
 
-      <section id="focus-music" class="music-category"><h2>Focus selections</h2><div class="music-card-grid">
-        ${categories.map((category) => musicChoices.filter((item) => item.category === category).map((item) => `
-          <article class="music-card"><div class="music-card-icon" aria-hidden="true">♫</div><div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.description)}</p><div class="music-card-links"><a href="${escapeHtml(musicWatchUrl(item))}" target="_blank" rel="noopener noreferrer">Open on YouTube</a><a href="${escapeHtml(youtubeSearchUrl(musicSearchQuery(item)))}" target="_blank" rel="noopener noreferrer">Find alternative</a></div></div><div class="music-card-actions"><button class="primary" type="button" data-play-music="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-save-music="${escapeHtml(item.id)}">Save</button></div></article>`).join('')).join('')}
-      </div></section>
-      <p class="library-note">Spotify and YouTube control availability, advertising, regional restrictions, sign-in requirements, and whether particular media can be embedded. Mark, Set, Go! stores links and book associations, not audio files.</p>
+      ${bookKey && bookItems.length ? `<details class="music-book-details"><summary>Music saved for ${currentBookLabel} <span>${bookItems.length}</span></summary><div class="preferred-music-list">${bookItems.map((item) => `<article class="preferred-music-item"><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}</span></div><div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button><button class="text-button" type="button" data-detach-book-music="${escapeHtml(item.id)}">Remove</button></div></article>`).join('')}</div></details>` : ''}
+
+      <details class="music-browse-details">
+        <summary>Browse more focus music <span>${musicChoices.length}</span></summary>
+        <div class="music-browse-list">
+          ${musicChoices.map((item) => `<article><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.description)}</span></div><div><button class="secondary" type="button" data-play-music="${escapeHtml(item.id)}">Play</button><button class="text-button" type="button" data-save-music="${escapeHtml(item.id)}">Save</button></div></article>`).join('')}
+        </div>
+      </details>
+
+      <p class="library-note music-service-note">Playback is provided by Spotify or YouTube. Mark, Set, Go! stores only links and book associations.</p>
     </section>`;
 
   app.querySelectorAll('[data-play-music]').forEach((button) => button.addEventListener('click', () => {
@@ -838,7 +867,7 @@ function renderMusicLibrary() {
     const choice = musicChoices.find((item) => item.id === button.dataset.saveMusic);
     if (!choice) return;
     const added = addPreferredMusic({ title: choice.title, source: choice.category, provider: 'youtube', choiceId: choice.id });
-    button.textContent = added ? 'Saved ✓' : 'Already saved';
+    button.textContent = added ? 'Saved ✓' : 'Saved';
     button.disabled = true;
   }));
   app.querySelectorAll('[data-play-preferred]').forEach((button) => button.addEventListener('click', () => playPreferredMusic(button.dataset.playPreferred)));
@@ -851,7 +880,9 @@ function renderMusicLibrary() {
     renderMusicLibrary();
   }));
   app.querySelectorAll('[data-attach-book-music]').forEach((button) => button.addEventListener('click', () => {
-    attachMusicToCurrentBook(button.dataset.attachBookMusic);
+    const id = button.dataset.attachBookMusic;
+    if (bookIds.includes(id)) detachMusicFromCurrentBook(id);
+    else attachMusicToCurrentBook(id);
     renderMusicLibrary();
   }));
   app.querySelectorAll('[data-detach-book-music]').forEach((button) => button.addEventListener('click', () => {
@@ -865,6 +896,23 @@ function renderMusicLibrary() {
     if (customName) parsed.title = customName;
     return parsed;
   };
+  const saveFormMusic = (attachToBook = false) => {
+    const status = app.querySelector('#music-service-status');
+    try {
+      const parsed = parseFormMusic();
+      const before = getPreferredMusic();
+      const added = addPreferredMusic({ title: parsed.title, source: parsed.source, provider: parsed.provider || 'youtube', src: parsed.src, originalUrl: parsed.originalUrl || '' });
+      const after = getPreferredMusic();
+      const saved = after.find((item) => !before.some((oldItem) => oldItem.id === item.id)) || after.find((item) => item.src === parsed.src || item.originalUrl === parsed.originalUrl);
+      if (attachToBook && saved && bookKey) attachMusicToCurrentBook(saved.id);
+      status.className = 'status';
+      status.textContent = attachToBook ? `Saved “${parsed.title}” for this book.` : (added ? `Saved “${parsed.title}” to My Music.` : 'That selection is already saved.');
+      window.setTimeout(renderMusicLibrary, 500);
+    } catch (error) {
+      status.className = 'status error';
+      status.textContent = error.message;
+    }
+  };
   app.querySelector('#music-url-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const status = app.querySelector('#music-service-status');
@@ -872,26 +920,16 @@ function renderMusicLibrary() {
       const parsed = parseFormMusic();
       playMusic(parsed);
       status.className = 'status';
-      status.textContent = `Loaded ${parsed.source}.`;
+      status.textContent = `Now playing ${parsed.title}.`;
     } catch (error) {
       status.className = 'status error';
       status.textContent = error.message;
     }
   });
-  app.querySelector('#save-music-preferred')?.addEventListener('click', () => {
-    const status = app.querySelector('#music-service-status');
-    try {
-      const parsed = parseFormMusic();
-      const added = addPreferredMusic({ title: parsed.title, source: parsed.source, provider: parsed.provider || 'youtube', src: parsed.src, originalUrl: parsed.originalUrl || '' });
-      status.className = 'status';
-      status.textContent = added ? `Saved “${parsed.title}” to My Music.` : 'That selection is already saved.';
-      if (added) window.setTimeout(renderMusicLibrary, 350);
-    } catch (error) {
-      status.className = 'status error';
-      status.textContent = error.message;
-    }
-  });
+  app.querySelector('#save-music-preferred')?.addEventListener('click', () => saveFormMusic(false));
+  app.querySelector('#save-music-to-book')?.addEventListener('click', () => saveFormMusic(true));
 }
+
 async function loadBillboardSongs() {
   const status = app.querySelector('#billboard-status');
   const list = app.querySelector('#billboard-list');
@@ -4063,6 +4101,8 @@ function comprehensionPassage() {
   };
 }
 
+window.MarkSetGoStartComprehension = startComprehensionCheck;
+
 function closeComprehensionDialog() {
   app.querySelector('#comprehension-dialog')?.close();
 }
@@ -5116,11 +5156,17 @@ function renderNavigationPane() {
   const pane = app.querySelector('#navigation-pane');
   if (!pane) return;
   const bookmarks = getBookmarks();
+  const pageBookmarks = getReaderBookmarks().filter((item) => item.documentId === state.documentId);
+  const bookmarkCount = bookmarks.length + pageBookmarks.length;
   const tocMarkup = state.toc.length
     ? state.toc.map((entry, index) => `<button type="button" class="toc-link" data-toc-index="${entry.index}" title="Go to ${escapeHtml(entry.title)}"><span>${index + 1}</span>${escapeHtml(entry.title)}</button>`).join('')
     : '<p class="navigation-empty">No chapter headings were detected.</p>';
-  const bookmarkMarkup = bookmarks.length
-    ? bookmarks.map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-bookmark="${escapeHtml(bookmark.id)}"><strong>${escapeHtml(bookmark.title)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-bookmark="${escapeHtml(bookmark.id)}" aria-label="Delete bookmark">×</button></div>`).join('')
+  const regularBookmarkMarkup = bookmarks.map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-bookmark="${escapeHtml(bookmark.id)}"><strong>${escapeHtml(bookmark.title)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-bookmark="${escapeHtml(bookmark.id)}" aria-label="Delete bookmark">×</button></div>`).join('');
+  const pageBookmarkMarkup = pageBookmarks
+    .sort((a,b)=>Number(a.pageNumber)-Number(b.pageNumber))
+    .map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-reader-bookmark="${escapeHtml(bookmark.id)}"><strong>Page ${Number(bookmark.pageNumber)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-reader-bookmark-list="${escapeHtml(bookmark.id)}" aria-label="Delete page bookmark">×</button></div>`).join('');
+  const bookmarkMarkup = bookmarkCount
+    ? regularBookmarkMarkup + pageBookmarkMarkup
     : '<p class="navigation-empty">No bookmarks saved yet.</p>';
   const definitions = definitionsForCurrentDocument();
   const definitionMarkup = definitions.length
@@ -5138,7 +5184,7 @@ function renderNavigationPane() {
     </div>
     <div class="reader-library-tabs" role="tablist" aria-label="Reading tools">
       <button class="reader-library-tab active" type="button" role="tab" data-reader-tab="contents" aria-selected="true">Contents</button>
-      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="bookmarks" aria-selected="false">Bookmarks <span>${bookmarks.length}</span></button>
+      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="bookmarks" aria-selected="false">Bookmarks <span>${bookmarkCount}</span></button>
       <button class="reader-library-tab" type="button" role="tab" data-reader-tab="definitions" aria-selected="false">Definitions <span>${definitions.length}</span></button>
       <button class="reader-library-tab" type="button" role="tab" data-reader-tab="notes" aria-selected="false">Notes <span>${notes.length}</span></button>
     </div>
@@ -5179,6 +5225,17 @@ function renderNavigationPane() {
   pane.querySelector('#add-bookmark')?.addEventListener('click', addBookmark);
   pane.querySelectorAll('[data-open-bookmark]').forEach((button) => {
     button.addEventListener('click', () => openBookmark(button.dataset.openBookmark));
+  });
+  pane.querySelectorAll('[data-open-reader-bookmark]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const bookmark = getReaderBookmarks().find((item) => item.id === button.dataset.openReaderBookmark);
+      if (!bookmark) return;
+      jumpToWordIndex(bookmark.wordIndex);
+      requestAnimationFrame(updateReaderBookmarkMarkers);
+    });
+  });
+  pane.querySelectorAll('[data-remove-reader-bookmark-list]').forEach((button) => {
+    button.addEventListener('click', () => removeReaderBookmark(button.dataset.removeReaderBookmarkList));
   });
   pane.querySelectorAll('[data-remove-bookmark]').forEach((button) => {
     button.addEventListener('click', () => removeBookmark(button.dataset.removeBookmark));
@@ -6350,9 +6407,42 @@ function currentTocTitle(){
   for(const item of items){ if(Number(item.index)<=Number(state.index)) current=item.title||current; else break; }
   return current;
 }
+function clearPersistentMarkSelection() {
+  app.querySelectorAll('#reader .ask-mark-selected').forEach((element)=>element.classList.remove('ask-mark-selected'));
+}
+function clearMarkSelectionForReadingResume() {
+  state.markPersistentSelection=null;
+  state.markSelection=null;
+  state.markSelectionLocked=false;
+  state.markSuppressNextReaderClick=false;
+  clearPersistentMarkSelection();
+  hideMarkToolbar();
+  const selection=window.getSelection?.();
+  if(selection && selection.rangeCount) selection.removeAllRanges();
+}
+function applyPersistentMarkSelectionHighlight() {
+  const selectionData=state.markPersistentSelection;
+  if(!selectionData) return;
+  const start=Math.max(0,Number(selectionData.startIndex)||0);
+  const end=Math.max(start+1,Number(selectionData.endIndex)||start+1);
+  app.querySelectorAll('#reader .reader-word[data-index], #reader .reader-group[data-start-index]').forEach((element)=>{
+    const elementStart=Number(element.dataset.index ?? element.dataset.startIndex);
+    const explicitEnd=Number(element.dataset.endIndex);
+    const elementEnd=Number.isFinite(explicitEnd) ? explicitEnd : elementStart+1;
+    if(Number.isFinite(elementStart) && elementStart<end && elementEnd>start){
+      element.classList.add('ask-mark-selected');
+    }
+  });
+}
+function persistMarkSelectionHighlight(selectionData) {
+  if(selectionData) state.markPersistentSelection={...selectionData};
+  clearPersistentMarkSelection();
+  applyPersistentMarkSelectionHighlight();
+}
 function showMarkToolbar(selectionData, rect) {
   const bar=app.querySelector('#mark-selection-toolbar'); if(!bar) return;
   state.markSelection=selectionData;
+  persistMarkSelectionHighlight(selectionData);
   bar.hidden=false;
   const width=bar.offsetWidth||540;
   bar.style.left=`${Math.max(8,Math.min(window.innerWidth-width-8,rect.left+rect.width/2-width/2))}px`;
@@ -6445,10 +6535,39 @@ function saveMarkInsight(extra={}){
   renderGlobalNotebookEntries();
   updateReaderStatus?.('Saved to Mark’s notebook.');
 }
+function openComparisonWorkspace(){
+  const selected=state.markSelection;
+  if(!selected?.text) return;
+  const payload={
+    id:`comparison-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    createdAt:new Date().toISOString(),
+    primary:{
+      documentId:selected.documentId||state.documentId||'',
+      title:selected.title||state.title||'Current text',
+      author:state.source?.author||'',
+      passage:selected.text,
+      startIndex:Number(selected.startIndex)||0,
+      endIndex:Number(selected.endIndex)||Number(selected.startIndex)||0,
+      chapter:selected.chapter||'',
+      source:state.source||null
+    },
+    comparisonTexts:[],
+    mode:'syntopicon',
+    notes:''
+  };
+  try{localStorage.setItem('markSetGoComparisonDraftV1',JSON.stringify(payload));}catch{}
+  const opened=window.open('/comparison-workspace.html','_blank');
+  if(!opened){
+    window.location.href='/comparison-workspace.html';
+  }
+  hideMarkToolbar();
+}
+
 async function runMarkAction(action,question=''){
   const selected=state.markSelection; if(!selected) return;
   if(action==='save'){saveMarkInsight({action:'selection'});return;}
-  if(action==='define' && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false); return; }
+  if(action==='related'){openComparisonWorkspace();return;}
+  if(action==='define' && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false, 'mark'); return; }
   const responsePanels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean);responsePanels.forEach(p=>{p.hidden=false;p.innerHTML='<p class="status">Ask Mark is reading the selection…</p>';});
   try{
     const targetLanguage=action==='translate'?(window.prompt('Translate into which language?','Spanish')||'').trim():''; if(action==='translate'&&!targetLanguage)return;
@@ -6613,34 +6732,109 @@ function selectReaderParagraphFromEvent(event){
 }
 function bindMarkCompanion(reader){
   const toolbar=app.querySelector('#mark-selection-toolbar'); if(!reader||!toolbar)return;
-  const handleSelection=()=>{window.setTimeout(()=>{
-    const data=captureMarkSelection();
-    if(!data) return hideMarkToolbar();
+  state.markSelectionInteraction={active:false,moved:false,paused:false,wasRunning:false,startX:0,startY:0};
+  state.markSelectionLocked=false;
+  state.markSuppressNextReaderClick=false;
+  state.markSelectionWasRunning=false;
+  state.markHighlightObserver?.disconnect?.();
+  state.markHighlightObserver=new MutationObserver(()=>{
+    if(state.markPersistentSelection) requestAnimationFrame(applyPersistentMarkSelectionHighlight);
+  });
+  state.markHighlightObserver.observe(reader,{childList:true,subtree:true});
 
-    /*
-      Selecting a passage is an intentional study interruption. Pause every
-      timed reading mode at its canonical word before displaying Mark tools.
-      The reader remains paused until the user explicitly presses Resume.
-    */
-    if(isReaderRunning()){
-      stopReader();
-      const start=app.querySelector('#start-reader');
-      const pause=app.querySelector('#pause-reader');
-      if(start){start.disabled=false;start.textContent=state.index?'Resume':'Start';}
-      if(pause) pause.disabled=true;
-      persistReaderSession({immediate:true});
-      updateReaderStatus('Paused for selected passage.');
+  const pauseForSelection=(interaction)=>{
+    if(interaction?.paused) return;
+    interaction.paused=true;
+    state.markSelectionWasRunning=Boolean(interaction?.wasRunning);
+    if(isReaderRunning()) pauseReader();
+    persistReaderSession({immediate:true});
+    updateReaderStatus('Paused while selecting a passage.');
+  };
+
+  const finalizeSelection=()=>window.setTimeout(()=>{
+    const interaction=state.markSelectionInteraction||{};
+    if(!interaction.active) return;
+    interaction.active=false;
+    const data=captureMarkSelection();
+    if(!interaction.moved || !data){
+      // A normal click/reposition is not a selection and must not interrupt playback.
+      if(interaction.paused && interaction.wasRunning && !isReaderRunning()) startReader();
+      return;
     }
 
+    pauseForSelection(interaction);
+    state.markSelectionLocked=true;
+    state.markSuppressNextReaderClick=true;
+    persistReaderSession({immediate:true});
+    updateReaderStatus('Paused for selected passage. Click elsewhere in the text to continue.');
+
     const selection=window.getSelection();
-    showMarkToolbar(data,selection.getRangeAt(0).getBoundingClientRect());
+    const range=selection?.rangeCount?selection.getRangeAt(0):null;
+    showMarkToolbar(data,range?.getBoundingClientRect?.()||reader.getBoundingClientRect());
     renderMarkSelectionCard();
     if(!app.querySelector('#fullscreen-mark-drawer')?.hidden)renderFullscreenMarkSelection();
-  },0);};
-  reader.addEventListener('mouseup',handleSelection);reader.addEventListener('keyup',handleSelection);
+  },0);
+
+  reader.addEventListener('pointerdown',(event)=>{
+    if(event.button!==undefined && event.button!==0) return;
+    if(event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
+
+    // Once a passage is locked, the next ordinary click clears it and resumes
+    // the reader. Let the existing reader click/reposition handler still run.
+    if(state.markSelectionLocked){
+      const shouldResume=Boolean(state.markSelectionWasRunning);
+      clearMarkSelectionForReadingResume();
+      state.markSelectionWasRunning=false;
+      updateReaderStatus('Selection cleared.');
+      if(shouldResume) window.setTimeout(()=>{ if(!isReaderRunning()) startReader(); },0);
+      return;
+    }
+
+    const interaction=state.markSelectionInteraction||{};
+    interaction.active=true;
+    interaction.moved=false;
+    interaction.paused=false;
+    interaction.wasRunning=isReaderRunning();
+    interaction.startX=Number(event.clientX)||0;
+    interaction.startY=Number(event.clientY)||0;
+    state.markSelectionInteraction=interaction;
+  },true);
+  reader.addEventListener('pointermove',(event)=>{
+    const interaction=state.markSelectionInteraction;
+    if(!interaction?.active) return;
+    if(Math.hypot((Number(event.clientX)||0)-interaction.startX,(Number(event.clientY)||0)-interaction.startY)>6){
+      if(!interaction.moved){
+        interaction.moved=true;
+        pauseForSelection(interaction);
+      }
+    }
+  },true);
+  reader.addEventListener('pointerup',finalizeSelection,true);
+  reader.addEventListener('pointercancel',()=>{if(state.markSelectionInteraction)state.markSelectionInteraction.active=false;},true);
+  reader.addEventListener('keyup',finalizeSelection);
+  reader.addEventListener('click',(event)=>{
+    if(!state.markSuppressNextReaderClick) return;
+    state.markSuppressNextReaderClick=false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  },true);
   reader.addEventListener('dblclick',event=>{if(event.altKey)selectReaderParagraphFromEvent(event);});
   toolbar.addEventListener('mousedown',e=>e.preventDefault());
-  toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();runMarkAction(b.dataset.markToolbarAction);}));
+  toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    if(b.dataset.markToolbarAction==='ask'){
+      hideMarkToolbar();
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        applyPersistentMarkSelectionHighlight();
+        const input=document.querySelector('[data-askmark-input]');
+        input?.focus();
+        applyPersistentMarkSelectionHighlight();
+      }));
+      return;
+    }
+    runMarkAction(b.dataset.markToolbarAction);
+  }));
   toolbar.querySelector('[data-mark-more]')?.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();});
   app.querySelector('#toggle-mark-panel')?.addEventListener('click',()=>{
     const layout=app.querySelector('#reader-layout');
@@ -6841,7 +7035,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       <div class="reader-pane-controls" aria-label="Reading area layout controls">
         <div class="reader-pane-buttons">
           <button id="toggle-navigation-pane" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="navigation-pane"><span aria-hidden="true">☰</span> Marks &amp; Contents</button>
-          <button id="toggle-word-panel" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="word-panel"><span aria-hidden="true">⚙</span> Reader Tools</button>
+          <button id="toggle-word-panel" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="word-panel" hidden><span aria-hidden="true">⚙</span> Reader Tools</button>
           <button id="toggle-mark-panel" class="secondary pane-toggle reader-side-toggle mark-pane-button" type="button" aria-pressed="false" aria-controls="word-panel"><span aria-hidden="true">✦</span> Ask Mark</button>
         </div>
         <button id="toggle-reader-fullscreen" class="viewer-fullscreen-button" type="button" aria-label="Enter text viewer fullscreen" title="Full screen text viewer">
@@ -6849,7 +7043,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
           <span class="fullscreen-label">Full screen</span>
         </button>
       </div>
-      <div class="reader-layout" id="reader-layout">
+      <div class="reader-layout word-panel-hidden" id="reader-layout">
         <aside id="navigation-pane" class="navigation-pane" aria-label="Contents and bookmarks"></aside>
         <div id="left-pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize contents pane" tabindex="0"></div>
         <div class="reader-center-column">
@@ -6946,6 +7140,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
             </section>
           </div>
           <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
+          <div id="reader-bookmark-layer" class="reader-bookmark-layer" aria-live="polite"></div>
 
             <aside id="fullscreen-mark-drawer" class="fullscreen-mark-drawer" hidden aria-label="Ask Mark reading companion">
               <header class="fullscreen-mark-header">
@@ -7004,12 +7199,13 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
 
       <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="analyze">🧠 Analyze</button><button type="button" data-mark-toolbar-action="define">Aa Define</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-more>••• Ask Mark</button>
+        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
         <button type="button" data-dictionary-action="save" role="menuitem">Save definition</button>
         <button type="button" data-dictionary-action="note" role="menuitem">Add note</button>
+        <button type="button" data-dictionary-action="bookmark" role="menuitem">Add bookmark</button>
       </div>
       <dialog id="comprehension-dialog" class="comprehension-dialog" aria-label="Comprehension check"></dialog>
 
@@ -7017,7 +7213,6 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         <button id="start-reader" class="primary">Start</button>
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
-        <button id="check-comprehension" class="secondary comprehension-trigger" type="button">🧠 Comprehension</button>
         <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. Click a word to continue from there; click empty space or press Space to pause or resume.</span>
       </div>
     </section>`;
@@ -7173,6 +7368,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     else startReader();
   });
   bindDictionaryMenu(reader);
+  window.requestAnimationFrame(updateReaderBookmarkMarkers);
   app.querySelector('#start-reader').addEventListener('click', () => { startReader(); persistReaderSession(); });
   app.querySelector('#pause-reader').addEventListener('click', () => { pauseReader(); persistReaderSession(); });
   app.querySelector('#reset-reader').addEventListener('click', () => { resetReader(); persistReaderSession(); });
@@ -7643,7 +7839,7 @@ function bindFullscreenOptions(readerFrame) {
 
 
 function arrangeReaderSidePanels() {
-  const wordPanel=app.querySelector('#word-panel'), toolbar=app.querySelector('.reader-toolbar'), media=app.querySelector('.reader-music-actions'), comprehension=app.querySelector('#check-comprehension'), translation=app.querySelector('.translation-tools'), wordResult=app.querySelector('#word-result');
+  const wordPanel=app.querySelector('#word-panel'), toolbar=app.querySelector('.reader-toolbar'), media=app.querySelector('.reader-music-actions'), translation=app.querySelector('.translation-tools'), wordResult=app.querySelector('#word-result');
   if(!wordPanel||!toolbar)return;
   wordPanel.classList.add('reader-control-panel','mark-companion-panel');wordPanel.setAttribute('aria-label','Mark and reader tools');
   const shell=document.createElement('div');shell.className='reader-control-shell mark-shell';shell.innerHTML=`
@@ -7651,14 +7847,13 @@ function arrangeReaderSidePanels() {
     <nav class="mark-tabs" aria-label="Reader tools and Mark tabs"><button type="button" data-mark-tab="tools" class="active">Reader Tools</button><button type="button" data-mark-tab="selection">Mark</button><button type="button" data-mark-tab="notebook">Notebook</button><button type="button" data-mark-tab="history">History</button></nav>
     <div id="mark-tools-panel" data-mark-panel="tools" class="mark-panel-view">
       <div id="reader-control-core" class="reader-control-section"></div>
-      <details class="reader-control-group"><summary>Learn</summary><div id="reader-control-learn" class="reader-control-group-body"><p class="reader-control-help">Check how well you understood the passage you just read.</p></div></details>
       <details class="reader-control-group"><summary>Media</summary><div id="reader-control-media" class="reader-control-group-body"></div></details>
-      <details class="reader-control-group" open><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
+      <details class="reader-control-group"><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
     </div>
     <div id="mark-selection-panel" data-mark-panel="selection" class="mark-panel-view" hidden></div>
     <div id="mark-notebook-panel" data-mark-panel="notebook" class="mark-panel-view" hidden></div>
     <div id="mark-history-panel" data-mark-panel="history" class="mark-panel-view" hidden></div>`;
-  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(comprehension)shell.querySelector('#reader-control-learn')?.appendChild(comprehension);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
+  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
   shell.querySelector('#close-reader-controls')?.addEventListener('click',()=>app.querySelector('#toggle-word-panel')?.click());
 }
 function bindReaderPaneControls() {
@@ -8209,6 +8404,7 @@ function updateBookPageStatus(forcedSpread = null) {
   const next = app.querySelector('#book-page-next');
   if (previous) previous.disabled = spreadIndex <= 0;
   if (next) next.disabled = firstPage >= totalPages;
+  updateReaderBookmarkMarkers();
 }
 
 function updateBookPageControls() {
@@ -8385,15 +8581,29 @@ function renderTwoColumnDocument(reader) {
 }
 
 
-function showDictionaryResult(word, definition, partOfSpeech = '', example = '', saved = false) {
-  const panel = app.querySelector('#word-result');
-  if (!panel) return;
-  panel.innerHTML = `
+function dictionaryResultMarkup(word, definition, partOfSpeech = '', example = '', saved = false) {
+  return `
+    <div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div>
     <h2>${escapeHtml(word)}</h2>
     ${partOfSpeech ? `<p class="dictionary-part">${escapeHtml(partOfSpeech)}</p>` : ''}
     <p class="word-meaning">${escapeHtml(definition)}</p>
     ${example ? `<p class="dictionary-example">“${escapeHtml(example)}”</p>` : ''}
     ${saved ? '<p class="dictionary-saved-note">Saved under Saved definitions.</p>' : ''}`;
+}
+
+function showDictionaryResult(word, definition, partOfSpeech = '', example = '', saved = false, target = 'tools') {
+  if (target === 'mark') {
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    const panel = app.querySelector('#mark-response');
+    if (!panel) return;
+    panel.hidden = false;
+    panel.innerHTML = dictionaryResultMarkup(word, definition, partOfSpeech, example, saved);
+    return;
+  }
+  const panel = app.querySelector('#word-result');
+  if (!panel) return;
+  panel.innerHTML = dictionaryResultMarkup(word, definition, partOfSpeech, example, saved);
 }
 
 async function lookupDictionaryWord(word) {
@@ -8417,18 +8627,34 @@ function openWordPanelForDictionary() {
   }
 }
 
-async function performDictionaryLookup(saveAfter = false) {
+async function performDictionaryLookup(saveAfter = false, target = 'tools') {
   const context = state.contextWord;
   if (!context) return;
-  openWordPanelForDictionary();
-  const panel = app.querySelector('#word-result');
-  if (panel) panel.innerHTML = `<h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+
+  if (target === 'mark') {
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    const markPanel = app.querySelector('#mark-response');
+    if (markPanel) {
+      markPanel.hidden = false;
+      markPanel.innerHTML = `<div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+    }
+  } else {
+    openWordPanelForDictionary();
+    const toolsPanel = app.querySelector('#word-result');
+    if (toolsPanel) toolsPanel.innerHTML = `<h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+  }
+
   try {
     const result = await lookupDictionaryWord(context.word);
-    showDictionaryResult(result.word, result.definition, result.partOfSpeech, result.example, false);
+    showDictionaryResult(result.word, result.definition, result.partOfSpeech, result.example, false, target);
     if (saveAfter) saveCurrentDefinition(result);
   } catch (error) {
-    if (panel) panel.innerHTML = `<h2>${escapeHtml(context.word)}</h2><p class="status error">${escapeHtml(error.message)}</p>`;
+    const panel = target === 'mark' ? app.querySelector('#mark-response') : app.querySelector('#word-result');
+    if (panel) {
+      panel.hidden = false;
+      panel.innerHTML = `<div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status error">${escapeHtml(error.message)}</p>`;
+    }
   }
 }
 
@@ -8461,6 +8687,118 @@ function saveCurrentDefinition(result) {
   showDictionaryResult(item.word, item.definition, item.partOfSpeech, item.example, true);
 }
 
+
+const READER_BOOKMARKS_KEY = 'markSetGoReaderPageBookmarksV1';
+
+function getReaderBookmarks() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(READER_BOOKMARKS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveReaderBookmarks(items) {
+  try {
+    localStorage.setItem(READER_BOOKMARKS_KEY, JSON.stringify(items));
+  } catch (_) {}
+}
+
+function bookmarkPageForWord(wordElement) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !wordElement) return { pageNumber: 1, pageKey: 'page-1', side: 'single' };
+
+  if (state.bookPages) {
+    const spreadIndex = getCurrentBookSpread(reader);
+    const readerRect = reader.getBoundingClientRect();
+    const wordRect = wordElement.getBoundingClientRect();
+    const midpoint = readerRect.left + (readerRect.width / 2);
+    const side = wordRect.left >= midpoint ? 'right' : 'left';
+    const pageNumber = spreadIndex * 2 + (side === 'right' ? 2 : 1);
+    return { pageNumber, pageKey: `book-page-${pageNumber}`, side };
+  }
+
+  const viewportHeight = Math.max(1, reader.clientHeight);
+  const absoluteTop = wordElement.offsetTop + reader.scrollTop;
+  const pageNumber = Math.max(1, Math.floor(absoluteTop / viewportHeight) + 1);
+  return { pageNumber, pageKey: `scroll-page-${pageNumber}`, side: 'single' };
+}
+
+function bookmarkForContextWord() {
+  const context = state.contextWord;
+  if (!context || !state.documentId) return null;
+  const page = bookmarkPageForWord(context.element);
+  return getReaderBookmarks().find((item) => item.documentId === state.documentId && item.pageKey === page.pageKey) || null;
+}
+
+function toggleBookmarkForContextWord() {
+  const context = state.contextWord;
+  if (!context || !state.documentId) return;
+  const page = bookmarkPageForWord(context.element);
+  const items = getReaderBookmarks();
+  const existing = items.find((item) => item.documentId === state.documentId && item.pageKey === page.pageKey);
+
+  if (existing) {
+    saveReaderBookmarks(items.filter((item) => item.id !== existing.id));
+    updateReaderStatus?.(`Bookmark removed from page ${page.pageNumber}.`);
+  } else {
+    items.push({
+      id: `bookmark-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      documentId: state.documentId,
+      title: state.title,
+      wordIndex: Number(context.index) || 0,
+      pageNumber: page.pageNumber,
+      pageKey: page.pageKey,
+      side: page.side,
+      createdAt: new Date().toISOString()
+    });
+    saveReaderBookmarks(items);
+    updateReaderStatus?.(`Bookmark added to page ${page.pageNumber}.`);
+  }
+  updateReaderBookmarkMarkers();
+  renderNavigationPane();
+}
+
+function removeReaderBookmark(id) {
+  saveReaderBookmarks(getReaderBookmarks().filter((item) => item.id !== id));
+  updateReaderBookmarkMarkers();
+  renderNavigationPane();
+  updateReaderStatus?.('Bookmark removed.');
+}
+
+function visibleReaderBookmarkPages() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return [];
+  if (state.bookPages) {
+    const spread = getCurrentBookSpread(reader);
+    return [spread * 2 + 1, spread * 2 + 2];
+  }
+  const pageNumber = Math.max(1, Math.floor(reader.scrollTop / Math.max(1, reader.clientHeight)) + 1);
+  return [pageNumber];
+}
+
+function updateReaderBookmarkMarkers() {
+  const layer = app.querySelector('#reader-bookmark-layer');
+  const reader = app.querySelector('#reader');
+  if (!layer || !reader || !state.documentId) return;
+
+  const visiblePages = visibleReaderBookmarkPages();
+  const bookmarks = getReaderBookmarks().filter((item) => item.documentId === state.documentId && visiblePages.includes(Number(item.pageNumber)));
+  layer.innerHTML = bookmarks.map((item) => {
+    const sideClass = state.bookPages ? (Number(item.pageNumber) % 2 === 0 ? 'bookmark-right-page' : 'bookmark-left-page') : 'bookmark-single-page';
+    return `<button type="button" class="reader-page-bookmark ${sideClass}" data-remove-reader-bookmark="${escapeHtml(item.id)}" title="Remove bookmark from page ${Number(item.pageNumber)}" aria-label="Remove bookmark from page ${Number(item.pageNumber)}"><span aria-hidden="true"></span></button>`;
+  }).join('');
+
+  layer.querySelectorAll('[data-remove-reader-bookmark]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      removeReaderBookmark(button.dataset.removeReaderBookmark);
+    });
+  });
+}
+
 function closeDictionaryMenu() {
   const menu = app.querySelector('#word-context-menu');
   if (menu) menu.hidden = true;
@@ -8469,38 +8807,114 @@ function closeDictionaryMenu() {
 function bindDictionaryMenu(reader) {
   const menu = app.querySelector('#word-context-menu');
   if (!menu) return;
+
+  const wordContextForEvent = (event) => {
+    const resolveFromElement = (element) => {
+      if (!(element instanceof Element)) return null;
+
+      const wordElement = element.closest?.('.reader-word');
+      if (wordElement) {
+        const explicitIndex = Number(wordElement.dataset.index);
+        if (Number.isFinite(explicitIndex)) return { element: wordElement, index: explicitIndex };
+
+        // Chunked/flash reader modes render word spans inside a group and put
+        // the absolute index on the group rather than on each child word.
+        const group = wordElement.closest('.reader-group[data-start-index]');
+        const groupStart = Number(group?.dataset.startIndex);
+        if (group && Number.isFinite(groupStart)) {
+          const words = Array.from(group.querySelectorAll('.reader-word'));
+          const offset = Math.max(0, words.indexOf(wordElement));
+          return { element: wordElement, index: groupStart + offset };
+        }
+      }
+
+      const group = element.closest?.('.reader-group[data-start-index]');
+      const groupStart = Number(group?.dataset.startIndex);
+      if (group && Number.isFinite(groupStart)) return { element: group, index: groupStart };
+      return null;
+    };
+
+    const directTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
+    let result = resolveFromElement(directTarget);
+    if (result) return result;
+
+    // Resolve the actual text node beneath overlays and pseudo-control layers.
+    const caret = document.caretPositionFromPoint?.(event.clientX, event.clientY);
+    const caretNode = caret?.offsetNode || document.caretRangeFromPoint?.(event.clientX, event.clientY)?.startContainer;
+    result = resolveFromElement(caretNode?.nodeType === Node.ELEMENT_NODE ? caretNode : caretNode?.parentElement);
+    if (result) return result;
+
+    const stack = typeof document.elementsFromPoint === 'function'
+      ? document.elementsFromPoint(event.clientX, event.clientY)
+      : [document.elementFromPoint?.(event.clientX, event.clientY)].filter(Boolean);
+    for (const element of stack) {
+      result = resolveFromElement(element);
+      if (result) return result;
+    }
+    return null;
+  };
+
   reader.addEventListener('contextmenu', (event) => {
-    const wordElement = event.target.closest('.reader-word[data-index]');
-    if (!wordElement) return;
+    const context = wordContextForEvent(event);
+    if (!context) return;
+    const { element: wordElement, index } = context;
     event.preventDefault();
-    event.stopPropagation();
-    const index = Number(wordElement.dataset.index);
-    state.contextWord = { word: state.words[index] || wordElement.textContent, index, element: wordElement };
+    event.stopImmediatePropagation();
+    const word = state.words[index] || wordElement.textContent;
+    state.contextWord = { word, index, element: wordElement };
+
+    // Treat the right-clicked word as the active Ask Mark selection so it stays
+    // visibly highlighted while the context menu and lookup result are open.
+    const wordSelection = {
+      text: String(word || '').trim(),
+      startIndex: index,
+      endIndex: index + 1,
+      chapter: chapterForWordIndex?.(index)?.title || ''
+    };
+    if (wordSelection.text) {
+      if (isReaderRunning()) {
+        state.markSelectionWasRunning = true;
+        pauseReader();
+      }
+      state.markSelection = wordSelection;
+      state.markSelectionLocked = true;
+      persistMarkSelectionHighlight(wordSelection);
+      renderMarkSelectionCard();
+      updateReaderStatus('Paused on selected word. Click elsewhere in the text to continue.');
+    }
+
     const existingNote = notesForCurrentDocument().find((item) => Number(item.wordIndex) === index);
     const noteButton = menu.querySelector('[data-dictionary-action="note"]');
     if (noteButton) noteButton.textContent = existingNote ? 'Edit note' : 'Add note';
+    const bookmarkButton = menu.querySelector('[data-dictionary-action="bookmark"]');
+    if (bookmarkButton) bookmarkButton.textContent = bookmarkForContextWord() ? 'Remove bookmark' : 'Add bookmark';
     const maxLeft = window.innerWidth - menu.offsetWidth - 12;
     const maxTop = window.innerHeight - menu.offsetHeight - 12;
     menu.style.left = `${Math.max(8, Math.min(event.clientX, maxLeft))}px`;
     menu.style.top = `${Math.max(8, Math.min(event.clientY, maxTop))}px`;
     menu.hidden = false;
-  });
+  }, true);
   menu.querySelector('[data-dictionary-action="lookup"]')?.addEventListener('click', () => {
     closeDictionaryMenu();
-    performDictionaryLookup(false);
+    performDictionaryLookup(false, 'mark');
   });
   menu.querySelector('[data-dictionary-action="save"]')?.addEventListener('click', () => {
     closeDictionaryMenu();
-    performDictionaryLookup(true);
+    performDictionaryLookup(true, 'mark');
   });
   menu.querySelector('[data-dictionary-action="note"]')?.addEventListener('click', () => {
     closeDictionaryMenu();
     const existing = notesForCurrentDocument().find((item) => Number(item.wordIndex) === Number(state.contextWord?.index));
     showNoteEditor(state.contextWord, existing || null);
   });
+  menu.querySelector('[data-dictionary-action="bookmark"]')?.addEventListener('click', () => {
+    closeDictionaryMenu();
+    toggleBookmarkForContextWord();
+  });
   document.addEventListener('click', closeDictionaryMenu);
   window.addEventListener('blur', closeDictionaryMenu);
   reader.addEventListener('scroll', closeDictionaryMenu, { passive: true });
+  reader.addEventListener('scroll', () => updateReaderBookmarkMarkers(), { passive: true });
   reader.addEventListener('scroll', () => ReaderContinuity.scheduleCheckpoint(), { passive: true });
   reader.addEventListener('pointerup', () => ReaderContinuity.scheduleCheckpoint());
   reader.addEventListener('keyup', () => ReaderContinuity.scheduleCheckpoint());
@@ -9210,6 +9624,7 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 /* Feature block moved to /modules/reading/pacman-mode.js */
 
 function startReader() {
+  if(state.markPersistentSelection || state.markSelectionLocked) clearMarkSelectionForReadingResume();
   const selectedMode = getSelectedMode();
   if (selectedMode === 'two-column') return;
   const currentTickerStage = app.querySelector('.digital-sign-stage');
@@ -11996,6 +12411,27 @@ function libraryRecencyLabel(lastReadAt) {
   })[recency];
 }
 
+function currentReaderFirstName() {
+  const account = window.MarkSetGoAuth?.session?.account || {};
+  const displayName =
+    window.MarkSetGoAuth?.getFirstName?.() ||
+    account.firstName ||
+    account.first_name ||
+    account.displayName ||
+    account.display_name ||
+    '';
+  return String(displayName).trim().split(/\s+/)[0] || '';
+}
+
+function updateLibraryWelcomeName() {
+  const nameNode = document.querySelector('#library-welcome-name');
+  if (!nameNode) return;
+  const firstName = currentReaderFirstName();
+  nameNode.textContent = firstName ? `, ${firstName}` : '';
+}
+
+document.addEventListener('marksetgo:auth-changed', updateLibraryWelcomeName);
+
 function renderMyLibraryHub() {
   finalizeReadingSession();
   stopReader();
@@ -12168,7 +12604,7 @@ function renderMyLibraryHub() {
       <header class="library-welcome">
         <div>
           <span class="source-category">My Library</span>
-          <h1>Welcome back.</h1>
+          <h1>Welcome back<span id="library-welcome-name"></span>.</h1>
           <p>Continue your reading journey and manage your personal collection.</p>
         </div>
 
@@ -12236,6 +12672,8 @@ function renderMyLibraryHub() {
       </details>
 
     </section>`;
+
+  updateLibraryWelcomeName();
 
   app.querySelectorAll('[data-library-document]').forEach((button) => {
     button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
