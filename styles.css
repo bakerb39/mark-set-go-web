@@ -8741,3 +8741,201 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
   }
   .site-footer nav { justify-content: flex-start; }
 }
+
+/* Keep the reader area directly beneath the action row without changing pane positioning. */
+.reader-pane-controls {
+  margin-bottom: 0 !important;
+}
+
+/* Ask Mark reader row: hide the redundant Reader Tools button and pull panes upward. */
+#toggle-word-panel {
+  display: none !important;
+}
+
+.reader-layout {
+  position: relative;
+  top: -34px;
+  margin-bottom: -34px !important;
+}
+
+/* Desktop reader command row: align Full screen with Contents / Ask Mark
+   while preserving the compact reader position and viewport height. */
+@media (min-width: 701px) {
+  .reader-pane-controls.ask-mark-toolbar {
+    position: relative !important;
+    min-height: 81px !important;
+    align-items: flex-start !important;
+  }
+
+  .reader-pane-controls.ask-mark-toolbar .reader-pane-buttons {
+    width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  .reader-pane-controls.ask-mark-toolbar #toggle-reader-fullscreen.viewer-fullscreen-button {
+    position: absolute !important;
+    top: 6px !important;
+    right: 0 !important;
+    left: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    margin: 0 !important;
+    z-index: 5 !important;
+  }
+}
+
+/* Desktop footer: extend its own background through any unused viewport space. */
+@media (min-width: 701px) {
+  body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  body > .site-footer {
+    flex: 1 0 auto;
+    align-content: start;
+  }
+}
+
+
+/* v9.0.2 unified navy, light-blue, gold, and silver interface */
+:root {
+  --page: #edf3f8;
+  --surface: #ffffff;
+  --ink: #14263a;
+  --muted: #627387;
+  --border: #c7d2de;
+  --accent: #173f67;
+  --msg-navy: #102f4d;
+  --msg-blue: #2f75b5;
+  --msg-light-blue: #dcebf7;
+  --msg-gold: #d6b45f;
+  --msg-silver: #e3e8ed;
+}
+html, body { min-height: 100%; }
+body { min-height: 100vh; display: flex; flex-direction: column; background: var(--page); }
+.site-header { background: var(--msg-navy) !important; }
+.site-header .brand { color: #fff !important; }
+.site-header nav > button,
+.site-header nav > details > summary,
+.site-header .nav-icon { color: var(--msg-gold) !important; }
+.site-header nav > button:hover,
+.site-header nav > button:focus-visible,
+.site-header nav > details > summary:hover,
+.site-header nav > details > summary:focus-visible,
+.site-header nav > details[open] > summary { background: rgba(214,180,95,.14) !important; color: #f1d98d !important; }
+.menu-popover, .professional-library-menu { border-color: #b9c7d5 !important; }
+.menu-popover button:hover, .menu-popover button:focus-visible,
+.professional-library-menu button:hover, .professional-library-menu button:focus-visible { background: var(--msg-light-blue) !important; color: var(--msg-navy) !important; }
+.menu-section-label, .source-category, .askmark-eyebrow { color: #8a6719 !important; }
+.primary, button.primary { background: var(--msg-navy) !important; color: #fff !important; }
+.primary:hover, button.primary:hover { background: #194f7a !important; }
+.secondary, button.secondary { background: var(--msg-silver) !important; color: var(--msg-navy) !important; }
+a, .text-link { color: #245f91; }
+.platform-page, .panel, .hero, .library-primary-focus, .library-continue-card, .ai-tool-card { border-color: #c7d2de !important; }
+progress::-webkit-progress-value, .library-progress-track > span { background: var(--msg-blue) !important; }
+.reader-settings details[open] > summary,
+.reader-toolbar details[open] > summary,
+.reader-control-section details[open] > summary,
+.reader-option-group[open] > summary { background: #d9dee4 !important; color: var(--msg-navy) !important; }
+.mark-pane-button, .askmark-send, .askmark-plus { border-color: #9db5ca !important; }
+.mark-tabs button.active, .askmark-view-tab.is-active { background: var(--msg-light-blue) !important; color: var(--msg-navy) !important; }
+.mark-selection-toolbar button:hover { background: var(--msg-light-blue) !important; color: var(--msg-navy) !important; }
+.reader-word::selection, .reader::selection { background: rgba(47,117,181,.34) !important; }
+.site-footer { margin-top: auto !important; background: var(--msg-navy) !important; color: #dce6ef !important; border-top: 3px solid var(--msg-gold); }
+.site-footer button, .site-footer strong { color: var(--msg-gold) !important; }
+.app-shell { flex: 1 0 auto; }
+
+/* Keep the passage visibly highlighted after it is sent to Ask Mark. */
+#reader .ask-mark-selected {
+  background: #f6d365 !important;
+  color: inherit !important;
+  border-radius: 0.18em;
+  box-shadow: 0 0 0 1px rgba(12, 35, 64, 0.12);
+}
+
+
+/* Requested reader settings cleanup: opened Reading/Display panels use neutral gray. */
+.settings-panel[open] > summary,
+.fullscreen-option-group[open] > summary,
+.reader-control-group[open] > summary {
+  background: #d9dee4 !important;
+  color: #173f67 !important;
+}
+
+/* Page bookmarks: red ribbon tabs anchored at the top edge of the text page. */
+.reader-frame {
+  position: relative;
+}
+
+.reader-bookmark-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 18;
+  overflow: hidden;
+}
+
+.reader-page-bookmark {
+  position: absolute;
+  top: 0;
+  width: 28px;
+  height: 54px;
+  padding: 0;
+  border: 0;
+  border-radius: 0 0 3px 3px;
+  background: #b8202e;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .28);
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 19;
+}
+
+.reader-page-bookmark::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 0;
+  height: 0;
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-bottom: 12px solid var(--reader-bg, #fff);
+}
+
+.reader-page-bookmark:hover,
+.reader-page-bookmark:focus-visible {
+  filter: brightness(1.08);
+  transform: translateY(1px);
+}
+
+.reader-page-bookmark.bookmark-left-page {
+  left: calc(50% - 42px);
+}
+
+.reader-page-bookmark.bookmark-right-page,
+.reader-page-bookmark.bookmark-single-page {
+  right: 28px;
+}
+
+.reader-frame:fullscreen .reader-page-bookmark.bookmark-left-page,
+.reader-frame.fullscreen-fallback .reader-page-bookmark.bookmark-left-page {
+  left: calc(50% - 42px);
+}
+
+/* Reader title refinement: smaller, cleaner, and more professional. */
+.reader-title-copy h1 {
+  font-size: clamp(1.45rem, 2.15vw, 2rem) !important;
+  line-height: 1.12 !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em !important;
+  color: #102f4f !important;
+  text-wrap: balance;
+}
+
+@media (max-width: 700px) {
+  .reader-title-copy h1 {
+    font-size: clamp(1.25rem, 6vw, 1.65rem) !important;
+    letter-spacing: -0.018em !important;
+  }
+}
