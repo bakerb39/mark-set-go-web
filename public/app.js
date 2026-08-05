@@ -6751,6 +6751,8 @@ function bindMarkCompanion(reader){
     startX:0,
     startY:0,
     pointerId:null,
+    pointerType:'mouse',
+    startedOnText:false,
     finalized:false
   });
 
@@ -6903,26 +6905,33 @@ function bindMarkCompanion(reader){
     interaction.startX=Number(event.clientX)||0;
     interaction.startY=Number(event.clientY)||0;
     interaction.pointerId=event.pointerId ?? null;
+    interaction.pointerType=event.pointerType || 'mouse';
+    interaction.startedOnText=Boolean(event.target.closest?.(
+      '.reader-word, .reader-group, .reader-paragraph, .reading-paragraph, p, blockquote, h1, h2, h3, h4, h5, h6'
+    ));
     state.markSelectionInteraction=interaction;
   },true);
 
-  // selectstart is the reliable boundary between a normal click-to-seek and a
-  // real text-selection drag. Pause synchronously here so the next reader paint
-  // cannot replace the DOM while the browser is constructing the selection.
-  reader.addEventListener('selectstart',()=>{
-    const interaction=state.markSelectionInteraction;
-    if(interaction?.active) pauseForSelection(interaction);
-  },true);
-
+  // Do not pause on `selectstart`: Chromium can emit it for an ordinary click
+  // before any range exists. That was swallowing normal blank-space clicks and
+  // immediately restarting the reader. A real mouse/pen drag from rendered text
+  // pauses below; touch and keyboard selection are confirmed by selectionchange.
   reader.addEventListener('pointermove',(event)=>{
     const interaction=state.markSelectionInteraction;
-    if(!interaction?.active) return;
+    if(!interaction?.active || interaction.paused) return;
     if(interaction.pointerId!==null && event.pointerId!==undefined && event.pointerId!==interaction.pointerId) return;
 
-    // Fallback for browsers/devices that delay selectstart. Four pixels is high
-    // enough to ignore click jitter but early enough to stop before the next
-    // reading tick at normal speeds.
-    if(Math.hypot((Number(event.clientX)||0)-interaction.startX,(Number(event.clientY)||0)-interaction.startY)>4){
+    const distance=Math.hypot(
+      (Number(event.clientX)||0)-interaction.startX,
+      (Number(event.clientY)||0)-interaction.startY
+    );
+    if(distance<=6) return;
+
+    // Mouse/pen selection should pause before the next reading paint can replace
+    // the DOM. Do not treat a drag that began in blank reader space—or a touch
+    // scroll—as a text selection. Touch selection is handled by selectionchange
+    // once the browser exposes a non-collapsed range.
+    if(interaction.startedOnText && interaction.pointerType!=='touch'){
       pauseForSelection(interaction);
     }
   },true);

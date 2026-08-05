@@ -47,7 +47,10 @@
       if (this.savedDefinitionAt?.(index)) span.classList.add('saved-definition-word');
       if (this.noteAt?.(index)) span.classList.add('saved-note-word');
       this.setWordContent(span, word, index);
-      span.tabIndex = state.language === 'en' ? -1 : 0;
+      // A tabindex on every English word prevents native drag selection across
+      // adjacent spans in Chromium. English words need no keyboard focus; only
+      // translated words remain focusable for their lookup interaction.
+      if (state.language !== 'en') span.tabIndex = 0;
       if (state.language !== 'en') {
         span.classList.add('translated-word');
         span.title = 'Click for English translation';
