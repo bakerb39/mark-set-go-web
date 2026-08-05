@@ -6739,11 +6739,27 @@ function selectReaderParagraphFromEvent(event){
   }
 }
 function bindMarkCompanion(reader){
-  const toolbar=app.querySelector('#mark-selection-toolbar'); if(!reader||!toolbar)return;
-  state.markSelectionInteraction={active:false,moved:false,paused:false,wasRunning:false,startX:0,startY:0};
+  const toolbar=app.querySelector('#mark-selection-toolbar');
+  if(!reader||!toolbar)return;
+
+  const freshInteraction=()=>({
+    active:false,
+    selecting:false,
+    moved:false,
+    paused:false,
+    wasRunning:false,
+    startX:0,
+    startY:0,
+    pointerId:null,
+    finalized:false
+  });
+
+  state.markSelectionInteraction=freshInteraction();
   state.markSelectionLocked=false;
   state.markSuppressNextReaderClick=false;
+  state.markResumeOnNextReaderClick=null;
   state.markSelectionWasRunning=false;
+
   state.markHighlightObserver?.disconnect?.();
   state.markHighlightObserver=new MutationObserver(()=>{
     if(state.markPersistentSelection) requestAnimationFrame(applyPersistentMarkSelectionHighlight);
@@ -6751,81 +6767,207 @@ function bindMarkCompanion(reader){
   state.markHighlightObserver.observe(reader,{childList:true,subtree:true});
 
   const pauseForSelection=(interaction)=>{
-    if(interaction?.paused) return;
+    if(!interaction || interaction.paused) return;
     interaction.paused=true;
-    state.markSelectionWasRunning=Boolean(interaction?.wasRunning);
+    interaction.selecting=true;
+    interaction.moved=true;
+    state.markSelectionWasRunning=Boolean(interaction.wasRunning);
+
+    // This flag is set before pointerup/click. The previous implementation set
+    // it inside a timeout after pointerup, which allowed the reader's normal
+    // click handler to restart playback before the selected passage was locked.
+    state.markSuppressNextReaderClick=true;
+
     if(isReaderRunning()) pauseReader();
     persistReaderSession({immediate:true});
     updateReaderStatus('Paused while selecting a passage.');
   };
 
-  const finalizeSelection=()=>window.setTimeout(()=>{
-    const interaction=state.markSelectionInteraction||{};
-    if(!interaction.active) return;
-    interaction.active=false;
-    const data=captureMarkSelection();
-    if(!interaction.moved || !data){
-      // A normal click/reposition is not a selection and must not interrupt playback.
-      if(interaction.paused && interaction.wasRunning && !isReaderRunning()) startReader();
-      return;
-    }
+  const lockCapturedSelection=()=>{
+    const interaction=state.markSelectionInteraction||freshInteraction();
+    if(interaction.finalized) return true;
 
+    const data=captureMarkSelection();
+    if(!data) return false;
+
+    interaction.finalized=true;
+    interaction.active=false;
     pauseForSelection(interaction);
     state.markSelectionLocked=true;
-    state.markSuppressNextReaderClick=true;
     persistReaderSession({immediate:true});
     updateReaderStatus('Paused for selected passage. Click elsewhere in the text to continue.');
 
-    const selection=window.getSelection();
+    const selection=window.getSelection?.();
     const range=selection?.rangeCount?selection.getRangeAt(0):null;
     showMarkToolbar(data,range?.getBoundingClientRect?.()||reader.getBoundingClientRect());
     renderMarkSelectionCard();
     if(!app.querySelector('#fullscreen-mark-drawer')?.hidden)renderFullscreenMarkSelection();
-  },0);
+    return true;
+  };
+
+  const finalizeSelection=()=>{
+    const interaction=state.markSelectionInteraction||freshInteraction();
+    if(!interaction.active && !interaction.selecting) return;
+    interaction.active=false;
+
+    if(!interaction.selecting && !interaction.moved){
+      // A true click remains a normal seek/toggle click. It never pauses first.
+      return;
+    }
+
+    pauseForSelection(interaction);
+
+    // Selection ranges are usually complete by pointerup. Retry for one frame
+    // because Chromium can publish the final range immediately after pointerup,
+    // especially when the drag crosses several inline word spans.
+    queueMicrotask(()=>{
+      if(lockCapturedSelection()) return;
+      requestAnimationFrame(()=>{
+        if(lockCapturedSelection()) return;
+
+        // The gesture looked like a selection but produced no range. Release
+        // the lock and restore the exact prior running state rather than leaving
+        // the reader unpredictably paused.
+        state.markSuppressNextReaderClick=false;
+        interaction.selecting=false;
+        interaction.moved=false;
+        if(interaction.wasRunning && !isReaderRunning()) startReader();
+      });
+    });
+  };
+
+  const selectionBelongsToReader=()=>{
+    const selection=window.getSelection?.();
+    if(!selection || selection.rangeCount===0 || selection.isCollapsed) return false;
+    const range=selection.getRangeAt(0);
+    return reader.contains(range.commonAncestorContainer)
+      || reader.contains(range.startContainer)
+      || reader.contains(range.endContainer);
+  };
+
+  const resumeAfterLockedSelectionClick=(event)=>{
+    const pending=state.markResumeOnNextReaderClick;
+    const shouldResume=Boolean(pending?.shouldResume);
+    state.markResumeOnNextReaderClick=null;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    if(!shouldResume) return;
+
+    const clickedWord=event.target.closest?.('.reader-word[data-index]');
+    const mode=getSelectedMode();
+    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','pointing-guide','marquee','auto-scroll']);
+
+    if(clickedWord && seekableModes.has(mode)){
+      const clickedIndex=Number(clickedWord.dataset.index);
+      if(Number.isFinite(clickedIndex)){
+        const group=findReadingGroup(clickedIndex);
+        stopReader();
+        state.index=group?.start ?? clickedIndex;
+        state.viewportAnchorIndex=state.index;
+        persistReaderSession({immediate:true});
+        updateReaderStatus(`Reading position moved to word ${(state.index+1).toLocaleString()}.`);
+        startReader();
+        return;
+      }
+    }
+
+    if(mode!=='two-column' && !isReaderRunning()) startReader();
+  };
 
   reader.addEventListener('pointerdown',(event)=>{
     if(event.button!==undefined && event.button!==0) return;
     if(event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
 
-    // Once a passage is locked, the next ordinary click clears it and resumes
-    // the reader. Let the existing reader click/reposition handler still run.
+    // The first ordinary click in the reader after using Ask Mark removes the
+    // temporary highlight. Playback resumes only if it had been running before
+    // the selection began; the click itself is handled in the capture listener.
     if(state.markSelectionLocked){
       const shouldResume=Boolean(state.markSelectionWasRunning);
       clearMarkSelectionForReadingResume();
       state.markSelectionWasRunning=false;
+      state.markResumeOnNextReaderClick={shouldResume};
+      state.markSelectionInteraction=freshInteraction();
       updateReaderStatus('Selection cleared.');
-      if(shouldResume) window.setTimeout(()=>{ if(!isReaderRunning()) startReader(); },0);
       return;
     }
 
-    const interaction=state.markSelectionInteraction||{};
+    const interaction=freshInteraction();
     interaction.active=true;
-    interaction.moved=false;
-    interaction.paused=false;
     interaction.wasRunning=isReaderRunning();
     interaction.startX=Number(event.clientX)||0;
     interaction.startY=Number(event.clientY)||0;
+    interaction.pointerId=event.pointerId ?? null;
     state.markSelectionInteraction=interaction;
   },true);
+
+  // selectstart is the reliable boundary between a normal click-to-seek and a
+  // real text-selection drag. Pause synchronously here so the next reader paint
+  // cannot replace the DOM while the browser is constructing the selection.
+  reader.addEventListener('selectstart',()=>{
+    const interaction=state.markSelectionInteraction;
+    if(interaction?.active) pauseForSelection(interaction);
+  },true);
+
   reader.addEventListener('pointermove',(event)=>{
     const interaction=state.markSelectionInteraction;
     if(!interaction?.active) return;
-    if(Math.hypot((Number(event.clientX)||0)-interaction.startX,(Number(event.clientY)||0)-interaction.startY)>6){
-      if(!interaction.moved){
-        interaction.moved=true;
-        pauseForSelection(interaction);
-      }
+    if(interaction.pointerId!==null && event.pointerId!==undefined && event.pointerId!==interaction.pointerId) return;
+
+    // Fallback for browsers/devices that delay selectstart. Four pixels is high
+    // enough to ignore click jitter but early enough to stop before the next
+    // reading tick at normal speeds.
+    if(Math.hypot((Number(event.clientX)||0)-interaction.startX,(Number(event.clientY)||0)-interaction.startY)>4){
+      pauseForSelection(interaction);
     }
   },true);
+
+  // selectionchange covers keyboard selection and touch implementations where
+  // pointermove/selectstart delivery can vary.
+  if(state.markSelectionChangeHandler){
+    document.removeEventListener('selectionchange',state.markSelectionChangeHandler);
+  }
+  state.markSelectionChangeHandler=()=>{
+    const interaction=state.markSelectionInteraction;
+    if(!interaction?.active || !selectionBelongsToReader()) return;
+    pauseForSelection(interaction);
+  };
+  document.addEventListener('selectionchange',state.markSelectionChangeHandler);
+
   reader.addEventListener('pointerup',finalizeSelection,true);
-  reader.addEventListener('pointercancel',()=>{if(state.markSelectionInteraction)state.markSelectionInteraction.active=false;},true);
-  reader.addEventListener('keyup',finalizeSelection);
+  reader.addEventListener('pointercancel',()=>{
+    const interaction=state.markSelectionInteraction;
+    if(!interaction) return;
+    interaction.active=false;
+    if(interaction.paused && !state.markSelectionLocked && interaction.wasRunning && !isReaderRunning()){
+      state.markSuppressNextReaderClick=false;
+      startReader();
+    }
+  },true);
+  reader.addEventListener('keyup',()=>{
+    if(selectionBelongsToReader()){
+      const interaction=state.markSelectionInteraction||freshInteraction();
+      interaction.active=true;
+      interaction.wasRunning=interaction.wasRunning||isReaderRunning();
+      state.markSelectionInteraction=interaction;
+      pauseForSelection(interaction);
+      finalizeSelection();
+    }
+  });
+
+  // This capture listener runs before the reader's normal click handler.
   reader.addEventListener('click',(event)=>{
+    if(state.markResumeOnNextReaderClick!==null){
+      resumeAfterLockedSelectionClick(event);
+      return;
+    }
     if(!state.markSuppressNextReaderClick) return;
     state.markSuppressNextReaderClick=false;
     event.preventDefault();
     event.stopImmediatePropagation();
   },true);
+
   reader.addEventListener('dblclick',event=>{if(event.altKey)selectReaderParagraphFromEvent(event);});
   toolbar.addEventListener('mousedown',e=>e.preventDefault());
   toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
@@ -6882,6 +7024,7 @@ function bindMarkCompanion(reader){
   document.addEventListener('mousedown',event=>{if(!event.target.closest('#mark-selection-toolbar')&&!event.target.closest('#word-panel')&&!reader.contains(event.target))hideMarkToolbar();});
   renderMarkSelectionCard();
 }
+
 function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.dataset.viewKey = 'reader';
   const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });

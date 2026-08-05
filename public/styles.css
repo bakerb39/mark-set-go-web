@@ -8948,3 +8948,11 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
     font-weight: 650 !important;
   }
 }
+
+/* v9.0.4 — stable live-reader passage selection. */
+#reader.interactive-reader,
+#reader.interactive-reader .reader-group,
+#reader.interactive-reader .reader-word {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+}
