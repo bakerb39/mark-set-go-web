@@ -119,7 +119,7 @@
   }
 
   function premiumHomeMarkup() {
-    return `<div class="ask-mark-premium-home">${heroMarkup()}${composerMarkup()}</div>`;
+    return `<div class="ask-mark-premium-home">${heroMarkup()}${contextMarkup()}${quickActionsMarkup()}${composerMarkup()}</div>`;
   }
 
   function studyMarkup() {

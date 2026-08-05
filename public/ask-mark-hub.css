@@ -138,14 +138,3 @@
   .ask-mark-avatar, .ask-mark-premium-home, .ask-mark-study-premium, .ask-mark-notebook-panel { animation: none !important; }
   .ask-mark-quick-card, .ask-mark-study-grid button { transition: none !important; }
 }
-
-
-/* v8.9.3 targeted cleanup: preserve Phase 1 and remove only requested space. */
-.ask-mark-context-card,
-.ask-mark-quick-section { display: none !important; }
-.reader-page-panel > .reader-pane-controls.ask-mark-toolbar {
-  margin-bottom: 0 !important;
-}
-.reader-page-panel > .reader-layout {
-  margin-top: 0 !important;
-}
