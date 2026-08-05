@@ -6402,10 +6402,18 @@ function captureMarkSelection() {
   const beforeStart=Math.max(0,startIndex-220), afterEnd=Math.min(state.words.length,startIndex+selectedWordCount+220);
   return {text,startIndex,endIndex:Math.min(state.words.length,startIndex+selectedWordCount),before:state.words.slice(beforeStart,startIndex).join(' '),after:state.words.slice(startIndex+selectedWordCount,afterEnd).join(' '),title:state.title,chapter:currentTocTitle?.()||'',documentId:state.documentId,createdAt:new Date().toISOString()};
 }
-function currentTocTitle(){
-  const items=Array.isArray(state.toc)?state.toc:[]; let current='';
-  for(const item of items){ if(Number(item.index)<=Number(state.index)) current=item.title||current; else break; }
+function tocTitleForWordIndex(wordIndex = state.index) {
+  const items = Array.isArray(state.toc) ? state.toc : [];
+  const target = Math.max(0, Number(wordIndex) || 0);
+  let current = '';
+  for (const item of items) {
+    if (Number(item.index) <= target) current = item.title || current;
+    else break;
+  }
   return current;
+}
+function currentTocTitle(){
+  return tocTitleForWordIndex(state.index);
 }
 function clearPersistentMarkSelection() {
   app.querySelectorAll('#reader .ask-mark-selected').forEach((element)=>element.classList.remove('ask-mark-selected'));
@@ -6731,11 +6739,27 @@ function selectReaderParagraphFromEvent(event){
   }
 }
 function bindMarkCompanion(reader){
-  const toolbar=app.querySelector('#mark-selection-toolbar'); if(!reader||!toolbar)return;
-  state.markSelectionInteraction={active:false,moved:false,paused:false,wasRunning:false,startX:0,startY:0};
+  const toolbar=app.querySelector('#mark-selection-toolbar');
+  if(!reader||!toolbar)return;
+
+  const freshInteraction=()=>({
+    active:false,
+    selecting:false,
+    moved:false,
+    paused:false,
+    wasRunning:false,
+    startX:0,
+    startY:0,
+    pointerId:null,
+    finalized:false
+  });
+
+  state.markSelectionInteraction=freshInteraction();
   state.markSelectionLocked=false;
   state.markSuppressNextReaderClick=false;
+  state.markResumeOnNextReaderClick=null;
   state.markSelectionWasRunning=false;
+
   state.markHighlightObserver?.disconnect?.();
   state.markHighlightObserver=new MutationObserver(()=>{
     if(state.markPersistentSelection) requestAnimationFrame(applyPersistentMarkSelectionHighlight);
@@ -6743,81 +6767,211 @@ function bindMarkCompanion(reader){
   state.markHighlightObserver.observe(reader,{childList:true,subtree:true});
 
   const pauseForSelection=(interaction)=>{
-    if(interaction?.paused) return;
+    if(!interaction || interaction.paused) return;
     interaction.paused=true;
-    state.markSelectionWasRunning=Boolean(interaction?.wasRunning);
+    interaction.selecting=true;
+    interaction.moved=true;
+    state.markSelectionWasRunning=Boolean(interaction.wasRunning);
+
+    // This flag is set before pointerup/click. The previous implementation set
+    // it inside a timeout after pointerup, which allowed the reader's normal
+    // click handler to restart playback before the selected passage was locked.
+    state.markSuppressNextReaderClick=true;
+
     if(isReaderRunning()) pauseReader();
     persistReaderSession({immediate:true});
     updateReaderStatus('Paused while selecting a passage.');
   };
 
-  const finalizeSelection=()=>window.setTimeout(()=>{
-    const interaction=state.markSelectionInteraction||{};
-    if(!interaction.active) return;
-    interaction.active=false;
-    const data=captureMarkSelection();
-    if(!interaction.moved || !data){
-      // A normal click/reposition is not a selection and must not interrupt playback.
-      if(interaction.paused && interaction.wasRunning && !isReaderRunning()) startReader();
-      return;
-    }
+  const lockCapturedSelection=()=>{
+    const interaction=state.markSelectionInteraction||freshInteraction();
+    if(interaction.finalized) return true;
 
+    const data=captureMarkSelection();
+    if(!data) return false;
+
+    interaction.finalized=true;
+    interaction.active=false;
     pauseForSelection(interaction);
     state.markSelectionLocked=true;
-    state.markSuppressNextReaderClick=true;
     persistReaderSession({immediate:true});
     updateReaderStatus('Paused for selected passage. Click elsewhere in the text to continue.');
 
-    const selection=window.getSelection();
+    const selection=window.getSelection?.();
     const range=selection?.rangeCount?selection.getRangeAt(0):null;
     showMarkToolbar(data,range?.getBoundingClientRect?.()||reader.getBoundingClientRect());
     renderMarkSelectionCard();
     if(!app.querySelector('#fullscreen-mark-drawer')?.hidden)renderFullscreenMarkSelection();
-  },0);
+    return true;
+  };
+
+  const finalizeSelection=()=>{
+    const interaction=state.markSelectionInteraction||freshInteraction();
+    if(!interaction.active && !interaction.selecting) return;
+    interaction.active=false;
+
+    if(!interaction.selecting && !interaction.moved){
+      // A true click remains a normal seek/toggle click. It never pauses first.
+      return;
+    }
+
+    pauseForSelection(interaction);
+
+    // Selection ranges are usually complete by pointerup. Retry for one frame
+    // because Chromium can publish the final range immediately after pointerup,
+    // especially when the drag crosses several inline word spans.
+    queueMicrotask(()=>{
+      if(lockCapturedSelection()) return;
+      requestAnimationFrame(()=>{
+        if(lockCapturedSelection()) return;
+
+        // The gesture looked like a selection but produced no range. Release
+        // the lock and restore the exact prior running state rather than leaving
+        // the reader unpredictably paused.
+        state.markSuppressNextReaderClick=false;
+        interaction.selecting=false;
+        interaction.moved=false;
+        if(interaction.wasRunning && !isReaderRunning()) startReader();
+      });
+    });
+  };
+
+  const selectionBelongsToReader=()=>{
+    const selection=window.getSelection?.();
+    if(!selection || selection.rangeCount===0 || selection.isCollapsed) return false;
+    const range=selection.getRangeAt(0);
+    return reader.contains(range.commonAncestorContainer)
+      || reader.contains(range.startContainer)
+      || reader.contains(range.endContainer);
+  };
+
+  const resumeAfterLockedSelectionClick=(event)=>{
+    state.markResumeOnNextReaderClick=null;
+
+    // The first click after a locked selection is still a normal reader click:
+    // a word click moves the reading position, while a click in blank reader
+    // space toggles play/pause. Do not base this on whether playback happened
+    // to be running before the selection began; that made blank clicks appear
+    // inconsistent whenever the passage was selected from an already-paused
+    // reader.
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    const clickedWord=event.target.closest?.('.reader-word[data-index]');
+    const mode=getSelectedMode();
+    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','pointing-guide','marquee','auto-scroll']);
+
+    if(clickedWord && seekableModes.has(mode)){
+      const clickedIndex=Number(clickedWord.dataset.index);
+      if(Number.isFinite(clickedIndex)){
+        const group=findReadingGroup(clickedIndex);
+        stopReader();
+        state.index=group?.start ?? clickedIndex;
+        state.viewportAnchorIndex=state.index;
+        persistReaderSession({immediate:true});
+        updateReaderStatus(`Reading position moved to word ${(state.index+1).toLocaleString()}.`);
+        startReader();
+        return;
+      }
+    }
+
+    if(mode==='two-column') return;
+    if(isReaderRunning()) pauseReader();
+    else startReader();
+    persistReaderSession();
+  };
 
   reader.addEventListener('pointerdown',(event)=>{
     if(event.button!==undefined && event.button!==0) return;
     if(event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
 
-    // Once a passage is locked, the next ordinary click clears it and resumes
-    // the reader. Let the existing reader click/reposition handler still run.
+    // The first ordinary click in the reader after using Ask Mark removes the
+    // temporary highlight. The following click handler then applies the normal
+    // reader behavior: blank space toggles play/pause and a word click seeks.
     if(state.markSelectionLocked){
-      const shouldResume=Boolean(state.markSelectionWasRunning);
       clearMarkSelectionForReadingResume();
       state.markSelectionWasRunning=false;
+      state.markResumeOnNextReaderClick={toggle:true};
+      state.markSelectionInteraction=freshInteraction();
       updateReaderStatus('Selection cleared.');
-      if(shouldResume) window.setTimeout(()=>{ if(!isReaderRunning()) startReader(); },0);
       return;
     }
 
-    const interaction=state.markSelectionInteraction||{};
+    const interaction=freshInteraction();
     interaction.active=true;
-    interaction.moved=false;
-    interaction.paused=false;
     interaction.wasRunning=isReaderRunning();
     interaction.startX=Number(event.clientX)||0;
     interaction.startY=Number(event.clientY)||0;
+    interaction.pointerId=event.pointerId ?? null;
     state.markSelectionInteraction=interaction;
   },true);
+
+  // selectstart is the reliable boundary between a normal click-to-seek and a
+  // real text-selection drag. Pause synchronously here so the next reader paint
+  // cannot replace the DOM while the browser is constructing the selection.
+  reader.addEventListener('selectstart',()=>{
+    const interaction=state.markSelectionInteraction;
+    if(interaction?.active) pauseForSelection(interaction);
+  },true);
+
   reader.addEventListener('pointermove',(event)=>{
     const interaction=state.markSelectionInteraction;
     if(!interaction?.active) return;
-    if(Math.hypot((Number(event.clientX)||0)-interaction.startX,(Number(event.clientY)||0)-interaction.startY)>6){
-      if(!interaction.moved){
-        interaction.moved=true;
-        pauseForSelection(interaction);
-      }
+    if(interaction.pointerId!==null && event.pointerId!==undefined && event.pointerId!==interaction.pointerId) return;
+
+    // Fallback for browsers/devices that delay selectstart. Four pixels is high
+    // enough to ignore click jitter but early enough to stop before the next
+    // reading tick at normal speeds.
+    if(Math.hypot((Number(event.clientX)||0)-interaction.startX,(Number(event.clientY)||0)-interaction.startY)>4){
+      pauseForSelection(interaction);
     }
   },true);
+
+  // selectionchange covers keyboard selection and touch implementations where
+  // pointermove/selectstart delivery can vary.
+  if(state.markSelectionChangeHandler){
+    document.removeEventListener('selectionchange',state.markSelectionChangeHandler);
+  }
+  state.markSelectionChangeHandler=()=>{
+    const interaction=state.markSelectionInteraction;
+    if(!interaction?.active || !selectionBelongsToReader()) return;
+    pauseForSelection(interaction);
+  };
+  document.addEventListener('selectionchange',state.markSelectionChangeHandler);
+
   reader.addEventListener('pointerup',finalizeSelection,true);
-  reader.addEventListener('pointercancel',()=>{if(state.markSelectionInteraction)state.markSelectionInteraction.active=false;},true);
-  reader.addEventListener('keyup',finalizeSelection);
+  reader.addEventListener('pointercancel',()=>{
+    const interaction=state.markSelectionInteraction;
+    if(!interaction) return;
+    interaction.active=false;
+    if(interaction.paused && !state.markSelectionLocked && interaction.wasRunning && !isReaderRunning()){
+      state.markSuppressNextReaderClick=false;
+      startReader();
+    }
+  },true);
+  reader.addEventListener('keyup',()=>{
+    if(selectionBelongsToReader()){
+      const interaction=state.markSelectionInteraction||freshInteraction();
+      interaction.active=true;
+      interaction.wasRunning=interaction.wasRunning||isReaderRunning();
+      state.markSelectionInteraction=interaction;
+      pauseForSelection(interaction);
+      finalizeSelection();
+    }
+  });
+
+  // This capture listener runs before the reader's normal click handler.
   reader.addEventListener('click',(event)=>{
+    if(state.markResumeOnNextReaderClick!==null){
+      resumeAfterLockedSelectionClick(event);
+      return;
+    }
     if(!state.markSuppressNextReaderClick) return;
     state.markSuppressNextReaderClick=false;
     event.preventDefault();
     event.stopImmediatePropagation();
   },true);
+
   reader.addEventListener('dblclick',event=>{if(event.altKey)selectReaderParagraphFromEvent(event);});
   toolbar.addEventListener('mousedown',e=>e.preventDefault());
   toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
@@ -6874,6 +7028,7 @@ function bindMarkCompanion(reader){
   document.addEventListener('mousedown',event=>{if(!event.target.closest('#mark-selection-toolbar')&&!event.target.closest('#word-panel')&&!reader.contains(event.target))hideMarkToolbar();});
   renderMarkSelectionCard();
 }
+
 function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.dataset.viewKey = 'reader';
   const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });
@@ -7331,6 +7486,12 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   };
   document.addEventListener('keydown', state.spacebarHandler);
 
+  const toggleReaderPlaybackFromBlankSpace = () => {
+    if (isReaderRunning()) pauseReader();
+    else startReader();
+    persistReaderSession();
+  };
+
   reader.addEventListener('click', (event) => {
     const translatedWord = event.target.closest('.translated-word');
     if (translatedWord && state.language !== 'en') {
@@ -7364,8 +7525,33 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     }
 
     if (mode === 'two-column') return;
-    if (isReaderRunning()) pauseReader();
-    else startReader();
+    toggleReaderPlaybackFromBlankSpace();
+  });
+
+  // The visible reader includes blank padding inside #reader-frame that sits
+  // outside the text article itself. Treat that space exactly like blank space
+  // inside #reader so normal reading can always be paused/resumed with a click.
+  const readerFrameBlankToggle = app.querySelector('#reader-frame');
+  readerFrameBlankToggle?.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target || reader.contains(target)) return;
+    if (target.closest('button, a, input, textarea, select, summary, [contenteditable="true"], #fullscreen-mark-drawer, #fullscreen-control-strip, #reader-bookmark-layer')) return;
+    if (getSelectedMode() === 'two-column') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (state.markSelectionLocked) {
+      clearMarkSelectionForReadingResume();
+      state.markSelectionWasRunning = false;
+      state.markResumeOnNextReaderClick = null;
+      state.markSelectionInteraction = null;
+      if (!isReaderRunning()) startReader();
+      persistReaderSession();
+      return;
+    }
+
+    toggleReaderPlaybackFromBlankSpace();
   });
   bindDictionaryMenu(reader);
   window.requestAnimationFrame(updateReaderBookmarkMarkers);
@@ -8543,8 +8729,9 @@ function updateModeControls(mode) {
 
 function appendStaticWords(container, words, startIndex = 0) {
   // Plain English text can be rendered as one text node, which keeps very large
-  // books responsive. Bionic and translated text still use word spans because
-  // they need per-word formatting or click handling.
+  // books responsive. Retain its global start index so pointer-based word
+  // actions can still resolve an exact word without materializing every span.
+  container.dataset.staticStartIndex = String(Math.max(0, Number(startIndex) || 0));
   if (!state.bionic && state.language === 'en') {
     container.textContent = words.join(' ');
     return;
@@ -8808,68 +8995,123 @@ function bindDictionaryMenu(reader) {
   const menu = app.querySelector('#word-context-menu');
   if (!menu) return;
 
-  const wordContextForEvent = (event) => {
-    const resolveFromElement = (element) => {
-      if (!(element instanceof Element)) return null;
-
-      const wordElement = element.closest?.('.reader-word');
-      if (wordElement) {
-        const explicitIndex = Number(wordElement.dataset.index);
-        if (Number.isFinite(explicitIndex)) return { element: wordElement, index: explicitIndex };
-
-        // Chunked/flash reader modes render word spans inside a group and put
-        // the absolute index on the group rather than on each child word.
-        const group = wordElement.closest('.reader-group[data-start-index]');
-        const groupStart = Number(group?.dataset.startIndex);
-        if (group && Number.isFinite(groupStart)) {
-          const words = Array.from(group.querySelectorAll('.reader-word'));
-          const offset = Math.max(0, words.indexOf(wordElement));
-          return { element: wordElement, index: groupStart + offset };
-        }
-      }
-
-      const group = element.closest?.('.reader-group[data-start-index]');
-      const groupStart = Number(group?.dataset.startIndex);
-      if (group && Number.isFinite(groupStart)) return { element: group, index: groupStart };
-      return null;
-    };
-
-    const directTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
-    let result = resolveFromElement(directTarget);
-    if (result) return result;
-
-    // Resolve the actual text node beneath overlays and pseudo-control layers.
-    const caret = document.caretPositionFromPoint?.(event.clientX, event.clientY);
-    const caretNode = caret?.offsetNode || document.caretRangeFromPoint?.(event.clientX, event.clientY)?.startContainer;
-    result = resolveFromElement(caretNode?.nodeType === Node.ELEMENT_NODE ? caretNode : caretNode?.parentElement);
-    if (result) return result;
-
-    const stack = typeof document.elementsFromPoint === 'function'
-      ? document.elementsFromPoint(event.clientX, event.clientY)
-      : [document.elementFromPoint?.(event.clientX, event.clientY)].filter(Boolean);
-    for (const element of stack) {
-      result = resolveFromElement(element);
-      if (result) return result;
+  const caretRangeAtPoint = (x, y) => {
+    if (typeof document.caretRangeFromPoint === 'function') {
+      return document.caretRangeFromPoint(x, y);
+    }
+    if (typeof document.caretPositionFromPoint === 'function') {
+      const position = document.caretPositionFromPoint(x, y);
+      if (!position) return null;
+      const range = document.createRange();
+      range.setStart(position.offsetNode, position.offset);
+      range.collapse(true);
+      return range;
     }
     return null;
   };
 
+  const wordMatchAtOffset = (text, rawOffset) => {
+    const offset = Math.max(0, Math.min(String(text || '').length, Number(rawOffset) || 0));
+    const matches = Array.from(String(text || '').matchAll(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*/gu));
+    return matches.find((match) => offset >= match.index && offset <= match.index + match[0].length)
+      || matches.find((match) => Math.abs(offset - match.index) <= 1)
+      || [...matches].reverse().find((match) => Math.abs(offset - (match.index + match[0].length)) <= 1)
+      || null;
+  };
+
+  const wordCountBeforePoint = (container, node, offset) => {
+    const before = document.createRange();
+    before.selectNodeContents(container);
+    try { before.setEnd(node, offset); }
+    catch (_) { return 0; }
+    return splitWords(before.toString()).length;
+  };
+
+  const wrapTextWord = (range, index) => {
+    if (!range || range.startContainer !== range.endContainer || range.startContainer.nodeType !== Node.TEXT_NODE) return null;
+    const span = document.createElement('span');
+    span.className = 'reader-word reader-context-word';
+    span.dataset.index = String(index);
+    try {
+      range.surroundContents(span);
+      return span;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const contextWordFromEvent = (event) => {
+    const directTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
+    let element = directTarget?.closest?.('.reader-word[data-index]') || null;
+    if (!element && typeof document.elementsFromPoint === 'function') {
+      element = document.elementsFromPoint(event.clientX, event.clientY)
+        .map((candidate) => candidate?.closest?.('.reader-word[data-index]'))
+        .find(Boolean) || null;
+    }
+    if (element) {
+      const index = Number(element.dataset.index);
+      if (!Number.isFinite(index)) return null;
+      return { word: state.words[index] || element.textContent, index, element };
+    }
+
+    // Full-page and two-column modes can contain plain text nodes rather than
+    // one span per word. Resolve the caret under the pointer, identify the word
+    // boundaries, and map the local text offset back to the global word index.
+    const caret = caretRangeAtPoint(event.clientX, event.clientY);
+    if (!caret || !reader.contains(caret.startContainer)) return null;
+    let textNode = caret.startContainer;
+    let offset = caret.startOffset;
+    if (textNode.nodeType !== Node.TEXT_NODE) {
+      const child = textNode.childNodes?.[Math.min(offset, Math.max(0, textNode.childNodes.length - 1))];
+      if (child?.nodeType === Node.TEXT_NODE) {
+        textNode = child;
+        offset = Math.min(offset, child.data.length);
+      } else {
+        return null;
+      }
+    }
+
+    const match = wordMatchAtOffset(textNode.data, offset);
+    if (!match) return null;
+    const range = document.createRange();
+    range.setStart(textNode, match.index);
+    range.setEnd(textNode, match.index + match[0].length);
+
+    const parent = textNode.parentElement;
+    const group = parent?.closest?.('.reader-group[data-start-index]');
+    const staticContainer = parent?.closest?.('[data-static-start-index]');
+    let index;
+    if (group) {
+      const base = Number(group.dataset.visibleStartIndex ?? group.dataset.startIndex) || 0;
+      index = base + wordCountBeforePoint(group, textNode, match.index);
+    } else if (staticContainer) {
+      const base = Number(staticContainer.dataset.staticStartIndex) || 0;
+      index = base + wordCountBeforePoint(staticContainer, textNode, match.index);
+    } else {
+      index = nearestWordIndexForSelection(match[0]);
+    }
+    index = Math.max(0, Math.min(state.words.length - 1, Number(index) || 0));
+    element = wrapTextWord(range, index) || parent;
+    return { word: state.words[index] || match[0], index, element, range };
+  };
+
   reader.addEventListener('contextmenu', (event) => {
-    const context = wordContextForEvent(event);
+    const context = contextWordFromEvent(event);
     if (!context) return;
-    const { element: wordElement, index } = context;
     event.preventDefault();
     event.stopImmediatePropagation();
-    const word = state.words[index] || wordElement.textContent;
-    state.contextWord = { word, index, element: wordElement };
+
+    app.querySelectorAll('#reader .reader-context-word').forEach((node) => node.classList.remove('reader-context-word'));
+    context.element?.classList?.add('reader-context-word');
+    state.contextWord = context;
 
     // Treat the right-clicked word as the active Ask Mark selection so it stays
     // visibly highlighted while the context menu and lookup result are open.
     const wordSelection = {
-      text: String(word || '').trim(),
-      startIndex: index,
-      endIndex: index + 1,
-      chapter: chapterForWordIndex?.(index)?.title || ''
+      text: String(context.word || '').trim(),
+      startIndex: context.index,
+      endIndex: context.index + 1,
+      chapter: tocTitleForWordIndex(context.index)
     };
     if (wordSelection.text) {
       if (isReaderRunning()) {
@@ -8879,21 +9121,27 @@ function bindDictionaryMenu(reader) {
       state.markSelection = wordSelection;
       state.markSelectionLocked = true;
       persistMarkSelectionHighlight(wordSelection);
+      context.element?.classList?.add('ask-mark-selected');
       renderMarkSelectionCard();
       updateReaderStatus('Paused on selected word. Click elsewhere in the text to continue.');
     }
 
-    const existingNote = notesForCurrentDocument().find((item) => Number(item.wordIndex) === index);
+    const existingNote = notesForCurrentDocument().find((item) => Number(item.wordIndex) === context.index);
     const noteButton = menu.querySelector('[data-dictionary-action="note"]');
     if (noteButton) noteButton.textContent = existingNote ? 'Edit note' : 'Add note';
     const bookmarkButton = menu.querySelector('[data-dictionary-action="bookmark"]');
     if (bookmarkButton) bookmarkButton.textContent = bookmarkForContextWord() ? 'Remove bookmark' : 'Add bookmark';
+
+    // Unhide before measuring so the menu is clamped to the viewport correctly.
+    menu.hidden = false;
+    menu.style.visibility = 'hidden';
     const maxLeft = window.innerWidth - menu.offsetWidth - 12;
     const maxTop = window.innerHeight - menu.offsetHeight - 12;
     menu.style.left = `${Math.max(8, Math.min(event.clientX, maxLeft))}px`;
     menu.style.top = `${Math.max(8, Math.min(event.clientY, maxTop))}px`;
-    menu.hidden = false;
-  }, true);
+    menu.style.visibility = '';
+    menu.querySelector('button')?.focus({ preventScroll: true });
+  });
   menu.querySelector('[data-dictionary-action="lookup"]')?.addEventListener('click', () => {
     closeDictionaryMenu();
     performDictionaryLookup(false, 'mark');
@@ -8911,7 +9159,13 @@ function bindDictionaryMenu(reader) {
     closeDictionaryMenu();
     toggleBookmarkForContextWord();
   });
-  document.addEventListener('click', closeDictionaryMenu);
+  document.addEventListener('pointerdown', (event) => {
+    // Close only for a primary-button press outside the custom menu. A generic
+    // document click listener can run after a right-click on some browsers and
+    // hide the menu immediately after it opens.
+    if (event.button !== 0 || menu.contains(event.target)) return;
+    closeDictionaryMenu();
+  }, true);
   window.addEventListener('blur', closeDictionaryMenu);
   reader.addEventListener('scroll', closeDictionaryMenu, { passive: true });
   reader.addEventListener('scroll', () => updateReaderBookmarkMarkers(), { passive: true });
@@ -8919,7 +9173,6 @@ function bindDictionaryMenu(reader) {
   reader.addEventListener('pointerup', () => ReaderContinuity.scheduleCheckpoint());
   reader.addEventListener('keyup', () => ReaderContinuity.scheduleCheckpoint());
 }
-
 
 
 
@@ -12412,13 +12665,19 @@ function libraryRecencyLabel(lastReadAt) {
 }
 
 function currentReaderFirstName() {
-  const account = window.MarkSetGoAuth?.session?.account || {};
+  const session = window.MarkSetGoAuth?.session || {};
+  const profile = session.user || session.account || window.MarkSetGoAuth?.user || window.MarkSetGoAuth?.account || {};
   const displayName =
     window.MarkSetGoAuth?.getFirstName?.() ||
-    account.firstName ||
-    account.first_name ||
-    account.displayName ||
-    account.display_name ||
+    profile.firstName ||
+    profile.first_name ||
+    profile.givenName ||
+    profile.given_name ||
+    profile.displayName ||
+    profile.display_name ||
+    profile.fullName ||
+    profile.full_name ||
+    profile.name ||
     '';
   return String(displayName).trim().split(/\s+/)[0] || '';
 }
@@ -12430,7 +12689,17 @@ function updateLibraryWelcomeName() {
   nameNode.textContent = firstName ? `, ${firstName}` : '';
 }
 
-document.addEventListener('marksetgo:auth-changed', updateLibraryWelcomeName);
+function scheduleLibraryPersonalization() {
+  // Update immediately, then retry briefly because Clerk and the library view
+  // can finish rendering in either order. The previous self-call caused a
+  // stack overflow and prevented personalization from ever being applied.
+  updateLibraryWelcomeName();
+  [50, 250, 750, 1500].forEach((delay) => window.setTimeout(updateLibraryWelcomeName, delay));
+}
+
+document.addEventListener('marksetgo:auth-changed', scheduleLibraryPersonalization);
+document.addEventListener('marksetgo:auth-ready', scheduleLibraryPersonalization);
+window.addEventListener('marksetgo:auth-ready', scheduleLibraryPersonalization);
 
 function renderMyLibraryHub() {
   finalizeReadingSession();
