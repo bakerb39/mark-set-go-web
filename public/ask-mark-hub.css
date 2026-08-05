@@ -140,132 +140,43 @@
 }
 
 
-/* v8.9.1 focused reader + Ask Mark usability patch */
-@media (min-width: 1051px) {
-  body:has(#reader-layout) {
-    height: 100vh;
-    overflow: hidden;
-  }
-  body:has(#reader-layout) #app {
-    height: calc(100vh - 48px);
-    overflow: hidden;
-  }
-  body:has(#reader-layout) .reader-page-panel {
-    height: 100%;
-    min-height: 0;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    box-sizing: border-box;
-    padding-top: .55rem;
-    padding-bottom: .55rem;
-  }
-  body:has(#reader-layout) .reader-title-row { flex: 0 0 auto; }
-  body:has(#reader-layout) .reader-pane-controls {
-    flex: 0 0 auto;
-    margin-top: 0;
-    margin-bottom: .35rem;
-  }
-  body:has(#reader-layout) .reader-frame-toolbar {
-    display: none;
-    min-height: 0;
-    height: 0;
-    padding: 0;
-  }
-  body:has(#reader-layout) .reader-layout {
-    flex: 1 1 auto;
-    min-height: 0;
-    height: auto;
-  }
-  body:has(#reader-layout) .reader-center-column,
-  body:has(#reader-layout) .navigation-pane,
-  body:has(#reader-layout) .word-panel,
-  body:has(#reader-layout) .reader-control-shell {
-    min-height: 0;
-    height: 100%;
-  }
-  body:has(#reader-layout) .reader-frame {
-    height: 100% !important;
-    min-height: 0;
-  }
-  body:has(#reader-layout) .reader-frame > .interactive-reader {
-    min-height: 0;
-  }
-  body:has(#reader-layout) .word-panel {
-    overflow: hidden !important;
-  }
+/* v8.9.2 focused Ask Mark layout — only requested changes */
+.ask-mark-premium-shell .reader-control-header {
+  position: relative; z-index: 12; display: flex; align-items: center; justify-content: space-between;
+  gap: .65rem; min-height: 92px; padding: .72rem .78rem; color: #fff;
+  background: linear-gradient(135deg, #0b2948 0%, #174c79 100%);
+  border-bottom: 1px solid rgba(215,168,63,.35); border-radius: 20px 20px 0 0;
+  overflow: hidden;
 }
-
-.ask-mark-premium-shell {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden !important;
-  padding: 0 !important;
+.ask-mark-premium-shell .reader-control-header::after {
+  content: ''; position: absolute; right: -34px; top: -56px; width: 150px; height: 150px;
+  border-radius: 50%; border: 1px solid rgba(255,255,255,.08);
+  box-shadow: 0 0 0 28px rgba(255,255,255,.035); pointer-events: none;
 }
-.ask-mark-premium-shell .reader-control-header,
-.ask-mark-premium-shell .mark-tabs { flex: 0 0 auto; }
-.ask-mark-premium-shell .ask-mark-premium-panel {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+.ask-mark-header-home { position: relative; z-index: 1; min-width: 0; display: flex; align-items: center; gap: .7rem; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.ask-mark-header-home img { flex: 0 0 auto; width: 58px; height: 58px; object-fit: cover; border-radius: 50%; border: 2px solid var(--mark-gold); box-shadow: 0 0 0 4px rgba(215,168,63,.14); }
+.ask-mark-header-home > span { min-width: 0; display: grid; line-height: 1.05; }
+.ask-mark-header-home small { color: var(--mark-gold-soft); text-transform: uppercase; letter-spacing: .11em; font-size: .58rem; font-weight: 900; }
+.ask-mark-header-home strong { font-family: Georgia, 'Times New Roman', serif; font-size: 1.25rem; }
+.ask-mark-header-home em { margin-top: .28rem; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,.84); font-style: normal; font-size: .72rem; }
+.ask-mark-header-actions { position: relative; z-index: 2; display: flex; align-items: center; gap: .35rem; }
+.ask-mark-header-icon, .ask-mark-premium-shell .reader-panel-close { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 50%; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.075); color: #fff; cursor: pointer; }
+.ask-mark-header-icon:hover, .ask-mark-premium-shell .reader-panel-close:hover { background: rgba(255,255,255,.16); }
+.ask-mark-hidden-tabs { display: none !important; }
+.ask-mark-premium-panel { padding: .72rem; }
+.ask-mark-premium-home { display: block; animation: markPanelIn .25s ease both; }
+.ask-mark-composer-card { width: 100%; padding: .78rem; border-radius: 18px; }
+.ask-mark-composer-card textarea { min-height: 108px; max-height: 260px; resize: vertical; overflow-y: auto; }
+.ask-mark-composer-footer { margin-top: .35rem; }
+.ask-mark-selection-results-panel .mark-selection-card,
+.ask-mark-selection-results-panel .mark-action-grid { display: none !important; }
+.mark-question-form-compact { margin-top: 0; }
+.mark-selection-toolbar { max-width: min(760px, calc(100vw - 20px)); flex-wrap: wrap; justify-content: center; white-space: normal; }
+.mark-selection-toolbar button { flex: 0 0 auto; }
+@media (max-width: 700px) {
+  .ask-mark-premium-shell .reader-control-header { min-height: 78px; padding: .58rem; border-radius: 14px 14px 0 0; }
+  .ask-mark-header-home img { width: 48px; height: 48px; }
+  .ask-mark-header-home em { display: none; }
+  .ask-mark-header-home strong { font-size: 1.05rem; }
+  .ask-mark-header-icon, .ask-mark-premium-shell .reader-panel-close { width: 31px; height: 31px; }
 }
-.ask-mark-premium-shell .ask-mark-premium-home {
-  min-height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: .7rem;
-}
-.ask-mark-premium-shell .ask-mark-hero {
-  min-height: 106px;
-  grid-template-columns: 74px 1fr;
-  padding: .78rem;
-  flex: 0 0 auto;
-}
-.ask-mark-premium-shell .ask-mark-avatar-wrap,
-.ask-mark-premium-shell .ask-mark-avatar {
-  width: 70px;
-  height: 70px;
-}
-.ask-mark-premium-shell .ask-mark-hero h2 { font-size: 1.42rem; }
-.ask-mark-premium-shell .ask-mark-hero p { font-size: .8rem; }
-.ask-mark-premium-shell .ask-mark-composer-card {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  padding: .8rem;
-}
-.ask-mark-premium-shell .ask-mark-composer-card > label {
-  display: block;
-  margin: 0 0 .45rem;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: .95rem;
-  font-weight: 800;
-  color: var(--mark-navy);
-}
-.ask-mark-premium-shell .ask-mark-composer-card textarea {
-  flex: 1 1 auto;
-  min-height: 150px;
-  resize: none;
-  padding: .72rem;
-  border: 1px solid var(--mark-line);
-  border-radius: 14px;
-  background: #fff;
-  box-sizing: border-box;
-}
-.ask-mark-premium-shell .ask-mark-composer-footer {
-  margin-top: .6rem;
-  padding-top: .6rem;
-}
-.ask-mark-composer-help {
-  margin: .55rem .1rem 0;
-  color: var(--mark-muted);
-  font-size: .68rem;
-  line-height: 1.35;
-}
-/* These actions now live only in the reader's floating selection toolbar. */
-.ask-mark-context-card,
-.ask-mark-quick-section,
-.ask-mark-selection-preview { display: none !important; }

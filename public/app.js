@@ -6447,9 +6447,7 @@ function renderMarkSelectionCard(){
   const panel=app.querySelector('#mark-selection-panel'); if(!panel) return;
   const selected=state.markSelection;
   if(!selected){ panel.innerHTML='<div class="mark-empty"><strong>Hi, I’m Ask Mark.</strong><p>Highlight any passage—or use the paragraph shortcut—and I’ll help you understand it without moving your reading position.</p></div>'; return; }
-  panel.innerHTML=`<div class="mark-selection-card"><span>Current selection · ${splitWords(selected.text).length} words</span><blockquote>${escapeHtml(selected.text.slice(0,1300))}${selected.text.length>1300?'…':''}</blockquote></div>
-  <div class="mark-action-grid">${[['explain','💡','Explain'],['summarize','≡','Summarize'],['analyze','🧠','Analyze'],['simplify','A','Simplify'],['context','🏛','Context'],['related','🔗','Related ideas'],['translate','🌍','Translate'],['save','★','Save insight']].map(([id,icon,label])=>`<button type="button" data-mark-action="${id}"><span>${icon}</span>${label}</button>`).join('')}</div>
-  <form id="mark-question-form" class="mark-question-form"><label for="mark-question">Ask Mark about this passage</label><div><input id="mark-question" type="text" maxlength="1200" placeholder="What does this mean here?"><button class="primary" type="submit">Ask</button></div></form>
+  panel.innerHTML=`<form id="mark-question-form" class="mark-question-form mark-question-form-compact"><label for="mark-question">Ask Mark about the highlighted passage</label><div><input id="mark-question" type="text" maxlength="1200" placeholder="What would you like to understand?"><button class="primary" type="submit">Ask</button></div></form>
   <div id="mark-response" class="mark-response" hidden></div>`;
   bindMarkPanelActions();
 }
@@ -7042,7 +7040,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
 
       <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="analyze">🧠 Analyze</button><button type="button" data-mark-toolbar-action="define">Aa Define</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-more>••• Ask Mark</button>
+        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="analyze">🧠 Analyze</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌂ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="define">Aa Define</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-more>••• Ask Mark</button>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
