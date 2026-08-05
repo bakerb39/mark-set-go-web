@@ -8746,3 +8746,14 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
 .reader-pane-controls {
   margin-bottom: 0 !important;
 }
+
+/* Ask Mark reader row: hide the redundant Reader Tools button and pull panes upward. */
+#toggle-word-panel {
+  display: none !important;
+}
+
+.reader-layout {
+  position: relative;
+  top: -34px;
+  margin-bottom: -34px !important;
+}
