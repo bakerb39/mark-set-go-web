@@ -8768,9 +8768,10 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
   top: 1rem;
 }
 
-/* Align the viewer full-screen control with the Contents / Ask Mark action row. */
+/* Full screen button: place it in the action row above the reader pane. */
 .reader-frame > .viewer-fullscreen-button {
-  top: -4.15rem !important;
+  top: -4.65rem !important;
+  right: .65rem !important;
 }
 
 .reader-frame:fullscreen > .viewer-fullscreen-button,
