@@ -137,12 +137,26 @@
 
 
   function currentFirstName() {
-    const displayName = state.session?.account?.displayName || state.clerk?.user?.firstName || state.clerk?.user?.fullName || '';
-    return String(displayName).trim().split(/\s+/)[0] || '';
+    const account = state.session?.account || {};
+    const user = state.clerk?.user || {};
+    const value =
+      account.firstName || account.first_name || account.givenName || account.given_name ||
+      account.displayName || account.display_name || account.name ||
+      user.firstName || user.first_name || user.fullName || user.full_name ||
+      user.username || '';
+    return String(value).trim().split(/\s+/)[0] || '';
   }
 
   function publishAuthState(session = state.session) {
-    window.MarkSetGoAuth = { clerk: state.clerk, session, refresh: fetchSession, getFirstName: currentFirstName };
+    window.MarkSetGoAuth = {
+      clerk: state.clerk,
+      session,
+      refresh: fetchSession,
+      getFirstName: currentFirstName
+    };
+    const detail = { session, firstName: currentFirstName() };
+    document.dispatchEvent(new CustomEvent('marksetgo:auth-ready', { detail }));
+    window.dispatchEvent(new CustomEvent('marksetgo:auth-ready', { detail }));
   }
 
   async function fetchSession() {

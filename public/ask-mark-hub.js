@@ -71,10 +71,15 @@
     return `${salutation}${firstName ? `, ${firstName}` : ''}.`;
   }
 
+
   function refreshPersonalization() {
-    const node = $('[data-askmark-greeting]', shell || document);
-    if (node) node.textContent = greeting();
+    const text = greeting();
+    $$('[data-askmark-greeting]').forEach((node) => { node.textContent = text; });
   }
+
+  document.addEventListener('marksetgo:auth-changed', refreshPersonalization);
+  document.addEventListener('marksetgo:auth-ready', refreshPersonalization);
+  window.addEventListener('marksetgo:auth-ready', refreshPersonalization);
 
   function premiumMarkup() {
     const context = getBookContext();
@@ -408,7 +413,6 @@
 
     syncSelection();
     syncContext();
-    refreshPersonalization();
     return true;
   }
 
@@ -429,7 +433,6 @@
   });
   document.addEventListener('selectionchange', () => setTimeout(syncSelection, 60));
   document.addEventListener('marksetgo:transform-state', syncContext);
-  document.addEventListener('marksetgo:auth-changed', () => requestAnimationFrame(refreshPersonalization));
 
   requestAnimationFrame(retryInstall);
   [400, 900, 1800, 3200].forEach((delay) => setTimeout(install, delay));

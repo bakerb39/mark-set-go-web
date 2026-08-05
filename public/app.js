@@ -12385,8 +12385,6 @@ function currentReaderFirstName() {
   const account = window.MarkSetGoAuth?.session?.account || {};
   const displayName =
     window.MarkSetGoAuth?.getFirstName?.() ||
-    window.MarkSetGoAuth?.clerk?.user?.firstName ||
-    window.MarkSetGoAuth?.clerk?.user?.fullName ||
     account.firstName ||
     account.first_name ||
     account.displayName ||
@@ -12402,7 +12400,14 @@ function updateLibraryWelcomeName() {
   nameNode.textContent = firstName ? `, ${firstName}` : '';
 }
 
-document.addEventListener('marksetgo:auth-changed', updateLibraryWelcomeName);
+function scheduleLibraryPersonalization() {
+  scheduleLibraryPersonalization();
+  [50, 250, 750, 1500].forEach((delay) => window.setTimeout(updateLibraryWelcomeName, delay));
+}
+
+document.addEventListener('marksetgo:auth-changed', scheduleLibraryPersonalization);
+document.addEventListener('marksetgo:auth-ready', scheduleLibraryPersonalization);
+window.addEventListener('marksetgo:auth-ready', scheduleLibraryPersonalization);
 
 function renderMyLibraryHub() {
   finalizeReadingSession();
@@ -12646,8 +12651,6 @@ function renderMyLibraryHub() {
     </section>`;
 
   updateLibraryWelcomeName();
-  requestAnimationFrame(updateLibraryWelcomeName);
-  window.setTimeout(updateLibraryWelcomeName, 250);
 
   app.querySelectorAll('[data-library-document]').forEach((button) => {
     button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
