@@ -8807,11 +8807,28 @@ function closeDictionaryMenu() {
 function bindDictionaryMenu(reader) {
   const menu = app.querySelector('#word-context-menu');
   if (!menu) return;
+
+  const wordElementForContextEvent = (event) => {
+    const directTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
+    let wordElement = directTarget?.closest?.('.reader-word[data-index]') || null;
+    if (wordElement) return wordElement;
+
+    // Some reader modes place an overlay or wrapper above the word spans. Use
+    // the pointer coordinates as a fallback so right-click remains available.
+    const stack = typeof document.elementsFromPoint === 'function'
+      ? document.elementsFromPoint(event.clientX, event.clientY)
+      : [document.elementFromPoint?.(event.clientX, event.clientY)].filter(Boolean);
+    wordElement = stack
+      .map((element) => element?.closest?.('.reader-word[data-index]'))
+      .find(Boolean) || null;
+    return wordElement;
+  };
+
   reader.addEventListener('contextmenu', (event) => {
-    const wordElement = event.target.closest('.reader-word[data-index]');
+    const wordElement = wordElementForContextEvent(event);
     if (!wordElement) return;
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
     const index = Number(wordElement.dataset.index);
     const word = state.words[index] || wordElement.textContent;
     state.contextWord = { word, index, element: wordElement };
@@ -8849,11 +8866,11 @@ function bindDictionaryMenu(reader) {
   });
   menu.querySelector('[data-dictionary-action="lookup"]')?.addEventListener('click', () => {
     closeDictionaryMenu();
-    performDictionaryLookup(false);
+    performDictionaryLookup(false, 'mark');
   });
   menu.querySelector('[data-dictionary-action="save"]')?.addEventListener('click', () => {
     closeDictionaryMenu();
-    performDictionaryLookup(true);
+    performDictionaryLookup(true, 'mark');
   });
   menu.querySelector('[data-dictionary-action="note"]')?.addEventListener('click', () => {
     closeDictionaryMenu();
