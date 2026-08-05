@@ -46,7 +46,24 @@
 
   function legacySelectionPanel() { return $('#mark-selection-panel', legacyHost || shell || document); }
   function selectionText() { return legacySelectionPanel()?.querySelector('.mark-selection-card blockquote')?.textContent?.trim() || ''; }
-  function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
+  function readerFirstName() {
+    return window.MarkSetGoAuth?.getFirstName?.() ||
+      String(window.MarkSetGoAuth?.session?.account?.displayName || '').trim().split(/\s+/)[0] || '';
+  }
+  function greeting() {
+    const h = new Date().getHours();
+    const salutation = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+    const firstName = readerFirstName();
+    return `${salutation}${firstName ? `, ${firstName}` : ''}`;
+  }
+  function refreshPersonalization() {
+    if (!shell) return;
+    shell.querySelectorAll('[data-mark-personal-greeting]').forEach((node) => {
+      node.textContent = node.dataset.markGreetingSuffix === 'scene'
+        ? `${greeting()}. I was just reading. What shall we explore?`
+        : `${greeting()}.`;
+    });
+  }
 
   function sceneMarkup() {
     const ctx = getBookContext();
@@ -81,7 +98,7 @@
               <div class="mark-scene-copy">
                 <span class="mark-scene-eyebrow">Your reading companion</span>
                 <h2>Ask Mark</h2>
-                <p data-mark-scene-line>${greeting()}. I was just reading. What shall we explore?</p>
+                <p data-mark-scene-line data-mark-personal-greeting data-mark-greeting-suffix="scene">${greeting()}. I was just reading. What shall we explore?</p>
               </div>
               <button class="mark-enter-chat" data-mark-focus-input>Start a conversation <span>→</span></button>
             </div>
@@ -95,7 +112,7 @@
             <div class="mark-conversation" data-mark-conversation aria-live="polite">
               <article class="mark-chat-row is-mark">
                 <img src="${AVATAR}" alt="">
-                <div><small>Mark</small><p><strong>${greeting()}.</strong> Highlight a passage or ask me about the book. I can explain, summarize, compare ideas, quiz you, or help save an insight.</p></div>
+                <div><small>Mark</small><p><strong data-mark-personal-greeting>${greeting()}.</strong> Highlight a passage or ask me about the book. I can explain, summarize, compare ideas, quiz you, or help save an insight.</p></div>
               </article>
             </div>
 
@@ -323,5 +340,6 @@
   document.addEventListener('selectionchange',()=>setTimeout(syncSelection,60));
   document.addEventListener('marksetgo:document-available',()=>{installCount=0;requestAnimationFrame(retry);});
   document.addEventListener('marksetgo:transform-state',syncContext);
+  document.addEventListener('marksetgo:auth-changed', () => requestAnimationFrame(refreshPersonalization));
   requestAnimationFrame(retry); [400,900,1800,3200].forEach(d=>setTimeout(install,d));
 })();

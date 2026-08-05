@@ -71,6 +71,11 @@
     return `${salutation}${firstName ? `, ${firstName}` : ''}.`;
   }
 
+  function refreshPersonalization() {
+    const node = $('[data-askmark-greeting]', shell || document);
+    if (node) node.textContent = greeting();
+  }
+
   function premiumMarkup() {
     const context = getBookContext();
     return `
@@ -99,7 +104,7 @@
                 <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
                 <div>
                   <span>Mark</span>
-                  <p><strong>${greeting()}</strong> Highlight a passage or ask me about the book. I can explain ideas, summarize, compare viewpoints, quiz you, or save an insight.</p>
+                  <p><strong data-askmark-greeting>${greeting()}</strong> Highlight a passage or ask me about the book. I can explain ideas, summarize, compare viewpoints, quiz you, or save an insight.</p>
                 </div>
               </article>
             </div>
@@ -403,6 +408,7 @@
 
     syncSelection();
     syncContext();
+    refreshPersonalization();
     return true;
   }
 
@@ -423,6 +429,7 @@
   });
   document.addEventListener('selectionchange', () => setTimeout(syncSelection, 60));
   document.addEventListener('marksetgo:transform-state', syncContext);
+  document.addEventListener('marksetgo:auth-changed', () => requestAnimationFrame(refreshPersonalization));
 
   requestAnimationFrame(retryInstall);
   [400, 900, 1800, 3200].forEach((delay) => setTimeout(install, delay));

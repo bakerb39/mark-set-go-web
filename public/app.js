@@ -12385,6 +12385,8 @@ function currentReaderFirstName() {
   const account = window.MarkSetGoAuth?.session?.account || {};
   const displayName =
     window.MarkSetGoAuth?.getFirstName?.() ||
+    window.MarkSetGoAuth?.clerk?.user?.firstName ||
+    window.MarkSetGoAuth?.clerk?.user?.fullName ||
     account.firstName ||
     account.first_name ||
     account.displayName ||
@@ -12644,6 +12646,8 @@ function renderMyLibraryHub() {
     </section>`;
 
   updateLibraryWelcomeName();
+  requestAnimationFrame(updateLibraryWelcomeName);
+  window.setTimeout(updateLibraryWelcomeName, 250);
 
   app.querySelectorAll('[data-library-document]').forEach((button) => {
     button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
