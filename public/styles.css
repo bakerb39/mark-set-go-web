@@ -8862,3 +8862,63 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
   background: #d9dee4 !important;
   color: #173f67 !important;
 }
+
+/* Page bookmarks: red ribbon tabs anchored at the top edge of the text page. */
+.reader-frame {
+  position: relative;
+}
+
+.reader-bookmark-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 18;
+  overflow: hidden;
+}
+
+.reader-page-bookmark {
+  position: absolute;
+  top: 0;
+  width: 28px;
+  height: 54px;
+  padding: 0;
+  border: 0;
+  border-radius: 0 0 3px 3px;
+  background: #b8202e;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .28);
+  cursor: pointer;
+  pointer-events: auto;
+  z-index: 19;
+}
+
+.reader-page-bookmark::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 0;
+  height: 0;
+  border-left: 14px solid transparent;
+  border-right: 14px solid transparent;
+  border-bottom: 12px solid var(--reader-bg, #fff);
+}
+
+.reader-page-bookmark:hover,
+.reader-page-bookmark:focus-visible {
+  filter: brightness(1.08);
+  transform: translateY(1px);
+}
+
+.reader-page-bookmark.bookmark-left-page {
+  left: calc(50% - 42px);
+}
+
+.reader-page-bookmark.bookmark-right-page,
+.reader-page-bookmark.bookmark-single-page {
+  right: 28px;
+}
+
+.reader-frame:fullscreen .reader-page-bookmark.bookmark-left-page,
+.reader-frame.fullscreen-fallback .reader-page-bookmark.bookmark-left-page {
+  left: calc(50% - 42px);
+}

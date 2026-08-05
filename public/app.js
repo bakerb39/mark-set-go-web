@@ -7028,6 +7028,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
             </section>
           </div>
           <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
+          <div id="reader-bookmark-layer" class="reader-bookmark-layer" aria-live="polite"></div>
 
             <aside id="fullscreen-mark-drawer" class="fullscreen-mark-drawer" hidden aria-label="Ask Mark reading companion">
               <header class="fullscreen-mark-header">
@@ -7092,6 +7093,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
         <button type="button" data-dictionary-action="save" role="menuitem">Save definition</button>
         <button type="button" data-dictionary-action="note" role="menuitem">Add note</button>
+        <button type="button" data-dictionary-action="bookmark" role="menuitem">Add bookmark</button>
       </div>
       <dialog id="comprehension-dialog" class="comprehension-dialog" aria-label="Comprehension check"></dialog>
 
@@ -7254,6 +7256,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     else startReader();
   });
   bindDictionaryMenu(reader);
+  window.requestAnimationFrame(updateReaderBookmarkMarkers);
   app.querySelector('#start-reader').addEventListener('click', () => { startReader(); persistReaderSession(); });
   app.querySelector('#pause-reader').addEventListener('click', () => { pauseReader(); persistReaderSession(); });
   app.querySelector('#reset-reader').addEventListener('click', () => { resetReader(); persistReaderSession(); });
@@ -8289,6 +8292,7 @@ function updateBookPageStatus(forcedSpread = null) {
   const next = app.querySelector('#book-page-next');
   if (previous) previous.disabled = spreadIndex <= 0;
   if (next) next.disabled = firstPage >= totalPages;
+  updateReaderBookmarkMarkers();
 }
 
 function updateBookPageControls() {
@@ -8541,6 +8545,116 @@ function saveCurrentDefinition(result) {
   showDictionaryResult(item.word, item.definition, item.partOfSpeech, item.example, true);
 }
 
+
+const READER_BOOKMARKS_KEY = 'markSetGoReaderPageBookmarksV1';
+
+function getReaderBookmarks() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(READER_BOOKMARKS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveReaderBookmarks(items) {
+  try {
+    localStorage.setItem(READER_BOOKMARKS_KEY, JSON.stringify(items));
+  } catch (_) {}
+}
+
+function bookmarkPageForWord(wordElement) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !wordElement) return { pageNumber: 1, pageKey: 'page-1', side: 'single' };
+
+  if (state.bookPages) {
+    const spreadIndex = getCurrentBookSpread(reader);
+    const readerRect = reader.getBoundingClientRect();
+    const wordRect = wordElement.getBoundingClientRect();
+    const midpoint = readerRect.left + (readerRect.width / 2);
+    const side = wordRect.left >= midpoint ? 'right' : 'left';
+    const pageNumber = spreadIndex * 2 + (side === 'right' ? 2 : 1);
+    return { pageNumber, pageKey: `book-page-${pageNumber}`, side };
+  }
+
+  const viewportHeight = Math.max(1, reader.clientHeight);
+  const absoluteTop = wordElement.offsetTop + reader.scrollTop;
+  const pageNumber = Math.max(1, Math.floor(absoluteTop / viewportHeight) + 1);
+  return { pageNumber, pageKey: `scroll-page-${pageNumber}`, side: 'single' };
+}
+
+function bookmarkForContextWord() {
+  const context = state.contextWord;
+  if (!context || !state.documentId) return null;
+  const page = bookmarkPageForWord(context.element);
+  return getReaderBookmarks().find((item) => item.documentId === state.documentId && item.pageKey === page.pageKey) || null;
+}
+
+function toggleBookmarkForContextWord() {
+  const context = state.contextWord;
+  if (!context || !state.documentId) return;
+  const page = bookmarkPageForWord(context.element);
+  const items = getReaderBookmarks();
+  const existing = items.find((item) => item.documentId === state.documentId && item.pageKey === page.pageKey);
+
+  if (existing) {
+    saveReaderBookmarks(items.filter((item) => item.id !== existing.id));
+    updateReaderStatus?.(`Bookmark removed from page ${page.pageNumber}.`);
+  } else {
+    items.push({
+      id: `bookmark-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      documentId: state.documentId,
+      title: state.title,
+      wordIndex: Number(context.index) || 0,
+      pageNumber: page.pageNumber,
+      pageKey: page.pageKey,
+      side: page.side,
+      createdAt: new Date().toISOString()
+    });
+    saveReaderBookmarks(items);
+    updateReaderStatus?.(`Bookmark added to page ${page.pageNumber}.`);
+  }
+  updateReaderBookmarkMarkers();
+}
+
+function removeReaderBookmark(id) {
+  saveReaderBookmarks(getReaderBookmarks().filter((item) => item.id !== id));
+  updateReaderBookmarkMarkers();
+  updateReaderStatus?.('Bookmark removed.');
+}
+
+function visibleReaderBookmarkPages() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return [];
+  if (state.bookPages) {
+    const spread = getCurrentBookSpread(reader);
+    return [spread * 2 + 1, spread * 2 + 2];
+  }
+  const pageNumber = Math.max(1, Math.floor(reader.scrollTop / Math.max(1, reader.clientHeight)) + 1);
+  return [pageNumber];
+}
+
+function updateReaderBookmarkMarkers() {
+  const layer = app.querySelector('#reader-bookmark-layer');
+  const reader = app.querySelector('#reader');
+  if (!layer || !reader || !state.documentId) return;
+
+  const visiblePages = visibleReaderBookmarkPages();
+  const bookmarks = getReaderBookmarks().filter((item) => item.documentId === state.documentId && visiblePages.includes(Number(item.pageNumber)));
+  layer.innerHTML = bookmarks.map((item) => {
+    const sideClass = state.bookPages ? (Number(item.pageNumber) % 2 === 0 ? 'bookmark-right-page' : 'bookmark-left-page') : 'bookmark-single-page';
+    return `<button type="button" class="reader-page-bookmark ${sideClass}" data-remove-reader-bookmark="${escapeHtml(item.id)}" title="Remove bookmark from page ${Number(item.pageNumber)}" aria-label="Remove bookmark from page ${Number(item.pageNumber)}"><span aria-hidden="true"></span></button>`;
+  }).join('');
+
+  layer.querySelectorAll('[data-remove-reader-bookmark]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      removeReaderBookmark(button.dataset.removeReaderBookmark);
+    });
+  });
+}
+
 function closeDictionaryMenu() {
   const menu = app.querySelector('#word-context-menu');
   if (menu) menu.hidden = true;
@@ -8559,6 +8673,8 @@ function bindDictionaryMenu(reader) {
     const existingNote = notesForCurrentDocument().find((item) => Number(item.wordIndex) === index);
     const noteButton = menu.querySelector('[data-dictionary-action="note"]');
     if (noteButton) noteButton.textContent = existingNote ? 'Edit note' : 'Add note';
+    const bookmarkButton = menu.querySelector('[data-dictionary-action="bookmark"]');
+    if (bookmarkButton) bookmarkButton.textContent = bookmarkForContextWord() ? 'Remove bookmark' : 'Add bookmark';
     const maxLeft = window.innerWidth - menu.offsetWidth - 12;
     const maxTop = window.innerHeight - menu.offsetHeight - 12;
     menu.style.left = `${Math.max(8, Math.min(event.clientX, maxLeft))}px`;
@@ -8578,9 +8694,14 @@ function bindDictionaryMenu(reader) {
     const existing = notesForCurrentDocument().find((item) => Number(item.wordIndex) === Number(state.contextWord?.index));
     showNoteEditor(state.contextWord, existing || null);
   });
+  menu.querySelector('[data-dictionary-action="bookmark"]')?.addEventListener('click', () => {
+    closeDictionaryMenu();
+    toggleBookmarkForContextWord();
+  });
   document.addEventListener('click', closeDictionaryMenu);
   window.addEventListener('blur', closeDictionaryMenu);
   reader.addEventListener('scroll', closeDictionaryMenu, { passive: true });
+  reader.addEventListener('scroll', () => updateReaderBookmarkMarkers(), { passive: true });
   reader.addEventListener('scroll', () => ReaderContinuity.scheduleCheckpoint(), { passive: true });
   reader.addEventListener('pointerup', () => ReaderContinuity.scheduleCheckpoint());
   reader.addEventListener('keyup', () => ReaderContinuity.scheduleCheckpoint());
