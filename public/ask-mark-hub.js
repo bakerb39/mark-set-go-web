@@ -59,11 +59,18 @@
     return panel?.querySelector('.mark-selection-card blockquote')?.textContent?.trim() || '';
   }
 
+  function readerFirstName() {
+    const clerkUser = window.MarkSetGoAuth?.clerk?.user;
+    const session = window.MarkSetGoAuth?.session || {};
+    const raw = clerkUser?.firstName || session.firstName || session.givenName || session.name || clerkUser?.fullName || '';
+    return String(raw).trim().split(/\s+/)[0] || '';
+  }
+
   function greeting() {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning.';
-    if (hour < 18) return 'Good afternoon.';
-    return 'Good evening.';
+    const name = readerFirstName();
+    const salutation = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    return `${salutation}${name ? `, ${name}` : ''}.`;
   }
 
   function premiumMarkup() {
@@ -118,7 +125,7 @@
           <button type="button" class="askmark-plus" data-askmark-more aria-label="More actions">＋</button>
           <label>
             <span class="sr-only">Ask Mark anything</span>
-            <textarea data-askmark-input rows="1" placeholder="Ask Mark anything about what you’re reading…"></textarea>
+            <textarea data-askmark-input rows="1" placeholder=""></textarea>
           </label>
           <button type="button" class="askmark-send" data-askmark-send aria-label="Send to Ask Mark">➜</button>
           <div class="askmark-more-menu" data-askmark-more-menu hidden>
@@ -127,6 +134,7 @@
             <button type="button" data-premium-mark-action="context"><span>⌛</span><strong>Historical context</strong><small>Use current reading</small></button>
             <button type="button" data-askmark-prompt="Identify the key ideas in this passage."><span>✦</span><strong>Key ideas</strong><small>Use current reading</small></button>
             <button type="button" data-askmark-prompt="Create memory tools for this passage."><span>◇</span><strong>Memory tools</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-comprehension><span>🧠</span><strong>Comprehension</strong><small>Check your understanding</small></button>
           </div>
         </footer>
       </div>`;
@@ -278,6 +286,12 @@
       $('[data-askmark-more-menu]', shell).hidden = true;
       runDocumentAction(button.dataset.documentAction);
     }));
+    $('[data-askmark-comprehension]', shell)?.addEventListener('click', () => {
+      const trigger = document.querySelector('#check-comprehension');
+      if (trigger) trigger.click();
+      $('[data-askmark-more-menu]', shell)?.setAttribute('hidden', '');
+    });
+
     $$('[data-askmark-prompt]', shell).forEach((button) => button.addEventListener('click', () => {
       $('[data-askmark-more-menu]', shell).hidden = true;
       runSelectionAction('ask', button.dataset.askmarkPrompt);

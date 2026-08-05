@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=8.6.3" rel="stylesheet"/>
+<link href="/styles.css?v=8.9.0-medium" rel="stylesheet"/>
 <link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
 <link href="/ask-mark-hub.css?v=9.0.1" rel="stylesheet"/>
 <link href="/mobile-simple.css?v=8.5.9" rel="stylesheet"/>
@@ -21,14 +21,14 @@
   <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
   <script defer src="/auth.js?v=8.1.2"></script>
   <script defer src="/cloud-data.js?v=8.1.2"></script>
-  <script defer src="/app.js?v=8.1.2"></script>
+  <script defer src="/app.js?v=8.9.0-medium"></script>
   <script defer src="/cloud-preferences.js?v=8.1.2"></script>
   <script defer src="/cloud-library.js?v=8.1.2"></script>
   <script defer src="/cloud-document.js?v=8.1.2"></script>
   <script defer src="/cloud-productivity.js?v=8.1.2"></script>
   <script defer src="/document-manager.js?v=8.1.2"></script>
   <script defer src="/read-anything.js?v=8.8.0"></script>
-  <script defer src="/ask-mark-hub.js?v=9.0.1"></script>
+  <script defer src="/ask-mark-hub.js?v=9.0.2-medium"></script>
   <script defer src="/mobile-simple.js?v=8.5.9"></script>
 </head>
 <body>
@@ -52,6 +52,11 @@
     <span class="menu-copy"><strong>My Reading</strong><small>Reading list, statuses, and saved editions</small></span>
   </button>
 
+  <button data-read="upload" type="button" role="menuitem">
+    <span class="menu-icon icon-import">⇧</span>
+    <span class="menu-copy"><strong>Read Anything</strong><small>Import a webpage, document, book, or pasted text</small></span>
+  </button>
+
   <div class="menu-divider"></div>
   <div class="menu-section-label">Collections</div>
 
@@ -68,14 +73,10 @@
       <span class="menu-icon icon-vocab">Aa</span>
       <span>Definitions</span>
     </button>
-    <button data-read="upload" type="button" role="menuitem">
-      <span class="menu-icon icon-import">⇧</span>
-      <span>Read Anything</span>
-    </button>
   </div>
 
   <div class="menu-divider"></div>
-  <div class="menu-section-label">Insights</div>
+  <div class="menu-section-label">Insights &amp; Action</div>
 
   <button data-action="progress-awards" type="button" role="menuitem">
     <span class="menu-icon icon-progress">↗</span>
@@ -109,13 +110,7 @@
 </div>
 </details>
 
-<details class="top-nav-menu ask-mark-menu">
-<summary><span class="nav-icon" aria-hidden="true">✦</span> Ask Mark</summary>
-<div class="menu-popover">
-<button data-action="ai-center" type="button"><span class="menu-icon">✦</span> Reading Companion</button>
-<button data-action="mark-notebook" type="button"><span class="menu-icon">▤</span> Mark’s Notebook</button>
-</div>
-</details>
+<button class="top-level-nav-button" data-action="mark-notebook" type="button"><span class="nav-icon" aria-hidden="true">▤</span> My Notebook</button>
 
 <button class="top-level-nav-button" data-action="music" type="button"><span class="nav-icon" aria-hidden="true">♫</span> Music &amp; Focus</button>
 

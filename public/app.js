@@ -7689,14 +7689,13 @@ function arrangeReaderSidePanels() {
     <nav class="mark-tabs" aria-label="Reader tools and Mark tabs"><button type="button" data-mark-tab="tools" class="active">Reader Tools</button><button type="button" data-mark-tab="selection">Mark</button><button type="button" data-mark-tab="notebook">Notebook</button><button type="button" data-mark-tab="history">History</button></nav>
     <div id="mark-tools-panel" data-mark-panel="tools" class="mark-panel-view">
       <div id="reader-control-core" class="reader-control-section"></div>
-      <details class="reader-control-group"><summary>Learn</summary><div id="reader-control-learn" class="reader-control-group-body"><p class="reader-control-help">Check how well you understood the passage you just read.</p></div></details>
       <details class="reader-control-group"><summary>Media</summary><div id="reader-control-media" class="reader-control-group-body"></div></details>
-      <details class="reader-control-group" open><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
+      <details class="reader-control-group"><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
     </div>
     <div id="mark-selection-panel" data-mark-panel="selection" class="mark-panel-view" hidden></div>
     <div id="mark-notebook-panel" data-mark-panel="notebook" class="mark-panel-view" hidden></div>
     <div id="mark-history-panel" data-mark-panel="history" class="mark-panel-view" hidden></div>`;
-  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(comprehension)shell.querySelector('#reader-control-learn')?.appendChild(comprehension);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
+  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(comprehension)comprehension.hidden=true;if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
   shell.querySelector('#close-reader-controls')?.addEventListener('click',()=>app.querySelector('#toggle-word-panel')?.click());
 }
 function bindReaderPaneControls() {
@@ -12206,7 +12205,7 @@ function renderMyLibraryHub() {
       <header class="library-welcome">
         <div>
           <span class="source-category">My Library</span>
-          <h1>Welcome back.</h1>
+          <h1>Welcome back<span data-reader-name-suffix></span>.</h1>
           <p>Continue your reading journey and manage your personal collection.</p>
         </div>
 
@@ -13260,3 +13259,6 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') ReaderContinuity.scheduleCheckpoint({ immediate: true });
 });
 
+
+// Keep account-aware greetings current as pages render.
+new MutationObserver(personalizeVisiblePage).observe(app, { childList: true, subtree: true });

@@ -8796,3 +8796,25 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
     align-content: start;
   }
 }
+
+
+/* v8.9 medium UI consistency pass: navy + light blue */
+:root {
+  --msg-navy: #17365d;
+  --msg-navy-deep: #102a46;
+  --msg-blue: #dceaf7;
+  --msg-blue-strong: #8fb8dd;
+  --msg-grey-active: #d8dee5;
+}
+html, body { min-height: 100%; }
+body { min-height: 100vh; display: flex; flex-direction: column; }
+body > .app-shell { flex: 1 0 auto; }
+body > .site-footer { margin-top: auto; width: 100%; background: var(--msg-navy-deep); }
+.site-header, .site-footer { background-color: var(--msg-navy-deep) !important; }
+.primary, .auth-nav-primary, button.primary { background: var(--msg-navy) !important; border-color: var(--msg-navy) !important; }
+.top-nav-menu[open] > summary, .site-header details[open] > summary, .top-level-nav-button:hover, .site-header summary:hover { background: rgba(220,234,247,.16) !important; }
+.reader-toolbar .settings-panel[open] > summary { background: var(--msg-grey-active) !important; color: #263442 !important; border-color: #aeb8c2 !important; }
+.reader-toolbar .settings-panel[open] > summary .settings-summary { color: #52606d !important; }
+.menu-popover .menu-section-label { color: var(--msg-navy) !important; }
+.platform-hero, .library-heading, .page-hero { border-color: var(--msg-blue-strong); }
+a, .text-link { color: #245f91; }
