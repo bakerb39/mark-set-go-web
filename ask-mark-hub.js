@@ -59,11 +59,22 @@
     return panel?.querySelector('.mark-selection-card blockquote')?.textContent?.trim() || '';
   }
 
+  function readerFirstName() {
+    return window.MarkSetGoAuth?.getFirstName?.() ||
+      String(window.MarkSetGoAuth?.session?.account?.displayName || '').trim().split(/\s+/)[0] || '';
+  }
+
   function greeting() {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning.';
-    if (hour < 18) return 'Good afternoon.';
-    return 'Good evening.';
+    const salutation = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const firstName = readerFirstName();
+    return `${salutation}${firstName ? `, ${firstName}` : ''}.`;
+  }
+
+
+  function refreshPersonalGreeting() {
+    const node = $('[data-askmark-personal-greeting]', shell || document);
+    if (node) node.textContent = greeting();
   }
 
   function premiumMarkup() {
@@ -89,34 +100,17 @@
 
         <main class="askmark-stage">
           <section class="askmark-view is-active" data-askmark-view-panel="chat">
-            <article class="askmark-now-reading">
-              <div class="askmark-book-mark" aria-hidden="true">▤</div>
-              <div>
-                <span>Now reading</span>
-                <strong data-askmark-title>${escapeHtml(context.title)}</strong>
-                <small data-askmark-chapter>${escapeHtml(context.chapter)}</small>
-              </div>
-              <button type="button" data-askmark-refresh title="Refresh reading context">↻</button>
-            </article>
-
             <div class="askmark-conversation" data-askmark-conversation aria-live="polite">
               <article class="askmark-message mark-message">
                 <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
                 <div>
                   <span>Mark</span>
-                  <p><strong>${greeting()}</strong> Highlight a passage or ask me about the book. I can explain ideas, summarize, compare viewpoints, quiz you, or save an insight.</p>
+                  <p><strong data-askmark-personal-greeting>${greeting()}</strong> Highlight a passage or ask me about the book. I can explain ideas, summarize, compare viewpoints, quiz you, or save an insight.</p>
                 </div>
               </article>
             </div>
 
-            <section class="askmark-selection-card" data-askmark-selection hidden>
-              <div><span>Selected passage</span><button type="button" data-clear-selection aria-label="Dismiss selected passage">×</button></div>
-              <blockquote data-askmark-selection-text></blockquote>
-            </section>
 
-            <div class="askmark-actions" aria-label="Quick actions">
-              ${QUICK_ACTIONS.map(([action, icon, label]) => `<button type="button" data-premium-mark-action="${action}"><span>${icon}</span>${label}</button>`).join('')}
-            </div>
           </section>
 
           <section class="askmark-view" data-askmark-view-panel="notebook">
@@ -130,18 +124,21 @@
           </section>
         </main>
 
-        <footer class="askmark-composer">
+        <footer class="askmark-composer" data-askmark-composer>
+          <div class="askmark-composer-resize" data-askmark-composer-resize role="separator" aria-label="Resize Ask Mark input" aria-orientation="horizontal" title="Drag upward to enlarge"></div>
           <button type="button" class="askmark-plus" data-askmark-more aria-label="More actions">＋</button>
           <label>
             <span class="sr-only">Ask Mark anything</span>
-            <textarea data-askmark-input rows="1" placeholder="Ask Mark anything about what you’re reading…"></textarea>
+            <textarea data-askmark-input rows="1" placeholder=""></textarea>
           </label>
           <button type="button" class="askmark-send" data-askmark-send aria-label="Send to Ask Mark">➜</button>
           <div class="askmark-more-menu" data-askmark-more-menu hidden>
-            <button type="button" data-premium-mark-action="translate">Translate passage</button>
-            <button type="button" data-premium-mark-action="save">Save passage</button>
-            <button type="button" data-document-action="summary">Summarize document</button>
-            <button type="button" data-document-action="readable">Make document readable</button>
+            <button type="button" data-askmark-prompt="Create a study guide for this passage."><span>▤</span><strong>Study guide</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-prompt="Create flash cards for this passage."><span>▱</span><strong>Flash cards</strong><small>Use current reading</small></button>
+            <button type="button" data-premium-mark-action="context"><span>⌛</span><strong>Historical context</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-prompt="Identify the key ideas in this passage."><span>✦</span><strong>Key ideas</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-prompt="Create memory tools for this passage."><span>◇</span><strong>Memory tools</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-comprehension><span>🧠</span><strong>Comprehension</strong><small>Check your understanding</small></button>
           </div>
         </footer>
       </div>`;
@@ -180,6 +177,19 @@
     </article>`;
     if (thinking) thinking.outerHTML = markup;
     else $('[data-askmark-conversation]', shell)?.insertAdjacentHTML('beforeend', markup);
+
+    const messages = $$('[data-askmark-conversation] .askmark-message', shell);
+    const latestMessage = messages[messages.length - 1];
+    const premiumSaveButton = latestMessage?.querySelector('[data-save-mark-response]');
+    const legacySaveButton = response.querySelector('[data-save-mark-response]');
+    if (premiumSaveButton && legacySaveButton) {
+      premiumSaveButton.addEventListener('click', () => {
+        legacySaveButton.click();
+        premiumSaveButton.disabled = true;
+        premiumSaveButton.textContent = 'Saved to notebook';
+      }, { once: true });
+    }
+
     response.hidden = true;
     const conversation = $('[data-askmark-conversation]', shell);
     if (conversation) conversation.scrollTop = conversation.scrollHeight;
@@ -280,6 +290,15 @@
       $('[data-askmark-more-menu]', shell).hidden = true;
       runDocumentAction(button.dataset.documentAction);
     }));
+    $('[data-askmark-comprehension]', shell)?.addEventListener('click', () => {
+      $('[data-askmark-more-menu]', shell)?.setAttribute('hidden', '');
+      window.MarkSetGoStartComprehension?.();
+    });
+
+    $$('[data-askmark-prompt]', shell).forEach((button) => button.addEventListener('click', () => {
+      $('[data-askmark-more-menu]', shell).hidden = true;
+      runSelectionAction('ask', button.dataset.askmarkPrompt);
+    }));
 
     const input = $('[data-askmark-input]', shell);
     const send = () => {
@@ -297,8 +316,36 @@
       }
     });
     input?.addEventListener('input', () => {
+      const composer = $('[data-askmark-composer]', shell);
+      if (composer?.dataset.userResized === '1') return;
       input.style.height = 'auto';
       input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+    });
+
+    const composer = $('[data-askmark-composer]', shell);
+    const resizeHandle = $('[data-askmark-composer-resize]', shell);
+    resizeHandle?.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      const startY = event.clientY;
+      const startHeight = input.getBoundingClientRect().height;
+      const panelHeight = shell.getBoundingClientRect().height;
+      const minHeight = 43;
+      const maxHeight = Math.max(140, Math.floor(panelHeight * 0.45));
+      composer.dataset.userResized = '1';
+      resizeHandle.setPointerCapture?.(event.pointerId);
+
+      const move = (moveEvent) => {
+        const nextHeight = Math.max(minHeight, Math.min(maxHeight, startHeight + (startY - moveEvent.clientY)));
+        input.style.height = `${nextHeight}px`;
+      };
+      const stop = () => {
+        resizeHandle.removeEventListener('pointermove', move);
+        resizeHandle.removeEventListener('pointerup', stop);
+        resizeHandle.removeEventListener('pointercancel', stop);
+      };
+      resizeHandle.addEventListener('pointermove', move);
+      resizeHandle.addEventListener('pointerup', stop);
+      resizeHandle.addEventListener('pointercancel', stop);
     });
 
     $('[data-askmark-more]', shell)?.addEventListener('click', () => {
@@ -385,4 +432,7 @@
 
   requestAnimationFrame(retryInstall);
   [400, 900, 1800, 3200].forEach((delay) => setTimeout(install, delay));
+
+  document.addEventListener('marksetgo:auth-changed', refreshPersonalGreeting);
+
 })();

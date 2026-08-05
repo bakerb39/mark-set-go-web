@@ -46,7 +46,17 @@
 
   function legacySelectionPanel() { return $('#mark-selection-panel', legacyHost || shell || document); }
   function selectionText() { return legacySelectionPanel()?.querySelector('.mark-selection-card blockquote')?.textContent?.trim() || ''; }
-  function greeting() { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening'; }
+  function readerFirstName() {
+    const account = window.MarkSetGoAuth?.session?.account || {};
+    const value = window.MarkSetGoAuth?.getFirstName?.() || account.firstName || account.first_name || account.displayName || account.display_name || '';
+    return String(value).trim().split(/\s+/)[0] || '';
+  }
+  function greeting() {
+    const h = new Date().getHours();
+    const salutation = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+    const firstName = readerFirstName();
+    return `${salutation}${firstName ? `, ${firstName}` : ''}`;
+  }
 
   function sceneMarkup() {
     const ctx = getBookContext();
@@ -81,7 +91,7 @@
               <div class="mark-scene-copy">
                 <span class="mark-scene-eyebrow">Your reading companion</span>
                 <h2>Ask Mark</h2>
-                <p data-mark-scene-line>${greeting()}. I was just reading. What shall we explore?</p>
+                <p data-mark-scene-line data-mark-personal-greeting>${greeting()}. I was just reading. What shall we explore?</p>
               </div>
               <button class="mark-enter-chat" data-mark-focus-input>Start a conversation <span>→</span></button>
             </div>
@@ -95,7 +105,7 @@
             <div class="mark-conversation" data-mark-conversation aria-live="polite">
               <article class="mark-chat-row is-mark">
                 <img src="${AVATAR}" alt="">
-                <div><small>Mark</small><p><strong>${greeting()}.</strong> Highlight a passage or ask me about the book. I can explain, summarize, compare ideas, quiz you, or help save an insight.</p></div>
+                <div><small>Mark</small><p><strong data-mark-personal-greeting>${greeting()}.</strong> Highlight a passage or ask me about the book. I can explain, summarize, compare ideas, quiz you, or help save an insight.</p></div>
               </article>
             </div>
 
@@ -122,7 +132,7 @@
 
         <footer class="mark-composer">
           <button class="mark-plus" data-mark-more aria-label="More actions">＋</button>
-          <label><textarea data-mark-input rows="1" placeholder="Ask Mark anything about what you’re reading…"></textarea></label>
+          <label><textarea data-mark-input rows="1" placeholder=""></textarea></label>
           <button class="mark-send" data-mark-send aria-label="Send question">➜</button>
           <div class="mark-more-menu" data-mark-more-menu hidden>
             <button data-mark-action="translate">Translate selected passage</button>
@@ -324,4 +334,11 @@
   document.addEventListener('marksetgo:document-available',()=>{installCount=0;requestAnimationFrame(retry);});
   document.addEventListener('marksetgo:transform-state',syncContext);
   requestAnimationFrame(retry); [400,900,1800,3200].forEach(d=>setTimeout(install,d));
+
+  document.addEventListener('marksetgo:auth-changed', () => {
+    document.querySelectorAll('[data-mark-personal-greeting]').forEach((node) => {
+      if (node.matches('strong')) node.textContent = `${greeting()}.`;
+      else node.textContent = `${greeting()}. I was just reading. What shall we explore?`;
+    });
+  });
 })();

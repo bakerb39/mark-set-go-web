@@ -135,12 +135,33 @@
     });
   }
 
+
+  function currentFirstName() {
+    const account = state.session?.account || {};
+    const clerkUser = state.clerk?.user || {};
+    const displayName =
+      account.firstName ||
+      account.first_name ||
+      account.displayName ||
+      account.display_name ||
+      clerkUser.firstName ||
+      clerkUser.first_name ||
+      clerkUser.fullName ||
+      clerkUser.full_name ||
+      '';
+    return String(displayName).trim().split(/\s+/)[0] || '';
+  }
+
+  function publishAuthState(session = state.session) {
+    window.MarkSetGoAuth = { clerk: state.clerk, session, refresh: fetchSession, getFirstName: currentFirstName };
+  }
+
   async function fetchSession() {
     const response = await fetch('/api/auth/session', { credentials: 'same-origin' });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || 'Unable to load account session.');
     state.session = payload;
-    window.MarkSetGoAuth = { clerk: state.clerk, session: payload, refresh: fetchSession };
+    publishAuthState(payload);
     document.dispatchEvent(new CustomEvent('marksetgo:auth-changed', { detail: payload }));
     applyBetaGate(payload);
     return payload;
@@ -169,7 +190,8 @@
       if (state.config.betaAccessEnabled) showGate('Checking your access…');
       if (!state.config.configured || !state.config.publishableKey) {
         setControls('<span class="auth-status" title="Authentication has not been configured">Guest</span>');
-        window.MarkSetGoAuth = { clerk: null, session: { authenticated: false, planCode: 'guest' }, refresh: fetchSession };
+        state.session = { authenticated: false, planCode: 'guest' };
+        publishAuthState(state.session);
         if (state.config.betaAccessEnabled) showGate('Private beta access is unavailable because authentication is not configured.');
         else closeGate();
         return;
@@ -191,7 +213,7 @@
         renderSignedInControls();
       } else {
         state.session = { authenticated: false, planCode: 'guest' };
-        window.MarkSetGoAuth = { clerk: state.clerk, session: state.session, refresh: fetchSession };
+        publishAuthState(state.session);
         renderGuestControls();
         applyBetaGate(state.session);
       }
@@ -202,7 +224,7 @@
           renderSignedInControls();
         } else {
           state.session = { authenticated: false, planCode: 'guest' };
-          window.MarkSetGoAuth = { clerk: state.clerk, session: state.session, refresh: fetchSession };
+          publishAuthState(state.session);
           renderGuestControls();
           applyBetaGate(state.session);
           document.dispatchEvent(new CustomEvent('marksetgo:auth-changed', { detail: state.session }));

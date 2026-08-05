@@ -8845,3 +8845,11 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
 .site-footer { margin-top: auto !important; background: var(--msg-navy) !important; color: #dce6ef !important; border-top: 3px solid var(--msg-gold); }
 .site-footer button, .site-footer strong { color: var(--msg-gold) !important; }
 .app-shell { flex: 1 0 auto; }
+
+/* Keep the passage visibly highlighted after it is sent to Ask Mark. */
+#reader .ask-mark-selected {
+  background: #f6d365 !important;
+  color: inherit !important;
+  border-radius: 0.18em;
+  box-shadow: 0 0 0 1px rgba(12, 35, 64, 0.12);
+}

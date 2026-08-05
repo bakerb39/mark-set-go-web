@@ -6390,9 +6390,26 @@ function currentTocTitle(){
   for(const item of items){ if(Number(item.index)<=Number(state.index)) current=item.title||current; else break; }
   return current;
 }
+function clearPersistentMarkSelection() {
+  app.querySelectorAll('#reader .ask-mark-selected').forEach((element)=>element.classList.remove('ask-mark-selected'));
+}
+function persistMarkSelectionHighlight(selectionData) {
+  clearPersistentMarkSelection();
+  if(!selectionData) return;
+  const start=Math.max(0,Number(selectionData.startIndex)||0);
+  const end=Math.max(start+1,Number(selectionData.endIndex)||start+1);
+  app.querySelectorAll('#reader .reader-word[data-index], #reader .reader-group[data-start-index]').forEach((element)=>{
+    const elementStart=Number(element.dataset.index ?? element.dataset.startIndex);
+    const elementEnd=Number(element.dataset.index ?? element.dataset.endIndex ?? elementStart)+1;
+    if(Number.isFinite(elementStart) && elementStart<end && elementEnd>start){
+      element.classList.add('ask-mark-selected');
+    }
+  });
+}
 function showMarkToolbar(selectionData, rect) {
   const bar=app.querySelector('#mark-selection-toolbar'); if(!bar) return;
   state.markSelection=selectionData;
+  persistMarkSelectionHighlight(selectionData);
   bar.hidden=false;
   const width=bar.offsetWidth||540;
   bar.style.left=`${Math.max(8,Math.min(window.innerWidth-width-8,rect.left+rect.width/2-width/2))}px`;
@@ -12047,6 +12064,27 @@ function libraryRecencyLabel(lastReadAt) {
   })[recency];
 }
 
+function currentReaderFirstName() {
+  const account = window.MarkSetGoAuth?.session?.account || {};
+  const displayName =
+    window.MarkSetGoAuth?.getFirstName?.() ||
+    account.firstName ||
+    account.first_name ||
+    account.displayName ||
+    account.display_name ||
+    '';
+  return String(displayName).trim().split(/\s+/)[0] || '';
+}
+
+function updateLibraryWelcomeName() {
+  const nameNode = document.querySelector('#library-welcome-name');
+  if (!nameNode) return;
+  const firstName = currentReaderFirstName();
+  nameNode.textContent = firstName ? `, ${firstName}` : '';
+}
+
+document.addEventListener('marksetgo:auth-changed', updateLibraryWelcomeName);
+
 function renderMyLibraryHub() {
   finalizeReadingSession();
   stopReader();
@@ -12288,11 +12326,7 @@ function renderMyLibraryHub() {
 
     </section>`;
 
-  {
-    const firstName = window.MarkSetGoAuth?.getFirstName?.() || String(window.MarkSetGoAuth?.session?.account?.displayName || '').trim().split(/\s+/)[0] || '';
-    const nameNode = app.querySelector('#library-welcome-name');
-    if (nameNode && firstName) nameNode.textContent = `, ${firstName}`;
-  }
+  updateLibraryWelcomeName();
 
   app.querySelectorAll('[data-library-document]').forEach((button) => {
     button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
