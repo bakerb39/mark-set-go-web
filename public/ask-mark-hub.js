@@ -168,7 +168,9 @@
     if (thinking) thinking.outerHTML = markup;
     else $('[data-askmark-conversation]', shell)?.insertAdjacentHTML('beforeend', markup);
 
-    const premiumSaveButton = $('[data-askmark-conversation] [data-save-mark-response]', shell);
+    const messages = $$('[data-askmark-conversation] .askmark-message', shell);
+    const latestMessage = messages[messages.length - 1];
+    const premiumSaveButton = latestMessage?.querySelector('[data-save-mark-response]');
     const legacySaveButton = response.querySelector('[data-save-mark-response]');
     if (premiumSaveButton && legacySaveButton) {
       premiumSaveButton.addEventListener('click', () => {
