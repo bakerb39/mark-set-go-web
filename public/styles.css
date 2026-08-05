@@ -8757,3 +8757,13 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
   top: -34px;
   margin-bottom: -34px !important;
 }
+
+/* Keep the viewer full-screen control above the reader/Ask Mark panes. */
+.reader-frame > .viewer-fullscreen-button {
+  top: -2.45rem;
+}
+
+.reader-frame:fullscreen > .viewer-fullscreen-button,
+.reader-frame.fullscreen-fallback > .viewer-fullscreen-button {
+  top: 1rem;
+}
