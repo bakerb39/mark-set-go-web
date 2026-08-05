@@ -88,7 +88,7 @@
 
 .askmark-composer { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:.48rem; align-items:end; padding:.72rem .8rem .82rem; border-top:1px solid var(--ask-line); background:rgba(255,253,247,.94); backdrop-filter:blur(14px); }
 .askmark-composer label { display:block; }
-.askmark-composer textarea { width:100%; min-height:43px; max-height:140px; resize:none; padding:.69rem .82rem; border:1px solid rgba(17,52,81,.18); border-radius:15px; color:var(--ask-ink); background:#fff; box-shadow:inset 0 1px 2px rgba(10,31,48,.04); font:inherit; line-height:1.4; }
+.askmark-composer textarea { width:100%; min-height:43px; max-height:none; resize:none; overflow:hidden; padding:.69rem .82rem; border:1px solid rgba(17,52,81,.18); border-radius:15px; color:var(--ask-ink); background:#fff; box-shadow:inset 0 1px 2px rgba(10,31,48,.04); font:inherit; line-height:1.4; }
 .askmark-composer textarea:focus { outline:2px solid rgba(211,164,71,.34); border-color:var(--ask-gold); }
 .askmark-plus,.askmark-send { width:42px; height:42px; border-radius:50%; cursor:pointer; }
 .askmark-plus { border:1px solid rgba(17,52,81,.15); color:var(--ask-navy-800); background:#fff; font-size:1.15rem; }
@@ -127,12 +127,11 @@
   .askmark-avatar-glow,.is-thinking i,.askmark-view.is-active,.askmark-message { animation:none!important; }
 }
 
-/* Ask Mark composer: user-resizable from its top edge. */
+/* Ask Mark text area: user-resizable from its top edge. */
 .askmark-composer {
   min-height: 74px;
-  max-height: 55%;
-  grid-template-rows: 10px minmax(0, 1fr);
-  align-items: stretch;
+  grid-template-rows: 10px auto;
+  align-items: end;
 }
 .askmark-composer-resize {
   grid-column: 1 / -1;
@@ -154,9 +153,7 @@
   transform: translateX(-50%);
 }
 .askmark-composer label { min-height: 0; }
-.askmark-composer[data-user-resized="1"] label,
-.askmark-composer[data-user-resized="1"] textarea { height: 100%; }
-.askmark-composer[data-user-resized="1"] textarea { max-height: none; resize: none; }
+.askmark-composer[data-user-resized="1"] textarea { max-height: none; resize: none; overflow:hidden; }
 
 /* Compact action cards opened by the plus button. */
 .askmark-more-menu {

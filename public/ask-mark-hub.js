@@ -310,16 +310,16 @@
     resizeHandle?.addEventListener('pointerdown', (event) => {
       event.preventDefault();
       const startY = event.clientY;
-      const startHeight = composer.getBoundingClientRect().height;
+      const startHeight = input.getBoundingClientRect().height;
       const panelHeight = shell.getBoundingClientRect().height;
-      const minHeight = 74;
-      const maxHeight = Math.max(150, Math.floor(panelHeight * 0.55));
+      const minHeight = 43;
+      const maxHeight = Math.max(140, Math.floor(panelHeight * 0.45));
       composer.dataset.userResized = '1';
       resizeHandle.setPointerCapture?.(event.pointerId);
 
       const move = (moveEvent) => {
         const nextHeight = Math.max(minHeight, Math.min(maxHeight, startHeight + (startY - moveEvent.clientY)));
-        composer.style.height = `${nextHeight}px`;
+        input.style.height = `${nextHeight}px`;
       };
       const stop = () => {
         resizeHandle.removeEventListener('pointermove', move);
