@@ -6846,16 +6846,14 @@ function bindMarkCompanion(reader){
   };
 
   const resumeAfterLockedSelectionClick=(event)=>{
+    const pending=state.markResumeOnNextReaderClick;
+    const shouldResume=Boolean(pending?.shouldResume);
     state.markResumeOnNextReaderClick=null;
 
-    // The first click after a locked selection is still a normal reader click:
-    // a word click moves the reading position, while a click in blank reader
-    // space toggles play/pause. Do not base this on whether playback happened
-    // to be running before the selection began; that made blank clicks appear
-    // inconsistent whenever the passage was selected from an already-paused
-    // reader.
     event.preventDefault();
     event.stopImmediatePropagation();
+
+    if(!shouldResume) return;
 
     const clickedWord=event.target.closest?.('.reader-word[data-index]');
     const mode=getSelectedMode();
@@ -6875,10 +6873,7 @@ function bindMarkCompanion(reader){
       }
     }
 
-    if(mode==='two-column') return;
-    if(isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
+    if(mode!=='two-column' && !isReaderRunning()) startReader();
   };
 
   reader.addEventListener('pointerdown',(event)=>{
@@ -6886,12 +6881,13 @@ function bindMarkCompanion(reader){
     if(event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
 
     // The first ordinary click in the reader after using Ask Mark removes the
-    // temporary highlight. The following click handler then applies the normal
-    // reader behavior: blank space toggles play/pause and a word click seeks.
+    // temporary highlight. Playback resumes only if it had been running before
+    // the selection began; the click itself is handled in the capture listener.
     if(state.markSelectionLocked){
+      const shouldResume=Boolean(state.markSelectionWasRunning);
       clearMarkSelectionForReadingResume();
       state.markSelectionWasRunning=false;
-      state.markResumeOnNextReaderClick={toggle:true};
+      state.markResumeOnNextReaderClick={shouldResume};
       state.markSelectionInteraction=freshInteraction();
       updateReaderStatus('Selection cleared.');
       return;
@@ -6919,12 +6915,12 @@ function bindMarkCompanion(reader){
     if(!interaction?.active) return;
     if(interaction.pointerId!==null && event.pointerId!==undefined && event.pointerId!==interaction.pointerId) return;
 
-    // Fallback for browsers/devices that delay selectstart. Four pixels is high
-    // enough to ignore click jitter but early enough to stop before the next
-    // reading tick at normal speeds.
-    if(Math.hypot((Number(event.clientX)||0)-interaction.startX,(Number(event.clientY)||0)-interaction.startY)>4){
-      pauseForSelection(interaction);
-    }
+    // Do not treat ordinary pointer jitter as a selection. The old distance-only
+    // fallback could set markSuppressNextReaderClick before a real range existed,
+    // swallowing normal pause/resume clicks. selectstart is the primary signal;
+    // this fallback pauses only after the browser has produced a non-collapsed
+    // selection that belongs to the reader.
+    if(selectionBelongsToReader()) pauseForSelection(interaction);
   },true);
 
   // selectionchange covers keyboard selection and touch implementations where
@@ -6967,7 +6963,15 @@ function bindMarkCompanion(reader){
       return;
     }
     if(!state.markSuppressNextReaderClick) return;
+
+    const interaction=state.markSelectionInteraction;
+    const hasRealSelection=state.markSelectionLocked
+      || Boolean(interaction?.finalized)
+      || selectionBelongsToReader();
+
     state.markSuppressNextReaderClick=false;
+    if(!hasRealSelection) return;
+
     event.preventDefault();
     event.stopImmediatePropagation();
   },true);
@@ -7486,12 +7490,6 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   };
   document.addEventListener('keydown', state.spacebarHandler);
 
-  const toggleReaderPlaybackFromBlankSpace = () => {
-    if (isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
-  };
-
   reader.addEventListener('click', (event) => {
     const translatedWord = event.target.closest('.translated-word');
     if (translatedWord && state.language !== 'en') {
@@ -7525,33 +7523,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     }
 
     if (mode === 'two-column') return;
-    toggleReaderPlaybackFromBlankSpace();
-  });
-
-  // The visible reader includes blank padding inside #reader-frame that sits
-  // outside the text article itself. Treat that space exactly like blank space
-  // inside #reader so normal reading can always be paused/resumed with a click.
-  const readerFrameBlankToggle = app.querySelector('#reader-frame');
-  readerFrameBlankToggle?.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target || reader.contains(target)) return;
-    if (target.closest('button, a, input, textarea, select, summary, [contenteditable="true"], #fullscreen-mark-drawer, #fullscreen-control-strip, #reader-bookmark-layer')) return;
-    if (getSelectedMode() === 'two-column') return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (state.markSelectionLocked) {
-      clearMarkSelectionForReadingResume();
-      state.markSelectionWasRunning = false;
-      state.markResumeOnNextReaderClick = null;
-      state.markSelectionInteraction = null;
-      if (!isReaderRunning()) startReader();
-      persistReaderSession();
-      return;
-    }
-
-    toggleReaderPlaybackFromBlankSpace();
+    if (isReaderRunning()) pauseReader();
+    else startReader();
   });
   bindDictionaryMenu(reader);
   window.requestAnimationFrame(updateReaderBookmarkMarkers);
