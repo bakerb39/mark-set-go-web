@@ -8853,3 +8853,12 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
   border-radius: 0.18em;
   box-shadow: 0 0 0 1px rgba(12, 35, 64, 0.12);
 }
+
+
+/* Requested reader settings cleanup: opened Reading/Display panels use neutral gray. */
+.settings-panel[open] > summary,
+.fullscreen-option-group[open] > summary,
+.reader-control-group[open] > summary {
+  background: #d9dee4 !important;
+  color: #173f67 !important;
+}

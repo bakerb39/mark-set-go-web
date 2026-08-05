@@ -6393,18 +6393,24 @@ function currentTocTitle(){
 function clearPersistentMarkSelection() {
   app.querySelectorAll('#reader .ask-mark-selected').forEach((element)=>element.classList.remove('ask-mark-selected'));
 }
-function persistMarkSelectionHighlight(selectionData) {
-  clearPersistentMarkSelection();
+function applyPersistentMarkSelectionHighlight() {
+  const selectionData=state.markPersistentSelection;
   if(!selectionData) return;
   const start=Math.max(0,Number(selectionData.startIndex)||0);
   const end=Math.max(start+1,Number(selectionData.endIndex)||start+1);
   app.querySelectorAll('#reader .reader-word[data-index], #reader .reader-group[data-start-index]').forEach((element)=>{
     const elementStart=Number(element.dataset.index ?? element.dataset.startIndex);
-    const elementEnd=Number(element.dataset.index ?? element.dataset.endIndex ?? elementStart)+1;
+    const explicitEnd=Number(element.dataset.endIndex);
+    const elementEnd=Number.isFinite(explicitEnd) ? explicitEnd : elementStart+1;
     if(Number.isFinite(elementStart) && elementStart<end && elementEnd>start){
       element.classList.add('ask-mark-selected');
     }
   });
+}
+function persistMarkSelectionHighlight(selectionData) {
+  if(selectionData) state.markPersistentSelection={...selectionData};
+  clearPersistentMarkSelection();
+  applyPersistentMarkSelectionHighlight();
 }
 function showMarkToolbar(selectionData, rect) {
   const bar=app.querySelector('#mark-selection-toolbar'); if(!bar) return;
@@ -6670,6 +6676,11 @@ function selectReaderParagraphFromEvent(event){
 }
 function bindMarkCompanion(reader){
   const toolbar=app.querySelector('#mark-selection-toolbar'); if(!reader||!toolbar)return;
+  state.markHighlightObserver?.disconnect?.();
+  state.markHighlightObserver=new MutationObserver(()=>{
+    if(state.markPersistentSelection) requestAnimationFrame(applyPersistentMarkSelectionHighlight);
+  });
+  state.markHighlightObserver.observe(reader,{childList:true,subtree:true});
   const handleSelection=()=>{window.setTimeout(()=>{
     const data=captureMarkSelection();
     if(!data) return hideMarkToolbar();
@@ -6702,10 +6713,12 @@ function bindMarkCompanion(reader){
     renderMarkSelectionCard();
     if(b.dataset.markToolbarAction==='ask'){
       hideMarkToolbar();
-      requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        applyPersistentMarkSelectionHighlight();
         const input=document.querySelector('[data-askmark-input]');
         input?.focus();
-      });
+        applyPersistentMarkSelectionHighlight();
+      }));
       return;
     }
     runMarkAction(b.dataset.markToolbarAction);
@@ -7711,7 +7724,7 @@ function bindFullscreenOptions(readerFrame) {
 
 
 function arrangeReaderSidePanels() {
-  const wordPanel=app.querySelector('#word-panel'), toolbar=app.querySelector('.reader-toolbar'), media=app.querySelector('.reader-music-actions'), comprehension=app.querySelector('#check-comprehension'), translation=app.querySelector('.translation-tools'), wordResult=app.querySelector('#word-result');
+  const wordPanel=app.querySelector('#word-panel'), toolbar=app.querySelector('.reader-toolbar'), media=app.querySelector('.reader-music-actions'), translation=app.querySelector('.translation-tools'), wordResult=app.querySelector('#word-result');
   if(!wordPanel||!toolbar)return;
   wordPanel.classList.add('reader-control-panel','mark-companion-panel');wordPanel.setAttribute('aria-label','Mark and reader tools');
   const shell=document.createElement('div');shell.className='reader-control-shell mark-shell';shell.innerHTML=`
@@ -7719,14 +7732,13 @@ function arrangeReaderSidePanels() {
     <nav class="mark-tabs" aria-label="Reader tools and Mark tabs"><button type="button" data-mark-tab="tools" class="active">Reader Tools</button><button type="button" data-mark-tab="selection">Mark</button><button type="button" data-mark-tab="notebook">Notebook</button><button type="button" data-mark-tab="history">History</button></nav>
     <div id="mark-tools-panel" data-mark-panel="tools" class="mark-panel-view">
       <div id="reader-control-core" class="reader-control-section"></div>
-      <details class="reader-control-group"><summary>Learn</summary><div id="reader-control-learn" class="reader-control-group-body"><p class="reader-control-help">Check how well you understood the passage you just read.</p></div></details>
       <details class="reader-control-group"><summary>Media</summary><div id="reader-control-media" class="reader-control-group-body"></div></details>
-      <details class="reader-control-group" open><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
+      <details class="reader-control-group"><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
     </div>
     <div id="mark-selection-panel" data-mark-panel="selection" class="mark-panel-view" hidden></div>
     <div id="mark-notebook-panel" data-mark-panel="notebook" class="mark-panel-view" hidden></div>
     <div id="mark-history-panel" data-mark-panel="history" class="mark-panel-view" hidden></div>`;
-  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(comprehension)shell.querySelector('#reader-control-learn')?.appendChild(comprehension);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
+  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
   shell.querySelector('#close-reader-controls')?.addEventListener('click',()=>app.querySelector('#toggle-word-panel')?.click());
 }
 function bindReaderPaneControls() {
