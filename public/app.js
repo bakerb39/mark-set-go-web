@@ -6846,14 +6846,16 @@ function bindMarkCompanion(reader){
   };
 
   const resumeAfterLockedSelectionClick=(event)=>{
-    const pending=state.markResumeOnNextReaderClick;
-    const shouldResume=Boolean(pending?.shouldResume);
     state.markResumeOnNextReaderClick=null;
 
+    // The first click after a locked selection is still a normal reader click:
+    // a word click moves the reading position, while a click in blank reader
+    // space toggles play/pause. Do not base this on whether playback happened
+    // to be running before the selection began; that made blank clicks appear
+    // inconsistent whenever the passage was selected from an already-paused
+    // reader.
     event.preventDefault();
     event.stopImmediatePropagation();
-
-    if(!shouldResume) return;
 
     const clickedWord=event.target.closest?.('.reader-word[data-index]');
     const mode=getSelectedMode();
@@ -6873,7 +6875,10 @@ function bindMarkCompanion(reader){
       }
     }
 
-    if(mode!=='two-column' && !isReaderRunning()) startReader();
+    if(mode==='two-column') return;
+    if(isReaderRunning()) pauseReader();
+    else startReader();
+    persistReaderSession();
   };
 
   reader.addEventListener('pointerdown',(event)=>{
@@ -6881,13 +6886,12 @@ function bindMarkCompanion(reader){
     if(event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
 
     // The first ordinary click in the reader after using Ask Mark removes the
-    // temporary highlight. Playback resumes only if it had been running before
-    // the selection began; the click itself is handled in the capture listener.
+    // temporary highlight. The following click handler then applies the normal
+    // reader behavior: blank space toggles play/pause and a word click seeks.
     if(state.markSelectionLocked){
-      const shouldResume=Boolean(state.markSelectionWasRunning);
       clearMarkSelectionForReadingResume();
       state.markSelectionWasRunning=false;
-      state.markResumeOnNextReaderClick={shouldResume};
+      state.markResumeOnNextReaderClick={toggle:true};
       state.markSelectionInteraction=freshInteraction();
       updateReaderStatus('Selection cleared.');
       return;
