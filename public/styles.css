@@ -8956,3 +8956,25 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
   -webkit-user-select: text !important;
   user-select: text !important;
 }
+
+/* Reader settings: use a consistent light-blue open state instead of green. */
+.reader-toolbar .settings-panel[open] {
+  background: #eef6fc !important;
+  border-color: #a9c7df !important;
+  box-shadow: 0 1px 0 rgba(36, 95, 145, .08), 0 5px 14px rgba(15, 39, 64, .06) !important;
+}
+
+.reader-toolbar .settings-panel[open] > summary {
+  background: #dcebf6 !important;
+  border-bottom-color: #b8cfe2 !important;
+  color: #173f67 !important;
+}
+
+.reader-toolbar .settings-panel[open] > summary > span:first-child,
+.reader-toolbar .settings-panel[open] .settings-summary {
+  color: #365f82 !important;
+}
+
+.reader-toolbar .settings-panel[open] .settings-content {
+  background: #f5f9fc !important;
+}
