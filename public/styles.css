@@ -8758,21 +8758,28 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
   margin-bottom: -34px !important;
 }
 
-/* Align Full screen with the Contents / Ask Mark command row without changing reader height. */
-.reader-pane-controls.ask-mark-toolbar {
-  flex-wrap: nowrap !important;
-  align-items: center !important;
-}
-.reader-pane-controls.ask-mark-toolbar .reader-pane-buttons {
-  width: auto !important;
-  flex: 1 1 auto !important;
-  min-width: 0 !important;
-}
-.reader-pane-controls.ask-mark-toolbar #toggle-reader-fullscreen.viewer-fullscreen-button {
-  position: static !important;
-  inset: auto !important;
-  transform: none !important;
-  align-self: center !important;
-  flex: 0 0 auto !important;
-  margin: 0 0 0 auto !important;
+/* Desktop reader command row: align Full screen with Contents / Ask Mark
+   while preserving the compact reader position and viewport height. */
+@media (min-width: 701px) {
+  .reader-pane-controls.ask-mark-toolbar {
+    position: relative !important;
+    min-height: 81px !important;
+    align-items: flex-start !important;
+  }
+
+  .reader-pane-controls.ask-mark-toolbar .reader-pane-buttons {
+    width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  .reader-pane-controls.ask-mark-toolbar #toggle-reader-fullscreen.viewer-fullscreen-button {
+    position: absolute !important;
+    top: 6px !important;
+    right: 0 !important;
+    left: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    margin: 0 !important;
+    z-index: 5 !important;
+  }
 }
