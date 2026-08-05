@@ -92,6 +92,7 @@
       author: activeImportedDocument.author || '',
       source: activeImportedDocument.source,
       versions: activeImportedDocument.versions || {},
+      originalText: activeImportedDocument.versions?.original || activeImportedDocument.originalText || '',
       selectedVersion: activeImportedVersion || 'original',
       updatedAt: new Date().toISOString()
     };
@@ -136,8 +137,10 @@
       baseTitle: cleanImportedTitle(record?.title || storedDocument?.source?.adaptedFrom || storedDocument?.title),
       author: record?.author || storedDocument?.source?.author || '',
       source: { ...(record?.source || storedDocument?.source || {}), readAnything: true, readAnythingKey: key },
-      versions: { ...(record?.versions || {}), ...(storedDocument?.text ? { [readingLevel]: storedDocument.text } : {}) }
+      versions: { ...(record?.versions || {}), ...(record?.originalText ? { original: record.originalText } : {}), ...(storedDocument?.text ? { [readingLevel]: storedDocument.text } : {}) },
+      originalText: record?.originalText || record?.versions?.original || ''
     };
+    if (!activeImportedDocument.versions.original && activeImportedDocument.originalText) activeImportedDocument.versions.original = activeImportedDocument.originalText;
     if (!activeImportedDocument.versions.original && readingLevel === 'original' && storedDocument?.text) activeImportedDocument.versions.original = storedDocument.text;
     activeImportedVersion = record?.selectedVersion && activeImportedDocument.versions[record.selectedVersion]
       ? record.selectedVersion
@@ -414,7 +417,66 @@
     }
   }
 
+
+  async function requestTranslation(language) {
+    const target = String(language || '').trim();
+    if (!target) throw new Error('Choose a language.');
+    if (!activeImportedDocument) throw new Error('Translation is available for imported documents.');
+    const key = `translation_${target.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+    if (activeImportedDocument.versions[key]) return renderImportedVersion(key);
+    const sourceText = transformSourceText();
+    if (sourceText.length < 20) throw new Error('The saved document text is unavailable. Reopen the original item from My Library and try again.');
+    showTransformStatus(`Translating to ${target}…`);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 115000);
+    try {
+      const response = await fetch('/api/read-anything/transform', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: activeImportedDocument.title,
+          text: sourceText,
+          instructions: `Translate the complete text into ${target}. Preserve headings, paragraph breaks, names, dates, quotations, and meaning. Return only the translated text.`
+        }),
+        signal: controller.signal
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || payload.error || `Server returned HTTP ${response.status}.`);
+      if (!payload.text) throw new Error('The server returned an empty translation.');
+      activeImportedDocument.versions[key] = payload.text;
+      activeImportedDocument.translationLanguage = target;
+      saveActiveFormatRecord();
+      showTransformStatus('');
+      renderImportedVersion(key);
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new Error('The translation took too long. Try a shorter article or passage.');
+      throw error;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  function makeReadable() {
+    if (!activeImportedDocument) throw new Error('Readable view is available for imported documents.');
+    const original = String(activeImportedDocument.versions?.original || activeImportedDocument.originalText || '').trim();
+    if (original.length < 20) throw new Error('The preserved original text is unavailable. Re-import this document once to restore it.');
+    activeImportedDocument.versions.clean = cleanFormatText(original);
+    saveActiveFormatRecord();
+    renderImportedVersion('clean');
+  }
+
+  function restoreOriginal() {
+    if (!activeImportedDocument) throw new Error('Original view is available for imported documents.');
+    const original = String(activeImportedDocument.versions?.original || activeImportedDocument.originalText || '').trim();
+    if (original.length < 20) throw new Error('The preserved original text is unavailable. Re-import this document once to restore it.');
+    activeImportedDocument.versions.original = original;
+    renderImportedVersion('original');
+  }
+
   function scheduleFormatControlAttach() {
+    document.querySelector('#read-anything-format-control')?.remove();
+    document.dispatchEvent(new CustomEvent('marksetgo:transform-state', { detail: { version: activeImportedVersion, label: versionLabel(activeImportedVersion), active: Boolean(activeImportedDocument) } }));
+    return;
     formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
     formatControlAttachTimers = [];
     let frame = 0;
@@ -524,7 +586,8 @@
       baseTitle: title,
       author: documentRecord.author || documentRecord.source?.author || '',
       source: { ...(documentRecord.source || {}), readAnything: true, readAnythingKey },
-      versions: { original: text, clean: cleanFormatText(text) }
+      versions: { original: text, clean: cleanFormatText(text) },
+      originalText: text
     };
     activeImportedVersion = 'original';
     saveActiveFormatRecord();
@@ -723,6 +786,20 @@
     renderHub();
   }, true);
 
-  window.MarkSetGoReadAnything = Object.freeze({ render: renderHub, openDocument, bookmarkletCode, cleanFormatText });
+  window.MarkSetGoReadAnything = Object.freeze({
+    render: renderHub,
+    openDocument,
+    bookmarkletCode,
+    cleanFormatText,
+    hasActiveDocument: () => Boolean(activeImportedDocument),
+    getActiveVersion: () => ({ key: activeImportedVersion, label: versionLabel(activeImportedVersion), title: activeImportedDocument?.baseTitle || activeImportedDocument?.title || '' }),
+    restoreOriginal,
+    makeReadable,
+    renderVersion: renderImportedVersion,
+    requestReadingLevel,
+    requestSummary,
+    requestCustomTransform,
+    requestTranslation
+  });
   window.setTimeout(openPendingCapture, 0);
 })();
