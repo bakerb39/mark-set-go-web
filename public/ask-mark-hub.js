@@ -167,6 +167,17 @@
     </article>`;
     if (thinking) thinking.outerHTML = markup;
     else $('[data-askmark-conversation]', shell)?.insertAdjacentHTML('beforeend', markup);
+
+    const premiumSaveButton = $('[data-askmark-conversation] [data-save-mark-response]', shell);
+    const legacySaveButton = response.querySelector('[data-save-mark-response]');
+    if (premiumSaveButton && legacySaveButton) {
+      premiumSaveButton.addEventListener('click', () => {
+        legacySaveButton.click();
+        premiumSaveButton.disabled = true;
+        premiumSaveButton.textContent = 'Saved to notebook';
+      }, { once: true });
+    }
+
     response.hidden = true;
     const conversation = $('[data-askmark-conversation]', shell);
     if (conversation) conversation.scrollTop = conversation.scrollHeight;
