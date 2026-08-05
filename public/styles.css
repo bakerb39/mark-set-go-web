@@ -8742,10 +8742,7 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
   .site-footer nav { justify-content: flex-start; }
 }
 
-/* Compact reader action row: remove excess space between controls and reader. */
+/* Keep the reader area directly beneath the action row without changing pane positioning. */
 .reader-pane-controls {
   margin-bottom: 0 !important;
-}
-.reader-layout {
-  margin-top: 0 !important;
 }

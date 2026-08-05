@@ -6879,6 +6879,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       <div class="reader-pane-controls" aria-label="Reading area layout controls">
         <div class="reader-pane-buttons">
           <button id="toggle-navigation-pane" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="navigation-pane"><span aria-hidden="true">☰</span> Marks &amp; Contents</button>
+          <button id="toggle-word-panel" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="word-panel" hidden><span aria-hidden="true">⚙</span> Reader Tools</button>
           <button id="toggle-mark-panel" class="secondary pane-toggle reader-side-toggle mark-pane-button" type="button" aria-pressed="false" aria-controls="word-panel"><span aria-hidden="true">✦</span> Ask Mark</button>
         </div>
         <button id="toggle-reader-fullscreen" class="viewer-fullscreen-button" type="button" aria-label="Enter text viewer fullscreen" title="Full screen text viewer">
