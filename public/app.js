@@ -6393,6 +6393,16 @@ function currentTocTitle(){
 function clearPersistentMarkSelection() {
   app.querySelectorAll('#reader .ask-mark-selected').forEach((element)=>element.classList.remove('ask-mark-selected'));
 }
+function clearMarkSelectionForReadingResume() {
+  state.markPersistentSelection=null;
+  state.markSelection=null;
+  state.markSelectionLocked=false;
+  state.markSuppressNextReaderClick=false;
+  clearPersistentMarkSelection();
+  hideMarkToolbar();
+  const selection=window.getSelection?.();
+  if(selection && selection.rangeCount) selection.removeAllRanges();
+}
 function applyPersistentMarkSelectionHighlight() {
   const selectionData=state.markPersistentSelection;
   if(!selectionData) return;
@@ -6705,36 +6715,71 @@ function selectReaderParagraphFromEvent(event){
 }
 function bindMarkCompanion(reader){
   const toolbar=app.querySelector('#mark-selection-toolbar'); if(!reader||!toolbar)return;
+  state.markSelectionInteraction={active:false,moved:false,wasRunning:false,startX:0,startY:0};
+  state.markSelectionLocked=false;
+  state.markSuppressNextReaderClick=false;
   state.markHighlightObserver?.disconnect?.();
   state.markHighlightObserver=new MutationObserver(()=>{
     if(state.markPersistentSelection) requestAnimationFrame(applyPersistentMarkSelectionHighlight);
   });
   state.markHighlightObserver.observe(reader,{childList:true,subtree:true});
-  const handleSelection=()=>{window.setTimeout(()=>{
+  const pauseForSelection=()=>{
+    if(!isReaderRunning()) return;
+    pauseReader();
+    persistReaderSession({immediate:true});
+    updateReaderStatus('Paused while selecting a passage.');
+  };
+  const finalizeSelection=()=>window.setTimeout(()=>{
     const data=captureMarkSelection();
-    if(!data) return hideMarkToolbar();
-
-    /*
-      Selecting a passage is an intentional study interruption. Pause every
-      timed reading mode at its canonical word before displaying Mark tools.
-      The reader remains paused until the user explicitly presses Resume.
-    */
-    if(isReaderRunning()){
-      stopReader();
-      const start=app.querySelector('#start-reader');
-      const pause=app.querySelector('#pause-reader');
-      if(start){start.disabled=false;start.textContent=state.index?'Resume':'Start';}
-      if(pause) pause.disabled=true;
-      persistReaderSession({immediate:true});
-      updateReaderStatus('Paused for selected passage.');
+    const interaction=state.markSelectionInteraction||{};
+    interaction.active=false;
+    if(!data){
+      state.markSelectionLocked=false;
+      return hideMarkToolbar();
     }
 
+    state.markSelectionLocked=true;
+    state.markSuppressNextReaderClick=true;
+    pauseReader();
+    persistReaderSession({immediate:true});
+    updateReaderStatus('Paused for selected passage. Click elsewhere or press Resume to continue.');
+
     const selection=window.getSelection();
-    showMarkToolbar(data,selection.getRangeAt(0).getBoundingClientRect());
+    const range=selection?.rangeCount?selection.getRangeAt(0):null;
+    showMarkToolbar(data,range?.getBoundingClientRect?.()||reader.getBoundingClientRect());
     renderMarkSelectionCard();
     if(!app.querySelector('#fullscreen-mark-drawer')?.hidden)renderFullscreenMarkSelection();
-  },0);};
-  reader.addEventListener('mouseup',handleSelection);reader.addEventListener('keyup',handleSelection);
+  },0);
+
+  reader.addEventListener('pointerdown',(event)=>{
+    if(event.button!==undefined && event.button!==0) return;
+    if(event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
+    const interaction=state.markSelectionInteraction||{};
+    interaction.active=true;
+    interaction.moved=false;
+    interaction.wasRunning=isReaderRunning();
+    interaction.startX=Number(event.clientX)||0;
+    interaction.startY=Number(event.clientY)||0;
+    state.markSelectionInteraction=interaction;
+    pauseForSelection();
+  },true);
+  reader.addEventListener('pointermove',(event)=>{
+    const interaction=state.markSelectionInteraction;
+    if(!interaction?.active) return;
+    if(Math.hypot((Number(event.clientX)||0)-interaction.startX,(Number(event.clientY)||0)-interaction.startY)>4){
+      interaction.moved=true;
+    }
+  },true);
+  reader.addEventListener('pointerup',finalizeSelection,true);
+  reader.addEventListener('pointercancel',()=>{if(state.markSelectionInteraction)state.markSelectionInteraction.active=false;},true);
+  reader.addEventListener('mouseup',finalizeSelection);
+  reader.addEventListener('keyup',finalizeSelection);
+  reader.addEventListener('click',(event)=>{
+    if(!state.markSuppressNextReaderClick) return;
+    state.markSuppressNextReaderClick=false;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  },true);
   reader.addEventListener('dblclick',event=>{if(event.altKey)selectReaderParagraphFromEvent(event);});
   toolbar.addEventListener('mousedown',e=>e.preventDefault());
   toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
@@ -9440,6 +9485,7 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 /* Feature block moved to /modules/reading/pacman-mode.js */
 
 function startReader() {
+  if(state.markPersistentSelection || state.markSelectionLocked) clearMarkSelectionForReadingResume();
   const selectedMode = getSelectedMode();
   if (selectedMode === 'two-column') return;
   const currentTickerStage = app.querySelector('.digital-sign-stage');
