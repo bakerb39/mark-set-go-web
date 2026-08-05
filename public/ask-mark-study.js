@@ -122,7 +122,7 @@
 
         <footer class="mark-composer">
           <button class="mark-plus" data-mark-more aria-label="More actions">＋</button>
-          <label><textarea data-mark-input rows="1" placeholder="Ask Mark anything about what you’re reading…"></textarea></label>
+          <label><textarea data-mark-input rows="1" placeholder=""></textarea></label>
           <button class="mark-send" data-mark-send aria-label="Send question">➜</button>
           <div class="mark-more-menu" data-mark-more-menu hidden>
             <button data-mark-action="translate">Translate selected passage</button>

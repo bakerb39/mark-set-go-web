@@ -4101,6 +4101,8 @@ function comprehensionPassage() {
   };
 }
 
+window.MarkSetGoStartComprehension = startComprehensionCheck;
+
 function closeComprehensionDialog() {
   app.querySelector('#comprehension-dialog')?.close();
 }
@@ -6678,7 +6680,19 @@ function bindMarkCompanion(reader){
   reader.addEventListener('mouseup',handleSelection);reader.addEventListener('keyup',handleSelection);
   reader.addEventListener('dblclick',event=>{if(event.altKey)selectReaderParagraphFromEvent(event);});
   toolbar.addEventListener('mousedown',e=>e.preventDefault());
-  toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();runMarkAction(b.dataset.markToolbarAction);}));
+  toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    if(b.dataset.markToolbarAction==='ask'){
+      hideMarkToolbar();
+      requestAnimationFrame(()=>{
+        const input=document.querySelector('[data-askmark-input]');
+        input?.focus();
+      });
+      return;
+    }
+    runMarkAction(b.dataset.markToolbarAction);
+  }));
   toolbar.querySelector('[data-mark-more]')?.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();});
   app.querySelector('#toggle-mark-panel')?.addEventListener('click',()=>{
     const layout=app.querySelector('#reader-layout');
@@ -6887,7 +6901,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
           <span class="fullscreen-label">Full screen</span>
         </button>
       </div>
-      <div class="reader-layout" id="reader-layout">
+      <div class="reader-layout word-panel-hidden" id="reader-layout">
         <aside id="navigation-pane" class="navigation-pane" aria-label="Contents and bookmarks"></aside>
         <div id="left-pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize contents pane" tabindex="0"></div>
         <div class="reader-center-column">
@@ -7042,7 +7056,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
 
       <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button>
+        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
@@ -7055,7 +7069,6 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         <button id="start-reader" class="primary">Start</button>
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
-        <button id="check-comprehension" class="secondary comprehension-trigger" type="button">🧠 Comprehension</button>
         <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. Click a word to continue from there; click empty space or press Space to pause or resume.</span>
       </div>
     </section>`;
@@ -7689,13 +7702,14 @@ function arrangeReaderSidePanels() {
     <nav class="mark-tabs" aria-label="Reader tools and Mark tabs"><button type="button" data-mark-tab="tools" class="active">Reader Tools</button><button type="button" data-mark-tab="selection">Mark</button><button type="button" data-mark-tab="notebook">Notebook</button><button type="button" data-mark-tab="history">History</button></nav>
     <div id="mark-tools-panel" data-mark-panel="tools" class="mark-panel-view">
       <div id="reader-control-core" class="reader-control-section"></div>
+      <details class="reader-control-group"><summary>Learn</summary><div id="reader-control-learn" class="reader-control-group-body"><p class="reader-control-help">Check how well you understood the passage you just read.</p></div></details>
       <details class="reader-control-group"><summary>Media</summary><div id="reader-control-media" class="reader-control-group-body"></div></details>
-      <details class="reader-control-group"><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
+      <details class="reader-control-group" open><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
     </div>
     <div id="mark-selection-panel" data-mark-panel="selection" class="mark-panel-view" hidden></div>
     <div id="mark-notebook-panel" data-mark-panel="notebook" class="mark-panel-view" hidden></div>
     <div id="mark-history-panel" data-mark-panel="history" class="mark-panel-view" hidden></div>`;
-  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(comprehension)comprehension.hidden=true;if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
+  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(comprehension)shell.querySelector('#reader-control-learn')?.appendChild(comprehension);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
   shell.querySelector('#close-reader-controls')?.addEventListener('click',()=>app.querySelector('#toggle-word-panel')?.click());
 }
 function bindReaderPaneControls() {
@@ -12205,7 +12219,7 @@ function renderMyLibraryHub() {
       <header class="library-welcome">
         <div>
           <span class="source-category">My Library</span>
-          <h1>Welcome back<span data-reader-name-suffix></span>.</h1>
+          <h1>Welcome back<span id="library-welcome-name"></span>.</h1>
           <p>Continue your reading journey and manage your personal collection.</p>
         </div>
 
@@ -12273,6 +12287,12 @@ function renderMyLibraryHub() {
       </details>
 
     </section>`;
+
+  {
+    const firstName = window.MarkSetGoAuth?.getFirstName?.() || String(window.MarkSetGoAuth?.session?.account?.displayName || '').trim().split(/\s+/)[0] || '';
+    const nameNode = app.querySelector('#library-welcome-name');
+    if (nameNode && firstName) nameNode.textContent = `, ${firstName}`;
+  }
 
   app.querySelectorAll('[data-library-document]').forEach((button) => {
     button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
@@ -13259,6 +13279,3 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') ReaderContinuity.scheduleCheckpoint({ immediate: true });
 });
 
-
-// Keep account-aware greetings current as pages render.
-new MutationObserver(personalizeVisiblePage).observe(app, { childList: true, subtree: true });

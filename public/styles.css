@@ -8798,23 +8798,50 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
 }
 
 
-/* v8.9 medium UI consistency pass: navy + light blue */
+/* v9.0.2 unified navy, light-blue, gold, and silver interface */
 :root {
-  --msg-navy: #17365d;
-  --msg-navy-deep: #102a46;
-  --msg-blue: #dceaf7;
-  --msg-blue-strong: #8fb8dd;
-  --msg-grey-active: #d8dee5;
+  --page: #edf3f8;
+  --surface: #ffffff;
+  --ink: #14263a;
+  --muted: #627387;
+  --border: #c7d2de;
+  --accent: #173f67;
+  --msg-navy: #102f4d;
+  --msg-blue: #2f75b5;
+  --msg-light-blue: #dcebf7;
+  --msg-gold: #d6b45f;
+  --msg-silver: #e3e8ed;
 }
 html, body { min-height: 100%; }
-body { min-height: 100vh; display: flex; flex-direction: column; }
-body > .app-shell { flex: 1 0 auto; }
-body > .site-footer { margin-top: auto; width: 100%; background: var(--msg-navy-deep); }
-.site-header, .site-footer { background-color: var(--msg-navy-deep) !important; }
-.primary, .auth-nav-primary, button.primary { background: var(--msg-navy) !important; border-color: var(--msg-navy) !important; }
-.top-nav-menu[open] > summary, .site-header details[open] > summary, .top-level-nav-button:hover, .site-header summary:hover { background: rgba(220,234,247,.16) !important; }
-.reader-toolbar .settings-panel[open] > summary { background: var(--msg-grey-active) !important; color: #263442 !important; border-color: #aeb8c2 !important; }
-.reader-toolbar .settings-panel[open] > summary .settings-summary { color: #52606d !important; }
-.menu-popover .menu-section-label { color: var(--msg-navy) !important; }
-.platform-hero, .library-heading, .page-hero { border-color: var(--msg-blue-strong); }
+body { min-height: 100vh; display: flex; flex-direction: column; background: var(--page); }
+.site-header { background: var(--msg-navy) !important; }
+.site-header .brand { color: #fff !important; }
+.site-header nav > button,
+.site-header nav > details > summary,
+.site-header .nav-icon { color: var(--msg-gold) !important; }
+.site-header nav > button:hover,
+.site-header nav > button:focus-visible,
+.site-header nav > details > summary:hover,
+.site-header nav > details > summary:focus-visible,
+.site-header nav > details[open] > summary { background: rgba(214,180,95,.14) !important; color: #f1d98d !important; }
+.menu-popover, .professional-library-menu { border-color: #b9c7d5 !important; }
+.menu-popover button:hover, .menu-popover button:focus-visible,
+.professional-library-menu button:hover, .professional-library-menu button:focus-visible { background: var(--msg-light-blue) !important; color: var(--msg-navy) !important; }
+.menu-section-label, .source-category, .askmark-eyebrow { color: #8a6719 !important; }
+.primary, button.primary { background: var(--msg-navy) !important; color: #fff !important; }
+.primary:hover, button.primary:hover { background: #194f7a !important; }
+.secondary, button.secondary { background: var(--msg-silver) !important; color: var(--msg-navy) !important; }
 a, .text-link { color: #245f91; }
+.platform-page, .panel, .hero, .library-primary-focus, .library-continue-card, .ai-tool-card { border-color: #c7d2de !important; }
+progress::-webkit-progress-value, .library-progress-track > span { background: var(--msg-blue) !important; }
+.reader-settings details[open] > summary,
+.reader-toolbar details[open] > summary,
+.reader-control-section details[open] > summary,
+.reader-option-group[open] > summary { background: #d9dee4 !important; color: var(--msg-navy) !important; }
+.mark-pane-button, .askmark-send, .askmark-plus { border-color: #9db5ca !important; }
+.mark-tabs button.active, .askmark-view-tab.is-active { background: var(--msg-light-blue) !important; color: var(--msg-navy) !important; }
+.mark-selection-toolbar button:hover { background: var(--msg-light-blue) !important; color: var(--msg-navy) !important; }
+.reader-word::selection, .reader::selection { background: rgba(47,117,181,.34) !important; }
+.site-footer { margin-top: auto !important; background: var(--msg-navy) !important; color: #dce6ef !important; border-top: 3px solid var(--msg-gold); }
+.site-footer button, .site-footer strong { color: var(--msg-gold) !important; }
+.app-shell { flex: 1 0 auto; }

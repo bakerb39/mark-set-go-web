@@ -60,17 +60,15 @@
   }
 
   function readerFirstName() {
-    const clerkUser = window.MarkSetGoAuth?.clerk?.user;
-    const session = window.MarkSetGoAuth?.session || {};
-    const raw = clerkUser?.firstName || session.firstName || session.givenName || session.name || clerkUser?.fullName || '';
-    return String(raw).trim().split(/\s+/)[0] || '';
+    return window.MarkSetGoAuth?.getFirstName?.() ||
+      String(window.MarkSetGoAuth?.session?.account?.displayName || '').trim().split(/\s+/)[0] || '';
   }
 
   function greeting() {
     const hour = new Date().getHours();
-    const name = readerFirstName();
     const salutation = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-    return `${salutation}${name ? `, ${name}` : ''}.`;
+    const firstName = readerFirstName();
+    return `${salutation}${firstName ? `, ${firstName}` : ''}.`;
   }
 
   function premiumMarkup() {
@@ -287,9 +285,8 @@
       runDocumentAction(button.dataset.documentAction);
     }));
     $('[data-askmark-comprehension]', shell)?.addEventListener('click', () => {
-      const trigger = document.querySelector('#check-comprehension');
-      if (trigger) trigger.click();
       $('[data-askmark-more-menu]', shell)?.setAttribute('hidden', '');
+      window.MarkSetGoStartComprehension?.();
     });
 
     $$('[data-askmark-prompt]', shell).forEach((button) => button.addEventListener('click', () => {
