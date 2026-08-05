@@ -113,7 +113,8 @@
           </section>
         </main>
 
-        <footer class="askmark-composer">
+        <footer class="askmark-composer" data-askmark-composer>
+          <div class="askmark-composer-resize" data-askmark-composer-resize role="separator" aria-label="Resize Ask Mark input" aria-orientation="horizontal" title="Drag upward to enlarge"></div>
           <button type="button" class="askmark-plus" data-askmark-more aria-label="More actions">＋</button>
           <label>
             <span class="sr-only">Ask Mark anything</span>
@@ -121,10 +122,11 @@
           </label>
           <button type="button" class="askmark-send" data-askmark-send aria-label="Send to Ask Mark">➜</button>
           <div class="askmark-more-menu" data-askmark-more-menu hidden>
-            <button type="button" data-premium-mark-action="translate">Translate passage</button>
-            <button type="button" data-premium-mark-action="save">Save passage</button>
-            <button type="button" data-document-action="summary">Summarize document</button>
-            <button type="button" data-document-action="readable">Make document readable</button>
+            <button type="button" data-askmark-prompt="Create a study guide for this passage."><span>▤</span><strong>Study guide</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-prompt="Create flash cards for this passage."><span>▱</span><strong>Flash cards</strong><small>Use current reading</small></button>
+            <button type="button" data-premium-mark-action="context"><span>⌛</span><strong>Historical context</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-prompt="Identify the key ideas in this passage."><span>✦</span><strong>Key ideas</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-prompt="Create memory tools for this passage."><span>◇</span><strong>Memory tools</strong><small>Use current reading</small></button>
           </div>
         </footer>
       </div>`;
@@ -276,6 +278,10 @@
       $('[data-askmark-more-menu]', shell).hidden = true;
       runDocumentAction(button.dataset.documentAction);
     }));
+    $$('[data-askmark-prompt]', shell).forEach((button) => button.addEventListener('click', () => {
+      $('[data-askmark-more-menu]', shell).hidden = true;
+      runSelectionAction('ask', button.dataset.askmarkPrompt);
+    }));
 
     const input = $('[data-askmark-input]', shell);
     const send = () => {
@@ -293,8 +299,36 @@
       }
     });
     input?.addEventListener('input', () => {
+      const composer = $('[data-askmark-composer]', shell);
+      if (composer?.dataset.userResized === '1') return;
       input.style.height = 'auto';
       input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+    });
+
+    const composer = $('[data-askmark-composer]', shell);
+    const resizeHandle = $('[data-askmark-composer-resize]', shell);
+    resizeHandle?.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      const startY = event.clientY;
+      const startHeight = composer.getBoundingClientRect().height;
+      const panelHeight = shell.getBoundingClientRect().height;
+      const minHeight = 74;
+      const maxHeight = Math.max(150, Math.floor(panelHeight * 0.55));
+      composer.dataset.userResized = '1';
+      resizeHandle.setPointerCapture?.(event.pointerId);
+
+      const move = (moveEvent) => {
+        const nextHeight = Math.max(minHeight, Math.min(maxHeight, startHeight + (startY - moveEvent.clientY)));
+        composer.style.height = `${nextHeight}px`;
+      };
+      const stop = () => {
+        resizeHandle.removeEventListener('pointermove', move);
+        resizeHandle.removeEventListener('pointerup', stop);
+        resizeHandle.removeEventListener('pointercancel', stop);
+      };
+      resizeHandle.addEventListener('pointermove', move);
+      resizeHandle.addEventListener('pointerup', stop);
+      resizeHandle.addEventListener('pointercancel', stop);
     });
 
     $('[data-askmark-more]', shell)?.addEventListener('click', () => {

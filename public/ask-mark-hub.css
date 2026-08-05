@@ -126,3 +126,74 @@
 @media (prefers-reduced-motion:reduce) {
   .askmark-avatar-glow,.is-thinking i,.askmark-view.is-active,.askmark-message { animation:none!important; }
 }
+
+/* Ask Mark composer: user-resizable from its top edge. */
+.askmark-composer {
+  min-height: 74px;
+  max-height: 55%;
+  grid-template-rows: 10px minmax(0, 1fr);
+  align-items: stretch;
+}
+.askmark-composer-resize {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 10px;
+  margin: -0.45rem 0 0;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.askmark-composer-resize::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 3px;
+  width: 42px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(17, 52, 81, .22);
+  transform: translateX(-50%);
+}
+.askmark-composer label { min-height: 0; }
+.askmark-composer[data-user-resized="1"] label,
+.askmark-composer[data-user-resized="1"] textarea { height: 100%; }
+.askmark-composer[data-user-resized="1"] textarea { max-height: none; resize: none; }
+
+/* Compact action cards opened by the plus button. */
+.askmark-more-menu {
+  width: 238px;
+  display: grid;
+  gap: .34rem;
+  padding: .45rem;
+}
+.askmark-more-menu[hidden] { display: none !important; }
+.askmark-more-menu button {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: .55rem;
+  align-items: center;
+  padding: .48rem .55rem;
+  border: 1px solid rgba(17,52,81,.11);
+  border-radius: 11px;
+  background: #fffdf8;
+}
+.askmark-more-menu button > span {
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  color: var(--ask-gold-soft);
+  background: var(--ask-navy-800);
+  font-weight: 800;
+}
+.askmark-more-menu button > strong {
+  font-size: .76rem;
+  line-height: 1.15;
+}
+.askmark-more-menu button > small {
+  color: var(--ask-muted);
+  font-size: .63rem;
+  line-height: 1.15;
+}
