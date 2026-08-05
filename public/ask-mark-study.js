@@ -47,8 +47,11 @@
   function legacySelectionPanel() { return $('#mark-selection-panel', legacyHost || shell || document); }
   function selectionText() { return legacySelectionPanel()?.querySelector('.mark-selection-card blockquote')?.textContent?.trim() || ''; }
   function readerFirstName() {
-    const account = window.MarkSetGoAuth?.session?.account || {};
-    const value = window.MarkSetGoAuth?.getFirstName?.() || account.firstName || account.first_name || account.displayName || account.display_name || '';
+    const session = window.MarkSetGoAuth?.session || {};
+    const profile = session.user || session.account || window.MarkSetGoAuth?.user || window.MarkSetGoAuth?.account || {};
+    const value = window.MarkSetGoAuth?.getFirstName?.() ||
+      profile.firstName || profile.first_name || profile.givenName || profile.given_name ||
+      profile.displayName || profile.display_name || profile.fullName || profile.full_name || profile.name || '';
     return String(value).trim().split(/\s+/)[0] || '';
   }
   function greeting() {

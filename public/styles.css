@@ -8922,3 +8922,29 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
 .reader-frame.fullscreen-fallback .reader-page-bookmark.bookmark-left-page {
   left: calc(50% - 42px);
 }
+
+
+/* v9.0.3 — compact professional reader title and reliable context-word cue. */
+.reader-page-panel .reader-title-copy h1 {
+  margin: 0 0 0.1rem !important;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.15rem, 1.15vw, 1.35rem) !important;
+  font-weight: 650 !important;
+  line-height: 1.15 !important;
+  letter-spacing: -0.015em;
+  color: #173f67;
+}
+#reader .reader-context-word,
+#reader .reader-context-word.ask-mark-selected {
+  background: #f6d365 !important;
+  color: inherit !important;
+  border-radius: 0.16em;
+  box-shadow: 0 0 0 1px rgba(12, 35, 64, 0.12);
+}
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen .reader-title-copy h1 {
+    font-family: inherit;
+    font-size: 0.94rem !important;
+    font-weight: 650 !important;
+  }
+}

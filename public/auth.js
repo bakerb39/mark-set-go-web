@@ -137,20 +137,25 @@
 
 
   function currentFirstName() {
-    const account = state.session?.account || {};
-    const user = state.clerk?.user || {};
+    // /api/auth/session returns the signed-in profile under `user`. Older
+    // builds used `account`, so accept both shapes during the migration.
+    const profile = state.session?.user || state.session?.account || {};
+    const clerkUser = state.clerk?.user || {};
     const value =
-      account.firstName || account.first_name || account.givenName || account.given_name ||
-      account.displayName || account.display_name || account.name ||
-      user.firstName || user.first_name || user.fullName || user.full_name ||
-      user.username || '';
+      profile.firstName || profile.first_name || profile.givenName || profile.given_name ||
+      profile.displayName || profile.display_name || profile.fullName || profile.full_name || profile.name ||
+      clerkUser.firstName || clerkUser.first_name || clerkUser.fullName || clerkUser.full_name ||
+      clerkUser.username || '';
     return String(value).trim().split(/\s+/)[0] || '';
   }
 
   function publishAuthState(session = state.session) {
+    const profile = session?.user || session?.account || null;
     window.MarkSetGoAuth = {
       clerk: state.clerk,
       session,
+      user: profile,
+      account: profile,
       refresh: fetchSession,
       getFirstName: currentFirstName
     };

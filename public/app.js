@@ -6402,10 +6402,18 @@ function captureMarkSelection() {
   const beforeStart=Math.max(0,startIndex-220), afterEnd=Math.min(state.words.length,startIndex+selectedWordCount+220);
   return {text,startIndex,endIndex:Math.min(state.words.length,startIndex+selectedWordCount),before:state.words.slice(beforeStart,startIndex).join(' '),after:state.words.slice(startIndex+selectedWordCount,afterEnd).join(' '),title:state.title,chapter:currentTocTitle?.()||'',documentId:state.documentId,createdAt:new Date().toISOString()};
 }
-function currentTocTitle(){
-  const items=Array.isArray(state.toc)?state.toc:[]; let current='';
-  for(const item of items){ if(Number(item.index)<=Number(state.index)) current=item.title||current; else break; }
+function tocTitleForWordIndex(wordIndex = state.index) {
+  const items = Array.isArray(state.toc) ? state.toc : [];
+  const target = Math.max(0, Number(wordIndex) || 0);
+  let current = '';
+  for (const item of items) {
+    if (Number(item.index) <= target) current = item.title || current;
+    else break;
+  }
   return current;
+}
+function currentTocTitle(){
+  return tocTitleForWordIndex(state.index);
 }
 function clearPersistentMarkSelection() {
   app.querySelectorAll('#reader .ask-mark-selected').forEach((element)=>element.classList.remove('ask-mark-selected'));
@@ -8543,8 +8551,9 @@ function updateModeControls(mode) {
 
 function appendStaticWords(container, words, startIndex = 0) {
   // Plain English text can be rendered as one text node, which keeps very large
-  // books responsive. Bionic and translated text still use word spans because
-  // they need per-word formatting or click handling.
+  // books responsive. Retain its global start index so pointer-based word
+  // actions can still resolve an exact word without materializing every span.
+  container.dataset.staticStartIndex = String(Math.max(0, Number(startIndex) || 0));
   if (!state.bionic && state.language === 'en') {
     container.textContent = words.join(' ');
     return;
@@ -8808,38 +8817,123 @@ function bindDictionaryMenu(reader) {
   const menu = app.querySelector('#word-context-menu');
   if (!menu) return;
 
-  const wordElementForContextEvent = (event) => {
-    const directTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
-    let wordElement = directTarget?.closest?.('.reader-word[data-index]') || null;
-    if (wordElement) return wordElement;
+  const caretRangeAtPoint = (x, y) => {
+    if (typeof document.caretRangeFromPoint === 'function') {
+      return document.caretRangeFromPoint(x, y);
+    }
+    if (typeof document.caretPositionFromPoint === 'function') {
+      const position = document.caretPositionFromPoint(x, y);
+      if (!position) return null;
+      const range = document.createRange();
+      range.setStart(position.offsetNode, position.offset);
+      range.collapse(true);
+      return range;
+    }
+    return null;
+  };
 
-    // Some reader modes place an overlay or wrapper above the word spans. Use
-    // the pointer coordinates as a fallback so right-click remains available.
-    const stack = typeof document.elementsFromPoint === 'function'
-      ? document.elementsFromPoint(event.clientX, event.clientY)
-      : [document.elementFromPoint?.(event.clientX, event.clientY)].filter(Boolean);
-    wordElement = stack
-      .map((element) => element?.closest?.('.reader-word[data-index]'))
-      .find(Boolean) || null;
-    return wordElement;
+  const wordMatchAtOffset = (text, rawOffset) => {
+    const offset = Math.max(0, Math.min(String(text || '').length, Number(rawOffset) || 0));
+    const matches = Array.from(String(text || '').matchAll(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*/gu));
+    return matches.find((match) => offset >= match.index && offset <= match.index + match[0].length)
+      || matches.find((match) => Math.abs(offset - match.index) <= 1)
+      || [...matches].reverse().find((match) => Math.abs(offset - (match.index + match[0].length)) <= 1)
+      || null;
+  };
+
+  const wordCountBeforePoint = (container, node, offset) => {
+    const before = document.createRange();
+    before.selectNodeContents(container);
+    try { before.setEnd(node, offset); }
+    catch (_) { return 0; }
+    return splitWords(before.toString()).length;
+  };
+
+  const wrapTextWord = (range, index) => {
+    if (!range || range.startContainer !== range.endContainer || range.startContainer.nodeType !== Node.TEXT_NODE) return null;
+    const span = document.createElement('span');
+    span.className = 'reader-word reader-context-word';
+    span.dataset.index = String(index);
+    try {
+      range.surroundContents(span);
+      return span;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const contextWordFromEvent = (event) => {
+    const directTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
+    let element = directTarget?.closest?.('.reader-word[data-index]') || null;
+    if (!element && typeof document.elementsFromPoint === 'function') {
+      element = document.elementsFromPoint(event.clientX, event.clientY)
+        .map((candidate) => candidate?.closest?.('.reader-word[data-index]'))
+        .find(Boolean) || null;
+    }
+    if (element) {
+      const index = Number(element.dataset.index);
+      if (!Number.isFinite(index)) return null;
+      return { word: state.words[index] || element.textContent, index, element };
+    }
+
+    // Full-page and two-column modes can contain plain text nodes rather than
+    // one span per word. Resolve the caret under the pointer, identify the word
+    // boundaries, and map the local text offset back to the global word index.
+    const caret = caretRangeAtPoint(event.clientX, event.clientY);
+    if (!caret || !reader.contains(caret.startContainer)) return null;
+    let textNode = caret.startContainer;
+    let offset = caret.startOffset;
+    if (textNode.nodeType !== Node.TEXT_NODE) {
+      const child = textNode.childNodes?.[Math.min(offset, Math.max(0, textNode.childNodes.length - 1))];
+      if (child?.nodeType === Node.TEXT_NODE) {
+        textNode = child;
+        offset = Math.min(offset, child.data.length);
+      } else {
+        return null;
+      }
+    }
+
+    const match = wordMatchAtOffset(textNode.data, offset);
+    if (!match) return null;
+    const range = document.createRange();
+    range.setStart(textNode, match.index);
+    range.setEnd(textNode, match.index + match[0].length);
+
+    const parent = textNode.parentElement;
+    const group = parent?.closest?.('.reader-group[data-start-index]');
+    const staticContainer = parent?.closest?.('[data-static-start-index]');
+    let index;
+    if (group) {
+      const base = Number(group.dataset.visibleStartIndex ?? group.dataset.startIndex) || 0;
+      index = base + wordCountBeforePoint(group, textNode, match.index);
+    } else if (staticContainer) {
+      const base = Number(staticContainer.dataset.staticStartIndex) || 0;
+      index = base + wordCountBeforePoint(staticContainer, textNode, match.index);
+    } else {
+      index = nearestWordIndexForSelection(match[0]);
+    }
+    index = Math.max(0, Math.min(state.words.length - 1, Number(index) || 0));
+    element = wrapTextWord(range, index) || parent;
+    return { word: state.words[index] || match[0], index, element, range };
   };
 
   reader.addEventListener('contextmenu', (event) => {
-    const wordElement = wordElementForContextEvent(event);
-    if (!wordElement) return;
+    const context = contextWordFromEvent(event);
+    if (!context) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    const index = Number(wordElement.dataset.index);
-    const word = state.words[index] || wordElement.textContent;
-    state.contextWord = { word, index, element: wordElement };
+
+    app.querySelectorAll('#reader .reader-context-word').forEach((node) => node.classList.remove('reader-context-word'));
+    context.element?.classList?.add('reader-context-word');
+    state.contextWord = context;
 
     // Treat the right-clicked word as the active Ask Mark selection so it stays
     // visibly highlighted while the context menu and lookup result are open.
     const wordSelection = {
-      text: String(word || '').trim(),
-      startIndex: index,
-      endIndex: index + 1,
-      chapter: chapterForWordIndex?.(index)?.title || ''
+      text: String(context.word || '').trim(),
+      startIndex: context.index,
+      endIndex: context.index + 1,
+      chapter: tocTitleForWordIndex(context.index)
     };
     if (wordSelection.text) {
       if (isReaderRunning()) {
@@ -8849,20 +8943,26 @@ function bindDictionaryMenu(reader) {
       state.markSelection = wordSelection;
       state.markSelectionLocked = true;
       persistMarkSelectionHighlight(wordSelection);
+      context.element?.classList?.add('ask-mark-selected');
       renderMarkSelectionCard();
       updateReaderStatus('Paused on selected word. Click elsewhere in the text to continue.');
     }
 
-    const existingNote = notesForCurrentDocument().find((item) => Number(item.wordIndex) === index);
+    const existingNote = notesForCurrentDocument().find((item) => Number(item.wordIndex) === context.index);
     const noteButton = menu.querySelector('[data-dictionary-action="note"]');
     if (noteButton) noteButton.textContent = existingNote ? 'Edit note' : 'Add note';
     const bookmarkButton = menu.querySelector('[data-dictionary-action="bookmark"]');
     if (bookmarkButton) bookmarkButton.textContent = bookmarkForContextWord() ? 'Remove bookmark' : 'Add bookmark';
+
+    // Unhide before measuring so the menu is clamped to the viewport correctly.
+    menu.hidden = false;
+    menu.style.visibility = 'hidden';
     const maxLeft = window.innerWidth - menu.offsetWidth - 12;
     const maxTop = window.innerHeight - menu.offsetHeight - 12;
     menu.style.left = `${Math.max(8, Math.min(event.clientX, maxLeft))}px`;
     menu.style.top = `${Math.max(8, Math.min(event.clientY, maxTop))}px`;
-    menu.hidden = false;
+    menu.style.visibility = '';
+    menu.querySelector('button')?.focus({ preventScroll: true });
   });
   menu.querySelector('[data-dictionary-action="lookup"]')?.addEventListener('click', () => {
     closeDictionaryMenu();
@@ -8881,7 +8981,13 @@ function bindDictionaryMenu(reader) {
     closeDictionaryMenu();
     toggleBookmarkForContextWord();
   });
-  document.addEventListener('click', closeDictionaryMenu);
+  document.addEventListener('pointerdown', (event) => {
+    // Close only for a primary-button press outside the custom menu. A generic
+    // document click listener can run after a right-click on some browsers and
+    // hide the menu immediately after it opens.
+    if (event.button !== 0 || menu.contains(event.target)) return;
+    closeDictionaryMenu();
+  }, true);
   window.addEventListener('blur', closeDictionaryMenu);
   reader.addEventListener('scroll', closeDictionaryMenu, { passive: true });
   reader.addEventListener('scroll', () => updateReaderBookmarkMarkers(), { passive: true });
@@ -8889,7 +8995,6 @@ function bindDictionaryMenu(reader) {
   reader.addEventListener('pointerup', () => ReaderContinuity.scheduleCheckpoint());
   reader.addEventListener('keyup', () => ReaderContinuity.scheduleCheckpoint());
 }
-
 
 
 
@@ -12382,13 +12487,19 @@ function libraryRecencyLabel(lastReadAt) {
 }
 
 function currentReaderFirstName() {
-  const account = window.MarkSetGoAuth?.session?.account || {};
+  const session = window.MarkSetGoAuth?.session || {};
+  const profile = session.user || session.account || window.MarkSetGoAuth?.user || window.MarkSetGoAuth?.account || {};
   const displayName =
     window.MarkSetGoAuth?.getFirstName?.() ||
-    account.firstName ||
-    account.first_name ||
-    account.displayName ||
-    account.display_name ||
+    profile.firstName ||
+    profile.first_name ||
+    profile.givenName ||
+    profile.given_name ||
+    profile.displayName ||
+    profile.display_name ||
+    profile.fullName ||
+    profile.full_name ||
+    profile.name ||
     '';
   return String(displayName).trim().split(/\s+/)[0] || '';
 }
@@ -12401,7 +12512,10 @@ function updateLibraryWelcomeName() {
 }
 
 function scheduleLibraryPersonalization() {
-  scheduleLibraryPersonalization();
+  // Update immediately, then retry briefly because Clerk and the library view
+  // can finish rendering in either order. The previous self-call caused a
+  // stack overflow and prevented personalization from ever being applied.
+  updateLibraryWelcomeName();
   [50, 250, 750, 1500].forEach((delay) => window.setTimeout(updateLibraryWelcomeName, delay));
 }
 

@@ -60,8 +60,12 @@
   }
 
   function readerFirstName() {
-    return window.MarkSetGoAuth?.getFirstName?.() ||
-      String(window.MarkSetGoAuth?.session?.account?.displayName || '').trim().split(/\s+/)[0] || '';
+    const session = window.MarkSetGoAuth?.session || {};
+    const profile = session.user || session.account || window.MarkSetGoAuth?.user || window.MarkSetGoAuth?.account || {};
+    const value = window.MarkSetGoAuth?.getFirstName?.() ||
+      profile.firstName || profile.first_name || profile.givenName || profile.given_name ||
+      profile.displayName || profile.display_name || profile.fullName || profile.full_name || profile.name || '';
+    return String(value).trim().split(/\s+/)[0] || '';
   }
 
   function greeting() {
