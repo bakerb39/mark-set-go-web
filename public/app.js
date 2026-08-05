@@ -5156,14 +5156,11 @@ function renderNavigationPane() {
   const pane = app.querySelector('#navigation-pane');
   if (!pane) return;
   const bookmarks = getBookmarks();
-  const pageBookmarks = getReaderBookmarks();
   const tocMarkup = state.toc.length
     ? state.toc.map((entry, index) => `<button type="button" class="toc-link" data-toc-index="${entry.index}" title="Go to ${escapeHtml(entry.title)}"><span>${index + 1}</span>${escapeHtml(entry.title)}</button>`).join('')
     : '<p class="navigation-empty">No chapter headings were detected.</p>';
-  const standardBookmarkMarkup = bookmarks.map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-bookmark="${escapeHtml(bookmark.id)}"><strong>${escapeHtml(bookmark.title)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-bookmark="${escapeHtml(bookmark.id)}" aria-label="Delete bookmark">×</button></div>`).join('');
-  const pageBookmarkMarkup = pageBookmarks.map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-reader-bookmark="${escapeHtml(bookmark.id)}"><strong>${escapeHtml(bookmark.title || 'Saved page')}</strong><span>Page ${Number(bookmark.pageNumber) || 1} · Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-reader-bookmark-list="${escapeHtml(bookmark.id)}" aria-label="Delete page bookmark">×</button></div>`).join('');
-  const bookmarkMarkup = standardBookmarkMarkup || pageBookmarkMarkup
-    ? `${pageBookmarkMarkup}${standardBookmarkMarkup}`
+  const bookmarkMarkup = bookmarks.length
+    ? bookmarks.map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-bookmark="${escapeHtml(bookmark.id)}"><strong>${escapeHtml(bookmark.title)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-bookmark="${escapeHtml(bookmark.id)}" aria-label="Delete bookmark">×</button></div>`).join('')
     : '<p class="navigation-empty">No bookmarks saved yet.</p>';
   const definitions = definitionsForCurrentDocument();
   const definitionMarkup = definitions.length
@@ -5181,7 +5178,7 @@ function renderNavigationPane() {
     </div>
     <div class="reader-library-tabs" role="tablist" aria-label="Reading tools">
       <button class="reader-library-tab active" type="button" role="tab" data-reader-tab="contents" aria-selected="true">Contents</button>
-      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="bookmarks" aria-selected="false">Bookmarks <span>${bookmarks.length + pageBookmarks.length}</span></button>
+      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="bookmarks" aria-selected="false">Bookmarks <span>${bookmarks.length}</span></button>
       <button class="reader-library-tab" type="button" role="tab" data-reader-tab="definitions" aria-selected="false">Definitions <span>${definitions.length}</span></button>
       <button class="reader-library-tab" type="button" role="tab" data-reader-tab="notes" aria-selected="false">Notes <span>${notes.length}</span></button>
     </div>
@@ -5225,12 +5222,6 @@ function renderNavigationPane() {
   });
   pane.querySelectorAll('[data-remove-bookmark]').forEach((button) => {
     button.addEventListener('click', () => removeBookmark(button.dataset.removeBookmark));
-  });
-  pane.querySelectorAll('[data-open-reader-bookmark]').forEach((button) => {
-    button.addEventListener('click', () => openReaderPageBookmark(button.dataset.openReaderBookmark));
-  });
-  pane.querySelectorAll('[data-remove-reader-bookmark-list]').forEach((button) => {
-    button.addEventListener('click', () => removeReaderBookmark(button.dataset.removeReaderBookmarkList));
   });
   pane.querySelectorAll('[data-open-definition]').forEach((button) => {
     button.addEventListener('click', () => openSavedDefinition(button.dataset.openDefinition));
@@ -6517,9 +6508,38 @@ function saveMarkInsight(extra={}){
   renderGlobalNotebookEntries();
   updateReaderStatus?.('Saved to Mark’s notebook.');
 }
+function openComparisonWorkspace(){
+  const selected=state.markSelection;
+  if(!selected?.text) return;
+  const payload={
+    id:`comparison-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    createdAt:new Date().toISOString(),
+    primary:{
+      documentId:selected.documentId||state.documentId||'',
+      title:selected.title||state.title||'Current text',
+      author:state.source?.author||'',
+      passage:selected.text,
+      startIndex:Number(selected.startIndex)||0,
+      endIndex:Number(selected.endIndex)||Number(selected.startIndex)||0,
+      chapter:selected.chapter||'',
+      source:state.source||null
+    },
+    comparisonTexts:[],
+    mode:'syntopicon',
+    notes:''
+  };
+  try{localStorage.setItem('markSetGoComparisonDraftV1',JSON.stringify(payload));}catch{}
+  const opened=window.open('/comparison-workspace.html','_blank');
+  if(!opened){
+    window.location.href='/comparison-workspace.html';
+  }
+  hideMarkToolbar();
+}
+
 async function runMarkAction(action,question=''){
   const selected=state.markSelection; if(!selected) return;
   if(action==='save'){saveMarkInsight({action:'selection'});return;}
+  if(action==='related'){openComparisonWorkspace();return;}
   if(action==='define' && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false); return; }
   const responsePanels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean);responsePanels.forEach(p=>{p.hidden=false;p.innerHTML='<p class="status">Ask Mark is reading the selection…</p>';});
   try{
@@ -8610,7 +8630,6 @@ function toggleBookmarkForContextWord() {
     saveReaderBookmarks(items.filter((item) => item.id !== existing.id));
     updateReaderStatus?.(`Bookmark removed from page ${page.pageNumber}.`);
   } else {
-    const documentStored = persistCurrentDocument();
     items.push({
       id: `bookmark-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       documentId: state.documentId,
@@ -8619,67 +8638,18 @@ function toggleBookmarkForContextWord() {
       pageNumber: page.pageNumber,
       pageKey: page.pageKey,
       side: page.side,
-      mode: getSelectedMode(),
-      source: state.source,
-      documentStored,
       createdAt: new Date().toISOString()
     });
     saveReaderBookmarks(items);
     updateReaderStatus?.(`Bookmark added to page ${page.pageNumber}.`);
   }
   updateReaderBookmarkMarkers();
-  renderNavigationPane();
 }
 
 function removeReaderBookmark(id) {
   saveReaderBookmarks(getReaderBookmarks().filter((item) => item.id !== id));
   updateReaderBookmarkMarkers();
-  renderNavigationPane();
   updateReaderStatus?.('Bookmark removed.');
-}
-
-async function openReaderPageBookmark(id) {
-  const bookmark = getReaderBookmarks().find((item) => item.id === id);
-  if (!bookmark) return;
-
-  if (bookmark.documentId === state.documentId && state.words.length) {
-    jumpToWordIndex(bookmark.wordIndex);
-    return;
-  }
-
-  let documentData = null;
-  try {
-    documentData = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${bookmark.documentId}`) || 'null');
-  } catch (_) {
-    documentData = null;
-  }
-
-  try {
-    if (!documentData?.text && bookmark.source?.type === 'gutenberg' && bookmark.source.id) {
-      const book = await loadApiPayload(`/api/gutenberg/books/${bookmark.source.id}/text`);
-      const author = book.authors?.length ? ` — ${book.authors.join(', ')}` : '';
-      documentData = { title: `${book.title}${author}`, text: book.text, source: bookmark.source };
-    }
-    if (!documentData?.text && bookmark.source?.type === 'built-in' && bookmark.source.key) {
-      const loaded = await loadLocalText(bookmark.source.key);
-      documentData = { ...loaded, source: bookmark.source };
-    }
-    if (!documentData?.text) throw new Error('The bookmarked text is no longer stored in this browser.');
-
-    renderReaderWithText(documentData.title, documentData.text, documentData.source || bookmark.source || { type: 'bookmark' });
-    requestAnimationFrame(() => {
-      const modeSelect = app.querySelector('#mode-select');
-      if (modeSelect && bookmark.mode) {
-        modeSelect.value = bookmark.mode;
-        prepareReaderView(bookmark.mode);
-        updateModeControls(bookmark.mode);
-      }
-      jumpToWordIndex(bookmark.wordIndex);
-    });
-  } catch (error) {
-    const status = app.querySelector('#reader-status');
-    if (status) status.textContent = error.message;
-  }
 }
 
 function visibleReaderBookmarkPages() {
@@ -9470,14 +9440,6 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 /* Feature block moved to /modules/reading/pacman-mode.js */
 
 function startReader() {
-  // A passage sent to Ask Mark stays highlighted while the reader is paused.
-  // Once playback resumes, remove that temporary reference highlight.
-  state.markPersistentSelection = null;
-  clearPersistentMarkSelection();
-  hideMarkToolbar();
-  const activeSelection = window.getSelection?.();
-  if (activeSelection && !activeSelection.isCollapsed) activeSelection.removeAllRanges();
-
   const selectedMode = getSelectedMode();
   if (selectedMode === 'two-column') return;
   const currentTickerStage = app.querySelector('.digital-sign-stage');
