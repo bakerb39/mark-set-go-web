@@ -323,11 +323,6 @@
     requestAnimationFrame(retryInstall);
   });
   document.addEventListener('marksetgo:transform-state', refreshContext);
-  document.addEventListener('marksetgo:notebook-updated', () => {
-    if (!configuredShell) return;
-    const notebookTab = configuredShell.querySelector('[data-mark-tab="notebook"]');
-    if (notebookTab?.classList.contains('active')) notebookTab.click();
-  });
 
   function retryInstall() {
     install();
