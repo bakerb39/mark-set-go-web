@@ -99,10 +99,6 @@
               </article>
             </div>
 
-            <section class="askmark-selection-card" data-askmark-selection hidden>
-              <div><span>Selected passage</span><button type="button" data-clear-selection aria-label="Dismiss selected passage">×</button></div>
-              <blockquote data-askmark-selection-text></blockquote>
-            </section>
 
           </section>
 
