@@ -8767,3 +8767,13 @@ body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;tran
 .reader-frame.fullscreen-fallback > .viewer-fullscreen-button {
   top: 1rem;
 }
+
+/* Align the viewer full-screen control with the Contents / Ask Mark action row. */
+.reader-frame > .viewer-fullscreen-button {
+  top: -4.15rem !important;
+}
+
+.reader-frame:fullscreen > .viewer-fullscreen-button,
+.reader-frame.fullscreen-fallback > .viewer-fullscreen-button {
+  top: 1rem !important;
+}
