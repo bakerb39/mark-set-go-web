@@ -6,17 +6,30 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=7.7.8" rel="stylesheet"/>
+<link href="/styles.css?v=8.6.3" rel="stylesheet"/>
+<link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
+<link href="/ask-mark-hub.css?v=8.9.0" rel="stylesheet"/>
+<link href="/mobile-simple.css?v=8.5.9" rel="stylesheet"/>
+<link rel="stylesheet" href="/button-feedback.css?v=8.6.6">
 <script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/SessionManager.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/ReaderEngine.js?v=3.2.1-stable-recovery"></script>
-<script defer src="/reader/VirtualRenderer.js?v=3.2.1-stable-recovery"></script>
+<script defer src="/reader/VirtualRenderer.js?v=7.7.15.3-toc-window"></script>
   <script defer src="/modules/reading/digital-sign-mode.js?v=7.2.1"></script>
   <script defer src="/modules/reading/pacman-mode.js?v=7.2.2"></script>
   <script defer src="/modules/pages/help-page.js?v=7.2.1"></script>
   <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
-  <script defer src="/auth.js?v=7.7.8"></script>
-  <script defer src="/app.js?v=7.7.12"></script>
+  <script defer src="/auth.js?v=8.1.2"></script>
+  <script defer src="/cloud-data.js?v=8.1.2"></script>
+  <script defer src="/app.js?v=8.1.2"></script>
+  <script defer src="/cloud-preferences.js?v=8.1.2"></script>
+  <script defer src="/cloud-library.js?v=8.1.2"></script>
+  <script defer src="/cloud-document.js?v=8.1.2"></script>
+  <script defer src="/cloud-productivity.js?v=8.1.2"></script>
+  <script defer src="/document-manager.js?v=8.1.2"></script>
+  <script defer src="/read-anything.js?v=8.8.0"></script>
+  <script defer src="/ask-mark-hub.js?v=8.9.0"></script>
+  <script defer src="/mobile-simple.js?v=8.5.9"></script>
 </head>
 <body>
 <header class="site-header">
@@ -57,7 +70,7 @@
     </button>
     <button data-read="upload" type="button" role="menuitem">
       <span class="menu-icon icon-import">⇧</span>
-      <span>Imports</span>
+      <span>Read Anything</span>
     </button>
   </div>
 
@@ -82,7 +95,7 @@
 <button data-action="browse" type="button"><span class="menu-icon">⌕</span> Browse Libraries</button>
 <button data-read="great-books" type="button"><span class="menu-icon">★</span> Great Books</button>
 <button data-read="bible" type="button"><span class="menu-icon">✦</span> Bible Study</button>
-<button data-read="upload" type="button"><span class="menu-icon">⇧</span> Import Book</button>
+<button data-read="upload" type="button"><span class="menu-icon">⇧</span> Read Anything</button>
 <button data-action="my-links" type="button"><span class="menu-icon">↗</span> My Links</button>
 </div>
 </details>
@@ -133,16 +146,19 @@
 <iframe allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen="" loading="lazy" id="music-player" referrerpolicy="strict-origin-when-cross-origin" title="Spotify or YouTube music player"></iframe>
 </div>
 </aside>
-<footer class="site-footer">
-<div class="site-footer-brand"><strong>Mark, Set, Go!</strong><span>Independent reading and lifelong-learning software by Brian Baker.</span></div>
-<nav aria-label="Footer links">
+<footer class="site-footer" id="msg-shared-bottom">
+<div class="site-footer-copy">
+<strong>Mark, Set, Go!</strong>
+<small>© 2026 Brian Baker. All rights reserved.</small>
+</div>
+<nav aria-label="Company information">
 <button type="button" data-action="about">About</button>
 <button type="button" data-action="contact">Contact</button>
 <button type="button" data-action="privacy">Privacy</button>
 <button type="button" data-action="terms">Terms</button>
-<button type="button" data-action="help">Help</button>
 </nav>
-<small>© 2026 Brian Baker. All rights reserved. Version 7.7.8.</small>
+<span class="site-footer-version">Early Access · v8.8.0</span>
 </footer>
+<script defer src="/button-feedback.js?v=8.6.6"></script>
 </body>
 </html>

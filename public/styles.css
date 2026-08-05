@@ -1977,8 +1977,8 @@ body.resizing-reader-panes { cursor: col-resize; user-select: none; }
   left: 50%;
   transform: translateX(-50%);
   width: min(82%, 46rem);
-  min-height: 2.9em;
-  padding: .42em .8em .38em;
+  min-height: 0;
+  padding: .30em .8em .24em;
   border: 1px solid color-mix(in srgb, var(--focus-anchor-color, #20a866) 45%, transparent);
   border-radius: .65rem;
   background: color-mix(in srgb, var(--surface) 92%, transparent);
@@ -1990,7 +1990,10 @@ body.resizing-reader-panes { cursor: col-resize; user-select: none; }
   overflow: hidden;
 }
 .focus-anchor-overlay[hidden] { display: none; }
-.focus-anchor-overlay .focus-anchor-stage { width: 100%; }
+.focus-anchor-overlay .focus-anchor-stage {
+  width: 100%;
+  line-height: 1;
+}
 .reader-frame:has(.reader.light) .focus-anchor-overlay {
   background: rgb(255 255 255 / .94);
   color: #111;
@@ -2005,7 +2008,8 @@ body.resizing-reader-panes { cursor: col-resize; user-select: none; }
   left: 50% !important;
   transform: translateX(-50%) !important;
   width: min(72%, 52rem);
-  min-height: 2.7em;
+  min-height: 0;
+  padding-block: .28em .22em;
   cursor: default;
   border-radius: .55rem;
   background: color-mix(in srgb, var(--surface) 96%, transparent);
@@ -8601,3 +8605,139 @@ body.light .comprehension-actions,
 /* v7.7.3: expose Clerk's authentication dialog above the private-beta gate. */
 body.clerk-auth-dialog-open .beta-access-gate{opacity:0;pointer-events:none;transition:opacity .12s ease}
 .cl-modalBackdrop,.cl-modalContent,[class*="cl-modal"],[data-clerk-modal]{z-index:2147483647!important}
+
+
+/* v7.7.15.3 unified Continue Reading card */
+.home-continue-reading {
+  align-items: flex-start;
+}
+.home-continue-reading > span:last-child {
+  width: 100%;
+}
+.home-continue-reading .progress-meter {
+  display: block;
+  width: 100%;
+  height: 5px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, .18);
+}
+.home-continue-reading .progress-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: .72;
+}
+
+/* v8.6.3 — one compact, left-aligned shared footer everywhere. */
+.site-footer {
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: start;
+  align-items: start;
+  gap: 2px;
+  width: 100%;
+  margin: 0;
+  padding: 9px max(18px, calc((100vw - 1500px) / 2));
+  border-top: 1px solid rgba(100,116,139,.18);
+  background: rgba(248,250,252,.96);
+  text-align: left;
+}
+.site-footer-copy {
+  display: grid;
+  justify-items: start;
+  gap: 1px;
+  min-width: 0;
+}
+.site-footer-copy strong { font-size: .82rem; line-height: 1.15; }
+.site-footer-copy small,
+.site-footer-version { font-size: .62rem; line-height: 1.15; opacity: .7; }
+.site-footer nav {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.site-footer nav button {
+  min-height: 0;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  font-size: .68rem;
+}
+.site-footer-version { white-space: nowrap; text-align: left; }
+
+/* v8.6.3 — preserve the established Book Pages multicolumn engine.
+   Only allow surrounding desktop containers to shrink; do not add CSS
+   containment or width limits to generated columns. */
+@media (min-width: 701px) {
+  .reader-layout,
+  .reader-center-column,
+  .reader-frame { min-width: 0; }
+  #reader.reader.book-pages-layout {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 700px) {
+  .site-footer {
+    position: static;
+    padding: 7px 10px calc(7px + env(safe-area-inset-bottom, 0));
+  }
+}
+
+/* v8.6.5 — desktop footer uses left information and right links/version. */
+.site-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "copy nav"
+    "copy version";
+  column-gap: 24px;
+  row-gap: 2px;
+  align-items: end;
+  justify-items: stretch;
+  text-align: left;
+}
+.site-footer-copy {
+  grid-area: copy;
+  justify-self: start;
+  align-self: center;
+}
+.site-footer nav {
+  grid-area: nav;
+  justify-self: end;
+  justify-content: flex-end;
+  text-align: right;
+}
+.site-footer-version {
+  grid-area: version;
+  justify-self: end;
+  text-align: right;
+}
+
+@media (max-width: 700px) {
+  .site-footer {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "copy"
+      "nav"
+      "version";
+    justify-items: start;
+    align-items: start;
+    column-gap: 0;
+    row-gap: 2px;
+    text-align: left;
+  }
+  .site-footer-copy,
+  .site-footer nav,
+  .site-footer-version {
+    justify-self: start;
+    text-align: left;
+  }
+  .site-footer nav { justify-content: flex-start; }
+}

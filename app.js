@@ -55,6 +55,20 @@ const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
 // this browser/app session. Persistent IndexedDB is reserved for Home > Resume.
 let activeReaderSnapshot = null;
 
+function clearActiveReaderPane() {
+  stopReader();
+  activeReaderSnapshot = null;
+  try { readerEngine.reset?.(); } catch {}
+  state.title = '';
+  state.currentText = '';
+  state.originalText = '';
+  state.words = [];
+  state.index = 0;
+  state.viewportAnchorIndex = 0;
+  state.documentId = '';
+  state.source = null;
+}
+
 
 const APP_VIEW_STATE_KEY = 'markSetGoViewStateV1';
 
@@ -2899,31 +2913,19 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   refreshFocusAnchorStyle();
   updateFocusAnchorOverlay();
 
-  // Book Pages needs a geometry pass after the DOM has its final font, width,
-  // mode and page setting. Merely checking the checkbox is not sufficient.
+  // Protected Book Pages refresh restoration:
+  // restore the visible spread from the saved viewport anchor while keeping
+  // the independent playback cursor at savedIndex.
   requestAnimationFrame(() => {
-    if (state.bookPages) {
-      scheduleBookPageReflow();
-      requestAnimationFrame(() => {
-        const activeReader = app.querySelector('#reader');
-        if (activeReader) {
-          ensureWordsRendered(activeReader, mode, wordCount, state.index + 100);
-          const target =
-            activeReader.querySelector(`.reader-word[data-index="${state.index}"]`) ||
-            activeReader.querySelector(`.reader-group[data-start-index="${state.index}"]`);
-          if (target) {
-            const readerRect = activeReader.getBoundingClientRect();
-            const targetRect = target.getBoundingClientRect();
-            const metrics = applyBookPageMetrics(activeReader);
-            const absoluteLeft = targetRect.left - readerRect.left + activeReader.scrollLeft - metrics.paddingLeft;
-            const pageIndex = Math.max(0, Math.floor(absoluteLeft / Math.max(1, metrics.pagePitch)));
-            goToBookSpread(Math.floor(pageIndex / 2), { behavior: 'auto', ensureRendered: true });
-          } else {
-            updateBookPageStatus();
-          }
-        }
-      });
-    }
+    if (!state.bookPages) return;
+    scheduleBookPageReflow({ anchorIndex: savedViewportAnchor });
+    requestAnimationFrame(() => {
+      restoreBookPageWordAnchor(savedViewportAnchor);
+      state.viewportAnchorIndex = savedViewportAnchor;
+      state.index = savedIndex;
+      readerEngine.setPosition(savedIndex);
+      updateReaderStatus();
+    });
   });
 
   const restoreSavedViewport = () => {
@@ -3106,37 +3108,23 @@ function renderHome() {
               <span><strong>WPM Test</strong><small>Measure your natural reading speed</small></span>
             </button>
 
-            <button class="secondary home-large-action" id="resume-last-reading" type="button">
+            ${resumeMeta?.title ? `<button class="secondary home-large-action home-continue-reading" id="resume-last-reading" type="button">
               <span aria-hidden="true">↩</span>
-              <span><strong>Resume Last Reading</strong><small>${resumeMeta?.title ? escapeHtml(resumeMeta.title) : 'No saved reading yet'}</small></span>
-            </button>
+              <span>
+                <strong>Continue Reading</strong>
+                <small>${escapeHtml(resumeMeta.title)}${resumePercent === null ? '' : ` · ${resumePercent}% complete`}</small>
+                ${resumePercent === null ? '' : `<span class="progress-meter" aria-hidden="true"><span style="width:${resumePercent}%"></span></span>`}
+              </span>
+            </button>` : `<button class="secondary home-large-action" id="resume-last-reading" type="button" disabled>
+              <span aria-hidden="true">↩</span>
+              <span><strong>Continue Reading</strong><small>No saved reading yet</small></span>
+            </button>`}
           </div>
 
-          ${resumeMeta?.title ? `<article class="resume-reading-card home-simple-resume">
-            <div>
-              <span class="resume-reading-kicker">Last reading</span>
-              <strong>${escapeHtml(resumeMeta.title)}</strong>
-              <small>${resumePercent === null ? 'Saved reading position' : `${resumePercent}% complete`} · opens only when you choose Resume</small>
-            </div>
-            ${resumePercent === null ? '' : `<div class="progress-meter"><span style="width:${resumePercent}%"></span></div>`}
-          </article>
-          <button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Forget Saved Reading</button>` : ''}
+          ${resumeMeta?.title ? `<button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Clear Resume Position</button>` : ''}
         </section>
       </div>
 
-      <section class="home-business-strip" aria-label="Company and product information">
-        <div>
-          <strong>Independent reading and learning platform</strong>
-          <span>Designed and developed by Brian Baker.</span>
-        </div>
-        <nav aria-label="Business information">
-          <button type="button" data-action="about">About</button>
-          <button type="button" data-action="contact">Contact</button>
-          <button type="button" data-action="privacy">Privacy</button>
-          <button type="button" data-action="terms">Terms</button>
-        </nav>
-        <small>© 2026 Brian Baker. All rights reserved. Mark, Set, Go! is an independent software project.</small>
-      </section>
     </section>`;
 
   app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));
@@ -3170,7 +3158,7 @@ function renderHome() {
   });
   app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
     await clearReaderSession();
-    activeReaderSnapshot = null;
+    clearActiveReaderPane();
     renderHome();
   });
 
@@ -4835,16 +4823,27 @@ function persistCurrentDocument() {
   if (!state.documentId || !state.currentText) return false;
   const key = `${DOCUMENT_STORAGE_PREFIX}${state.documentId}`;
   try {
-    if (!localStorage.getItem(key)) {
-      localStorage.setItem(key, JSON.stringify({
-        title: state.title,
-        text: state.currentText,
-        source: state.source
-      }));
+    const next = {
+      title: state.title,
+      text: state.currentText,
+      source: state.source
+    };
+    const existingRaw = localStorage.getItem(key);
+    let shouldWrite = !existingRaw;
+    if (existingRaw) {
+      try {
+        const existing = JSON.parse(existingRaw);
+        shouldWrite = existing?.title !== next.title
+          || existing?.text !== next.text
+          || JSON.stringify(existing?.source || {}) !== JSON.stringify(next.source || {});
+      } catch {
+        shouldWrite = true;
+      }
     }
+    if (shouldWrite) localStorage.setItem(key, JSON.stringify(next));
     return true;
   } catch (error) {
-    console.warn('Document could not be stored for bookmarks.', error);
+    console.warn('Document could not be stored in this browser.', error);
     return false;
   }
 }
@@ -5042,7 +5041,14 @@ function jumpToWordIndex(wordIndex) {
     const reader = app.querySelector('#reader');
     if (!reader) return;
     if (!['flash', 'digital-sign'].includes(mode)) {
-      ensureWordsRendered(reader, mode, groupSize, index + 100);
+      const distantTocJump = !state.bookPages
+        && (index < Number(state.renderedWordStart || 0)
+          || index > Number(state.renderedWordEnd || 0) + 1600);
+      if (distantTocJump) {
+        virtualRenderer.renderWindowAround(reader, mode, groupSize, index);
+      } else {
+        ensureWordsRendered(reader, mode, groupSize, index + 100);
+      }
       const target = reader.querySelector(`.reader-word[data-index="${index}"]`)
         || reader.querySelector(`.reader-group[data-start-index="${index}"]`);
       if (target) {
@@ -6741,6 +6747,14 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   state.uploadedIllustrations = Array.isArray(source?.illustrations) ? source.illustrations : [];
   state.illustrationMode = state.uploadedIllustrations.length ? 'chapter' : 'off';
   if (!state.words.length) return renderError('No readable text', 'The selected source did not contain readable words.');
+
+  // Every successful import/open must create the local document payload immediately.
+  // Previously the text was only persisted after actions such as adding a bookmark,
+  // allowing cloud metadata to sync while the actual document remained unavailable.
+  persistCurrentDocument();
+  document.dispatchEvent(new CustomEvent('marksetgo:document-available', {
+    detail: { documentId: state.documentId, title: state.title }
+  }));
 
   app.innerHTML = `
     <section class="panel reader-page-panel">
@@ -12010,13 +12024,64 @@ function renderMyLibraryHub() {
   const primaryPercent = primaryBook?.totalWords
     ? Math.min(100, Math.round((Number(primaryBook.furthestWord) || 0) / primaryBook.totalWords * 100))
     : 0;
+  // My Library must become interactive before any expensive reading-profile
+  // analysis. Parsing several full stored books and sampling up to 110,000
+  // characters from each one blocked the main thread and delayed click handlers.
+  // Show an already-cached profile when available; otherwise omit the badge here.
+  // A profile will still be calculated normally when the user opens its dedicated
+  // Reading Profile flow, where the analysis is expected and intentional.
+  const mobileSimpleLibrary = window.matchMedia?.('(max-width: 760px)')?.matches;
+  // Mobile intentionally excludes reading profiles. Desktop displays only an
+  // already-cached browser profile and never analyzes book text while opening
+  // My Library.
+  const libraryDifficultyCache = mobileSimpleLibrary ? null : difficultyCache();
   const storedDifficultyForProgress = (item) => {
-    if (!item) return null;
-    let document = null;
-    try { document = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${item.documentId}`) || 'null'); } catch {}
-    return getBookDifficulty({ documentId:item.documentId, title:item.title, author:document?.source?.author || '', year:document?.source?.year || '', description:document?.source?.description || '' }, document?.text || '');
+    if (!item || mobileSimpleLibrary || !libraryDifficultyCache) return null;
+    const key = difficultyKey({ documentId:item.documentId, title:item.title });
+    return libraryDifficultyCache[key]?.profile || null;
   };
   const primaryDifficulty = storedDifficultyForProgress(primaryBook);
+
+  const deleteStoredDocument = async (documentId, title = 'this book') => {
+    if (!documentId) return;
+    const confirmed = window.confirm(`Delete “${title}” from My Library? This removes its saved text, progress, bookmarks, notes, cached reading profile, and signed-in cloud copy.`);
+    if (!confirmed) return;
+
+    const progressRecords = readStoredObject(READING_PROGRESS_KEY);
+    const removed = progressRecords[documentId] || { documentId, title };
+
+    try {
+      const cloudBook = window.MarkSetGoCloudLibrary?.list?.().find((book) => String(book.clientRecordId || '') === String(documentId));
+      if (cloudBook?.id && window.MarkSetGoCloud?.library?.remove) {
+        await window.MarkSetGoCloud.library.remove(cloudBook.id);
+      }
+    } catch (error) {
+      const continueLocal = window.confirm(`The cloud copy could not be deleted (${error?.message || 'unknown error'}). Delete the local copy anyway?`);
+      if (!continueLocal) return;
+    }
+
+    delete progressRecords[documentId];
+    localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progressRecords));
+    localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`);
+
+    const readingList = getReadingList().filter((item) => String(item.documentId || '') !== String(documentId));
+    saveReadingList(readingList);
+    saveBookmarks(getBookmarks().filter((item) => String(item.documentId || '') !== String(documentId)));
+    saveNotes(getNotes().filter((item) => String(item.documentId || '') !== String(documentId)));
+
+    const profileKey = difficultyKey({ documentId, title });
+    const profiles = difficultyCache();
+    if (profiles[profileKey]) {
+      delete profiles[profileKey];
+      localStorage.setItem(BOOK_DIFFICULTY_CACHE_KEY, JSON.stringify(profiles));
+    }
+    localStorage.removeItem(readingProfileCacheKey({ documentId, title }));
+    ['none', 'light', 'full'].forEach((mode) => localStorage.removeItem(bookGuideCacheKey({ documentId, title }, mode)));
+
+    await clearRemovedBookReferences({ ...removed, documentId, title });
+    await window.MarkSetGoCloudLibrary?.refresh?.().catch?.(() => {});
+    renderMyLibraryHub();
+  };
 
   const openStoredDocument = async (documentId, wordIndex = null) => {
     let data = null;
@@ -12090,7 +12155,10 @@ function renderMyLibraryHub() {
         <p>${percent}% complete · Last read ${escapeHtml(lastRead)}</p>
         ${difficulty ? difficultyBadge(difficulty, {title:item.title}) : ''}
         <div class="library-progress-track"><span style="width:${percent}%"></span></div>
-        <button class="${index === 0 ? 'primary' : 'secondary'}" type="button" data-library-document="${escapeHtml(item.documentId)}">Resume reading</button>
+        <div class="library-book-actions">
+          <button class="${index === 0 ? 'primary' : 'secondary'}" type="button" data-library-document="${escapeHtml(item.documentId)}">Resume reading</button>
+          <button class="secondary library-delete-book" type="button" data-library-delete="${escapeHtml(item.documentId)}" data-library-title="${escapeHtml(item.title || 'Untitled')}" aria-label="Delete ${escapeHtml(item.title || 'book')}">Delete</button>
+        </div>
       </div>
     </article>`;
   }).join('');
@@ -12123,6 +12191,7 @@ function renderMyLibraryHub() {
               <div class="focus-actions">
                 <button class="primary" type="button" data-library-document="${escapeHtml(primaryBook.documentId)}">Resume reading</button>
                 <button class="secondary" type="button" data-action="reader">Open Reader</button>
+                <button class="secondary library-delete-book" type="button" data-library-delete="${escapeHtml(primaryBook.documentId)}" data-library-title="${escapeHtml(primaryBook.title || 'Untitled')}">Delete</button>
               </div>
             </div>
           ` : `
@@ -12171,6 +12240,10 @@ function renderMyLibraryHub() {
   app.querySelectorAll('[data-library-document]').forEach((button) => {
     button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
   });
+  app.querySelectorAll('[data-library-delete]').forEach((button) => {
+    button.addEventListener('click', () => deleteStoredDocument(button.dataset.libraryDelete, button.dataset.libraryTitle || 'this book'));
+  });
+  document.dispatchEvent(new CustomEvent('marksetgo:library-rendered'));
 }
 function renderLibraryRecords(kind) {
   stopReader();
