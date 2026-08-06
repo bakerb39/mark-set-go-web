@@ -13,7 +13,17 @@
   const write = (key, value) => localStorage.setItem(key, JSON.stringify(value));
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  const sameBook = (a, b) => normalize(a) && normalize(a) === normalize(b);
+  const normalizeBookTitle = value => normalize(String(value || '')
+    .split(/\s+[—–-]\s+/)[0]
+    .replace(/^(the|a|an)\s+/i, ''));
+  const sameBook = (a, b) => {
+    const left = normalizeBookTitle(a);
+    const right = normalizeBookTitle(b);
+    if (!left || !right) return false;
+    if (left === right) return true;
+    // Reader titles often append an author or edition after the saved library title.
+    return Math.min(left.length, right.length) >= 5 && (left.includes(right) || right.includes(left));
+  };
   const todayIso = () => new Date().toISOString().slice(0, 10);
   const yearEnd = () => `${new Date().getFullYear()}-12-31`;
 

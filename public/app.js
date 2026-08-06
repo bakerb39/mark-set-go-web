@@ -7495,6 +7495,20 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   };
   document.addEventListener('keydown', state.spacebarHandler);
 
+  // Recognize a selected goal book as soon as it is opened or resumed.
+  // startReader() also calls this, while ReadingGoals suppresses duplicate notices.
+  window.setTimeout(() => {
+    try {
+      window.ReadingGoals?.onSessionStart({
+        title: state.title || title,
+        documentId: state.documentId,
+        wpm: Number(app.querySelector('#speed')?.value) || state.wpm || 0
+      });
+    } catch (error) {
+      console.warn('Reading goal encouragement on book load failed:', error);
+    }
+  }, 250);
+
   reader.addEventListener('click', (event) => {
     const translatedWord = event.target.closest('.translated-word');
     if (translatedWord && state.language !== 'en') {
