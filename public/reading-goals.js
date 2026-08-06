@@ -2,7 +2,6 @@
   'use strict';
 
   const GOALS_KEY = 'markSetGoReadingGoalsV2';
-  const COMPANION_STATE_KEY = 'markSetGoGoalCompanionStateV1';
   const PROGRESS_KEY = 'markSetGoReadingProgressV1';
   const ACTIVITY_KEY = 'markSetGoReadingActivityV1';
   const COMPREHENSION_KEY = 'markSetGoComprehensionV1';
@@ -99,6 +98,7 @@
     const goals = getGoals();
     const metrics = getMetrics(goals);
     const list = read(LIST_KEY, []);
+    const libraryDocuments = getLibraryDocuments();
     app.dataset.viewKey = 'reading-goals';
     app.innerHTML = `<section class="panel reading-goals-page">
       <header class="goals-hero">
@@ -183,103 +183,27 @@
     app.querySelector('.action-center-hero')?.insertAdjacentElement('afterend',section);
   }
 
-  function companionState() { return read(COMPANION_STATE_KEY, {}); }
-  function saveCompanionState(state) { write(COMPANION_STATE_KEY, state); }
-
-  function daysRemaining(deadline) {
-    if(!deadline) return null;
-    const end=new Date(deadline+'T23:59:59');
-    if(Number.isNaN(end.getTime())) return null;
-    return Math.ceil((end-Date.now())/86400000);
-  }
-
-  function milestoneFor(percent) {
-    if(percent>=100) return 100;
-    if(percent>=75) return 75;
-    if(percent>=50) return 50;
-    if(percent>=25) return 25;
-    return 0;
-  }
-
-  function companionThought(percent, change, milestone) {
-    if(milestone===100) return 'You finished it. Take a moment to notice what stayed with you—that is where a book becomes part of your thinking.';
-    if(milestone===75) return 'You are in the final stretch. This is a good point to watch how the book’s major ideas begin to converge.';
-    if(milestone===50) return 'Halfway through is a useful place to pause and ask: what has changed since the opening pages?';
-    if(milestone===25) return 'You have enough of the book behind you now to begin noticing its recurring patterns and questions.';
-    if(change>=10) return 'That was a strong stretch of reading. Momentum like this makes difficult books feel much more manageable.';
-    if(change>=5) return 'You made meaningful progress since my last update. Consistency matters more than a perfect session.';
-    const thoughts=[
-      'A few focused pages still count. The habit grows every time you return.',
-      'Try carrying one question with you as you read; it can turn passive reading into a conversation.',
-      'You do not have to understand everything immediately. Important books often become clearer through continued attention.',
-      'Notice one sentence or idea worth remembering today. Small discoveries accumulate.',
-      'Welcome back. Returning to a book is itself a form of progress.'
-    ];
-    return thoughts[Math.abs(percent)%thoughts.length];
-  }
-
-  function buildCompanionMessage(goal, book, previous) {
-    const title=goal.title || 'this book';
-    const percent=Math.max(0,Math.min(100,Number(book.percent||0)));
-    const priorPercent=Number(previous?.percent||0);
-    const change=Math.max(0,percent-priorPercent);
-    const remaining=daysRemaining(goal.deadline);
-    const milestone=milestoneFor(percent);
-    let opening;
-    if(!previous) opening=`I’m glad you chose ${title} as a reading goal.`;
-    else if(change>0) opening=`Welcome back to ${title}. You’re now ${percent}% through${change?`, up ${change}% since my last update`:''}.`;
-    else opening=`Welcome back to ${title}. You’re ${percent}% through.`;
-    let timing='';
-    if(remaining!==null) {
-      if(remaining<0) timing=` The target date passed ${Math.abs(remaining)} day${Math.abs(remaining)===1?'':'s'} ago, but the goal is still worth finishing.`;
-      else if(remaining===0) timing=' Your target date is today.';
-      else timing=` You have ${remaining} day${remaining===1?'':'s'} remaining.`;
-    }
-    return `${opening}${timing} ${companionThought(percent,change,milestone)}`;
-  }
-
-  function shouldSendCompanionUpdate(previous, percent) {
-    if(!previous) return true;
-    const today=new Date().toISOString().slice(0,10);
-    const newDay=previous.date!==today;
-    const progressGain=percent>=Number(previous.percent||0)+5;
-    const newMilestone=milestoneFor(percent)>Number(previous.milestone||0);
-    return newDay || progressGain || newMilestone;
-  }
-
-  function sendCompanionMessage(goal, book, previous) {
-    const percent=Math.max(0,Math.min(100,Number(book.percent||0)));
-    const milestone=milestoneFor(percent);
-    const date=new Date().toISOString().slice(0,10);
-    const id=`goal-${goal.id}-${date}-${percent}-${milestone}`;
-    const detail={
-      id,
-      kind:'goal-update',
-      bookId:goal.bookId,
-      documentId:goal.bookId,
-      title:goal.title,
-      message:buildCompanionMessage(goal,book,previous),
-      createdAt:new Date().toISOString()
-    };
-    document.dispatchEvent(new CustomEvent('marksetgo:ask-mark-companion-message',{detail}));
-    window.AskMarkCompanion?.addMessage?.(detail);
-  }
-
   function encourageGoalBook(context={}) {
     const goals=getGoals(); if(!goals.enabled) return;
     const bookId=String(context.documentId||context.bookId||'').trim(); if(!bookId) return;
-    const goal=goals.books.find(item => item.bookId === bookId); if(!goal) return;
-    const metrics=getMetrics(goals); const book=metrics.bookGoals.find(item=>item.id===goal.id)||goal;
-    const percent=Math.max(0,Math.min(100,Number(book.percent||0)));
-    const state=companionState(); const previous=state[goal.id];
-    if(!shouldSendCompanionUpdate(previous,percent)) return;
-    sendCompanionMessage(goal,book,previous);
-    state[goal.id]={date:new Date().toISOString().slice(0,10),percent,milestone:milestoneFor(percent),sentAt:new Date().toISOString()};
-    saveCompanionState(state);
+    const goal=goals.books.find(item => item.bookId === bookId);
+    if(!goal) return;
+    const key=`${bookId}|${new Date().toISOString().slice(0,10)}`; if(lastEncouragedSession===key) return; lastEncouragedSession=key;
+    const m=getMetrics(goals); const book=m.bookGoals.find(item=>item.id===goal.id)||goal;
+    const title=goal.title || context.title || 'this book';
+    const deadline=goal.deadline ? new Date(goal.deadline+'T12:00:00').toLocaleDateString(undefined,{month:'long',day:'numeric'}) : '';
+    const message=`You’re reading one of your goal books. You’re ${book.percent||0}% through ${title}${deadline?` and working toward your ${deadline} target`:''}. Keep going—you’re building real momentum.`;
+    showEncouragement(message);
   }
 
   function onSessionStart(context={}) { encourageGoalBook(context); }
-  function onBookOpened(context={}) { window.setTimeout(() => encourageGoalBook(context), 350); }
+  function onBookOpened(context={}) { window.setTimeout(() => encourageGoalBook(context), 250); }
+
+  function showEncouragement(message) {
+    document.querySelector('.reading-goal-toast')?.remove();
+    const toast=document.createElement('aside'); toast.className='reading-goal-toast'; toast.setAttribute('role','status'); toast.innerHTML=`<span class="goal-mark-avatar">M</span><div><strong>Mark</strong><p>${esc(message)}</p></div><button type="button" aria-label="Dismiss">×</button>`;
+    document.body.appendChild(toast); toast.querySelector('button').addEventListener('click',()=>toast.remove()); setTimeout(()=>toast.remove(),10000);
+  }
 
   async function syncGoals(goals=getGoals()) {
     if(!goals.emailProgress) return;
