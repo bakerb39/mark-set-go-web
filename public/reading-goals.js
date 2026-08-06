@@ -97,6 +97,7 @@
     if (!app) return;
     const goals = getGoals();
     const metrics = getMetrics(goals);
+    const libraryDocuments = getLibraryDocuments();
     const list = read(LIST_KEY, []);
     app.dataset.viewKey = 'reading-goals';
     app.innerHTML = `<section class="panel reading-goals-page">
