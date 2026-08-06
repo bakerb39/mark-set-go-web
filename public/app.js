@@ -9885,6 +9885,7 @@ function startReader() {
   start.disabled = true;
   pause.disabled = false;
   beginReadingSession();
+  try { window.ReadingGoals?.onSessionStart({ title: state.title, documentId: state.documentId, wpm: speed }); } catch (error) { console.warn('Reading goal encouragement failed:', error); }
 
   const expectedMeaningful = state.meaningfulChunks && modeSupportsMeaningfulChunks(mode);
   if (state.renderedMode !== mode
@@ -13685,6 +13686,7 @@ document.addEventListener('click', (event) => {
   if (actionName === 'terms') renderTerms();
   if (actionName === 'music') renderMusicLibrary();
   if (actionName === 'my-reading' || actionName === 'reading-list') renderReadingList();
+  if (actionName === 'reading-goals') window.ReadingGoals?.render();
   if (actionName === 'progress-dashboard' || actionName === 'progress-awards') renderProgressDashboard();
   if (actionName === 'action-center') renderActionCenter();
   if (actionName === 'vocabulary-builder') renderVocabularyBuilder();
