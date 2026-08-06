@@ -7,11 +7,31 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const transformApi = () => window.MarkSetGoReadAnything;
+  const COMPANION_MESSAGES_KEY = 'markSetGoAskMarkCompanionMessagesV1';
+  const MAX_COMPANION_MESSAGES = 40;
+
+  function readCompanionMessages() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(COMPANION_MESSAGES_KEY) || '[]');
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function saveCompanionMessages(items) {
+    try { localStorage.setItem(COMPANION_MESSAGES_KEY, JSON.stringify(items.slice(-MAX_COMPANION_MESSAGES))); } catch (_) {}
+  }
+
+  function activeDocumentId() {
+    return String(currentDocumentId || window.MarkSetGoActiveDocumentId || document.body?.dataset?.documentId || '').trim();
+  }
 
   let shell = null;
   let legacyHost = null;
   let selectionObserver = null;
   let installAttempts = 0;
+  let currentDocumentId = '';
 
   const QUICK_ACTIONS = [
     ['explain', '✦', 'Explain'],
@@ -150,6 +170,49 @@
           </div>
         </footer>
       </div>`;
+  }
+
+  function companionMessageMarkup(item) {
+    const label = item.kind === 'goal-update' ? 'Reading goal update' : 'Reading companion';
+    return `<article class="askmark-message mark-message askmark-companion-message" data-companion-message-id="${escapeHtml(item.id || '')}">
+      <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+      <div><span>Mark <small>${escapeHtml(label)}</small></span><p>${escapeHtml(item.message || '')}</p></div>
+    </article>`;
+  }
+
+  function renderStoredCompanionMessages() {
+    const conversation = $('[data-askmark-conversation]', shell);
+    if (!conversation) return;
+    const currentId = activeDocumentId();
+    const items = readCompanionMessages().filter((item) => !item.bookId || !currentId || item.bookId === currentId);
+    items.slice(-8).forEach((item) => {
+      if (conversation.querySelector(`[data-companion-message-id="${CSS.escape(item.id || '')}"]`)) return;
+      conversation.insertAdjacentHTML('beforeend', companionMessageMarkup(item));
+    });
+    conversation.scrollTop = conversation.scrollHeight;
+  }
+
+  function addCompanionMessage(detail = {}) {
+    const message = String(detail.message || '').trim();
+    if (!message) return;
+    const item = {
+      id: String(detail.id || `companion-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`),
+      bookId: String(detail.bookId || detail.documentId || '').trim(),
+      title: String(detail.title || '').trim(),
+      kind: String(detail.kind || 'goal-update'),
+      message,
+      createdAt: detail.createdAt || new Date().toISOString()
+    };
+    const items = readCompanionMessages();
+    if (!items.some((existing) => existing.id === item.id)) {
+      items.push(item);
+      saveCompanionMessages(items);
+    }
+    const conversation = $('[data-askmark-conversation]', shell);
+    if (conversation && !conversation.querySelector(`[data-companion-message-id="${CSS.escape(item.id)}"]`)) {
+      conversation.insertAdjacentHTML('beforeend', companionMessageMarkup(item));
+      conversation.scrollTop = conversation.scrollHeight;
+    }
   }
 
   function addUserMessage(text) {
@@ -417,6 +480,7 @@
 
     syncSelection();
     syncContext();
+    renderStoredCompanionMessages();
     return true;
   }
 
@@ -431,12 +495,15 @@
     if (!install() && installAttempts < 180) requestAnimationFrame(retryInstall);
   }
 
-  document.addEventListener('marksetgo:document-available', () => {
+  document.addEventListener('marksetgo:document-available', (event) => {
+    currentDocumentId = String(event.detail?.documentId || event.detail?.bookId || '').trim();
     installAttempts = 0;
     requestAnimationFrame(retryInstall);
   });
   document.addEventListener('selectionchange', () => setTimeout(syncSelection, 60));
   document.addEventListener('marksetgo:transform-state', syncContext);
+  document.addEventListener('marksetgo:ask-mark-companion-message', (event) => addCompanionMessage(event.detail || {}));
+  window.AskMarkCompanion = { addMessage: addCompanionMessage, getMessages: readCompanionMessages };
 
   requestAnimationFrame(retryInstall);
   [400, 900, 1800, 3200].forEach((delay) => setTimeout(install, delay));
