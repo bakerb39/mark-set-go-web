@@ -7089,8 +7089,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     ? suppliedToc
     : detectTableOfContents(text);
 
+  const suppliedDocumentId = String(source?.documentId || source?.bookId || '').trim();
   readerEngine.loadBook(bookModel, {
-    documentId: documentIdFor(title, String(text)),
+    documentId: suppliedDocumentId || documentIdFor(title, String(text)),
     structure,
     toc
   });
@@ -7494,20 +7495,6 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     persistReaderSession();
   };
   document.addEventListener('keydown', state.spacebarHandler);
-
-  // Recognize a selected goal book as soon as it is opened or resumed.
-  // startReader() also calls this, while ReadingGoals suppresses duplicate notices.
-  window.setTimeout(() => {
-    try {
-      window.ReadingGoals?.onSessionStart({
-        title: state.title || title,
-        documentId: state.documentId,
-        wpm: Number(app.querySelector('#speed')?.value) || state.wpm || 0
-      });
-    } catch (error) {
-      console.warn('Reading goal encouragement on book load failed:', error);
-    }
-  }, 250);
 
   reader.addEventListener('click', (event) => {
     const translatedWord = event.target.closest('.translated-word');
@@ -12620,7 +12607,7 @@ function renderBrowseHub() {
     let data = null;
     try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
     if (!data?.text) return renderReadingList();
-    renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
+    renderReaderWithText(data.title, data.text, { ...(data.source || { type:'saved' }), documentId });
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
     requestAnimationFrame(() => jumpToWordIndex(record?.lastWord || 0));
   }));

@@ -6,6 +6,7 @@
   const ACTIVITY_KEY = 'markSetGoReadingActivityV1';
   const COMPREHENSION_KEY = 'markSetGoComprehensionV1';
   const LIST_KEY = 'markSetGoReadingListV1';
+  const DOCUMENT_PREFIX = 'markSetGoDocumentV1:';
   const EMAIL_KEY = 'markSetGoEmailPreferencesV1';
   let lastEncouragedSession = '';
 
@@ -14,6 +15,29 @@
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const todayIso = () => new Date().toISOString().slice(0, 10);
   const yearEnd = () => `${new Date().getFullYear()}-12-31`;
+
+  function getLibraryDocuments() {
+    const documents = [];
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(DOCUMENT_PREFIX)) continue;
+      const documentId = key.slice(DOCUMENT_PREFIX.length).trim();
+      if (!documentId) continue;
+      try {
+        const item = JSON.parse(localStorage.getItem(key) || 'null');
+        if (!item?.text || !String(item.title || '').trim()) continue;
+        documents.push({
+          documentId,
+          title: String(item.title).trim(),
+          source: item.source || null,
+          savedAt: item.savedAt || item.updatedAt || item.importedAt || ''
+        });
+      } catch (_) {}
+    }
+    return documents
+      .sort((a, b) => String(a.title).localeCompare(String(b.title)))
+      .filter((item, index, all) => index === 0 || item.documentId !== all[index - 1].documentId);
+  }
 
   function defaults() {
     return {
@@ -45,6 +69,7 @@
     const activity = read(ACTIVITY_KEY, []);
     const comprehension = read(COMPREHENSION_KEY, []);
     const list = read(LIST_KEY, []);
+    const libraryDocuments = getLibraryDocuments();
     const year = new Date().getFullYear();
     const completedIds = new Set();
     list.filter(item => item.status === 'finished').forEach(item => completedIds.add(item.documentId || item.id || item.title));
@@ -94,8 +119,8 @@
           <div class="goal-fields"><label>Target reading speed<input id="goal-target-wpm" type="number" min="50" max="1500" step="10" value="${Number(goals.targetWpm)||350}"><small>words per minute</small></label><label>Target comprehension<input id="goal-target-comprehension" type="number" min="1" max="100" value="${Number(goals.targetComprehension)||80}"><small>percent</small></label></div>
           <div class="goal-current-metrics"><span>Current WPM <strong>${metrics.avgWpm || '—'}</strong></span><span>Current comprehension <strong>${metrics.avgComprehension ? metrics.avgComprehension+'%' : '—'}</strong></span></div>
         </section>
-        <section class="goals-card goal-books-card"><div class="goals-card-heading"><span>▤</span><div><h2>Books to finish</h2><p>Choose books from My Reading and give each one a target date.</p></div></div>
-          <div class="goal-book-adder"><select id="goal-book-select"><option value="">Choose a book…</option>${list.filter(item=>item.title && (item.documentId || item.id)).map(item=>`<option value="${esc(item.documentId||item.id)}">${esc(item.title)}</option>`).join('')}</select><input id="goal-book-deadline" type="date" min="${todayIso()}" value="${goals.annualDeadline||yearEnd()}"><button id="add-goal-book" class="secondary" type="button">Add book goal</button></div>
+        <section class="goals-card goal-books-card"><div class="goals-card-heading"><span>▤</span><div><h2>Books to finish</h2><p>Choose books already stored in My Library and give each one a target date.</p></div></div>
+          <div class="goal-book-adder"><select id="goal-book-select"><option value="">Choose a book…</option>${libraryDocuments.map(item=>`<option value="${esc(item.documentId)}">${esc(item.title)}</option>`).join('')}</select><input id="goal-book-deadline" type="date" min="${todayIso()}" value="${goals.annualDeadline||yearEnd()}"><button id="add-goal-book" class="secondary" type="button">Add book goal</button></div>
           <div id="goal-book-list" class="goal-book-list">${metrics.bookGoals.length ? metrics.bookGoals.map(book=>`<article><div><strong>${esc(book.title)}</strong><small>Target ${book.deadline ? new Date(book.deadline+'T12:00:00').toLocaleDateString() : 'not set'}</small></div><div class="goal-inline-progress"><span style="width:${book.percent}%"></span></div><b>${book.percent}%</b><button type="button" data-remove-goal-book="${esc(book.id)}" aria-label="Remove ${esc(book.title)}">×</button></article>`).join('') : '<p class="empty-state">No book-specific goals yet.</p>'}</div>
         </section>
         <section class="goals-card"><div class="goals-card-heading"><span>✉</span><div><h2>Visibility & encouragement</h2><p>Keep goal progress prominent and include it in Action Center emails.</p></div></div>
@@ -108,10 +133,10 @@
     const form = app.querySelector('#reading-goals-form');
     const select = app.querySelector('#goal-book-select');
     app.querySelector('#add-goal-book')?.addEventListener('click', () => {
-      const chosen = list.find(item => String(item.documentId||item.id) === select.value);
+      const chosen = libraryDocuments.find(item => String(item.documentId) === select.value);
       if (!chosen) return;
       const current = getGoals();
-      const bookId = String(chosen.documentId || chosen.id || '').trim();
+      const bookId = String(chosen.documentId || '').trim();
       if (!bookId) return;
       if (!current.books.some(item => item.bookId === bookId)) current.books.push({ id:`goal-book-${Date.now()}`, bookId, title:chosen.title, deadline:app.querySelector('#goal-book-deadline').value, createdAt:new Date().toISOString() });
       saveGoals(current); render();
@@ -190,5 +215,5 @@
   const observer=new MutationObserver(()=>{ injectProgress(); injectActionCenter(); });
   document.addEventListener('marksetgo:document-available', event => onBookOpened(event.detail || {}));
   window.addEventListener('DOMContentLoaded',()=>{ const app=document.querySelector('#app'); if(app) observer.observe(app,{childList:true,subtree:true}); injectProgress(); injectActionCenter(); });
-  window.ReadingGoals={render,getGoals,saveGoals,getMetrics,onSessionStart,onBookOpened,injectProgress,injectActionCenter,syncGoals};
+  window.ReadingGoals={render,getGoals,saveGoals,getMetrics,getLibraryDocuments,onSessionStart,onBookOpened,injectProgress,injectActionCenter,syncGoals};
 })();
