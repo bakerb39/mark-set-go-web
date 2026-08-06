@@ -6751,6 +6751,8 @@ function bindMarkCompanion(reader){
     startX:0,
     startY:0,
     pointerId:null,
+    pointerType:'mouse',
+    startedOnText:false,
     finalized:false
   });
 
@@ -6846,14 +6848,16 @@ function bindMarkCompanion(reader){
   };
 
   const resumeAfterLockedSelectionClick=(event)=>{
-    const pending=state.markResumeOnNextReaderClick;
-    const shouldResume=Boolean(pending?.shouldResume);
     state.markResumeOnNextReaderClick=null;
 
+    // The first click after a locked selection is still a normal reader click:
+    // a word click moves the reading position, while a click in blank reader
+    // space toggles play/pause. Do not base this on whether playback happened
+    // to be running before the selection began; that made blank clicks appear
+    // inconsistent whenever the passage was selected from an already-paused
+    // reader.
     event.preventDefault();
     event.stopImmediatePropagation();
-
-    if(!shouldResume) return;
 
     const clickedWord=event.target.closest?.('.reader-word[data-index]');
     const mode=getSelectedMode();
@@ -6873,7 +6877,10 @@ function bindMarkCompanion(reader){
       }
     }
 
-    if(mode!=='two-column' && !isReaderRunning()) startReader();
+    if(mode==='two-column') return;
+    if(isReaderRunning()) pauseReader();
+    else startReader();
+    persistReaderSession();
   };
 
   reader.addEventListener('pointerdown',(event)=>{
@@ -6881,13 +6888,12 @@ function bindMarkCompanion(reader){
     if(event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
 
     // The first ordinary click in the reader after using Ask Mark removes the
-    // temporary highlight. Playback resumes only if it had been running before
-    // the selection began; the click itself is handled in the capture listener.
+    // temporary highlight. The following click handler then applies the normal
+    // reader behavior: blank space toggles play/pause and a word click seeks.
     if(state.markSelectionLocked){
-      const shouldResume=Boolean(state.markSelectionWasRunning);
       clearMarkSelectionForReadingResume();
       state.markSelectionWasRunning=false;
-      state.markResumeOnNextReaderClick={shouldResume};
+      state.markResumeOnNextReaderClick={toggle:true};
       state.markSelectionInteraction=freshInteraction();
       updateReaderStatus('Selection cleared.');
       return;
@@ -6899,28 +6905,35 @@ function bindMarkCompanion(reader){
     interaction.startX=Number(event.clientX)||0;
     interaction.startY=Number(event.clientY)||0;
     interaction.pointerId=event.pointerId ?? null;
+    interaction.pointerType=event.pointerType || 'mouse';
+    interaction.startedOnText=Boolean(event.target.closest?.(
+      '.reader-word, .reader-group, .reader-paragraph, .reading-paragraph, p, blockquote, h1, h2, h3, h4, h5, h6'
+    ));
     state.markSelectionInteraction=interaction;
   },true);
 
-  // selectstart is the reliable boundary between a normal click-to-seek and a
-  // real text-selection drag. Pause synchronously here so the next reader paint
-  // cannot replace the DOM while the browser is constructing the selection.
-  reader.addEventListener('selectstart',()=>{
-    const interaction=state.markSelectionInteraction;
-    if(interaction?.active) pauseForSelection(interaction);
-  },true);
-
+  // Do not pause on `selectstart`: Chromium can emit it for an ordinary click
+  // before any range exists. That was swallowing normal blank-space clicks and
+  // immediately restarting the reader. A real mouse/pen drag from rendered text
+  // pauses below; touch and keyboard selection are confirmed by selectionchange.
   reader.addEventListener('pointermove',(event)=>{
     const interaction=state.markSelectionInteraction;
-    if(!interaction?.active) return;
+    if(!interaction?.active || interaction.paused) return;
     if(interaction.pointerId!==null && event.pointerId!==undefined && event.pointerId!==interaction.pointerId) return;
 
-    // Do not treat ordinary pointer jitter as a selection. The old distance-only
-    // fallback could set markSuppressNextReaderClick before a real range existed,
-    // swallowing normal pause/resume clicks. selectstart is the primary signal;
-    // this fallback pauses only after the browser has produced a non-collapsed
-    // selection that belongs to the reader.
-    if(selectionBelongsToReader()) pauseForSelection(interaction);
+    const distance=Math.hypot(
+      (Number(event.clientX)||0)-interaction.startX,
+      (Number(event.clientY)||0)-interaction.startY
+    );
+    if(distance<=6) return;
+
+    // Mouse/pen selection should pause before the next reading paint can replace
+    // the DOM. Do not treat a drag that began in blank reader space—or a touch
+    // scroll—as a text selection. Touch selection is handled by selectionchange
+    // once the browser exposes a non-collapsed range.
+    if(interaction.startedOnText && interaction.pointerType!=='touch'){
+      pauseForSelection(interaction);
+    }
   },true);
 
   // selectionchange covers keyboard selection and touch implementations where
@@ -6963,15 +6976,7 @@ function bindMarkCompanion(reader){
       return;
     }
     if(!state.markSuppressNextReaderClick) return;
-
-    const interaction=state.markSelectionInteraction;
-    const hasRealSelection=state.markSelectionLocked
-      || Boolean(interaction?.finalized)
-      || selectionBelongsToReader();
-
     state.markSuppressNextReaderClick=false;
-    if(!hasRealSelection) return;
-
     event.preventDefault();
     event.stopImmediatePropagation();
   },true);
@@ -9880,6 +9885,7 @@ function startReader() {
   start.disabled = true;
   pause.disabled = false;
   beginReadingSession();
+  try { window.ReadingGoals?.onSessionStart({ title: state.title, documentId: state.documentId, wpm: speed }); } catch (error) { console.warn('Reading goal encouragement failed:', error); }
 
   const expectedMeaningful = state.meaningfulChunks && modeSupportsMeaningfulChunks(mode);
   if (state.renderedMode !== mode
@@ -13680,6 +13686,7 @@ document.addEventListener('click', (event) => {
   if (actionName === 'terms') renderTerms();
   if (actionName === 'music') renderMusicLibrary();
   if (actionName === 'my-reading' || actionName === 'reading-list') renderReadingList();
+  if (actionName === 'reading-goals') window.ReadingGoals?.render();
   if (actionName === 'progress-dashboard' || actionName === 'progress-awards') renderProgressDashboard();
   if (actionName === 'action-center') renderActionCenter();
   if (actionName === 'vocabulary-builder') renderVocabularyBuilder();
