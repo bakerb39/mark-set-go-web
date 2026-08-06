@@ -137,16 +137,35 @@
 
 
   function currentFirstName() {
-    // /api/auth/session returns the signed-in profile under `user`. Older
-    // builds used `account`, so accept both shapes during the migration.
+    // Prefer Clerk's explicit first-name fields. The API display name can fall
+    // back to an email address when the account profile has no name, and an
+    // email must never be used as a greeting.
     const profile = state.session?.user || state.session?.account || {};
     const clerkUser = state.clerk?.user || {};
-    const value =
-      profile.firstName || profile.first_name || profile.givenName || profile.given_name ||
-      profile.displayName || profile.display_name || profile.fullName || profile.full_name || profile.name ||
-      clerkUser.firstName || clerkUser.first_name || clerkUser.fullName || clerkUser.full_name ||
-      clerkUser.username || '';
-    return String(value).trim().split(/\s+/)[0] || '';
+    const candidates = [
+      clerkUser.firstName,
+      clerkUser.first_name,
+      profile.firstName,
+      profile.first_name,
+      profile.givenName,
+      profile.given_name,
+      clerkUser.fullName,
+      clerkUser.full_name,
+      profile.displayName,
+      profile.display_name,
+      profile.fullName,
+      profile.full_name,
+      profile.name,
+      clerkUser.username
+    ];
+
+    for (const candidate of candidates) {
+      const value = String(candidate || '').trim();
+      if (!value || value.includes('@')) continue;
+      const first = value.split(/\s+/)[0].replace(/^[^A-Za-z]+|[^A-Za-z'’-]+$/g, '');
+      if (first) return first;
+    }
+    return '';
   }
 
   function publishAuthState(session = state.session) {
