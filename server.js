@@ -650,6 +650,15 @@ app.post('/api/email/preferences', async (req, res) => {
   try { const user=await requireAccountUser(req,res); if(!user)return; const result=await query(`insert into user_email_preferences(user_id,email,reminders,newsletter,notes,notes_frequency,timezone,active,updated_at) values($1,$2,$3,$4,$5,$6,$7,true,now()) on conflict(user_id) do update set email=excluded.email,reminders=excluded.reminders,newsletter=excluded.newsletter,notes=excluded.notes,notes_frequency=excluded.notes_frequency,timezone=excluded.timezone,active=true,updated_at=now() returning *`,[user.id,email,record.reminders,record.newsletter,record.notes,record.notesFrequency,record.timezone]); res.json({ok:true,configured:emailConfigured(),preferences:record,durable:true,updatedAt:result.rows[0].updated_at}); }
   catch(error){console.error('Email preference save failed:',error);res.status(500).json({error:'Unable to save email preferences.'});}
 });
+app.post('/api/email/sync-goals', (req, res) => {
+  const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
+  if (!record?.active) return res.status(404).json({error:'Save email preferences first.'});
+  const goals=req.body?.goals||{}; const metrics=req.body?.metrics||{};
+  record.goalProgress={enabled:Boolean(goals.enabled),emailProgress:Boolean(goals.emailProgress),annualBooks:Number(goals.annualBooks)||0,targetWpm:Number(goals.targetWpm)||0,targetComprehension:Number(goals.targetComprehension)||0,weeklyMinutes:Number(goals.weeklyMinutes)||0,completedBooks:Number(metrics.completedBooks)||0,annualPercent:Number(metrics.annualPercent)||0,avgWpm:Number(metrics.avgWpm)||0,avgComprehension:Number(metrics.avgComprehension)||0,currentWeeklyMinutes:Number(metrics.weeklyMinutes)||0,updatedAt:new Date().toISOString()};
+  record.updatedAt=new Date().toISOString(); emailSubscriptions.set(clientId,record); res.json({ok:true});
+});
+function goalProgressEmail(record){ const g=record?.goalProgress; if(!g?.enabled||!g?.emailProgress)return {html:'',text:''}; return {html:`<div style="margin-top:18px;padding:14px;background:#eef8ff;border-radius:10px"><strong>Reading goal progress</strong><p>${g.completedBooks} of ${g.annualBooks} books · ${g.annualPercent}% of annual challenge<br>${g.currentWeeklyMinutes}/${g.weeklyMinutes} minutes this week · ${g.avgWpm||'—'}/${g.targetWpm} WPM · ${g.avgComprehension||'—'}/${g.targetComprehension}% comprehension</p></div>`,text:` Reading goals: ${g.completedBooks}/${g.annualBooks} books (${g.annualPercent}%), ${g.currentWeeklyMinutes}/${g.weeklyMinutes} weekly minutes, ${g.avgWpm||'—'}/${g.targetWpm} WPM, ${g.avgComprehension||'—'}/${g.targetComprehension}% comprehension.`}; }
+
 app.post('/api/email/sync-actions', (req, res) => {
   const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
   if (!record?.active) return res.status(404).json({error:'Save email preferences first.'});
@@ -717,7 +726,7 @@ setInterval(async()=>{
       const due=Date.parse(action.dueAt); if(!Number.isFinite(due)) continue;
       const notifyAt=due-(offsets[action.reminder]??0)*60000; const signature=`${action.id}|${action.dueAt}|${action.reminder}|${action.updatedAt}`;
       if(now<notifyAt||now-notifyAt>10*60000||action.lastEmailSignature===signature) continue;
-      try { await sendResendEmail({to:record.email,subject:`Reminder: ${action.title}`,html:emailFrame('Reading action reminder',`<p><strong>${escapeEmail(action.title)}</strong></p><p>Due ${escapeEmail(new Date(due).toLocaleString())}${action.sourceTitle?` · ${escapeEmail(action.sourceTitle)}`:''}</p>`,record.clientId),text:`Reminder: ${action.title}. Due ${new Date(due).toLocaleString()}.`}); action.lastEmailSignature=signature; }
+      try { const gp=goalProgressEmail(record); await sendResendEmail({to:record.email,subject:`Reminder: ${action.title}`,html:emailFrame('Reading action reminder',`<p><strong>${escapeEmail(action.title)}</strong></p><p>Due ${escapeEmail(new Date(due).toLocaleString())}${action.sourceTitle?` · ${escapeEmail(action.sourceTitle)}`:''}</p>${gp.html}`,record.clientId),text:`Reminder: ${action.title}. Due ${new Date(due).toLocaleString()}.${gp.text}`}); action.lastEmailSignature=signature; }
       catch(error){ console.error('Email reminder failed:',error.message); }
     }
   }
@@ -737,7 +746,8 @@ setInterval(async()=>{
     const notes=changed.length?changed:record.notesData;
     const content=notesEmailContent(notes);
     try {
-      await sendResendEmail({to:record.email,subject:`Your ${record.notesFrequency} reading notes digest`,html:emailFrame('Reading notes digest',content.html,record.clientId),text:content.text});
+      const gp=goalProgressEmail(record);
+      await sendResendEmail({to:record.email,subject:`Your ${record.notesFrequency} reading notes digest`,html:emailFrame('Reading notes digest',content.html+gp.html,record.clientId),text:content.text+gp.text});
       record.lastNotesDigestAt=new Date().toISOString();
     } catch(error){ console.error('Notes digest email failed:',error.message); }
   }

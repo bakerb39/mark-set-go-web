@@ -1,0 +1,32 @@
+{
+  "title": "Frankenstein: Illustrated Five-Chapter Demo",
+  "author": "Mary Wollstonecraft Shelley",
+  "textFile": "book.txt",
+  "illustrations": [
+    {
+      "heading": "Chapter 1",
+      "image": "images/chapter-01.png",
+      "caption": "Victor's childhood and family life near Lake Geneva."
+    },
+    {
+      "heading": "Chapter 2",
+      "image": "images/chapter-02.png",
+      "caption": "Victor witnesses lightning shatter a tree near Geneva."
+    },
+    {
+      "heading": "Chapter 3",
+      "image": "images/chapter-03.png",
+      "caption": "Victor begins his scientific studies at Ingolstadt."
+    },
+    {
+      "heading": "Chapter 4",
+      "image": "images/chapter-04.png",
+      "caption": "Victor works in secrecy on the being he intends to animate."
+    },
+    {
+      "heading": "Chapter 5",
+      "image": "images/chapter-05.png",
+      "caption": "The creature awakens and Victor recoils from his creation."
+    }
+  ]
+}
