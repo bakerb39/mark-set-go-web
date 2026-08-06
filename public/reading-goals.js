@@ -193,17 +193,19 @@
     const title=goal.title || context.title || 'this book';
     const deadline=goal.deadline ? new Date(goal.deadline+'T12:00:00').toLocaleDateString(undefined,{month:'long',day:'numeric'}) : '';
     const message=`You’re reading one of your goal books. You’re ${book.percent||0}% through ${title}${deadline?` and working toward your ${deadline} target`:''}. Keep going—you’re building real momentum.`;
-    showEncouragement(message);
+    document.dispatchEvent(new CustomEvent('marksetgo:ask-mark-companion-message', {
+      detail: {
+        id: `goal-update-${goal.id}-${key}`,
+        bookId,
+        title,
+        kind: 'goal-update',
+        message
+      }
+    }));
   }
 
   function onSessionStart(context={}) { encourageGoalBook(context); }
   function onBookOpened(context={}) { window.setTimeout(() => encourageGoalBook(context), 250); }
-
-  function showEncouragement(message) {
-    document.querySelector('.reading-goal-toast')?.remove();
-    const toast=document.createElement('aside'); toast.className='reading-goal-toast'; toast.setAttribute('role','status'); toast.innerHTML=`<span class="goal-mark-avatar">M</span><div><strong>Mark</strong><p>${esc(message)}</p></div><button type="button" aria-label="Dismiss">×</button>`;
-    document.body.appendChild(toast); toast.querySelector('button').addEventListener('click',()=>toast.remove()); setTimeout(()=>toast.remove(),10000);
-  }
 
   async function syncGoals(goals=getGoals()) {
     if(!goals.emailProgress) return;
