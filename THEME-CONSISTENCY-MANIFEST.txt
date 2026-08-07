@@ -1,0 +1,35 @@
+Mark, Set, Go! - Consistent Theme Pass
+Version: v9.1.10-consistent-theme
+
+Requested visual changes:
+- Replace green UI accents/states with the existing blue family.
+- Keep gold, but make it lighter/brighter so it stands out against navy.
+- Preserve the app's navy / light-blue / gold identity consistently.
+
+Protected behavior:
+- app.js unchanged byte-for-byte.
+- public/app.js unchanged byte-for-byte.
+- public/reader/ unchanged byte-for-byte.
+- No playback, click/seek, pagination, persistence, fullscreen, Book Pages, or Ask Mark behavior changed.
+
+Changed code is presentation-only:
+- styles.css / public/styles.css
+- ask-mark-hub.css / public/ask-mark-hub.css
+- ask-mark-study.css / public/ask-mark-study.css
+- small UI helper scripts only where CSS color literals are injected:
+  cloud-document.js
+  cloud-library.js
+  cloud-productivity.js
+  document-manager.js
+  and their public/ copies
+- index.html/public/index.html stylesheet cache key only
+
+Palette:
+- Navy: existing navy family retained
+- Blue accent: #2f75b5
+- Light blue: #dcebf7
+- Brighter gold: #e8cc76
+Additional consistency normalization:
+- Recency book-cover colors now use blue shades rather than green/violet/amber/burgundy.
+- App section-card accents are normalized to the blue family.
+- Reader's user-selectable pointer/anchor color choices were intentionally left intact because they are reader customization controls, not app theme chrome.

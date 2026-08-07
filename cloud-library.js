@@ -237,7 +237,7 @@
       .cloud-library-account-card{border:1px solid var(--border,#d8dfdc);border-radius:12px;padding:.85rem;background:var(--surface,#fff);display:grid;gap:.55rem}
       .cloud-library-account-card h3{margin:0;font-size:1rem}.cloud-library-account-card p{margin:0;color:var(--muted,#66736d);font-size:.86rem}
       .cloud-library-account-actions{display:flex;gap:.45rem;flex-wrap:wrap}.cloud-library-account-actions button{font-size:.8rem}
-      .cloud-saved-badge{display:inline-flex;margin-left:.45rem;font-size:.7rem;font-weight:600;color:var(--accent-strong,#176b50)}
+      .cloud-saved-badge{display:inline-flex;margin-left:.45rem;font-size:.7rem;font-weight:600;color:var(--accent-strong,#245f91)}
     `;
     document.head.appendChild(style);
   }

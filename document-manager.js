@@ -194,8 +194,8 @@
     const style = document.createElement('style');
     style.id = 'unified-document-manager-styles';
     style.textContent = `
-      .unified-document-state{display:inline-flex;width:max-content;margin:.22rem 0 .35rem;padding:.18rem .48rem;border-radius:999px;font-size:.69rem;font-weight:750;background:#eef3f1;color:#53615b}
-      .unified-document-state[data-state="document"]{background:#e4f4ec;color:#176b50}
+      .unified-document-state{display:inline-flex;width:max-content;margin:.22rem 0 .35rem;padding:.18rem .48rem;border-radius:999px;font-size:.69rem;font-weight:750;background:#edf3f8;color:#536b82}
+      .unified-document-state[data-state="document"]{background:#e7f1fa;color:#245f91}
       .unified-document-state[data-state="metadata"]{background:#fff3d6;color:#815f00}
       .unified-document-state[data-state="local"]{background:#edf1f8;color:#415b83}
     `;

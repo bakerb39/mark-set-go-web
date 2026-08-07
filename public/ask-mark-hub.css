@@ -3,8 +3,8 @@
   --ask-navy-950: #071827;
   --ask-navy-900: #0b2238;
   --ask-navy-800: #113451;
-  --ask-gold: #d3a447;
-  --ask-gold-soft: #f0d89f;
+  --ask-gold: #e4c463;
+  --ask-gold-soft: #f6e5aa;
   --ask-cream: #fbf7ed;
   --ask-paper: #fffdf7;
   --ask-ink: #183047;
@@ -39,7 +39,7 @@
 .askmark-avatar-wrap { position:relative; width:62px; height:62px; flex:none; }
 .askmark-avatar-glow { position:absolute; inset:-7px; border-radius:50%; background:radial-gradient(circle,rgba(211,164,71,.42),transparent 68%); animation:askmark-breathe 4.8s ease-in-out infinite; }
 .askmark-avatar { position:relative; width:100%; height:100%; object-fit:cover; border-radius:50%; border:2px solid var(--ask-gold); box-shadow:0 7px 22px rgba(0,0,0,.32); }
-.askmark-presence { position:absolute; right:1px; bottom:3px; width:13px; height:13px; border-radius:50%; background:#62c38b; border:3px solid var(--ask-navy-900); }
+.askmark-presence { position:absolute; right:1px; bottom:3px; width:13px; height:13px; border-radius:50%; background:#5aa6e8; border:3px solid var(--ask-navy-900); }
 .askmark-eyebrow { display:block; color:var(--ask-gold-soft); font-size:.66rem; font-weight:850; letter-spacing:.14em; text-transform:uppercase; }
 .askmark-brand-copy h2 { margin:.15rem 0 0; color:#fff; font:800 1.45rem/1.05 Georgia,serif; letter-spacing:.01em; }
 .askmark-header-actions { display:flex; gap:.32rem; }

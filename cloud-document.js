@@ -68,7 +68,7 @@
     style.textContent = `
       .cloud-document-controls{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.45rem}
       .cloud-document-note{font-size:.74rem;color:var(--muted,#66736d);margin-top:.25rem}
-      .cloud-document-badge{display:inline-flex;margin-left:.35rem;font-size:.68rem;font-weight:700;color:var(--accent-strong,#176b50)}
+      .cloud-document-badge{display:inline-flex;margin-left:.35rem;font-size:.68rem;font-weight:700;color:var(--accent-strong,#245f91)}
     `;
     document.head.appendChild(style);
   }
