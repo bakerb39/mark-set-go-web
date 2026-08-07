@@ -7837,9 +7837,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       return;
     }
 
-    if (mode === 'two-column') return;
+    // Blank-space clicks always toggle playback. This is intentionally
+    // independent of the selected display mode; word clicks above still seek.
     if (isReaderRunning()) pauseReader();
     else startReader();
+    persistReaderSession();
   });
   bindDictionaryMenu(reader);
   window.requestAnimationFrame(updateReaderBookmarkMarkers);
@@ -12913,6 +12915,15 @@ function renderBrowseHub() {
       <form id="browse-global-search" class="browse-search">
         <span aria-hidden="true">⌕</span>
         <input id="browse-global-query" type="search" required placeholder="Search titles, authors, subjects, or ideas across all libraries">
+        <label class="browse-format-field">
+          <span>Format</span>
+          <select id="browse-global-format" aria-label="Preferred book format">
+            <option value="best">Best available</option>
+            <option value="text">Plain text</option>
+            <option value="epub">EPUB</option>
+            <option value="pdf">PDF</option>
+          </select>
+        </label>
         <button class="primary" type="submit">Search All Libraries</button>
       </form>
 
@@ -12961,13 +12972,15 @@ function renderBrowseHub() {
       </section>
     </section>`;
 
-  const search = (query) => {
+  const search = (query, format = app.querySelector('#browse-global-format')?.value || 'best') => {
     localStorage.setItem('markSetGoPendingLibrarySearch', query);
     renderUnifiedLibrary();
     requestAnimationFrame(() => {
       const input = app.querySelector('#unified-library-query');
+      const formatSelect = app.querySelector('#unified-library-format');
       const form = app.querySelector('#unified-library-search');
       if (input) input.value = query;
+      if (formatSelect) formatSelect.value = format;
       form?.requestSubmit();
     });
   };
