@@ -9919,3 +9919,51 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
 #reader > div:has(> .empty-reader-icon) p {
   color:#9fc4df !important;
 }
+
+
+/* v9.2.34 unified compact footer/banner */
+.site-footer,
+.app-footer,
+.page-footer,
+footer.site-footer,
+footer.app-footer {
+  min-height:0 !important;
+  height:auto !important;
+  padding:.6rem 1rem .65rem !important;
+  margin-top:1rem;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-sizing:border-box;
+}
+
+.site-footer > *,
+.app-footer > *,
+.page-footer > * {
+  margin-top:0 !important;
+  margin-bottom:0 !important;
+}
+
+.site-footer p,
+.app-footer p,
+.page-footer p {
+  margin:.08rem 0 !important;
+  line-height:1.25 !important;
+}
+
+/* Prevent page shells from stretching the footer vertically. */
+#app + .site-footer,
+#app + .app-footer,
+body > .site-footer,
+body > .app-footer {
+  flex:0 0 auto !important;
+}
+
+/* Keep the Reader footer/banner compact too, matching the same visual rhythm. */
+.reader-page-panel + .site-footer,
+.reader-page-panel + .app-footer,
+.reader-footer {
+  min-height:0 !important;
+  height:auto !important;
+  padding:.5rem 1rem .55rem !important;
+}
