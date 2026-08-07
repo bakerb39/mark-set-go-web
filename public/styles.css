@@ -10215,3 +10215,41 @@ body > .app-footer {
     width: min(68vw, 390px) !important;
   }
 }
+
+
+/* v9.2.44 light homepage Mark presentation */
+.home-mark-icon-stage {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(241,215,122,.16) 0, rgba(91,151,239,.06) 30%, rgba(255,255,255,0) 64%) !important;
+  color: #0b3b67 !important;
+}
+
+.home-mark-portrait-wrap {
+  position: relative;
+}
+
+.home-mark-portrait-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(241,215,122,.18), rgba(91,151,239,.07) 50%, transparent 72%);
+  filter: blur(10px);
+  pointer-events: none;
+}
+
+.home-mark-avatar {
+  position: relative;
+  z-index: 1;
+  box-shadow:
+    0 16px 34px rgba(15,23,42,.18),
+    0 0 26px rgba(202,166,76,.12) !important;
+}
+
+.home-mark-stage-caption strong {
+  color: #0b3b67 !important;
+}
+
+.home-mark-stage-caption span {
+  color: #526b82 !important;
+}
