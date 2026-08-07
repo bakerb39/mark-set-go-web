@@ -8968,3 +8968,73 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
   .browse-hub .browse-search button { grid-column:1 / -1; grid-row:auto; }
 }
 
+
+/* Browse: compact editorial treatment for Recommended starting points.
+   Presentation-only. No reader or search behavior changes. */
+.browse-hub .platform-book-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.browse-hub .platform-book-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 10px;
+  min-height: 0;
+  padding: 10px 11px;
+  border-radius: 8px;
+  border-left-width: 3px;
+}
+
+.browse-hub .platform-book-card .book-spine {
+  display: none;
+}
+
+.browse-hub .platform-book-card > div:not(.book-spine) {
+  min-width: 0;
+}
+
+.browse-hub .platform-book-card h3 {
+  margin: 0 0 2px;
+  font-size: .84rem;
+  line-height: 1.16;
+  font-weight: 700;
+}
+
+.browse-hub .platform-book-card p {
+  margin: 0 0 3px;
+  font-size: .66rem;
+  line-height: 1.2;
+  opacity: .82;
+}
+
+.browse-hub .platform-book-card small {
+  display: block;
+  margin: 0;
+  font-size: .61rem;
+  line-height: 1.25;
+  opacity: .62;
+}
+
+.browse-hub .platform-book-card button {
+  grid-column: auto;
+  justify-self: end;
+  align-self: center;
+  min-height: 28px;
+  padding: 4px 8px;
+  white-space: nowrap;
+  font-size: .62rem;
+}
+
+@media (max-width: 980px) {
+  .browse-hub .platform-book-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .browse-hub .platform-book-grid {
+    grid-template-columns: 1fr;
+  }
+}
