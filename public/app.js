@@ -9579,38 +9579,45 @@ function bindDictionaryMenu(reader) {
     if (!context) return null;
     return { ...context, page: context.page ? { ...context.page } : null };
   };
-  menu.querySelector('[data-dictionary-action="lookup"]')?.addEventListener('click', (event) => {
+  // Use one capture-phase dispatcher for the custom menu. Reader surface and
+  // Ask Mark listeners can repaint or react to the same click; dispatching here
+  // guarantees the chosen context action runs first and uses the captured word.
+  menu.addEventListener('click', (event) => {
+    const button = event.target instanceof Element
+      ? event.target.closest('[data-dictionary-action]')
+      : null;
+    if (!button || !menu.contains(button)) return;
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
+
     const context = capturedContext();
-    closeDictionaryMenu();
-    performDictionaryLookup(false, 'mark', context);
-  });
-  menu.querySelector('[data-dictionary-action="save"]')?.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const context = capturedContext();
-    closeDictionaryMenu();
-    performDictionaryLookup(true, 'mark', context);
-  });
-  menu.querySelector('[data-dictionary-action="note"]')?.addEventListener('click', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const context = capturedContext();
+    const action = button.dataset.dictionaryAction;
     closeDictionaryMenu();
     if (!context) return;
-    const existing = notesForCurrentDocument().find((item) => Number(item.wordIndex) === Number(context.index));
-    showNoteEditor(context, existing || null);
-  });
-  menu.querySelector('[data-dictionary-action="bookmark"]')?.addEventListener('click', (event) => {
-    event.preventDefault();
+
+    if (action === 'lookup') {
+      performDictionaryLookup(false, 'mark', context);
+      return;
+    }
+    if (action === 'save') {
+      performDictionaryLookup(true, 'mark', context);
+      return;
+    }
+    if (action === 'note') {
+      const existing = notesForCurrentDocument()
+        .find((item) => Number(item.wordIndex) === Number(context.index));
+      showNoteEditor(context, existing || null);
+      return;
+    }
+    if (action === 'bookmark') {
+      toggleBookmarkForContextWord(context);
+      requestAnimationFrame(() => updateReaderBookmarkMarkers());
+    }
+  }, true);
+  menu.addEventListener('pointerdown', (event) => {
+    // Keep reader-surface pointer handlers from treating a menu press as a
+    // reading-canvas click.
     event.stopPropagation();
-    const context = capturedContext();
-    closeDictionaryMenu();
-    toggleBookmarkForContextWord(context);
-    // The menu/highlight pipeline may repaint reader DOM immediately after the
-    // command. Re-apply the visual marker after that paint as well.
-    requestAnimationFrame(() => updateReaderBookmarkMarkers());
   });
   document.addEventListener('pointerdown', (event) => {
     // Close only for a primary-button press outside the custom menu. A generic
