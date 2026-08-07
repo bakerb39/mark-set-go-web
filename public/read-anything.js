@@ -600,7 +600,11 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   async function applyCleanup(level = 'standard', scope = 'document', selectedText = '') {
-    if (!activeImportedDocument) throw new Error('Format is available after importing, pasting, or creating a document.');
+    // Always synchronize with the live Reader at action time. This prevents a
+    // valid on-screen document from being rejected because formatter state or
+    // local persistence lagged behind the Reader.
+    ensureActiveReaderDocument();
+    if (!activeImportedDocument) throw new Error('No readable text is currently available to format.');
     const original = String(activeImportedDocument.versions?.original || activeImportedDocument.originalText || '').trim();
     if (original.length < 20) throw new Error('The preserved original text is unavailable.');
     let result;
@@ -1006,12 +1010,45 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
   function ensureActiveReaderDocument() {
     const current = window.MarkSetGoCurrentReaderDocument?.get?.();
-    if (!current?.documentId || !current?.text) return Boolean(activeImportedDocument);
+    if (!current?.documentId || !String(current?.text || '').trim()) return Boolean(activeImportedDocument);
+
+    const currentId = String(current.documentId);
     const activeReaderId = String(activeImportedDocument?.source?.readerDocumentId || '');
-    if (!activeImportedDocument || (activeReaderId && activeReaderId !== String(current.documentId))) {
-      restoreImportedFormatRecord(current.documentId, current.title || '');
+
+    if (activeImportedDocument && activeReaderId === currentId) return true;
+
+    // First reuse any existing formatter record for this Reader document.
+    if (restoreImportedFormatRecord(currentId, current.title || '')) {
+      const restoredReaderId = String(activeImportedDocument?.source?.readerDocumentId || currentId);
+      if (restoredReaderId === currentId) return true;
     }
-    return Boolean(activeImportedDocument);
+
+    // The live Reader is the final source of truth. Do not require a matching
+    // localStorage document record: some valid Reader loads have not persisted
+    // that record yet, but the Reader bridge already exposes the complete text.
+    const originalText = String(current.text || '').trim();
+    if (!originalText) return false;
+
+    const key = `reader-${currentId}`;
+    activeImportedDocument = {
+      title: cleanImportedTitle(current.title || 'Untitled'),
+      baseTitle: cleanImportedTitle(current.title || 'Untitled'),
+      author: current.source?.author || '',
+      source: {
+        ...(current.source || {}),
+        readAnything: true,
+        readAnythingKey: key,
+        readerDocumentId: currentId,
+        formatterAdoptedFromLiveReader: true
+      },
+      versions: { original: originalText },
+      originalText
+    };
+    activeImportedVersion = 'original';
+    rememberFormatDocument(currentId, key);
+    saveActiveFormatRecord();
+    scheduleFormatControlAttach();
+    return true;
   }
 
   window.MarkSetGoReadAnything = Object.freeze({

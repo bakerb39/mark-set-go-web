@@ -126,8 +126,8 @@
                 <summary>Cleanup level</summary>
                 <div class="askmark-format-body askmark-format-levels">
                   <button type="button" data-format-level="light"><strong>Light</strong><small>Characters, spacing, punctuation</small></button>
-                  <button type="button" class="is-selected" data-format-level="standard"><strong>Standard</strong><small>OCR cleanup, paragraphs, page artifacts</small></button>
-                  <button type="button" data-format-level="deep"><strong>Deep Clean</strong><small>Full cleanup plus document structure</small></button>
+                  <button type="button" data-format-level="standard"><strong>Standard</strong><small>Fast local OCR cleanup, paragraphs, page artifacts</small></button>
+                  <button type="button" class="is-selected" data-format-level="deep"><strong>AI Deep Clean</strong><small>Context-aware OCR repair and document structure</small></button>
                 </div>
               </details>
               <details class="askmark-format-group" open>
@@ -327,18 +327,21 @@
     $$('[data-format-level]', shell).forEach((button) => button.addEventListener('click', () => {
       $$('[data-format-level]', shell).forEach((item) => item.classList.toggle('is-selected', item === button));
     }));
-    $('[data-askmark-format-apply]', shell)?.addEventListener('click', () => {
+    $('[data-askmark-format-apply]', shell)?.addEventListener('click', async () => {
       const status = $('[data-askmark-format-status]', shell);
       try {
         const api = transformApi();
-        if (!api?.hasActiveDocument?.()) throw new Error('Open or import a document first, then use Format.');
         const level = $('[data-format-level].is-selected', shell)?.dataset.formatLevel || 'standard';
         const scope = shell.querySelector('input[name="askmark-format-scope"]:checked')?.value || 'document';
         const selected = scope === 'selection' ? getSelectionText() : '';
         if (scope === 'selection' && !selected) throw new Error('Highlight a passage first, or choose Entire document.');
-        const report = api.applyCleanup(level, scope, selected);
+        // Synchronize against the live Reader only after validating the selected
+        // passage. applyCleanup() also performs this synchronization defensively.
+        if (!api?.hasActiveDocument?.()) throw new Error('The current Reader text could not be accessed for formatting.');
+        if (status) status.textContent = level === 'deep' ? 'AI Deep Clean is reviewing the text…' : 'Formatting text…';
+        const report = await api.applyCleanup(level, scope, selected);
         const fixes = Object.entries(report || {}).filter(([key, value]) => key !== 'level' && Number(value) > 0).reduce((sum, [, value]) => sum + Number(value), 0);
-        if (status) status.textContent = `${level === 'deep' ? 'Deep Clean' : level[0].toUpperCase() + level.slice(1)} applied${fixes ? ` · ${fixes} cleanup actions` : ''}. Original preserved.`;
+        if (status) status.textContent = `${level === 'deep' ? 'AI Deep Clean' : level[0].toUpperCase() + level.slice(1)} applied${fixes ? ` · ${fixes} cleanup actions` : ''}. Original preserved.`;
         syncContext();
       } catch (error) { if (status) status.textContent = error?.message || 'Formatting could not be completed.'; }
     });
@@ -439,11 +442,14 @@
   function configureShell() {
     const candidate = $('.reader-control-shell.mark-shell');
     if (!candidate) return false;
-    if (candidate.dataset.premiumConfigured === '1') {
+    if (candidate.dataset.premiumConfigured === '1' && candidate.querySelector('[data-askmark-premium]') && candidate.querySelector('[data-askmark-view="format"]')) {
       shell = candidate;
       syncSelection();
       return true;
     }
+    // The reader can rebuild the contents of the same shell when a different document loads.
+    // In that case the dataset flag survives even though Ask Mark's premium/Format UI was removed.
+    if (candidate.dataset.premiumConfigured === '1') delete candidate.dataset.premiumConfigured;
 
     shell = candidate;
     shell.dataset.premiumConfigured = '1';
