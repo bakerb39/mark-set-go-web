@@ -8097,7 +8097,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   });
   bindDictionaryMenu(reader);
   window.requestAnimationFrame(updateReaderBookmarkMarkers);
-  app.querySelector('#start-reader').addEventListener('click', () => { startReader(); persistReaderSession(); });
+  app.querySelector('#start-reader').addEventListener('click', () => {
+    startReader();
+    persistReaderSession();
+    window.ReadingGoals?.onSessionStart?.({documentId:state.documentId,title:state.title});
+  });
   app.querySelector('#pause-reader').addEventListener('click', () => { pauseReader(); persistReaderSession(); });
   app.querySelector('#reset-reader').addEventListener('click', () => { resetReader(); persistReaderSession(); });
   app.querySelector('#check-comprehension')?.addEventListener('click', startComprehensionCheck);

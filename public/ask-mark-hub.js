@@ -186,6 +186,53 @@
     conversation.scrollTop = conversation.scrollHeight;
   }
 
+  const MARK_PROGRESS_SEEN_KEY='markSetGoMarkProgressSeenV1';
+
+  function currentReaderProgressContext(){
+    const current=window.MarkSetGoCurrentReaderDocument?.get?.() || {};
+    return {
+      documentId:String(current.documentId||''),
+      title:String(current.title||'')
+    };
+  }
+
+  function addMarkProgressMessage(update,{force=false}={}){
+    if(!shell || !update?.message) return false;
+    const conversation=$('[data-askmark-conversation]',shell);
+    if(!conversation) return false;
+
+    let seen={};
+    try{seen=JSON.parse(localStorage.getItem(MARK_PROGRESS_SEEN_KEY)||'{}')||{};}catch(_){}
+
+    const documentKey=currentReaderProgressContext().documentId || currentReaderProgressContext().title || 'general';
+    const previous=seen[documentKey]||{};
+    const now=Date.now();
+    const recent=Number(previous.at||0) && now-Number(previous.at)<6*60*60*1000;
+
+    if(!force && previous.signature===update.signature && recent) return false;
+
+    conversation.insertAdjacentHTML('beforeend',`
+      <article class="askmark-message mark-message askmark-progress-message" data-mark-progress-message>
+        <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+        <div>
+          <span>Mark · Your progress</span>
+          <p>${escapeHtml(update.message)}</p>
+        </div>
+      </article>`);
+    conversation.scrollTop=conversation.scrollHeight;
+
+    seen[documentKey]={signature:update.signature,at:now};
+    try{localStorage.setItem(MARK_PROGRESS_SEEN_KEY,JSON.stringify(seen));}catch(_){}
+    return true;
+  }
+
+  function refreshMarkProgress({force=false}={}){
+    const api=window.ReadingGoals;
+    if(!api?.getCompanionProgress) return false;
+    const update=api.getCompanionProgress(currentReaderProgressContext());
+    return addMarkProgressMessage(update,{force});
+  }
+
   function addThinkingMessage() {
     const conversation = $('[data-askmark-conversation]', shell);
     if (!conversation) return null;
@@ -482,6 +529,7 @@
 
     syncSelection();
     syncContext();
+    window.setTimeout(()=>refreshMarkProgress(),80);
     return true;
   }
 
@@ -499,6 +547,12 @@
   document.addEventListener('marksetgo:document-available', () => {
     installAttempts = 0;
     requestAnimationFrame(retryInstall);
+    window.setTimeout(()=>refreshMarkProgress(),220);
+  });
+  document.addEventListener('marksetgo:goals-updated',()=>window.setTimeout(()=>refreshMarkProgress({force:true}),80));
+  document.addEventListener('marksetgo:mark-progress-update',(event)=>{
+    if(event?.detail?.message) addMarkProgressMessage(event.detail,{force:true});
+    else refreshMarkProgress({force:true});
   });
   document.addEventListener('selectionchange', () => setTimeout(syncSelection, 60));
   document.addEventListener('marksetgo:transform-state', syncContext);

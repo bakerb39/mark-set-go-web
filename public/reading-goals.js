@@ -171,16 +171,98 @@
     app.querySelector('.action-center-hero')?.insertAdjacentElement('afterend',section);
   }
 
+  function getCompanionProgress(context={}) {
+    const goals=getGoals();
+    if(!goals.enabled) return null;
+
+    const m=getMetrics(goals);
+    const title=String(context.title||'').trim();
+    const documentId=String(context.documentId||'').trim();
+    const progress=Object.values(read(PROGRESS_KEY,{}));
+    const currentProgress=title || documentId
+      ? progress.find(item => (documentId && item.documentId===documentId) || (title && sameBook(item.title,title)))
+      : null;
+    const currentPercent=Math.max(0,Math.min(100,Math.round(Number(currentProgress?.percent ?? currentProgress?.progressPercent ?? 0))));
+
+    const speedTarget=Math.max(1,Number(goals.targetWpm)||350);
+    const compTarget=Math.max(1,Number(goals.targetComprehension)||80);
+    const weeklyTarget=Math.max(1,Number(goals.weeklyMinutes)||150);
+    const annualTarget=Math.max(1,Number(goals.annualBooks)||12);
+
+    const parts=[];
+    if(m.avgWpm>0){
+      const delta=m.avgWpm-speedTarget;
+      parts.push(delta>=0
+        ? `Your recent reading pace is ${m.avgWpm} WPM, ${delta===0?'right on':`${delta} above`} your ${speedTarget} WPM target.`
+        : `Your recent reading pace is ${m.avgWpm} WPM; you’re ${Math.abs(delta)} WPM from your ${speedTarget} WPM target.`);
+    }
+    if(m.avgComprehension>0){
+      const delta=m.avgComprehension-compTarget;
+      parts.push(delta>=0
+        ? `Comprehension is ${m.avgComprehension}%, meeting your ${compTarget}% goal.`
+        : `Comprehension is ${m.avgComprehension}%, ${Math.abs(delta)} points from your ${compTarget}% goal.`);
+    }
+    if(title && currentPercent>0){
+      parts.push(`You’re ${currentPercent}% through ${title}.`);
+    }
+    if(m.completedBooks>0 || m.annualPercent>0){
+      parts.push(`You’ve completed ${m.completedBooks} of ${annualTarget} books this year (${m.annualPercent}%).`);
+    }
+    if(m.weeklyMinutes>0){
+      const weeklyPercent=Math.min(100,Math.round(m.weeklyMinutes/weeklyTarget*100));
+      parts.push(`This week you’ve logged ${m.weeklyMinutes} of ${weeklyTarget} reading minutes (${weeklyPercent}%).`);
+    }
+
+    if(!parts.length) return null;
+
+    // Keep Mark conversational: prioritize current performance, current book,
+    // and one broader goal rather than dumping the entire dashboard every time.
+    const selected=[];
+    const speed=parts.find(p=>/WPM/.test(p)); if(speed) selected.push(speed);
+    const comprehension=parts.find(p=>/Comprehension/.test(p)); if(comprehension) selected.push(comprehension);
+    const book=parts.find(p=>/^You’re \d+% through/.test(p)); if(book) selected.push(book);
+    const annual=parts.find(p=>/completed .* books this year/.test(p));
+    const weekly=parts.find(p=>/This week/.test(p));
+    if(selected.length<4 && annual) selected.push(annual);
+    if(selected.length<4 && weekly) selected.push(weekly);
+
+    const encouragement =
+      m.avgWpm>=speedTarget && m.avgComprehension>=compTarget
+        ? 'You’re balancing speed and understanding very well—keep that combination.'
+        : m.avgComprehension>=compTarget
+          ? 'Your understanding is holding up well. Keep building pace gradually rather than sacrificing comprehension.'
+          : m.avgWpm>=speedTarget && m.avgComprehension>0
+            ? 'Your pace is strong. Give comprehension a little more attention before pushing the speed higher.'
+            : 'Keep the progress steady; consistency matters more than forcing the numbers upward all at once.';
+
+    const signature=[
+      new Date().toISOString().slice(0,10),
+      Math.round((m.avgWpm||0)/10)*10,
+      Math.round((m.avgComprehension||0)/5)*5,
+      Math.round((m.annualPercent||0)/5)*5,
+      Math.round((m.weeklyMinutes||0)/15)*15,
+      Math.round(currentPercent/5)*5,
+      documentId||title
+    ].join('|');
+
+    return {
+      message:`${selected.join(' ')} ${encouragement}`.trim(),
+      signature,
+      metrics:m,
+      goals,
+      currentPercent,
+      title
+    };
+  }
+
   function onSessionStart(context={}) {
-    const goals=getGoals(); if(!goals.enabled) return;
-    const title=String(context.title||'').trim(); if(!title) return;
-    const goal=goals.books.find(item => (context.documentId && item.documentId===context.documentId) || sameBook(item.title,title));
-    if(!goal) return;
-    const key=`${context.documentId||title}|${new Date().toISOString().slice(0,10)}`; if(lastEncouragedSession===key) return; lastEncouragedSession=key;
-    const m=getMetrics(goals); const book=m.bookGoals.find(item=>item.id===goal.id)||goal;
-    const deadline=goal.deadline ? new Date(goal.deadline+'T12:00:00').toLocaleDateString(undefined,{month:'long',day:'numeric'}) : '';
-    const message=`You’re reading one of your goal books. You’re ${book.percent||0}% through ${title}${deadline?` and working toward your ${deadline} target`:''}. Keep going—you’re building real momentum.`;
-    showEncouragement(message);
+    const update=getCompanionProgress(context);
+    if(!update) return;
+    const key=`${context.documentId||context.title||'reader'}|${new Date().toISOString().slice(0,10)}`;
+    if(lastEncouragedSession===key) return;
+    lastEncouragedSession=key;
+    showEncouragement(update.message);
+    document.dispatchEvent(new CustomEvent('marksetgo:mark-progress-update',{detail:update}));
   }
 
   function showEncouragement(message) {
@@ -199,5 +281,5 @@
   document.addEventListener('click', event => { const button=event.target.closest?.('[data-action="reading-goals"]'); if(!button) return; event.preventDefault(); event.stopImmediatePropagation(); render(); }, true);
   const observer=new MutationObserver(()=>{ injectProgress(); injectActionCenter(); });
   window.addEventListener('DOMContentLoaded',()=>{ const app=document.querySelector('#app'); if(app) observer.observe(app,{childList:true,subtree:true}); injectProgress(); injectActionCenter(); });
-  window.ReadingGoals={render,getGoals,saveGoals,getMetrics,onSessionStart,injectProgress,injectActionCenter,syncGoals};
+  window.ReadingGoals={render,getGoals,saveGoals,getMetrics,getCompanionProgress,onSessionStart,injectProgress,injectActionCenter,syncGoals};
 })();
