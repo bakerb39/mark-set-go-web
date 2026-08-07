@@ -9352,3 +9352,56 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
 .global-notebook-page #global-notebook-entries .notebook-plain-text {
   background:#fff !important;
 }
+
+
+/* v9.2.22 app-wide text contrast pass
+   Reader typography/content colors are intentionally excluded. */
+#app > .panel:not(.reader-page-panel),
+#app > .platform-page,
+.library-page,
+.help-page,
+.progress-analytics-page,
+.browse-hub,
+.my-library-hub,
+.ai-center,
+.knowledge-graph-page,
+.reading-goals-page,
+.action-center-page,
+.global-notebook-page {
+  color:#17324d;
+}
+
+#app > .panel:not(.reader-page-panel) p,
+#app > .platform-page p,
+#app > .panel:not(.reader-page-panel) li,
+#app > .platform-page li,
+#app > .panel:not(.reader-page-panel) label,
+#app > .platform-page label {
+  color:#244664;
+}
+
+#app > .panel:not(.reader-page-panel) small,
+#app > .platform-page small,
+#app > .panel:not(.reader-page-panel) .muted,
+#app > .platform-page .muted,
+.platform-hero p,
+.section-heading p,
+.library-welcome p,
+.progress-hero p,
+.goals-card-heading p,
+.goal-current-metrics,
+.goal-current-metrics span,
+.fine-print,
+.random-note-meta,
+.cloud-library-account-card p {
+  color:#496983 !important;
+  opacity:1 !important;
+}
+
+#app > .panel:not(.reader-page-panel) input::placeholder,
+#app > .platform-page input::placeholder,
+#app > .panel:not(.reader-page-panel) textarea::placeholder,
+#app > .platform-page textarea::placeholder {
+  color:#6a8296;
+  opacity:1;
+}

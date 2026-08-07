@@ -52,10 +52,24 @@
     list.filter(item => item.status === 'finished').forEach(item => completedIds.add(item.documentId || item.id || item.title));
     progress.filter(item => Number(item.percent || item.progressPercent || 0) >= 99).forEach(item => completedIds.add(item.documentId || item.title));
     const completedBooks = completedIds.size;
-    const recentWpm = activity.slice(0, 20).map(item => Number(item.wpm)).filter(Boolean);
-    const avgWpm = recentWpm.length ? Math.round(recentWpm.reduce((a,b)=>a+b,0)/recentWpm.length) : 0;
-    const scores = comprehension.slice(0, 20).map(item => Number(item.score ?? item.percent ?? item.percentage)).filter(Number.isFinite);
-    const avgComprehension = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+
+    // Reading sessions store wordsRead + seconds, not a precomputed `wpm`.
+    // Use the same measured-speed calculation as Progress & Awards.
+    const recentActivity = activity.slice(0, 20);
+    const recentWords = recentActivity.reduce((sum, item) => sum + (Number(item.wordsRead) || 0), 0);
+    const recentSeconds = recentActivity.reduce((sum, item) => sum + (Number(item.seconds) || 0), 0);
+    const avgWpm = recentSeconds > 0
+      ? Math.round(recentWords / (recentSeconds / 60))
+      : 0;
+
+    // Current comprehension results are stored as `scorePercent`.
+    // Keep older field names as fallbacks for legacy records.
+    const scores = comprehension.slice(0, 20)
+      .map(item => Number(item.scorePercent ?? item.score ?? item.percent ?? item.percentage))
+      .filter(Number.isFinite);
+    const avgComprehension = scores.length
+      ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length)
+      : 0;
     const now = Date.now();
     const weekAgo = now - 7*86400000;
     const weeklyMinutes = Math.round(activity.filter(item => Date.parse(item.createdAt || item.startedAt || item.endedAt || 0) >= weekAgo).reduce((sum,item)=>sum + Number(item.seconds || item.durationSeconds || 0),0)/60);

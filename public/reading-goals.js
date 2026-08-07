@@ -1,43 +1,21 @@
 (() => {
   'use strict';
 
-  const GOALS_KEY = 'markSetGoReadingGoalsV2';
+  const GOALS_KEY = 'markSetGoReadingGoalsV1';
   const PROGRESS_KEY = 'markSetGoReadingProgressV1';
   const ACTIVITY_KEY = 'markSetGoReadingActivityV1';
   const COMPREHENSION_KEY = 'markSetGoComprehensionV1';
   const LIST_KEY = 'markSetGoReadingListV1';
-  const DOCUMENT_PREFIX = 'markSetGoDocumentV1:';
   const EMAIL_KEY = 'markSetGoEmailPreferencesV1';
   let lastEncouragedSession = '';
 
   const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch (_) { return fallback; } };
   const write = (key, value) => localStorage.setItem(key, JSON.stringify(value));
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const normalize = value => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const sameBook = (a, b) => normalize(a) && normalize(a) === normalize(b);
   const todayIso = () => new Date().toISOString().slice(0, 10);
   const yearEnd = () => `${new Date().getFullYear()}-12-31`;
-
-  function getLibraryDocuments() {
-    const documents = [];
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (!key || !key.startsWith(DOCUMENT_PREFIX)) continue;
-      const documentId = key.slice(DOCUMENT_PREFIX.length).trim();
-      if (!documentId) continue;
-      try {
-        const item = JSON.parse(localStorage.getItem(key) || 'null');
-        if (!item?.text || !String(item.title || '').trim()) continue;
-        documents.push({
-          documentId,
-          title: String(item.title).trim(),
-          source: item.source || null,
-          savedAt: item.savedAt || item.updatedAt || item.importedAt || ''
-        });
-      } catch (_) {}
-    }
-    return documents
-      .sort((a, b) => String(a.title).localeCompare(String(b.title)))
-      .filter((item, index, all) => index === 0 || item.documentId !== all[index - 1].documentId);
-  }
 
   function defaults() {
     return {
@@ -69,21 +47,34 @@
     const activity = read(ACTIVITY_KEY, []);
     const comprehension = read(COMPREHENSION_KEY, []);
     const list = read(LIST_KEY, []);
-    const libraryDocuments = getLibraryDocuments();
     const year = new Date().getFullYear();
     const completedIds = new Set();
     list.filter(item => item.status === 'finished').forEach(item => completedIds.add(item.documentId || item.id || item.title));
     progress.filter(item => Number(item.percent || item.progressPercent || 0) >= 99).forEach(item => completedIds.add(item.documentId || item.title));
     const completedBooks = completedIds.size;
-    const recentWpm = activity.slice(0, 20).map(item => Number(item.wpm)).filter(Boolean);
-    const avgWpm = recentWpm.length ? Math.round(recentWpm.reduce((a,b)=>a+b,0)/recentWpm.length) : 0;
-    const scores = comprehension.slice(0, 20).map(item => Number(item.score ?? item.percent ?? item.percentage)).filter(Number.isFinite);
-    const avgComprehension = scores.length ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length) : 0;
+
+    // Reading sessions store wordsRead + seconds, not a precomputed `wpm`.
+    // Use the same measured-speed calculation as Progress & Awards.
+    const recentActivity = activity.slice(0, 20);
+    const recentWords = recentActivity.reduce((sum, item) => sum + (Number(item.wordsRead) || 0), 0);
+    const recentSeconds = recentActivity.reduce((sum, item) => sum + (Number(item.seconds) || 0), 0);
+    const avgWpm = recentSeconds > 0
+      ? Math.round(recentWords / (recentSeconds / 60))
+      : 0;
+
+    // Current comprehension results are stored as `scorePercent`.
+    // Keep older field names as fallbacks for legacy records.
+    const scores = comprehension.slice(0, 20)
+      .map(item => Number(item.scorePercent ?? item.score ?? item.percent ?? item.percentage))
+      .filter(Number.isFinite);
+    const avgComprehension = scores.length
+      ? Math.round(scores.reduce((a,b)=>a+b,0)/scores.length)
+      : 0;
     const now = Date.now();
     const weekAgo = now - 7*86400000;
     const weeklyMinutes = Math.round(activity.filter(item => Date.parse(item.createdAt || item.startedAt || item.endedAt || 0) >= weekAgo).reduce((sum,item)=>sum + Number(item.seconds || item.durationSeconds || 0),0)/60);
     const bookGoals = goals.books.map(goal => {
-      const match = progress.find(item => goal.bookId && item.documentId === goal.bookId);
+      const match = progress.find(item => (goal.documentId && item.documentId === goal.documentId) || sameBook(item.title, goal.title));
       const percent = Math.max(0, Math.min(100, Math.round(Number(match?.percent ?? match?.progressPercent ?? 0))));
       return { ...goal, percent, completed: percent >= 99 || goal.completed === true };
     });
@@ -98,7 +89,6 @@
     const goals = getGoals();
     const metrics = getMetrics(goals);
     const list = read(LIST_KEY, []);
-    const libraryDocuments = getLibraryDocuments();
     app.dataset.viewKey = 'reading-goals';
     app.innerHTML = `<section class="panel reading-goals-page">
       <header class="goals-hero">
@@ -120,8 +110,8 @@
           <div class="goal-fields"><label>Target reading speed<input id="goal-target-wpm" type="number" min="50" max="1500" step="10" value="${Number(goals.targetWpm)||350}"><small>words per minute</small></label><label>Target comprehension<input id="goal-target-comprehension" type="number" min="1" max="100" value="${Number(goals.targetComprehension)||80}"><small>percent</small></label></div>
           <div class="goal-current-metrics"><span>Current WPM <strong>${metrics.avgWpm || '—'}</strong></span><span>Current comprehension <strong>${metrics.avgComprehension ? metrics.avgComprehension+'%' : '—'}</strong></span></div>
         </section>
-        <section class="goals-card goal-books-card"><div class="goals-card-heading"><span>▤</span><div><h2>Books to finish</h2><p>Choose books already stored in My Library and give each one a target date.</p></div></div>
-          <div class="goal-book-adder"><select id="goal-book-select"><option value="">Choose a book…</option>${libraryDocuments.map(item=>`<option value="${esc(item.documentId)}">${esc(item.title)}</option>`).join('')}</select><input id="goal-book-deadline" type="date" min="${todayIso()}" value="${goals.annualDeadline||yearEnd()}"><button id="add-goal-book" class="secondary" type="button">Add book goal</button></div>
+        <section class="goals-card goal-books-card"><div class="goals-card-heading"><span>▤</span><div><h2>Books to finish</h2><p>Choose books from My Reading and give each one a target date.</p></div></div>
+          <div class="goal-book-adder"><select id="goal-book-select"><option value="">Choose a book…</option>${list.filter(item=>item.title).map(item=>`<option value="${esc(item.id||item.documentId||item.title)}">${esc(item.title)}</option>`).join('')}</select><input id="goal-book-deadline" type="date" min="${todayIso()}" value="${goals.annualDeadline||yearEnd()}"><button id="add-goal-book" class="secondary" type="button">Add book goal</button></div>
           <div id="goal-book-list" class="goal-book-list">${metrics.bookGoals.length ? metrics.bookGoals.map(book=>`<article><div><strong>${esc(book.title)}</strong><small>Target ${book.deadline ? new Date(book.deadline+'T12:00:00').toLocaleDateString() : 'not set'}</small></div><div class="goal-inline-progress"><span style="width:${book.percent}%"></span></div><b>${book.percent}%</b><button type="button" data-remove-goal-book="${esc(book.id)}" aria-label="Remove ${esc(book.title)}">×</button></article>`).join('') : '<p class="empty-state">No book-specific goals yet.</p>'}</div>
         </section>
         <section class="goals-card"><div class="goals-card-heading"><span>✉</span><div><h2>Visibility & encouragement</h2><p>Keep goal progress prominent and include it in Action Center emails.</p></div></div>
@@ -134,12 +124,10 @@
     const form = app.querySelector('#reading-goals-form');
     const select = app.querySelector('#goal-book-select');
     app.querySelector('#add-goal-book')?.addEventListener('click', () => {
-      const chosen = libraryDocuments.find(item => String(item.documentId) === select.value);
+      const chosen = list.find(item => String(item.id||item.documentId||item.title) === select.value);
       if (!chosen) return;
       const current = getGoals();
-      const bookId = String(chosen.documentId || '').trim();
-      if (!bookId) return;
-      if (!current.books.some(item => item.bookId === bookId)) current.books.push({ id:`goal-book-${Date.now()}`, bookId, title:chosen.title, deadline:app.querySelector('#goal-book-deadline').value, createdAt:new Date().toISOString() });
+      if (!current.books.some(item => sameBook(item.title, chosen.title))) current.books.push({ id:`goal-book-${Date.now()}`, documentId:chosen.documentId||'', title:chosen.title, deadline:app.querySelector('#goal-book-deadline').value, createdAt:new Date().toISOString() });
       saveGoals(current); render();
     });
     app.querySelectorAll('[data-remove-goal-book]').forEach(button => button.addEventListener('click', () => { const current=getGoals(); current.books=current.books.filter(item=>item.id!==button.dataset.removeGoalBook); saveGoals(current); render(); }));
@@ -183,29 +171,23 @@
     app.querySelector('.action-center-hero')?.insertAdjacentElement('afterend',section);
   }
 
-  function encourageGoalBook(context={}) {
+  function onSessionStart(context={}) {
     const goals=getGoals(); if(!goals.enabled) return;
-    const bookId=String(context.documentId||context.bookId||'').trim(); if(!bookId) return;
-    const goal=goals.books.find(item => item.bookId === bookId);
+    const title=String(context.title||'').trim(); if(!title) return;
+    const goal=goals.books.find(item => (context.documentId && item.documentId===context.documentId) || sameBook(item.title,title));
     if(!goal) return;
-    const key=`${bookId}|${new Date().toISOString().slice(0,10)}`; if(lastEncouragedSession===key) return; lastEncouragedSession=key;
+    const key=`${context.documentId||title}|${new Date().toISOString().slice(0,10)}`; if(lastEncouragedSession===key) return; lastEncouragedSession=key;
     const m=getMetrics(goals); const book=m.bookGoals.find(item=>item.id===goal.id)||goal;
-    const title=goal.title || context.title || 'this book';
     const deadline=goal.deadline ? new Date(goal.deadline+'T12:00:00').toLocaleDateString(undefined,{month:'long',day:'numeric'}) : '';
     const message=`You’re reading one of your goal books. You’re ${book.percent||0}% through ${title}${deadline?` and working toward your ${deadline} target`:''}. Keep going—you’re building real momentum.`;
-    document.dispatchEvent(new CustomEvent('marksetgo:ask-mark-companion-message', {
-      detail: {
-        id: `goal-update-${goal.id}-${key}`,
-        bookId,
-        title,
-        kind: 'goal-update',
-        message
-      }
-    }));
+    showEncouragement(message);
   }
 
-  function onSessionStart(context={}) { encourageGoalBook(context); }
-  function onBookOpened(context={}) { window.setTimeout(() => encourageGoalBook(context), 250); }
+  function showEncouragement(message) {
+    document.querySelector('.reading-goal-toast')?.remove();
+    const toast=document.createElement('aside'); toast.className='reading-goal-toast'; toast.setAttribute('role','status'); toast.innerHTML=`<span class="goal-mark-avatar">M</span><div><strong>Mark</strong><p>${esc(message)}</p></div><button type="button" aria-label="Dismiss">×</button>`;
+    document.body.appendChild(toast); toast.querySelector('button').addEventListener('click',()=>toast.remove()); setTimeout(()=>toast.remove(),10000);
+  }
 
   async function syncGoals(goals=getGoals()) {
     if(!goals.emailProgress) return;
@@ -216,7 +198,6 @@
 
   document.addEventListener('click', event => { const button=event.target.closest?.('[data-action="reading-goals"]'); if(!button) return; event.preventDefault(); event.stopImmediatePropagation(); render(); }, true);
   const observer=new MutationObserver(()=>{ injectProgress(); injectActionCenter(); });
-  document.addEventListener('marksetgo:document-available', event => onBookOpened(event.detail || {}));
   window.addEventListener('DOMContentLoaded',()=>{ const app=document.querySelector('#app'); if(app) observer.observe(app,{childList:true,subtree:true}); injectProgress(); injectActionCenter(); });
-  window.ReadingGoals={render,getGoals,saveGoals,getMetrics,getLibraryDocuments,onSessionStart,onBookOpened,injectProgress,injectActionCenter,syncGoals};
+  window.ReadingGoals={render,getGoals,saveGoals,getMetrics,onSessionStart,injectProgress,injectActionCenter,syncGoals};
 })();
