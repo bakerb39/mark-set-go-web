@@ -7805,14 +7805,18 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   };
   document.addEventListener('keydown', state.spacebarHandler);
 
-  reader.addEventListener('click', (event) => {
-    const translatedWord = event.target.closest('.translated-word');
+  readerFrame.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    if (target.closest('button, input, textarea, select, a, summary, [contenteditable="true"], [role="textbox"], #fullscreen-control-strip, #fullscreen-mark-drawer, #focus-anchor-overlay')) return;
+
+    const translatedWord = target.closest('.translated-word');
     if (translatedWord && state.language !== 'en') {
       handleTranslatedWordClick(event);
       return;
     }
 
-    const clickedWord = event.target.closest('.reader-word[data-index]');
+    const clickedWord = target.closest('.reader-word[data-index]');
     const mode = getSelectedMode();
     const seekableModes = new Set(['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'auto-scroll']);
 
