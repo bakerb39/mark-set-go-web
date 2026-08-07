@@ -10119,3 +10119,99 @@ body > .app-footer {
     width: clamp(220px, 58vw, 360px);
   }
 }
+
+
+/* v9.2.43 refined homepage Mark composition */
+.home-mark-icon-stage {
+  min-height: 430px !important;
+  height: auto !important;
+  display: grid !important;
+  grid-template-rows: 1fr auto !important;
+  place-items: center !important;
+  align-content: center !important;
+  gap: 12px !important;
+  padding: clamp(24px, 3.5vw, 42px) clamp(22px, 4vw, 46px) 24px !important;
+  box-sizing: border-box !important;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(63,118,155,.34) 0, rgba(21,61,89,.22) 33%, rgba(7,24,39,.96) 72%),
+    linear-gradient(180deg,#0a2237 0%,#071827 100%) !important;
+}
+
+.home-mark-portrait-wrap {
+  width: min(74%, 500px);
+  display: grid;
+  place-items: center;
+  align-self: end;
+}
+
+.home-mark-avatar {
+  width: 100% !important;
+  max-width: 500px !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: cover !important;
+  border-radius: 50% !important;
+  border: 0 !important;
+  box-shadow:
+    0 20px 42px rgba(0,0,0,.34),
+    0 0 36px rgba(228,196,99,.12) !important;
+}
+
+.home-mark-stage-caption {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  text-align: center;
+  color: #f6fbff;
+}
+
+.home-mark-stage-caption strong {
+  font-size: clamp(.9rem,1.35vw,1.05rem);
+  line-height: 1.1;
+  color: #f1d77a !important;
+  letter-spacing: .01em;
+}
+
+.home-mark-stage-caption span {
+  font-size: clamp(.68rem,1vw,.78rem);
+  line-height: 1.25;
+  color: #d4e6f3 !important;
+}
+
+/* Let the two home cards read as one balanced row instead of a tall graphic
+   beside a shorter action panel. */
+.home-reading-card,
+.home-start-card {
+  min-height: 0 !important;
+}
+
+.home-reading-card {
+  align-self: stretch !important;
+}
+
+.home-reading-card .home-reading-copy {
+  padding-top: .7rem !important;
+  padding-bottom: .75rem !important;
+}
+
+.home-start-card {
+  padding-bottom: 1rem !important;
+}
+
+/* Prevent the Mark visual from creating unnecessary empty vertical space. */
+@media (min-width: 851px) {
+  .home-mark-icon-stage {
+    min-height: 410px !important;
+  }
+}
+
+@media (max-width: 850px) {
+  .home-mark-icon-stage {
+    min-height: 0 !important;
+    padding: 28px 20px 22px !important;
+  }
+
+  .home-mark-portrait-wrap {
+    width: min(68vw, 390px) !important;
+  }
+}

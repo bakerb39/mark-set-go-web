@@ -3640,11 +3640,17 @@ function renderHome() {
       <div class="home-reader-launch">
         <figure class="home-mark-card">
           <div class="home-mark-icon-stage">
-            <img
-              class="home-mark-avatar"
-              src="/assets/ask-mark/ask-mark-avatar.png"
-              alt="Mark, your reading companion."
-            >
+            <div class="home-mark-portrait-wrap">
+              <img
+                class="home-mark-avatar"
+                src="/assets/ask-mark/ask-mark-avatar.png"
+                alt="Mark, your reading companion."
+              >
+            </div>
+            <div class="home-mark-stage-caption">
+              <strong>Your reading companion</strong>
+              <span>Read faster. Understand deeper. Remember longer.</span>
+            </div>
           </div>
           <figcaption>
             <strong>Meet Mark.</strong>
