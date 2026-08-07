@@ -7306,20 +7306,22 @@ function bindMarkCompanion(reader){
 
   const resumeAfterLockedSelectionClick=(event)=>{
     const pending=state.markResumeOnNextReaderClick;
-    const shouldResume=Boolean(pending?.shouldResume);
+    const wasRunningBeforeSelection=Boolean(pending?.shouldResume);
     state.markResumeOnNextReaderClick=null;
 
     event.preventDefault();
     event.stopImmediatePropagation();
 
-    if(!shouldResume) return;
-
     const clickedWord=event.target.closest?.('.reader-word[data-index]');
+    const clickedGroup=event.target.closest?.('.reader-group[data-start-index]');
     const mode=getSelectedMode();
     const seekableModes=new Set(['highlight','bold-focus','smooth-glide','pointing-guide','marquee','auto-scroll']);
 
-    if(clickedWord && seekableModes.has(mode)){
-      const clickedIndex=Number(clickedWord.dataset.index);
+    // The click that clears an Ask Mark selection must still perform the user's
+    // requested reader action. Previously a paused-before-selection state
+    // returned here and swallowed this first click.
+    if((clickedWord || clickedGroup) && seekableModes.has(mode)){
+      const clickedIndex=Number(clickedWord?.dataset.index ?? clickedGroup?.dataset.startIndex);
       if(Number.isFinite(clickedIndex)){
         const group=findReadingGroup(clickedIndex);
         stopReader();
@@ -7327,12 +7329,25 @@ function bindMarkCompanion(reader){
         state.viewportAnchorIndex=state.index;
         persistReaderSession({immediate:true});
         updateReaderStatus(`Reading position moved to word ${(state.index+1).toLocaleString()}.`);
-        startReader();
+
+        if(wasRunningBeforeSelection){
+          startReader();
+        }else{
+          // Honor the seek immediately but preserve the paused state.
+          pauseReader();
+          persistReaderSession({immediate:true});
+        }
         return;
       }
     }
 
-    if(mode!=='two-column' && !isReaderRunning()) startReader();
+    // A blank-space click follows the normal reader toggle contract. The
+    // selection itself temporarily paused playback, so the clearing click
+    // resumes/starts immediately regardless of the pre-selection state.
+    if(mode!=='two-column' && !isReaderRunning()){
+      startReader();
+      persistReaderSession();
+    }
   };
 
   reader.addEventListener('pointerdown',(event)=>{
