@@ -9268,3 +9268,45 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
   cursor:pointer;
   pointer-events:auto;
 }
+
+
+/* v9.2.9 keep pane resizing available on compact desktop */
+@media (min-width:701px) and (max-width:1050px) {
+  .reader-layout,
+  .reader-layout.navigation-hidden,
+  .reader-layout.word-panel-hidden,
+  .reader-layout.navigation-hidden.word-panel-hidden {
+    align-items:stretch;
+  }
+
+  .reader-layout:not(.navigation-hidden):not(.word-panel-hidden) {
+    grid-template-columns:
+      minmax(150px, var(--navigation-width))
+      8px
+      minmax(280px, 1fr)
+      8px
+      var(--word-panel-width);
+  }
+
+  .reader-layout.navigation-hidden:not(.word-panel-hidden) {
+    grid-template-columns:minmax(280px,1fr) 8px var(--word-panel-width);
+  }
+
+  .reader-layout:not(.navigation-hidden).word-panel-hidden {
+    grid-template-columns:var(--navigation-width) 8px minmax(280px,1fr);
+  }
+
+  .reader-layout.navigation-hidden.word-panel-hidden {
+    grid-template-columns:minmax(0,1fr);
+  }
+
+  #left-pane-splitter,
+  #right-pane-splitter {
+    display:block;
+  }
+
+  .navigation-pane,
+  .word-panel {
+    grid-column:auto;
+  }
+}
