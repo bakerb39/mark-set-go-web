@@ -327,6 +327,7 @@
                 <button class="primary" type="button" data-cloud-library-cloud-open="${escapeHtml(book.id)}">Open cloud text</button>
                 ${hasLocalDocument(book.clientRecordId) ? `<button class="secondary" type="button" data-cloud-library-open="${id}">Open local text</button>` : ''}
                 ${sourceUrl ? `<a class="secondary button-link" href="${sourceUrl}" target="_blank" rel="noopener noreferrer">Open source</a>` : ''}
+                <button class="secondary danger" type="button" data-cloud-library-delete="${escapeHtml(book.id)}" data-cloud-library-delete-title="${escapeHtml(book.title)}">Delete</button>
               </div>
             </article>`;
           }).join('')}
@@ -355,6 +356,30 @@
           } catch (_) {}
           window.alert(error?.message || 'This cloud document could not be opened and was removed from the account library.');
         } finally {
+          if (button.isConnected) {
+            button.disabled = false;
+            button.textContent = original;
+          }
+        }
+      });
+    });
+
+    root.querySelectorAll('[data-cloud-library-delete]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const bookId = button.dataset.cloudLibraryDelete;
+        const title = button.dataset.cloudLibraryDeleteTitle || 'this item';
+        if (!bookId) return;
+        if (!window.confirm(`Delete "${title}" from your account library? This removes its cloud text, metadata, and saved account progress.`)) return;
+
+        button.disabled = true;
+        const original = button.textContent;
+        button.textContent = 'Deleting…';
+        try {
+          await cloudApi()?.remove?.(bookId);
+          await loadCloudLibrary();
+        } catch (error) {
+          console.warn('Cloud library delete failed:', error);
+          window.alert(error?.message || 'The account-library item could not be deleted.');
           if (button.isConnected) {
             button.disabled = false;
             button.textContent = original;
