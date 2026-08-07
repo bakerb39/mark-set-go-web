@@ -4816,17 +4816,80 @@ function normalizeLookupWord(value) {
   return String(value || '').replace(/^[^\p{L}'’-]+|[^\p{L}'’-]+$/gu, '').toLocaleLowerCase();
 }
 
-function getSavedDefinitions() {
+// v9.2.44 Reader annotations use IndexedDB, not localStorage quota.
+// The in-memory arrays preserve the existing synchronous API used throughout
+// the Reader while IndexedDB provides the durable store.
+const READER_DEFINITIONS_CACHE_KEY = 'reader-annotations:definitions:v1';
+const READER_NOTES_CACHE_KEY = 'reader-annotations:notes:v1';
+
+function readLegacyAnnotationArray(key) {
   try {
-    const parsed = JSON.parse(localStorage.getItem(SAVED_DEFINITIONS_KEY) || '[]');
+    const parsed = JSON.parse(localStorage.getItem(key) || '[]');
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
+let savedDefinitionsCache = readLegacyAnnotationArray(SAVED_DEFINITIONS_KEY).slice(0, 500);
+let readerNotesCache = readLegacyAnnotationArray(NOTE_STORAGE_KEY).slice(0, 1000);
+let readerAnnotationHydrated = false;
+
+async function persistReaderAnnotationRecord(key, items) {
+  const ok = await cacheReadingBook({
+    key,
+    type: 'reader-annotations',
+    items,
+    updatedAt: new Date().toISOString()
+  });
+  if (!ok) console.warn(`Reader annotations could not be persisted: ${key}`);
+  return ok;
+}
+
+async function hydrateReaderAnnotationStores() {
+  if (readerAnnotationHydrated) return;
+  readerAnnotationHydrated = true;
+
+  try {
+    const [definitionRecord, noteRecord] = await Promise.all([
+      getCachedReadingBook(READER_DEFINITIONS_CACHE_KEY),
+      getCachedReadingBook(READER_NOTES_CACHE_KEY)
+    ]);
+
+    const indexedDefinitions = Array.isArray(definitionRecord?.items) ? definitionRecord.items : [];
+    const indexedNotes = Array.isArray(noteRecord?.items) ? noteRecord.items : [];
+
+    // If IndexedDB already has data, it is authoritative. Otherwise migrate the
+    // legacy localStorage arrays once.
+    if (indexedDefinitions.length) savedDefinitionsCache = indexedDefinitions;
+    else if (savedDefinitionsCache.length) await persistReaderAnnotationRecord(READER_DEFINITIONS_CACHE_KEY, savedDefinitionsCache);
+
+    if (indexedNotes.length) readerNotesCache = indexedNotes;
+    else if (readerNotesCache.length) await persistReaderAnnotationRecord(READER_NOTES_CACHE_KEY, readerNotesCache);
+
+    // Remove the bulky legacy copies only after IndexedDB has had a chance to
+    // receive them. This also gives localStorage quota back to the rest of app.
+    try { localStorage.removeItem(SAVED_DEFINITIONS_KEY); } catch {}
+    try { localStorage.removeItem(NOTE_STORAGE_KEY); } catch {}
+
+    if (app.querySelector('#reader')) {
+      renderNavigationPane();
+      applySavedDefinitionHighlights();
+    }
+  } catch (error) {
+    console.warn('Reader annotation migration could not complete.', error);
+  }
+}
+
+function getSavedDefinitions() {
+  return savedDefinitionsCache;
+}
+
 function saveDefinitions(items) {
-  localStorage.setItem(SAVED_DEFINITIONS_KEY, JSON.stringify(items.slice(0, 100)));
+  savedDefinitionsCache = (Array.isArray(items) ? items : []).slice(0, 500);
+  // Fire-and-forget durable save; never let browser quota errors break lookup.
+  void persistReaderAnnotationRecord(READER_DEFINITIONS_CACHE_KEY, savedDefinitionsCache);
+  return true;
 }
 
 function definitionsForCurrentDocument() {
@@ -4861,17 +4924,25 @@ function openSavedDefinition(id) {
 
 
 function getNotes() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(NOTE_STORAGE_KEY) || '[]');
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
+  return readerNotesCache;
 }
 
 function saveNotes(notes) {
-  const trimmed = notes.slice(0, 200);
-  localStorage.setItem(NOTE_STORAGE_KEY, JSON.stringify(trimmed));
+  const trimmed = (Array.isArray(notes) ? notes : []).slice(0, 1000);
+  readerNotesCache = trimmed;
+  void persistReaderAnnotationRecord(READER_NOTES_CACHE_KEY, trimmed);
+
+  // Keep only the tiny cookie used by the existing email/indicator workflow.
   const ids = trimmed.slice(0, 30).map((item) => item.id).join(',');
   document.cookie = `markSetGoNotes=${encodeURIComponent(ids)}; Max-Age=31536000; Path=/; SameSite=Lax`;
+  return true;
+}
+
+// Hydrate after startup without blocking the Reader's first paint.
+if (typeof requestIdleCallback === 'function') {
+  requestIdleCallback(() => hydrateReaderAnnotationStores(), { timeout: 1200 });
+} else {
+  window.setTimeout(() => hydrateReaderAnnotationStores(), 100);
 }
 
 function collectEmailNotes() {
