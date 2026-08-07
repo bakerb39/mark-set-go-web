@@ -7788,60 +7788,24 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     switchReadingMode(modeSelect.value);
   });
 
-  // Spacebar acts as a simple play/pause toggle while the reader is open.
-  // Remove the previous handler first because loading another book rebuilds this view.
-  if (state.spacebarHandler) document.removeEventListener('keydown', state.spacebarHandler);
-  state.spacebarHandler = (event) => {
-    if (event.code !== 'Space' || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
-
-    const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest('input, textarea, select, button, a, summary, [contenteditable="true"], [role="textbox"]')) return;
-    if (!app.querySelector('#reader') || getSelectedMode() === 'two-column') return;
-
-    event.preventDefault();
-    if (isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
-  };
-  document.addEventListener('keydown', state.spacebarHandler);
-
-  reader.addEventListener('click', (event) => {
-    const translatedWord = event.target.closest('.translated-word');
-    if (translatedWord && state.language !== 'en') {
-      handleTranslatedWordClick(event);
-      return;
-    }
-
-    const clickedWord = event.target.closest('.reader-word[data-index]');
-    const mode = getSelectedMode();
-    const seekableModes = new Set(['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'auto-scroll']);
-
-    // In full-text modes, clicking a specific word changes the reading position
-    // instead of merely toggling pause. Snap to the beginning of that word's
-    // current reading group so Highlight/Bold/Meaningful Chunks remain aligned.
-    if (clickedWord && seekableModes.has(mode)) {
-      event.preventDefault();
-      event.stopPropagation();
-      const clickedIndex = Number(clickedWord.dataset.index);
-      if (Number.isFinite(clickedIndex)) {
-        const wasRunning = isReaderRunning();
-        const group = findReadingGroup(clickedIndex);
-        stopReader();
-        state.index = group?.start ?? clickedIndex;
-        state.viewportAnchorIndex = state.index;
-        persistReaderSession({ immediate: true });
-        updateReaderStatus(`Reading position moved to word ${(state.index + 1).toLocaleString()}.`);
-        startReader();
-        if (!wasRunning) window.setTimeout(pauseReader, 0);
-      }
-      return;
-    }
-
-    // Blank-space clicks always toggle playback. This is intentionally
-    // independent of the selected display mode; word clicks above still seek.
-    if (isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
+  // Protected reader interaction contract lives outside general app integration code.
+  // Do not change this behavior without explicit approval; see READER-BEHAVIOR-CONTRACT.md.
+  if (!window.ReaderInteractions?.install) {
+    throw new Error('Protected ReaderInteractions module did not load.');
+  }
+  window.ReaderInteractions.install({
+    reader,
+    state,
+    getSelectedMode,
+    isReaderRunning,
+    startReader,
+    pauseReader,
+    stopReader,
+    persistReaderSession,
+    findReadingGroup,
+    updateReaderStatus,
+    handleTranslatedWordClick,
+    app
   });
   bindDictionaryMenu(reader);
   window.requestAnimationFrame(updateReaderBookmarkMarkers);
