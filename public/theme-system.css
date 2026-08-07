@@ -1,0 +1,311 @@
+/* Mark, Set, Go! shared visual design system — v9.2.4
+   One palette for application pages. Layout remains owned by page-specific CSS.
+   This file intentionally contains presentation rules only. */
+:root {
+  --msg-navy: #0b2d4f;
+  --msg-navy-deep: #08243f;
+  --msg-blue: #2f75b5;
+  --msg-blue-strong: #236aa8;
+  --msg-blue-hover: #1e5f98;
+  --msg-blue-soft: #e8f2fb;
+  --msg-blue-soft-2: #f4f9fd;
+  --msg-blue-soft-3: #dcebf7;
+  --msg-blue-border: #b8d3e8;
+  --msg-blue-border-soft: #d5e5f2;
+  --msg-gold: #f1d77a;
+  --msg-gold-bright: #ffe69a;
+  --msg-gold-soft: #fff7d8;
+  --msg-ink: #18324a;
+  --msg-muted: #60758a;
+  --msg-surface: #ffffff;
+  --msg-page: #eef4f8;
+  --msg-danger: #a33a3a;
+
+  /* Existing app tokens resolve to the same system. */
+  --accent: var(--msg-blue);
+  --ui-accent: var(--msg-blue);
+  --panel: var(--msg-surface);
+  --surface: var(--msg-surface);
+  --page: var(--msg-page);
+  --ink: var(--msg-ink);
+  --muted: var(--msg-muted);
+  --border: var(--msg-blue-border-soft);
+}
+
+/* ---------- Shared application surfaces ---------- */
+body { background: var(--msg-page); color: var(--msg-ink); }
+
+#app > .platform-page,
+#app > .panel:not(.reader-page-panel) {
+  color: var(--msg-ink);
+}
+
+#app > .platform-page :is(.panel,.card,.panel-card,.source-card,.record-card,.platform-card,.platform-book-card,.unified-book-card,.progress-book-card,.vocabulary-card,.analytics-card,.annual-goal-card),
+#app > .panel:not(.reader-page-panel) :is(.panel,.card,.panel-card,.source-card,.record-card,.platform-card,.platform-book-card,.unified-book-card,.progress-book-card,.vocabulary-card,.analytics-card,.annual-goal-card) {
+  border-color: var(--msg-blue-border-soft);
+}
+
+#app > .platform-page :is(h1,h2,h3,strong),
+#app > .panel:not(.reader-page-panel) :is(h1,h2,h3,strong) {
+  color: var(--msg-ink);
+}
+
+#app > .platform-page :is(.muted,small),
+#app > .panel:not(.reader-page-panel) :is(.muted,small) {
+  color: var(--msg-muted);
+}
+
+/* Form controls and buttons use one consistent family. */
+#app > .platform-page :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea),
+#app > .panel:not(.reader-page-panel) :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea) {
+  border-color: var(--msg-blue-border-soft);
+  background: var(--msg-surface);
+  color: var(--msg-ink);
+}
+#app > .platform-page :is(input,select,textarea):focus,
+#app > .panel:not(.reader-page-panel) :is(input,select,textarea):focus {
+  border-color: var(--msg-blue);
+  outline-color: color-mix(in srgb, var(--msg-blue) 35%, transparent);
+}
+
+#app > .platform-page .primary,
+#app > .panel:not(.reader-page-panel) .primary,
+.auth-nav-primary {
+  background: var(--msg-blue) !important;
+  border-color: var(--msg-blue) !important;
+  color: #fff !important;
+}
+#app > .platform-page .primary:hover,
+#app > .platform-page .primary:focus-visible,
+#app > .panel:not(.reader-page-panel) .primary:hover,
+#app > .panel:not(.reader-page-panel) .primary:focus-visible,
+.auth-nav-primary:hover,
+.auth-nav-primary:focus-visible {
+  background: var(--msg-blue-strong) !important;
+  border-color: var(--msg-blue-strong) !important;
+}
+#app > .platform-page .secondary,
+#app > .panel:not(.reader-page-panel) .secondary {
+  background: var(--msg-blue-soft) !important;
+  border-color: var(--msg-blue-border) !important;
+  color: var(--msg-navy) !important;
+}
+#app > .platform-page .secondary:hover,
+#app > .platform-page .secondary:focus-visible,
+#app > .panel:not(.reader-page-panel) .secondary:hover,
+#app > .panel:not(.reader-page-panel) .secondary:focus-visible {
+  background: var(--msg-blue-soft-3) !important;
+  border-color: var(--msg-blue) !important;
+}
+
+/* ---------- Shared section/card language ---------- */
+.app-section-card,
+.app-section-notifications,
+.app-section-email,
+.app-section-create,
+.app-section-actions {
+  --section-accent: var(--msg-blue) !important;
+  --section-tint: var(--msg-blue-soft-2) !important;
+  border-color: var(--msg-blue-border-soft) !important;
+}
+.app-section-card::before { background: var(--msg-blue) !important; }
+.app-section-card > .section-heading {
+  background: linear-gradient(90deg,var(--msg-blue-soft),rgba(255,255,255,.72)) !important;
+  border-bottom-color: var(--msg-blue-border-soft) !important;
+}
+.app-section-card > .section-heading h2::before {
+  background: var(--msg-blue) !important;
+  color: #fff !important;
+}
+
+/* KPI cards vary by shade, not by unrelated hues. */
+.action-kpi-grid article:nth-child(1) { border-top-color:#236aa8 !important; }
+.action-kpi-grid article:nth-child(2) { border-top-color:#2f75b5 !important; }
+.action-kpi-grid article:nth-child(3) { border-top-color:#4a88bd !important; }
+.action-kpi-grid article:nth-child(4) { border-top-color:#679ac6 !important; }
+.action-kpi-grid article:nth-child(5) { border-top-color:#83acd0 !important; }
+
+/* Common selected/open/active states. */
+:is(.is-active,.active,.selected,[aria-selected="true"]):where(.platform-card,.source-card,.record-card,.library-continue-card,.music-quick-button,.my-link-row) {
+  border-color: var(--msg-blue) !important;
+  background: var(--msg-blue-soft-2) !important;
+}
+
+/* ---------- Music & Focus ---------- */
+.music-simple-page,
+.music-library {
+  --music-accent: var(--msg-blue);
+  --music-border: var(--msg-blue-border-soft);
+  --music-soft: var(--msg-blue-soft-2);
+}
+.music-current-book {
+  border-color: var(--music-border) !important;
+  background: var(--msg-blue-soft) !important;
+}
+.music-current-book > span { color: var(--msg-blue-strong) !important; }
+.music-primary-section,
+.music-secondary-section,
+.music-book-details,
+.music-browse-details,
+.music-card {
+  border-color: var(--music-border) !important;
+  background: var(--msg-surface) !important;
+}
+.music-section-heading h2 { color: var(--msg-navy) !important; }
+.music-section-heading p,
+.music-current-book small,
+.music-quick-button small,
+.music-saved-info small,
+.music-empty-state span,
+.music-optional-name summary,
+.music-or { color: var(--msg-muted) !important; }
+.music-step {
+  background: var(--msg-blue) !important;
+  color: #fff !important;
+}
+.music-quick-button {
+  border-color: var(--music-border) !important;
+  background: var(--msg-blue-soft-2) !important;
+  color: var(--msg-ink) !important;
+}
+.music-quick-button:hover,
+.music-quick-button:focus-visible,
+.music-quick-button[aria-pressed="true"],
+.music-quick-button.is-active {
+  border-color: var(--msg-blue) !important;
+  background: var(--msg-blue-soft-3) !important;
+}
+.music-quick-button > span:first-child { color: var(--msg-blue-strong) !important; }
+.music-or span { background: var(--msg-surface) !important; }
+.music-saved-item {
+  border-color: var(--music-border) !important;
+  background: var(--msg-surface) !important;
+}
+.music-provider-badge {
+  background: var(--msg-blue-soft) !important;
+  color: var(--msg-blue-strong) !important;
+  border: 1px solid var(--msg-blue-border-soft) !important;
+}
+.music-empty-state {
+  border-color: var(--msg-blue-border) !important;
+  background: var(--msg-blue-soft-2) !important;
+}
+.music-card-icon {
+  background: var(--msg-blue-soft) !important;
+  color: var(--msg-blue-strong) !important;
+}
+.music-dock { border-color: #244b6c !important; background: var(--msg-navy-deep) !important; }
+.music-dock-bar { background: var(--msg-navy) !important; }
+.music-dock-actions button { background: #244b6c !important; color: #fff !important; }
+
+/* ---------- Library / progress / vocabulary ---------- */
+.library-progress-track,
+.progress-track { background: var(--msg-blue-soft-3) !important; }
+.library-progress-track span,
+.progress-track span,
+progress::-webkit-progress-value { background: var(--msg-blue) !important; }
+.cloud-saved-badge,
+.cloud-document-badge,
+.random-note-badge,
+.unified-document-state[data-state="document"],
+.email-cloud-status .ok,
+.auth-plan-badge {
+  background: var(--msg-blue-soft) !important;
+  border-color: var(--msg-blue-border-soft) !important;
+  color: var(--msg-blue-strong) !important;
+}
+
+/* ---------- Browse / sources / Great Ideas ---------- */
+.platform-card,
+.source-card,
+.platform-book-card,
+.unified-book-card,
+.ai-tool-card,
+.great-book-card,
+.syntopicon-card,
+.idea-card {
+  border-color: var(--msg-blue-border-soft) !important;
+}
+.platform-card:hover,
+.source-card:hover,
+.platform-book-card:hover,
+.unified-book-card:hover,
+.ai-tool-card:hover,
+.great-book-card:hover,
+.syntopicon-card:hover,
+.idea-card:hover {
+  border-color: var(--msg-blue-border) !important;
+}
+.icon-search,.icon-gutenberg,.icon-archive,.icon-openlibrary,.icon-wikisource {
+  background: linear-gradient(145deg,var(--msg-blue),var(--msg-navy)) !important;
+  color:#fff !important;
+}
+.ai-tool-card > span,
+.ai-tool-card:nth-child(4n+1) > span,
+.ai-tool-card:nth-child(4n+2) > span,
+.ai-tool-card:nth-child(4n+4) > span {
+  background: var(--msg-blue-soft) !important;
+  color: var(--msg-blue-strong) !important;
+}
+/* Gold remains a deliberate secondary accent, not a competing page color. */
+.ai-tool-card:nth-child(4n+3) > span {
+  background: var(--msg-gold-soft) !important;
+  color: #765b13 !important;
+}
+
+/* ---------- My Links / Notes / other utility pages ---------- */
+.my-link-row {
+  background: var(--msg-blue-soft-2) !important;
+}
+.my-link-row:hover,
+.my-link-row.is-active {
+  border-color: var(--msg-blue-border) !important;
+  background: var(--msg-blue-soft) !important;
+}
+.iframe-notice {
+  border-color: var(--msg-blue-border-soft) !important;
+  background: var(--msg-blue-soft-2) !important;
+  color: var(--msg-muted) !important;
+}
+
+/* ---------- Reader settings presentation only ---------- */
+.reader-toolbar .settings-panel[open] {
+  background: var(--msg-blue-soft) !important;
+  border-color: var(--msg-blue-border) !important;
+}
+.reader-toolbar .settings-panel[open] > summary {
+  background: var(--msg-blue-soft-3) !important;
+  border-bottom-color: var(--msg-blue-border) !important;
+}
+.reader-toolbar .settings-panel[open] > summary > span:first-child {
+  color: var(--msg-blue-strong) !important;
+}
+.reader-toolbar .settings-panel[open] .settings-summary { color: var(--msg-muted) !important; }
+.reader-toolbar .settings-panel[open] .settings-content { background: var(--msg-blue-soft-2) !important; }
+
+/* Reader document title stays compact and professional. */
+.reader-title-copy h1 {
+  color: var(--msg-navy) !important;
+  font-size: clamp(1.22rem,1.55vw,1.52rem) !important;
+  line-height: 1.18 !important;
+  font-weight: 700 !important;
+  letter-spacing: -.012em !important;
+}
+.reader-title-links { color: var(--msg-muted) !important; }
+
+/* ---------- Navigation ---------- */
+.site-header { background: var(--msg-navy-deep) !important; }
+.site-header .brand { color: #fff !important; }
+.site-header .menu-section-label,
+.site-header .brand-accent { color: var(--msg-gold) !important; }
+.site-header .menu-popover { border-color: var(--msg-blue-border-soft) !important; }
+.site-header .menu-popover > button:hover,
+.site-header .menu-popover > button:focus-visible {
+  background: var(--msg-blue-soft) !important;
+  color: var(--msg-navy) !important;
+}
+
+/* Keep existing deliberate gold branding bright. */
+.msg-gold,
+.gold-accent,
+[data-theme-accent="gold"] { color: var(--msg-gold) !important; }
