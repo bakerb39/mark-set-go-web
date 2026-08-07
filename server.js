@@ -3012,7 +3012,7 @@ async function searchOpenLibrary(q) {
   return (payload.docs || []).slice(0, 10).map((book) => ({
     provider: 'openlibrary', id: String(book.key || '').replace('/works/', ''), title: book.title || 'Untitled',
     author: authorNames(book.author_name), year: book.first_publish_year || '', language: Array.isArray(book.language) ? book.language[0] : '',
-    cover: book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` : '', readable: false,
+    availableFormats: [], cover: book.cover_i ? `https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg` : '', readable: false,
     externalUrl: book.key ? `https://openlibrary.org${book.key}` : 'https://openlibrary.org/',
     description: book.public_scan_b ? 'A public scan may be available from a linked archive.' : 'Edition and catalog information from Open Library.'
   }));
@@ -3020,13 +3020,13 @@ async function searchOpenLibrary(q) {
 
 async function searchInternetArchive(q) {
   const query = `(title:(${JSON.stringify(q)}) OR creator:(${JSON.stringify(q)})) AND mediatype:texts`;
-  const params = new URLSearchParams({ q: query, fl: 'identifier,title,creator,date,language,description', rows: '12', page: '1', output: 'json', sort: 'downloads desc' });
+  const params = new URLSearchParams({ q: query, fl: 'identifier,title,creator,date,language,description,format', rows: '12', page: '1', output: 'json', sort: 'downloads desc' });
   const payload = await fetchJsonWithRetry(`https://archive.org/advancedsearch.php?${params}`, { timeoutMs: 20000, attempts: 2, cacheTtlMs: LIBRARY_CACHE_MS });
   return (payload.response?.docs || []).slice(0, 10).map((book) => ({
     provider: 'internetarchive', id: book.identifier, title: Array.isArray(book.title) ? book.title[0] : book.title || 'Untitled',
     author: Array.isArray(book.creator) ? book.creator.join(', ') : book.creator || '', year: String(book.date || '').slice(0,4),
     language: Array.isArray(book.language) ? book.language[0] : book.language || '', cover: `https://archive.org/services/img/${encodeURIComponent(book.identifier)}`,
-    readable: true, externalUrl: `https://archive.org/details/${encodeURIComponent(book.identifier)}`,
+    readable: true, availableFormats: (Array.isArray(book.format) ? book.format : [book.format]).filter(Boolean).reduce((formats, value) => { const label = String(value).toLowerCase(); if (label.includes('epub') && !formats.includes('epub')) formats.push('epub'); if (label.includes('pdf') && !formats.includes('pdf')) formats.push('pdf'); if ((label.includes('text') || label.includes('djvu')) && !formats.includes('text')) formats.push('text'); return formats; }, []), externalUrl: `https://archive.org/details/${encodeURIComponent(book.identifier)}`,
     description: stripMarkup(Array.isArray(book.description) ? book.description[0] : book.description || '').slice(0, 280)
   }));
 }
@@ -3035,7 +3035,7 @@ async function searchWikisource(q) {
   const params = new URLSearchParams({ action: 'query', generator: 'search', gsrsearch: q, gsrnamespace: '0', gsrlimit: '10', prop: 'extracts|info|pageimages', exintro: '1', explaintext: '1', exchars: '280', inprop: 'url', piprop: 'thumbnail', pithumbsize: '300', format: 'json', origin: '*' });
   const payload = await fetchJsonWithRetry(`https://en.wikisource.org/w/api.php?${params}`, { timeoutMs: 18000, attempts: 2, cacheTtlMs: LIBRARY_CACHE_MS });
   return Object.values(payload.query?.pages || {}).map((page) => ({
-    provider: 'wikisource', id: String(page.pageid), title: page.title || 'Untitled', author: '', language: 'English',
+    provider: 'wikisource', id: String(page.pageid), title: page.title || 'Untitled', author: '', language: 'English', availableFormats:['text'],
     cover: page.thumbnail?.source || '', readable: true, externalUrl: page.fullurl || `https://en.wikisource.org/?curid=${page.pageid}`,
     description: page.extract || 'Proofread text from Wikisource.'
   }));
@@ -3056,7 +3056,7 @@ async function searchStandardEbooks(q) {
     const alternate = entry.find('link[rel="alternate"]').first().attr('href') || entry.find('id').first().text().trim();
     const cover = entry.find('link').filter((_j,n) => /image\/jpeg|image\/png/i.test($(n).attr('type') || '')).first().attr('href') || '';
     const id = Buffer.from(acquisition || alternate).toString('base64url');
-    results.push({ provider: 'standardebooks', id, title, author, language: 'English', format: 'EPUB', cover, readable: Boolean(acquisition), externalUrl: alternate, description: stripMarkup(entry.find('summary,content').first().text()).slice(0,280) });
+    results.push({ provider: 'standardebooks', id, title, author, language: 'English', format: 'EPUB', availableFormats:['epub'], cover, readable: Boolean(acquisition), externalUrl: alternate, description: stripMarkup(entry.find('summary,content').first().text()).slice(0,280) });
   });
   return results;
 }
@@ -3064,19 +3064,21 @@ async function searchStandardEbooks(q) {
 async function searchGutenbergUnified(q) {
   const params = new URLSearchParams({ search: q, languages: 'en' });
   const payload = await fetchJsonWithRetry(`${GUTENDEX_BASE}/books/?${params}`, { timeoutMs: 18000, attempts: 1, cacheTtlMs: LIBRARY_CACHE_MS });
-  return (payload.results || []).slice(0, 10).map((raw) => { const book = normalizeGutenbergBook(raw); return {
+  return (payload.results || []).slice(0, 10).map((raw) => { const book = normalizeGutenbergBook(raw); const formatKeys = Object.keys(raw?.formats || {}); const availableFormats = []; if (formatKeys.some((key) => key.startsWith('text/plain'))) availableFormats.push('text'); if (formatKeys.some((key) => /application\/epub\+zip/i.test(key))) availableFormats.push('epub'); if (formatKeys.some((key) => /application\/pdf/i.test(key))) availableFormats.push('pdf'); return {
     provider: 'gutenberg', id: String(book.id), title: book.title, author: book.authors.join(', '), language: book.languages.join(', '),
-    cover: book.cover, readable: true, externalUrl: book.gutenbergUrl, description: book.subjects.slice(0,2).join(' · '), format: 'Plain text'
+    cover: book.cover, readable: true, availableFormats, externalUrl: book.gutenbergUrl, description: book.subjects.slice(0,2).join(' · '), format: availableFormats.map((item) => item === 'text' ? 'Plain text' : item.toUpperCase()).join(' · ')
   }; });
 }
 
 app.get('/api/library/search', async (req, res) => {
   const q = String(req.query.q || '').trim().slice(0, 160);
   const provider = String(req.query.provider || 'all').toLowerCase();
+  const format = String(req.query.format || 'best').toLowerCase();
+  if (!['best','text','epub','pdf'].includes(format)) return res.status(400).json({ error: 'Unknown book format.' });
   if (q.length < 2) return res.status(400).json({ error: 'Enter at least two characters to search.' });
   const available = { standardebooks: searchStandardEbooks, internetarchive: searchInternetArchive, openlibrary: searchOpenLibrary, wikisource: searchWikisource, gutenberg: searchGutenbergUnified };
   if (provider !== 'all' && !available[provider]) return res.status(400).json({ error: 'Unknown library source.' });
-  const cacheKey = `${provider}:${q.toLowerCase()}`;
+  const cacheKey = `${provider}:${format}:${q.toLowerCase()}`;
   const cached = librarySearchCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return res.json(cached.payload);
   const targets = provider === 'all' ? Object.entries(available) : [[provider, available[provider]]];
@@ -3086,9 +3088,10 @@ app.get('/api/library/search', async (req, res) => {
     const name = targets[index][0];
     if (result.status === 'fulfilled') books.push(...result.value[1]); else errors.push({ provider: name, error: result.reason?.message || 'Unavailable' });
   });
-  const payload = { query: q, provider, books: books.slice(0, provider === 'all' ? 30 : 15), errors };
-  if (books.length) librarySearchCache.set(cacheKey, { payload, expiresAt: Date.now() + LIBRARY_CACHE_MS });
-  if (!books.length && errors.length === targets.length) return res.status(502).json({ error: 'The selected libraries could not be reached. Please try again shortly.', details: errors });
+  const filteredBooks = format === 'best' ? books : books.filter((book) => Array.isArray(book.availableFormats) && book.availableFormats.includes(format));
+  const payload = { query: q, provider, format, books: filteredBooks.slice(0, provider === 'all' ? 30 : 15), errors };
+  if (filteredBooks.length) librarySearchCache.set(cacheKey, { payload, expiresAt: Date.now() + LIBRARY_CACHE_MS });
+  if (!filteredBooks.length && !books.length && errors.length === targets.length) return res.status(502).json({ error: 'The selected libraries could not be reached. Please try again shortly.', details: errors });
   return res.json(payload);
 });
 
@@ -3127,9 +3130,62 @@ async function readStandardEbooks(id) {
   return { title, author: '', text, sourceUrl };
 }
 
+
+function selectArchiveFormatFile(files, format) {
+  const candidates = (Array.isArray(files) ? files : []).filter((file) => Number(file?.size || 0) > 0);
+  const within = (file, max) => Number(file.size || 0) <= max;
+  if (format === 'epub') return candidates.find((file) => /\.epub$/i.test(file.name || '') && within(file, 60 * 1024 * 1024));
+  if (format === 'pdf') return candidates.find((file) => /\.pdf$/i.test(file.name || '') && !/(text|searchable|bw)\.pdf$/i.test(file.name || '') && within(file, 100 * 1024 * 1024))
+    || candidates.find((file) => /\.pdf$/i.test(file.name || '') && within(file, 100 * 1024 * 1024));
+  return candidates.find((file) => /_djvu\.txt$/i.test(file.name || '') && within(file, 25 * 1024 * 1024))
+    || candidates.find((file) => /\.txt$/i.test(file.name || '') && within(file, 25 * 1024 * 1024));
+}
+
+function selectGutenbergFormatUrl(formats, format) {
+  const entries = Object.entries(formats || {}).filter(([, url]) => typeof url === 'string' && /^https?:\/\//i.test(url));
+  if (format === 'epub') return entries.find(([mime]) => /application\/epub\+zip/i.test(mime))?.[1] || '';
+  if (format === 'pdf') return entries.find(([mime]) => /application\/pdf/i.test(mime))?.[1] || '';
+  return entries.find(([mime]) => /^text\/plain/i.test(mime) && /utf-8/i.test(mime))?.[1]
+    || entries.find(([mime]) => /^text\/plain/i.test(mime))?.[1] || '';
+}
+
+app.get('/api/library/download', async (req, res) => {
+  const provider = String(req.query.provider || '').toLowerCase();
+  const id = String(req.query.id || '').trim().slice(0, 700);
+  const format = String(req.query.format || '').toLowerCase();
+  if (!id || !['epub','pdf'].includes(format)) return res.status(400).json({ error: 'Choose an EPUB or PDF edition.' });
+  try {
+    let sourceUrl = '';
+    if (provider === 'internetarchive') {
+      const metadata = await fetchJsonWithRetry(`https://archive.org/metadata/${encodeURIComponent(id)}`, { timeoutMs:22000, attempts:2, cacheTtlMs:LIBRARY_CACHE_MS });
+      const file = selectArchiveFormatFile(metadata.files, format);
+      if (!file) throw new Error(`No ${format.toUpperCase()} edition was found for this Internet Archive item.`);
+      sourceUrl = `https://archive.org/download/${encodeURIComponent(id)}/${encodeURIComponent(file.name).replace(/%2F/g, '/')}`;
+    } else if (provider === 'standardebooks' && format === 'epub') {
+      try { sourceUrl = Buffer.from(id, 'base64url').toString('utf8'); } catch {}
+      const parsed = new URL(sourceUrl);
+      if (parsed.hostname !== 'standardebooks.org' && !parsed.hostname.endsWith('.standardebooks.org')) throw new Error('Invalid Standard Ebooks download host.');
+    } else if (provider === 'gutenberg') {
+      const numericId = Number.parseInt(id, 10);
+      const payload = await fetchJsonWithRetry(`${GUTENDEX_BASE}/books/${numericId}`, { timeoutMs:20000, attempts:1, cacheTtlMs:LIBRARY_CACHE_MS });
+      sourceUrl = selectGutenbergFormatUrl(payload?.formats, format);
+      if (!sourceUrl) throw new Error(`Project Gutenberg does not list a ${format.toUpperCase()} edition for this book.`);
+    } else {
+      throw new Error(`This source does not provide a direct ${format.toUpperCase()} edition.`);
+    }
+    const { buffer, contentType } = await fetchBuffer(sourceUrl, { maxBytes: format === 'pdf' ? 100 * 1024 * 1024 : 60 * 1024 * 1024, timeoutMs:45000 });
+    res.setHeader('Content-Type', format === 'epub' ? 'application/epub+zip' : (contentType || 'application/pdf'));
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    return res.send(buffer);
+  } catch (error) {
+    return res.status(502).json({ error: error?.name === 'AbortError' ? 'The selected edition took too long to download.' : error?.message || 'The selected edition could not be downloaded.' });
+  }
+});
+
 app.get('/api/library/read', async (req, res) => {
   const provider = String(req.query.provider || '').toLowerCase();
   const id = String(req.query.id || '').trim().slice(0, 700);
+  const format = String(req.query.format || 'best').toLowerCase();
   if (!id) return res.status(400).json({ error: 'A book identifier is required.' });
   try {
     if (provider === 'internetarchive') return res.json(await readInternetArchive(id));
