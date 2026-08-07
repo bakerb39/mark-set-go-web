@@ -144,6 +144,32 @@
       }
     }
     if (!key) {
+      // A document can be fully loaded in the Reader without having originated in
+      // Read Anything/Create a Book. Adopt the Reader's persisted document so
+      // Ask Mark Format works for every readable text, not only imported ones.
+      if (storedDocument?.text) {
+        key = `reader-${String(documentId)}`;
+        const originalText = String(storedDocument.text || '').trim();
+        activeImportedDocument = {
+          title: cleanImportedTitle(storedDocument.title || documentTitle || 'Untitled'),
+          baseTitle: cleanImportedTitle(storedDocument.title || documentTitle || 'Untitled'),
+          author: storedDocument.source?.author || '',
+          source: {
+            ...(storedDocument.source || {}),
+            readAnything: true,
+            readAnythingKey: key,
+            readerDocumentId: String(documentId),
+            formatterAdoptedFromReader: true
+          },
+          versions: { original: originalText },
+          originalText
+        };
+        activeImportedVersion = 'original';
+        rememberFormatDocument(documentId, key);
+        saveActiveFormatRecord();
+        scheduleFormatControlAttach();
+        return true;
+      }
       activeImportedDocument = null;
       document.querySelector('#read-anything-format-control')?.remove();
       return false;
@@ -156,7 +182,7 @@
       title: cleanImportedTitle(record?.title || storedDocument?.source?.adaptedFrom || storedDocument?.title),
       baseTitle: cleanImportedTitle(record?.title || storedDocument?.source?.adaptedFrom || storedDocument?.title),
       author: record?.author || storedDocument?.source?.author || '',
-      source: { ...(record?.source || storedDocument?.source || {}), readAnything: true, readAnythingKey: key },
+      source: { ...(record?.source || storedDocument?.source || {}), readAnything: true, readAnythingKey: key, readerDocumentId: String(documentId) },
       versions: { ...(record?.versions || {}), ...(record?.originalText ? { original: record.originalText } : {}), ...(storedDocument?.text ? { [readingLevel]: storedDocument.text } : {}) },
       originalText: record?.originalText || record?.versions?.original || ''
     };
@@ -531,7 +557,49 @@
     return { text, report };
   }
 
-  function applyCleanup(level = 'standard', scope = 'document', selectedText = '') {
+  async function requestAiCleanupText(value, title = 'Untitled', level = 'deep') {
+    const sourceText = String(value || '').replace(/\r/g, '').trim();
+    if (sourceText.length < 20) throw new Error('There is not enough text to format.');
+    if (sourceText.length > 120000) throw new Error('AI Deep Clean currently supports up to 120,000 characters at a time. Format a chapter or shorter section, or use Standard for the full document.');
+    const instructions = `Perform a conservative editorial/OCR cleanup of this ${level === 'deep' ? 'book or document' : 'text'}. Do NOT summarize, paraphrase, simplify, modernize, censor, or rewrite the author's prose. Preserve every meaningful sentence, quotation, name, date, number, footnote marker, and intentional wording unless it is clearly scan/OCR corruption.
+
+Repair only what is justified by the text and surrounding context:
+- fix obvious OCR character substitutions, garbled characters, and scan noise;
+- repair words broken across scanned page/line boundaries and obvious spacing errors;
+- remove running page headers, repeated book/author titles, page numbers, footer fragments, and other recurring scan artifacts when they are not part of the prose;
+- reconstruct damaged chapter, book, part, and section headings when the intended heading is reasonably clear;
+- normalize chapter/section heading layout and paragraph breaks;
+- normalize obvious quote/apostrophe/dash/ellipsis encoding problems;
+- preserve archaic spelling, historical usage, capitalization, dialect, foreign-language phrases, and stylistic punctuation unless clearly corrupted;
+- never invent missing prose. If a damaged word cannot be inferred confidently, leave it rather than guessing.
+
+Return only the complete cleaned text. Do not include a report, commentary, markdown fences, or explanation.`;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 115000);
+    try {
+      const response = await fetch('/api/read-anything/transform', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: String(title || 'Untitled'), text: sourceText, instructions }),
+        signal: controller.signal
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || payload.error || `Server returned HTTP ${response.status}.`);
+      if (!payload.text) throw new Error('The AI formatter returned an empty result.');
+      // Finish with only safe character/spacing normalization; do not run structural regex cleanup over AI output.
+      const finalPass = cleanupTextContent(payload.text, 'light');
+      return { text: finalPass.text, report: { ...finalPass.report, level: 'deep', ai: true } };
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new Error('AI Deep Clean took too long. Try a shorter chapter or use Standard cleanup.');
+      throw new Error(error?.message === 'Failed to fetch'
+        ? 'The AI formatter connection was interrupted. Try again.'
+        : error?.message || 'AI Deep Clean could not be completed.');
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+  async function applyCleanup(level = 'standard', scope = 'document', selectedText = '') {
     if (!activeImportedDocument) throw new Error('Format is available after importing, pasting, or creating a document.');
     const original = String(activeImportedDocument.versions?.original || activeImportedDocument.originalText || '').trim();
     if (original.length < 20) throw new Error('The preserved original text is unavailable.');
@@ -540,10 +608,14 @@
       const selected = String(selectedText).trim();
       const at = original.indexOf(selected);
       if (at < 0) throw new Error('I could not match that highlighted passage in the preserved original.');
-      const cleaned = cleanupTextContent(selected, level);
+      const cleaned = level === 'deep'
+        ? await requestAiCleanupText(selected, activeImportedDocument.title || 'Selected passage', level)
+        : cleanupTextContent(selected, level);
       result = { text: original.slice(0, at) + cleaned.text + original.slice(at + selected.length), report: cleaned.report };
     } else {
-      result = cleanupTextContent(original, level);
+      result = level === 'deep'
+        ? await requestAiCleanupText(original, activeImportedDocument.title || 'Untitled', level)
+        : cleanupTextContent(original, level);
     }
     const key = `cleanup_${level}_${scope === 'selection' ? 'selection' : 'document'}`;
     activeImportedDocument.versions[key] = result.text;
@@ -916,6 +988,7 @@
     if (pendingImportedRender && activeImportedDocument) {
       pendingImportedRender = false;
       const key = activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument);
+      activeImportedDocument.source = { ...(activeImportedDocument.source || {}), readerDocumentId: String(documentId) };
       rememberFormatDocument(documentId, key);
       saveActiveFormatRecord();
       scheduleFormatControlAttach();
@@ -931,14 +1004,25 @@
     renderHub();
   }, true);
 
+  function ensureActiveReaderDocument() {
+    const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+    if (!current?.documentId || !current?.text) return Boolean(activeImportedDocument);
+    const activeReaderId = String(activeImportedDocument?.source?.readerDocumentId || '');
+    if (!activeImportedDocument || (activeReaderId && activeReaderId !== String(current.documentId))) {
+      restoreImportedFormatRecord(current.documentId, current.title || '');
+    }
+    return Boolean(activeImportedDocument);
+  }
+
   window.MarkSetGoReadAnything = Object.freeze({
     render: renderHub,
     openDocument,
     bookmarkletCode,
     cleanFormatText,
     cleanupTextContent,
+    requestAiCleanupText,
     applyCleanup,
-    hasActiveDocument: () => Boolean(activeImportedDocument),
+    hasActiveDocument: () => ensureActiveReaderDocument(),
     getActiveVersion: () => ({ key: activeImportedVersion, label: versionLabel(activeImportedVersion), title: activeImportedDocument?.baseTitle || activeImportedDocument?.title || '' }),
     restoreOriginal,
     makeReadable,

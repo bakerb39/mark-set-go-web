@@ -39,6 +39,20 @@ if (!BookModel || !SessionManager || !ReaderEngine || !VirtualRenderer) {
 const readerSessionManager = new SessionManager();
 const readerEngine = new ReaderEngine();
 const state = readerEngine.state;
+
+// Public, read-only bridge for companion features that need the exact document
+// currently loaded in the reader without reaching into protected reader modules.
+window.MarkSetGoCurrentReaderDocument = Object.freeze({
+  get: () => {
+    if (!state?.documentId || !state?.currentText) return null;
+    return {
+      documentId: String(state.documentId),
+      title: String(state.title || 'Untitled'),
+      text: String(state.currentText || ''),
+      source: { ...(state.source || {}) }
+    };
+  }
+});
 const virtualRenderer = new VirtualRenderer({
   getState: () => state,
   setWordContent: (element, word) => setWordContent(element, word),
@@ -3224,7 +3238,7 @@ function renderBookBuilder() {
             <legend>Cleanup level</legend>
             <label><input type="radio" name="builder-cleanup-level" value="light" ${draft.cleanupLevel === 'light' ? 'checked' : ''}><strong>Light</strong><small>Characters, spacing, punctuation</small></label>
             <label><input type="radio" name="builder-cleanup-level" value="standard" ${draft.cleanupLevel === 'standard' ? 'checked' : ''}><strong>Standard</strong><small>OCR cleanup, paragraphs, page artifacts</small></label>
-            <label><input type="radio" name="builder-cleanup-level" value="deep" ${(!draft.cleanupLevel || draft.cleanupLevel === 'deep') ? 'checked' : ''}><strong>Deep Clean</strong><small>Full cleanup and document structure</small></label>
+            <label><input type="radio" name="builder-cleanup-level" value="deep" ${(!draft.cleanupLevel || draft.cleanupLevel === 'deep') ? 'checked' : ''}><strong>AI Deep Clean</strong><small>Context-aware OCR repair and document structure</small></label>
           </fieldset>
           <div class="book-builder-options">
             <label><input id="builder-clean-toc" type="checkbox" ${draft.cleanToc === false ? '' : 'checked'}> Remove a printed table of contents from the reading text and keep it in the Contents pane.</label>
@@ -3268,6 +3282,7 @@ function renderBookBuilder() {
   let importedSource = draft.importedSource || null;
   const selectedCleanupLevel = () => cleanupLevelInputs.find((input) => input.checked)?.value || 'deep';
   const formatter = () => window.MarkSetGoReadAnything?.cleanupTextContent;
+  const aiFormatter = () => window.MarkSetGoReadAnything?.requestAiCleanupText;
 
   const loadBuilderFile = async (file) => {
     if (!file) return;
@@ -3334,20 +3349,32 @@ function renderBookBuilder() {
     try { await loadBuilderFile(event.target.files?.[0]); }
     catch (error) { status.textContent = error?.message || 'The file could not be opened.'; }
   });
-  app.querySelector('#builder-clean')?.addEventListener('click', () => {
+  app.querySelector('#builder-clean')?.addEventListener('click', async () => {
+    const button = app.querySelector('#builder-clean');
     try {
-      const fn = formatter();
-      if (!fn) throw new Error('The shared formatter is not ready. Refresh and try again.');
-      cleanedPreview = fn(textInput.value, selectedCleanupLevel());
+      button.disabled = true;
+      const level = selectedCleanupLevel();
+      status.textContent = level === 'deep' ? 'AI Deep Clean is reviewing the full text…' : 'Cleaning text…';
+      if (level === 'deep') {
+        const fn = aiFormatter();
+        if (!fn) throw new Error('The AI formatter is not ready. Refresh and try again.');
+        cleanedPreview = await fn(textInput.value, titleInput.value.trim() || 'Untitled', 'deep');
+      } else {
+        const fn = formatter();
+        if (!fn) throw new Error('The shared formatter is not ready. Refresh and try again.');
+        cleanedPreview = fn(textInput.value, level);
+      }
       const report = cleanedPreview.report || {};
       const bits = [];
+      if (report.ai) bits.push('context-aware AI cleanup complete');
       if (report.badCharacters) bits.push(`${report.badCharacters} bad characters removed`);
       if (report.pageArtifacts) bits.push(`${report.pageArtifacts} page artifacts removed`);
       if (report.repeatedHeaders) bits.push(`${report.repeatedHeaders} repeated headers removed`);
       if (report.brokenWords) bits.push(`${report.brokenWords} broken words repaired`);
-      app.querySelector('#builder-cleanup-report').textContent = `${selectedCleanupLevel() === 'deep' ? 'Deep Clean' : selectedCleanupLevel()} preview ready${bits.length ? `: ${bits.join(', ')}.` : '.'} Original pasted/uploaded text remains preserved in the editor.`;
+      app.querySelector('#builder-cleanup-report').textContent = `${level === 'deep' ? 'AI Deep Clean' : level} preview ready${bits.length ? `: ${bits.join(', ')}.` : '.'} Original pasted/uploaded text remains preserved in the editor.`;
       analyze();
     } catch (error) { status.textContent = error?.message || 'Cleanup could not be completed.'; }
+    finally { button.disabled = false; }
   });
   app.querySelector('#builder-analyze').addEventListener('click', analyze);
   app.querySelector('#builder-clear').addEventListener('click', () => {
@@ -3355,8 +3382,13 @@ function renderBookBuilder() {
     localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
     renderBookBuilder();
   });
-  app.querySelector('#book-builder-form').addEventListener('submit', (event) => {
+  app.querySelector('#book-builder-form').addEventListener('submit', async (event) => {
     event.preventDefault();
+    if (selectedCleanupLevel() === 'deep' && !cleanedPreview) {
+      status.textContent = 'Run Clean & Preview first so AI Deep Clean can review the source before the book is created.';
+      app.querySelector('#builder-clean')?.focus();
+      return;
+    }
     const { text, sections, words, normalized } = analyze();
     const title = titleInput.value.trim();
     const author = authorInput.value.trim();
