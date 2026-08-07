@@ -158,7 +158,7 @@
       });
 
       document.querySelectorAll('.cloud-library-account-card').forEach((card) => {
-        const bookId = card.querySelector('[data-cloud-library-remove]')?.dataset.cloudLibraryRemove;
+        const bookId = card.dataset.cloudLibraryBookId;
         const book = books.find((item) => String(item.id) === String(bookId));
         if (!book) return;
         card.querySelectorAll('.cloud-document-state,.cloud-saved-badge,.cloud-document-badge').forEach((node) => node.remove());

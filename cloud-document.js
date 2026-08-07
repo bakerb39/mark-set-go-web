@@ -55,9 +55,9 @@
   }
 
   async function removeText(bookId) {
-    if (!window.confirm('Remove the stored cloud text? The book metadata will remain in My Library.')) return;
+    if (!window.confirm('Remove this cloud book? The stored text and its library metadata will both be deleted from your account.')) return;
     setBusy(bookId, true);
-    try { await api().removeDocument(bookId); await refresh(); }
+    try { await api().remove(bookId); await refresh(); }
     finally { setBusy(bookId, false); }
   }
 
@@ -107,8 +107,8 @@
     injectStyles();
     const books = cloudBooks();
     root.querySelectorAll('.cloud-library-account-card').forEach((card, index) => {
-      const remove = card.querySelector('[data-cloud-library-remove]');
-      const book = remove ? bookById(remove.dataset.cloudLibraryRemove) : books[index];
+      const bookId = card.dataset.cloudLibraryBookId;
+      const book = bookId ? bookById(bookId) : books[index];
       if (!book) return;
       card.querySelector('.cloud-document-controls,.cloud-document-note')?.remove();
       card.querySelector('.cloud-document-note')?.remove();

@@ -267,13 +267,12 @@
           ${books.map((book) => {
             const id = escapeHtml(book.clientRecordId);
             const sourceUrl = escapeHtml(book.sourceUrl || book.metadata?.source?.url || '');
-            return `<article class="cloud-library-account-card">
+            return `<article class="cloud-library-account-card" data-cloud-library-book-id="${id}">
               <div><span class="source-category">Cloud library</span><h3>${escapeHtml(book.title)}</h3><p>${escapeHtml(book.author || 'Author not listed')}</p></div>
               <p>${hasLocalDocument(book.clientRecordId) ? 'The text is available in this browser session.' : 'Metadata is saved. Reopen or re-import the source text to read it on this device.'}</p>
               <div class="cloud-library-account-actions">
                 ${hasLocalDocument(book.clientRecordId) ? `<button class="primary" type="button" data-cloud-library-open="${id}">Open local text</button>` : ''}
                 ${sourceUrl ? `<a class="secondary button-link" href="${sourceUrl}" target="_blank" rel="noopener noreferrer">Open source</a>` : ''}
-                <button class="secondary" type="button" data-cloud-library-remove="${escapeHtml(book.id)}">Remove metadata</button>
               </div>
             </article>`;
           }).join('')}
@@ -288,20 +287,6 @@
         const existing = root.querySelector(`[data-library-document="${CSS.escape(id)}"]`);
         if (existing) existing.click();
         else window.alert('The text metadata is saved to your account, but the reading text must be reopened on this device.');
-      });
-    });
-    root.querySelectorAll('[data-cloud-library-remove]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const api = cloudApi();
-        if (!api || !window.confirm('Remove this book metadata from your account library?')) return;
-        button.disabled = true;
-        try {
-          await api.remove(button.dataset.cloudLibraryRemove);
-          await loadCloudLibrary();
-        } catch (error) {
-          window.alert(error.message || 'The account library record could not be removed.');
-          button.disabled = false;
-        }
       });
     });
   }
