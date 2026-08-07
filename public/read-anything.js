@@ -502,9 +502,109 @@
     }
   }
 
+  function detectDocumentStructure(value) {
+    const text = String(value || '').replace(/\r/g, '').trim();
+    if (!text) return { type: 'empty', confidence: 1, entries: 0 };
+
+    const flat = text.replace(/\s+/g, ' ').trim();
+    const tocHeading = /\b(?:BOOK|CHAPTER|PART|SECTION|ACT)\s+(?:[IVXLCDM]+|\d{1,3}|[A-Z]+(?:-[A-Z]+)*)\b/gi;
+    const tocMatches = [...flat.matchAll(tocHeading)];
+
+    if (tocMatches.length >= 4) {
+      const distances = tocMatches.slice(1).map((match, index) => match.index - tocMatches[index].index);
+      const averageDistance = distances.length
+        ? distances.reduce((sum, distance) => sum + distance, 0) / distances.length
+        : flat.length;
+      const leading = flat.slice(0, tocMatches[0].index).trim();
+      const compactLeading = !leading || leading.length <= 120;
+      const denseSequence = averageDistance <= 220;
+
+      if (compactLeading && denseSequence) {
+        return {
+          type: 'table_of_contents',
+          confidence: Math.min(1, .72 + tocMatches.length * .015),
+          entries: tocMatches.length + (leading ? 1 : 0)
+        };
+      }
+    }
+
+    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+    const bibliographyLines = lines.filter(line =>
+      /(?:\b(?:vol\.|pp?\.|ed\.|press|university|publisher|doi|isbn)\b|https?:\/\/)/i.test(line)
+    ).length;
+    if (lines.length >= 5 && bibliographyLines / lines.length >= .45) {
+      return { type: 'bibliography', confidence: .78, entries: lines.length };
+    }
+
+    const poetryLines = lines.filter(line => line.length > 0 && line.length <= 85).length;
+    const terminalPunctuation = lines.filter(line => /[.!?]["'’”)]?$/.test(line)).length;
+    if (lines.length >= 6 && poetryLines / lines.length >= .8 && terminalPunctuation / lines.length < .55) {
+      return { type: 'poetry', confidence: .68, entries: lines.length };
+    }
+
+    const frontMatterSignals = /(?:copyright|contents|translator(?:'s)?\s+preface|preface|foreword|introduction|publisher|printed in|isbn)/i;
+    if (flat.length <= 8000 && frontMatterSignals.test(flat.slice(0, 2000))) {
+      return { type: 'front_matter', confidence: .62, entries: 0 };
+    }
+
+    return { type: 'prose', confidence: .7, entries: 0 };
+  }
+
+  function formatTableOfContents(value) {
+    const flat = String(value || '').replace(/\r/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!flat) return '';
+
+    const headingPattern = /\b(?:BOOK|CHAPTER|PART|SECTION|ACT)\s+(?:[IVXLCDM]+|\d{1,3}|[A-Z]+(?:-[A-Z]+)*)\b/gi;
+    const matches = [...flat.matchAll(headingPattern)];
+    if (matches.length < 2) return flat;
+
+    const rows = [];
+    const leading = flat.slice(0, matches[0].index).trim();
+    if (leading) rows.push(leading.replace(/\s*[—–:-]\s*$/, '').trim());
+
+    for (let index = 0; index < matches.length; index += 1) {
+      const start = matches[index].index;
+      const end = index + 1 < matches.length ? matches[index + 1].index : flat.length;
+      let row = flat.slice(start, end).trim();
+
+      // Keep the source wording, but normalize whitespace around the separator.
+      row = row
+        .replace(/\s*([—–])\s*/g, ' $1 ')
+        .replace(/\s*:\s*/g, ': ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      rows.push(row);
+    }
+
+    return rows.join('\n\n').trim();
+  }
+
+  function structureAwareFormat(value, level = 'standard') {
+    const structure = detectDocumentStructure(value);
+    if (structure.type === 'table_of_contents') {
+      return {
+        text: formatTableOfContents(value),
+        structure
+      };
+    }
+    return { text: String(value || ''), structure };
+  }
+
   function cleanupTextContent(value, level = 'standard') {
     const original = String(value || '').replace(/\r/g, '').normalize('NFKC');
-    const report = { level, badCharacters: 0, pageArtifacts: 0, repeatedHeaders: 0, brokenWords: 0, spacingFixes: 0 };
+    const detectedStructure = detectDocumentStructure(original);
+    const report = {
+      level,
+      structureType: detectedStructure.type,
+      structureConfidence: detectedStructure.confidence,
+      structureEntries: detectedStructure.entries || 0,
+      badCharacters: 0,
+      pageArtifacts: 0,
+      repeatedHeaders: 0,
+      brokenWords: 0,
+      spacingFixes: 0
+    };
     if (!original.trim()) return { text: '', report };
 
     let text = original.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, () => { report.badCharacters += 1; return ''; });
@@ -551,9 +651,18 @@
       if (text !== before) report.spacingFixes += 1;
     });
 
-    if (level === 'light') text = text.replace(/\n{3,}/g, '\n\n').trim();
-    else if (level === 'standard') text = cleanFormatText(text).replace(/\n{3,}/g, '\n\n').trim();
-    else text = smartFormatText(cleanFormatText(text), 'all').replace(/\n{3,}/g, '\n\n').trim();
+    // Structural formatting runs before generic prose paragraphization.
+    // A compact TOC should become one semantic entry per block rather than
+    // being mistaken for a long paragraph.
+    if (detectedStructure.type === 'table_of_contents' && level !== 'light') {
+      text = formatTableOfContents(text);
+    } else if (level === 'light') {
+      text = text.replace(/\n{3,}/g, '\n\n').trim();
+    } else if (level === 'standard') {
+      text = cleanFormatText(text).replace(/\n{3,}/g, '\n\n').trim();
+    } else {
+      text = smartFormatText(cleanFormatText(text), 'all').replace(/\n{3,}/g, '\n\n').trim();
+    }
     return { text, report };
   }
 
@@ -561,7 +670,21 @@
     const sourceText = String(value || '').replace(/\r/g, '').trim();
     if (sourceText.length < 20) throw new Error('There is not enough text to format.');
     if (sourceText.length > 120000) throw new Error('AI Deep Clean currently supports up to 120,000 characters at a time. Format a chapter or shorter section, or use Standard for the full document.');
-    const instructions = `Perform a conservative editorial/OCR cleanup of this ${level === 'deep' ? 'book or document' : 'text'}. Do NOT summarize, paraphrase, simplify, modernize, censor, or rewrite the author's prose. Preserve every meaningful sentence, quotation, name, date, number, footnote marker, and intentional wording unless it is clearly scan/OCR corruption.
+    const structure = detectDocumentStructure(sourceText);
+    const structureGuidance = {
+      table_of_contents: `The passage appears to be a TABLE OF CONTENTS. Treat each Introduction/Book/Chapter/Part/Section entry as a distinct structural item. Put each entry on its own line or block, preserve the original labels and titles, preserve their order, and do not merge the entries into prose. Do not invent page numbers or titles.`,
+      poetry: `The passage appears to contain POETRY or verse. Preserve deliberate line breaks, stanza breaks, indentation cues, capitalization, and punctuation. Do not paragraphize verse into prose.`,
+      bibliography: `The passage appears to be a BIBLIOGRAPHY or reference list. Preserve one citation/reference per item and do not merge separate references into prose.`,
+      front_matter: `The passage appears to be FRONT MATTER. Preserve distinct title, author, publisher, copyright, preface, introduction, and contents elements as separate structural blocks.`,
+      prose: `The passage appears to be ordinary PROSE. Restore sensible paragraphs and section headings without rewriting the prose.`
+    }[structure.type] || `Preserve the detected document structure.`;
+
+    const instructions = `Perform a conservative editorial/OCR cleanup of this ${level === 'deep' ? 'book or document' : 'text'}. First identify and preserve the document's structure before correcting its surface text.
+
+Detected structure: ${structure.type}.
+${structureGuidance}
+
+Do NOT summarize, paraphrase, simplify, modernize, censor, or rewrite the author's prose. Preserve every meaningful sentence, quotation, name, date, number, footnote marker, and intentional wording unless it is clearly scan/OCR corruption.
 
 Repair only what is justified by the text and surrounding context:
 - fix obvious OCR character substitutions, garbled characters, and scan noise;
@@ -571,7 +694,9 @@ Repair only what is justified by the text and surrounding context:
 - normalize chapter/section heading layout and paragraph breaks;
 - normalize obvious quote/apostrophe/dash/ellipsis encoding problems;
 - preserve archaic spelling, historical usage, capitalization, dialect, foreign-language phrases, and stylistic punctuation unless clearly corrupted;
-- never invent missing prose. If a damaged word cannot be inferred confidently, leave it rather than guessing.
+- never invent missing prose. If a damaged word cannot be inferred confidently, leave it rather than guessing;
+- preserve semantic lists as lists: a table of contents must remain a table of contents, bibliography entries must remain separate, and poetry must retain verse/stanza structure;
+- when a TOC is compressed onto one line, split it at each Book/Chapter/Part/Section boundary instead of creating prose paragraphs.
 
 Return only the complete cleaned text. Do not include a report, commentary, markdown fences, or explanation.`;
     const controller = new AbortController();
@@ -588,7 +713,18 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       if (!payload.text) throw new Error('The AI formatter returned an empty result.');
       // Finish with only safe character/spacing normalization; do not run structural regex cleanup over AI output.
       const finalPass = cleanupTextContent(payload.text, 'light');
-      return { text: finalPass.text, report: { ...finalPass.report, level: 'deep', ai: true } };
+      const finalStructure = detectDocumentStructure(finalPass.text);
+      return {
+        text: finalPass.text,
+        report: {
+          ...finalPass.report,
+          level: 'deep',
+          ai: true,
+          structureType: structure.type,
+          structureConfidence: structure.confidence,
+          structureEntries: structure.entries || finalStructure.entries || 0
+        }
+      };
     } catch (error) {
       if (error?.name === 'AbortError') throw new Error('AI Deep Clean took too long. Try a shorter chapter or use Standard cleanup.');
       throw new Error(error?.message === 'Failed to fetch'
