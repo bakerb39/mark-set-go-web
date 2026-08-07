@@ -309,3 +309,44 @@ progress::-webkit-progress-value { background: var(--msg-blue) !important; }
 .msg-gold,
 .gold-accent,
 [data-theme-accent="gold"] { color: var(--msg-gold) !important; }
+
+
+/* v9.2.41 Reader empty-state contrast belongs in the final theme layer.
+   theme-system.css loads after styles.css, so these rules must live here. */
+#app > .empty-reader-page .empty-reader-canvas .empty-reader-placeholder,
+#app > .panel.empty-reader-page .empty-reader-canvas .empty-reader-placeholder {
+  color:#f7fbff !important;
+  -webkit-text-fill-color:#f7fbff !important;
+  opacity:1 !important;
+}
+
+#app > .empty-reader-page .empty-reader-canvas .empty-reader-placeholder h2,
+#app > .panel.empty-reader-page .empty-reader-canvas .empty-reader-placeholder h2 {
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+
+#app > .empty-reader-page .empty-reader-canvas .empty-reader-placeholder p,
+#app > .panel.empty-reader-page .empty-reader-canvas .empty-reader-placeholder p {
+  color:#c5def0 !important;
+  -webkit-text-fill-color:#c5def0 !important;
+  opacity:1 !important;
+}
+
+/* Primary empty-reader action: never use navy copy on the blue button. */
+#app > .empty-reader-page .empty-reader-action.primary,
+#app > .panel.empty-reader-page .empty-reader-action.primary,
+#app > .empty-reader-page .empty-reader-action.primary strong,
+#app > .panel.empty-reader-page .empty-reader-action.primary strong {
+  color:#ffffff !important;
+  -webkit-text-fill-color:#ffffff !important;
+}
+
+#app > .empty-reader-page .empty-reader-action.primary small,
+#app > .panel.empty-reader-page .empty-reader-action.primary small {
+  color:#e5f2fb !important;
+  -webkit-text-fill-color:#e5f2fb !important;
+  opacity:1 !important;
+}
