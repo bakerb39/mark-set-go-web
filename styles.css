@@ -9876,3 +9876,46 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
     font-size:1.85rem !important;
   }
 }
+
+
+/* v9.2.33 Reader empty-state contrast */
+#reader .reader-empty-state,
+#reader .empty-reader-state,
+#reader .reader-placeholder,
+.reader-frame .reader-empty-state,
+.reader-frame .empty-reader-state,
+.reader-frame .reader-placeholder {
+  color:#eef7ff !important;
+}
+
+#reader .reader-empty-state h2,
+#reader .reader-empty-state h3,
+#reader .empty-reader-state h2,
+#reader .empty-reader-state h3,
+#reader .reader-placeholder h2,
+#reader .reader-placeholder h3,
+.reader-frame .reader-empty-state h2,
+.reader-frame .empty-reader-state h2,
+.reader-frame .reader-placeholder h2 {
+  color:#eaf5ff !important;
+  opacity:1 !important;
+}
+
+#reader .reader-empty-state p,
+#reader .empty-reader-state p,
+#reader .reader-placeholder p,
+.reader-frame .reader-empty-state p,
+.reader-frame .empty-reader-state p,
+.reader-frame .reader-placeholder p {
+  color:#9fc4df !important;
+  opacity:1 !important;
+}
+
+/* Fallback for the current direct empty-state markup. */
+#reader > div:has(> .empty-reader-icon) h2,
+#reader > div:has(> .empty-reader-icon) strong {
+  color:#eaf5ff !important;
+}
+#reader > div:has(> .empty-reader-icon) p {
+  color:#9fc4df !important;
+}
