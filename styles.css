@@ -9676,3 +9676,94 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
     hyphens:auto;
   }
 }
+
+
+/* v9.2.28 unified non-reader page title system */
+#app .platform-hero,
+#app .library-welcome,
+#app .progress-hero,
+#app .goals-hero,
+#app .action-center-hero {
+  background:transparent !important;
+  color:#17324d !important;
+}
+
+/* One title size and color everywhere. */
+#app .platform-hero h1,
+#app .library-welcome h1,
+#app .progress-hero h1,
+#app .goals-hero h1,
+#app .action-center-hero h1 {
+  margin:0 0 .35rem !important;
+  font-size:clamp(1.9rem, 3vw, 2.35rem) !important;
+  line-height:1.08 !important;
+  font-weight:800 !important;
+  letter-spacing:-.025em !important;
+  color:#0b3b67 !important;
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+
+/* One subtitle treatment everywhere. */
+#app .platform-hero p,
+#app .library-welcome p,
+#app .progress-hero p,
+#app .goals-hero p,
+#app .action-center-hero p {
+  margin:.2rem 0 0 !important;
+  max-width:860px;
+  font-size:.9rem !important;
+  line-height:1.45 !important;
+  color:#496983 !important;
+  opacity:1 !important;
+}
+
+/* One eyebrow/kicker treatment everywhere. */
+#app .platform-hero .source-category,
+#app .library-welcome .source-category,
+#app .progress-hero .source-category,
+#app .goals-hero .source-category,
+#app .action-center-hero .source-category {
+  display:inline-flex;
+  align-items:center;
+  margin:0 0 .35rem !important;
+  padding:.2rem .48rem !important;
+  border-radius:999px;
+  background:#eef3f6 !important;
+  color:#b87800 !important;
+  font-size:.68rem !important;
+  line-height:1.1 !important;
+  font-weight:800 !important;
+  letter-spacing:.075em !important;
+  text-transform:uppercase;
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+
+/* Neutralize older dark-hero rules on pages that now use the unified white shell. */
+#app .goals-hero h1,
+#app .goals-hero h2,
+#app .goals-hero h3,
+#app .goals-hero p,
+#app .progress-hero h1,
+#app .progress-hero h2,
+#app .progress-hero h3,
+#app .progress-hero p,
+#app .action-center-hero h1,
+#app .action-center-hero h2,
+#app .action-center-hero h3,
+#app .action-center-hero p {
+  color:inherit;
+}
+
+#app .goals-hero h1,
+#app .progress-hero h1,
+#app .action-center-hero h1 {
+  color:#0b3b67 !important;
+}
+
+#app .goals-hero p,
+#app .progress-hero p,
+#app .action-center-hero p {
+  color:#496983 !important;
+}
