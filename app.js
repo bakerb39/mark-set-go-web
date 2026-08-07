@@ -7805,24 +7805,39 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   };
   document.addEventListener('keydown', state.spacebarHandler);
 
-  reader.addEventListener('click', (event) => {
-    const translatedWord = event.target.closest('.translated-word');
+  readerFrame.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    if (target.closest('button, input, textarea, select, a, summary, [contenteditable="true"], [role="textbox"], #fullscreen-control-strip, #fullscreen-mark-drawer, #focus-anchor-overlay')) return;
+
+    // Ask Mark owns the click immediately following a real text selection.
+    // Let the reader's selection handling own that interaction before this bubble-phase toggle.
+    if (state.markSuppressNextReaderClick || state.markSelectionLocked || state.markResumeOnNextReaderClick !== null) return;
+    const liveSelection = window.getSelection?.();
+    if (liveSelection && !liveSelection.isCollapsed && liveSelection.rangeCount) {
+      const range = liveSelection.getRangeAt(0);
+      if (reader.contains(range.commonAncestorContainer)
+          || reader.contains(range.startContainer)
+          || reader.contains(range.endContainer)) return;
+    }
+
+    const translatedWord = target.closest('.translated-word');
     if (translatedWord && state.language !== 'en') {
       handleTranslatedWordClick(event);
       return;
     }
 
-    const clickedWord = event.target.closest('.reader-word[data-index]');
+    const clickedWord = target.closest('.reader-word[data-index]');
+    const clickedGroup = target.closest('.reader-group[data-start-index]');
     const mode = getSelectedMode();
     const seekableModes = new Set(['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'auto-scroll']);
 
-    // In full-text modes, clicking a specific word changes the reading position
-    // instead of merely toggling pause. Snap to the beginning of that word's
-    // current reading group so Highlight/Bold/Meaningful Chunks remain aligned.
-    if (clickedWord && seekableModes.has(mode)) {
+    // In full-text modes, clicking visible text changes the reading position
+    // instead of toggling pause. Support both individual word spans and grouped
+    // text containers so every visible text click resolves to a reading index.
+    if ((clickedWord || clickedGroup) && seekableModes.has(mode)) {
       event.preventDefault();
-      event.stopPropagation();
-      const clickedIndex = Number(clickedWord.dataset.index);
+      const clickedIndex = Number(clickedWord?.dataset.index ?? clickedGroup?.dataset.startIndex);
       if (Number.isFinite(clickedIndex)) {
         const wasRunning = isReaderRunning();
         const group = findReadingGroup(clickedIndex);
@@ -7840,6 +7855,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     if (mode === 'two-column') return;
     if (isReaderRunning()) pauseReader();
     else startReader();
+    persistReaderSession();
   });
   bindDictionaryMenu(reader);
   window.requestAnimationFrame(updateReaderBookmarkMarkers);
