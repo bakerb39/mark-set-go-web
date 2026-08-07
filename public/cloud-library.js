@@ -156,8 +156,19 @@
   }
 
   function setBooks(books) {
-    state.books = (Array.isArray(books) ? books : []).map(normalizeCloudBook);
-    state.byClientId = new Map(state.books.filter((book) => book.clientRecordId).map((book) => [book.clientRecordId, book]));
+    // Account-library state represents readable cloud items only. Metadata-only
+    // rows are not books the user can open, so they must never contribute to
+    // cards, badges, downstream consumers, or the synced-item count.
+    state.books = (Array.isArray(books) ? books : [])
+      .map(normalizeCloudBook)
+      .filter((book) => book.documentStored);
+
+    state.byClientId = new Map(
+      state.books
+        .filter((book) => book.clientRecordId)
+        .map((book) => [book.clientRecordId, book])
+    );
+
     decorateLibraryView();
     document.dispatchEvent(new CustomEvent('marksetgo:cloud-library-ready', {
       detail: { count: state.books.length, books: state.books.slice() }
@@ -344,12 +355,13 @@
       status.className = 'cloud-library-sync-status';
       root.querySelector('.library-welcome > div')?.appendChild(status);
     }
+    const readableCount = state.books.filter((book) => book.documentStored).length;
     const statusState = state.lastError ? 'error' : state.syncing ? 'syncing' : 'saved';
     const statusText = state.lastError
-      ? 'Account library sync unavailable'
+      ? 'Account library unavailable'
       : state.syncing
-        ? 'Syncing account library…'
-        : `${state.books.length} account librar${state.books.length === 1 ? 'y item' : 'y items'} synced`;
+        ? 'Updating account library…'
+        : `${readableCount} readable account librar${readableCount === 1 ? 'y item' : 'y items'} available`;
     if (status.dataset.state !== statusState) status.dataset.state = statusState;
     if (status.textContent !== statusText) status.textContent = statusText;
 
@@ -394,6 +406,9 @@
   document.addEventListener('marksetgo:cloud-ready', (event) => {
     state.authenticated = true;
     const books = event.detail?.library || [];
+
+    // setBooks filters immediately to readable cloud documents, so the account
+    // count is correct from the first paint even before orphan cleanup finishes.
     setBooks(books);
     scheduleSync(250);
     startPolling();
