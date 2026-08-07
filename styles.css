@@ -9405,3 +9405,105 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
   color:#6a8296;
   opacity:1;
 }
+
+
+/* v9.2.23 non-reader content spacing pass
+   Adds consistent breathing room without changing Reader text geometry. */
+#app > .panel:not(.reader-page-panel) > section,
+#app > .platform-page > section {
+  box-sizing:border-box;
+}
+
+/* Headings and explanatory copy inside bordered/card-like application sections
+   should never sit directly against an edge. */
+#app > .panel:not(.reader-page-panel) .section-heading,
+#app > .platform-page .section-heading,
+#app > .panel:not(.reader-page-panel) .goals-card-heading,
+#app > .platform-page .goals-card-heading,
+#app > .panel:not(.reader-page-panel) .notebook-list-heading,
+#app > .platform-page .notebook-list-heading {
+  padding-left:.8rem;
+  padding-right:.8rem;
+}
+
+/* Notebook collection heading needs its own inset because the entry list itself
+   is the visual reading surface. Individual records keep their existing padding. */
+.global-notebook-page #global-notebook-entries > .notebook-list-heading {
+  padding:.8rem .85rem .55rem;
+}
+
+/* Give goal/accountability content a consistent inner gutter while preserving
+   existing grids, inputs, and card borders. */
+.reading-goals-page .goals-card > :not(.goals-card-heading),
+.reading-goals-page .goal-accountability > :not(.goals-card-heading),
+.reading-goals-page [class*="goal-account"] > :not(.goals-card-heading) {
+  margin-left:.8rem;
+  margin-right:.8rem;
+}
+
+.reading-goals-page .goals-card > :last-child,
+.reading-goals-page .goal-accountability > :last-child,
+.reading-goals-page [class*="goal-account"] > :last-child {
+  margin-bottom:.8rem;
+}
+
+/* Common standalone card copy: add breathing room only where a component has
+   not already supplied its own explicit internal padding. */
+#app > .panel:not(.reader-page-panel) .app-section-card > p,
+#app > .platform-page .app-section-card > p,
+#app > .panel:not(.reader-page-panel) .app-section-card > small,
+#app > .platform-page .app-section-card > small {
+  margin-left:.85rem;
+  margin-right:.85rem;
+}
+
+/* Avoid edge-hugging text in notebook records/readable panels. */
+.global-notebook-page .expanded-notebook-record {
+  padding:1rem !important;
+}
+.global-notebook-page .notebook-passage blockquote,
+.global-notebook-page .notebook-mark-response,
+.global-notebook-page .notebook-personal-note,
+.global-notebook-page .notebook-plain-text {
+  margin-left:.15rem;
+  margin-right:.15rem;
+}
+
+
+/* v9.2.24 dark hero contrast correction
+   Keep blue text on light surfaces; use light text + brighter gold on navy surfaces. */
+#app .goals-hero,
+#app .progress-hero,
+#app .action-center-hero,
+#app .platform-hero.is-dark,
+#app .dark-hero,
+#app [class*="hero"].navy,
+#app [class*="hero"].dark {
+  color:#f7fbff !important;
+}
+
+#app .goals-hero h1,
+#app .goals-hero h2,
+#app .goals-hero h3,
+#app .goals-hero p,
+#app .progress-hero h1,
+#app .progress-hero h2,
+#app .progress-hero h3,
+#app .progress-hero p,
+#app .action-center-hero h1,
+#app .action-center-hero h2,
+#app .action-center-hero h3,
+#app .action-center-hero p {
+  color:#eaf5ff !important;
+  opacity:1 !important;
+}
+
+#app .goals-hero .source-category,
+#app .progress-hero .source-category,
+#app .action-center-hero .source-category,
+#app .platform-hero.is-dark .source-category,
+#app .dark-hero .source-category {
+  color:#ffd34f !important;
+  opacity:1 !important;
+  text-shadow:0 0 1px rgba(255,211,79,.15);
+}
