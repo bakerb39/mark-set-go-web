@@ -3021,6 +3021,290 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
 }
 
 
+
+const BOOK_BUILDER_DRAFT_KEY = 'markSetGoBookBuilderDraftV1';
+
+function normalizeBuilderText(value) {
+  return String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{4,}/g, '\n\n\n')
+    .trim();
+}
+
+function detectBuilderSections(text) {
+  const lines = normalizeBuilderText(text).split('\n');
+  const headingPattern = /^(?:(?:chapter|book|part|section|canto|act)\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)(?:\s*[:.\-–—]\s*.*)?|(?:prologue|epilogue|introduction|preface|foreword|afterword|conclusion|appendix)(?:\s*[:.\-–—]\s*.*)?)$/i;
+  const allCapsPattern = /^[A-Z0-9][A-Z0-9 '\u2019\-–—,:;.]{2,80}$/;
+  const headings = [];
+  lines.forEach((raw, lineIndex) => {
+    const title = raw.trim().replace(/\s+/g, ' ');
+    if (!title || title.length > 100) return;
+    const previousBlank = lineIndex === 0 || !lines[lineIndex - 1].trim();
+    const nextBlank = lineIndex === lines.length - 1 || !lines[lineIndex + 1].trim();
+    if (headingPattern.test(title) || (previousBlank && nextBlank && allCapsPattern.test(title) && /[A-Z]/.test(title))) {
+      headings.push({ title, lineIndex });
+    }
+  });
+  if (!headings.length && normalizeBuilderText(text)) headings.push({ title: 'Full Text', lineIndex: 0 });
+  return headings.slice(0, 300);
+}
+
+function builderWordCount(text) {
+  return (String(text || '').match(/[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu) || []).length;
+}
+
+function normalizedSourceLine(value) {
+  return String(value || '')
+    .toLocaleLowerCase()
+    .replace(/[“”‘’'\"`]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function removePrintedTocFromText(text) {
+  const lines = String(text || '').replace(/\r/g, '').split('\n');
+  const markerIndex = lines.findIndex((line, index) => index < Math.min(lines.length, 1800) && /^(?:table\s+of\s+contents|contents)$/i.test(line.trim()));
+  if (markerIndex < 0) return { text: String(text || ''), removedLines: 0, detected: false };
+
+  const candidates = [];
+  for (let index = markerIndex + 1; index < Math.min(lines.length, markerIndex + 320); index += 1) {
+    const line = lines[index].replace(/\s+/g, ' ').trim();
+    if (!line || /^\[PDF Page \d+\]$/i.test(line)) continue;
+    const wordCount = splitWords(line).length;
+    const cleaned = line
+      .replace(/(?:\.{2,}|\s{2,})\s*(?:\d+|[ivxlcdm]+)\s*$/iu, '')
+      .replace(/\s+(?:\d+|[ivxlcdm]+)\s*$/iu, '')
+      .trim();
+    const structural = Boolean(classifyStructureLine(cleaned, splitWords(cleaned).length));
+    const pageLike = /(?:\.{2,}|\s{2,})\s*(?:\d+|[ivxlcdm]+)\s*$/iu.test(line);
+    if (cleaned && cleaned.length <= 170 && wordCount <= 26 && (structural || pageLike || /^[A-Z0-9IVXLC][^.!?]{1,120}$/u.test(cleaned))) {
+      const key = normalizeTocTitle(cleaned) || normalizedSourceLine(cleaned);
+      if (key.length >= 2) candidates.push({ index, title: cleaned, key });
+    }
+  }
+  if (candidates.length < 3) return { text: String(text || ''), removedLines: 0, detected: true };
+
+  let bodyStart = -1;
+  const candidateKeys = new Set(candidates.map((item) => item.key));
+  const searchFrom = Math.max(candidates.at(-1)?.index + 1 || markerIndex + 1, markerIndex + 8);
+  for (let index = searchFrom; index < lines.length; index += 1) {
+    const line = lines[index].replace(/\s+/g, ' ').trim();
+    if (!line || /^\[PDF Page \d+\]$/i.test(line)) continue;
+    const key = normalizeTocTitle(line) || normalizedSourceLine(line);
+    if (candidateKeys.has(key) && classifyStructureLine(line, splitWords(line).length)) {
+      bodyStart = index;
+      break;
+    }
+  }
+
+  // Fallback for scanned/flattened contents pages: require a strongly page-numbered list
+  // before removing through the first clearly prose-like paragraph.
+  if (bodyStart < 0) {
+    const pageNumbered = lines.slice(markerIndex + 1, Math.min(lines.length, markerIndex + 320))
+      .filter((line) => /(?:\.{2,}|\s{2,})\s*\d+\s*$/.test(line.trim())).length;
+    if (pageNumbered < 5) return { text: String(text || ''), removedLines: 0, detected: true };
+    for (let index = candidates.at(-1).index + 1; index < Math.min(lines.length, markerIndex + 420); index += 1) {
+      const line = lines[index].replace(/\s+/g, ' ').trim();
+      if (/^\[PDF Page \d+\]$/i.test(line) || !line) continue;
+      if (splitWords(line).length >= 18 && /[.!?][”\"']?$/.test(line)) { bodyStart = index; break; }
+    }
+  }
+
+  if (bodyStart < 0) return { text: String(text || ''), removedLines: 0, detected: true };
+  const removedLines = bodyStart - markerIndex;
+  lines.splice(markerIndex, removedLines);
+  return {
+    text: lines.join('\n').replace(/\n{4,}/g, '\n\n\n').trim(),
+    removedLines,
+    detected: true
+  };
+}
+
+function isLikelyRealSectionHeading(value) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  return /^(?:(?:chapter|chap\.?|book|part|section|article|canto|act)\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b|(?:prologue|epilogue|introduction|preface|foreword|afterword|conclusion|appendix)(?:\s+[a-z0-9ivxlcdm]+)?\b)/i.test(clean);
+}
+
+function removeRepeatedSourceHeaders(text, { title = '', author = '' } = {}) {
+  const lines = String(text || '').replace(/\r/g, '').split('\n');
+  const counts = new Map();
+  const titleKey = normalizedSourceLine(String(title).split(' — ')[0]);
+  const authorKey = normalizedSourceLine(author);
+  for (const line of lines) {
+    const clean = line.replace(/\s+/g, ' ').trim();
+    if (!clean || clean.length > 120 || /^\[PDF Page \d+\]$/i.test(clean)) continue;
+    const key = normalizedSourceLine(clean);
+    if (!key || key.length < 2) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const repeated = new Set([...counts.entries()].filter(([, count]) => count >= 4).map(([key]) => key));
+  let seenTitle = false;
+  let removed = 0;
+  const output = [];
+  for (const raw of lines) {
+    const clean = raw.replace(/\s+/g, ' ').trim();
+    const key = normalizedSourceLine(clean);
+    const isTitle = Boolean(titleKey && key === titleKey);
+    const isAuthor = Boolean(authorKey && key === authorKey);
+    const isStandalonePage = /^\s*(?:page\s+)?\d{1,5}\s*$/i.test(clean);
+    const safeRepeatedHeader = repeated.has(key)
+      && clean.length <= 100
+      && !isLikelyRealSectionHeading(clean)
+      && !/[.!?][”\"']?$/.test(clean);
+
+    if (isTitle) {
+      if (!seenTitle) { seenTitle = true; output.push(raw); }
+      else removed += 1;
+      continue;
+    }
+    if ((isAuthor && counts.get(key) >= 3) || safeRepeatedHeader || isStandalonePage) {
+      removed += 1;
+      continue;
+    }
+    output.push(raw);
+  }
+  return { text: output.join('\n').replace(/\n{4,}/g, '\n\n\n').trim(), removedLines: removed };
+}
+
+function normalizeImportedBookText(text, options = {}) {
+  let value = normalizeBuilderText(text);
+  const report = { printedTocLines: 0, repeatedHeaderLines: 0 };
+  if (options.removePrintedToc !== false) {
+    const cleaned = removePrintedTocFromText(value);
+    value = cleaned.text;
+    report.printedTocLines = cleaned.removedLines;
+  }
+  if (options.removeRepeatedHeaders !== false) {
+    const cleaned = removeRepeatedSourceHeaders(value, options);
+    value = cleaned.text;
+    report.repeatedHeaderLines = cleaned.removedLines;
+  }
+  const toc = detectTableOfContents(value);
+  return { text: value, toc, report };
+}
+
+function renderBookBuilder() {
+  stopReader();
+  let draft = {};
+  try { draft = JSON.parse(localStorage.getItem(BOOK_BUILDER_DRAFT_KEY) || '{}') || {}; } catch {}
+  app.innerHTML = `
+    <section class="platform-page book-builder-page">
+      <header class="book-builder-header">
+        <div>
+          <span class="source-category">Create a Book</span>
+          <h1>Build an app-ready book</h1>
+          <p>Paste a text, review the detected chapters, and create a private book in My Library.</p>
+        </div>
+        <button class="secondary" type="button" data-action="my-library">My Library</button>
+      </header>
+
+      <div class="book-builder-grid">
+        <form id="book-builder-form" class="book-builder-editor">
+          <div class="book-builder-fields">
+            <label><span>Title</span><input id="builder-title" maxlength="180" value="${escapeHtml(draft.title || '')}" placeholder="The Republic" required></label>
+            <label><span>Author</span><input id="builder-author" maxlength="180" value="${escapeHtml(draft.author || '')}" placeholder="Plato"></label>
+          </div>
+          <label class="book-builder-text-label"><span>Book text</span>
+            <textarea id="builder-text" spellcheck="false" placeholder="Paste the complete text here. Chapter headings such as CHAPTER I, BOOK II, PART THREE, Preface, and Epilogue will be detected automatically." required>${escapeHtml(draft.text || '')}</textarea>
+          </label>
+          <div class="book-builder-options">
+            <label><input id="builder-clean-toc" type="checkbox" ${draft.cleanToc === false ? '' : 'checked'}> Remove a printed table of contents from the reading text and keep it in the Contents pane.</label>
+            <label><input id="builder-clean-headers" type="checkbox" ${draft.cleanHeaders === false ? '' : 'checked'}> Remove repeated page headers, page numbers, and repeated book-title lines.</label>
+            <label><input id="builder-rights" type="checkbox" ${draft.rights ? 'checked' : ''}> I own this text, have permission to use it, or it is in the public domain.</label>
+          </div>
+          <div class="book-builder-actions">
+            <button id="builder-analyze" class="secondary" type="button">Analyze structure</button>
+            <button class="primary" type="submit">Create book</button>
+            <button id="builder-clear" class="subtle-link" type="button">Clear draft</button>
+          </div>
+          <p id="builder-status" class="status" aria-live="polite"></p>
+        </form>
+
+        <aside class="book-builder-preview">
+          <div class="book-builder-preview-heading">
+            <div><span class="source-category">Preview</span><h2>Table of contents</h2></div>
+            <span id="builder-count" class="book-builder-count">0 words</span>
+          </div>
+          <ol id="builder-toc" class="book-builder-toc"><li class="empty">Paste text to generate a table of contents.</li></ol>
+          <div class="book-builder-note"><strong>First-pass behavior</strong><p>The resulting book stays private, opens in the existing reader, and uses the app’s normal library and reading-progress storage.</p></div>
+        </aside>
+      </div>
+    </section>`;
+
+  const titleInput = app.querySelector('#builder-title');
+  const authorInput = app.querySelector('#builder-author');
+  const textInput = app.querySelector('#builder-text');
+  const cleanTocInput = app.querySelector('#builder-clean-toc');
+  const cleanHeadersInput = app.querySelector('#builder-clean-headers');
+  const rightsInput = app.querySelector('#builder-rights');
+  const status = app.querySelector('#builder-status');
+  const toc = app.querySelector('#builder-toc');
+  const count = app.querySelector('#builder-count');
+
+  const saveDraft = () => {
+    try { localStorage.setItem(BOOK_BUILDER_DRAFT_KEY, JSON.stringify({ title:titleInput.value, author:authorInput.value, text:textInput.value, cleanToc:cleanTocInput.checked, cleanHeaders:cleanHeadersInput.checked, rights:rightsInput.checked })); } catch {}
+  };
+  const analyze = () => {
+    const normalized = normalizeImportedBookText(textInput.value, {
+      title: titleInput.value.trim(),
+      author: authorInput.value.trim(),
+      removePrintedToc: cleanTocInput.checked,
+      removeRepeatedHeaders: cleanHeadersInput.checked
+    });
+    const text = normalized.text;
+    const sections = normalized.toc.length ? normalized.toc.map((item) => ({ title:item.title, lineIndex:null, index:item.index, type:item.type })) : detectBuilderSections(text);
+    const words = builderWordCount(text);
+    count.textContent = `${words.toLocaleString()} words · ${sections.length} ${sections.length === 1 ? 'section' : 'sections'}`;
+    toc.innerHTML = sections.length
+      ? sections.map((section) => `<li><span>${escapeHtml(section.title)}</span><small>${Number.isFinite(section.index) ? `Word ${(section.index + 1).toLocaleString()}` : `Line ${(Number(section.lineIndex || 0) + 1).toLocaleString()}`}</small></li>`).join('')
+      : '<li class="empty">No chapter headings detected yet.</li>';
+    const cleanupBits = [];
+    if (normalized.report.printedTocLines) cleanupBits.push(`removed ${normalized.report.printedTocLines} printed-TOC lines`);
+    if (normalized.report.repeatedHeaderLines) cleanupBits.push(`removed ${normalized.report.repeatedHeaderLines} repeated header/page-number lines`);
+    status.textContent = text ? `Detected ${sections.length} section${sections.length === 1 ? '' : 's'}${cleanupBits.length ? `; ${cleanupBits.join(' and ')}` : ''}. Review the preview, then create the book.` : '';
+    saveDraft();
+    return { text, sections, words, normalized };
+  };
+
+  let analyzeTimer = null;
+  [titleInput, authorInput, textInput, cleanTocInput, cleanHeadersInput, rightsInput].forEach((input) => input.addEventListener('input', () => {
+    saveDraft();
+    if (input === textInput) {
+      clearTimeout(analyzeTimer);
+      analyzeTimer = setTimeout(analyze, 350);
+    }
+  }));
+  app.querySelector('#builder-analyze').addEventListener('click', analyze);
+  app.querySelector('#builder-clear').addEventListener('click', () => {
+    if (!window.confirm('Clear this book-builder draft?')) return;
+    localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+    renderBookBuilder();
+  });
+  app.querySelector('#book-builder-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const { text, sections, words, normalized } = analyze();
+    const title = titleInput.value.trim();
+    const author = authorInput.value.trim();
+    if (!title) return titleInput.focus();
+    if (words < 10) { status.textContent = 'Add more book text before creating the book.'; return textInput.focus(); }
+    if (!rightsInput.checked) { status.textContent = 'Confirm that you have the right to use this text.'; return rightsInput.focus(); }
+    const displayTitle = author ? `${title} — ${author}` : title;
+    const source = {
+      type: 'book-builder',
+      author,
+      createdAt: new Date().toISOString(),
+      documentToc: detectTableOfContents(text),
+      cleanup: normalized?.report || {},
+      private: true
+    };
+    localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+    renderReaderWithText(displayTitle, text, source);
+  });
+
+  if (textInput.value.trim()) analyze();
+}
+
 function renderEmptyReader() {
   stopReader();
 
@@ -3046,6 +3330,11 @@ function renderEmptyReader() {
         <button class="primary empty-reader-action" type="button" data-read="upload">
           <span aria-hidden="true">⬆</span>
           <span><strong>Import Book / Text</strong><small>EPUB, PDF, or TXT</small></span>
+        </button>
+
+        <button class="secondary empty-reader-action" type="button" data-read="book-builder">
+          <span aria-hidden="true">✎</span>
+          <span><strong>Create a Book</strong><small>Paste text and build a clean TOC</small></span>
         </button>
 
         <button class="secondary empty-reader-action" type="button" data-read="url">
@@ -6195,12 +6484,13 @@ const LIBRARY_PROVIDERS = {
   gutenberg: { label: 'Project Gutenberg', icon: 'G', note: 'Public-domain ebooks with mirror fallback.' }
 };
 
-function unifiedBookCard(book) {
+function unifiedBookCard(book, selectedFormat = 'best') {
   const provider = LIBRARY_PROVIDERS[book.provider] || { label: book.provider || 'Library', icon: '◫' };
   const canRead = Boolean(book.readable);
   const author = book.author || 'Unknown author';
   const details = [book.year, book.language, book.format].filter(Boolean).join(' · ');
   const difficulty = getBookDifficulty(book);
+  const formatLabel = selectedFormat === 'epub' ? 'EPUB' : selectedFormat === 'pdf' ? 'PDF' : selectedFormat === 'text' ? 'Plain text' : '';
   return `
     <article class="unified-book-card">
       <div class="unified-cover-wrap">
@@ -6214,7 +6504,7 @@ function unifiedBookCard(book) {
         ${difficultyBadge(difficulty, book)}
         ${book.description ? `<p class="unified-description">${escapeHtml(book.description)}</p>` : ''}
         <div class="unified-actions">
-          ${canRead ? `<button class="primary" type="button" data-library-read="${escapeHtml(book.provider)}" data-library-id="${escapeHtml(book.id)}">▸ Read now</button>` : ''}
+          ${canRead ? `<button class="primary" type="button" data-library-read="${escapeHtml(book.provider)}" data-library-id="${escapeHtml(book.id)}" data-library-format="${escapeHtml(selectedFormat)}">▸ ${formatLabel ? `Open ${formatLabel}` : 'Read now'}</button>` : ''}
           ${book.externalUrl ? `<a class="secondary button-link" href="${escapeHtml(book.externalUrl)}" target="_blank" rel="noopener noreferrer">↗ Book page</a>` : ''}
           <button class="secondary" type="button" data-library-save='${escapeHtml(JSON.stringify({title: book.title, author, sourceUrl: book.externalUrl || '', provider: book.provider}))}'>＋ Reading list</button>
         </div>
@@ -6241,6 +6531,12 @@ async function renderUnifiedLibrary(initial = {}) {
           <option value="all" ${provider === 'all' ? 'selected' : ''}>All libraries</option>
           ${Object.entries(LIBRARY_PROVIDERS).map(([key, item]) => `<option value="${key}" ${provider === key ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
         </select>
+        <select id="unified-library-format" aria-label="Book format">
+          <option value="best">Best available</option>
+          <option value="text">Plain text</option>
+          <option value="epub">EPUB</option>
+          <option value="pdf">PDF</option>
+        </select>
         <button class="primary" type="submit">Search</button>
       </form>
       <div class="list-toolbar-row">
@@ -6263,15 +6559,16 @@ async function renderUnifiedLibrary(initial = {}) {
   const search = async () => {
     const q = app.querySelector('#unified-library-query').value.trim();
     const source = app.querySelector('#unified-library-provider').value;
+    const format = app.querySelector('#unified-library-format').value;
     if (!q) { status.textContent = 'Enter a title or author.'; results.innerHTML = ''; return; }
     status.className = 'status';
     status.textContent = `Searching ${source === 'all' ? 'all libraries' : LIBRARY_PROVIDERS[source]?.label || source}…`;
     results.innerHTML = '<div class="library-loading"><span class="loading-book">◫</span><p>Gathering editions…</p></div>';
     try {
-      const payload = await loadApiPayload(`/api/library/search?q=${encodeURIComponent(q)}&provider=${encodeURIComponent(source)}`);
+      const payload = await loadApiPayload(`/api/library/search?q=${encodeURIComponent(q)}&provider=${encodeURIComponent(source)}&format=${encodeURIComponent(format)}`);
       const books = Array.isArray(payload.books) ? payload.books : [];
       status.textContent = books.length ? `${books.length} result${books.length === 1 ? '' : 's'} found.` : 'No books found. Try a broader search.';
-      results.innerHTML = books.length ? books.map(unifiedBookCard).join('') : '<div class="empty-library"><h2>No results</h2><p>Try another title, author, or source.</p></div>';
+      results.innerHTML = books.length ? books.map((book) => unifiedBookCard(book, format)).join('') : `<div class="empty-library"><h2>No results</h2><p>${format === 'best' ? 'Try another title, author, or source.' : `No matching ${format === 'text' ? 'plain-text' : format.toUpperCase()} edition was found. Try Best available or another source.`}</p></div>`;
       bindUnifiedLibraryActions(results);
       bindListPresentationControls({
         key:'all-libraries',
@@ -6298,11 +6595,28 @@ function bindUnifiedLibraryActions(container) {
   container.querySelectorAll('[data-library-read]').forEach((button) => button.addEventListener('click', async () => {
     const provider = button.dataset.libraryRead;
     const id = button.dataset.libraryId;
+    const format = button.dataset.libraryFormat || 'best';
     const original = button.textContent;
     button.disabled = true; button.textContent = 'Loading…';
     try {
-      const book = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}`);
-      renderReaderWithText(`${book.title}${book.author ? ` — ${book.author}` : ''}`, book.text, { type: provider, id, sourceUrl: book.sourceUrl });
+      if (format === 'epub' || format === 'pdf') {
+        const response = await fetch(`/api/library/download?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}&format=${encodeURIComponent(format)}`);
+        if (!response.ok) {
+          let message = `The ${format.toUpperCase()} edition could not be opened.`;
+          try { message = (await response.json()).error || message; } catch {}
+          throw new Error(message);
+        }
+        const blob = await response.blob();
+        const file = new File([blob], `${provider}-${id}.${format}`, { type: format === 'epub' ? 'application/epub+zip' : 'application/pdf' });
+        const parsed = format === 'epub' ? await parseEpubFile(file) : await parsePdfFile(file);
+        parsed.source = { ...(parsed.source || {}), type: provider, provider, id, remoteFormat: format };
+        renderReaderWithText(parsed.title, parsed.text, parsed.source);
+        return;
+      }
+      const book = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}&format=${encodeURIComponent(format)}`);
+      const fullTitle = `${book.title}${book.author ? ` — ${book.author}` : ''}`;
+      const normalized = normalizeImportedBookText(book.text, { title:book.title, author:book.author });
+      renderReaderWithText(fullTitle, normalized.text, { type: provider, id, sourceUrl: book.sourceUrl, remoteFormat: format === 'best' ? 'text' : format, documentToc: normalized.toc, cleanup: normalized.report });
     } catch (error) {
       window.alert(error.message);
       button.disabled = false; button.textContent = original;
@@ -6335,6 +6649,7 @@ async function renderReader(kind) {
   if (normalizedKind === 'frankenstein-demo') return loadBuiltInIllustratedDemo();
   if (normalizedKind === 'url') return renderUrlImporter();
   if (normalizedKind === 'upload') return renderUpload();
+  if (normalizedKind === 'book-builder') return renderBookBuilder();
   if (normalizedKind === 'illustrated-upload') return renderIllustratedUpload();
   if (normalizedKind === 'unified-library') return renderUnifiedLibrary();
   if (normalizedKind === 'gutenberg') return renderGutenbergLibrary();
@@ -6751,8 +7066,6 @@ function bindMarkCompanion(reader){
     startX:0,
     startY:0,
     pointerId:null,
-    pointerType:'mouse',
-    startedOnText:false,
     finalized:false
   });
 
@@ -6848,16 +7161,14 @@ function bindMarkCompanion(reader){
   };
 
   const resumeAfterLockedSelectionClick=(event)=>{
+    const pending=state.markResumeOnNextReaderClick;
+    const shouldResume=Boolean(pending?.shouldResume);
     state.markResumeOnNextReaderClick=null;
 
-    // The first click after a locked selection is still a normal reader click:
-    // a word click moves the reading position, while a click in blank reader
-    // space toggles play/pause. Do not base this on whether playback happened
-    // to be running before the selection began; that made blank clicks appear
-    // inconsistent whenever the passage was selected from an already-paused
-    // reader.
     event.preventDefault();
     event.stopImmediatePropagation();
+
+    if(!shouldResume) return;
 
     const clickedWord=event.target.closest?.('.reader-word[data-index]');
     const mode=getSelectedMode();
@@ -6877,10 +7188,7 @@ function bindMarkCompanion(reader){
       }
     }
 
-    if(mode==='two-column') return;
-    if(isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
+    if(mode!=='two-column' && !isReaderRunning()) startReader();
   };
 
   reader.addEventListener('pointerdown',(event)=>{
@@ -6888,12 +7196,13 @@ function bindMarkCompanion(reader){
     if(event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
 
     // The first ordinary click in the reader after using Ask Mark removes the
-    // temporary highlight. The following click handler then applies the normal
-    // reader behavior: blank space toggles play/pause and a word click seeks.
+    // temporary highlight. Playback resumes only if it had been running before
+    // the selection began; the click itself is handled in the capture listener.
     if(state.markSelectionLocked){
+      const shouldResume=Boolean(state.markSelectionWasRunning);
       clearMarkSelectionForReadingResume();
       state.markSelectionWasRunning=false;
-      state.markResumeOnNextReaderClick={toggle:true};
+      state.markResumeOnNextReaderClick={shouldResume};
       state.markSelectionInteraction=freshInteraction();
       updateReaderStatus('Selection cleared.');
       return;
@@ -6905,35 +7214,28 @@ function bindMarkCompanion(reader){
     interaction.startX=Number(event.clientX)||0;
     interaction.startY=Number(event.clientY)||0;
     interaction.pointerId=event.pointerId ?? null;
-    interaction.pointerType=event.pointerType || 'mouse';
-    interaction.startedOnText=Boolean(event.target.closest?.(
-      '.reader-word, .reader-group, .reader-paragraph, .reading-paragraph, p, blockquote, h1, h2, h3, h4, h5, h6'
-    ));
     state.markSelectionInteraction=interaction;
   },true);
 
-  // Do not pause on `selectstart`: Chromium can emit it for an ordinary click
-  // before any range exists. That was swallowing normal blank-space clicks and
-  // immediately restarting the reader. A real mouse/pen drag from rendered text
-  // pauses below; touch and keyboard selection are confirmed by selectionchange.
+  // selectstart is the reliable boundary between a normal click-to-seek and a
+  // real text-selection drag. Pause synchronously here so the next reader paint
+  // cannot replace the DOM while the browser is constructing the selection.
+  reader.addEventListener('selectstart',()=>{
+    const interaction=state.markSelectionInteraction;
+    if(interaction?.active) pauseForSelection(interaction);
+  },true);
+
   reader.addEventListener('pointermove',(event)=>{
     const interaction=state.markSelectionInteraction;
-    if(!interaction?.active || interaction.paused) return;
+    if(!interaction?.active) return;
     if(interaction.pointerId!==null && event.pointerId!==undefined && event.pointerId!==interaction.pointerId) return;
 
-    const distance=Math.hypot(
-      (Number(event.clientX)||0)-interaction.startX,
-      (Number(event.clientY)||0)-interaction.startY
-    );
-    if(distance<=6) return;
-
-    // Mouse/pen selection should pause before the next reading paint can replace
-    // the DOM. Do not treat a drag that began in blank reader space—or a touch
-    // scroll—as a text selection. Touch selection is handled by selectionchange
-    // once the browser exposes a non-collapsed range.
-    if(interaction.startedOnText && interaction.pointerType!=='touch'){
-      pauseForSelection(interaction);
-    }
+    // Do not treat ordinary pointer jitter as a selection. The old distance-only
+    // fallback could set markSuppressNextReaderClick before a real range existed,
+    // swallowing normal pause/resume clicks. selectstart is the primary signal;
+    // this fallback pauses only after the browser has produced a non-collapsed
+    // selection that belongs to the reader.
+    if(selectionBelongsToReader()) pauseForSelection(interaction);
   },true);
 
   // selectionchange covers keyboard selection and touch implementations where
@@ -6976,7 +7278,15 @@ function bindMarkCompanion(reader){
       return;
     }
     if(!state.markSuppressNextReaderClick) return;
+
+    const interaction=state.markSelectionInteraction;
+    const hasRealSelection=state.markSelectionLocked
+      || Boolean(interaction?.finalized)
+      || selectionBelongsToReader();
+
     state.markSuppressNextReaderClick=false;
+    if(!hasRealSelection) return;
+
     event.preventDefault();
     event.stopImmediatePropagation();
   },true);
@@ -7089,9 +7399,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     ? suppliedToc
     : detectTableOfContents(text);
 
-  const suppliedDocumentId = String(source?.documentId || source?.bookId || '').trim();
   readerEngine.loadBook(bookModel, {
-    documentId: suppliedDocumentId || documentIdFor(title, String(text)),
+    documentId: documentIdFor(title, String(text)),
     structure,
     toc
   });
@@ -9886,7 +10195,6 @@ function startReader() {
   start.disabled = true;
   pause.disabled = false;
   beginReadingSession();
-  try { window.ReadingGoals?.onSessionStart({ title: state.title, documentId: state.documentId, wpm: speed }); } catch (error) { console.warn('Reading goal encouragement failed:', error); }
 
   const expectedMeaningful = state.meaningfulChunks && modeSupportsMeaningfulChunks(mode);
   if (state.renderedMode !== mode
@@ -12080,15 +12388,35 @@ async function parseEpubFile(file) {
     Array.from(manifest.values()).map((item) => [resolveArchivePath(opfPath, item.href), item])
   );
   let wordIndex = 0;
+  let preservedEpubTitle = false;
+  let preservedEpubAuthor = false;
 
   for (const idref of spineIds) {
     const item = manifest.get(idref);
     if (!item?.href) continue;
+    if (/(^|\s)nav(\s|$)/i.test(item.properties || '')) continue;
     const chapterPath = resolveArchivePath(opfPath, item.href);
     if (!archive.entries.has(chapterPath)) continue;
     const chapterText = await archive.readText(chapterPath);
     const chapterDoc = new DOMParser().parseFromString(chapterText, 'text/html');
-    const lines = epubContentLines(chapterDoc);
+    let lines = epubContentLines(chapterDoc);
+    // Navigation/TOC files are already excluded by the spine/nav parser. Remove
+    // repeated running headers such as the book title that some EPUBs include
+    // at the top of every chapter file.
+    const epubTitleKey = normalizedSourceLine(title);
+    const epubAuthorKey = normalizedSourceLine(creator);
+    lines = lines.filter((line) => {
+      const key = normalizedSourceLine(line.text);
+      if (epubTitleKey && key === epubTitleKey) {
+        if (preservedEpubTitle) return false;
+        preservedEpubTitle = true;
+      }
+      if (epubAuthorKey && key === epubAuthorKey) {
+        if (preservedEpubAuthor) return false;
+        preservedEpubAuthor = true;
+      }
+      return true;
+    });
     fileStart.set(chapterPath, wordIndex);
 
     // Preserve embedded EPUB artwork by converting archive-relative image
@@ -12308,6 +12636,11 @@ async function parsePdfFile(file, onProgress = () => {}) {
 
   const pdf = await loadingTask.promise;
   const metadata = await pdf.getMetadata().catch(() => null);
+  const title =
+    String(metadata?.info?.Title || '').trim()
+    || file.name.replace(/\.pdf$/i, '')
+    || 'Imported PDF';
+  const pdfAuthor = String(metadata?.info?.Author || '').trim();
   const pageRefs = new Map();
   const pages = [];
   let extractedCharacters = 0;
@@ -12338,17 +12671,56 @@ async function parsePdfFile(file, onProgress = () => {}) {
     onProgress(percent, `Extracting page ${pageNumber} of ${pdf.numPages}…`);
   }
 
+  // Remove running headers/footers that recur across PDF pages before the
+  // pages are joined into reader text. This catches book titles and page labels
+  // without disturbing one-off chapter headings.
+  const pdfLineCounts = new Map();
+  pages.forEach((page) => page.text.split('\n').forEach((line) => {
+    const clean = line.replace(/\s+/g, ' ').trim();
+    if (!clean || clean.length > 120) return;
+    const key = normalizedSourceLine(clean);
+    if (key) pdfLineCounts.set(key, (pdfLineCounts.get(key) || 0) + 1);
+  }));
+  const repeatThreshold = Math.max(3, Math.ceil(pdf.numPages * .3));
+  const repeatedPdfLines = new Set([...pdfLineCounts.entries()].filter(([, count]) => count >= repeatThreshold).map(([key]) => key));
+  const pdfTitleKey = normalizedSourceLine(title);
+  const pdfAuthorKey = normalizedSourceLine(pdfAuthor);
+  let preservedPdfTitle = false;
+  let preservedPdfAuthor = false;
+  pages.forEach((page) => {
+    page.text = page.text.split('\n').filter((line) => {
+      const clean = line.replace(/\s+/g, ' ').trim();
+      const key = normalizedSourceLine(clean);
+      if (/^(?:page\s+)?\d{1,5}$/i.test(clean)) return false;
+      if (pdfTitleKey && key === pdfTitleKey && repeatedPdfLines.has(key)) {
+        if (preservedPdfTitle) return false;
+        preservedPdfTitle = true;
+        return true;
+      }
+      if (pdfAuthorKey && key === pdfAuthorKey && repeatedPdfLines.has(key)) {
+        if (preservedPdfAuthor) return false;
+        preservedPdfAuthor = true;
+        return true;
+      }
+      if (!repeatedPdfLines.has(key)) return true;
+      return isLikelyRealSectionHeading(clean);
+    }).join('\n').trim();
+  });
+
   const outline = await pdf.getOutline().catch(() => null);
   const toc = pdfOutlineToToc(outline || [], pageRefs);
-  const title =
-    String(metadata?.info?.Title || '').trim()
-    || file.name.replace(/\.pdf$/i, '')
-    || 'Imported PDF';
-
-  const text = pages
+  let text = pages
     .map((page) => `\n\n[PDF Page ${page.pageNumber}]\n\n${page.text}`)
     .join('')
     .trim();
+  const normalizedPdf = normalizeImportedBookText(text, { title, author:pdfAuthor, removePrintedToc:true, removeRepeatedHeaders:false });
+  text = normalizedPdf.text;
+  const pdfDocumentToc = toc.map((item) => {
+    const marker = item.pageNumber ? `[PDF Page ${item.pageNumber}]` : '';
+    const position = marker ? text.indexOf(marker) : -1;
+    if (position < 0) return null;
+    return { title:item.title, index:splitWords(text.slice(0, position)).length, type:'chapter', pageNumber:item.pageNumber };
+  }).filter(Boolean);
 
   const textCoverage = pdf.numPages ? textPages / pdf.numPages : 0;
   const likelyScanned = extractedCharacters < Math.max(200, pdf.numPages * 35)
@@ -12374,7 +12746,9 @@ async function parsePdfFile(file, onProgress = () => {}) {
       importedAt: new Date().toISOString(),
       toc,
       pages: pages.map(({ pageNumber, width, height }) => ({ pageNumber, width, height })),
-      textCoverage
+      textCoverage,
+      cleanup: normalizedPdf.report,
+      documentToc: pdfDocumentToc.length ? pdfDocumentToc : normalizedPdf.toc
     },
     stats: {
       pageCount: pdf.numPages,
@@ -12473,13 +12847,17 @@ function renderUpload() {
 
       progress.hidden = true;
       status.textContent = 'Opening text file…';
-      const text = await file.text();
-      if (!text.trim()) throw new Error('This text file is empty.');
-      renderReaderWithText(file.name.replace(/\.txt$/i, ''), text, {
+      const rawText = await file.text();
+      if (!rawText.trim()) throw new Error('This text file is empty.');
+      const importedTitle = file.name.replace(/\.txt$/i, '');
+      const normalized = normalizeImportedBookText(rawText, { title: importedTitle });
+      renderReaderWithText(importedTitle, normalized.text, {
         type: 'upload',
         name: file.name,
         fileSize: file.size,
-        importedAt: new Date().toISOString()
+        importedAt: new Date().toISOString(),
+        documentToc: normalized.toc,
+        cleanup: normalized.report
       });
     } catch (error) {
       console.error('Book import failed.', error);
@@ -12607,7 +12985,7 @@ function renderBrowseHub() {
     let data = null;
     try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
     if (!data?.text) return renderReadingList();
-    renderReaderWithText(data.title, data.text, { ...(data.source || { type:'saved' }), documentId });
+    renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
     requestAnimationFrame(() => jumpToWordIndex(record?.lastWord || 0));
   }));
@@ -12858,6 +13236,7 @@ function renderMyLibraryHub() {
         </div>
 
         <div class="library-header-actions">
+          <button class="secondary" type="button" data-read="book-builder">Create a Book</button>
           <button class="secondary" type="button" data-action="browse">Browse books</button>
           <button class="primary" type="button" data-action="reader">Open Reader</button>
         </div>
@@ -13687,7 +14066,6 @@ document.addEventListener('click', (event) => {
   if (actionName === 'terms') renderTerms();
   if (actionName === 'music') renderMusicLibrary();
   if (actionName === 'my-reading' || actionName === 'reading-list') renderReadingList();
-  if (actionName === 'reading-goals') window.ReadingGoals?.render();
   if (actionName === 'progress-dashboard' || actionName === 'progress-awards') renderProgressDashboard();
   if (actionName === 'action-center') renderActionCenter();
   if (actionName === 'vocabulary-builder') renderVocabularyBuilder();
