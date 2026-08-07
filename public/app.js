@@ -2750,8 +2750,15 @@ function bindDraggableFocusAnchor(overlay) {
     event.preventDefault();
     event.stopPropagation();
     overlay.classList.add('focus-anchor-dragging');
+    state.focusAnchorSuppressClick = false;
+    const dragStartX = Number(event.clientX) || 0;
+    const dragStartY = Number(event.clientY) || 0;
 
     const move = (moveEvent) => {
+      const dx = (Number(moveEvent.clientX) || 0) - dragStartX;
+      const dy = (Number(moveEvent.clientY) || 0) - dragStartY;
+      if (Math.hypot(dx, dy) > 4) state.focusAnchorSuppressClick = true;
+
       const rect = frame.getBoundingClientRect();
       const x = ((moveEvent.clientX - rect.left) / Math.max(1, rect.width)) * 100;
       const y = ((moveEvent.clientY - rect.top) / Math.max(1, rect.height)) * 100;
@@ -7217,13 +7224,10 @@ function bindMarkCompanion(reader){
     state.markSelectionInteraction=interaction;
   },true);
 
-  // selectstart is the reliable boundary between a normal click-to-seek and a
-  // real text-selection drag. Pause synchronously here so the next reader paint
-  // cannot replace the DOM while the browser is constructing the selection.
-  reader.addEventListener('selectstart',()=>{
-    const interaction=state.markSelectionInteraction;
-    if(interaction?.active) pauseForSelection(interaction);
-  },true);
+  // Do not pause on selectstart alone. Browsers may fire selectstart during an
+  // ordinary click before any real range exists, which would make a normal
+  // click-to-seek look as though the reader had already been paused. Actual
+  // non-collapsed selections are handled by pointermove/selectionchange below.
 
   reader.addEventListener('pointermove',(event)=>{
     const interaction=state.markSelectionInteraction;
@@ -7808,7 +7812,15 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   readerFrame.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
-    if (target.closest('button, input, textarea, select, a, summary, [contenteditable="true"], [role="textbox"], #fullscreen-control-strip, #fullscreen-mark-drawer, #focus-anchor-overlay')) return;
+    if (target.closest('button, input, textarea, select, a, summary, [contenteditable="true"], [role="textbox"], #fullscreen-control-strip, #fullscreen-mark-drawer')) return;
+
+    // A real Focus Anchor drag must not also toggle playback when the pointer is
+    // released. A simple click on the anchor, however, is still a blank-reader
+    // click and follows the same pause/resume contract as the rest of the canvas.
+    if (target.closest('#focus-anchor-overlay') && state.focusAnchorSuppressClick) {
+      state.focusAnchorSuppressClick = false;
+      return;
+    }
 
     // Ask Mark owns the click immediately following a real text selection.
     // Let the reader's selection handling own that interaction before this bubble-phase toggle.
