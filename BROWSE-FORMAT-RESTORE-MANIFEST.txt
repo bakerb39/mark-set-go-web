@@ -1,0 +1,28 @@
+Baseline: reader-stable-2026-08-07
+Scope: Restore the missing format selector on the Browse landing search only.
+
+Restored choices:
+- Best available
+- Plain text
+- EPUB
+- PDF
+
+Behavior:
+- Browse landing selection is handed to the already-existing unified library format selector.
+- The existing unified library search endpoint receives the selected format exactly as before.
+
+Changed source files:
+- app.js
+- public/app.js
+- styles.css
+- public/styles.css
+- index.html (cache key only)
+- public/index.html (cache key only)
+
+Reader protection verification:
+- No files under public/reader/ changed.
+- app.js diff contains only renderBrowseHub format-selector/handoff changes.
+- No startReader(), pauseReader(), stopReader(), click-selection, pagination, fullscreen, persistence, or Ask Mark reader code changed.
+- app.js and public/app.js are byte-identical after the change.
+- styles.css and public/styles.css are byte-identical after the change.
+- Both app.js copies pass node --check.
