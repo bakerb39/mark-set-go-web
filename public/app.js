@@ -9130,8 +9130,8 @@ function openWordPanelForDictionary() {
   }
 }
 
-async function performDictionaryLookup(saveAfter = false, target = 'tools') {
-  const context = state.contextWord;
+async function performDictionaryLookup(saveAfter = false, target = 'tools', contextOverride = null) {
+  const context = contextOverride || state.contextWord;
   if (!context) return;
 
   if (target === 'mark') {
@@ -9151,7 +9151,7 @@ async function performDictionaryLookup(saveAfter = false, target = 'tools') {
   try {
     const result = await lookupDictionaryWord(context.word);
     showDictionaryResult(result.word, result.definition, result.partOfSpeech, result.example, false, target);
-    if (saveAfter) saveCurrentDefinition(result);
+    if (saveAfter) saveCurrentDefinition(result, context, target);
   } catch (error) {
     const panel = target === 'mark' ? app.querySelector('#mark-response') : app.querySelector('#word-result');
     if (panel) {
@@ -9161,8 +9161,8 @@ async function performDictionaryLookup(saveAfter = false, target = 'tools') {
   }
 }
 
-function saveCurrentDefinition(result) {
-  const context = state.contextWord;
+function saveCurrentDefinition(result, contextOverride = null, target = 'tools') {
+  const context = contextOverride || state.contextWord;
   if (!context || !state.documentId) return;
   const items = getSavedDefinitions();
   const existing = items.find((item) => item.documentId === state.documentId && Number(item.wordIndex) === context.index);
@@ -9185,9 +9185,10 @@ function saveCurrentDefinition(result) {
   };
   const updated = [item, ...items.filter((entry) => entry.id !== item.id)];
   saveDefinitions(updated);
-  context.element.classList.add('saved-definition-word');
+  context.element?.classList?.add('saved-definition-word');
+  app.querySelector(`.reader-word[data-index="${item.wordIndex}"]`)?.classList.add('saved-definition-word');
   renderNavigationPane();
-  showDictionaryResult(item.word, item.definition, item.partOfSpeech, item.example, true);
+  showDictionaryResult(item.word, item.definition, item.partOfSpeech, item.example, true, target);
 }
 
 
@@ -9223,22 +9224,27 @@ function bookmarkPageForWord(wordElement) {
   }
 
   const viewportHeight = Math.max(1, reader.clientHeight);
-  const absoluteTop = wordElement.offsetTop + reader.scrollTop;
+  // Resolve the word's absolute position inside the scrollable reader exactly once.
+  // offsetTop may be relative to a nested reading group, while adding scrollTop to
+  // an already content-relative offset can double-count the current scroll position.
+  const readerRect = reader.getBoundingClientRect();
+  const wordRect = wordElement.getBoundingClientRect();
+  const absoluteTop = Math.max(0, (wordRect.top - readerRect.top) + reader.scrollTop);
   const pageNumber = Math.max(1, Math.floor(absoluteTop / viewportHeight) + 1);
   return { pageNumber, pageKey: `scroll-page-${pageNumber}`, side: 'single' };
 }
 
-function bookmarkForContextWord() {
-  const context = state.contextWord;
+function bookmarkForContextWord(contextOverride = null) {
+  const context = contextOverride || state.contextWord;
   if (!context || !state.documentId) return null;
-  const page = bookmarkPageForWord(context.element);
+  const page = context.page || bookmarkPageForWord(context.element);
   return getReaderBookmarks().find((item) => item.documentId === state.documentId && item.pageKey === page.pageKey) || null;
 }
 
-function toggleBookmarkForContextWord() {
-  const context = state.contextWord;
+function toggleBookmarkForContextWord(contextOverride = null) {
+  const context = contextOverride || state.contextWord;
   if (!context || !state.documentId) return;
-  const page = bookmarkPageForWord(context.element);
+  const page = context.page || bookmarkPageForWord(context.element);
   const items = getReaderBookmarks();
   const existing = items.find((item) => item.documentId === state.documentId && item.pageKey === page.pageKey);
 
@@ -9419,6 +9425,10 @@ function bindDictionaryMenu(reader) {
 
     app.querySelectorAll('#reader .reader-context-word').forEach((node) => node.classList.remove('reader-context-word'));
     context.element?.classList?.add('reader-context-word');
+    // Capture the page while the right-clicked word is still a live DOM node.
+    // Ask Mark highlighting can redraw/wrap reader text, so later actions should
+    // not have to recompute the bookmark page from a stale element reference.
+    context.page = bookmarkPageForWord(context.element);
     state.contextWord = context;
 
     // Treat the right-clicked word as the active Ask Mark selection so it stays
@@ -9458,22 +9468,43 @@ function bindDictionaryMenu(reader) {
     menu.style.visibility = '';
     menu.querySelector('button')?.focus({ preventScroll: true });
   });
-  menu.querySelector('[data-dictionary-action="lookup"]')?.addEventListener('click', () => {
+  const capturedContext = () => {
+    const context = state.contextWord;
+    if (!context) return null;
+    return { ...context, page: context.page ? { ...context.page } : null };
+  };
+  menu.querySelector('[data-dictionary-action="lookup"]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const context = capturedContext();
     closeDictionaryMenu();
-    performDictionaryLookup(false, 'mark');
+    performDictionaryLookup(false, 'mark', context);
   });
-  menu.querySelector('[data-dictionary-action="save"]')?.addEventListener('click', () => {
+  menu.querySelector('[data-dictionary-action="save"]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const context = capturedContext();
     closeDictionaryMenu();
-    performDictionaryLookup(true, 'mark');
+    performDictionaryLookup(true, 'mark', context);
   });
-  menu.querySelector('[data-dictionary-action="note"]')?.addEventListener('click', () => {
+  menu.querySelector('[data-dictionary-action="note"]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const context = capturedContext();
     closeDictionaryMenu();
-    const existing = notesForCurrentDocument().find((item) => Number(item.wordIndex) === Number(state.contextWord?.index));
-    showNoteEditor(state.contextWord, existing || null);
+    if (!context) return;
+    const existing = notesForCurrentDocument().find((item) => Number(item.wordIndex) === Number(context.index));
+    showNoteEditor(context, existing || null);
   });
-  menu.querySelector('[data-dictionary-action="bookmark"]')?.addEventListener('click', () => {
+  menu.querySelector('[data-dictionary-action="bookmark"]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const context = capturedContext();
     closeDictionaryMenu();
-    toggleBookmarkForContextWord();
+    toggleBookmarkForContextWord(context);
+    // The menu/highlight pipeline may repaint reader DOM immediately after the
+    // command. Re-apply the visual marker after that paint as well.
+    requestAnimationFrame(() => updateReaderBookmarkMarkers());
   });
   document.addEventListener('pointerdown', (event) => {
     // Close only for a primary-button press outside the custom menu. A generic
