@@ -9628,36 +9628,52 @@ function bookmarkPageForWord(wordElement) {
 function bookmarkForContextWord(contextOverride = null) {
   const context = contextOverride || state.contextWord;
   if (!context || !state.documentId) return null;
-  const page = context.page || bookmarkPageForWord(context.element);
-  return getReaderBookmarks().find((item) => item.documentId === state.documentId && item.pageKey === page.pageKey) || null;
+
+  // Right-click bookmarks belong to an exact logical word, not to a computed
+  // scroll page. Virtualized large texts can change spacer/page geometry while
+  // the word index remains permanently stable.
+  const wordIndex = Math.max(0, Number(context.index) || 0);
+  return getReaderBookmarks().find((item) =>
+    item.documentId === state.documentId
+    && Number(item.wordIndex) === wordIndex
+  ) || null;
 }
 
 function toggleBookmarkForContextWord(contextOverride = null) {
   const context = contextOverride || state.contextWord;
-  if (!context || !state.documentId) return;
+  if (!context || !state.documentId) return false;
+
+  const wordIndex = Math.max(0, Number(context.index) || 0);
   const page = context.page || bookmarkPageForWord(context.element);
   const items = getReaderBookmarks();
-  const existing = items.find((item) => item.documentId === state.documentId && item.pageKey === page.pageKey);
+  const existing = items.find((item) =>
+    item.documentId === state.documentId
+    && Number(item.wordIndex) === wordIndex
+  );
 
   if (existing) {
     saveReaderBookmarks(items.filter((item) => item.id !== existing.id));
-    updateReaderStatus?.(`Bookmark removed from page ${page.pageNumber}.`);
+    updateReaderStatus?.(`Bookmark removed at word ${(wordIndex + 1).toLocaleString()}.`);
   } else {
     items.push({
       id: `bookmark-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       documentId: state.documentId,
       title: state.title,
-      wordIndex: Number(context.index) || 0,
+      wordIndex,
+      // Page metadata is retained only as a display hint. The bookmark's real
+      // identity and restore location are the stable word index.
       pageNumber: page.pageNumber,
       pageKey: page.pageKey,
       side: page.side,
       createdAt: new Date().toISOString()
     });
     saveReaderBookmarks(items);
-    updateReaderStatus?.(`Bookmark added to page ${page.pageNumber}.`);
+    updateReaderStatus?.(`Bookmark added at word ${(wordIndex + 1).toLocaleString()}.`);
   }
+
   updateReaderBookmarkMarkers();
   renderNavigationPane();
+  return true;
 }
 
 function removeReaderBookmark(id) {
@@ -9678,16 +9694,52 @@ function visibleReaderBookmarkPages() {
   return [pageNumber];
 }
 
+function visibleBookmarkWordIndexes(reader) {
+  if (!reader) return new Set();
+  const readerRect = reader.getBoundingClientRect();
+  const visible = new Set();
+
+  reader.querySelectorAll('.reader-word[data-index]').forEach((word) => {
+    const rect = word.getBoundingClientRect();
+    if (rect.bottom < readerRect.top || rect.top > readerRect.bottom) return;
+    if (rect.right < readerRect.left || rect.left > readerRect.right) return;
+    const index = Number(word.dataset.index);
+    if (Number.isFinite(index)) visible.add(index);
+  });
+
+  return visible;
+}
+
 function updateReaderBookmarkMarkers() {
   const layer = app.querySelector('#reader-bookmark-layer');
   const reader = app.querySelector('#reader');
   if (!layer || !reader || !state.documentId) return;
 
-  const visiblePages = visibleReaderBookmarkPages();
-  const bookmarks = getReaderBookmarks().filter((item) => item.documentId === state.documentId && visiblePages.includes(Number(item.pageNumber)));
+  const all = getReaderBookmarks().filter((item) => item.documentId === state.documentId);
+  let bookmarks = [];
+
+  if (state.bookPages) {
+    // Facing pages have stable physical page geometry, so retain the page-side
+    // ribbon behavior there.
+    const visiblePages = visibleReaderBookmarkPages();
+    bookmarks = all.filter((item) => visiblePages.includes(Number(item.pageNumber)));
+  } else {
+    // Scrolling/virtualized readers must use live word visibility. Calculated
+    // page numbers are not stable when virtual spacers move after TOC jumps.
+    const visibleWordIndexes = visibleBookmarkWordIndexes(reader);
+    bookmarks = all.filter((item) => visibleWordIndexes.has(Number(item.wordIndex)));
+  }
+
+  // A single top-edge marker is sufficient for a scrolling viewport; multiple
+  // exact bookmarks still remain individually listed in Marks & Contents.
+  if (!state.bookPages && bookmarks.length > 1) bookmarks = bookmarks.slice(0, 1);
+
   layer.innerHTML = bookmarks.map((item) => {
-    const sideClass = state.bookPages ? (Number(item.pageNumber) % 2 === 0 ? 'bookmark-right-page' : 'bookmark-left-page') : 'bookmark-single-page';
-    return `<button type="button" class="reader-page-bookmark ${sideClass}" data-remove-reader-bookmark="${escapeHtml(item.id)}" title="Remove bookmark from page ${Number(item.pageNumber)}" aria-label="Remove bookmark from page ${Number(item.pageNumber)}"><span aria-hidden="true"></span></button>`;
+    const wordNumber = Math.max(1, Number(item.wordIndex) + 1);
+    const sideClass = state.bookPages
+      ? (Number(item.pageNumber) % 2 === 0 ? 'bookmark-right-page' : 'bookmark-left-page')
+      : 'bookmark-single-page';
+    return `<button type="button" class="reader-page-bookmark ${sideClass}" data-remove-reader-bookmark="${escapeHtml(item.id)}" title="Remove bookmark at word ${wordNumber.toLocaleString()}" aria-label="Remove bookmark at word ${wordNumber.toLocaleString()}"><span aria-hidden="true"></span></button>`;
   }).join('');
 
   layer.querySelectorAll('[data-remove-reader-bookmark]').forEach((button) => {
@@ -9898,9 +9950,16 @@ function bindDictionaryMenu(reader) {
       return true;
     }
     if (action === 'bookmark') {
-      toggleBookmarkForContextWord(stableContext);
-      requestAnimationFrame(() => updateReaderBookmarkMarkers());
-      return true;
+      const changed = toggleBookmarkForContextWord(stableContext);
+      if (changed) {
+        // Repaint after navigation pane reconstruction and again on the next
+        // frame, so the ribbon survives DOM/layout work triggered by the save.
+        requestAnimationFrame(() => {
+          updateReaderBookmarkMarkers();
+          requestAnimationFrame(updateReaderBookmarkMarkers);
+        });
+      }
+      return changed;
     }
     return false;
   };
