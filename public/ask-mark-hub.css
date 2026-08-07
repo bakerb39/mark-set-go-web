@@ -88,7 +88,7 @@
 
 .askmark-composer { position:relative; display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:.48rem; align-items:end; padding:.72rem .8rem .82rem; border-top:1px solid var(--ask-line); background:rgba(255,253,247,.94); backdrop-filter:blur(14px); }
 .askmark-composer label { display:block; }
-.askmark-composer textarea { width:100%; min-height:43px; max-height:none; resize:none; overflow:hidden; padding:.69rem .82rem; border:1px solid rgba(17,52,81,.18); border-radius:15px; color:var(--ask-ink); background:#fff; box-shadow:inset 0 1px 2px rgba(10,31,48,.04); font:inherit; line-height:1.4; }
+.askmark-composer textarea { width:100%; min-height:43px; max-height:140px; resize:none; padding:.69rem .82rem; border:1px solid rgba(17,52,81,.18); border-radius:15px; color:var(--ask-ink); background:#fff; box-shadow:inset 0 1px 2px rgba(10,31,48,.04); font:inherit; line-height:1.4; }
 .askmark-composer textarea:focus { outline:2px solid rgba(211,164,71,.34); border-color:var(--ask-gold); }
 .askmark-plus,.askmark-send { width:42px; height:42px; border-radius:50%; cursor:pointer; }
 .askmark-plus { border:1px solid rgba(17,52,81,.15); color:var(--ask-navy-800); background:#fff; font-size:1.15rem; }
@@ -127,70 +127,6 @@
   .askmark-avatar-glow,.is-thinking i,.askmark-view.is-active,.askmark-message { animation:none!important; }
 }
 
-/* Ask Mark text area: user-resizable from its top edge. */
-.askmark-composer {
-  min-height: 74px;
-  grid-template-rows: 10px auto;
-  align-items: end;
-}
-.askmark-composer-resize {
-  grid-column: 1 / -1;
-  position: relative;
-  height: 10px;
-  margin: -0.45rem 0 0;
-  cursor: ns-resize;
-  touch-action: none;
-}
-.askmark-composer-resize::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 3px;
-  width: 42px;
-  height: 4px;
-  border-radius: 999px;
-  background: rgba(17, 52, 81, .22);
-  transform: translateX(-50%);
-}
-.askmark-composer label { min-height: 0; }
-.askmark-composer[data-user-resized="1"] textarea { max-height: none; resize: none; overflow:hidden; }
 
-/* Compact action cards opened by the plus button. */
-.askmark-more-menu {
-  width: 238px;
-  display: grid;
-  gap: .34rem;
-  padding: .45rem;
-}
-.askmark-more-menu[hidden] { display: none !important; }
-.askmark-more-menu button {
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  column-gap: .55rem;
-  align-items: center;
-  padding: .48rem .55rem;
-  border: 1px solid rgba(17,52,81,.11);
-  border-radius: 11px;
-  background: #fffdf8;
-}
-.askmark-more-menu button > span {
-  grid-row: 1 / 3;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  color: var(--ask-gold-soft);
-  background: var(--ask-navy-800);
-  font-weight: 800;
-}
-.askmark-more-menu button > strong {
-  font-size: .76rem;
-  line-height: 1.15;
-}
-.askmark-more-menu button > small {
-  color: var(--ask-muted);
-  font-size: .63rem;
-  line-height: 1.15;
-}
+/* Shared Format panel: intentionally mirrors Reader Settings card structure. */
+.askmark-format-stack{display:grid;gap:.65rem}.askmark-format-group{border:1px solid var(--ask-line);border-radius:12px;background:#fff;overflow:hidden}.askmark-format-group summary{padding:.75rem;color:var(--ask-navy-800);font-weight:800;cursor:pointer}.askmark-format-body{padding:.15rem .75rem .75rem}.askmark-format-levels{display:grid;gap:.45rem}.askmark-format-levels button{display:grid;grid-template-columns:1fr;text-align:left;gap:.12rem;padding:.65rem .7rem;border:1px solid var(--ask-line);border-radius:10px;background:#fff;color:var(--ask-navy-800);cursor:pointer}.askmark-format-levels button small{color:var(--ask-muted)}.askmark-format-levels button.is-selected{border-color:#2e72ad;background:#eaf4ff;box-shadow:inset 3px 0 #1f5f95}.askmark-format-scope{display:grid;gap:.55rem}.askmark-format-scope label{display:flex;gap:.5rem;align-items:center}.askmark-format-checks{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;padding:.1rem .75rem .75rem;color:#425467;font-size:.78rem}.askmark-format-actions{display:flex;gap:.5rem;flex-wrap:wrap}.askmark-format-note{margin:.1rem 0;color:var(--ask-muted);font-size:.78rem;line-height:1.45}.askmark-format-status{min-height:1.25em}.askmark-header-actions button[data-askmark-view="format"]{font-weight:850;font-size:.72rem}@media(max-width:430px){.askmark-format-checks{grid-template-columns:1fr}}

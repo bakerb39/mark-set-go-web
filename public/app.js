@@ -3201,7 +3201,7 @@ function renderBookBuilder() {
         <div>
           <span class="source-category">Create a Book</span>
           <h1>Build an app-ready book</h1>
-          <p>Paste a text, review the detected chapters, and create a private book in My Library.</p>
+          <p>Upload or paste raw text, clean OCR and page artifacts, review the detected chapters, and create a private reading edition.</p>
         </div>
         <button class="secondary" type="button" data-action="my-library">My Library</button>
       </header>
@@ -3212,15 +3212,27 @@ function renderBookBuilder() {
             <label><span>Title</span><input id="builder-title" maxlength="180" value="${escapeHtml(draft.title || '')}" placeholder="The Republic" required></label>
             <label><span>Author</span><input id="builder-author" maxlength="180" value="${escapeHtml(draft.author || '')}" placeholder="Plato"></label>
           </div>
+          <section class="book-builder-import">
+            <div><strong>Add your text</strong><small>Upload a book/document or paste into the editor below.</small></div>
+            <label class="secondary button-link book-builder-file-button">Upload File<input id="builder-file" type="file" accept=".epub,.pdf,.docx,.txt,.md,.markdown" hidden></label>
+            <span id="builder-file-name" class="book-builder-file-name"></span>
+          </section>
           <label class="book-builder-text-label"><span>Book text</span>
-            <textarea id="builder-text" spellcheck="false" placeholder="Paste the complete text here. Chapter headings such as CHAPTER I, BOOK II, PART THREE, Preface, and Epilogue will be detected automatically." required>${escapeHtml(draft.text || '')}</textarea>
+            <textarea id="builder-text" spellcheck="false" placeholder="Paste the complete text here, or upload EPUB, PDF, Word, Markdown, or TXT. Chapter headings such as CHAPTER I, BOOK II, PART THREE, Preface, and Epilogue will be detected automatically." required>${escapeHtml(draft.text || '')}</textarea>
           </label>
+          <fieldset class="book-builder-cleanup">
+            <legend>Cleanup level</legend>
+            <label><input type="radio" name="builder-cleanup-level" value="light" ${draft.cleanupLevel === 'light' ? 'checked' : ''}><strong>Light</strong><small>Characters, spacing, punctuation</small></label>
+            <label><input type="radio" name="builder-cleanup-level" value="standard" ${draft.cleanupLevel === 'standard' ? 'checked' : ''}><strong>Standard</strong><small>OCR cleanup, paragraphs, page artifacts</small></label>
+            <label><input type="radio" name="builder-cleanup-level" value="deep" ${(!draft.cleanupLevel || draft.cleanupLevel === 'deep') ? 'checked' : ''}><strong>Deep Clean</strong><small>Full cleanup and document structure</small></label>
+          </fieldset>
           <div class="book-builder-options">
             <label><input id="builder-clean-toc" type="checkbox" ${draft.cleanToc === false ? '' : 'checked'}> Remove a printed table of contents from the reading text and keep it in the Contents pane.</label>
             <label><input id="builder-clean-headers" type="checkbox" ${draft.cleanHeaders === false ? '' : 'checked'}> Remove repeated page headers, page numbers, and repeated book-title lines.</label>
             <label><input id="builder-rights" type="checkbox" ${draft.rights ? 'checked' : ''}> I own this text, have permission to use it, or it is in the public domain.</label>
           </div>
           <div class="book-builder-actions">
+            <button id="builder-clean" class="secondary" type="button">Clean &amp; Preview</button>
             <button id="builder-analyze" class="secondary" type="button">Analyze structure</button>
             <button class="primary" type="submit">Create book</button>
             <button id="builder-clear" class="subtle-link" type="button">Clear draft</button>
@@ -3234,7 +3246,7 @@ function renderBookBuilder() {
             <span id="builder-count" class="book-builder-count">0 words</span>
           </div>
           <ol id="builder-toc" class="book-builder-toc"><li class="empty">Paste text to generate a table of contents.</li></ol>
-          <div class="book-builder-note"><strong>First-pass behavior</strong><p>The resulting book stays private, opens in the existing reader, and uses the app’s normal library and reading-progress storage.</p></div>
+          <div class="book-builder-note"><strong>Cleanup preview</strong><p id="builder-cleanup-report">Your original stays in the editor until you choose Clean &amp; Preview. The created book uses the cleaned edition.</p></div>
         </aside>
       </div>
     </section>`;
@@ -3242,6 +3254,9 @@ function renderBookBuilder() {
   const titleInput = app.querySelector('#builder-title');
   const authorInput = app.querySelector('#builder-author');
   const textInput = app.querySelector('#builder-text');
+  const fileInput = app.querySelector('#builder-file');
+  const fileName = app.querySelector('#builder-file-name');
+  const cleanupLevelInputs = [...app.querySelectorAll('input[name="builder-cleanup-level"]')];
   const cleanTocInput = app.querySelector('#builder-clean-toc');
   const cleanHeadersInput = app.querySelector('#builder-clean-headers');
   const rightsInput = app.querySelector('#builder-rights');
@@ -3249,11 +3264,43 @@ function renderBookBuilder() {
   const toc = app.querySelector('#builder-toc');
   const count = app.querySelector('#builder-count');
 
+  let cleanedPreview = null;
+  let importedSource = draft.importedSource || null;
+  const selectedCleanupLevel = () => cleanupLevelInputs.find((input) => input.checked)?.value || 'deep';
+  const formatter = () => window.MarkSetGoReadAnything?.cleanupTextContent;
+
+  const loadBuilderFile = async (file) => {
+    if (!file) return;
+    status.textContent = `Opening ${file.name}…`;
+    const lower = file.name.toLowerCase();
+    let parsed = null;
+    if (lower.endsWith('.epub')) parsed = await parseEpubFile(file);
+    else if (lower.endsWith('.pdf')) parsed = await parsePdfFile(file, (message) => { status.textContent = message; });
+    else if (lower.endsWith('.docx')) {
+      const response = await fetch('/api/import/docx', { method:'POST', headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}, body:await file.arrayBuffer() });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'The Word document could not be imported.');
+      parsed = { title:payload.title || file.name.replace(/\.docx$/i,''), text:payload.text, source:{type:'docx'} };
+    } else {
+      let text = await file.text();
+      if (lower.endsWith('.md') || lower.endsWith('.markdown')) text = text.replace(/^#{1,6}\s+/gm,'').replace(/^\s*>\s?/gm,'').replace(/[*_~`]/g,'');
+      parsed = { title:file.name.replace(/\.(txt|md|markdown)$/i,''), text, source:{type:'text-upload'} };
+    }
+    if (!parsed?.text?.trim()) throw new Error('No readable text was found in that file.');
+    textInput.value = parsed.text.trim();
+    if (!titleInput.value.trim() && parsed.title) titleInput.value = parsed.title;
+    importedSource = { ...(parsed.source || {}), name:file.name, fileSize:file.size };
+    if (fileName) fileName.textContent = file.name;
+    cleanedPreview = null; saveDraft(); analyze();
+    status.textContent = `${file.name} loaded. Choose a cleanup level, then Clean & Preview.`;
+  };
+
   const saveDraft = () => {
-    try { localStorage.setItem(BOOK_BUILDER_DRAFT_KEY, JSON.stringify({ title:titleInput.value, author:authorInput.value, text:textInput.value, cleanToc:cleanTocInput.checked, cleanHeaders:cleanHeadersInput.checked, rights:rightsInput.checked })); } catch {}
+    try { localStorage.setItem(BOOK_BUILDER_DRAFT_KEY, JSON.stringify({ title:titleInput.value, author:authorInput.value, text:textInput.value, cleanupLevel:selectedCleanupLevel(), importedSource, cleanToc:cleanTocInput.checked, cleanHeaders:cleanHeadersInput.checked, rights:rightsInput.checked })); } catch {}
   };
   const analyze = () => {
-    const normalized = normalizeImportedBookText(textInput.value, {
+    const analysisSource = cleanedPreview?.text || textInput.value;
+    const normalized = normalizeImportedBookText(analysisSource, {
       title: titleInput.value.trim(),
       author: authorInput.value.trim(),
       removePrintedToc: cleanTocInput.checked,
@@ -3275,13 +3322,33 @@ function renderBookBuilder() {
   };
 
   let analyzeTimer = null;
-  [titleInput, authorInput, textInput, cleanTocInput, cleanHeadersInput, rightsInput].forEach((input) => input.addEventListener('input', () => {
+  [titleInput, authorInput, textInput, ...cleanupLevelInputs, cleanTocInput, cleanHeadersInput, rightsInput].forEach((input) => input.addEventListener('input', () => {
     saveDraft();
     if (input === textInput) {
+      cleanedPreview = null;
       clearTimeout(analyzeTimer);
       analyzeTimer = setTimeout(analyze, 350);
     }
   }));
+  fileInput?.addEventListener('change', async (event) => {
+    try { await loadBuilderFile(event.target.files?.[0]); }
+    catch (error) { status.textContent = error?.message || 'The file could not be opened.'; }
+  });
+  app.querySelector('#builder-clean')?.addEventListener('click', () => {
+    try {
+      const fn = formatter();
+      if (!fn) throw new Error('The shared formatter is not ready. Refresh and try again.');
+      cleanedPreview = fn(textInput.value, selectedCleanupLevel());
+      const report = cleanedPreview.report || {};
+      const bits = [];
+      if (report.badCharacters) bits.push(`${report.badCharacters} bad characters removed`);
+      if (report.pageArtifacts) bits.push(`${report.pageArtifacts} page artifacts removed`);
+      if (report.repeatedHeaders) bits.push(`${report.repeatedHeaders} repeated headers removed`);
+      if (report.brokenWords) bits.push(`${report.brokenWords} broken words repaired`);
+      app.querySelector('#builder-cleanup-report').textContent = `${selectedCleanupLevel() === 'deep' ? 'Deep Clean' : selectedCleanupLevel()} preview ready${bits.length ? `: ${bits.join(', ')}.` : '.'} Original pasted/uploaded text remains preserved in the editor.`;
+      analyze();
+    } catch (error) { status.textContent = error?.message || 'Cleanup could not be completed.'; }
+  });
   app.querySelector('#builder-analyze').addEventListener('click', analyze);
   app.querySelector('#builder-clear').addEventListener('click', () => {
     if (!window.confirm('Clear this book-builder draft?')) return;
@@ -3297,9 +3364,16 @@ function renderBookBuilder() {
     if (words < 10) { status.textContent = 'Add more book text before creating the book.'; return textInput.focus(); }
     if (!rightsInput.checked) { status.textContent = 'Confirm that you have the right to use this text.'; return rightsInput.focus(); }
     const displayTitle = author ? `${title} — ${author}` : title;
+    const rawOriginal = textInput.value.trim();
+    const originalKey = `markSetGoBookBuilderOriginalV1:${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+    try { localStorage.setItem(originalKey, rawOriginal); } catch (error) { console.warn('Original book-builder text could not be preserved separately.', error); }
     const source = {
       type: 'book-builder',
+      ...(importedSource || {}),
       author,
+      cleanupLevel: selectedCleanupLevel(),
+      originalPreserved: true,
+      originalKey,
       createdAt: new Date().toISOString(),
       documentToc: detectTableOfContents(text),
       cleanup: normalized?.report || {},

@@ -7,31 +7,11 @@
   const $ = (selector, root = document) => root.querySelector(selector);
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const transformApi = () => window.MarkSetGoReadAnything;
-  const COMPANION_MESSAGES_KEY = 'markSetGoAskMarkCompanionMessagesV1';
-  const MAX_COMPANION_MESSAGES = 40;
-
-  function readCompanionMessages() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(COMPANION_MESSAGES_KEY) || '[]');
-      return Array.isArray(parsed) ? parsed : [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  function saveCompanionMessages(items) {
-    try { localStorage.setItem(COMPANION_MESSAGES_KEY, JSON.stringify(items.slice(-MAX_COMPANION_MESSAGES))); } catch (_) {}
-  }
-
-  function activeDocumentId() {
-    return String(currentDocumentId || window.MarkSetGoActiveDocumentId || document.body?.dataset?.documentId || '').trim();
-  }
 
   let shell = null;
   let legacyHost = null;
   let selectionObserver = null;
   let installAttempts = 0;
-  let currentDocumentId = '';
 
   const QUICK_ACTIONS = [
     ['explain', '✦', 'Explain'],
@@ -80,12 +60,8 @@
   }
 
   function readerFirstName() {
-    const session = window.MarkSetGoAuth?.session || {};
-    const profile = session.user || session.account || window.MarkSetGoAuth?.user || window.MarkSetGoAuth?.account || {};
-    const value = window.MarkSetGoAuth?.getFirstName?.() ||
-      profile.firstName || profile.first_name || profile.givenName || profile.given_name ||
-      profile.displayName || profile.display_name || profile.fullName || profile.full_name || profile.name || '';
-    return String(value).trim().split(/\s+/)[0] || '';
+    return window.MarkSetGoAuth?.getFirstName?.() ||
+      String(window.MarkSetGoAuth?.session?.account?.displayName || '').trim().split(/\s+/)[0] || '';
   }
 
   function greeting() {
@@ -96,14 +72,10 @@
   }
 
 
-  function refreshPersonalization() {
-    const text = greeting();
-    $$('[data-askmark-greeting]').forEach((node) => { node.textContent = text; });
+  function refreshPersonalGreeting() {
+    const node = $('[data-askmark-personal-greeting]', shell || document);
+    if (node) node.textContent = greeting();
   }
-
-  document.addEventListener('marksetgo:auth-changed', refreshPersonalization);
-  document.addEventListener('marksetgo:auth-ready', refreshPersonalization);
-  window.addEventListener('marksetgo:auth-ready', refreshPersonalization);
 
   function premiumMarkup() {
     const context = getBookContext();
@@ -122,6 +94,7 @@
           </div>
           <div class="askmark-header-actions">
             <button type="button" data-askmark-view="notebook" aria-label="Open notebook" title="Notebook">✎</button>
+            <button type="button" data-askmark-view="format" aria-label="Format text" title="Format">Aa</button>
             <button type="button" data-askmark-view="tools" aria-label="Open reader settings" title="Reader settings">⚙</button>
           </div>
         </header>
@@ -133,7 +106,7 @@
                 <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
                 <div>
                   <span>Mark</span>
-                  <p><strong data-askmark-greeting>${greeting()}</strong> Highlight a passage or ask me about the book. I can explain ideas, summarize, compare viewpoints, quiz you, or save an insight.</p>
+                  <p><strong data-askmark-personal-greeting>${greeting()}</strong> Highlight a passage or ask me about the book. I can explain ideas, summarize, compare viewpoints, quiz you, or save an insight.</p>
                 </div>
               </article>
             </div>
@@ -144,6 +117,39 @@
           <section class="askmark-view" data-askmark-view-panel="notebook">
             <div class="askmark-subhead"><button type="button" data-askmark-back>←</button><div><span>Your saved thinking</span><h3>Mark’s Notebook</h3></div></div>
             <div class="askmark-legacy-slot" data-notebook-slot></div>
+          </section>
+
+          <section class="askmark-view" data-askmark-view-panel="format">
+            <div class="askmark-subhead"><button type="button" data-askmark-back>←</button><div><span>Text cleanup</span><h3>Format</h3></div></div>
+            <div class="askmark-format-stack">
+              <details class="askmark-format-group" open>
+                <summary>Cleanup level</summary>
+                <div class="askmark-format-body askmark-format-levels">
+                  <button type="button" data-format-level="light"><strong>Light</strong><small>Characters, spacing, punctuation</small></button>
+                  <button type="button" class="is-selected" data-format-level="standard"><strong>Standard</strong><small>OCR cleanup, paragraphs, page artifacts</small></button>
+                  <button type="button" data-format-level="deep"><strong>Deep Clean</strong><small>Full cleanup plus document structure</small></button>
+                </div>
+              </details>
+              <details class="askmark-format-group" open>
+                <summary>Apply to</summary>
+                <div class="askmark-format-body askmark-format-scope">
+                  <label><input type="radio" name="askmark-format-scope" value="document" checked> Entire document</label>
+                  <label><input type="radio" name="askmark-format-scope" value="selection"> Highlighted passage</label>
+                </div>
+              </details>
+              <details class="askmark-format-group" open>
+                <summary>What gets cleaned</summary>
+                <div class="askmark-format-checks">
+                  <span>✓ Bad / control characters</span><span>✓ Broken line-end words</span><span>✓ Repeated headers &amp; titles</span><span>✓ Page numbers &amp; scan artifacts</span><span>✓ Paragraphs &amp; spacing</span><span>✓ Chapter / section structure</span><span>✓ Punctuation normalization</span>
+                </div>
+              </details>
+              <div class="askmark-format-actions">
+                <button class="primary" type="button" data-askmark-format-apply>Format Text</button>
+                <button class="secondary" type="button" data-askmark-format-original>Restore Original</button>
+              </div>
+              <p class="askmark-format-note">The original text is always preserved. Formatting changes structure and scan artifacts; it does not intentionally rewrite the author's prose.</p>
+              <div class="status askmark-format-status" data-askmark-format-status aria-live="polite"></div>
+            </div>
           </section>
 
           <section class="askmark-view" data-askmark-view-panel="tools">
@@ -170,49 +176,6 @@
           </div>
         </footer>
       </div>`;
-  }
-
-  function companionMessageMarkup(item) {
-    const label = item.kind === 'goal-update' ? 'Reading goal update' : 'Reading companion';
-    return `<article class="askmark-message mark-message askmark-companion-message" data-companion-message-id="${escapeHtml(item.id || '')}">
-      <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
-      <div><span>Mark <small>${escapeHtml(label)}</small></span><p>${escapeHtml(item.message || '')}</p></div>
-    </article>`;
-  }
-
-  function renderStoredCompanionMessages() {
-    const conversation = $('[data-askmark-conversation]', shell);
-    if (!conversation) return;
-    const currentId = activeDocumentId();
-    const items = readCompanionMessages().filter((item) => !item.bookId || !currentId || item.bookId === currentId);
-    items.slice(-8).forEach((item) => {
-      if (conversation.querySelector(`[data-companion-message-id="${CSS.escape(item.id || '')}"]`)) return;
-      conversation.insertAdjacentHTML('beforeend', companionMessageMarkup(item));
-    });
-    conversation.scrollTop = conversation.scrollHeight;
-  }
-
-  function addCompanionMessage(detail = {}) {
-    const message = String(detail.message || '').trim();
-    if (!message) return;
-    const item = {
-      id: String(detail.id || `companion-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`),
-      bookId: String(detail.bookId || detail.documentId || '').trim(),
-      title: String(detail.title || '').trim(),
-      kind: String(detail.kind || 'goal-update'),
-      message,
-      createdAt: detail.createdAt || new Date().toISOString()
-    };
-    const items = readCompanionMessages();
-    if (!items.some((existing) => existing.id === item.id)) {
-      items.push(item);
-      saveCompanionMessages(items);
-    }
-    const conversation = $('[data-askmark-conversation]', shell);
-    if (conversation && !conversation.querySelector(`[data-companion-message-id="${CSS.escape(item.id)}"]`)) {
-      conversation.insertAdjacentHTML('beforeend', companionMessageMarkup(item));
-      conversation.scrollTop = conversation.scrollHeight;
-    }
   }
 
   function addUserMessage(text) {
@@ -361,6 +324,30 @@
       $('[data-askmark-more-menu]', shell).hidden = true;
       runDocumentAction(button.dataset.documentAction);
     }));
+    $$('[data-format-level]', shell).forEach((button) => button.addEventListener('click', () => {
+      $$('[data-format-level]', shell).forEach((item) => item.classList.toggle('is-selected', item === button));
+    }));
+    $('[data-askmark-format-apply]', shell)?.addEventListener('click', () => {
+      const status = $('[data-askmark-format-status]', shell);
+      try {
+        const api = transformApi();
+        if (!api?.hasActiveDocument?.()) throw new Error('Open or import a document first, then use Format.');
+        const level = $('[data-format-level].is-selected', shell)?.dataset.formatLevel || 'standard';
+        const scope = shell.querySelector('input[name="askmark-format-scope"]:checked')?.value || 'document';
+        const selected = scope === 'selection' ? getSelectionText() : '';
+        if (scope === 'selection' && !selected) throw new Error('Highlight a passage first, or choose Entire document.');
+        const report = api.applyCleanup(level, scope, selected);
+        const fixes = Object.entries(report || {}).filter(([key, value]) => key !== 'level' && Number(value) > 0).reduce((sum, [, value]) => sum + Number(value), 0);
+        if (status) status.textContent = `${level === 'deep' ? 'Deep Clean' : level[0].toUpperCase() + level.slice(1)} applied${fixes ? ` · ${fixes} cleanup actions` : ''}. Original preserved.`;
+        syncContext();
+      } catch (error) { if (status) status.textContent = error?.message || 'Formatting could not be completed.'; }
+    });
+    $('[data-askmark-format-original]', shell)?.addEventListener('click', () => {
+      const status = $('[data-askmark-format-status]', shell);
+      try { transformApi()?.restoreOriginal?.(); if (status) status.textContent = 'Original text restored.'; }
+      catch (error) { if (status) status.textContent = error?.message || 'Original text could not be restored.'; }
+    });
+
     $('[data-askmark-comprehension]', shell)?.addEventListener('click', () => {
       $('[data-askmark-more-menu]', shell)?.setAttribute('hidden', '');
       window.MarkSetGoStartComprehension?.();
@@ -480,7 +467,6 @@
 
     syncSelection();
     syncContext();
-    renderStoredCompanionMessages();
     return true;
   }
 
@@ -495,16 +481,16 @@
     if (!install() && installAttempts < 180) requestAnimationFrame(retryInstall);
   }
 
-  document.addEventListener('marksetgo:document-available', (event) => {
-    currentDocumentId = String(event.detail?.documentId || event.detail?.bookId || '').trim();
+  document.addEventListener('marksetgo:document-available', () => {
     installAttempts = 0;
     requestAnimationFrame(retryInstall);
   });
   document.addEventListener('selectionchange', () => setTimeout(syncSelection, 60));
   document.addEventListener('marksetgo:transform-state', syncContext);
-  document.addEventListener('marksetgo:ask-mark-companion-message', (event) => addCompanionMessage(event.detail || {}));
-  window.AskMarkCompanion = { addMessage: addCompanionMessage, getMessages: readCompanionMessages };
 
   requestAnimationFrame(retryInstall);
   [400, 900, 1800, 3200].forEach((delay) => setTimeout(install, delay));
+
+  document.addEventListener('marksetgo:auth-changed', refreshPersonalGreeting);
+
 })();

@@ -94,6 +94,7 @@
           </div>
           <div class="askmark-header-actions">
             <button type="button" data-askmark-view="notebook" aria-label="Open notebook" title="Notebook">✎</button>
+            <button type="button" data-askmark-view="format" aria-label="Format text" title="Format">Aa</button>
             <button type="button" data-askmark-view="tools" aria-label="Open reader settings" title="Reader settings">⚙</button>
           </div>
         </header>
@@ -116,6 +117,39 @@
           <section class="askmark-view" data-askmark-view-panel="notebook">
             <div class="askmark-subhead"><button type="button" data-askmark-back>←</button><div><span>Your saved thinking</span><h3>Mark’s Notebook</h3></div></div>
             <div class="askmark-legacy-slot" data-notebook-slot></div>
+          </section>
+
+          <section class="askmark-view" data-askmark-view-panel="format">
+            <div class="askmark-subhead"><button type="button" data-askmark-back>←</button><div><span>Text cleanup</span><h3>Format</h3></div></div>
+            <div class="askmark-format-stack">
+              <details class="askmark-format-group" open>
+                <summary>Cleanup level</summary>
+                <div class="askmark-format-body askmark-format-levels">
+                  <button type="button" data-format-level="light"><strong>Light</strong><small>Characters, spacing, punctuation</small></button>
+                  <button type="button" class="is-selected" data-format-level="standard"><strong>Standard</strong><small>OCR cleanup, paragraphs, page artifacts</small></button>
+                  <button type="button" data-format-level="deep"><strong>Deep Clean</strong><small>Full cleanup plus document structure</small></button>
+                </div>
+              </details>
+              <details class="askmark-format-group" open>
+                <summary>Apply to</summary>
+                <div class="askmark-format-body askmark-format-scope">
+                  <label><input type="radio" name="askmark-format-scope" value="document" checked> Entire document</label>
+                  <label><input type="radio" name="askmark-format-scope" value="selection"> Highlighted passage</label>
+                </div>
+              </details>
+              <details class="askmark-format-group" open>
+                <summary>What gets cleaned</summary>
+                <div class="askmark-format-checks">
+                  <span>✓ Bad / control characters</span><span>✓ Broken line-end words</span><span>✓ Repeated headers &amp; titles</span><span>✓ Page numbers &amp; scan artifacts</span><span>✓ Paragraphs &amp; spacing</span><span>✓ Chapter / section structure</span><span>✓ Punctuation normalization</span>
+                </div>
+              </details>
+              <div class="askmark-format-actions">
+                <button class="primary" type="button" data-askmark-format-apply>Format Text</button>
+                <button class="secondary" type="button" data-askmark-format-original>Restore Original</button>
+              </div>
+              <p class="askmark-format-note">The original text is always preserved. Formatting changes structure and scan artifacts; it does not intentionally rewrite the author's prose.</p>
+              <div class="status askmark-format-status" data-askmark-format-status aria-live="polite"></div>
+            </div>
           </section>
 
           <section class="askmark-view" data-askmark-view-panel="tools">
@@ -290,6 +324,30 @@
       $('[data-askmark-more-menu]', shell).hidden = true;
       runDocumentAction(button.dataset.documentAction);
     }));
+    $$('[data-format-level]', shell).forEach((button) => button.addEventListener('click', () => {
+      $$('[data-format-level]', shell).forEach((item) => item.classList.toggle('is-selected', item === button));
+    }));
+    $('[data-askmark-format-apply]', shell)?.addEventListener('click', () => {
+      const status = $('[data-askmark-format-status]', shell);
+      try {
+        const api = transformApi();
+        if (!api?.hasActiveDocument?.()) throw new Error('Open or import a document first, then use Format.');
+        const level = $('[data-format-level].is-selected', shell)?.dataset.formatLevel || 'standard';
+        const scope = shell.querySelector('input[name="askmark-format-scope"]:checked')?.value || 'document';
+        const selected = scope === 'selection' ? getSelectionText() : '';
+        if (scope === 'selection' && !selected) throw new Error('Highlight a passage first, or choose Entire document.');
+        const report = api.applyCleanup(level, scope, selected);
+        const fixes = Object.entries(report || {}).filter(([key, value]) => key !== 'level' && Number(value) > 0).reduce((sum, [, value]) => sum + Number(value), 0);
+        if (status) status.textContent = `${level === 'deep' ? 'Deep Clean' : level[0].toUpperCase() + level.slice(1)} applied${fixes ? ` · ${fixes} cleanup actions` : ''}. Original preserved.`;
+        syncContext();
+      } catch (error) { if (status) status.textContent = error?.message || 'Formatting could not be completed.'; }
+    });
+    $('[data-askmark-format-original]', shell)?.addEventListener('click', () => {
+      const status = $('[data-askmark-format-status]', shell);
+      try { transformApi()?.restoreOriginal?.(); if (status) status.textContent = 'Original text restored.'; }
+      catch (error) { if (status) status.textContent = error?.message || 'Original text could not be restored.'; }
+    });
+
     $('[data-askmark-comprehension]', shell)?.addEventListener('click', () => {
       $('[data-askmark-more-menu]', shell)?.setAttribute('hidden', '');
       window.MarkSetGoStartComprehension?.();
