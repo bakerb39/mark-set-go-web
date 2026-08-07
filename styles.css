@@ -9340,3 +9340,15 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
   background:#5aa6e8 !important;
   color:#fff !important;
 }
+
+
+/* v9.2.17 My Notebook reading area */
+.global-notebook-page #global-notebook-entries,
+.global-notebook-page #global-notebook-entries .mark-record,
+.global-notebook-page #global-notebook-entries .expanded-notebook-record,
+.global-notebook-page #global-notebook-entries .notebook-passage,
+.global-notebook-page #global-notebook-entries .notebook-mark-response,
+.global-notebook-page #global-notebook-entries .notebook-personal-note,
+.global-notebook-page #global-notebook-entries .notebook-plain-text {
+  background:#fff !important;
+}

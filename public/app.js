@@ -7210,7 +7210,9 @@ function bindMarkCompanion(reader){
     startX:0,
     startY:0,
     pointerId:null,
-    finalized:false
+    finalized:false,
+    downWordIndex:null,
+    downWasText:false
   });
 
   state.markSelectionInteraction=freshInteraction();
@@ -7367,12 +7369,32 @@ function bindMarkCompanion(reader){
       return;
     }
 
+    // A prior DOM range can survive a normal click while the reader is repainting.
+    // Clear that stale browser range before tracking this new gesture. A genuine
+    // drag selection will create a fresh non-collapsed range as the pointer moves.
+    const existingSelection=window.getSelection?.();
+    if(existingSelection && !existingSelection.isCollapsed && existingSelection.rangeCount){
+      const existingRange=existingSelection.getRangeAt(0);
+      if(reader.contains(existingRange.commonAncestorContainer)
+          || reader.contains(existingRange.startContainer)
+          || reader.contains(existingRange.endContainer)){
+        existingSelection.removeAllRanges();
+      }
+    }
+
     const interaction=freshInteraction();
     interaction.active=true;
     interaction.wasRunning=isReaderRunning();
     interaction.startX=Number(event.clientX)||0;
     interaction.startY=Number(event.clientY)||0;
     interaction.pointerId=event.pointerId ?? null;
+
+    const downWord=event.target.closest?.('.reader-word[data-index]');
+    const downGroup=event.target.closest?.('.reader-group[data-start-index]');
+    const downIndex=Number(downWord?.dataset.index ?? downGroup?.dataset.startIndex);
+    interaction.downWordIndex=Number.isFinite(downIndex) ? downIndex : null;
+    interaction.downWasText=Boolean(downWord || downGroup);
+
     state.markSelectionInteraction=interaction;
   },true);
 
@@ -7386,12 +7408,15 @@ function bindMarkCompanion(reader){
     if(!interaction?.active) return;
     if(interaction.pointerId!==null && event.pointerId!==undefined && event.pointerId!==interaction.pointerId) return;
 
-    // Do not treat ordinary pointer jitter as a selection. The old distance-only
-    // fallback could set markSuppressNextReaderClick before a real range existed,
-    // swallowing normal pause/resume clicks. selectstart is the primary signal;
-    // this fallback pauses only after the browser has produced a non-collapsed
-    // selection that belongs to the reader.
-    if(selectionBelongsToReader()) pauseForSelection(interaction);
+    const dx=(Number(event.clientX)||0)-interaction.startX;
+    const dy=(Number(event.clientY)||0)-interaction.startY;
+    const distance=Math.hypot(dx,dy);
+
+    // Selection owns the gesture only after meaningful pointer movement.
+    // This prevents transient/stale browser ranges during active reader repaint
+    // from turning an ordinary word click into a suppressed "selection" click.
+    if(distance>=4) interaction.moved=true;
+    if(interaction.moved && selectionBelongsToReader()) pauseForSelection(interaction);
   },true);
 
   // selectionchange covers keyboard selection and touch implementations where
@@ -7401,12 +7426,55 @@ function bindMarkCompanion(reader){
   }
   state.markSelectionChangeHandler=()=>{
     const interaction=state.markSelectionInteraction;
-    if(!interaction?.active || !selectionBelongsToReader()) return;
+    if(!interaction?.active || !interaction.moved || !selectionBelongsToReader()) return;
     pauseForSelection(interaction);
   };
   document.addEventListener('selectionchange',state.markSelectionChangeHandler);
 
-  reader.addEventListener('pointerup',finalizeSelection,true);
+  const performStableReaderPointerAction=(interaction)=>{
+    const mode=getSelectedMode();
+    if(mode==='two-column') return;
+
+    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','pointing-guide','marquee','auto-scroll']);
+    const clickedIndex=Number(interaction?.downWordIndex);
+
+    if(interaction?.downWasText && Number.isFinite(clickedIndex) && seekableModes.has(mode)){
+      const wasRunning=isReaderRunning();
+      const group=findReadingGroup(clickedIndex);
+      stopReader();
+      state.index=group?.start ?? clickedIndex;
+      state.viewportAnchorIndex=state.index;
+      persistReaderSession({immediate:true});
+      updateReaderStatus(`Reading position moved to word ${(state.index+1).toLocaleString()}.`);
+      startReader();
+      if(!wasRunning) window.setTimeout(pauseReader,0);
+      return;
+    }
+
+    if(isReaderRunning()) pauseReader();
+    else startReader();
+    persistReaderSession();
+  };
+
+  reader.addEventListener('pointerup',(event)=>{
+    const interaction=state.markSelectionInteraction;
+
+    // A true click is resolved here, using the stable target captured at
+    // pointerdown. This avoids losing the action when the running reader repaints
+    // or replaces the clicked word before the browser dispatches `click`.
+    if(interaction?.active && !interaction.selecting && !interaction.moved){
+      interaction.active=false;
+      performStableReaderPointerAction(interaction);
+
+      state.readerSuppressSyntheticClick=true;
+      window.setTimeout(()=>{
+        state.readerSuppressSyntheticClick=false;
+      },0);
+      return;
+    }
+
+    finalizeSelection();
+  },true);
   reader.addEventListener('pointercancel',()=>{
     const interaction=state.markSelectionInteraction;
     if(!interaction) return;
@@ -7962,6 +8030,12 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   document.addEventListener('keydown', state.spacebarHandler);
 
   readerFrame.addEventListener('click', (event) => {
+    if (state.readerSuppressSyntheticClick) {
+      state.readerSuppressSyntheticClick = false;
+      event.preventDefault();
+      return;
+    }
+
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
     if (target.closest('button, input, textarea, select, a, summary, [contenteditable="true"], [role="textbox"], #fullscreen-control-strip, #fullscreen-mark-drawer')) return;
