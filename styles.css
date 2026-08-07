@@ -10407,3 +10407,56 @@ html.msg-walkthrough-active .site-header nav > details.msg-walkthrough-open-menu
 @media (max-width:700px) {
   .msg-walkthrough-connector { display:none !important; }
 }
+
+
+/* v9.2.47 pin complete walkthrough dropdowns above the overlay */
+html.msg-walkthrough-active .site-header {
+  z-index:2147483400 !important;
+}
+
+html.msg-walkthrough-active .site-header nav > details.msg-walkthrough-open-menu,
+html.msg-walkthrough-active .site-header nav > details.msg-walkthrough-open-menu > summary {
+  z-index:2147483500 !important;
+}
+
+html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-menu {
+  display:block !important;
+  position:fixed !important;
+  left:var(--walkthrough-menu-left) !important;
+  right:auto !important;
+  top:var(--walkthrough-menu-top) !important;
+  bottom:auto !important;
+  width:var(--walkthrough-menu-width) !important;
+  min-width:0 !important;
+  max-width:calc(100vw - 20px) !important;
+  max-height:var(--walkthrough-menu-max-height) !important;
+  overflow-y:auto !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  transform:none !important;
+  filter:none !important;
+  clip:auto !important;
+  clip-path:none !important;
+  pointer-events:auto !important;
+  z-index:2147483600 !important;
+  background:#fff !important;
+  color:#18212b !important;
+  box-shadow:0 16px 38px rgba(0,0,0,.34) !important;
+}
+
+/* All dropdown descendants must remain above the walkthrough mask, not just
+   the one currently outlined. */
+html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-menu,
+html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-menu * {
+  visibility:visible !important;
+}
+
+html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-menu button {
+  position:relative !important;
+  z-index:auto !important;
+}
+
+html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-menu .msg-walkthrough-target {
+  z-index:2 !important;
+  box-shadow:inset 0 0 0 2px #e2b93f !important;
+}

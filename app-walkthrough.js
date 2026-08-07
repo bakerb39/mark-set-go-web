@@ -27,13 +27,55 @@
     return $$(selector, scope).find(isVisibleElement) || null;
   }
 
+  function clearPinnedMenu() {
+    $$('.site-header .menu-popover.msg-walkthrough-pinned-menu').forEach((popover) => {
+      popover.classList.remove('msg-walkthrough-pinned-menu');
+      popover.style.removeProperty('--walkthrough-menu-left');
+      popover.style.removeProperty('--walkthrough-menu-top');
+      popover.style.removeProperty('--walkthrough-menu-width');
+      popover.style.removeProperty('--walkthrough-menu-max-height');
+    });
+  }
+
+  function pinMenuPopover(menu) {
+    if (!menu) return;
+    const summary = menu.querySelector(':scope > summary');
+    const popover = menu.querySelector(':scope > .menu-popover');
+    if (!summary || !popover) return;
+
+    clearPinnedMenu();
+
+    const summaryRect = summary.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const preferredWidth = Math.max(
+      260,
+      Math.min(360, Math.max(popover.scrollWidth || 0, summaryRect.width))
+    );
+
+    let left = summaryRect.left;
+    if (left + preferredWidth > viewportWidth - 10) {
+      left = Math.max(10, viewportWidth - preferredWidth - 10);
+    }
+    const top = Math.min(viewportHeight - 80, summaryRect.bottom + 6);
+    const maxHeight = Math.max(180, viewportHeight - top - 12);
+
+    popover.style.setProperty('--walkthrough-menu-left', `${Math.round(left)}px`);
+    popover.style.setProperty('--walkthrough-menu-top', `${Math.round(top)}px`);
+    popover.style.setProperty('--walkthrough-menu-width', `${Math.round(preferredWidth)}px`);
+    popover.style.setProperty('--walkthrough-menu-max-height', `${Math.round(maxHeight)}px`);
+    popover.classList.add('msg-walkthrough-pinned-menu');
+  }
+
   function closeHeaderMenus(except = null) {
     $$('.site-header nav > details').forEach((menu) => {
       if (menu !== except) {
         menu.open = false;
         menu.classList.remove('msg-walkthrough-open-menu');
+        menu.querySelector(':scope > .menu-popover')?.classList.remove('msg-walkthrough-pinned-menu');
       }
     });
+    if (!except) clearPinnedMenu();
   }
 
   function headerMenuContaining(selector) {
@@ -51,7 +93,9 @@
     $$('.site-header nav > details').forEach((item) => item.classList.remove('msg-walkthrough-open-menu'));
     menu.classList.add('msg-walkthrough-open-menu');
     menu.open = true;
-    await wait(110);
+    await wait(80);
+    pinMenuPopover(menu);
+    await wait(40);
   }
 
   async function prepareReader() {
@@ -478,7 +522,11 @@
 
   function schedulePosition() {
     window.cancelAnimationFrame(resizeRaf);
-    resizeRaf = window.requestAnimationFrame(positionOverlay);
+    resizeRaf = window.requestAnimationFrame(() => {
+      const openMenu = $('.site-header nav > details.msg-walkthrough-open-menu');
+      if (openMenu) pinMenuPopover(openMenu);
+      positionOverlay();
+    });
   }
 
   function positionOverlay() {
@@ -597,7 +645,17 @@
     if (!target) return null;
 
     let rect = target.getBoundingClientRect();
-    if (rect.top < 72 || rect.bottom > window.innerHeight - 20 || rect.left < 4 || rect.right > window.innerWidth - 4) {
+    const menuPopover = target.closest('.site-header .menu-popover');
+    if (menuPopover) {
+      const menuRect = menuPopover.getBoundingClientRect();
+      if (rect.top < menuRect.top + 4) {
+        menuPopover.scrollTop -= (menuRect.top + 4 - rect.top);
+        await wait(40);
+      } else if (rect.bottom > menuRect.bottom - 4) {
+        menuPopover.scrollTop += (rect.bottom - (menuRect.bottom - 4));
+        await wait(40);
+      }
+    } else if (rect.top < 72 || rect.bottom > window.innerHeight - 20 || rect.left < 4 || rect.right > window.innerWidth - 4) {
       target.scrollIntoView({ block:'center', inline:'nearest', behavior:'auto' });
       await wait(100);
     }
@@ -648,6 +706,7 @@
     if (finishing) return;
     finishing = true;
     clearTarget();
+    clearPinnedMenu();
     closeHeaderMenus();
     $$('.site-header nav > details').forEach((menu) => menu.classList.remove('msg-walkthrough-open-menu'));
     if (root) root.hidden = true;
