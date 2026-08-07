@@ -93,6 +93,95 @@ const virtualRenderer = new VirtualRenderer({
   scheduleIllustrationsForRange: (reader, start, end, mode) => scheduleIllustrationsForRange(reader, start, end, mode),
   updateBookPageStatus: () => updateBookPageStatus()
 });
+
+// v9.2.42 Large-text virtual-window continuity guard.
+// After a distant TOC jump the unrendered book is represented by large spacer
+// elements. Watch the real rendered-text boundaries and shift the window before
+// the viewport can enter one of those spacers. This integration guard leaves
+// VirtualRenderer.js itself untouched.
+const virtualSpacerGuardState = new WeakMap();
+
+function bindVirtualSpacerGuard(reader) {
+  if (!reader || virtualSpacerGuardState.has(reader)) return;
+
+  const guard = { frame: 0, shifting: false, lastShiftAt: 0 };
+
+  const check = () => {
+    guard.frame = 0;
+    if (guard.shifting || !state.virtualized || state.bookPages || !state.words.length) return;
+
+    const topSpacer = reader.querySelector('.virtual-reader-spacer-top');
+    const bottomSpacer = reader.querySelector('.virtual-reader-spacer-bottom');
+    if (!topSpacer || !bottomSpacer) return;
+
+    const readerRect = reader.getBoundingClientRect();
+    const topRect = topSpacer.getBoundingClientRect();
+    const bottomRect = bottomSpacer.getBoundingClientRect();
+    const renderedStart = Math.max(0, Number(state.renderedWordStart) || 0);
+    const renderedEnd = Math.min(state.words.length, Number(state.renderedWordEnd) || 0);
+    if (renderedEnd <= renderedStart) return;
+
+    // Start moving the virtual window before blank spacer is visible.
+    const threshold = Math.max(900, reader.clientHeight * 1.75);
+    const nearBottom = renderedEnd < state.words.length
+      && bottomRect.top <= readerRect.bottom + threshold;
+    const nearTop = renderedStart > 0
+      && topRect.bottom >= readerRect.top - threshold;
+
+    if (!nearBottom && !nearTop) return;
+    if (performance.now() - guard.lastShiftAt < 90) return;
+
+    const mode = state.renderedMode || getSelectedMode();
+    if (['flash','digital-sign','two-column','auto-scroll'].includes(mode)) return;
+
+    const groupSize = Math.max(1, Number(app.querySelector('#word-count')?.value) || 1);
+    const anchor = virtualRenderer.visibleReadingAnchor(reader, state.viewportAnchorIndex ?? state.index);
+    const windowSize = Math.max(1600, renderedEnd - renderedStart);
+    const shift = Math.max(500, Math.min(900, Math.round(windowSize / 3)));
+
+    let nextStart = renderedStart;
+    if (nearBottom) nextStart = Math.min(
+      Math.max(0, state.words.length - windowSize),
+      renderedStart + shift
+    );
+    else if (nearTop) nextStart = Math.max(0, renderedStart - shift);
+
+    const nextEnd = Math.min(state.words.length, nextStart + windowSize);
+    if (nextStart === renderedStart && nextEnd === renderedEnd) return;
+
+    guard.shifting = true;
+    guard.lastShiftAt = performance.now();
+
+    // renderVirtualRange can move the window while restoring the same visible
+    // logical word, so scrolling continues naturally rather than jumping.
+    virtualRenderer.renderVirtualRange(
+      reader,
+      mode,
+      groupSize,
+      nextStart,
+      nextEnd,
+      anchor
+    );
+
+    state.viewportAnchorIndex = anchor;
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      guard.shifting = false;
+    }));
+  };
+
+  const schedule = () => {
+    if (guard.frame) return;
+    guard.frame = requestAnimationFrame(check);
+  };
+
+  reader.addEventListener('scroll', schedule, { passive: true });
+  reader.addEventListener('wheel', schedule, { passive: true });
+  virtualSpacerGuardState.set(reader, { guard, schedule });
+
+  // A TOC jump/restored anchor may already be close to a boundary.
+  requestAnimationFrame(schedule);
+}
 let readerSessionSaveTimer = null;
 let readerReturnCheckpointTimer = null;
 const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
@@ -7930,6 +8019,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   renderNavigationPane();
   prepareReaderView('highlight');
   updateModeControls('highlight');
+  bindVirtualSpacerGuard(reader);
   app.querySelector('#book-page-prev')?.addEventListener('click', () => turnBookPages(-1));
   app.querySelector('#book-page-next')?.addEventListener('click', () => turnBookPages(1));
 
@@ -9774,46 +9864,83 @@ function bindDictionaryMenu(reader) {
     if (!context) return null;
     return { ...context, page: context.page ? { ...context.page } : null };
   };
-  // Use one capture-phase dispatcher for the custom menu. Reader surface and
-  // Ask Mark listeners can repaint or react to the same click; dispatching here
-  // guarantees the chosen context action runs first and uses the captured word.
+  const runDictionaryAction = (button, event) => {
+    if (!button || !menu.contains(button)) return false;
+    event?.preventDefault?.();
+    event?.stopImmediatePropagation?.();
+
+    const context = capturedContext();
+    const action = button.dataset.dictionaryAction;
+    if (!context || !action) return false;
+
+    // Capture everything before hiding/repainting. Lookup/notes can immediately
+    // update Ask Mark or the reader DOM.
+    const stableContext = {
+      ...context,
+      element: context.element || null,
+      page: context.page ? { ...context.page } : null
+    };
+
+    closeDictionaryMenu();
+
+    if (action === 'lookup') {
+      performDictionaryLookup(false, 'mark', stableContext);
+      return true;
+    }
+    if (action === 'save') {
+      performDictionaryLookup(true, 'mark', stableContext);
+      return true;
+    }
+    if (action === 'note') {
+      const existing = notesForCurrentDocument()
+        .find((item) => Number(item.wordIndex) === Number(stableContext.index));
+      showNoteEditor(stableContext, existing || null);
+      return true;
+    }
+    if (action === 'bookmark') {
+      toggleBookmarkForContextWord(stableContext);
+      requestAnimationFrame(() => updateReaderBookmarkMarkers());
+      return true;
+    }
+    return false;
+  };
+
+  let lastPointerActionAt = 0;
+
+  // Execute mouse/touch menu choices on pointerup. This occurs before the
+  // synthetic click and is resistant to reader selection/click handlers that
+  // may repaint the DOM between pointerup and click.
+  menu.addEventListener('pointerup', (event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    const button = event.target instanceof Element
+      ? event.target.closest('[data-dictionary-action]')
+      : null;
+    if (!button || !menu.contains(button)) return;
+    if (runDictionaryAction(button, event)) lastPointerActionAt = performance.now();
+  }, true);
+
+  // Keyboard activation still uses click. Suppress only the synthetic click
+  // immediately following a pointerup action.
   menu.addEventListener('click', (event) => {
     const button = event.target instanceof Element
       ? event.target.closest('[data-dictionary-action]')
       : null;
     if (!button || !menu.contains(button)) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
-
-    const context = capturedContext();
-    const action = button.dataset.dictionaryAction;
-    closeDictionaryMenu();
-    if (!context) return;
-
-    if (action === 'lookup') {
-      performDictionaryLookup(false, 'mark', context);
+    if (performance.now() - lastPointerActionAt < 500) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
       return;
     }
-    if (action === 'save') {
-      performDictionaryLookup(true, 'mark', context);
-      return;
-    }
-    if (action === 'note') {
-      const existing = notesForCurrentDocument()
-        .find((item) => Number(item.wordIndex) === Number(context.index));
-      showNoteEditor(context, existing || null);
-      return;
-    }
-    if (action === 'bookmark') {
-      toggleBookmarkForContextWord(context);
-      requestAnimationFrame(() => updateReaderBookmarkMarkers());
-    }
+    runDictionaryAction(button, event);
   }, true);
+
   menu.addEventListener('pointerdown', (event) => {
-    // Keep reader-surface pointer handlers from treating a menu press as a
-    // reading-canvas click.
-    event.stopPropagation();
-  });
+    if (event.target instanceof Element && event.target.closest('[data-dictionary-action]')) {
+      event.preventDefault();
+    }
+    // Keep reader-surface and selection handlers from owning the menu press.
+    event.stopImmediatePropagation();
+  }, true);
   document.addEventListener('pointerdown', (event) => {
     // Close only for a primary-button press outside the custom menu. A generic
     // document click listener can run after a right-click on some browsers and
