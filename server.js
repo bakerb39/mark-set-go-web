@@ -309,9 +309,6 @@ app.get('/api/account/library', async (req, res) => {
     if (!user) return;
     if (!client) return res.status(503).json({ error: 'The account database is unavailable.' });
 
-    // Account-library records are useful only when readable cloud text exists.
-    // Remove legacy/orphan metadata rows at the source so they cannot reappear
-    // in any browser, bootstrap payload, count, badge, or library card.
     await client.query(`
       delete from library_books b
       where b.user_id = $1
@@ -329,8 +326,9 @@ app.get('/api/account/library', async (req, res) => {
              p.mode, p.playback_index, p.viewport_anchor_index, p.viewport_offset_px,
              p.word_index, p.scroll_ratio, p.page_number, p.position_data,
              p.updated_at as progress_updated_at,
-             true as document_stored, d.raw_bytes as document_raw_bytes,
-             d.compressed_bytes as document_compressed_bytes, d.updated_at as document_updated_at
+             d.content_gzip, d.raw_bytes as document_raw_bytes,
+             d.compressed_bytes as document_compressed_bytes,
+             d.updated_at as document_updated_at
       from library_books b
       join account_documents d on d.user_id = b.user_id and d.book_id = b.id
       left join reading_positions p on p.user_id = b.user_id and p.book_id = b.id
@@ -338,7 +336,37 @@ app.get('/api/account/library', async (req, res) => {
       order by coalesce(p.updated_at, d.updated_at, b.updated_at) desc
     `, [user.id]);
 
-    res.json({ books: result.rows });
+    const books = [];
+    const invalidIds = [];
+
+    for (const row of result.rows) {
+      let readable = false;
+      try {
+        if (row.content_gzip && Number(row.document_raw_bytes) > 0 && Number(row.document_compressed_bytes) > 0) {
+          const text = zlib.gunzipSync(row.content_gzip).toString('utf8');
+          readable = Boolean(text.trim());
+        }
+      } catch (_) {
+        readable = false;
+      }
+
+      if (!readable) {
+        invalidIds.push(row.id);
+        continue;
+      }
+
+      const { content_gzip, ...book } = row;
+      books.push({ ...book, document_stored: true });
+    }
+
+    if (invalidIds.length) {
+      await client.query(
+        'delete from library_books where user_id = $1 and id = any($2::uuid[])',
+        [user.id, invalidIds]
+      );
+    }
+
+    res.json({ books });
   } catch (error) {
     console.error('Library load failed:', error);
     res.status(500).json({ error: 'Unable to load the library.' });

@@ -315,7 +315,7 @@
     if (!books.length) return '';
     return `
       <details class="library-section cloud-library-account-section" open>
-        <summary><span><strong>Saved to your account</strong><small>Library metadata available from PostgreSQL</small></span><span class="library-section-count">${books.length}</span></summary>
+        <summary><span><strong>Saved to your account</strong><small>Readable cloud text available from your account</small></span><span class="library-section-count">${books.length}</span></summary>
         <div class="library-section-body"><div class="cloud-library-account-grid">
           ${books.map((book) => {
             const id = escapeHtml(book.clientRecordId);
@@ -324,7 +324,8 @@
               <div><span class="source-category">Cloud library</span><h3>${escapeHtml(book.title)}</h3><p>${escapeHtml(book.author || 'Author not listed')}</p></div>
               <p>${hasLocalDocument(book.clientRecordId) ? 'The text is available in this browser session.' : 'The readable text is stored in your account.'}</p>
               <div class="cloud-library-account-actions">
-                ${hasLocalDocument(book.clientRecordId) ? `<button class="primary" type="button" data-cloud-library-open="${id}">Open local text</button>` : ''}
+                <button class="primary" type="button" data-cloud-library-cloud-open="${escapeHtml(book.id)}">Open cloud text</button>
+                ${hasLocalDocument(book.clientRecordId) ? `<button class="secondary" type="button" data-cloud-library-open="${id}">Open local text</button>` : ''}
                 ${sourceUrl ? `<a class="secondary button-link" href="${sourceUrl}" target="_blank" rel="noopener noreferrer">Open source</a>` : ''}
               </div>
             </article>`;
@@ -334,12 +335,39 @@
   }
 
   function bindCloudSection(root) {
+    root.querySelectorAll('[data-cloud-library-cloud-open]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const bookId = button.dataset.cloudLibraryCloudOpen;
+        if (!bookId) return;
+        button.disabled = true;
+        const original = button.textContent;
+        button.textContent = 'Opening…';
+        try {
+          if (!window.MarkSetGoCloudDocuments?.openText) {
+            throw new Error('Cloud document opening is not available.');
+          }
+          await window.MarkSetGoCloudDocuments.openText(bookId);
+        } catch (error) {
+          console.warn('Cloud document could not be opened:', error);
+          try {
+            await cloudApi()?.remove?.(bookId);
+            await loadCloudLibrary();
+          } catch (_) {}
+          window.alert(error?.message || 'This cloud document could not be opened and was removed from the account library.');
+        } finally {
+          if (button.isConnected) {
+            button.disabled = false;
+            button.textContent = original;
+          }
+        }
+      });
+    });
+
     root.querySelectorAll('[data-cloud-library-open]').forEach((button) => {
       button.addEventListener('click', () => {
         const id = button.dataset.cloudLibraryOpen;
         const existing = root.querySelector(`[data-library-document="${CSS.escape(id)}"]`);
         if (existing) existing.click();
-        else window.alert('This book is stored in your account. Use Open cloud text to load it on this device.');
       });
     });
   }
