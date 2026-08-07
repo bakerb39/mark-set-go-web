@@ -487,8 +487,30 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       return;
     }
 
-    // Blank-space clicks always toggle playback. This is intentionally
-    // independent of the selected display mode; word clicks above still seek.
+    // Non-word reader-surface clicks bubble to #reader-frame, which owns the
+    // protected blank-space pause/resume contract for the entire reading canvas.
+  });
+
+  readerFrame?.addEventListener('click', (event) => {
+    if (event.defaultPrevented) return;
+
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    // Viewer chrome must never toggle playback. The reading article itself is
+    // intentionally NOT excluded so its blank areas use the same contract as
+    // the surrounding canvas margins.
+    if (target.closest('button, a, input, textarea, select, summary, [contenteditable="true"], [role="textbox"], #fullscreen-control-strip, #fullscreen-mark-drawer, #reader-bookmark-layer, #focus-anchor-overlay')) return;
+
+    const clickedWord = target.closest('.reader-word[data-index]');
+    const mode = getSelectedMode();
+    const seekableModes = new Set(['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'auto-scroll']);
+    if (clickedWord && seekableModes.has(mode)) return;
+
+    // A live text selection belongs to Ask Mark/selection behavior and must not
+    // also toggle playback.
+    if (selectionBelongsToReader()) return;
+
     if (isReaderRunning()) pauseReader();
     else startReader();
     persistReaderSession();

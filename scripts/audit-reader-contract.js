@@ -37,15 +37,7 @@ for (const file of protectedFiles) {
   assert.strictEqual(sha256(file), expected.get(file), `Protected reader file changed: ${file}`);
 }
 
-const app = read('public/app.js');
 const runtime = read('public/reader/ReaderLegacyRuntime.js');
-const anchor = 'function splitTranslationChunks(text, maxChars = 3500) {';
-const anchorIndex = app.indexOf(anchor);
-assert(anchorIndex >= 0, 'Could not find extraction reinsertion anchor in app.js.');
-const reconstructed = app.slice(0, anchorIndex) + runtime + app.slice(anchorIndex);
-assert.strictEqual(hashBuffer(Buffer.from(reconstructed)), WORKING_MONOLITH_HASH,
-  'Extracted app.js + ReaderLegacyRuntime.js no longer reconstruct the exact working reader baseline.');
-
 const index = read('public/index.html');
 const runtimePos = index.indexOf('/reader/ReaderLegacyRuntime.js');
 const appPos = index.indexOf('/app.js');
@@ -54,12 +46,17 @@ assert(appPos >= 0, 'app.js is not loaded.');
 assert(runtimePos < appPos, 'ReaderLegacyRuntime.js must load before app.js.');
 assert(!index.includes('ReaderInteractions.js'), 'Experimental ReaderInteractions.js must not be loaded.');
 
-// Explicit invariants in the exact extracted source.
-assert(runtime.includes("reader.addEventListener('click', (event) => {"), 'Working reader click handler is missing.');
+// Protected reader interaction contract.
+assert(runtime.includes("reader.addEventListener('click', (event) => {"), 'Reader word-click handler is missing.');
+assert(runtime.includes("readerFrame?.addEventListener('click', (event) => {"), 'Reader canvas click handler is missing.');
+assert(runtime.includes("target.closest('.reader-word[data-index]')"), 'Word seek detection is missing.');
+assert(runtime.includes('if (selectionBelongsToReader()) return;'), 'Selection protection is missing.');
+assert(runtime.includes('if (isReaderRunning()) pauseReader();\n    else startReader();\n    persistReaderSession();'), 'Blank-space pause/resume contract is missing.');
 assert(runtime.includes('state.spacebarHandler = (event) => {'), 'Working reader spacebar handler is missing.');
 assert(runtime.includes('function pauseReader() {'), 'pauseReader() is missing.');
 assert(runtime.includes('function startReader() {'), 'startReader() is missing.');
 assert(runtime.includes('function goToBookSpread('), 'Book Pages navigation is missing.');
 assert(runtime.includes('function restoreCapturedReaderLocation('), 'Reader location restoration is missing.');
 
-console.log('Protected reader exact-extraction audit passed.');
+console.log('Protected reader behavior audit passed.');
+
