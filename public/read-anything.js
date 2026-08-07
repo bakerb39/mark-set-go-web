@@ -123,6 +123,26 @@
         } catch {}
       }
     }
+    if (!key && storedDocument?.source?.originalKey) {
+      const originalText = localStorage.getItem(storedDocument.source.originalKey) || '';
+      if (originalText) {
+        key = `builder-${String(documentId)}`;
+        const currentKey = 'created';
+        activeImportedDocument = {
+          title: cleanImportedTitle(storedDocument.title),
+          baseTitle: cleanImportedTitle(storedDocument.title),
+          author: storedDocument.source?.author || '',
+          source: { ...(storedDocument.source || {}), readAnything:true, readAnythingKey:key },
+          versions: { original: originalText, [currentKey]: storedDocument.text || originalText },
+          originalText
+        };
+        activeImportedVersion = currentKey;
+        rememberFormatDocument(documentId, key);
+        saveActiveFormatRecord();
+        scheduleFormatControlAttach();
+        return true;
+      }
+    }
     if (!key) {
       activeImportedDocument = null;
       document.querySelector('#read-anything-format-control')?.remove();
@@ -454,6 +474,83 @@
     } finally {
       window.clearTimeout(timeout);
     }
+  }
+
+  function cleanupTextContent(value, level = 'standard') {
+    const original = String(value || '').replace(/\r/g, '').normalize('NFKC');
+    const report = { level, badCharacters: 0, pageArtifacts: 0, repeatedHeaders: 0, brokenWords: 0, spacingFixes: 0 };
+    if (!original.trim()) return { text: '', report };
+
+    let text = original.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, () => { report.badCharacters += 1; return ''; });
+    text = text.replace(/\u00ad/g, () => { report.badCharacters += 1; return ''; });
+    text = text.replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ');
+
+    if (level !== 'light') {
+      // Join words split only by a line-ending hyphen; preserve normal hyphenated compounds.
+      text = text.replace(/([\p{L}]{3,})-\s*\n\s*([\p{Ll}]{2,})/gu, (_m, a, b) => { report.brokenWords += 1; return `${a}${b}`; });
+
+      const lines = text.split('\n');
+      const normalized = lines.map(line => line.replace(/\s+/g, ' ').trim());
+      const counts = new Map();
+      normalized.forEach(line => {
+        if (!line || line.length > 90) return;
+        const key = line.toLocaleLowerCase().replace(/\d+/g, '#').replace(/[^\p{L}\p{N}#]+/gu, ' ').trim();
+        if (key) counts.set(key, (counts.get(key) || 0) + 1);
+      });
+      const kept = [];
+      normalized.forEach((line, index) => {
+        if (!line) { kept.push(''); return; }
+        const key = line.toLocaleLowerCase().replace(/\d+/g, '#').replace(/[^\p{L}\p{N}#]+/gu, ' ').trim();
+        const standalonePage = /^(?:page\s*)?\d{1,4}$/i.test(line) || /^[ivxlcdm]{1,8}$/i.test(line);
+        const runningHeader = line.length <= 70 && (counts.get(key) || 0) >= 3 && !/^(chapter|book|part|section|act|scene)\b/i.test(line);
+        const pageHeader = /^\d{1,4}\s+[A-Z][A-Z '&.,:-]{3,70}$/.test(line) || /^[A-Z][A-Z '&.,:-]{3,70}\s+\d{1,4}$/.test(line);
+        if (standalonePage || pageHeader) { report.pageArtifacts += 1; return; }
+        if (runningHeader) { report.repeatedHeaders += 1; return; }
+        kept.push(line);
+      });
+      text = kept.join('\n');
+    }
+
+    // Common scan/encoding noise that can be corrected without changing meaning.
+    const safeFixes = [
+      [/\s+([,.;:!?])/g, '$1'],
+      [/([“‘(])\s+/g, '$1'],
+      [/\s+([”’)])/g, '$1'],
+      [/\.{4,}/g, '…'],
+      [/\s+—\s+/g, ' — ']
+    ];
+    safeFixes.forEach(([pattern, replacement]) => {
+      const before = text;
+      text = text.replace(pattern, replacement);
+      if (text !== before) report.spacingFixes += 1;
+    });
+
+    if (level === 'light') text = text.replace(/\n{3,}/g, '\n\n').trim();
+    else if (level === 'standard') text = cleanFormatText(text).replace(/\n{3,}/g, '\n\n').trim();
+    else text = smartFormatText(cleanFormatText(text), 'all').replace(/\n{3,}/g, '\n\n').trim();
+    return { text, report };
+  }
+
+  function applyCleanup(level = 'standard', scope = 'document', selectedText = '') {
+    if (!activeImportedDocument) throw new Error('Format is available after importing, pasting, or creating a document.');
+    const original = String(activeImportedDocument.versions?.original || activeImportedDocument.originalText || '').trim();
+    if (original.length < 20) throw new Error('The preserved original text is unavailable.');
+    let result;
+    if (scope === 'selection' && String(selectedText || '').trim()) {
+      const selected = String(selectedText).trim();
+      const at = original.indexOf(selected);
+      if (at < 0) throw new Error('I could not match that highlighted passage in the preserved original.');
+      const cleaned = cleanupTextContent(selected, level);
+      result = { text: original.slice(0, at) + cleaned.text + original.slice(at + selected.length), report: cleaned.report };
+    } else {
+      result = cleanupTextContent(original, level);
+    }
+    const key = `cleanup_${level}_${scope === 'selection' ? 'selection' : 'document'}`;
+    activeImportedDocument.versions[key] = result.text;
+    activeImportedDocument.cleanupReport = result.report;
+    saveActiveFormatRecord();
+    renderImportedVersion(key);
+    return result.report;
   }
 
   function makeReadable() {
@@ -839,6 +936,8 @@
     openDocument,
     bookmarkletCode,
     cleanFormatText,
+    cleanupTextContent,
+    applyCleanup,
     hasActiveDocument: () => Boolean(activeImportedDocument),
     getActiveVersion: () => ({ key: activeImportedVersion, label: versionLabel(activeImportedVersion), title: activeImportedDocument?.baseTitle || activeImportedDocument?.title || '' }),
     restoreOriginal,

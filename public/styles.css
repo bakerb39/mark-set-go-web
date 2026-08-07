@@ -9243,3 +9243,7 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
   border-color: var(--msg-blue) !important;
   color: var(--msg-navy) !important;
 }
+
+
+/* Create a Book shared formatter + upload */
+.book-builder-import{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:2px 0 16px;padding:14px;border:1px dashed rgba(31,95,149,.38);border-radius:13px;background:rgba(234,244,255,.55)}.book-builder-import>div{margin-right:auto}.book-builder-import strong,.book-builder-import small{display:block}.book-builder-import small,.book-builder-file-name{color:var(--muted,#657282);font-size:.82rem}.book-builder-cleanup{margin:15px 0;border:1px solid rgba(30,56,91,.14);border-radius:13px;padding:12px 14px}.book-builder-cleanup legend{font-weight:800;color:var(--msg-navy,#153b63);padding:0 6px}.book-builder-cleanup label{display:grid;grid-template-columns:auto 1fr;column-gap:8px;align-items:center;padding:8px 7px;border-radius:9px}.book-builder-cleanup label:has(input:checked){background:#eaf4ff}.book-builder-cleanup label input{grid-row:1 / span 2}.book-builder-cleanup label small{grid-column:2;color:var(--muted,#657282)}
