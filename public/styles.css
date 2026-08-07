@@ -9967,3 +9967,59 @@ body > .app-footer {
   height:auto !important;
   padding:.5rem 1rem .55rem !important;
 }
+
+
+/* v9.2.37 balanced desktop footer */
+.site-footer {
+  display:grid !important;
+  grid-template-columns:minmax(220px,1fr) auto minmax(220px,1fr) !important;
+  grid-template-areas:"copy nav version" !important;
+  align-items:center !important;
+  column-gap:24px !important;
+  row-gap:0 !important;
+  width:100% !important;
+  box-sizing:border-box !important;
+}
+
+.site-footer-copy {
+  grid-area:copy !important;
+  justify-self:start !important;
+  text-align:left !important;
+}
+
+.site-footer nav {
+  grid-area:nav !important;
+  justify-self:center !important;
+  justify-content:center !important;
+  flex-wrap:nowrap !important;
+}
+
+.site-footer-version {
+  grid-area:version !important;
+  justify-self:end !important;
+  text-align:right !important;
+  white-space:nowrap !important;
+}
+
+@media (max-width:760px) {
+  .site-footer {
+    grid-template-columns:1fr !important;
+    grid-template-areas:
+      "copy"
+      "nav"
+      "version" !important;
+    justify-items:start !important;
+    row-gap:5px !important;
+  }
+
+  .site-footer nav {
+    justify-self:start !important;
+    justify-content:flex-start !important;
+    flex-wrap:wrap !important;
+  }
+
+  .site-footer-version {
+    justify-self:start !important;
+    text-align:left !important;
+  }
+}
