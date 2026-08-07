@@ -3639,11 +3639,13 @@ function renderHome() {
 
       <div class="home-reader-launch">
         <figure class="home-mark-card">
-          <img
-            class="home-reading-gif"
-            src="/assets/home/mark-reading.gif"
-            alt="Mark reading a book with animated eye movement."
-          >
+          <div class="home-mark-icon-stage">
+            <img
+              class="home-mark-avatar"
+              src="/assets/ask-mark/ask-mark-avatar.png"
+              alt="Mark, your reading companion."
+            >
+          </div>
           <figcaption>
             <strong>Meet Mark.</strong>
             <span>Practice smoother eye movement, stronger focus, faster reading, and better comprehension.</span>

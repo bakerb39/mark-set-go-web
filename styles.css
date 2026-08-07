@@ -10023,3 +10023,99 @@ body > .app-footer {
     text-align:left !important;
   }
 }
+
+
+/* v9.2.38 exact empty Reader placeholder contrast */
+#app .empty-reader-canvas .empty-reader-placeholder {
+  color:#f4f9ff !important;
+  opacity:1 !important;
+}
+
+#app .empty-reader-canvas .empty-reader-placeholder h2 {
+  color:#f4f9ff !important;
+  opacity:1 !important;
+  text-shadow:0 1px 1px rgba(0,0,0,.35) !important;
+}
+
+#app .empty-reader-canvas .empty-reader-placeholder p {
+  color:#b9d7ec !important;
+  opacity:1 !important;
+}
+
+#app .empty-reader-canvas .empty-reader-icon {
+  opacity:1 !important;
+}
+
+
+/* v9.2.39 Reader selection/highlight readability */
+#reader ::selection,
+.reader-frame ::selection {
+  background:#ffe27a !important;
+  color:#102a43 !important;
+}
+
+#reader .reader-word.mark-selected,
+#reader .reader-word.is-selected,
+#reader .reader-word.selection-highlight,
+#reader .reader-word.highlighted,
+.reader-frame .reader-word.mark-selected,
+.reader-frame .reader-word.is-selected,
+.reader-frame .reader-word.selection-highlight,
+.reader-frame .reader-word.highlighted {
+  background:#ffe27a !important;
+  color:#102a43 !important;
+  box-shadow:0 0 0 1px rgba(180,120,0,.18) inset !important;
+  text-shadow:none !important;
+}
+
+/* Existing yellow passage/selection blocks should remain readable even when
+   app-wide text rules or reader themes change. */
+#reader [data-mark-selection],
+#reader .mark-selection-highlight,
+#reader .selection-highlight,
+.reader-frame [data-mark-selection],
+.reader-frame .mark-selection-highlight,
+.reader-frame .selection-highlight {
+  background:#ffe27a !important;
+  color:#102a43 !important;
+  opacity:1 !important;
+}
+
+
+/* v9.2.42 homepage Mark avatar hero */
+.home-mark-icon-stage {
+  min-height: min(58vh, 590px);
+  display: grid;
+  place-items: center;
+  padding: clamp(28px, 5vw, 64px);
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(39,87,119,.72) 0, rgba(18,51,78,.56) 32%, rgba(7,24,39,.96) 74%),
+    #071827;
+}
+
+.home-mark-avatar {
+  display: block;
+  width: clamp(260px, 58%, 440px);
+  max-width: 88%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 5px solid #e4c463;
+  box-shadow:
+    0 22px 48px rgba(0,0,0,.42),
+    0 0 0 10px rgba(228,196,99,.10),
+    0 0 58px rgba(228,196,99,.20);
+}
+
+@media (max-width: 850px) {
+  .home-mark-icon-stage {
+    min-height: 0;
+    padding: 32px 22px;
+  }
+
+  .home-mark-avatar {
+    width: clamp(220px, 58vw, 360px);
+  }
+}
