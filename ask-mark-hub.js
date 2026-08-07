@@ -331,13 +331,19 @@
       const status = $('[data-askmark-format-status]', shell);
       try {
         const api = transformApi();
+        if (!api?.applyCleanup) throw new Error('The formatter is not available.');
         const level = $('[data-format-level].is-selected', shell)?.dataset.formatLevel || 'standard';
         const scope = shell.querySelector('input[name="askmark-format-scope"]:checked')?.value || 'document';
         const selected = scope === 'selection' ? getSelectionText() : '';
-        if (scope === 'selection' && !selected) throw new Error('Highlight a passage first, or choose Entire document.');
-        // Synchronize against the live Reader only after validating the selected
-        // passage. applyCleanup() also performs this synchronization defensively.
-        if (!api?.hasActiveDocument?.()) throw new Error('The current Reader text could not be accessed for formatting.');
+
+        if (scope === 'selection') {
+          if (!selected) throw new Error('Highlight a passage first, or choose Entire document.');
+          // A highlighted passage is already valid formatting input. Do not run
+          // the whole-document availability gate here.
+        } else if (!api.hasActiveDocument?.()) {
+          throw new Error('The current Reader text could not be accessed for whole-document formatting.');
+        }
+
         if (status) status.textContent = level === 'deep' ? 'AI Deep Clean is reviewing the text…' : 'Formatting text…';
         const report = await api.applyCleanup(level, scope, selected);
         const fixes = Object.entries(report || {}).filter(([key, value]) => key !== 'level' && Number(value) > 0).reduce((sum, [, value]) => sum + Number(value), 0);

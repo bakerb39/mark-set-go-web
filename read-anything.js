@@ -600,22 +600,44 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   async function applyCleanup(level = 'standard', scope = 'document', selectedText = '') {
-    // Always synchronize with the live Reader at action time. This prevents a
-    // valid on-screen document from being rejected because formatter state or
-    // local persistence lagged behind the Reader.
+    // The live Reader is the source of truth at action time.
     ensureActiveReaderDocument();
-    if (!activeImportedDocument) throw new Error('No readable text is currently available to format.');
+
+    const selected = String(selectedText || '').trim();
+    if (scope === 'selection' && !selected) {
+      throw new Error('No highlighted passage was available to format.');
+    }
+    if (!activeImportedDocument) {
+      throw new Error(scope === 'selection'
+        ? 'The highlighted passage is visible, but the Reader source text could not be accessed.'
+        : 'No readable text is currently available to format.');
+    }
+
     const original = String(activeImportedDocument.versions?.original || activeImportedDocument.originalText || '').trim();
     if (original.length < 20) throw new Error('The preserved original text is unavailable.');
     let result;
-    if (scope === 'selection' && String(selectedText || '').trim()) {
-      const selected = String(selectedText).trim();
+    if (scope === 'selection') {
       const at = original.indexOf(selected);
-      if (at < 0) throw new Error('I could not match that highlighted passage in the preserved original.');
-      const cleaned = level === 'deep'
-        ? await requestAiCleanupText(selected, activeImportedDocument.title || 'Selected passage', level)
-        : cleanupTextContent(selected, level);
-      result = { text: original.slice(0, at) + cleaned.text + original.slice(at + selected.length), report: cleaned.report };
+      if (at < 0) {
+        // If the displayed Reader is a previously formatted version, try matching
+        // the selection against that live version and use it as the working base.
+        const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+        const liveText = String(current?.text || '').trim();
+        const liveAt = liveText ? liveText.indexOf(selected) : -1;
+        if (liveAt < 0) throw new Error('I could not match that highlighted passage in the current Reader text.');
+        const cleaned = level === 'deep'
+          ? await requestAiCleanupText(selected, activeImportedDocument.title || current?.title || 'Selected passage', level)
+          : cleanupTextContent(selected, level);
+        result = {
+          text: liveText.slice(0, liveAt) + cleaned.text + liveText.slice(liveAt + selected.length),
+          report: cleaned.report
+        };
+      } else {
+        const cleaned = level === 'deep'
+          ? await requestAiCleanupText(selected, activeImportedDocument.title || 'Selected passage', level)
+          : cleanupTextContent(selected, level);
+        result = { text: original.slice(0, at) + cleaned.text + original.slice(at + selected.length), report: cleaned.report };
+      }
     } else {
       result = level === 'deep'
         ? await requestAiCleanupText(original, activeImportedDocument.title || 'Untitled', level)
