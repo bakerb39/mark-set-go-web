@@ -473,9 +473,57 @@
     renderImportedVersion('original');
   }
 
+  function smartFormatText(value, mode = 'all') {
+    const original = String(value || '').replace(/\r/g, '').trim();
+    if (!original) return '';
+    let text = original.replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ');
+    if (mode === 'spacing') return text.replace(/\n{3,}/g, '\n\n').trim();
+    const blocks = text.split(/\n\s*\n+/).map(x => x.trim()).filter(Boolean);
+    const out = [];
+    for (const block of blocks) {
+      const lines = block.split('\n').map(x => x.trim()).filter(Boolean);
+      for (const line of lines) {
+        const heading = /^(chapter|part|section|article|book|act|scene|letter)\s+[\divxlcdm]+\b/i.test(line)
+          || (/^[A-Z0-9][A-Z0-9 ’'“”"—–:,-]{3,90}$/.test(line) && line.split(/\s+/).length <= 12);
+        const list = /^[•▪◦*-]\s+/.test(line) || /^\d+[.)]\s+/.test(line);
+        if ((mode === 'sections' || mode === 'all') && (heading || list)) { out.push(line); continue; }
+        if (mode === 'sections') { out.push(line); continue; }
+        out.push(paragraphizeLongText(line, 4, 520));
+      }
+    }
+    return out.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+  }
+
+  function applySmartFormat(mode = 'all') {
+    if (!activeImportedDocument) throw new Error('Smart Format is available for imported or pasted documents.');
+    const original = String(activeImportedDocument.versions?.original || activeImportedDocument.originalText || '').trim();
+    if (original.length < 20) throw new Error('The preserved original text is unavailable.');
+    const key = `format_${mode}`;
+    activeImportedDocument.versions[key] = smartFormatText(original, mode);
+    saveActiveFormatRecord();
+    renderImportedVersion(key);
+  }
+
+  function installDisplayFormatControl() {
+    if (!activeImportedDocument) return;
+    const display = [...document.querySelectorAll('#app .settings-panel')].find(d => d.querySelector('summary span')?.textContent?.trim() === 'Display');
+    const content = display?.querySelector('.settings-content');
+    if (!content || content.querySelector('.smart-format-control')) return;
+    const box = document.createElement('div');
+    box.className = 'smart-format-control';
+    box.innerHTML = `<div class="smart-format-heading"><strong>Format</strong><small>Structure this text without rewriting it</small></div><div class="smart-format-actions"><button type="button" class="secondary" data-smart-format="spacing">Clean spacing</button><button type="button" class="secondary" data-smart-format="paragraphs">Paragraphs</button><button type="button" class="secondary" data-smart-format="sections">Sections</button><button type="button" class="primary" data-smart-format="all">Format all</button><button type="button" class="secondary" data-smart-format="original">Original</button></div>`;
+    content.appendChild(box);
+    box.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-smart-format]'); if (!button) return;
+      try { button.dataset.smartFormat === 'original' ? restoreOriginal() : applySmartFormat(button.dataset.smartFormat); }
+      catch (error) { showTransformStatus(error.message, true); }
+    });
+  }
+
   function scheduleFormatControlAttach() {
     document.querySelector('#read-anything-format-control')?.remove();
     document.dispatchEvent(new CustomEvent('marksetgo:transform-state', { detail: { version: activeImportedVersion, label: versionLabel(activeImportedVersion), active: Boolean(activeImportedDocument) } }));
+    [0, 100, 350, 800].forEach((delay) => window.setTimeout(installDisplayFormatControl, delay));
     return;
     formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
     formatControlAttachTimers = [];
