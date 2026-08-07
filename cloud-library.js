@@ -167,8 +167,33 @@
   async function loadCloudLibrary() {
     const api = cloudApi();
     if (!state.authenticated || !api) return [];
-    const payload = await api.list();
-    setBooks(payload?.books || []);
+
+    let payload = await api.list();
+    let books = (Array.isArray(payload?.books) ? payload.books : []).map(normalizeCloudBook);
+
+    // A cloud-library entry is valid only when its readable text is stored too.
+    // Remove legacy/orphan metadata records automatically instead of showing
+    // "metadata only" cards that the user cannot actually open.
+    const orphans = books.filter((book) => book.id && !book.documentStored);
+    if (orphans.length) {
+      const results = await Promise.allSettled(orphans.map((book) => api.remove(book.id)));
+      const failedIds = new Set(
+        results
+          .map((result, index) => result.status === 'rejected' ? String(orphans[index].id) : '')
+          .filter(Boolean)
+      );
+
+      if (failedIds.size) {
+        console.warn('Some orphan cloud-library metadata records could not be removed.', [...failedIds]);
+      }
+
+      // Refresh from the server after cleanup so the in-memory library exactly
+      // matches the account and successfully deleted records disappear at once.
+      payload = await api.list();
+      books = (Array.isArray(payload?.books) ? payload.books : []).map(normalizeCloudBook);
+    }
+
+    setBooks(books.filter((book) => book.documentStored));
     return state.books;
   }
 
@@ -180,22 +205,35 @@
     try {
       const local = collectLocalMetadata();
       for (const record of local) {
+        const localDocument = readDocument(record.clientRecordId);
+        const existingCloudBook = state.byClientId.get(record.clientRecordId);
+
+        // Do not create metadata-only cloud records. A record belongs in the
+        // account library only when readable cloud text exists or local text is
+        // present now so it can be uploaded in this same sync operation.
+        if (!localDocument?.text && !existingCloudBook?.documentStored) continue;
+
         const signature = stableSignature(record);
         if (!force && state.signatures.get(record.clientRecordId) === signature) continue;
+
         const payload = await api.save(record);
         let saved = normalizeCloudBook(payload?.book || {});
         state.signatures.set(record.clientRecordId, signature);
         if (saved.clientRecordId) state.byClientId.set(saved.clientRecordId, saved);
 
-        // Signed-in imports should save the readable text with the library entry.
-        // This removes the old hidden/manual “Save text to account” requirement.
-        const localDocument = readDocument(record.clientRecordId);
+        // Signed-in imports save metadata and readable text as one logical item.
         if (saved.id && !saved.documentStored && localDocument?.text) {
           const text = String(localDocument.text);
           if (encoder.encode(text).byteLength <= MAX_ACCOUNT_DOCUMENT_BYTES) {
             await api.saveDocument(saved.id, text);
             saved = { ...saved, documentStored: true };
             state.byClientId.set(record.clientRecordId, saved);
+          } else {
+            // If the text cannot be stored, remove the metadata record too. The
+            // account library never retains an unusable metadata-only entry.
+            await api.remove(saved.id);
+            state.byClientId.delete(record.clientRecordId);
+            state.signatures.delete(record.clientRecordId);
           }
         }
       }
@@ -223,7 +261,11 @@
   }
 
   function cloudOnlyBooks() {
-    return state.books.filter((book) => book.clientRecordId && !readObject(PROGRESS_KEY)[book.clientRecordId]);
+    return state.books.filter((book) =>
+      book.documentStored &&
+      book.clientRecordId &&
+      !readObject(PROGRESS_KEY)[book.clientRecordId]
+    );
   }
 
   function injectStyles() {
@@ -269,7 +311,7 @@
             const sourceUrl = escapeHtml(book.sourceUrl || book.metadata?.source?.url || '');
             return `<article class="cloud-library-account-card" data-cloud-library-book-id="${id}">
               <div><span class="source-category">Cloud library</span><h3>${escapeHtml(book.title)}</h3><p>${escapeHtml(book.author || 'Author not listed')}</p></div>
-              <p>${hasLocalDocument(book.clientRecordId) ? 'The text is available in this browser session.' : 'Metadata is saved. Reopen or re-import the source text to read it on this device.'}</p>
+              <p>${hasLocalDocument(book.clientRecordId) ? 'The text is available in this browser session.' : 'The readable text is stored in your account.'}</p>
               <div class="cloud-library-account-actions">
                 ${hasLocalDocument(book.clientRecordId) ? `<button class="primary" type="button" data-cloud-library-open="${id}">Open local text</button>` : ''}
                 ${sourceUrl ? `<a class="secondary button-link" href="${sourceUrl}" target="_blank" rel="noopener noreferrer">Open source</a>` : ''}
@@ -286,7 +328,7 @@
         const id = button.dataset.cloudLibraryOpen;
         const existing = root.querySelector(`[data-library-document="${CSS.escape(id)}"]`);
         if (existing) existing.click();
-        else window.alert('The text metadata is saved to your account, but the reading text must be reopened on this device.');
+        else window.alert('This book is stored in your account. Use Open cloud text to load it on this device.');
       });
     });
   }
