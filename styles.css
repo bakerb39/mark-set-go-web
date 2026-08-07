@@ -9270,43 +9270,73 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
 }
 
 
-/* v9.2.9 keep pane resizing available on compact desktop */
-@media (min-width:701px) and (max-width:1050px) {
+
+
+/* v9.2.11 restore responsive Contents pane behavior */
+.navigation-pane {
+  min-width:0;
+  overflow-x:hidden;
+}
+.navigation-pane * {
+  max-width:100%;
+  box-sizing:border-box;
+}
+.navigation-pane button,
+.navigation-pane a,
+.navigation-pane .toc-entry,
+.navigation-pane [data-toc-index] {
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+
+
+/* v9.2.13 Contents width + fullscreen hover */
+.navigation-pane {
+  min-width:220px;
+  overflow-x:hidden !important;
+}
+.navigation-pane .reader-library-tabs,
+.navigation-pane .navigation-section,
+.navigation-pane .toc-list,
+.navigation-pane .toc-entry,
+.navigation-pane [data-toc-index] {
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+}
+.navigation-pane [data-toc-index],
+.navigation-pane .toc-entry {
+  white-space:normal !important;
+  overflow-wrap:break-word;
+  word-break:normal;
+}
+
+/* At the app's compact breakpoint, side panes return to the normal stacked layout. */
+@media (max-width:1050px) {
   .reader-layout,
   .reader-layout.navigation-hidden,
   .reader-layout.word-panel-hidden,
   .reader-layout.navigation-hidden.word-panel-hidden {
-    align-items:stretch;
+    grid-template-columns:minmax(0,1fr) !important;
   }
-
-  .reader-layout:not(.navigation-hidden):not(.word-panel-hidden) {
-    grid-template-columns:
-      minmax(150px, var(--navigation-width))
-      8px
-      minmax(280px, 1fr)
-      8px
-      var(--word-panel-width);
-  }
-
-  .reader-layout.navigation-hidden:not(.word-panel-hidden) {
-    grid-template-columns:minmax(280px,1fr) 8px var(--word-panel-width);
-  }
-
-  .reader-layout:not(.navigation-hidden).word-panel-hidden {
-    grid-template-columns:var(--navigation-width) 8px minmax(280px,1fr);
-  }
-
-  .reader-layout.navigation-hidden.word-panel-hidden {
-    grid-template-columns:minmax(0,1fr);
-  }
-
-  #left-pane-splitter,
-  #right-pane-splitter {
-    display:block;
-  }
-
   .navigation-pane,
   .word-panel {
-    grid-column:auto;
+    grid-column:1 !important;
+    width:100% !important;
+    min-width:0 !important;
   }
+  .pane-splitter {
+    display:none !important;
+  }
+}
+
+/* Full screen: navy at rest, light blue on hover/focus. */
+.viewer-fullscreen-button {
+  background:#0b2238 !important;
+  color:#fff !important;
+}
+.viewer-fullscreen-button:hover,
+.viewer-fullscreen-button:focus-visible {
+  background:#5aa6e8 !important;
+  color:#fff !important;
 }
