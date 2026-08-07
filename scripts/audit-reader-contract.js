@@ -9,11 +9,18 @@ const protectedFiles = [
   'public/reader/SessionManager.js',
   'public/reader/ReaderEngine.js',
   'public/reader/VirtualRenderer.js',
-  'public/reader/ReaderInteractions.js'
+  'public/reader/ReaderLegacyRuntime.js'
 ];
+const WORKING_MONOLITH_HASH = 'fccb0da5923ab16c72bf734ea5bf94a2232ada40d5bc10901f4bad0399412968';
 
-function sha256(file) {
-  return crypto.createHash('sha256').update(fs.readFileSync(path.join(root, file))).digest('hex');
+function hashBuffer(value) {
+  return crypto.createHash('sha256').update(value).digest('hex');
+}
+function read(rel) {
+  return fs.readFileSync(path.join(root, rel), 'utf8');
+}
+function sha256(rel) {
+  return hashBuffer(fs.readFileSync(path.join(root, rel)));
 }
 
 const checksumPath = path.join(root, 'PROTECTED-READER-SHA256.txt');
@@ -30,21 +37,29 @@ for (const file of protectedFiles) {
   assert.strictEqual(sha256(file), expected.get(file), `Protected reader file changed: ${file}`);
 }
 
-// Load pure interaction contract helpers in Node. Element is needed only when
-// shouldHandleSpacebar receives a DOM target; these tests intentionally use null targets.
-global.Element = class Element {};
-const interactions = require(path.join(root, 'public/reader/ReaderInteractions.js'));
+const app = read('public/app.js');
+const runtime = read('public/reader/ReaderLegacyRuntime.js');
+const anchor = 'function splitTranslationChunks(text, maxChars = 3500) {';
+const anchorIndex = app.indexOf(anchor);
+assert(anchorIndex >= 0, 'Could not find extraction reinsertion anchor in app.js.');
+const reconstructed = app.slice(0, anchorIndex) + runtime + app.slice(anchorIndex);
+assert.strictEqual(hashBuffer(Buffer.from(reconstructed)), WORKING_MONOLITH_HASH,
+  'Extracted app.js + ReaderLegacyRuntime.js no longer reconstruct the exact working reader baseline.');
 
-assert.strictEqual(interactions.classifyReaderClick({ mode: 'highlight' }), 'toggle-playback', 'Blank reader click must toggle playback.');
-assert.strictEqual(interactions.classifyReaderClick({ mode: 'two-column' }), 'toggle-playback', 'Blank click contract must not silently disappear by mode.');
-assert.strictEqual(interactions.classifyReaderClick({ clickedWordIndex: 42, mode: 'highlight' }), 'seek-word', 'Word click in Highlight must seek.');
-assert.strictEqual(interactions.classifyReaderClick({ clickedWordIndex: 42, mode: 'bold-focus' }), 'seek-word', 'Word click in Bold Focus must seek.');
-assert.strictEqual(interactions.classifyReaderClick({ translatedWord: true, clickedWordIndex: 42, mode: 'highlight' }), 'translated-word', 'Translated-word action must take precedence.');
-assert.strictEqual(interactions.shouldHandleSpacebar({ code: 'Space', repeat: false, altKey: false, ctrlKey: false, metaKey: false, target: null }, { readerPresent: true, mode: 'highlight' }), true, 'Spacebar must toggle in normal reader modes.');
-assert.strictEqual(interactions.shouldHandleSpacebar({ code: 'Space', repeat: false, altKey: false, ctrlKey: false, metaKey: false, target: null }, { readerPresent: true, mode: 'two-column' }), false, 'Spacebar remains disabled in two-column mode.');
+const index = read('public/index.html');
+const runtimePos = index.indexOf('/reader/ReaderLegacyRuntime.js');
+const appPos = index.indexOf('/app.js');
+assert(runtimePos >= 0, 'ReaderLegacyRuntime.js is not loaded.');
+assert(appPos >= 0, 'app.js is not loaded.');
+assert(runtimePos < appPos, 'ReaderLegacyRuntime.js must load before app.js.');
+assert(!index.includes('ReaderInteractions.js'), 'Experimental ReaderInteractions.js must not be loaded.');
 
-const app = fs.readFileSync(path.join(root, 'public/app.js'), 'utf8');
-assert(app.includes('window.ReaderInteractions.install({'), 'app.js must delegate protected interactions to ReaderInteractions.');
-assert(!app.includes("reader.addEventListener('click', (event) => {\n    const translatedWord"), 'Protected bubble click handler must not be reimplemented in app.js.');
+// Explicit invariants in the exact extracted source.
+assert(runtime.includes("reader.addEventListener('click', (event) => {"), 'Working reader click handler is missing.');
+assert(runtime.includes('state.spacebarHandler = (event) => {'), 'Working reader spacebar handler is missing.');
+assert(runtime.includes('function pauseReader() {'), 'pauseReader() is missing.');
+assert(runtime.includes('function startReader() {'), 'startReader() is missing.');
+assert(runtime.includes('function goToBookSpread('), 'Book Pages navigation is missing.');
+assert(runtime.includes('function restoreCapturedReaderLocation('), 'Reader location restoration is missing.');
 
-console.log('Protected reader contract audit passed.');
+console.log('Protected reader exact-extraction audit passed.');
