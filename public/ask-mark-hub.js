@@ -335,17 +335,20 @@
         const level = $('[data-format-level].is-selected', shell)?.dataset.formatLevel || 'standard';
         const scope = shell.querySelector('input[name="askmark-format-scope"]:checked')?.value || 'document';
         const selected = scope === 'selection' ? getSelectionText() : '';
+        const selectionRange = scope === 'selection'
+          ? window.MarkSetGoCurrentReaderDocument?.getSelectionRange?.()
+          : null;
 
         if (scope === 'selection') {
-          if (!selected) throw new Error('Highlight a passage first, or choose Entire document.');
-          // A highlighted passage is already valid formatting input. Do not run
-          // the whole-document availability gate here.
+          if (!selected && !selectionRange?.text) throw new Error('Highlight a passage first, or choose Entire document.');
+          // The Reader's canonical word-index range is the primary locator.
+          // Displayed selection text is retained only as a compatibility fallback.
         } else if (!api.hasActiveDocument?.()) {
           throw new Error('The current Reader text could not be accessed for whole-document formatting.');
         }
 
         if (status) status.textContent = level === 'deep' ? 'AI Deep Clean is reviewing the text…' : 'Formatting text…';
-        const report = await api.applyCleanup(level, scope, selected);
+        const report = await api.applyCleanup(level, scope, selected, selectionRange);
         const fixes = Object.entries(report || {}).filter(([key, value]) => key !== 'level' && Number(value) > 0).reduce((sum, [, value]) => sum + Number(value), 0);
         if (status) status.textContent = `${level === 'deep' ? 'AI Deep Clean' : level[0].toUpperCase() + level.slice(1)} applied${fixes ? ` · ${fixes} cleanup actions` : ''}. Original preserved.`;
         syncContext();

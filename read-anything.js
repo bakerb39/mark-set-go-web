@@ -599,12 +599,16 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     }
   }
 
-  async function applyCleanup(level = 'standard', scope = 'document', selectedText = '') {
+  async function applyCleanup(level = 'standard', scope = 'document', selectedText = '', selectionRange = null) {
     // The live Reader is the source of truth at action time.
     ensureActiveReaderDocument();
 
     const selected = String(selectedText || '').trim();
-    if (scope === 'selection' && !selected) {
+    const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+    const liveText = String(current?.text || '');
+    const range = selectionRange || window.MarkSetGoCurrentReaderDocument?.getSelectionRange?.();
+
+    if (scope === 'selection' && !selected && !String(range?.text || '').trim()) {
       throw new Error('No highlighted passage was available to format.');
     }
     if (!activeImportedDocument) {
@@ -615,34 +619,63 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     const original = String(activeImportedDocument.versions?.original || activeImportedDocument.originalText || '').trim();
     if (original.length < 20) throw new Error('The preserved original text is unavailable.');
+
     let result;
+
     if (scope === 'selection') {
-      const at = original.indexOf(selected);
-      if (at < 0) {
-        // If the displayed Reader is a previously formatted version, try matching
-        // the selection against that live version and use it as the working base.
-        const current = window.MarkSetGoCurrentReaderDocument?.get?.();
-        const liveText = String(current?.text || '').trim();
-        const liveAt = liveText ? liveText.indexOf(selected) : -1;
-        if (liveAt < 0) throw new Error('I could not match that highlighted passage in the current Reader text.');
+      // Primary path: use the Reader's canonical word range converted to exact
+      // character offsets in the currently displayed source text.
+      const rangeMatchesCurrentDocument =
+        range &&
+        Number.isFinite(Number(range.charStart)) &&
+        Number.isFinite(Number(range.charEnd)) &&
+        Number(range.charStart) >= 0 &&
+        Number(range.charEnd) > Number(range.charStart) &&
+        (!range.documentId || !current?.documentId || String(range.documentId) === String(current.documentId));
+
+      if (rangeMatchesCurrentDocument && liveText) {
+        const charStart = Math.max(0, Number(range.charStart));
+        const charEnd = Math.min(liveText.length, Number(range.charEnd));
+        const sourcePassage = liveText.slice(charStart, charEnd);
+
+        if (!sourcePassage.trim()) throw new Error('The highlighted Reader range was empty.');
+
         const cleaned = level === 'deep'
-          ? await requestAiCleanupText(selected, activeImportedDocument.title || current?.title || 'Selected passage', level)
-          : cleanupTextContent(selected, level);
+          ? await requestAiCleanupText(sourcePassage, activeImportedDocument.title || current?.title || 'Selected passage', level)
+          : cleanupTextContent(sourcePassage, level);
+
         result = {
-          text: liveText.slice(0, liveAt) + cleaned.text + liveText.slice(liveAt + selected.length),
-          report: cleaned.report
+          text: liveText.slice(0, charStart) + cleaned.text + liveText.slice(charEnd),
+          report: { ...cleaned.report, rangeBased: true }
         };
       } else {
+        // Compatibility fallback for selections created by older builds that do
+        // not expose indexes. This is intentionally secondary to range matching.
+        const candidate = selected || String(range?.text || '').trim();
+        const originalAt = candidate ? original.indexOf(candidate) : -1;
+        const liveAt = candidate && liveText ? liveText.indexOf(candidate) : -1;
+
+        if (originalAt < 0 && liveAt < 0) {
+          throw new Error('The highlighted passage range could not be resolved in the current Reader.');
+        }
+
+        const baseText = liveAt >= 0 ? liveText : original;
+        const at = liveAt >= 0 ? liveAt : originalAt;
         const cleaned = level === 'deep'
-          ? await requestAiCleanupText(selected, activeImportedDocument.title || 'Selected passage', level)
-          : cleanupTextContent(selected, level);
-        result = { text: original.slice(0, at) + cleaned.text + original.slice(at + selected.length), report: cleaned.report };
+          ? await requestAiCleanupText(candidate, activeImportedDocument.title || current?.title || 'Selected passage', level)
+          : cleanupTextContent(candidate, level);
+
+        result = {
+          text: baseText.slice(0, at) + cleaned.text + baseText.slice(at + candidate.length),
+          report: { ...cleaned.report, rangeBased: false }
+        };
       }
     } else {
       result = level === 'deep'
         ? await requestAiCleanupText(original, activeImportedDocument.title || 'Untitled', level)
         : cleanupTextContent(original, level);
     }
+
     const key = `cleanup_${level}_${scope === 'selection' ? 'selection' : 'document'}`;
     activeImportedDocument.versions[key] = result.text;
     activeImportedDocument.cleanupReport = result.report;

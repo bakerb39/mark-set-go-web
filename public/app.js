@@ -51,6 +51,37 @@ window.MarkSetGoCurrentReaderDocument = Object.freeze({
       text: String(state.currentText || ''),
       source: { ...(state.source || {}) }
     };
+  },
+
+  // Resolve the active Ask Mark selection by the Reader's canonical word indexes,
+  // then translate those indexes into exact character offsets in currentText.
+  // This avoids fragile string matching when rendered whitespace/OCR differs.
+  getSelectionRange: () => {
+    const selection = state?.markSelection || state?.markPersistentSelection;
+    const text = String(state?.currentText || '');
+    if (!selection || !text) return null;
+
+    const startIndex = Math.max(0, Number(selection.startIndex) || 0);
+    const endIndex = Math.max(startIndex + 1, Number(selection.endIndex) || startIndex + 1);
+    const tokens = Array.from(text.matchAll(/\S+/g));
+    if (!tokens.length || startIndex >= tokens.length) return null;
+
+    const safeEndIndex = Math.min(tokens.length, endIndex);
+    const first = tokens[startIndex];
+    const last = tokens[safeEndIndex - 1];
+    if (!first || !last || !Number.isFinite(first.index) || !Number.isFinite(last.index)) return null;
+
+    const charStart = first.index;
+    const charEnd = last.index + last[0].length;
+
+    return {
+      documentId: String(state.documentId || ''),
+      startIndex,
+      endIndex: safeEndIndex,
+      charStart,
+      charEnd,
+      text: text.slice(charStart, charEnd)
+    };
   }
 });
 const virtualRenderer = new VirtualRenderer({
