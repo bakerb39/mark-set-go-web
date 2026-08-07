@@ -1870,8 +1870,8 @@ body.viewer-fullscreen-open { overflow: hidden; }
 .pane-toggle.pane-closed { opacity: .72; }
 .reader-resize-hint { margin-left: auto; color: var(--muted); font-size: .7rem; }
 .reader-layout {
-  --navigation-width: clamp(190px, 18vw, 260px);
-  --word-panel-width: clamp(210px, 22vw, 290px);
+  --navigation-width: 280px;
+  --word-panel-width: 380px;
   display: grid;
   grid-template-columns: var(--navigation-width) 8px minmax(0, 1fr) 8px var(--word-panel-width);
   align-items: stretch;
@@ -9506,4 +9506,173 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
   color:#ffd34f !important;
   opacity:1 !important;
   text-shadow:0 0 1px rgba(255,211,79,.15);
+}
+
+
+/* v9.2.26 unified non-reader page shell
+   Standardize application pages around the Progress & Awards visual treatment:
+   white content surface on the existing light-blue app background, consistent
+   width, alignment, padding, and hero spacing. Reader geometry is excluded. */
+
+#app > .platform-page,
+#app > .panel:not(.reader-page-panel),
+.my-library-hub,
+.reading-goals-page,
+.progress-analytics-page,
+.global-notebook-page,
+.action-center-page,
+.browse-hub,
+.ai-center,
+.knowledge-graph-page,
+.help-page,
+.library-page {
+  width:min(1180px, calc(100% - 32px));
+  max-width:1180px;
+  margin-left:auto !important;
+  margin-right:auto !important;
+  box-sizing:border-box;
+}
+
+.my-library-hub,
+.reading-goals-page,
+.progress-analytics-page,
+.global-notebook-page,
+.action-center-page,
+.browse-hub,
+.ai-center,
+.knowledge-graph-page,
+.help-page,
+.library-page,
+#app > .platform-page,
+#app > .panel:not(.reader-page-panel) {
+  background:#fff !important;
+  border:1px solid #c7dded;
+  border-radius:14px;
+  padding:18px 20px 22px;
+}
+
+/* Keep the existing light-blue application canvas visible around each page. */
+#app {
+  background:transparent;
+}
+
+/* One common page-header treatment. */
+.platform-hero,
+.library-welcome,
+.progress-hero,
+.goals-hero,
+.action-center-hero {
+  margin:0 0 16px !important;
+  padding:0 0 14px !important;
+  border:0 !important;
+  border-bottom:1px solid #dbe9f3 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  color:#17324d !important;
+  align-items:flex-end;
+}
+
+.platform-hero h1,
+.library-welcome h1,
+.progress-hero h1,
+.goals-hero h1,
+.action-center-hero h1 {
+  color:#0b3b67 !important;
+  opacity:1 !important;
+}
+
+.platform-hero p,
+.library-welcome p,
+.progress-hero p,
+.goals-hero p,
+.action-center-hero p {
+  color:#496983 !important;
+  opacity:1 !important;
+}
+
+/* Keep the gold eyebrow/kicker throughout, but bright enough to read cleanly. */
+.platform-hero .source-category,
+.library-welcome .source-category,
+.progress-hero .source-category,
+.goals-hero .source-category,
+.action-center-hero .source-category {
+  color:#b67a00 !important;
+  background:#edf3f7;
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+
+/* My Library had an extra gray page wash; keep cards distinct but the page white. */
+.my-library-hub,
+.my-library-hub .library-main,
+.my-library-hub .library-content,
+.my-library-hub .library-hub-content {
+  background:#fff !important;
+}
+
+/* Normalize internal section alignment so pages begin on the same visual axis. */
+.my-library-hub > *,
+.reading-goals-page > *,
+.progress-analytics-page > *,
+.global-notebook-page > *,
+.action-center-page > *,
+.browse-hub > *,
+.ai-center > *,
+.knowledge-graph-page > *,
+.help-page > *,
+.library-page > * {
+  box-sizing:border-box;
+}
+
+/* On smaller screens retain the same edge spacing without forcing a desktop width. */
+@media (max-width:700px) {
+  #app > .platform-page,
+  #app > .panel:not(.reader-page-panel),
+  .my-library-hub,
+  .reading-goals-page,
+  .progress-analytics-page,
+  .global-notebook-page,
+  .action-center-page,
+  .browse-hub,
+  .ai-center,
+  .knowledge-graph-page,
+  .help-page,
+  .library-page {
+    width:calc(100% - 16px);
+    padding:14px 12px 18px;
+    border-radius:10px;
+  }
+
+  .platform-hero,
+  .library-welcome,
+  .progress-hero,
+  .goals-hero,
+  .action-center-hero {
+    align-items:flex-start;
+  }
+}
+
+
+/* v9.2.27 comfortable default Reader side panes */
+@media (min-width:1051px) {
+  #reader-layout {
+    --navigation-width:280px;
+    --word-panel-width:380px;
+  }
+
+  #reader-layout .navigation-pane {
+    min-width:260px;
+  }
+
+  #reader-layout .word-panel {
+    min-width:320px;
+  }
+
+  #reader-layout .navigation-pane [data-toc-index],
+  #reader-layout .navigation-pane .toc-entry {
+    overflow-wrap:normal;
+    word-break:normal;
+    hyphens:auto;
+  }
 }

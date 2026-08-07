@@ -8640,11 +8640,11 @@ function bindReaderResize(readerFrame, reader) {
 
   const savedLeft = Number(localStorage.getItem('msg-navigation-width'));
   const savedRight = Number(localStorage.getItem('msg-word-panel-width'));
-  if (Number.isFinite(savedLeft)) layout.style.setProperty('--navigation-width', `${Math.max(220, Math.min(420, savedLeft))}px`);
+  if (Number.isFinite(savedLeft)) layout.style.setProperty('--navigation-width', `${Math.max(260, Math.min(420, savedLeft))}px`);
   if (Number.isFinite(savedRight)) {
     const layoutWidth = Math.max(0, layout.getBoundingClientRect().width || 0);
     const rightMax = Math.max(480, Math.min(760, layoutWidth - 320));
-    layout.style.setProperty('--word-panel-width', `${Math.max(180, Math.min(rightMax, savedRight))}px`);
+    layout.style.setProperty('--word-panel-width', `${Math.max(320, Math.min(rightMax, savedRight))}px`);
   }
 
   const bindSplitter = (splitter, side) => {
@@ -8662,7 +8662,7 @@ function bindReaderResize(readerFrame, reader) {
       const layoutWidth = Math.max(0, layout.getBoundingClientRect().width || 0);
       const rightMax = Math.max(480, Math.min(760, layoutWidth - 320));
       const width = Math.max(
-        side === 'left' ? 220 : 180,
+        side === 'left' ? 260 : 320,
         Math.min(side === 'left' ? 420 : rightMax, next)
       );
       layout.style.setProperty(property, `${width}px`);
