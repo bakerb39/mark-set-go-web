@@ -55,6 +55,20 @@ const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
 // this browser/app session. Persistent IndexedDB is reserved for Home > Resume.
 let activeReaderSnapshot = null;
 
+function clearActiveReaderPane() {
+  stopReader();
+  activeReaderSnapshot = null;
+  try { readerEngine.reset?.(); } catch {}
+  state.title = '';
+  state.currentText = '';
+  state.originalText = '';
+  state.words = [];
+  state.index = 0;
+  state.viewportAnchorIndex = 0;
+  state.documentId = '';
+  state.source = null;
+}
+
 
 const APP_VIEW_STATE_KEY = 'markSetGoViewStateV1';
 
@@ -766,54 +780,83 @@ function stopMusic() {
 
 function renderMusicLibrary() {
   stopReader();
-  const categories = [...new Set(musicChoices.map((item) => item.category))];
   const preferred = getPreferredMusic();
   const bookKey = currentBookMusicKey();
   const bookIds = getBookMusic(bookKey);
   const bookItems = bookIds.map((id) => preferred.find((item) => item.id === id)).filter(Boolean);
-  const currentBookLabel = state?.title ? `“${escapeHtml(state.title)}”` : 'the current book';
-  app.innerHTML = `
-    <section class="panel music-library">
-      <div class="library-heading"><div><h1>Music &amp; Focus</h1><p>Listen through official Spotify embeds or the YouTube player, save favorites, and associate playlists with individual books.</p></div></div>
-      <nav class="music-section-nav" aria-label="Music sections"><a href="#add-music">Add music</a><a href="#book-music">Book music</a><a href="#preferred-music">My music</a><a href="#focus-music">Focus selections</a></nav>
+  const currentBookLabel = state?.title ? `“${escapeHtml(state.title)}”` : 'No book open';
+  const quickChoices = musicChoices.slice(0, 6);
 
-      <section id="add-music" class="music-category music-add-service">
-        <div class="library-heading"><div><h2>Add Spotify or YouTube</h2><p>Paste a public Spotify or YouTube URL. Playback remains hosted by the selected service.</p></div></div>
-        <form id="music-url-form" class="music-url-form">
-          <label>Spotify or YouTube URL<input id="music-service-url" type="url" placeholder="https://open.spotify.com/playlist/… or https://youtube.com/playlist?list=…"></label>
-          <label>Name (optional)<input id="music-service-name" type="text" maxlength="80" placeholder="My reading playlist"></label>
-          <div class="music-url-actions"><button class="primary" type="submit">Load player</button><button id="save-music-preferred" class="secondary" type="button">Save to My Music</button></div>
+  app.innerHTML = `
+    <section class="panel music-library music-simple-page">
+      <div class="library-heading music-page-heading">
+        <div>
+          <h1>Music &amp; Focus</h1>
+          <p>Choose something to listen to while you read. You can save it for later or connect it to the current book.</p>
+        </div>
+      </div>
+
+      <section class="music-current-book" aria-label="Current book">
+        <span>Current book</span>
+        <strong>${currentBookLabel}</strong>
+        ${bookKey ? `<small>${bookItems.length ? `${bookItems.length} saved music ${bookItems.length === 1 ? 'selection' : 'selections'}` : 'No music saved for this book yet'}</small>` : '<small>Open a book to save music specifically for it.</small>'}
+      </section>
+
+      <section class="music-primary-section">
+        <div class="music-section-heading">
+          <div><span class="music-step">1</span><h2>Start listening</h2></div>
+          <p>Pick a focus option or paste a Spotify or YouTube link.</p>
+        </div>
+
+        <div class="music-quick-picks">
+          ${quickChoices.map((item) => `<button class="music-quick-button" type="button" data-play-music="${escapeHtml(item.id)}"><span aria-hidden="true">♫</span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.category)}</small></span></button>`).join('')}
+        </div>
+
+        <div class="music-or"><span>or use your own music</span></div>
+
+        <form id="music-url-form" class="music-simple-form">
+          <label for="music-service-url">Spotify or YouTube link</label>
+          <div class="music-link-row">
+            <input id="music-service-url" type="url" required placeholder="Paste a playlist, album, track, or video link">
+            <button class="primary" type="submit">Play</button>
+          </div>
+          <details class="music-optional-name">
+            <summary>Add a custom name</summary>
+            <label for="music-service-name" class="sr-only">Custom name</label>
+            <input id="music-service-name" type="text" maxlength="80" placeholder="Example: Dracula reading soundtrack">
+          </details>
+          <div class="music-save-row">
+            <button id="save-music-preferred" class="secondary" type="button">Save to My Music</button>
+            ${bookKey ? '<button id="save-music-to-book" class="secondary" type="button">Save for this book</button>' : ''}
+          </div>
           <span id="music-service-status" class="status" aria-live="polite"></span>
         </form>
       </section>
 
-      <section id="book-music" class="music-category preferred-music-library">
-        <div class="library-heading"><div><h2>Music for ${currentBookLabel}</h2><p>${bookKey ? 'These selections will be shown as book-specific choices whenever this book is open.' : 'Open a book first, then return here to associate music with it.'}</p></div></div>
-        <div class="preferred-music-list">
-          ${bookItems.length ? bookItems.map((item) => `
-            <article class="preferred-music-item">
-              <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}</span></div>
-              <div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-detach-book-music="${escapeHtml(item.id)}">Remove from book</button></div>
-            </article>`).join('') : `<p class="library-note">${bookKey ? 'No music has been attached to this book yet.' : 'No book is currently open.'}</p>`}
+      <section class="music-secondary-section">
+        <div class="music-section-heading">
+          <div><span class="music-step">2</span><h2>Your saved music</h2></div>
+          <p>Play a saved selection or connect it to ${bookKey ? currentBookLabel : 'a book later'}.</p>
         </div>
-      </section>
-
-      <section id="preferred-music" class="music-category preferred-music-library">
-        <div class="library-heading"><div><h2>My Music</h2><p>Saved selections appear in reader music controls and can be assigned to books.</p></div></div>
-        <div id="preferred-music-list" class="preferred-music-list">
+        <div id="preferred-music-list" class="preferred-music-list music-saved-list">
           ${preferred.length ? preferred.map((item) => `
-            <article class="preferred-music-item">
-              <div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}${bookIds.includes(item.id) ? ' · Attached to current book' : ''}</span></div>
-              <div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button>${bookKey ? `<button class="secondary" type="button" data-attach-book-music="${escapeHtml(item.id)}">${bookIds.includes(item.id) ? 'Attached ✓' : 'Add to book'}</button>` : ''}<button class="secondary" type="button" data-remove-preferred="${escapeHtml(item.id)}">Remove</button></div>
-            </article>`).join('') : '<p class="library-note">No saved music yet. Add a Spotify or YouTube selection above.</p>'}
+            <article class="preferred-music-item music-saved-item">
+              <div class="music-saved-info"><span class="music-provider-badge">${escapeHtml(item.provider === 'spotify' ? 'Spotify' : 'YouTube')}</span><strong>${escapeHtml(item.title)}</strong>${bookIds.includes(item.id) ? '<small>Saved for this book</small>' : ''}</div>
+              <div class="preferred-music-actions"><button class="primary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button>${bookKey ? `<button class="secondary" type="button" data-attach-book-music="${escapeHtml(item.id)}">${bookIds.includes(item.id) ? 'Remove from book' : 'Save for book'}</button>` : ''}<button class="text-button danger-text" type="button" data-remove-preferred="${escapeHtml(item.id)}">Delete</button></div>
+            </article>`).join('') : '<div class="music-empty-state"><strong>No saved music yet</strong><span>Play a link above, then choose “Save to My Music.”</span></div>'}
         </div>
       </section>
 
-      <section id="focus-music" class="music-category"><h2>Focus selections</h2><div class="music-card-grid">
-        ${categories.map((category) => musicChoices.filter((item) => item.category === category).map((item) => `
-          <article class="music-card"><div class="music-card-icon" aria-hidden="true">♫</div><div><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.description)}</p><div class="music-card-links"><a href="${escapeHtml(musicWatchUrl(item))}" target="_blank" rel="noopener noreferrer">Open on YouTube</a><a href="${escapeHtml(youtubeSearchUrl(musicSearchQuery(item)))}" target="_blank" rel="noopener noreferrer">Find alternative</a></div></div><div class="music-card-actions"><button class="primary" type="button" data-play-music="${escapeHtml(item.id)}">Play</button><button class="secondary" type="button" data-save-music="${escapeHtml(item.id)}">Save</button></div></article>`).join('')).join('')}
-      </div></section>
-      <p class="library-note">Spotify and YouTube control availability, advertising, regional restrictions, sign-in requirements, and whether particular media can be embedded. Mark, Set, Go! stores links and book associations, not audio files.</p>
+      ${bookKey && bookItems.length ? `<details class="music-book-details"><summary>Music saved for ${currentBookLabel} <span>${bookItems.length}</span></summary><div class="preferred-music-list">${bookItems.map((item) => `<article class="preferred-music-item"><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.source || 'Music')}</span></div><div class="preferred-music-actions"><button class="secondary" type="button" data-play-preferred="${escapeHtml(item.id)}">Play</button><button class="text-button" type="button" data-detach-book-music="${escapeHtml(item.id)}">Remove</button></div></article>`).join('')}</div></details>` : ''}
+
+      <details class="music-browse-details">
+        <summary>Browse more focus music <span>${musicChoices.length}</span></summary>
+        <div class="music-browse-list">
+          ${musicChoices.map((item) => `<article><div><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.description)}</span></div><div><button class="secondary" type="button" data-play-music="${escapeHtml(item.id)}">Play</button><button class="text-button" type="button" data-save-music="${escapeHtml(item.id)}">Save</button></div></article>`).join('')}
+        </div>
+      </details>
+
+      <p class="library-note music-service-note">Playback is provided by Spotify or YouTube. Mark, Set, Go! stores only links and book associations.</p>
     </section>`;
 
   app.querySelectorAll('[data-play-music]').forEach((button) => button.addEventListener('click', () => {
@@ -824,7 +867,7 @@ function renderMusicLibrary() {
     const choice = musicChoices.find((item) => item.id === button.dataset.saveMusic);
     if (!choice) return;
     const added = addPreferredMusic({ title: choice.title, source: choice.category, provider: 'youtube', choiceId: choice.id });
-    button.textContent = added ? 'Saved ✓' : 'Already saved';
+    button.textContent = added ? 'Saved ✓' : 'Saved';
     button.disabled = true;
   }));
   app.querySelectorAll('[data-play-preferred]').forEach((button) => button.addEventListener('click', () => playPreferredMusic(button.dataset.playPreferred)));
@@ -837,7 +880,9 @@ function renderMusicLibrary() {
     renderMusicLibrary();
   }));
   app.querySelectorAll('[data-attach-book-music]').forEach((button) => button.addEventListener('click', () => {
-    attachMusicToCurrentBook(button.dataset.attachBookMusic);
+    const id = button.dataset.attachBookMusic;
+    if (bookIds.includes(id)) detachMusicFromCurrentBook(id);
+    else attachMusicToCurrentBook(id);
     renderMusicLibrary();
   }));
   app.querySelectorAll('[data-detach-book-music]').forEach((button) => button.addEventListener('click', () => {
@@ -851,6 +896,23 @@ function renderMusicLibrary() {
     if (customName) parsed.title = customName;
     return parsed;
   };
+  const saveFormMusic = (attachToBook = false) => {
+    const status = app.querySelector('#music-service-status');
+    try {
+      const parsed = parseFormMusic();
+      const before = getPreferredMusic();
+      const added = addPreferredMusic({ title: parsed.title, source: parsed.source, provider: parsed.provider || 'youtube', src: parsed.src, originalUrl: parsed.originalUrl || '' });
+      const after = getPreferredMusic();
+      const saved = after.find((item) => !before.some((oldItem) => oldItem.id === item.id)) || after.find((item) => item.src === parsed.src || item.originalUrl === parsed.originalUrl);
+      if (attachToBook && saved && bookKey) attachMusicToCurrentBook(saved.id);
+      status.className = 'status';
+      status.textContent = attachToBook ? `Saved “${parsed.title}” for this book.` : (added ? `Saved “${parsed.title}” to My Music.` : 'That selection is already saved.');
+      window.setTimeout(renderMusicLibrary, 500);
+    } catch (error) {
+      status.className = 'status error';
+      status.textContent = error.message;
+    }
+  };
   app.querySelector('#music-url-form')?.addEventListener('submit', (event) => {
     event.preventDefault();
     const status = app.querySelector('#music-service-status');
@@ -858,26 +920,16 @@ function renderMusicLibrary() {
       const parsed = parseFormMusic();
       playMusic(parsed);
       status.className = 'status';
-      status.textContent = `Loaded ${parsed.source}.`;
+      status.textContent = `Now playing ${parsed.title}.`;
     } catch (error) {
       status.className = 'status error';
       status.textContent = error.message;
     }
   });
-  app.querySelector('#save-music-preferred')?.addEventListener('click', () => {
-    const status = app.querySelector('#music-service-status');
-    try {
-      const parsed = parseFormMusic();
-      const added = addPreferredMusic({ title: parsed.title, source: parsed.source, provider: parsed.provider || 'youtube', src: parsed.src, originalUrl: parsed.originalUrl || '' });
-      status.className = 'status';
-      status.textContent = added ? `Saved “${parsed.title}” to My Music.` : 'That selection is already saved.';
-      if (added) window.setTimeout(renderMusicLibrary, 350);
-    } catch (error) {
-      status.className = 'status error';
-      status.textContent = error.message;
-    }
-  });
+  app.querySelector('#save-music-preferred')?.addEventListener('click', () => saveFormMusic(false));
+  app.querySelector('#save-music-to-book')?.addEventListener('click', () => saveFormMusic(true));
 }
+
 async function loadBillboardSongs() {
   const status = app.querySelector('#billboard-status');
   const list = app.querySelector('#billboard-list');
@@ -2698,8 +2750,15 @@ function bindDraggableFocusAnchor(overlay) {
     event.preventDefault();
     event.stopPropagation();
     overlay.classList.add('focus-anchor-dragging');
+    state.focusAnchorSuppressClick = false;
+    const dragStartX = Number(event.clientX) || 0;
+    const dragStartY = Number(event.clientY) || 0;
 
     const move = (moveEvent) => {
+      const dx = (Number(moveEvent.clientX) || 0) - dragStartX;
+      const dy = (Number(moveEvent.clientY) || 0) - dragStartY;
+      if (Math.hypot(dx, dy) > 4) state.focusAnchorSuppressClick = true;
+
       const rect = frame.getBoundingClientRect();
       const x = ((moveEvent.clientX - rect.left) / Math.max(1, rect.width)) * 100;
       const y = ((moveEvent.clientY - rect.top) / Math.max(1, rect.height)) * 100;
@@ -2899,31 +2958,19 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   refreshFocusAnchorStyle();
   updateFocusAnchorOverlay();
 
-  // Book Pages needs a geometry pass after the DOM has its final font, width,
-  // mode and page setting. Merely checking the checkbox is not sufficient.
+  // Protected Book Pages refresh restoration:
+  // restore the visible spread from the saved viewport anchor while keeping
+  // the independent playback cursor at savedIndex.
   requestAnimationFrame(() => {
-    if (state.bookPages) {
-      scheduleBookPageReflow();
-      requestAnimationFrame(() => {
-        const activeReader = app.querySelector('#reader');
-        if (activeReader) {
-          ensureWordsRendered(activeReader, mode, wordCount, state.index + 100);
-          const target =
-            activeReader.querySelector(`.reader-word[data-index="${state.index}"]`) ||
-            activeReader.querySelector(`.reader-group[data-start-index="${state.index}"]`);
-          if (target) {
-            const readerRect = activeReader.getBoundingClientRect();
-            const targetRect = target.getBoundingClientRect();
-            const metrics = applyBookPageMetrics(activeReader);
-            const absoluteLeft = targetRect.left - readerRect.left + activeReader.scrollLeft - metrics.paddingLeft;
-            const pageIndex = Math.max(0, Math.floor(absoluteLeft / Math.max(1, metrics.pagePitch)));
-            goToBookSpread(Math.floor(pageIndex / 2), { behavior: 'auto', ensureRendered: true });
-          } else {
-            updateBookPageStatus();
-          }
-        }
-      });
-    }
+    if (!state.bookPages) return;
+    scheduleBookPageReflow({ anchorIndex: savedViewportAnchor });
+    requestAnimationFrame(() => {
+      restoreBookPageWordAnchor(savedViewportAnchor);
+      state.viewportAnchorIndex = savedViewportAnchor;
+      state.index = savedIndex;
+      readerEngine.setPosition(savedIndex);
+      updateReaderStatus();
+    });
   });
 
   const restoreSavedViewport = () => {
@@ -2981,6 +3028,364 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
 }
 
 
+
+const BOOK_BUILDER_DRAFT_KEY = 'markSetGoBookBuilderDraftV1';
+
+function normalizeBuilderText(value) {
+  return String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{4,}/g, '\n\n\n')
+    .trim();
+}
+
+function detectBuilderSections(text) {
+  const lines = normalizeBuilderText(text).split('\n');
+  const headingPattern = /^(?:(?:chapter|book|part|section|canto|act)\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)(?:\s*[:.\-–—]\s*.*)?|(?:prologue|epilogue|introduction|preface|foreword|afterword|conclusion|appendix)(?:\s*[:.\-–—]\s*.*)?)$/i;
+  const allCapsPattern = /^[A-Z0-9][A-Z0-9 '\u2019\-–—,:;.]{2,80}$/;
+  const headings = [];
+  lines.forEach((raw, lineIndex) => {
+    const title = raw.trim().replace(/\s+/g, ' ');
+    if (!title || title.length > 100) return;
+    const previousBlank = lineIndex === 0 || !lines[lineIndex - 1].trim();
+    const nextBlank = lineIndex === lines.length - 1 || !lines[lineIndex + 1].trim();
+    if (headingPattern.test(title) || (previousBlank && nextBlank && allCapsPattern.test(title) && /[A-Z]/.test(title))) {
+      headings.push({ title, lineIndex });
+    }
+  });
+  if (!headings.length && normalizeBuilderText(text)) headings.push({ title: 'Full Text', lineIndex: 0 });
+  return headings.slice(0, 300);
+}
+
+function builderWordCount(text) {
+  return (String(text || '').match(/[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu) || []).length;
+}
+
+function normalizedSourceLine(value) {
+  return String(value || '')
+    .toLocaleLowerCase()
+    .replace(/[“”‘’'\"`]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+function removePrintedTocFromText(text) {
+  const lines = String(text || '').replace(/\r/g, '').split('\n');
+  const markerIndex = lines.findIndex((line, index) => index < Math.min(lines.length, 1800) && /^(?:table\s+of\s+contents|contents)$/i.test(line.trim()));
+  if (markerIndex < 0) return { text: String(text || ''), removedLines: 0, detected: false };
+
+  const candidates = [];
+  for (let index = markerIndex + 1; index < Math.min(lines.length, markerIndex + 320); index += 1) {
+    const line = lines[index].replace(/\s+/g, ' ').trim();
+    if (!line || /^\[PDF Page \d+\]$/i.test(line)) continue;
+    const wordCount = splitWords(line).length;
+    const cleaned = line
+      .replace(/(?:\.{2,}|\s{2,})\s*(?:\d+|[ivxlcdm]+)\s*$/iu, '')
+      .replace(/\s+(?:\d+|[ivxlcdm]+)\s*$/iu, '')
+      .trim();
+    const structural = Boolean(classifyStructureLine(cleaned, splitWords(cleaned).length));
+    const pageLike = /(?:\.{2,}|\s{2,})\s*(?:\d+|[ivxlcdm]+)\s*$/iu.test(line);
+    if (cleaned && cleaned.length <= 170 && wordCount <= 26 && (structural || pageLike || /^[A-Z0-9IVXLC][^.!?]{1,120}$/u.test(cleaned))) {
+      const key = normalizeTocTitle(cleaned) || normalizedSourceLine(cleaned);
+      if (key.length >= 2) candidates.push({ index, title: cleaned, key });
+    }
+  }
+  if (candidates.length < 3) return { text: String(text || ''), removedLines: 0, detected: true };
+
+  let bodyStart = -1;
+  const candidateKeys = new Set(candidates.map((item) => item.key));
+  const searchFrom = Math.max(candidates.at(-1)?.index + 1 || markerIndex + 1, markerIndex + 8);
+  for (let index = searchFrom; index < lines.length; index += 1) {
+    const line = lines[index].replace(/\s+/g, ' ').trim();
+    if (!line || /^\[PDF Page \d+\]$/i.test(line)) continue;
+    const key = normalizeTocTitle(line) || normalizedSourceLine(line);
+    if (candidateKeys.has(key) && classifyStructureLine(line, splitWords(line).length)) {
+      bodyStart = index;
+      break;
+    }
+  }
+
+  // Fallback for scanned/flattened contents pages: require a strongly page-numbered list
+  // before removing through the first clearly prose-like paragraph.
+  if (bodyStart < 0) {
+    const pageNumbered = lines.slice(markerIndex + 1, Math.min(lines.length, markerIndex + 320))
+      .filter((line) => /(?:\.{2,}|\s{2,})\s*\d+\s*$/.test(line.trim())).length;
+    if (pageNumbered < 5) return { text: String(text || ''), removedLines: 0, detected: true };
+    for (let index = candidates.at(-1).index + 1; index < Math.min(lines.length, markerIndex + 420); index += 1) {
+      const line = lines[index].replace(/\s+/g, ' ').trim();
+      if (/^\[PDF Page \d+\]$/i.test(line) || !line) continue;
+      if (splitWords(line).length >= 18 && /[.!?][”\"']?$/.test(line)) { bodyStart = index; break; }
+    }
+  }
+
+  if (bodyStart < 0) return { text: String(text || ''), removedLines: 0, detected: true };
+  const removedLines = bodyStart - markerIndex;
+  lines.splice(markerIndex, removedLines);
+  return {
+    text: lines.join('\n').replace(/\n{4,}/g, '\n\n\n').trim(),
+    removedLines,
+    detected: true
+  };
+}
+
+function isLikelyRealSectionHeading(value) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim();
+  return /^(?:(?:chapter|chap\.?|book|part|section|article|canto|act)\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b|(?:prologue|epilogue|introduction|preface|foreword|afterword|conclusion|appendix)(?:\s+[a-z0-9ivxlcdm]+)?\b)/i.test(clean);
+}
+
+function removeRepeatedSourceHeaders(text, { title = '', author = '' } = {}) {
+  const lines = String(text || '').replace(/\r/g, '').split('\n');
+  const counts = new Map();
+  const titleKey = normalizedSourceLine(String(title).split(' — ')[0]);
+  const authorKey = normalizedSourceLine(author);
+  for (const line of lines) {
+    const clean = line.replace(/\s+/g, ' ').trim();
+    if (!clean || clean.length > 120 || /^\[PDF Page \d+\]$/i.test(clean)) continue;
+    const key = normalizedSourceLine(clean);
+    if (!key || key.length < 2) continue;
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const repeated = new Set([...counts.entries()].filter(([, count]) => count >= 4).map(([key]) => key));
+  let seenTitle = false;
+  let removed = 0;
+  const output = [];
+  for (const raw of lines) {
+    const clean = raw.replace(/\s+/g, ' ').trim();
+    const key = normalizedSourceLine(clean);
+    const isTitle = Boolean(titleKey && key === titleKey);
+    const isAuthor = Boolean(authorKey && key === authorKey);
+    const isStandalonePage = /^\s*(?:page\s+)?\d{1,5}\s*$/i.test(clean);
+    const safeRepeatedHeader = repeated.has(key)
+      && clean.length <= 100
+      && !isLikelyRealSectionHeading(clean)
+      && !/[.!?][”\"']?$/.test(clean);
+
+    if (isTitle) {
+      if (!seenTitle) { seenTitle = true; output.push(raw); }
+      else removed += 1;
+      continue;
+    }
+    if ((isAuthor && counts.get(key) >= 3) || safeRepeatedHeader || isStandalonePage) {
+      removed += 1;
+      continue;
+    }
+    output.push(raw);
+  }
+  return { text: output.join('\n').replace(/\n{4,}/g, '\n\n\n').trim(), removedLines: removed };
+}
+
+function normalizeImportedBookText(text, options = {}) {
+  let value = normalizeBuilderText(text);
+  const report = { printedTocLines: 0, repeatedHeaderLines: 0 };
+  if (options.removePrintedToc !== false) {
+    const cleaned = removePrintedTocFromText(value);
+    value = cleaned.text;
+    report.printedTocLines = cleaned.removedLines;
+  }
+  if (options.removeRepeatedHeaders !== false) {
+    const cleaned = removeRepeatedSourceHeaders(value, options);
+    value = cleaned.text;
+    report.repeatedHeaderLines = cleaned.removedLines;
+  }
+  const toc = detectTableOfContents(value);
+  return { text: value, toc, report };
+}
+
+function renderBookBuilder() {
+  stopReader();
+  let draft = {};
+  try { draft = JSON.parse(localStorage.getItem(BOOK_BUILDER_DRAFT_KEY) || '{}') || {}; } catch {}
+  app.innerHTML = `
+    <section class="platform-page book-builder-page">
+      <header class="book-builder-header">
+        <div>
+          <span class="source-category">Create a Book</span>
+          <h1>Build an app-ready book</h1>
+          <p>Upload or paste raw text, clean OCR and page artifacts, review the detected chapters, and create a private reading edition.</p>
+        </div>
+        <button class="secondary" type="button" data-action="my-library">My Library</button>
+      </header>
+
+      <div class="book-builder-grid">
+        <form id="book-builder-form" class="book-builder-editor">
+          <div class="book-builder-fields">
+            <label><span>Title</span><input id="builder-title" maxlength="180" value="${escapeHtml(draft.title || '')}" placeholder="The Republic" required></label>
+            <label><span>Author</span><input id="builder-author" maxlength="180" value="${escapeHtml(draft.author || '')}" placeholder="Plato"></label>
+          </div>
+          <section class="book-builder-import">
+            <div><strong>Add your text</strong><small>Upload a book/document or paste into the editor below.</small></div>
+            <label class="secondary button-link book-builder-file-button">Upload File<input id="builder-file" type="file" accept=".epub,.pdf,.docx,.txt,.md,.markdown" hidden></label>
+            <span id="builder-file-name" class="book-builder-file-name"></span>
+          </section>
+          <label class="book-builder-text-label"><span>Book text</span>
+            <textarea id="builder-text" spellcheck="false" placeholder="Paste the complete text here, or upload EPUB, PDF, Word, Markdown, or TXT. Chapter headings such as CHAPTER I, BOOK II, PART THREE, Preface, and Epilogue will be detected automatically." required>${escapeHtml(draft.text || '')}</textarea>
+          </label>
+          <fieldset class="book-builder-cleanup">
+            <legend>Cleanup level</legend>
+            <label><input type="radio" name="builder-cleanup-level" value="light" ${draft.cleanupLevel === 'light' ? 'checked' : ''}><strong>Light</strong><small>Characters, spacing, punctuation</small></label>
+            <label><input type="radio" name="builder-cleanup-level" value="standard" ${draft.cleanupLevel === 'standard' ? 'checked' : ''}><strong>Standard</strong><small>OCR cleanup, paragraphs, page artifacts</small></label>
+            <label><input type="radio" name="builder-cleanup-level" value="deep" ${(!draft.cleanupLevel || draft.cleanupLevel === 'deep') ? 'checked' : ''}><strong>Deep Clean</strong><small>Full cleanup and document structure</small></label>
+          </fieldset>
+          <div class="book-builder-options">
+            <label><input id="builder-clean-toc" type="checkbox" ${draft.cleanToc === false ? '' : 'checked'}> Remove a printed table of contents from the reading text and keep it in the Contents pane.</label>
+            <label><input id="builder-clean-headers" type="checkbox" ${draft.cleanHeaders === false ? '' : 'checked'}> Remove repeated page headers, page numbers, and repeated book-title lines.</label>
+            <label><input id="builder-rights" type="checkbox" ${draft.rights ? 'checked' : ''}> I own this text, have permission to use it, or it is in the public domain.</label>
+          </div>
+          <div class="book-builder-actions">
+            <button id="builder-clean" class="secondary" type="button">Clean &amp; Preview</button>
+            <button id="builder-analyze" class="secondary" type="button">Analyze structure</button>
+            <button class="primary" type="submit">Create book</button>
+            <button id="builder-clear" class="subtle-link" type="button">Clear draft</button>
+          </div>
+          <p id="builder-status" class="status" aria-live="polite"></p>
+        </form>
+
+        <aside class="book-builder-preview">
+          <div class="book-builder-preview-heading">
+            <div><span class="source-category">Preview</span><h2>Table of contents</h2></div>
+            <span id="builder-count" class="book-builder-count">0 words</span>
+          </div>
+          <ol id="builder-toc" class="book-builder-toc"><li class="empty">Paste text to generate a table of contents.</li></ol>
+          <div class="book-builder-note"><strong>Cleanup preview</strong><p id="builder-cleanup-report">Your original stays in the editor until you choose Clean &amp; Preview. The created book uses the cleaned edition.</p></div>
+        </aside>
+      </div>
+    </section>`;
+
+  const titleInput = app.querySelector('#builder-title');
+  const authorInput = app.querySelector('#builder-author');
+  const textInput = app.querySelector('#builder-text');
+  const fileInput = app.querySelector('#builder-file');
+  const fileName = app.querySelector('#builder-file-name');
+  const cleanupLevelInputs = [...app.querySelectorAll('input[name="builder-cleanup-level"]')];
+  const cleanTocInput = app.querySelector('#builder-clean-toc');
+  const cleanHeadersInput = app.querySelector('#builder-clean-headers');
+  const rightsInput = app.querySelector('#builder-rights');
+  const status = app.querySelector('#builder-status');
+  const toc = app.querySelector('#builder-toc');
+  const count = app.querySelector('#builder-count');
+
+  let cleanedPreview = null;
+  let importedSource = draft.importedSource || null;
+  const selectedCleanupLevel = () => cleanupLevelInputs.find((input) => input.checked)?.value || 'deep';
+  const formatter = () => window.MarkSetGoReadAnything?.cleanupTextContent;
+
+  const loadBuilderFile = async (file) => {
+    if (!file) return;
+    status.textContent = `Opening ${file.name}…`;
+    const lower = file.name.toLowerCase();
+    let parsed = null;
+    if (lower.endsWith('.epub')) parsed = await parseEpubFile(file);
+    else if (lower.endsWith('.pdf')) parsed = await parsePdfFile(file, (message) => { status.textContent = message; });
+    else if (lower.endsWith('.docx')) {
+      const response = await fetch('/api/import/docx', { method:'POST', headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}, body:await file.arrayBuffer() });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'The Word document could not be imported.');
+      parsed = { title:payload.title || file.name.replace(/\.docx$/i,''), text:payload.text, source:{type:'docx'} };
+    } else {
+      let text = await file.text();
+      if (lower.endsWith('.md') || lower.endsWith('.markdown')) text = text.replace(/^#{1,6}\s+/gm,'').replace(/^\s*>\s?/gm,'').replace(/[*_~`]/g,'');
+      parsed = { title:file.name.replace(/\.(txt|md|markdown)$/i,''), text, source:{type:'text-upload'} };
+    }
+    if (!parsed?.text?.trim()) throw new Error('No readable text was found in that file.');
+    textInput.value = parsed.text.trim();
+    if (!titleInput.value.trim() && parsed.title) titleInput.value = parsed.title;
+    importedSource = { ...(parsed.source || {}), name:file.name, fileSize:file.size };
+    if (fileName) fileName.textContent = file.name;
+    cleanedPreview = null; saveDraft(); analyze();
+    status.textContent = `${file.name} loaded. Choose a cleanup level, then Clean & Preview.`;
+  };
+
+  const saveDraft = () => {
+    try { localStorage.setItem(BOOK_BUILDER_DRAFT_KEY, JSON.stringify({ title:titleInput.value, author:authorInput.value, text:textInput.value, cleanupLevel:selectedCleanupLevel(), importedSource, cleanToc:cleanTocInput.checked, cleanHeaders:cleanHeadersInput.checked, rights:rightsInput.checked })); } catch {}
+  };
+  const analyze = () => {
+    const analysisSource = cleanedPreview?.text || textInput.value;
+    const normalized = normalizeImportedBookText(analysisSource, {
+      title: titleInput.value.trim(),
+      author: authorInput.value.trim(),
+      removePrintedToc: cleanTocInput.checked,
+      removeRepeatedHeaders: cleanHeadersInput.checked
+    });
+    const text = normalized.text;
+    const sections = normalized.toc.length ? normalized.toc.map((item) => ({ title:item.title, lineIndex:null, index:item.index, type:item.type })) : detectBuilderSections(text);
+    const words = builderWordCount(text);
+    count.textContent = `${words.toLocaleString()} words · ${sections.length} ${sections.length === 1 ? 'section' : 'sections'}`;
+    toc.innerHTML = sections.length
+      ? sections.map((section) => `<li><span>${escapeHtml(section.title)}</span><small>${Number.isFinite(section.index) ? `Word ${(section.index + 1).toLocaleString()}` : `Line ${(Number(section.lineIndex || 0) + 1).toLocaleString()}`}</small></li>`).join('')
+      : '<li class="empty">No chapter headings detected yet.</li>';
+    const cleanupBits = [];
+    if (normalized.report.printedTocLines) cleanupBits.push(`removed ${normalized.report.printedTocLines} printed-TOC lines`);
+    if (normalized.report.repeatedHeaderLines) cleanupBits.push(`removed ${normalized.report.repeatedHeaderLines} repeated header/page-number lines`);
+    status.textContent = text ? `Detected ${sections.length} section${sections.length === 1 ? '' : 's'}${cleanupBits.length ? `; ${cleanupBits.join(' and ')}` : ''}. Review the preview, then create the book.` : '';
+    saveDraft();
+    return { text, sections, words, normalized };
+  };
+
+  let analyzeTimer = null;
+  [titleInput, authorInput, textInput, ...cleanupLevelInputs, cleanTocInput, cleanHeadersInput, rightsInput].forEach((input) => input.addEventListener('input', () => {
+    saveDraft();
+    if (input === textInput) {
+      cleanedPreview = null;
+      clearTimeout(analyzeTimer);
+      analyzeTimer = setTimeout(analyze, 350);
+    }
+  }));
+  fileInput?.addEventListener('change', async (event) => {
+    try { await loadBuilderFile(event.target.files?.[0]); }
+    catch (error) { status.textContent = error?.message || 'The file could not be opened.'; }
+  });
+  app.querySelector('#builder-clean')?.addEventListener('click', () => {
+    try {
+      const fn = formatter();
+      if (!fn) throw new Error('The shared formatter is not ready. Refresh and try again.');
+      cleanedPreview = fn(textInput.value, selectedCleanupLevel());
+      const report = cleanedPreview.report || {};
+      const bits = [];
+      if (report.badCharacters) bits.push(`${report.badCharacters} bad characters removed`);
+      if (report.pageArtifacts) bits.push(`${report.pageArtifacts} page artifacts removed`);
+      if (report.repeatedHeaders) bits.push(`${report.repeatedHeaders} repeated headers removed`);
+      if (report.brokenWords) bits.push(`${report.brokenWords} broken words repaired`);
+      app.querySelector('#builder-cleanup-report').textContent = `${selectedCleanupLevel() === 'deep' ? 'Deep Clean' : selectedCleanupLevel()} preview ready${bits.length ? `: ${bits.join(', ')}.` : '.'} Original pasted/uploaded text remains preserved in the editor.`;
+      analyze();
+    } catch (error) { status.textContent = error?.message || 'Cleanup could not be completed.'; }
+  });
+  app.querySelector('#builder-analyze').addEventListener('click', analyze);
+  app.querySelector('#builder-clear').addEventListener('click', () => {
+    if (!window.confirm('Clear this book-builder draft?')) return;
+    localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+    renderBookBuilder();
+  });
+  app.querySelector('#book-builder-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    const { text, sections, words, normalized } = analyze();
+    const title = titleInput.value.trim();
+    const author = authorInput.value.trim();
+    if (!title) return titleInput.focus();
+    if (words < 10) { status.textContent = 'Add more book text before creating the book.'; return textInput.focus(); }
+    if (!rightsInput.checked) { status.textContent = 'Confirm that you have the right to use this text.'; return rightsInput.focus(); }
+    const displayTitle = author ? `${title} — ${author}` : title;
+    const rawOriginal = textInput.value.trim();
+    const originalKey = `markSetGoBookBuilderOriginalV1:${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+    try { localStorage.setItem(originalKey, rawOriginal); } catch (error) { console.warn('Original book-builder text could not be preserved separately.', error); }
+    const source = {
+      type: 'book-builder',
+      ...(importedSource || {}),
+      author,
+      cleanupLevel: selectedCleanupLevel(),
+      originalPreserved: true,
+      originalKey,
+      createdAt: new Date().toISOString(),
+      documentToc: detectTableOfContents(text),
+      cleanup: normalized?.report || {},
+      private: true
+    };
+    localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+    renderReaderWithText(displayTitle, text, source);
+  });
+
+  if (textInput.value.trim()) analyze();
+}
+
 function renderEmptyReader() {
   stopReader();
 
@@ -3006,6 +3411,11 @@ function renderEmptyReader() {
         <button class="primary empty-reader-action" type="button" data-read="upload">
           <span aria-hidden="true">⬆</span>
           <span><strong>Import Book / Text</strong><small>EPUB, PDF, or TXT</small></span>
+        </button>
+
+        <button class="secondary empty-reader-action" type="button" data-read="book-builder">
+          <span aria-hidden="true">✎</span>
+          <span><strong>Create a Book</strong><small>Paste text and build a clean TOC</small></span>
         </button>
 
         <button class="secondary empty-reader-action" type="button" data-read="url">
@@ -3106,37 +3516,23 @@ function renderHome() {
               <span><strong>WPM Test</strong><small>Measure your natural reading speed</small></span>
             </button>
 
-            <button class="secondary home-large-action" id="resume-last-reading" type="button">
+            ${resumeMeta?.title ? `<button class="secondary home-large-action home-continue-reading" id="resume-last-reading" type="button">
               <span aria-hidden="true">↩</span>
-              <span><strong>Resume Last Reading</strong><small>${resumeMeta?.title ? escapeHtml(resumeMeta.title) : 'No saved reading yet'}</small></span>
-            </button>
+              <span>
+                <strong>Continue Reading</strong>
+                <small>${escapeHtml(resumeMeta.title)}${resumePercent === null ? '' : ` · ${resumePercent}% complete`}</small>
+                ${resumePercent === null ? '' : `<span class="progress-meter" aria-hidden="true"><span style="width:${resumePercent}%"></span></span>`}
+              </span>
+            </button>` : `<button class="secondary home-large-action" id="resume-last-reading" type="button" disabled>
+              <span aria-hidden="true">↩</span>
+              <span><strong>Continue Reading</strong><small>No saved reading yet</small></span>
+            </button>`}
           </div>
 
-          ${resumeMeta?.title ? `<article class="resume-reading-card home-simple-resume">
-            <div>
-              <span class="resume-reading-kicker">Last reading</span>
-              <strong>${escapeHtml(resumeMeta.title)}</strong>
-              <small>${resumePercent === null ? 'Saved reading position' : `${resumePercent}% complete`} · opens only when you choose Resume</small>
-            </div>
-            ${resumePercent === null ? '' : `<div class="progress-meter"><span style="width:${resumePercent}%"></span></div>`}
-          </article>
-          <button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Forget Saved Reading</button>` : ''}
+          ${resumeMeta?.title ? `<button class="secondary subtle home-forget-reading" id="forget-last-reading" type="button">Clear Resume Position</button>` : ''}
         </section>
       </div>
 
-      <section class="home-business-strip" aria-label="Company and product information">
-        <div>
-          <strong>Independent reading and learning platform</strong>
-          <span>Designed and developed by Brian Baker.</span>
-        </div>
-        <nav aria-label="Business information">
-          <button type="button" data-action="about">About</button>
-          <button type="button" data-action="contact">Contact</button>
-          <button type="button" data-action="privacy">Privacy</button>
-          <button type="button" data-action="terms">Terms</button>
-        </nav>
-        <small>© 2026 Brian Baker. All rights reserved. Mark, Set, Go! is an independent software project.</small>
-      </section>
     </section>`;
 
   app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));
@@ -3170,7 +3566,7 @@ function renderHome() {
   });
   app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
     await clearReaderSession();
-    activeReaderSnapshot = null;
+    clearActiveReaderPane();
     renderHome();
   });
 
@@ -4075,6 +4471,8 @@ function comprehensionPassage() {
   };
 }
 
+window.MarkSetGoStartComprehension = startComprehensionCheck;
+
 function closeComprehensionDialog() {
   app.querySelector('#comprehension-dialog')?.close();
 }
@@ -4835,16 +5233,27 @@ function persistCurrentDocument() {
   if (!state.documentId || !state.currentText) return false;
   const key = `${DOCUMENT_STORAGE_PREFIX}${state.documentId}`;
   try {
-    if (!localStorage.getItem(key)) {
-      localStorage.setItem(key, JSON.stringify({
-        title: state.title,
-        text: state.currentText,
-        source: state.source
-      }));
+    const next = {
+      title: state.title,
+      text: state.currentText,
+      source: state.source
+    };
+    const existingRaw = localStorage.getItem(key);
+    let shouldWrite = !existingRaw;
+    if (existingRaw) {
+      try {
+        const existing = JSON.parse(existingRaw);
+        shouldWrite = existing?.title !== next.title
+          || existing?.text !== next.text
+          || JSON.stringify(existing?.source || {}) !== JSON.stringify(next.source || {});
+      } catch {
+        shouldWrite = true;
+      }
     }
+    if (shouldWrite) localStorage.setItem(key, JSON.stringify(next));
     return true;
   } catch (error) {
-    console.warn('Document could not be stored for bookmarks.', error);
+    console.warn('Document could not be stored in this browser.', error);
     return false;
   }
 }
@@ -5042,7 +5451,14 @@ function jumpToWordIndex(wordIndex) {
     const reader = app.querySelector('#reader');
     if (!reader) return;
     if (!['flash', 'digital-sign'].includes(mode)) {
-      ensureWordsRendered(reader, mode, groupSize, index + 100);
+      const distantTocJump = !state.bookPages
+        && (index < Number(state.renderedWordStart || 0)
+          || index > Number(state.renderedWordEnd || 0) + 1600);
+      if (distantTocJump) {
+        virtualRenderer.renderWindowAround(reader, mode, groupSize, index);
+      } else {
+        ensureWordsRendered(reader, mode, groupSize, index + 100);
+      }
       const target = reader.querySelector(`.reader-word[data-index="${index}"]`)
         || reader.querySelector(`.reader-group[data-start-index="${index}"]`);
       if (target) {
@@ -5110,11 +5526,17 @@ function renderNavigationPane() {
   const pane = app.querySelector('#navigation-pane');
   if (!pane) return;
   const bookmarks = getBookmarks();
+  const pageBookmarks = getReaderBookmarks().filter((item) => item.documentId === state.documentId);
+  const bookmarkCount = bookmarks.length + pageBookmarks.length;
   const tocMarkup = state.toc.length
     ? state.toc.map((entry, index) => `<button type="button" class="toc-link" data-toc-index="${entry.index}" title="Go to ${escapeHtml(entry.title)}"><span>${index + 1}</span>${escapeHtml(entry.title)}</button>`).join('')
     : '<p class="navigation-empty">No chapter headings were detected.</p>';
-  const bookmarkMarkup = bookmarks.length
-    ? bookmarks.map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-bookmark="${escapeHtml(bookmark.id)}"><strong>${escapeHtml(bookmark.title)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-bookmark="${escapeHtml(bookmark.id)}" aria-label="Delete bookmark">×</button></div>`).join('')
+  const regularBookmarkMarkup = bookmarks.map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-bookmark="${escapeHtml(bookmark.id)}"><strong>${escapeHtml(bookmark.title)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-bookmark="${escapeHtml(bookmark.id)}" aria-label="Delete bookmark">×</button></div>`).join('');
+  const pageBookmarkMarkup = pageBookmarks
+    .sort((a,b)=>Number(a.pageNumber)-Number(b.pageNumber))
+    .map((bookmark) => `<div class="bookmark-item"><button type="button" class="bookmark-open" data-open-reader-bookmark="${escapeHtml(bookmark.id)}"><strong>Page ${Number(bookmark.pageNumber)}</strong><span>Word ${Number(bookmark.wordIndex).toLocaleString()}</span></button><button type="button" class="bookmark-remove" data-remove-reader-bookmark-list="${escapeHtml(bookmark.id)}" aria-label="Delete page bookmark">×</button></div>`).join('');
+  const bookmarkMarkup = bookmarkCount
+    ? regularBookmarkMarkup + pageBookmarkMarkup
     : '<p class="navigation-empty">No bookmarks saved yet.</p>';
   const definitions = definitionsForCurrentDocument();
   const definitionMarkup = definitions.length
@@ -5132,7 +5554,7 @@ function renderNavigationPane() {
     </div>
     <div class="reader-library-tabs" role="tablist" aria-label="Reading tools">
       <button class="reader-library-tab active" type="button" role="tab" data-reader-tab="contents" aria-selected="true">Contents</button>
-      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="bookmarks" aria-selected="false">Bookmarks <span>${bookmarks.length}</span></button>
+      <button class="reader-library-tab" type="button" role="tab" data-reader-tab="bookmarks" aria-selected="false">Bookmarks <span>${bookmarkCount}</span></button>
       <button class="reader-library-tab" type="button" role="tab" data-reader-tab="definitions" aria-selected="false">Definitions <span>${definitions.length}</span></button>
       <button class="reader-library-tab" type="button" role="tab" data-reader-tab="notes" aria-selected="false">Notes <span>${notes.length}</span></button>
     </div>
@@ -5173,6 +5595,17 @@ function renderNavigationPane() {
   pane.querySelector('#add-bookmark')?.addEventListener('click', addBookmark);
   pane.querySelectorAll('[data-open-bookmark]').forEach((button) => {
     button.addEventListener('click', () => openBookmark(button.dataset.openBookmark));
+  });
+  pane.querySelectorAll('[data-open-reader-bookmark]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const bookmark = getReaderBookmarks().find((item) => item.id === button.dataset.openReaderBookmark);
+      if (!bookmark) return;
+      jumpToWordIndex(bookmark.wordIndex);
+      requestAnimationFrame(updateReaderBookmarkMarkers);
+    });
+  });
+  pane.querySelectorAll('[data-remove-reader-bookmark-list]').forEach((button) => {
+    button.addEventListener('click', () => removeReaderBookmark(button.dataset.removeReaderBookmarkList));
   });
   pane.querySelectorAll('[data-remove-bookmark]').forEach((button) => {
     button.addEventListener('click', () => removeBookmark(button.dataset.removeBookmark));
@@ -6132,12 +6565,13 @@ const LIBRARY_PROVIDERS = {
   gutenberg: { label: 'Project Gutenberg', icon: 'G', note: 'Public-domain ebooks with mirror fallback.' }
 };
 
-function unifiedBookCard(book) {
+function unifiedBookCard(book, selectedFormat = 'best') {
   const provider = LIBRARY_PROVIDERS[book.provider] || { label: book.provider || 'Library', icon: '◫' };
   const canRead = Boolean(book.readable);
   const author = book.author || 'Unknown author';
   const details = [book.year, book.language, book.format].filter(Boolean).join(' · ');
   const difficulty = getBookDifficulty(book);
+  const formatLabel = selectedFormat === 'epub' ? 'EPUB' : selectedFormat === 'pdf' ? 'PDF' : selectedFormat === 'text' ? 'Plain text' : '';
   return `
     <article class="unified-book-card">
       <div class="unified-cover-wrap">
@@ -6151,7 +6585,7 @@ function unifiedBookCard(book) {
         ${difficultyBadge(difficulty, book)}
         ${book.description ? `<p class="unified-description">${escapeHtml(book.description)}</p>` : ''}
         <div class="unified-actions">
-          ${canRead ? `<button class="primary" type="button" data-library-read="${escapeHtml(book.provider)}" data-library-id="${escapeHtml(book.id)}">▸ Read now</button>` : ''}
+          ${canRead ? `<button class="primary" type="button" data-library-read="${escapeHtml(book.provider)}" data-library-id="${escapeHtml(book.id)}" data-library-format="${escapeHtml(selectedFormat)}">▸ ${formatLabel ? `Open ${formatLabel}` : 'Read now'}</button>` : ''}
           ${book.externalUrl ? `<a class="secondary button-link" href="${escapeHtml(book.externalUrl)}" target="_blank" rel="noopener noreferrer">↗ Book page</a>` : ''}
           <button class="secondary" type="button" data-library-save='${escapeHtml(JSON.stringify({title: book.title, author, sourceUrl: book.externalUrl || '', provider: book.provider}))}'>＋ Reading list</button>
         </div>
@@ -6178,6 +6612,12 @@ async function renderUnifiedLibrary(initial = {}) {
           <option value="all" ${provider === 'all' ? 'selected' : ''}>All libraries</option>
           ${Object.entries(LIBRARY_PROVIDERS).map(([key, item]) => `<option value="${key}" ${provider === key ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
         </select>
+        <select id="unified-library-format" aria-label="Book format">
+          <option value="best">Best available</option>
+          <option value="text">Plain text</option>
+          <option value="epub">EPUB</option>
+          <option value="pdf">PDF</option>
+        </select>
         <button class="primary" type="submit">Search</button>
       </form>
       <div class="list-toolbar-row">
@@ -6200,15 +6640,16 @@ async function renderUnifiedLibrary(initial = {}) {
   const search = async () => {
     const q = app.querySelector('#unified-library-query').value.trim();
     const source = app.querySelector('#unified-library-provider').value;
+    const format = app.querySelector('#unified-library-format').value;
     if (!q) { status.textContent = 'Enter a title or author.'; results.innerHTML = ''; return; }
     status.className = 'status';
     status.textContent = `Searching ${source === 'all' ? 'all libraries' : LIBRARY_PROVIDERS[source]?.label || source}…`;
     results.innerHTML = '<div class="library-loading"><span class="loading-book">◫</span><p>Gathering editions…</p></div>';
     try {
-      const payload = await loadApiPayload(`/api/library/search?q=${encodeURIComponent(q)}&provider=${encodeURIComponent(source)}`);
+      const payload = await loadApiPayload(`/api/library/search?q=${encodeURIComponent(q)}&provider=${encodeURIComponent(source)}&format=${encodeURIComponent(format)}`);
       const books = Array.isArray(payload.books) ? payload.books : [];
       status.textContent = books.length ? `${books.length} result${books.length === 1 ? '' : 's'} found.` : 'No books found. Try a broader search.';
-      results.innerHTML = books.length ? books.map(unifiedBookCard).join('') : '<div class="empty-library"><h2>No results</h2><p>Try another title, author, or source.</p></div>';
+      results.innerHTML = books.length ? books.map((book) => unifiedBookCard(book, format)).join('') : `<div class="empty-library"><h2>No results</h2><p>${format === 'best' ? 'Try another title, author, or source.' : `No matching ${format === 'text' ? 'plain-text' : format.toUpperCase()} edition was found. Try Best available or another source.`}</p></div>`;
       bindUnifiedLibraryActions(results);
       bindListPresentationControls({
         key:'all-libraries',
@@ -6235,11 +6676,28 @@ function bindUnifiedLibraryActions(container) {
   container.querySelectorAll('[data-library-read]').forEach((button) => button.addEventListener('click', async () => {
     const provider = button.dataset.libraryRead;
     const id = button.dataset.libraryId;
+    const format = button.dataset.libraryFormat || 'best';
     const original = button.textContent;
     button.disabled = true; button.textContent = 'Loading…';
     try {
-      const book = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}`);
-      renderReaderWithText(`${book.title}${book.author ? ` — ${book.author}` : ''}`, book.text, { type: provider, id, sourceUrl: book.sourceUrl });
+      if (format === 'epub' || format === 'pdf') {
+        const response = await fetch(`/api/library/download?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}&format=${encodeURIComponent(format)}`);
+        if (!response.ok) {
+          let message = `The ${format.toUpperCase()} edition could not be opened.`;
+          try { message = (await response.json()).error || message; } catch {}
+          throw new Error(message);
+        }
+        const blob = await response.blob();
+        const file = new File([blob], `${provider}-${id}.${format}`, { type: format === 'epub' ? 'application/epub+zip' : 'application/pdf' });
+        const parsed = format === 'epub' ? await parseEpubFile(file) : await parsePdfFile(file);
+        parsed.source = { ...(parsed.source || {}), type: provider, provider, id, remoteFormat: format };
+        renderReaderWithText(parsed.title, parsed.text, parsed.source);
+        return;
+      }
+      const book = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}&format=${encodeURIComponent(format)}`);
+      const fullTitle = `${book.title}${book.author ? ` — ${book.author}` : ''}`;
+      const normalized = normalizeImportedBookText(book.text, { title:book.title, author:book.author });
+      renderReaderWithText(fullTitle, normalized.text, { type: provider, id, sourceUrl: book.sourceUrl, remoteFormat: format === 'best' ? 'text' : format, documentToc: normalized.toc, cleanup: normalized.report });
     } catch (error) {
       window.alert(error.message);
       button.disabled = false; button.textContent = original;
@@ -6272,6 +6730,7 @@ async function renderReader(kind) {
   if (normalizedKind === 'frankenstein-demo') return loadBuiltInIllustratedDemo();
   if (normalizedKind === 'url') return renderUrlImporter();
   if (normalizedKind === 'upload') return renderUpload();
+  if (normalizedKind === 'book-builder') return renderBookBuilder();
   if (normalizedKind === 'illustrated-upload') return renderIllustratedUpload();
   if (normalizedKind === 'unified-library') return renderUnifiedLibrary();
   if (normalizedKind === 'gutenberg') return renderGutenbergLibrary();
@@ -6339,14 +6798,55 @@ function captureMarkSelection() {
   const beforeStart=Math.max(0,startIndex-220), afterEnd=Math.min(state.words.length,startIndex+selectedWordCount+220);
   return {text,startIndex,endIndex:Math.min(state.words.length,startIndex+selectedWordCount),before:state.words.slice(beforeStart,startIndex).join(' '),after:state.words.slice(startIndex+selectedWordCount,afterEnd).join(' '),title:state.title,chapter:currentTocTitle?.()||'',documentId:state.documentId,createdAt:new Date().toISOString()};
 }
-function currentTocTitle(){
-  const items=Array.isArray(state.toc)?state.toc:[]; let current='';
-  for(const item of items){ if(Number(item.index)<=Number(state.index)) current=item.title||current; else break; }
+function tocTitleForWordIndex(wordIndex = state.index) {
+  const items = Array.isArray(state.toc) ? state.toc : [];
+  const target = Math.max(0, Number(wordIndex) || 0);
+  let current = '';
+  for (const item of items) {
+    if (Number(item.index) <= target) current = item.title || current;
+    else break;
+  }
   return current;
+}
+function currentTocTitle(){
+  return tocTitleForWordIndex(state.index);
+}
+function clearPersistentMarkSelection() {
+  app.querySelectorAll('#reader .ask-mark-selected').forEach((element)=>element.classList.remove('ask-mark-selected'));
+}
+function clearMarkSelectionForReadingResume() {
+  state.markPersistentSelection=null;
+  state.markSelection=null;
+  state.markSelectionLocked=false;
+  state.markSuppressNextReaderClick=false;
+  clearPersistentMarkSelection();
+  hideMarkToolbar();
+  const selection=window.getSelection?.();
+  if(selection && selection.rangeCount) selection.removeAllRanges();
+}
+function applyPersistentMarkSelectionHighlight() {
+  const selectionData=state.markPersistentSelection;
+  if(!selectionData) return;
+  const start=Math.max(0,Number(selectionData.startIndex)||0);
+  const end=Math.max(start+1,Number(selectionData.endIndex)||start+1);
+  app.querySelectorAll('#reader .reader-word[data-index], #reader .reader-group[data-start-index]').forEach((element)=>{
+    const elementStart=Number(element.dataset.index ?? element.dataset.startIndex);
+    const explicitEnd=Number(element.dataset.endIndex);
+    const elementEnd=Number.isFinite(explicitEnd) ? explicitEnd : elementStart+1;
+    if(Number.isFinite(elementStart) && elementStart<end && elementEnd>start){
+      element.classList.add('ask-mark-selected');
+    }
+  });
+}
+function persistMarkSelectionHighlight(selectionData) {
+  if(selectionData) state.markPersistentSelection={...selectionData};
+  clearPersistentMarkSelection();
+  applyPersistentMarkSelectionHighlight();
 }
 function showMarkToolbar(selectionData, rect) {
   const bar=app.querySelector('#mark-selection-toolbar'); if(!bar) return;
   state.markSelection=selectionData;
+  persistMarkSelectionHighlight(selectionData);
   bar.hidden=false;
   const width=bar.offsetWidth||540;
   bar.style.left=`${Math.max(8,Math.min(window.innerWidth-width-8,rect.left+rect.width/2-width/2))}px`;
@@ -6439,10 +6939,39 @@ function saveMarkInsight(extra={}){
   renderGlobalNotebookEntries();
   updateReaderStatus?.('Saved to Mark’s notebook.');
 }
+function openComparisonWorkspace(){
+  const selected=state.markSelection;
+  if(!selected?.text) return;
+  const payload={
+    id:`comparison-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    createdAt:new Date().toISOString(),
+    primary:{
+      documentId:selected.documentId||state.documentId||'',
+      title:selected.title||state.title||'Current text',
+      author:state.source?.author||'',
+      passage:selected.text,
+      startIndex:Number(selected.startIndex)||0,
+      endIndex:Number(selected.endIndex)||Number(selected.startIndex)||0,
+      chapter:selected.chapter||'',
+      source:state.source||null
+    },
+    comparisonTexts:[],
+    mode:'syntopicon',
+    notes:''
+  };
+  try{localStorage.setItem('markSetGoComparisonDraftV1',JSON.stringify(payload));}catch{}
+  const opened=window.open('/comparison-workspace.html','_blank');
+  if(!opened){
+    window.location.href='/comparison-workspace.html';
+  }
+  hideMarkToolbar();
+}
+
 async function runMarkAction(action,question=''){
   const selected=state.markSelection; if(!selected) return;
   if(action==='save'){saveMarkInsight({action:'selection'});return;}
-  if(action==='define' && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false); return; }
+  if(action==='related'){openComparisonWorkspace();return;}
+  if(action==='define' && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false, 'mark'); return; }
   const responsePanels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean);responsePanels.forEach(p=>{p.hidden=false;p.innerHTML='<p class="status">Ask Mark is reading the selection…</p>';});
   try{
     const targetLanguage=action==='translate'?(window.prompt('Translate into which language?','Spanish')||'').trim():''; if(action==='translate'&&!targetLanguage)return;
@@ -6606,35 +7135,257 @@ function selectReaderParagraphFromEvent(event){
   }
 }
 function bindMarkCompanion(reader){
-  const toolbar=app.querySelector('#mark-selection-toolbar'); if(!reader||!toolbar)return;
-  const handleSelection=()=>{window.setTimeout(()=>{
+  const toolbar=app.querySelector('#mark-selection-toolbar');
+  if(!reader||!toolbar)return;
+
+  const freshInteraction=()=>({
+    active:false,
+    selecting:false,
+    moved:false,
+    paused:false,
+    wasRunning:false,
+    startX:0,
+    startY:0,
+    pointerId:null,
+    finalized:false
+  });
+
+  state.markSelectionInteraction=freshInteraction();
+  state.markSelectionLocked=false;
+  state.markSuppressNextReaderClick=false;
+  state.markResumeOnNextReaderClick=null;
+  state.markSelectionWasRunning=false;
+
+  state.markHighlightObserver?.disconnect?.();
+  state.markHighlightObserver=new MutationObserver(()=>{
+    if(state.markPersistentSelection) requestAnimationFrame(applyPersistentMarkSelectionHighlight);
+  });
+  state.markHighlightObserver.observe(reader,{childList:true,subtree:true});
+
+  const pauseForSelection=(interaction)=>{
+    if(!interaction || interaction.paused) return;
+    interaction.paused=true;
+    interaction.selecting=true;
+    interaction.moved=true;
+    state.markSelectionWasRunning=Boolean(interaction.wasRunning);
+
+    // This flag is set before pointerup/click. The previous implementation set
+    // it inside a timeout after pointerup, which allowed the reader's normal
+    // click handler to restart playback before the selected passage was locked.
+    state.markSuppressNextReaderClick=true;
+
+    if(isReaderRunning()) pauseReader();
+    persistReaderSession({immediate:true});
+    updateReaderStatus('Paused while selecting a passage.');
+  };
+
+  const lockCapturedSelection=()=>{
+    const interaction=state.markSelectionInteraction||freshInteraction();
+    if(interaction.finalized) return true;
+
     const data=captureMarkSelection();
-    if(!data) return hideMarkToolbar();
+    if(!data) return false;
 
-    /*
-      Selecting a passage is an intentional study interruption. Pause every
-      timed reading mode at its canonical word before displaying Mark tools.
-      The reader remains paused until the user explicitly presses Resume.
-    */
-    if(isReaderRunning()){
-      stopReader();
-      const start=app.querySelector('#start-reader');
-      const pause=app.querySelector('#pause-reader');
-      if(start){start.disabled=false;start.textContent=state.index?'Resume':'Start';}
-      if(pause) pause.disabled=true;
-      persistReaderSession({immediate:true});
-      updateReaderStatus('Paused for selected passage.');
-    }
+    interaction.finalized=true;
+    interaction.active=false;
+    pauseForSelection(interaction);
+    state.markSelectionLocked=true;
+    persistReaderSession({immediate:true});
+    updateReaderStatus('Paused for selected passage. Click elsewhere in the text to continue.');
 
-    const selection=window.getSelection();
-    showMarkToolbar(data,selection.getRangeAt(0).getBoundingClientRect());
+    const selection=window.getSelection?.();
+    const range=selection?.rangeCount?selection.getRangeAt(0):null;
+    showMarkToolbar(data,range?.getBoundingClientRect?.()||reader.getBoundingClientRect());
     renderMarkSelectionCard();
     if(!app.querySelector('#fullscreen-mark-drawer')?.hidden)renderFullscreenMarkSelection();
-  },0);};
-  reader.addEventListener('mouseup',handleSelection);reader.addEventListener('keyup',handleSelection);
+    return true;
+  };
+
+  const finalizeSelection=()=>{
+    const interaction=state.markSelectionInteraction||freshInteraction();
+    if(!interaction.active && !interaction.selecting) return;
+    interaction.active=false;
+
+    if(!interaction.selecting && !interaction.moved){
+      // A true click remains a normal seek/toggle click. It never pauses first.
+      return;
+    }
+
+    pauseForSelection(interaction);
+
+    // Selection ranges are usually complete by pointerup. Retry for one frame
+    // because Chromium can publish the final range immediately after pointerup,
+    // especially when the drag crosses several inline word spans.
+    queueMicrotask(()=>{
+      if(lockCapturedSelection()) return;
+      requestAnimationFrame(()=>{
+        if(lockCapturedSelection()) return;
+
+        // The gesture looked like a selection but produced no range. Release
+        // the lock and restore the exact prior running state rather than leaving
+        // the reader unpredictably paused.
+        state.markSuppressNextReaderClick=false;
+        interaction.selecting=false;
+        interaction.moved=false;
+        if(interaction.wasRunning && !isReaderRunning()) startReader();
+      });
+    });
+  };
+
+  const selectionBelongsToReader=()=>{
+    const selection=window.getSelection?.();
+    if(!selection || selection.rangeCount===0 || selection.isCollapsed) return false;
+    const range=selection.getRangeAt(0);
+    return reader.contains(range.commonAncestorContainer)
+      || reader.contains(range.startContainer)
+      || reader.contains(range.endContainer);
+  };
+
+  const resumeAfterLockedSelectionClick=(event)=>{
+    const pending=state.markResumeOnNextReaderClick;
+    const shouldResume=Boolean(pending?.shouldResume);
+    state.markResumeOnNextReaderClick=null;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+
+    if(!shouldResume) return;
+
+    const clickedWord=event.target.closest?.('.reader-word[data-index]');
+    const mode=getSelectedMode();
+    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','pointing-guide','marquee','auto-scroll']);
+
+    if(clickedWord && seekableModes.has(mode)){
+      const clickedIndex=Number(clickedWord.dataset.index);
+      if(Number.isFinite(clickedIndex)){
+        const group=findReadingGroup(clickedIndex);
+        stopReader();
+        state.index=group?.start ?? clickedIndex;
+        state.viewportAnchorIndex=state.index;
+        persistReaderSession({immediate:true});
+        updateReaderStatus(`Reading position moved to word ${(state.index+1).toLocaleString()}.`);
+        startReader();
+        return;
+      }
+    }
+
+    if(mode!=='two-column' && !isReaderRunning()) startReader();
+  };
+
+  reader.addEventListener('pointerdown',(event)=>{
+    if(event.button!==undefined && event.button!==0) return;
+    if(event.target.closest('button, a, input, textarea, select, summary, [contenteditable="true"]')) return;
+
+    // The first ordinary click in the reader after using Ask Mark removes the
+    // temporary highlight. Playback resumes only if it had been running before
+    // the selection began; the click itself is handled in the capture listener.
+    if(state.markSelectionLocked){
+      const shouldResume=Boolean(state.markSelectionWasRunning);
+      clearMarkSelectionForReadingResume();
+      state.markSelectionWasRunning=false;
+      state.markResumeOnNextReaderClick={shouldResume};
+      state.markSelectionInteraction=freshInteraction();
+      updateReaderStatus('Selection cleared.');
+      return;
+    }
+
+    const interaction=freshInteraction();
+    interaction.active=true;
+    interaction.wasRunning=isReaderRunning();
+    interaction.startX=Number(event.clientX)||0;
+    interaction.startY=Number(event.clientY)||0;
+    interaction.pointerId=event.pointerId ?? null;
+    state.markSelectionInteraction=interaction;
+  },true);
+
+  // Do not pause on selectstart alone. Browsers may fire selectstart during an
+  // ordinary click before any real range exists, which would make a normal
+  // click-to-seek look as though the reader had already been paused. Actual
+  // non-collapsed selections are handled by pointermove/selectionchange below.
+
+  reader.addEventListener('pointermove',(event)=>{
+    const interaction=state.markSelectionInteraction;
+    if(!interaction?.active) return;
+    if(interaction.pointerId!==null && event.pointerId!==undefined && event.pointerId!==interaction.pointerId) return;
+
+    // Do not treat ordinary pointer jitter as a selection. The old distance-only
+    // fallback could set markSuppressNextReaderClick before a real range existed,
+    // swallowing normal pause/resume clicks. selectstart is the primary signal;
+    // this fallback pauses only after the browser has produced a non-collapsed
+    // selection that belongs to the reader.
+    if(selectionBelongsToReader()) pauseForSelection(interaction);
+  },true);
+
+  // selectionchange covers keyboard selection and touch implementations where
+  // pointermove/selectstart delivery can vary.
+  if(state.markSelectionChangeHandler){
+    document.removeEventListener('selectionchange',state.markSelectionChangeHandler);
+  }
+  state.markSelectionChangeHandler=()=>{
+    const interaction=state.markSelectionInteraction;
+    if(!interaction?.active || !selectionBelongsToReader()) return;
+    pauseForSelection(interaction);
+  };
+  document.addEventListener('selectionchange',state.markSelectionChangeHandler);
+
+  reader.addEventListener('pointerup',finalizeSelection,true);
+  reader.addEventListener('pointercancel',()=>{
+    const interaction=state.markSelectionInteraction;
+    if(!interaction) return;
+    interaction.active=false;
+    if(interaction.paused && !state.markSelectionLocked && interaction.wasRunning && !isReaderRunning()){
+      state.markSuppressNextReaderClick=false;
+      startReader();
+    }
+  },true);
+  reader.addEventListener('keyup',()=>{
+    if(selectionBelongsToReader()){
+      const interaction=state.markSelectionInteraction||freshInteraction();
+      interaction.active=true;
+      interaction.wasRunning=interaction.wasRunning||isReaderRunning();
+      state.markSelectionInteraction=interaction;
+      pauseForSelection(interaction);
+      finalizeSelection();
+    }
+  });
+
+  // This capture listener runs before the reader's normal click handler.
+  reader.addEventListener('click',(event)=>{
+    if(state.markResumeOnNextReaderClick!==null){
+      resumeAfterLockedSelectionClick(event);
+      return;
+    }
+    if(!state.markSuppressNextReaderClick) return;
+
+    const interaction=state.markSelectionInteraction;
+    const hasRealSelection=state.markSelectionLocked
+      || Boolean(interaction?.finalized)
+      || selectionBelongsToReader();
+
+    state.markSuppressNextReaderClick=false;
+    if(!hasRealSelection) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  },true);
+
   reader.addEventListener('dblclick',event=>{if(event.altKey)selectReaderParagraphFromEvent(event);});
   toolbar.addEventListener('mousedown',e=>e.preventDefault());
-  toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();runMarkAction(b.dataset.markToolbarAction);}));
+  toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    if(b.dataset.markToolbarAction==='ask'){
+      hideMarkToolbar();
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{
+        applyPersistentMarkSelectionHighlight();
+        const input=document.querySelector('[data-askmark-input]');
+        input?.focus();
+        applyPersistentMarkSelectionHighlight();
+      }));
+      return;
+    }
+    runMarkAction(b.dataset.markToolbarAction);
+  }));
   toolbar.querySelector('[data-mark-more]')?.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();});
   app.querySelector('#toggle-mark-panel')?.addEventListener('click',()=>{
     const layout=app.querySelector('#reader-layout');
@@ -6674,6 +7425,7 @@ function bindMarkCompanion(reader){
   document.addEventListener('mousedown',event=>{if(!event.target.closest('#mark-selection-toolbar')&&!event.target.closest('#word-panel')&&!reader.contains(event.target))hideMarkToolbar();});
   renderMarkSelectionCard();
 }
+
 function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.dataset.viewKey = 'reader';
   const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });
@@ -6741,6 +7493,14 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   state.uploadedIllustrations = Array.isArray(source?.illustrations) ? source.illustrations : [];
   state.illustrationMode = state.uploadedIllustrations.length ? 'chapter' : 'off';
   if (!state.words.length) return renderError('No readable text', 'The selected source did not contain readable words.');
+
+  // Every successful import/open must create the local document payload immediately.
+  // Previously the text was only persisted after actions such as adding a bookmark,
+  // allowing cloud metadata to sync while the actual document remained unavailable.
+  persistCurrentDocument();
+  document.dispatchEvent(new CustomEvent('marksetgo:document-available', {
+    detail: { documentId: state.documentId, title: state.title }
+  }));
 
   app.innerHTML = `
     <section class="panel reader-page-panel">
@@ -6827,7 +7587,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       <div class="reader-pane-controls" aria-label="Reading area layout controls">
         <div class="reader-pane-buttons">
           <button id="toggle-navigation-pane" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="navigation-pane"><span aria-hidden="true">☰</span> Marks &amp; Contents</button>
-          <button id="toggle-word-panel" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="word-panel"><span aria-hidden="true">⚙</span> Reader Tools</button>
+          <button id="toggle-word-panel" class="secondary pane-toggle reader-side-toggle" type="button" aria-pressed="false" aria-controls="word-panel" hidden><span aria-hidden="true">⚙</span> Reader Tools</button>
           <button id="toggle-mark-panel" class="secondary pane-toggle reader-side-toggle mark-pane-button" type="button" aria-pressed="false" aria-controls="word-panel"><span aria-hidden="true">✦</span> Ask Mark</button>
         </div>
         <button id="toggle-reader-fullscreen" class="viewer-fullscreen-button" type="button" aria-label="Enter text viewer fullscreen" title="Full screen text viewer">
@@ -6835,7 +7595,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
           <span class="fullscreen-label">Full screen</span>
         </button>
       </div>
-      <div class="reader-layout" id="reader-layout">
+      <div class="reader-layout word-panel-hidden" id="reader-layout">
         <aside id="navigation-pane" class="navigation-pane" aria-label="Contents and bookmarks"></aside>
         <div id="left-pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize contents pane" tabindex="0"></div>
         <div class="reader-center-column">
@@ -6932,6 +7692,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
             </section>
           </div>
           <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
+          <div id="reader-bookmark-layer" class="reader-bookmark-layer" aria-live="polite"></div>
 
             <aside id="fullscreen-mark-drawer" class="fullscreen-mark-drawer" hidden aria-label="Ask Mark reading companion">
               <header class="fullscreen-mark-header">
@@ -6990,12 +7751,13 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
 
       <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="analyze">🧠 Analyze</button><button type="button" data-mark-toolbar-action="define">Aa Define</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-more>••• Ask Mark</button>
+        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
         <button type="button" data-dictionary-action="save" role="menuitem">Save definition</button>
         <button type="button" data-dictionary-action="note" role="menuitem">Add note</button>
+        <button type="button" data-dictionary-action="bookmark" role="menuitem">Add bookmark</button>
       </div>
       <dialog id="comprehension-dialog" class="comprehension-dialog" aria-label="Comprehension check"></dialog>
 
@@ -7003,7 +7765,6 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         <button id="start-reader" class="primary">Start</button>
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
-        <button id="check-comprehension" class="secondary comprehension-trigger" type="button">🧠 Comprehension</button>
         <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. Click a word to continue from there; click empty space or press Space to pause or resume.</span>
       </div>
     </section>`;
@@ -7122,24 +7883,47 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   };
   document.addEventListener('keydown', state.spacebarHandler);
 
-  reader.addEventListener('click', (event) => {
-    const translatedWord = event.target.closest('.translated-word');
+  readerFrame.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    if (target.closest('button, input, textarea, select, a, summary, [contenteditable="true"], [role="textbox"], #fullscreen-control-strip, #fullscreen-mark-drawer')) return;
+
+    // A real Focus Anchor drag must not also toggle playback when the pointer is
+    // released. A simple click on the anchor, however, is still a blank-reader
+    // click and follows the same pause/resume contract as the rest of the canvas.
+    if (target.closest('#focus-anchor-overlay') && state.focusAnchorSuppressClick) {
+      state.focusAnchorSuppressClick = false;
+      return;
+    }
+
+    // Ask Mark owns the click immediately following a real text selection.
+    // Let the reader's selection handling own that interaction before this bubble-phase toggle.
+    if (state.markSuppressNextReaderClick || state.markSelectionLocked || state.markResumeOnNextReaderClick !== null) return;
+    const liveSelection = window.getSelection?.();
+    if (liveSelection && !liveSelection.isCollapsed && liveSelection.rangeCount) {
+      const range = liveSelection.getRangeAt(0);
+      if (reader.contains(range.commonAncestorContainer)
+          || reader.contains(range.startContainer)
+          || reader.contains(range.endContainer)) return;
+    }
+
+    const translatedWord = target.closest('.translated-word');
     if (translatedWord && state.language !== 'en') {
       handleTranslatedWordClick(event);
       return;
     }
 
-    const clickedWord = event.target.closest('.reader-word[data-index]');
+    const clickedWord = target.closest('.reader-word[data-index]');
+    const clickedGroup = target.closest('.reader-group[data-start-index]');
     const mode = getSelectedMode();
     const seekableModes = new Set(['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'auto-scroll']);
 
-    // In full-text modes, clicking a specific word changes the reading position
-    // instead of merely toggling pause. Snap to the beginning of that word's
-    // current reading group so Highlight/Bold/Meaningful Chunks remain aligned.
-    if (clickedWord && seekableModes.has(mode)) {
+    // In full-text modes, clicking visible text changes the reading position
+    // instead of toggling pause. Support both individual word spans and grouped
+    // text containers so every visible text click resolves to a reading index.
+    if ((clickedWord || clickedGroup) && seekableModes.has(mode)) {
       event.preventDefault();
-      event.stopPropagation();
-      const clickedIndex = Number(clickedWord.dataset.index);
+      const clickedIndex = Number(clickedWord?.dataset.index ?? clickedGroup?.dataset.startIndex);
       if (Number.isFinite(clickedIndex)) {
         const wasRunning = isReaderRunning();
         const group = findReadingGroup(clickedIndex);
@@ -7157,8 +7941,10 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     if (mode === 'two-column') return;
     if (isReaderRunning()) pauseReader();
     else startReader();
+    persistReaderSession();
   });
   bindDictionaryMenu(reader);
+  window.requestAnimationFrame(updateReaderBookmarkMarkers);
   app.querySelector('#start-reader').addEventListener('click', () => { startReader(); persistReaderSession(); });
   app.querySelector('#pause-reader').addEventListener('click', () => { pauseReader(); persistReaderSession(); });
   app.querySelector('#reset-reader').addEventListener('click', () => { resetReader(); persistReaderSession(); });
@@ -7629,7 +8415,7 @@ function bindFullscreenOptions(readerFrame) {
 
 
 function arrangeReaderSidePanels() {
-  const wordPanel=app.querySelector('#word-panel'), toolbar=app.querySelector('.reader-toolbar'), media=app.querySelector('.reader-music-actions'), comprehension=app.querySelector('#check-comprehension'), translation=app.querySelector('.translation-tools'), wordResult=app.querySelector('#word-result');
+  const wordPanel=app.querySelector('#word-panel'), toolbar=app.querySelector('.reader-toolbar'), media=app.querySelector('.reader-music-actions'), translation=app.querySelector('.translation-tools'), wordResult=app.querySelector('#word-result');
   if(!wordPanel||!toolbar)return;
   wordPanel.classList.add('reader-control-panel','mark-companion-panel');wordPanel.setAttribute('aria-label','Mark and reader tools');
   const shell=document.createElement('div');shell.className='reader-control-shell mark-shell';shell.innerHTML=`
@@ -7637,14 +8423,13 @@ function arrangeReaderSidePanels() {
     <nav class="mark-tabs" aria-label="Reader tools and Mark tabs"><button type="button" data-mark-tab="tools" class="active">Reader Tools</button><button type="button" data-mark-tab="selection">Mark</button><button type="button" data-mark-tab="notebook">Notebook</button><button type="button" data-mark-tab="history">History</button></nav>
     <div id="mark-tools-panel" data-mark-panel="tools" class="mark-panel-view">
       <div id="reader-control-core" class="reader-control-section"></div>
-      <details class="reader-control-group"><summary>Learn</summary><div id="reader-control-learn" class="reader-control-group-body"><p class="reader-control-help">Check how well you understood the passage you just read.</p></div></details>
       <details class="reader-control-group"><summary>Media</summary><div id="reader-control-media" class="reader-control-group-body"></div></details>
-      <details class="reader-control-group" open><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
+      <details class="reader-control-group"><summary>Translation &amp; Word Tools</summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
     </div>
     <div id="mark-selection-panel" data-mark-panel="selection" class="mark-panel-view" hidden></div>
     <div id="mark-notebook-panel" data-mark-panel="notebook" class="mark-panel-view" hidden></div>
     <div id="mark-history-panel" data-mark-panel="history" class="mark-panel-view" hidden></div>`;
-  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(comprehension)shell.querySelector('#reader-control-learn')?.appendChild(comprehension);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
+  wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
   shell.querySelector('#close-reader-controls')?.addEventListener('click',()=>app.querySelector('#toggle-word-panel')?.click());
 }
 function bindReaderPaneControls() {
@@ -8195,6 +8980,7 @@ function updateBookPageStatus(forcedSpread = null) {
   const next = app.querySelector('#book-page-next');
   if (previous) previous.disabled = spreadIndex <= 0;
   if (next) next.disabled = firstPage >= totalPages;
+  updateReaderBookmarkMarkers();
 }
 
 function updateBookPageControls() {
@@ -8333,8 +9119,9 @@ function updateModeControls(mode) {
 
 function appendStaticWords(container, words, startIndex = 0) {
   // Plain English text can be rendered as one text node, which keeps very large
-  // books responsive. Bionic and translated text still use word spans because
-  // they need per-word formatting or click handling.
+  // books responsive. Retain its global start index so pointer-based word
+  // actions can still resolve an exact word without materializing every span.
+  container.dataset.staticStartIndex = String(Math.max(0, Number(startIndex) || 0));
   if (!state.bionic && state.language === 'en') {
     container.textContent = words.join(' ');
     return;
@@ -8371,15 +9158,29 @@ function renderTwoColumnDocument(reader) {
 }
 
 
-function showDictionaryResult(word, definition, partOfSpeech = '', example = '', saved = false) {
-  const panel = app.querySelector('#word-result');
-  if (!panel) return;
-  panel.innerHTML = `
+function dictionaryResultMarkup(word, definition, partOfSpeech = '', example = '', saved = false) {
+  return `
+    <div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div>
     <h2>${escapeHtml(word)}</h2>
     ${partOfSpeech ? `<p class="dictionary-part">${escapeHtml(partOfSpeech)}</p>` : ''}
     <p class="word-meaning">${escapeHtml(definition)}</p>
     ${example ? `<p class="dictionary-example">“${escapeHtml(example)}”</p>` : ''}
     ${saved ? '<p class="dictionary-saved-note">Saved under Saved definitions.</p>' : ''}`;
+}
+
+function showDictionaryResult(word, definition, partOfSpeech = '', example = '', saved = false, target = 'tools') {
+  if (target === 'mark') {
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    const panel = app.querySelector('#mark-response');
+    if (!panel) return;
+    panel.hidden = false;
+    panel.innerHTML = dictionaryResultMarkup(word, definition, partOfSpeech, example, saved);
+    return;
+  }
+  const panel = app.querySelector('#word-result');
+  if (!panel) return;
+  panel.innerHTML = dictionaryResultMarkup(word, definition, partOfSpeech, example, saved);
 }
 
 async function lookupDictionaryWord(word) {
@@ -8403,23 +9204,39 @@ function openWordPanelForDictionary() {
   }
 }
 
-async function performDictionaryLookup(saveAfter = false) {
-  const context = state.contextWord;
+async function performDictionaryLookup(saveAfter = false, target = 'tools', contextOverride = null) {
+  const context = contextOverride || state.contextWord;
   if (!context) return;
-  openWordPanelForDictionary();
-  const panel = app.querySelector('#word-result');
-  if (panel) panel.innerHTML = `<h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+
+  if (target === 'mark') {
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    const markPanel = app.querySelector('#mark-response');
+    if (markPanel) {
+      markPanel.hidden = false;
+      markPanel.innerHTML = `<div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+    }
+  } else {
+    openWordPanelForDictionary();
+    const toolsPanel = app.querySelector('#word-result');
+    if (toolsPanel) toolsPanel.innerHTML = `<h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+  }
+
   try {
     const result = await lookupDictionaryWord(context.word);
-    showDictionaryResult(result.word, result.definition, result.partOfSpeech, result.example, false);
-    if (saveAfter) saveCurrentDefinition(result);
+    showDictionaryResult(result.word, result.definition, result.partOfSpeech, result.example, false, target);
+    if (saveAfter) saveCurrentDefinition(result, context, target);
   } catch (error) {
-    if (panel) panel.innerHTML = `<h2>${escapeHtml(context.word)}</h2><p class="status error">${escapeHtml(error.message)}</p>`;
+    const panel = target === 'mark' ? app.querySelector('#mark-response') : app.querySelector('#word-result');
+    if (panel) {
+      panel.hidden = false;
+      panel.innerHTML = `<div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status error">${escapeHtml(error.message)}</p>`;
+    }
   }
 }
 
-function saveCurrentDefinition(result) {
-  const context = state.contextWord;
+function saveCurrentDefinition(result, contextOverride = null, target = 'tools') {
+  const context = contextOverride || state.contextWord;
   if (!context || !state.documentId) return;
   const items = getSavedDefinitions();
   const existing = items.find((item) => item.documentId === state.documentId && Number(item.wordIndex) === context.index);
@@ -8442,9 +9259,127 @@ function saveCurrentDefinition(result) {
   };
   const updated = [item, ...items.filter((entry) => entry.id !== item.id)];
   saveDefinitions(updated);
-  context.element.classList.add('saved-definition-word');
+  context.element?.classList?.add('saved-definition-word');
+  app.querySelector(`.reader-word[data-index="${item.wordIndex}"]`)?.classList.add('saved-definition-word');
   renderNavigationPane();
-  showDictionaryResult(item.word, item.definition, item.partOfSpeech, item.example, true);
+  showDictionaryResult(item.word, item.definition, item.partOfSpeech, item.example, true, target);
+}
+
+
+const READER_BOOKMARKS_KEY = 'markSetGoReaderPageBookmarksV1';
+
+function getReaderBookmarks() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(READER_BOOKMARKS_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveReaderBookmarks(items) {
+  try {
+    localStorage.setItem(READER_BOOKMARKS_KEY, JSON.stringify(items));
+  } catch (_) {}
+}
+
+function bookmarkPageForWord(wordElement) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !wordElement) return { pageNumber: 1, pageKey: 'page-1', side: 'single' };
+
+  if (state.bookPages) {
+    const spreadIndex = getCurrentBookSpread(reader);
+    const readerRect = reader.getBoundingClientRect();
+    const wordRect = wordElement.getBoundingClientRect();
+    const midpoint = readerRect.left + (readerRect.width / 2);
+    const side = wordRect.left >= midpoint ? 'right' : 'left';
+    const pageNumber = spreadIndex * 2 + (side === 'right' ? 2 : 1);
+    return { pageNumber, pageKey: `book-page-${pageNumber}`, side };
+  }
+
+  const viewportHeight = Math.max(1, reader.clientHeight);
+  // Resolve the word's absolute position inside the scrollable reader exactly once.
+  // offsetTop may be relative to a nested reading group, while adding scrollTop to
+  // an already content-relative offset can double-count the current scroll position.
+  const readerRect = reader.getBoundingClientRect();
+  const wordRect = wordElement.getBoundingClientRect();
+  const absoluteTop = Math.max(0, (wordRect.top - readerRect.top) + reader.scrollTop);
+  const pageNumber = Math.max(1, Math.floor(absoluteTop / viewportHeight) + 1);
+  return { pageNumber, pageKey: `scroll-page-${pageNumber}`, side: 'single' };
+}
+
+function bookmarkForContextWord(contextOverride = null) {
+  const context = contextOverride || state.contextWord;
+  if (!context || !state.documentId) return null;
+  const page = context.page || bookmarkPageForWord(context.element);
+  return getReaderBookmarks().find((item) => item.documentId === state.documentId && item.pageKey === page.pageKey) || null;
+}
+
+function toggleBookmarkForContextWord(contextOverride = null) {
+  const context = contextOverride || state.contextWord;
+  if (!context || !state.documentId) return;
+  const page = context.page || bookmarkPageForWord(context.element);
+  const items = getReaderBookmarks();
+  const existing = items.find((item) => item.documentId === state.documentId && item.pageKey === page.pageKey);
+
+  if (existing) {
+    saveReaderBookmarks(items.filter((item) => item.id !== existing.id));
+    updateReaderStatus?.(`Bookmark removed from page ${page.pageNumber}.`);
+  } else {
+    items.push({
+      id: `bookmark-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      documentId: state.documentId,
+      title: state.title,
+      wordIndex: Number(context.index) || 0,
+      pageNumber: page.pageNumber,
+      pageKey: page.pageKey,
+      side: page.side,
+      createdAt: new Date().toISOString()
+    });
+    saveReaderBookmarks(items);
+    updateReaderStatus?.(`Bookmark added to page ${page.pageNumber}.`);
+  }
+  updateReaderBookmarkMarkers();
+  renderNavigationPane();
+}
+
+function removeReaderBookmark(id) {
+  saveReaderBookmarks(getReaderBookmarks().filter((item) => item.id !== id));
+  updateReaderBookmarkMarkers();
+  renderNavigationPane();
+  updateReaderStatus?.('Bookmark removed.');
+}
+
+function visibleReaderBookmarkPages() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return [];
+  if (state.bookPages) {
+    const spread = getCurrentBookSpread(reader);
+    return [spread * 2 + 1, spread * 2 + 2];
+  }
+  const pageNumber = Math.max(1, Math.floor(reader.scrollTop / Math.max(1, reader.clientHeight)) + 1);
+  return [pageNumber];
+}
+
+function updateReaderBookmarkMarkers() {
+  const layer = app.querySelector('#reader-bookmark-layer');
+  const reader = app.querySelector('#reader');
+  if (!layer || !reader || !state.documentId) return;
+
+  const visiblePages = visibleReaderBookmarkPages();
+  const bookmarks = getReaderBookmarks().filter((item) => item.documentId === state.documentId && visiblePages.includes(Number(item.pageNumber)));
+  layer.innerHTML = bookmarks.map((item) => {
+    const sideClass = state.bookPages ? (Number(item.pageNumber) % 2 === 0 ? 'bookmark-right-page' : 'bookmark-left-page') : 'bookmark-single-page';
+    return `<button type="button" class="reader-page-bookmark ${sideClass}" data-remove-reader-bookmark="${escapeHtml(item.id)}" title="Remove bookmark from page ${Number(item.pageNumber)}" aria-label="Remove bookmark from page ${Number(item.pageNumber)}"><span aria-hidden="true"></span></button>`;
+  }).join('');
+
+  layer.querySelectorAll('[data-remove-reader-bookmark]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      removeReaderBookmark(button.dataset.removeReaderBookmark);
+    });
+  });
 }
 
 function closeDictionaryMenu() {
@@ -8455,43 +9390,210 @@ function closeDictionaryMenu() {
 function bindDictionaryMenu(reader) {
   const menu = app.querySelector('#word-context-menu');
   if (!menu) return;
+
+  const caretRangeAtPoint = (x, y) => {
+    if (typeof document.caretRangeFromPoint === 'function') {
+      return document.caretRangeFromPoint(x, y);
+    }
+    if (typeof document.caretPositionFromPoint === 'function') {
+      const position = document.caretPositionFromPoint(x, y);
+      if (!position) return null;
+      const range = document.createRange();
+      range.setStart(position.offsetNode, position.offset);
+      range.collapse(true);
+      return range;
+    }
+    return null;
+  };
+
+  const wordMatchAtOffset = (text, rawOffset) => {
+    const offset = Math.max(0, Math.min(String(text || '').length, Number(rawOffset) || 0));
+    const matches = Array.from(String(text || '').matchAll(/[\p{L}\p{N}][\p{L}\p{N}'’\-]*/gu));
+    return matches.find((match) => offset >= match.index && offset <= match.index + match[0].length)
+      || matches.find((match) => Math.abs(offset - match.index) <= 1)
+      || [...matches].reverse().find((match) => Math.abs(offset - (match.index + match[0].length)) <= 1)
+      || null;
+  };
+
+  const wordCountBeforePoint = (container, node, offset) => {
+    const before = document.createRange();
+    before.selectNodeContents(container);
+    try { before.setEnd(node, offset); }
+    catch (_) { return 0; }
+    return splitWords(before.toString()).length;
+  };
+
+  const wrapTextWord = (range, index) => {
+    if (!range || range.startContainer !== range.endContainer || range.startContainer.nodeType !== Node.TEXT_NODE) return null;
+    const span = document.createElement('span');
+    span.className = 'reader-word reader-context-word';
+    span.dataset.index = String(index);
+    try {
+      range.surroundContents(span);
+      return span;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  const contextWordFromEvent = (event) => {
+    const directTarget = event.target instanceof Element ? event.target : event.target?.parentElement;
+    let element = directTarget?.closest?.('.reader-word[data-index]') || null;
+    if (!element && typeof document.elementsFromPoint === 'function') {
+      element = document.elementsFromPoint(event.clientX, event.clientY)
+        .map((candidate) => candidate?.closest?.('.reader-word[data-index]'))
+        .find(Boolean) || null;
+    }
+    if (element) {
+      const index = Number(element.dataset.index);
+      if (!Number.isFinite(index)) return null;
+      return { word: state.words[index] || element.textContent, index, element };
+    }
+
+    // Full-page and two-column modes can contain plain text nodes rather than
+    // one span per word. Resolve the caret under the pointer, identify the word
+    // boundaries, and map the local text offset back to the global word index.
+    const caret = caretRangeAtPoint(event.clientX, event.clientY);
+    if (!caret || !reader.contains(caret.startContainer)) return null;
+    let textNode = caret.startContainer;
+    let offset = caret.startOffset;
+    if (textNode.nodeType !== Node.TEXT_NODE) {
+      const child = textNode.childNodes?.[Math.min(offset, Math.max(0, textNode.childNodes.length - 1))];
+      if (child?.nodeType === Node.TEXT_NODE) {
+        textNode = child;
+        offset = Math.min(offset, child.data.length);
+      } else {
+        return null;
+      }
+    }
+
+    const match = wordMatchAtOffset(textNode.data, offset);
+    if (!match) return null;
+    const range = document.createRange();
+    range.setStart(textNode, match.index);
+    range.setEnd(textNode, match.index + match[0].length);
+
+    const parent = textNode.parentElement;
+    const group = parent?.closest?.('.reader-group[data-start-index]');
+    const staticContainer = parent?.closest?.('[data-static-start-index]');
+    let index;
+    if (group) {
+      const base = Number(group.dataset.visibleStartIndex ?? group.dataset.startIndex) || 0;
+      index = base + wordCountBeforePoint(group, textNode, match.index);
+    } else if (staticContainer) {
+      const base = Number(staticContainer.dataset.staticStartIndex) || 0;
+      index = base + wordCountBeforePoint(staticContainer, textNode, match.index);
+    } else {
+      index = nearestWordIndexForSelection(match[0]);
+    }
+    index = Math.max(0, Math.min(state.words.length - 1, Number(index) || 0));
+    element = wrapTextWord(range, index) || parent;
+    return { word: state.words[index] || match[0], index, element, range };
+  };
+
   reader.addEventListener('contextmenu', (event) => {
-    const wordElement = event.target.closest('.reader-word[data-index]');
-    if (!wordElement) return;
+    const context = contextWordFromEvent(event);
+    if (!context) return;
     event.preventDefault();
-    event.stopPropagation();
-    const index = Number(wordElement.dataset.index);
-    state.contextWord = { word: state.words[index] || wordElement.textContent, index, element: wordElement };
-    const existingNote = notesForCurrentDocument().find((item) => Number(item.wordIndex) === index);
+    event.stopImmediatePropagation();
+
+    app.querySelectorAll('#reader .reader-context-word').forEach((node) => node.classList.remove('reader-context-word'));
+    context.element?.classList?.add('reader-context-word');
+    // Capture the page while the right-clicked word is still a live DOM node.
+    // Ask Mark highlighting can redraw/wrap reader text, so later actions should
+    // not have to recompute the bookmark page from a stale element reference.
+    context.page = bookmarkPageForWord(context.element);
+    state.contextWord = context;
+
+    // Treat the right-clicked word as the active Ask Mark selection so it stays
+    // visibly highlighted while the context menu and lookup result are open.
+    const wordSelection = {
+      text: String(context.word || '').trim(),
+      startIndex: context.index,
+      endIndex: context.index + 1,
+      chapter: tocTitleForWordIndex(context.index)
+    };
+    if (wordSelection.text) {
+      if (isReaderRunning()) {
+        state.markSelectionWasRunning = true;
+        pauseReader();
+      }
+      state.markSelection = wordSelection;
+      state.markSelectionLocked = true;
+      persistMarkSelectionHighlight(wordSelection);
+      context.element?.classList?.add('ask-mark-selected');
+      renderMarkSelectionCard();
+      updateReaderStatus('Paused on selected word. Click elsewhere in the text to continue.');
+    }
+
+    const existingNote = notesForCurrentDocument().find((item) => Number(item.wordIndex) === context.index);
     const noteButton = menu.querySelector('[data-dictionary-action="note"]');
     if (noteButton) noteButton.textContent = existingNote ? 'Edit note' : 'Add note';
+    const bookmarkButton = menu.querySelector('[data-dictionary-action="bookmark"]');
+    if (bookmarkButton) bookmarkButton.textContent = bookmarkForContextWord() ? 'Remove bookmark' : 'Add bookmark';
+
+    // Unhide before measuring so the menu is clamped to the viewport correctly.
+    menu.hidden = false;
+    menu.style.visibility = 'hidden';
     const maxLeft = window.innerWidth - menu.offsetWidth - 12;
     const maxTop = window.innerHeight - menu.offsetHeight - 12;
     menu.style.left = `${Math.max(8, Math.min(event.clientX, maxLeft))}px`;
     menu.style.top = `${Math.max(8, Math.min(event.clientY, maxTop))}px`;
-    menu.hidden = false;
+    menu.style.visibility = '';
+    menu.querySelector('button')?.focus({ preventScroll: true });
   });
-  menu.querySelector('[data-dictionary-action="lookup"]')?.addEventListener('click', () => {
+  const capturedContext = () => {
+    const context = state.contextWord;
+    if (!context) return null;
+    return { ...context, page: context.page ? { ...context.page } : null };
+  };
+  menu.querySelector('[data-dictionary-action="lookup"]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const context = capturedContext();
     closeDictionaryMenu();
-    performDictionaryLookup(false);
+    performDictionaryLookup(false, 'mark', context);
   });
-  menu.querySelector('[data-dictionary-action="save"]')?.addEventListener('click', () => {
+  menu.querySelector('[data-dictionary-action="save"]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const context = capturedContext();
     closeDictionaryMenu();
-    performDictionaryLookup(true);
+    performDictionaryLookup(true, 'mark', context);
   });
-  menu.querySelector('[data-dictionary-action="note"]')?.addEventListener('click', () => {
+  menu.querySelector('[data-dictionary-action="note"]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const context = capturedContext();
     closeDictionaryMenu();
-    const existing = notesForCurrentDocument().find((item) => Number(item.wordIndex) === Number(state.contextWord?.index));
-    showNoteEditor(state.contextWord, existing || null);
+    if (!context) return;
+    const existing = notesForCurrentDocument().find((item) => Number(item.wordIndex) === Number(context.index));
+    showNoteEditor(context, existing || null);
   });
-  document.addEventListener('click', closeDictionaryMenu);
+  menu.querySelector('[data-dictionary-action="bookmark"]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const context = capturedContext();
+    closeDictionaryMenu();
+    toggleBookmarkForContextWord(context);
+    // The menu/highlight pipeline may repaint reader DOM immediately after the
+    // command. Re-apply the visual marker after that paint as well.
+    requestAnimationFrame(() => updateReaderBookmarkMarkers());
+  });
+  document.addEventListener('pointerdown', (event) => {
+    // Close only for a primary-button press outside the custom menu. A generic
+    // document click listener can run after a right-click on some browsers and
+    // hide the menu immediately after it opens.
+    if (event.button !== 0 || menu.contains(event.target)) return;
+    closeDictionaryMenu();
+  }, true);
   window.addEventListener('blur', closeDictionaryMenu);
   reader.addEventListener('scroll', closeDictionaryMenu, { passive: true });
+  reader.addEventListener('scroll', () => updateReaderBookmarkMarkers(), { passive: true });
   reader.addEventListener('scroll', () => ReaderContinuity.scheduleCheckpoint(), { passive: true });
   reader.addEventListener('pointerup', () => ReaderContinuity.scheduleCheckpoint());
   reader.addEventListener('keyup', () => ReaderContinuity.scheduleCheckpoint());
 }
-
 
 
 
@@ -9196,6 +10298,7 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 /* Feature block moved to /modules/reading/pacman-mode.js */
 
 function startReader() {
+  if(state.markPersistentSelection || state.markSelectionLocked) clearMarkSelectionForReadingResume();
   const selectedMode = getSelectedMode();
   if (selectedMode === 'two-column') return;
   const currentTickerStage = app.querySelector('.digital-sign-stage');
@@ -11418,15 +12521,35 @@ async function parseEpubFile(file) {
     Array.from(manifest.values()).map((item) => [resolveArchivePath(opfPath, item.href), item])
   );
   let wordIndex = 0;
+  let preservedEpubTitle = false;
+  let preservedEpubAuthor = false;
 
   for (const idref of spineIds) {
     const item = manifest.get(idref);
     if (!item?.href) continue;
+    if (/(^|\s)nav(\s|$)/i.test(item.properties || '')) continue;
     const chapterPath = resolveArchivePath(opfPath, item.href);
     if (!archive.entries.has(chapterPath)) continue;
     const chapterText = await archive.readText(chapterPath);
     const chapterDoc = new DOMParser().parseFromString(chapterText, 'text/html');
-    const lines = epubContentLines(chapterDoc);
+    let lines = epubContentLines(chapterDoc);
+    // Navigation/TOC files are already excluded by the spine/nav parser. Remove
+    // repeated running headers such as the book title that some EPUBs include
+    // at the top of every chapter file.
+    const epubTitleKey = normalizedSourceLine(title);
+    const epubAuthorKey = normalizedSourceLine(creator);
+    lines = lines.filter((line) => {
+      const key = normalizedSourceLine(line.text);
+      if (epubTitleKey && key === epubTitleKey) {
+        if (preservedEpubTitle) return false;
+        preservedEpubTitle = true;
+      }
+      if (epubAuthorKey && key === epubAuthorKey) {
+        if (preservedEpubAuthor) return false;
+        preservedEpubAuthor = true;
+      }
+      return true;
+    });
     fileStart.set(chapterPath, wordIndex);
 
     // Preserve embedded EPUB artwork by converting archive-relative image
@@ -11646,6 +12769,11 @@ async function parsePdfFile(file, onProgress = () => {}) {
 
   const pdf = await loadingTask.promise;
   const metadata = await pdf.getMetadata().catch(() => null);
+  const title =
+    String(metadata?.info?.Title || '').trim()
+    || file.name.replace(/\.pdf$/i, '')
+    || 'Imported PDF';
+  const pdfAuthor = String(metadata?.info?.Author || '').trim();
   const pageRefs = new Map();
   const pages = [];
   let extractedCharacters = 0;
@@ -11676,17 +12804,56 @@ async function parsePdfFile(file, onProgress = () => {}) {
     onProgress(percent, `Extracting page ${pageNumber} of ${pdf.numPages}…`);
   }
 
+  // Remove running headers/footers that recur across PDF pages before the
+  // pages are joined into reader text. This catches book titles and page labels
+  // without disturbing one-off chapter headings.
+  const pdfLineCounts = new Map();
+  pages.forEach((page) => page.text.split('\n').forEach((line) => {
+    const clean = line.replace(/\s+/g, ' ').trim();
+    if (!clean || clean.length > 120) return;
+    const key = normalizedSourceLine(clean);
+    if (key) pdfLineCounts.set(key, (pdfLineCounts.get(key) || 0) + 1);
+  }));
+  const repeatThreshold = Math.max(3, Math.ceil(pdf.numPages * .3));
+  const repeatedPdfLines = new Set([...pdfLineCounts.entries()].filter(([, count]) => count >= repeatThreshold).map(([key]) => key));
+  const pdfTitleKey = normalizedSourceLine(title);
+  const pdfAuthorKey = normalizedSourceLine(pdfAuthor);
+  let preservedPdfTitle = false;
+  let preservedPdfAuthor = false;
+  pages.forEach((page) => {
+    page.text = page.text.split('\n').filter((line) => {
+      const clean = line.replace(/\s+/g, ' ').trim();
+      const key = normalizedSourceLine(clean);
+      if (/^(?:page\s+)?\d{1,5}$/i.test(clean)) return false;
+      if (pdfTitleKey && key === pdfTitleKey && repeatedPdfLines.has(key)) {
+        if (preservedPdfTitle) return false;
+        preservedPdfTitle = true;
+        return true;
+      }
+      if (pdfAuthorKey && key === pdfAuthorKey && repeatedPdfLines.has(key)) {
+        if (preservedPdfAuthor) return false;
+        preservedPdfAuthor = true;
+        return true;
+      }
+      if (!repeatedPdfLines.has(key)) return true;
+      return isLikelyRealSectionHeading(clean);
+    }).join('\n').trim();
+  });
+
   const outline = await pdf.getOutline().catch(() => null);
   const toc = pdfOutlineToToc(outline || [], pageRefs);
-  const title =
-    String(metadata?.info?.Title || '').trim()
-    || file.name.replace(/\.pdf$/i, '')
-    || 'Imported PDF';
-
-  const text = pages
+  let text = pages
     .map((page) => `\n\n[PDF Page ${page.pageNumber}]\n\n${page.text}`)
     .join('')
     .trim();
+  const normalizedPdf = normalizeImportedBookText(text, { title, author:pdfAuthor, removePrintedToc:true, removeRepeatedHeaders:false });
+  text = normalizedPdf.text;
+  const pdfDocumentToc = toc.map((item) => {
+    const marker = item.pageNumber ? `[PDF Page ${item.pageNumber}]` : '';
+    const position = marker ? text.indexOf(marker) : -1;
+    if (position < 0) return null;
+    return { title:item.title, index:splitWords(text.slice(0, position)).length, type:'chapter', pageNumber:item.pageNumber };
+  }).filter(Boolean);
 
   const textCoverage = pdf.numPages ? textPages / pdf.numPages : 0;
   const likelyScanned = extractedCharacters < Math.max(200, pdf.numPages * 35)
@@ -11712,7 +12879,9 @@ async function parsePdfFile(file, onProgress = () => {}) {
       importedAt: new Date().toISOString(),
       toc,
       pages: pages.map(({ pageNumber, width, height }) => ({ pageNumber, width, height })),
-      textCoverage
+      textCoverage,
+      cleanup: normalizedPdf.report,
+      documentToc: pdfDocumentToc.length ? pdfDocumentToc : normalizedPdf.toc
     },
     stats: {
       pageCount: pdf.numPages,
@@ -11811,13 +12980,17 @@ function renderUpload() {
 
       progress.hidden = true;
       status.textContent = 'Opening text file…';
-      const text = await file.text();
-      if (!text.trim()) throw new Error('This text file is empty.');
-      renderReaderWithText(file.name.replace(/\.txt$/i, ''), text, {
+      const rawText = await file.text();
+      if (!rawText.trim()) throw new Error('This text file is empty.');
+      const importedTitle = file.name.replace(/\.txt$/i, '');
+      const normalized = normalizeImportedBookText(rawText, { title: importedTitle });
+      renderReaderWithText(importedTitle, normalized.text, {
         type: 'upload',
         name: file.name,
         fileSize: file.size,
-        importedAt: new Date().toISOString()
+        importedAt: new Date().toISOString(),
+        documentToc: normalized.toc,
+        cleanup: normalized.report
       });
     } catch (error) {
       console.error('Book import failed.', error);
@@ -11873,6 +13046,15 @@ function renderBrowseHub() {
       <form id="browse-global-search" class="browse-search">
         <span aria-hidden="true">⌕</span>
         <input id="browse-global-query" type="search" required placeholder="Search titles, authors, subjects, or ideas across all libraries">
+        <label class="browse-format-field">
+          <span>Format</span>
+          <select id="browse-global-format" aria-label="Preferred book format">
+            <option value="best">Best available</option>
+            <option value="text">Plain text</option>
+            <option value="epub">EPUB</option>
+            <option value="pdf">PDF</option>
+          </select>
+        </label>
         <button class="primary" type="submit">Search All Libraries</button>
       </form>
 
@@ -11921,13 +13103,15 @@ function renderBrowseHub() {
       </section>
     </section>`;
 
-  const search = (query) => {
+  const search = (query, format = app.querySelector('#browse-global-format')?.value || 'best') => {
     localStorage.setItem('markSetGoPendingLibrarySearch', query);
     renderUnifiedLibrary();
     requestAnimationFrame(() => {
       const input = app.querySelector('#unified-library-query');
+      const formatSelect = app.querySelector('#unified-library-format');
       const form = app.querySelector('#unified-library-search');
       if (input) input.value = query;
+      if (formatSelect) formatSelect.value = format;
       form?.requestSubmit();
     });
   };
@@ -11982,6 +13166,43 @@ function libraryRecencyLabel(lastReadAt) {
   })[recency];
 }
 
+function currentReaderFirstName() {
+  const session = window.MarkSetGoAuth?.session || {};
+  const profile = session.user || session.account || window.MarkSetGoAuth?.user || window.MarkSetGoAuth?.account || {};
+  const displayName =
+    window.MarkSetGoAuth?.getFirstName?.() ||
+    profile.firstName ||
+    profile.first_name ||
+    profile.givenName ||
+    profile.given_name ||
+    profile.displayName ||
+    profile.display_name ||
+    profile.fullName ||
+    profile.full_name ||
+    profile.name ||
+    '';
+  return String(displayName).trim().split(/\s+/)[0] || '';
+}
+
+function updateLibraryWelcomeName() {
+  const nameNode = document.querySelector('#library-welcome-name');
+  if (!nameNode) return;
+  const firstName = currentReaderFirstName();
+  nameNode.textContent = firstName ? `, ${firstName}` : '';
+}
+
+function scheduleLibraryPersonalization() {
+  // Update immediately, then retry briefly because Clerk and the library view
+  // can finish rendering in either order. The previous self-call caused a
+  // stack overflow and prevented personalization from ever being applied.
+  updateLibraryWelcomeName();
+  [50, 250, 750, 1500].forEach((delay) => window.setTimeout(updateLibraryWelcomeName, delay));
+}
+
+document.addEventListener('marksetgo:auth-changed', scheduleLibraryPersonalization);
+document.addEventListener('marksetgo:auth-ready', scheduleLibraryPersonalization);
+window.addEventListener('marksetgo:auth-ready', scheduleLibraryPersonalization);
+
 function renderMyLibraryHub() {
   finalizeReadingSession();
   stopReader();
@@ -12010,13 +13231,64 @@ function renderMyLibraryHub() {
   const primaryPercent = primaryBook?.totalWords
     ? Math.min(100, Math.round((Number(primaryBook.furthestWord) || 0) / primaryBook.totalWords * 100))
     : 0;
+  // My Library must become interactive before any expensive reading-profile
+  // analysis. Parsing several full stored books and sampling up to 110,000
+  // characters from each one blocked the main thread and delayed click handlers.
+  // Show an already-cached profile when available; otherwise omit the badge here.
+  // A profile will still be calculated normally when the user opens its dedicated
+  // Reading Profile flow, where the analysis is expected and intentional.
+  const mobileSimpleLibrary = window.matchMedia?.('(max-width: 760px)')?.matches;
+  // Mobile intentionally excludes reading profiles. Desktop displays only an
+  // already-cached browser profile and never analyzes book text while opening
+  // My Library.
+  const libraryDifficultyCache = mobileSimpleLibrary ? null : difficultyCache();
   const storedDifficultyForProgress = (item) => {
-    if (!item) return null;
-    let document = null;
-    try { document = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${item.documentId}`) || 'null'); } catch {}
-    return getBookDifficulty({ documentId:item.documentId, title:item.title, author:document?.source?.author || '', year:document?.source?.year || '', description:document?.source?.description || '' }, document?.text || '');
+    if (!item || mobileSimpleLibrary || !libraryDifficultyCache) return null;
+    const key = difficultyKey({ documentId:item.documentId, title:item.title });
+    return libraryDifficultyCache[key]?.profile || null;
   };
   const primaryDifficulty = storedDifficultyForProgress(primaryBook);
+
+  const deleteStoredDocument = async (documentId, title = 'this book') => {
+    if (!documentId) return;
+    const confirmed = window.confirm(`Delete “${title}” from My Library? This removes its saved text, progress, bookmarks, notes, cached reading profile, and signed-in cloud copy.`);
+    if (!confirmed) return;
+
+    const progressRecords = readStoredObject(READING_PROGRESS_KEY);
+    const removed = progressRecords[documentId] || { documentId, title };
+
+    try {
+      const cloudBook = window.MarkSetGoCloudLibrary?.list?.().find((book) => String(book.clientRecordId || '') === String(documentId));
+      if (cloudBook?.id && window.MarkSetGoCloud?.library?.remove) {
+        await window.MarkSetGoCloud.library.remove(cloudBook.id);
+      }
+    } catch (error) {
+      const continueLocal = window.confirm(`The cloud copy could not be deleted (${error?.message || 'unknown error'}). Delete the local copy anyway?`);
+      if (!continueLocal) return;
+    }
+
+    delete progressRecords[documentId];
+    localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progressRecords));
+    localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`);
+
+    const readingList = getReadingList().filter((item) => String(item.documentId || '') !== String(documentId));
+    saveReadingList(readingList);
+    saveBookmarks(getBookmarks().filter((item) => String(item.documentId || '') !== String(documentId)));
+    saveNotes(getNotes().filter((item) => String(item.documentId || '') !== String(documentId)));
+
+    const profileKey = difficultyKey({ documentId, title });
+    const profiles = difficultyCache();
+    if (profiles[profileKey]) {
+      delete profiles[profileKey];
+      localStorage.setItem(BOOK_DIFFICULTY_CACHE_KEY, JSON.stringify(profiles));
+    }
+    localStorage.removeItem(readingProfileCacheKey({ documentId, title }));
+    ['none', 'light', 'full'].forEach((mode) => localStorage.removeItem(bookGuideCacheKey({ documentId, title }, mode)));
+
+    await clearRemovedBookReferences({ ...removed, documentId, title });
+    await window.MarkSetGoCloudLibrary?.refresh?.().catch?.(() => {});
+    renderMyLibraryHub();
+  };
 
   const openStoredDocument = async (documentId, wordIndex = null) => {
     let data = null;
@@ -12090,7 +13362,10 @@ function renderMyLibraryHub() {
         <p>${percent}% complete · Last read ${escapeHtml(lastRead)}</p>
         ${difficulty ? difficultyBadge(difficulty, {title:item.title}) : ''}
         <div class="library-progress-track"><span style="width:${percent}%"></span></div>
-        <button class="${index === 0 ? 'primary' : 'secondary'}" type="button" data-library-document="${escapeHtml(item.documentId)}">Resume reading</button>
+        <div class="library-book-actions">
+          <button class="${index === 0 ? 'primary' : 'secondary'}" type="button" data-library-document="${escapeHtml(item.documentId)}">Resume reading</button>
+          <button class="secondary library-delete-book" type="button" data-library-delete="${escapeHtml(item.documentId)}" data-library-title="${escapeHtml(item.title || 'Untitled')}" aria-label="Delete ${escapeHtml(item.title || 'book')}">Delete</button>
+        </div>
       </div>
     </article>`;
   }).join('');
@@ -12100,11 +13375,12 @@ function renderMyLibraryHub() {
       <header class="library-welcome">
         <div>
           <span class="source-category">My Library</span>
-          <h1>Welcome back.</h1>
+          <h1>Welcome back<span id="library-welcome-name"></span>.</h1>
           <p>Continue your reading journey and manage your personal collection.</p>
         </div>
 
         <div class="library-header-actions">
+          <button class="secondary" type="button" data-read="book-builder">Create a Book</button>
           <button class="secondary" type="button" data-action="browse">Browse books</button>
           <button class="primary" type="button" data-action="reader">Open Reader</button>
         </div>
@@ -12123,6 +13399,7 @@ function renderMyLibraryHub() {
               <div class="focus-actions">
                 <button class="primary" type="button" data-library-document="${escapeHtml(primaryBook.documentId)}">Resume reading</button>
                 <button class="secondary" type="button" data-action="reader">Open Reader</button>
+                <button class="secondary library-delete-book" type="button" data-library-delete="${escapeHtml(primaryBook.documentId)}" data-library-title="${escapeHtml(primaryBook.title || 'Untitled')}">Delete</button>
               </div>
             </div>
           ` : `
@@ -12168,9 +13445,15 @@ function renderMyLibraryHub() {
 
     </section>`;
 
+  updateLibraryWelcomeName();
+
   app.querySelectorAll('[data-library-document]').forEach((button) => {
     button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
   });
+  app.querySelectorAll('[data-library-delete]').forEach((button) => {
+    button.addEventListener('click', () => deleteStoredDocument(button.dataset.libraryDelete, button.dataset.libraryTitle || 'this book'));
+  });
+  document.dispatchEvent(new CustomEvent('marksetgo:library-rendered'));
 }
 function renderLibraryRecords(kind) {
   stopReader();

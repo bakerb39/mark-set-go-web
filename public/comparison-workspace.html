@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Comparison Workspace · Mark, Set, Go!</title>
+  <link rel="stylesheet" href="comparison-workspace.css">
+<link rel="stylesheet" href="/theme-system.css?v=9.2.4-shared-theme">
+</head>
+<body>
+  <header class="workspace-header">
+    <div>
+      <span class="eyebrow">MARK, SET, GO!</span>
+      <h1>Comparison Workspace</h1>
+      <p>Compare passages, authors, and Great Ideas without disturbing your reading position.</p>
+    </div>
+    <div class="header-actions">
+      <button id="save-workspace" class="secondary" type="button">Save workspace</button>
+      <button id="close-workspace" class="ghost" type="button">Close tab</button>
+    </div>
+  </header>
+
+  <main class="workspace-shell">
+    <section class="primary-card" aria-labelledby="primary-heading">
+      <div class="section-heading">
+        <div><span>PRIMARY TEXT</span><h2 id="primary-heading">Selected passage</h2></div>
+        <span id="primary-location" class="location-pill"></span>
+      </div>
+      <h3 id="primary-title">Current text</h3>
+      <blockquote id="primary-passage"></blockquote>
+    </section>
+
+    <section class="controls-card">
+      <div class="section-heading compact">
+        <div><span>COMPARE BY</span><h2>Choose a lens</h2></div>
+        <button id="add-text" class="primary" type="button">+ Add comparison text</button>
+      </div>
+      <div id="comparison-modes" class="mode-row" role="tablist" aria-label="Comparison lens">
+        <button class="active" data-mode="syntopicon" type="button">Syntopicon ideas</button>
+        <button data-mode="arguments" type="button">Key arguments</button>
+        <button data-mode="agreement" type="button">Agreement &amp; difference</button>
+        <button data-mode="definitions" type="button">Definitions</button>
+        <button data-mode="themes" type="button">Themes</button>
+      </div>
+    </section>
+
+    <section class="workspace-grid">
+      <aside class="source-panel">
+        <div class="section-heading compact"><div><span>TEXTS</span><h2>Comparison set</h2></div></div>
+        <div id="source-list" class="source-list"></div>
+        <button id="add-text-secondary" class="dashed" type="button">+ Add another text</button>
+      </aside>
+
+      <section class="analysis-panel">
+        <div class="section-heading compact">
+          <div><span>WORKSPACE</span><h2 id="analysis-heading">Syntopicon ideas</h2></div>
+          <button id="analyze-mark" class="primary" type="button">Ask Mark to compare</button>
+        </div>
+        <div id="idea-chips" class="idea-chips"></div>
+        <div id="passage-results" class="passage-results"></div>
+        <div id="mark-analysis" class="mark-analysis" hidden></div>
+      </section>
+    </section>
+
+    <section class="notes-card">
+      <div class="section-heading compact"><div><span>NOTES</span><h2>Your synthesis</h2></div></div>
+      <textarea id="workspace-notes" rows="7" placeholder="Record similarities, differences, questions, and conclusions..."></textarea>
+    </section>
+  </main>
+
+  <dialog id="add-text-dialog">
+    <form method="dialog" class="dialog-card">
+      <header><div><span>ADD TEXT</span><h2>Choose a comparison source</h2></div><button value="cancel" class="icon-button" aria-label="Close">×</button></header>
+      <div class="dialog-tabs">
+        <button type="button" class="active" data-dialog-tab="library">My Library</button>
+        <button type="button" data-dialog-tab="paste">Paste text</button>
+        <button type="button" data-dialog-tab="upload">Upload file</button>
+      </div>
+      <section data-dialog-panel="library">
+        <p class="muted">Locally saved books available in this browser.</p>
+        <div id="library-list" class="library-list"></div>
+      </section>
+      <section data-dialog-panel="paste" hidden>
+        <label>Title<input id="paste-title" type="text" placeholder="Title or source name"></label>
+        <label>Author<input id="paste-author" type="text" placeholder="Optional"></label>
+        <label>Text<textarea id="paste-text" rows="10" placeholder="Paste the comparison text here"></textarea></label>
+        <button id="add-pasted-text" class="primary" type="button">Add text</button>
+      </section>
+      <section data-dialog-panel="upload" hidden>
+        <label class="upload-box">Choose a plain-text, Markdown, or HTML file<input id="upload-text" type="file" accept=".txt,.md,.markdown,.html,.htm,text/plain,text/markdown,text/html"></label>
+        <p id="upload-status" class="muted"></p>
+      </section>
+    </form>
+  </dialog>
+
+  <script src="comparison-workspace.js"></script>
+</body>
+</html>

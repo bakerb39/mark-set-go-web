@@ -1,0 +1,496 @@
+(() => {
+  'use strict';
+
+  const app = document.getElementById('app');
+  if (!app) return;
+
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+  const transformApi = () => window.MarkSetGoReadAnything;
+
+  let shell = null;
+  let legacyHost = null;
+  let selectionObserver = null;
+  let installAttempts = 0;
+
+  const QUICK_ACTIONS = [
+    ['explain', '✦', 'Explain'],
+    ['summarize', '≡', 'Summarize'],
+    ['analyze', '◇', 'Analyze'],
+    ['simplify', 'Aa', 'Simplify'],
+    ['context', '⌂', 'Context'],
+    ['related', '∞', 'Compare']
+  ];
+
+  function escapeHtml(value = '') {
+    return String(value).replace(/[&<>'"]/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+    })[character]);
+  }
+
+  function getBookContext() {
+    const title =
+      $('#reader-title')?.textContent?.trim() ||
+      $('.reader-title')?.textContent?.trim() ||
+      $('main h1')?.textContent?.trim() ||
+      document.title.replace(/\s*[|–-].*$/, '').trim() ||
+      'Your current reading';
+
+    const chapter =
+      $('.book-page-chapter')?.textContent?.trim() ||
+      $('[data-current-chapter]')?.textContent?.trim() ||
+      $('.reader-status')?.textContent?.trim() ||
+      'Ready when you are';
+
+    const progress =
+      $('#reader-progress')?.value ||
+      $('[data-reading-progress]')?.textContent?.trim() ||
+      '';
+
+    return { title, chapter, progress };
+  }
+
+  function getLegacySelectionPanel() {
+    return $('#mark-selection-panel', legacyHost || shell || document);
+  }
+
+  function getSelectionText() {
+    const panel = getLegacySelectionPanel();
+    return panel?.querySelector('.mark-selection-card blockquote')?.textContent?.trim() || '';
+  }
+
+  function readerFirstName() {
+    return window.MarkSetGoAuth?.getFirstName?.() ||
+      String(window.MarkSetGoAuth?.session?.account?.displayName || '').trim().split(/\s+/)[0] || '';
+  }
+
+  function greeting() {
+    const hour = new Date().getHours();
+    const salutation = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+    const firstName = readerFirstName();
+    return `${salutation}${firstName ? `, ${firstName}` : ''}.`;
+  }
+
+
+  function refreshPersonalGreeting() {
+    const node = $('[data-askmark-personal-greeting]', shell || document);
+    if (node) node.textContent = greeting();
+  }
+
+  function premiumMarkup() {
+    const context = getBookContext();
+    return `
+      <div class="askmark-premium" data-askmark-premium>
+        <header class="askmark-hero">
+          <button class="askmark-close" type="button" data-askmark-close aria-label="Close Ask Mark">×</button>
+          <div class="askmark-avatar-wrap" aria-hidden="true">
+            <span class="askmark-avatar-glow"></span>
+            <img class="askmark-avatar" src="/assets/ask-mark/ask-mark-avatar.png" alt="">
+            <span class="askmark-presence"></span>
+          </div>
+          <div class="askmark-brand-copy">
+            <span class="askmark-eyebrow">Your reading companion</span>
+            <h2>Ask Mark</h2>
+          </div>
+          <div class="askmark-header-actions">
+            <button type="button" data-askmark-view="notebook" aria-label="Open notebook" title="Notebook">✎</button>
+            <button type="button" data-askmark-view="format" aria-label="Format text" title="Format">Aa</button>
+            <button type="button" data-askmark-view="tools" aria-label="Open reader settings" title="Reader settings">⚙</button>
+          </div>
+        </header>
+
+        <main class="askmark-stage">
+          <section class="askmark-view is-active" data-askmark-view-panel="chat">
+            <div class="askmark-conversation" data-askmark-conversation aria-live="polite">
+              <article class="askmark-message mark-message">
+                <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+                <div>
+                  <span>Mark</span>
+                  <p><strong data-askmark-personal-greeting>${greeting()}</strong> Highlight a passage or ask me about the book. I can explain ideas, summarize, compare viewpoints, quiz you, or save an insight.</p>
+                </div>
+              </article>
+            </div>
+
+
+          </section>
+
+          <section class="askmark-view" data-askmark-view-panel="notebook">
+            <div class="askmark-subhead"><button type="button" data-askmark-back>←</button><div><span>Your saved thinking</span><h3>Mark’s Notebook</h3></div></div>
+            <div class="askmark-legacy-slot" data-notebook-slot></div>
+          </section>
+
+          <section class="askmark-view" data-askmark-view-panel="format">
+            <div class="askmark-subhead"><button type="button" data-askmark-back>←</button><div><span>Text cleanup</span><h3>Format</h3></div></div>
+            <div class="askmark-format-stack">
+              <details class="askmark-format-group" open>
+                <summary>Cleanup level</summary>
+                <div class="askmark-format-body askmark-format-levels">
+                  <button type="button" data-format-level="light"><strong>Light</strong><small>Characters, spacing, punctuation</small></button>
+                  <button type="button" class="is-selected" data-format-level="standard"><strong>Standard</strong><small>OCR cleanup, paragraphs, page artifacts</small></button>
+                  <button type="button" data-format-level="deep"><strong>Deep Clean</strong><small>Full cleanup plus document structure</small></button>
+                </div>
+              </details>
+              <details class="askmark-format-group" open>
+                <summary>Apply to</summary>
+                <div class="askmark-format-body askmark-format-scope">
+                  <label><input type="radio" name="askmark-format-scope" value="document" checked> Entire document</label>
+                  <label><input type="radio" name="askmark-format-scope" value="selection"> Highlighted passage</label>
+                </div>
+              </details>
+              <details class="askmark-format-group" open>
+                <summary>What gets cleaned</summary>
+                <div class="askmark-format-checks">
+                  <span>✓ Bad / control characters</span><span>✓ Broken line-end words</span><span>✓ Repeated headers &amp; titles</span><span>✓ Page numbers &amp; scan artifacts</span><span>✓ Paragraphs &amp; spacing</span><span>✓ Chapter / section structure</span><span>✓ Punctuation normalization</span>
+                </div>
+              </details>
+              <div class="askmark-format-actions">
+                <button class="primary" type="button" data-askmark-format-apply>Format Text</button>
+                <button class="secondary" type="button" data-askmark-format-original>Restore Original</button>
+              </div>
+              <p class="askmark-format-note">The original text is always preserved. Formatting changes structure and scan artifacts; it does not intentionally rewrite the author's prose.</p>
+              <div class="status askmark-format-status" data-askmark-format-status aria-live="polite"></div>
+            </div>
+          </section>
+
+          <section class="askmark-view" data-askmark-view-panel="tools">
+            <div class="askmark-subhead"><button type="button" data-askmark-back>←</button><div><span>Reading preferences</span><h3>Reader Settings</h3></div></div>
+            <div class="askmark-legacy-slot" data-tools-slot></div>
+          </section>
+        </main>
+
+        <footer class="askmark-composer" data-askmark-composer>
+          <div class="askmark-composer-resize" data-askmark-composer-resize role="separator" aria-label="Resize Ask Mark input" aria-orientation="horizontal" title="Drag upward to enlarge"></div>
+          <button type="button" class="askmark-plus" data-askmark-more aria-label="More actions">＋</button>
+          <label>
+            <span class="sr-only">Ask Mark anything</span>
+            <textarea data-askmark-input rows="1" placeholder=""></textarea>
+          </label>
+          <button type="button" class="askmark-send" data-askmark-send aria-label="Send to Ask Mark">➜</button>
+          <div class="askmark-more-menu" data-askmark-more-menu hidden>
+            <button type="button" data-askmark-prompt="Create a study guide for this passage."><span>▤</span><strong>Study guide</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-prompt="Create flash cards for this passage."><span>▱</span><strong>Flash cards</strong><small>Use current reading</small></button>
+            <button type="button" data-premium-mark-action="context"><span>⌛</span><strong>Historical context</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-prompt="Identify the key ideas in this passage."><span>✦</span><strong>Key ideas</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-prompt="Create memory tools for this passage."><span>◇</span><strong>Memory tools</strong><small>Use current reading</small></button>
+            <button type="button" data-askmark-comprehension><span>🧠</span><strong>Comprehension</strong><small>Check your understanding</small></button>
+          </div>
+        </footer>
+      </div>`;
+  }
+
+  function addUserMessage(text) {
+    const conversation = $('[data-askmark-conversation]', shell);
+    if (!conversation || !text) return;
+    conversation.insertAdjacentHTML('beforeend', `
+      <article class="askmark-message user-message"><div><span>You</span><p>${escapeHtml(text)}</p></div></article>`);
+    conversation.scrollTop = conversation.scrollHeight;
+  }
+
+  function addThinkingMessage() {
+    const conversation = $('[data-askmark-conversation]', shell);
+    if (!conversation) return null;
+    const id = `askmark-thinking-${Date.now()}`;
+    conversation.insertAdjacentHTML('beforeend', `
+      <article class="askmark-message mark-message is-thinking" id="${id}">
+        <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+        <div><span>Mark</span><p><i></i><i></i><i></i></p></div>
+      </article>`);
+    conversation.scrollTop = conversation.scrollHeight;
+    return document.getElementById(id);
+  }
+
+  function syncLegacyResponse() {
+    const response = getLegacySelectionPanel()?.querySelector('#mark-response');
+    if (!response || response.hidden || !response.textContent.trim()) return;
+    const thinking = $('.askmark-message.is-thinking', shell);
+    const body = response.cloneNode(true);
+    body.querySelectorAll('button').forEach((button) => button.classList.add('askmark-inline-action'));
+    const markup = `<article class="askmark-message mark-message">
+      <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+      <div><span>Mark</span><div class="askmark-rich-response">${body.innerHTML}</div></div>
+    </article>`;
+    if (thinking) thinking.outerHTML = markup;
+    else $('[data-askmark-conversation]', shell)?.insertAdjacentHTML('beforeend', markup);
+
+    const messages = $$('[data-askmark-conversation] .askmark-message', shell);
+    const latestMessage = messages[messages.length - 1];
+    const premiumSaveButton = latestMessage?.querySelector('[data-save-mark-response]');
+    const legacySaveButton = response.querySelector('[data-save-mark-response]');
+    if (premiumSaveButton && legacySaveButton) {
+      premiumSaveButton.addEventListener('click', () => {
+        legacySaveButton.click();
+        premiumSaveButton.disabled = true;
+        premiumSaveButton.textContent = 'Saved to notebook';
+      }, { once: true });
+    }
+
+    response.hidden = true;
+    const conversation = $('[data-askmark-conversation]', shell);
+    if (conversation) conversation.scrollTop = conversation.scrollHeight;
+  }
+
+  function syncSelection() {
+    if (!shell) return;
+    const text = getSelectionText();
+    const card = $('[data-askmark-selection]', shell);
+    const output = $('[data-askmark-selection-text]', shell);
+    if (!card || !output) return;
+    card.hidden = !text;
+    output.textContent = text.length > 420 ? `${text.slice(0, 420)}…` : text;
+  }
+
+  function syncContext() {
+    if (!shell) return;
+    const context = getBookContext();
+    const title = $('[data-askmark-title]', shell);
+    const chapter = $('[data-askmark-chapter]', shell);
+    if (title) title.textContent = context.title;
+    if (chapter) chapter.textContent = context.chapter;
+  }
+
+  function activatePremiumView(view = 'chat') {
+    $$('[data-askmark-view-panel]', shell).forEach((panel) => panel.classList.toggle('is-active', panel.dataset.askmarkViewPanel === view));
+    shell.classList.toggle('askmark-secondary-open', view !== 'chat');
+
+    if (view === 'notebook') {
+      const legacyNotebook = $('#mark-notebook-panel', legacyHost);
+      legacyHost?.querySelector('[data-mark-tab="notebook"]')?.click();
+      if (legacyNotebook) $('[data-notebook-slot]', shell)?.appendChild(legacyNotebook);
+    }
+    if (view === 'tools') {
+      const legacyTools = $('#mark-tools-panel', legacyHost);
+      legacyHost?.querySelector('[data-mark-tab="tools"]')?.click();
+      if (legacyTools) $('[data-tools-slot]', shell)?.appendChild(legacyTools);
+    }
+  }
+
+  function runSelectionAction(action, question = '') {
+    const panel = getLegacySelectionPanel();
+    const text = getSelectionText();
+    if (!text) {
+      addUserMessage(question || `${action[0].toUpperCase()}${action.slice(1)} this passage.`);
+      const thinking = addThinkingMessage();
+      if (thinking) thinking.querySelector('p').textContent = 'Highlight a passage first, then choose an action or ask a question about it.';
+      return;
+    }
+
+    addUserMessage(question || `${action[0].toUpperCase()}${action.slice(1)} this passage.`);
+    addThinkingMessage();
+
+    if (action === 'ask') {
+      const input = panel?.querySelector('#mark-question');
+      const form = panel?.querySelector('#mark-question-form');
+      if (input && form) {
+        input.value = question;
+        form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      }
+    } else {
+      panel?.querySelector(`[data-mark-action="${action}"]`)?.click();
+    }
+    setTimeout(syncLegacyResponse, 300);
+  }
+
+  async function runDocumentAction(action) {
+    const api = transformApi();
+    if (!api?.hasActiveDocument?.()) {
+      addUserMessage(action === 'summary' ? 'Summarize this document.' : 'Make this document easier to read.');
+      const thinking = addThinkingMessage();
+      if (thinking) thinking.querySelector('p').textContent = 'Open an imported document first to use whole-document actions.';
+      return;
+    }
+    addUserMessage(action === 'summary' ? 'Summarize this document.' : 'Make this document easier to read.');
+    const thinking = addThinkingMessage();
+    try {
+      if (action === 'summary') await api.requestSummary('quick');
+      else await api.makeReadable();
+      if (thinking) thinking.querySelector('p').textContent = action === 'summary' ? 'I created a concise summary view for the document.' : 'I created a cleaner, more readable version of the document.';
+      syncContext();
+    } catch (error) {
+      if (thinking) thinking.querySelector('p').textContent = error?.message || 'I could not complete that request.';
+    }
+  }
+
+  function bindPremiumEvents() {
+    $('[data-askmark-close]', shell)?.addEventListener('click', () => $('#toggle-mark-panel')?.click());
+    $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
+    $$('[data-askmark-view]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView(button.dataset.askmarkView)));
+    $$('[data-askmark-back]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView('chat')));
+
+    $$('[data-premium-mark-action]', shell).forEach((button) => button.addEventListener('click', () => {
+      $('[data-askmark-more-menu]', shell).hidden = true;
+      runSelectionAction(button.dataset.premiumMarkAction);
+    }));
+    $$('[data-document-action]', shell).forEach((button) => button.addEventListener('click', () => {
+      $('[data-askmark-more-menu]', shell).hidden = true;
+      runDocumentAction(button.dataset.documentAction);
+    }));
+    $$('[data-format-level]', shell).forEach((button) => button.addEventListener('click', () => {
+      $$('[data-format-level]', shell).forEach((item) => item.classList.toggle('is-selected', item === button));
+    }));
+    $('[data-askmark-format-apply]', shell)?.addEventListener('click', () => {
+      const status = $('[data-askmark-format-status]', shell);
+      try {
+        const api = transformApi();
+        if (!api?.hasActiveDocument?.()) throw new Error('Open or import a document first, then use Format.');
+        const level = $('[data-format-level].is-selected', shell)?.dataset.formatLevel || 'standard';
+        const scope = shell.querySelector('input[name="askmark-format-scope"]:checked')?.value || 'document';
+        const selected = scope === 'selection' ? getSelectionText() : '';
+        if (scope === 'selection' && !selected) throw new Error('Highlight a passage first, or choose Entire document.');
+        const report = api.applyCleanup(level, scope, selected);
+        const fixes = Object.entries(report || {}).filter(([key, value]) => key !== 'level' && Number(value) > 0).reduce((sum, [, value]) => sum + Number(value), 0);
+        if (status) status.textContent = `${level === 'deep' ? 'Deep Clean' : level[0].toUpperCase() + level.slice(1)} applied${fixes ? ` · ${fixes} cleanup actions` : ''}. Original preserved.`;
+        syncContext();
+      } catch (error) { if (status) status.textContent = error?.message || 'Formatting could not be completed.'; }
+    });
+    $('[data-askmark-format-original]', shell)?.addEventListener('click', () => {
+      const status = $('[data-askmark-format-status]', shell);
+      try { transformApi()?.restoreOriginal?.(); if (status) status.textContent = 'Original text restored.'; }
+      catch (error) { if (status) status.textContent = error?.message || 'Original text could not be restored.'; }
+    });
+
+    $('[data-askmark-comprehension]', shell)?.addEventListener('click', () => {
+      $('[data-askmark-more-menu]', shell)?.setAttribute('hidden', '');
+      window.MarkSetGoStartComprehension?.();
+    });
+
+    $$('[data-askmark-prompt]', shell).forEach((button) => button.addEventListener('click', () => {
+      $('[data-askmark-more-menu]', shell).hidden = true;
+      runSelectionAction('ask', button.dataset.askmarkPrompt);
+    }));
+
+    const input = $('[data-askmark-input]', shell);
+    const send = () => {
+      const value = input?.value.trim();
+      if (!value) return;
+      input.value = '';
+      input.style.height = '';
+      runSelectionAction('ask', value);
+    };
+    $('[data-askmark-send]', shell)?.addEventListener('click', send);
+    input?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        send();
+      }
+    });
+    input?.addEventListener('input', () => {
+      const composer = $('[data-askmark-composer]', shell);
+      if (composer?.dataset.userResized === '1') return;
+      input.style.height = 'auto';
+      input.style.height = `${Math.min(input.scrollHeight, 140)}px`;
+    });
+
+    const composer = $('[data-askmark-composer]', shell);
+    const resizeHandle = $('[data-askmark-composer-resize]', shell);
+    resizeHandle?.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      const startY = event.clientY;
+      const startHeight = input.getBoundingClientRect().height;
+      const panelHeight = shell.getBoundingClientRect().height;
+      const minHeight = 43;
+      const maxHeight = Math.max(140, Math.floor(panelHeight * 0.45));
+      composer.dataset.userResized = '1';
+      resizeHandle.setPointerCapture?.(event.pointerId);
+
+      const move = (moveEvent) => {
+        const nextHeight = Math.max(minHeight, Math.min(maxHeight, startHeight + (startY - moveEvent.clientY)));
+        input.style.height = `${nextHeight}px`;
+      };
+      const stop = () => {
+        resizeHandle.removeEventListener('pointermove', move);
+        resizeHandle.removeEventListener('pointerup', stop);
+        resizeHandle.removeEventListener('pointercancel', stop);
+      };
+      resizeHandle.addEventListener('pointermove', move);
+      resizeHandle.addEventListener('pointerup', stop);
+      resizeHandle.addEventListener('pointercancel', stop);
+    });
+
+    $('[data-askmark-more]', shell)?.addEventListener('click', () => {
+      const menu = $('[data-askmark-more-menu]', shell);
+      menu.hidden = !menu.hidden;
+    });
+    $('[data-clear-selection]', shell)?.addEventListener('click', () => {
+      $('[data-askmark-selection]', shell).hidden = true;
+    });
+  }
+
+  function configureTopToolbar() {
+    const controls = $('.reader-pane-controls');
+    if (!controls) return false;
+    controls.classList.add('ask-mark-toolbar');
+    const contents = $('#toggle-navigation-pane', controls);
+    const readerTools = $('#toggle-word-panel', controls);
+    const ask = $('#toggle-mark-panel', controls);
+    if (contents) contents.innerHTML = '<span aria-hidden="true">☰</span> Contents';
+    if (readerTools) {
+      readerTools.hidden = false;
+      readerTools.innerHTML = '<span aria-hidden="true">⚙</span> Reader';
+    }
+    if (ask) {
+      ask.hidden = false;
+      ask.innerHTML = '<img src="/assets/ask-mark/ask-mark-avatar.png" alt=""> <span>Ask Mark</span>';
+      ask.classList.add('ask-mark-primary-toggle');
+    }
+    $('#read-anything-format-control')?.remove();
+    return Boolean(ask);
+  }
+
+  function configureShell() {
+    const candidate = $('.reader-control-shell.mark-shell');
+    if (!candidate) return false;
+    if (candidate.dataset.premiumConfigured === '1') {
+      shell = candidate;
+      syncSelection();
+      return true;
+    }
+
+    shell = candidate;
+    shell.dataset.premiumConfigured = '1';
+    legacyHost = document.createElement('div');
+    legacyHost.className = 'askmark-legacy-host';
+    legacyHost.hidden = true;
+    while (shell.firstChild) legacyHost.appendChild(shell.firstChild);
+    shell.appendChild(legacyHost);
+    shell.insertAdjacentHTML('beforeend', premiumMarkup());
+    bindPremiumEvents();
+
+    const legacySelection = getLegacySelectionPanel();
+    if (legacySelection) {
+      selectionObserver?.disconnect();
+      selectionObserver = new MutationObserver(() => {
+        syncSelection();
+        syncLegacyResponse();
+      });
+      selectionObserver.observe(legacySelection, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
+    }
+
+    syncSelection();
+    syncContext();
+    return true;
+  }
+
+  function install() {
+    const toolbarReady = configureTopToolbar();
+    const shellReady = configureShell();
+    return toolbarReady && shellReady;
+  }
+
+  function retryInstall() {
+    installAttempts += 1;
+    if (!install() && installAttempts < 180) requestAnimationFrame(retryInstall);
+  }
+
+  document.addEventListener('marksetgo:document-available', () => {
+    installAttempts = 0;
+    requestAnimationFrame(retryInstall);
+  });
+  document.addEventListener('selectionchange', () => setTimeout(syncSelection, 60));
+  document.addEventListener('marksetgo:transform-state', syncContext);
+
+  requestAnimationFrame(retryInstall);
+  [400, 900, 1800, 3200].forEach((delay) => setTimeout(install, delay));
+
+  document.addEventListener('marksetgo:auth-changed', refreshPersonalGreeting);
+
+})();

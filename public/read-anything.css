@@ -1,0 +1,278 @@
+.read-anything-page{max-width:1180px;margin:0 auto}.read-anything-hero{display:flex;justify-content:space-between;gap:1rem;align-items:flex-start;margin-bottom:1.25rem}.read-anything-hero h1{margin:.2rem 0}.read-anything-promise{padding:.65rem .85rem;border-radius:999px;background:#edf5ff;color:#165f9c;font-weight:750;white-space:nowrap}.read-anything-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1rem}.read-anything-card{border:1px solid #dce4eb;border-radius:16px;padding:1rem;background:#fff;display:flex;flex-direction:column;align-items:flex-start;min-height:210px}.read-anything-card.featured{grid-column:span 2;background:#f7fbff;border-color:#b9d7ef}.read-anything-card h2{margin:.45rem 0 .2rem;font-size:1.05rem}.read-anything-card p{margin:.1rem 0 1rem;color:#637080}.read-anything-card form{width:100%;display:grid;grid-template-columns:1fr auto;gap:.6rem;align-items:end;margin-top:auto}.read-anything-card label{width:100%}.read-anything-card input{width:100%}.read-anything-card>button,.read-anything-file-button{margin-top:auto}.read-anything-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:#edf3f8;font-weight:800}.read-anything-workspace{margin-top:1rem;padding:1rem;border:1px solid #dce4eb;border-radius:16px;background:#fff}.read-anything-workspace label{display:block;margin:.7rem 0}.read-anything-workspace input,.read-anything-workspace textarea{width:100%}.read-anything-recent{margin-top:1.25rem}.read-anything-recent article{display:grid;grid-template-columns:110px 1fr auto;gap:.8rem;padding:.7rem 0;border-bottom:1px solid #e5e9ee}.read-anything-recent span{text-transform:capitalize;color:#536b7c}.read-anything-recent small{color:#71808d}@media(max-width:760px){.read-anything-hero{display:block}.read-anything-promise{display:inline-flex;margin-top:.5rem}.read-anything-grid{grid-template-columns:1fr}.read-anything-card.featured{grid-column:auto}.read-anything-card form{grid-template-columns:1fr}.read-anything-recent article{grid-template-columns:1fr}.read-anything-card{min-height:auto}}
+
+
+.read-anything-format-control{position:relative;margin-left:auto;align-self:center;z-index:80;flex:0 0 auto}
+.read-anything-format-control>summary{list-style:none;cursor:pointer;border:0;border-radius:6px;background:transparent;padding:.2rem .35rem;font-size:.72rem;line-height:1;font-weight:700;letter-spacing:.02em;color:inherit;text-transform:uppercase}
+.read-anything-format-control>summary::-webkit-details-marker{display:none}
+.read-anything-format-control[open]>summary{background:rgba(127,127,127,.18)}
+.read-anything-format-menu{position:absolute;right:0;top:calc(100% + .35rem);z-index:90;width:min(280px,calc(100vw - 1rem));display:grid;gap:.45rem;padding:.65rem;border:1px solid #ccd8e2;border-radius:12px;background:#fff;color:#173044;box-shadow:0 12px 34px rgba(21,48,68,.22);max-height:min(420px,calc(100dvh - 110px));overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain}
+.read-anything-format-menu-head{display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+.read-anything-format-menu-head button{border:0;background:transparent;padding:.1rem .35rem;font-size:1.2rem;line-height:1}
+.read-anything-format-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.35rem}
+.read-anything-format-menu button{min-width:0;text-align:center;padding:.45rem .5rem}
+.read-anything-format-menu label{display:grid;gap:.25rem;font-size:.78rem}
+.read-anything-format-menu select{width:100%;min-width:0;padding:.42rem}
+.read-anything-format-menu small{color:#667887;line-height:1.25;font-size:.72rem}
+.read-anything-format-menu .status{margin:0;padding:.45rem .55rem;font-size:.76rem}
+.read-anything-format-menu .status.error{color:#9c2727;background:#fff0f0}
+@media(max-width:760px){
+  .read-anything-format-control{position:absolute;right:8px;top:50%;transform:translateY(-50%);margin:0;color:#f7f8fa}
+  .read-anything-format-control>summary{color:#f7f8fa;font-size:.65rem;padding:.25rem .3rem}
+  .read-anything-format-menu{position:fixed;top:calc(var(--msg-mobile-header,52px) + 46px);right:6px;left:auto;bottom:auto;width:min(270px,calc(100vw - 12px));max-height:calc(100dvh - var(--msg-mobile-header,52px) - var(--msg-mobile-nav,62px) - 58px)}
+}
+
+/* v8.5.7 — compact imported-document control on the real mobile title ribbon. */
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen .read-anything-format-control {
+    position: absolute !important;
+    top: 8px !important;
+    right: 10px !important;
+    left: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    margin: 0 !important;
+    z-index: 10050 !important;
+    width: auto !important;
+    max-width: none !important;
+    color: #f7f8fa !important;
+  }
+
+  #app.msg-mobile-reader-screen .read-anything-format-control > summary {
+    display: inline-flex !important;
+    align-items: center !important;
+    min-height: 24px !important;
+    width: auto !important;
+    max-width: none !important;
+    padding: 2px 5px !important;
+    border: 0 !important;
+    border-radius: 5px !important;
+    background: transparent !important;
+    color: #f7f8fa !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    letter-spacing: .02em !important;
+    text-transform: uppercase !important;
+  }
+
+  #app.msg-mobile-reader-screen .read-anything-format-control[open] > summary {
+    background: rgba(255,255,255,.14) !important;
+  }
+
+  #app.msg-mobile-reader-screen .read-anything-format-menu {
+    position: fixed !important;
+    top: calc(var(--msg-mobile-header) + 46px) !important;
+    right: 8px !important;
+    bottom: auto !important;
+    left: auto !important;
+    transform: none !important;
+    width: min(276px, calc(100vw - 16px)) !important;
+    max-width: calc(100vw - 16px) !important;
+    max-height: calc(100dvh - var(--msg-mobile-header) - var(--msg-mobile-nav) - 58px) !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding: 8px !important;
+    gap: 6px !important;
+    z-index: 10100 !important;
+  }
+
+  #app.msg-mobile-reader-screen .read-anything-format-actions {
+    display: grid !important;
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    gap: 5px !important;
+  }
+
+  #app.msg-mobile-reader-screen .read-anything-format-menu button,
+  #app.msg-mobile-reader-screen .read-anything-format-menu select {
+    min-height: 34px !important;
+    padding: 5px 6px !important;
+    font-size: 12px !important;
+  }
+}
+
+
+/* v8.6.4 — keep Format visible on the mobile title ribbon. */
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen .reader-title-row {
+    position: relative !important;
+    overflow: visible !important;
+  }
+  #app.msg-mobile-reader-screen .read-anything-format-control,
+  #app.msg-mobile-reader-screen .read-anything-format-control-mobile {
+    display: block !important;
+    position: absolute !important;
+    top: 8px !important;
+    right: 9px !important;
+    left: auto !important;
+    margin: 0 !important;
+    transform: none !important;
+    z-index: 10060 !important;
+  }
+  #app.msg-mobile-reader-screen .read-anything-format-control > summary {
+    display: inline-flex !important;
+    color: #f7f8fa !important;
+    font-size: 10px !important;
+    line-height: 1 !important;
+    padding: 3px 5px !important;
+  }
+}
+
+/* v8.6.6 — compact Format labels and visible imported paragraph spacing. */
+.read-anything-format-actions button {
+  font-size: .68rem;
+  line-height: 1.05;
+  padding-inline: .3rem;
+  white-space: nowrap;
+}
+#app.read-anything-paragraph-spacing .reader-paragraph-break {
+  height: 1.15em;
+}
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen .read-anything-format-actions button {
+    font-size: 10px !important;
+    line-height: 1 !important;
+    padding: 5px 3px !important;
+  }
+}
+
+
+/* v8.7.0 — integrated Transform control and compact in-reader workspace. */
+.read-anything-transform-control > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  text-transform: none;
+  font-size: .75rem;
+  letter-spacing: 0;
+}
+.read-anything-transform-control .transform-state {
+  display: inline-flex;
+  align-items: center;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: .18rem .38rem;
+  border-radius: 999px;
+  background: rgba(127,127,127,.16);
+  font-size: .67rem;
+  font-weight: 650;
+}
+.read-anything-transform-menu { width: min(340px, calc(100vw - 1rem)); gap: .7rem; }
+.read-anything-transform-menu section { display: grid; gap: .4rem; padding-top: .55rem; border-top: 1px solid #e4e9ee; }
+.read-anything-transform-menu section:first-of-type { border-top: 0; padding-top: 0; }
+.read-anything-format-menu-head > div { display: grid; gap: .12rem; }
+.read-anything-format-menu-head > div small { font-size: .7rem; }
+.transform-section-label { display: block; font-size: .68rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #647887; }
+.transform-reading-actions { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.transform-summary-actions { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.read-anything-transform-menu button.active { border-color: #276ca7; background: #eaf4fc; color: #174f7e; }
+.transform-apply-level { width: 100%; }
+.transform-custom textarea { width: 100%; resize: vertical; min-height: 74px; max-height: 150px; padding: .5rem; border: 1px solid #bdcbd6; border-radius: 8px; font: inherit; }
+.transform-preserve-note { display: block; }
+@media (max-width:700px) {
+  #app.msg-mobile-reader-screen .read-anything-transform-control > summary { gap: 3px !important; text-transform: none !important; }
+  #app.msg-mobile-reader-screen .read-anything-transform-control .transform-label { font-size: 10px; }
+  #app.msg-mobile-reader-screen .read-anything-transform-control .transform-state { display: inline; }
+  #app.msg-mobile-reader-screen .read-anything-transform-menu { width: min(330px,calc(100vw - 16px)) !important; }
+}
+
+
+/* v8.7.2 — integrated reader command bar. */
+#app .reader-pane-controls.read-anything-command-bar {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  min-width: 0;
+}
+#app .read-anything-command-bar .reader-pane-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+}
+#app .read-anything-command-bar .reader-pane-buttons > button {
+  appearance: none;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: .22rem .62rem;
+  color: inherit;
+  font-size: .82rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+#app .read-anything-command-bar .reader-pane-buttons > button:first-child { padding-left: 0; }
+#app .read-anything-command-bar .reader-pane-buttons > button + button {
+  border-left: 1px solid currentColor;
+}
+#app .read-anything-command-bar .reader-pane-buttons > button:hover,
+#app .read-anything-command-bar .reader-pane-buttons > button:focus-visible {
+  text-decoration: underline;
+  background: transparent;
+}
+#app .read-anything-command-bar .read-anything-transform-control {
+  position: relative;
+  inset: auto;
+  transform: none;
+  margin: 0 0 0 auto;
+  color: inherit;
+  z-index: 30;
+}
+#app .read-anything-command-bar .read-anything-transform-control > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+  padding: .25rem .1rem;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: .82rem;
+  font-weight: 750;
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+#app .read-anything-command-bar .read-anything-transform-control > summary:hover,
+#app .read-anything-command-bar .read-anything-transform-control > summary:focus-visible { text-decoration: underline; }
+#app .read-anything-command-bar .transform-state {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: inherit;
+  font-weight: inherit;
+}
+#app .read-anything-command-bar .transform-caret { font-size: .68rem; }
+#app .read-anything-command-bar .read-anything-transform-menu {
+  position: fixed;
+  top: max(56px, calc(env(safe-area-inset-top) + 48px));
+  right: 12px;
+  left: auto;
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100dvh - 76px);
+  overflow-y: auto;
+  z-index: 2147483000;
+}
+#app .read-anything-command-bar .transform-reading-actions { grid-template-columns: repeat(3,minmax(0,1fr)); }
+#app .read-anything-command-bar .transform-level-actions { grid-template-columns: repeat(2,minmax(0,1fr)); }
+#app .read-anything-command-bar .transform-secondary-action { width: 100%; text-align: left; }
+#app .read-anything-command-bar .viewer-fullscreen-button { margin-left: .45rem; }
+@media (max-width:700px) {
+  #app .reader-pane-controls.read-anything-command-bar { gap: .25rem; }
+  #app .read-anything-command-bar .reader-pane-buttons > button { padding: .2rem .38rem; font-size: .68rem; }
+  #app .read-anything-command-bar .read-anything-transform-control > summary { font-size: .68rem; }
+  #app .read-anything-command-bar .transform-state { display: inline; max-width: 72px; }
+  #app .read-anything-command-bar .viewer-fullscreen-button { display: none !important; }
+  #app .read-anything-command-bar .read-anything-transform-menu {
+    top: max(48px, calc(env(safe-area-inset-top) + 42px));
+    right: 8px;
+    width: min(340px, calc(100vw - 16px));
+    max-height: calc(100dvh - 64px);
+  }
+}

@@ -135,12 +135,60 @@
     });
   }
 
+
+  function currentFirstName() {
+    // Prefer Clerk's explicit first-name fields. The API display name can fall
+    // back to an email address when the account profile has no name, and an
+    // email must never be used as a greeting.
+    const profile = state.session?.user || state.session?.account || {};
+    const clerkUser = state.clerk?.user || {};
+    const candidates = [
+      clerkUser.firstName,
+      clerkUser.first_name,
+      profile.firstName,
+      profile.first_name,
+      profile.givenName,
+      profile.given_name,
+      clerkUser.fullName,
+      clerkUser.full_name,
+      profile.displayName,
+      profile.display_name,
+      profile.fullName,
+      profile.full_name,
+      profile.name,
+      clerkUser.username
+    ];
+
+    for (const candidate of candidates) {
+      const value = String(candidate || '').trim();
+      if (!value || value.includes('@')) continue;
+      const first = value.split(/\s+/)[0].replace(/^[^A-Za-z]+|[^A-Za-z'’-]+$/g, '');
+      if (first) return first;
+    }
+    return '';
+  }
+
+  function publishAuthState(session = state.session) {
+    const profile = session?.user || session?.account || null;
+    window.MarkSetGoAuth = {
+      clerk: state.clerk,
+      session,
+      user: profile,
+      account: profile,
+      refresh: fetchSession,
+      getFirstName: currentFirstName
+    };
+    const detail = { session, firstName: currentFirstName() };
+    document.dispatchEvent(new CustomEvent('marksetgo:auth-ready', { detail }));
+    window.dispatchEvent(new CustomEvent('marksetgo:auth-ready', { detail }));
+  }
+
   async function fetchSession() {
     const response = await fetch('/api/auth/session', { credentials: 'same-origin' });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || 'Unable to load account session.');
     state.session = payload;
-    window.MarkSetGoAuth = { clerk: state.clerk, session: payload, refresh: fetchSession };
+    publishAuthState(payload);
     document.dispatchEvent(new CustomEvent('marksetgo:auth-changed', { detail: payload }));
     applyBetaGate(payload);
     return payload;
@@ -169,7 +217,8 @@
       if (state.config.betaAccessEnabled) showGate('Checking your access…');
       if (!state.config.configured || !state.config.publishableKey) {
         setControls('<span class="auth-status" title="Authentication has not been configured">Guest</span>');
-        window.MarkSetGoAuth = { clerk: null, session: { authenticated: false, planCode: 'guest' }, refresh: fetchSession };
+        state.session = { authenticated: false, planCode: 'guest' };
+        publishAuthState(state.session);
         if (state.config.betaAccessEnabled) showGate('Private beta access is unavailable because authentication is not configured.');
         else closeGate();
         return;
@@ -191,7 +240,7 @@
         renderSignedInControls();
       } else {
         state.session = { authenticated: false, planCode: 'guest' };
-        window.MarkSetGoAuth = { clerk: state.clerk, session: state.session, refresh: fetchSession };
+        publishAuthState(state.session);
         renderGuestControls();
         applyBetaGate(state.session);
       }
@@ -202,7 +251,7 @@
           renderSignedInControls();
         } else {
           state.session = { authenticated: false, planCode: 'guest' };
-          window.MarkSetGoAuth = { clerk: state.clerk, session: state.session, refresh: fetchSession };
+          publishAuthState(state.session);
           renderGuestControls();
           applyBetaGate(state.session);
           document.dispatchEvent(new CustomEvent('marksetgo:auth-changed', { detail: state.session }));

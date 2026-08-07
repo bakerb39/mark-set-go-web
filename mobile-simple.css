@@ -1,0 +1,791 @@
+/* Mark, Set, Go! simplified mobile shell. Desktop is intentionally unaffected. */
+@media (max-width: 700px) {
+  :root {
+    --msg-mobile-header: 52px;
+    --msg-mobile-nav: 64px;
+    --msg-mobile-reader-controls: 104px;
+  }
+
+  html, body {
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
+    overflow: hidden !important;
+    overscroll-behavior: none;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: #f7f8fa;
+  }
+
+  .site-header,
+  .music-dock {
+    display: none !important;
+  }
+
+  #msg-mobile-header {
+    position: fixed;
+    inset: 0 0 auto 0;
+    z-index: 10020;
+    height: var(--msg-mobile-header);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: env(safe-area-inset-top, 0) 16px 0;
+    border-bottom: 1px solid rgba(20, 33, 61, .12);
+    background: rgba(255,255,255,.96);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  #msg-mobile-header strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+  }
+
+  #msg-mobile-header .msg-mobile-mark {
+    color: #1769aa;
+    font-weight: 800;
+    flex: 0 0 auto;
+  }
+
+  #app.app-shell {
+    position: fixed;
+    inset: var(--msg-mobile-header) 0 var(--msg-mobile-nav) 0;
+    width: 100%;
+    max-width: none;
+    height: auto;
+    min-height: 0;
+    margin: 0;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: #f7f8fa;
+  }
+
+  #app > section,
+  #app > .panel,
+  #app .reader-page-panel {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    min-height: 0;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Native-style contained scrolling: the page itself never scrolls. */
+  #app.msg-mobile-list-screen {
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  #msg-shared-bottom {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 10020;
+    height: calc(var(--msg-mobile-nav) + env(safe-area-inset-bottom, 0));
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 5px 8px env(safe-area-inset-bottom, 0);
+    border-top: 1px solid rgba(20, 33, 61, .12);
+    background: rgba(255,255,255,.98);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  #msg-shared-bottom button {
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: #52606d;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 4px;
+    font: inherit;
+    font-size: 11px;
+  }
+
+  #msg-shared-bottom nav button span:first-child {
+    font-size: 21px;
+    line-height: 1;
+  }
+
+  #msg-shared-bottom nav button.active {
+    color: #1769aa;
+    background: #eaf3fb;
+    font-weight: 700;
+  }
+
+  /* Reader becomes a single fixed viewport. */
+  #app.msg-mobile-reader-screen {
+    overflow: hidden !important;
+    background: #111820;
+  }
+
+  #app.msg-mobile-reader-screen .reader-page-panel {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) var(--msg-mobile-reader-controls);
+    overflow: hidden;
+    padding: 0 !important;
+  }
+
+  #app.msg-mobile-reader-screen .reader-title-row {
+    min-height: 42px;
+    margin: 0 !important;
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(255,255,255,.10);
+    background: #111820;
+  }
+
+  #app.msg-mobile-reader-screen .reader-title-copy { min-width:0; padding-right:52px; }
+
+  #app.msg-mobile-reader-screen .reader-title-copy h1 {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 15px;
+    color: #f7f8fa;
+  }
+
+  #app.msg-mobile-reader-screen .reader-title-links,
+  #app.msg-mobile-reader-screen .reader-music-actions,
+  #app.msg-mobile-reader-screen .reader-toolbar,
+  #app.msg-mobile-reader-screen .reader-pane-controls,
+  #app.msg-mobile-reader-screen .navigation-pane,
+  #app.msg-mobile-reader-screen .word-panel,
+  #app.msg-mobile-reader-screen .pane-splitter,
+  #app.msg-mobile-reader-screen .reader-viewer-footer,
+  #app.msg-mobile-reader-screen .playback-controls,
+  #app.msg-mobile-reader-screen #mark-selection-toolbar,
+  #app.msg-mobile-reader-screen #word-context-menu,
+  #app.msg-mobile-reader-screen .fullscreen-control-strip,
+  #app.msg-mobile-reader-screen .fullscreen-mark-drawer {
+    display: none !important;
+  }
+
+  #app.msg-mobile-reader-screen .reader-layout,
+  #app.msg-mobile-reader-screen .reader-center-column,
+  #app.msg-mobile-reader-screen #reader-frame {
+    width: 100% !important;
+    height: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    display: block !important;
+    overflow: hidden !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 18px 18px 24px !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    font-size: var(--msg-mobile-reader-font-size, 14px) !important;
+    line-height: 1.7;
+    -webkit-overflow-scrolling: auto;
+  }
+
+  #app.msg-mobile-reader-screen #reader.light {
+    background: #fff !important;
+    color: #17202a !important;
+  }
+
+  #msg-mobile-reader-controls {
+    display: none;
+  }
+
+  #app.msg-mobile-reader-screen #msg-mobile-reader-controls {
+    display: grid;
+    grid-template-rows: 48px 40px;
+    gap: 6px;
+    height: var(--msg-mobile-reader-controls);
+    padding: 7px 10px;
+    border-top: 1px solid rgba(255,255,255,.10);
+    background: #111820;
+  }
+
+  #msg-mobile-reader-controls .msg-control-row {
+    display: grid;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  #msg-mobile-reader-controls .msg-speed-row {
+    grid-template-columns: 44px minmax(86px, 1fr) 44px 54px;
+  }
+
+  #msg-mobile-reader-controls .msg-option-row {
+    grid-template-columns: 42px minmax(62px, .75fr) 42px minmax(76px, .9fr);
+  }
+
+  #msg-mobile-reader-controls button {
+    min-height: 42px;
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 12px;
+    background: #202b36;
+    color: white;
+    font: inherit;
+    font-weight: 700;
+  }
+
+  #msg-mobile-reader-controls .msg-play {
+    background: #1769aa;
+    border-color: #1769aa;
+    font-size: 18px;
+  }
+
+  #msg-mobile-reader-controls .msg-speed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    border-radius: 12px;
+    color: white;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  #msg-mobile-reader-controls .msg-theme {
+    min-height: 38px;
+    font-size: 12px;
+  }
+
+  #msg-mobile-reader-controls .msg-text-size {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    color: white;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  /* Mobile uses one fixed top anchor band. It occupies real visual space; text starts below it. */
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top .focus-anchor-overlay {
+    top: 8px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100% - 24px) !important;
+    max-width: 46rem;
+    min-height: 0 !important;
+    padding: .28em .65em .24em !important;
+    cursor: default !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader {
+    padding-top: 78px !important;
+  }
+
+  /* Read Anything is a contained mobile screen; only its content area scrolls. */
+  #app.msg-mobile-list-screen .read-anything-page {
+    min-height: 100%;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 14px !important;
+  }
+
+  #app.msg-mobile-list-screen .read-anything-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  #app.msg-mobile-list-screen .read-anything-promise {
+    display: none !important;
+  }
+
+  /* Simplify library and browse cards without changing their behavior. */
+  #app.msg-mobile-list-screen .panel {
+    padding: 14px !important;
+  }
+
+  #app.msg-mobile-list-screen .section-heading,
+  #app.msg-mobile-list-screen .page-heading {
+    margin-bottom: 12px;
+  }
+
+  #app.msg-mobile-list-screen h1 {
+    font-size: 23px;
+  }
+
+  #app.msg-mobile-list-screen .library-header-tools,
+  #app.msg-mobile-list-screen .global-notebook-actions,
+  #app.msg-mobile-list-screen [data-action="progress-awards"],
+  #app.msg-mobile-list-screen [data-action="action-center"] {
+    display: none !important;
+  }
+}
+
+
+/* v8.5.2: Mobile library actions are compact; reading-profile badges are excluded. */
+@media (max-width: 760px) {
+  .my-library-hub .difficulty-badge,
+  .my-library-hub [class*="difficulty-"] { display: none !important; }
+  .library-book-actions { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
+  .library-delete-book { min-height: 40px; }
+}
+
+/* v8.5.3: harden every mobile screen against horizontal overflow. */
+@media (max-width: 700px) {
+  html,
+  body,
+  #app,
+  #app.app-shell,
+  #msg-mobile-header,
+  #msg-shared-bottom {
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    overflow-x: hidden !important;
+  }
+
+  #app *,
+  #msg-mobile-header *,
+  #msg-shared-bottom * {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  #app > *,
+  #app section,
+  #app .panel,
+  #app .card,
+  #app .reader-page-panel,
+  #app .read-anything-page,
+  #app .read-anything-grid,
+  #app .my-library-hub,
+  #app .library-grid,
+  #app .library-list,
+  #app .browse-grid,
+  #app form,
+  #app fieldset {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  #app img,
+  #app video,
+  #app canvas,
+  #app svg,
+  #app iframe {
+    max-width: 100% !important;
+    height: auto;
+  }
+
+  #app input,
+  #app select,
+  #app textarea,
+  #app button {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  #app input:not([type="checkbox"]):not([type="radio"]),
+  #app select,
+  #app textarea {
+    width: 100% !important;
+  }
+
+  #app pre,
+  #app code,
+  #app .source-url,
+  #app .book-source,
+  #app .library-book-title,
+  #app .library-book-meta,
+  #app .read-anything-page a,
+  #app .read-anything-page p,
+  #app .read-anything-page label {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  #app .library-book-actions,
+  #app .library-header-actions,
+  #app .library-header-tools,
+  #app .read-anything-actions,
+  #app .button-row,
+  #app .action-row,
+  #app .toolbar-row {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  #app .library-book-actions > *,
+  #app .read-anything-actions > *,
+  #app .button-row > *,
+  #app .action-row > * {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  #app .read-anything-grid,
+  #app .library-grid,
+  #app .browse-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  #msg-mobile-reader-controls,
+  #msg-mobile-reader-controls .msg-control-row,
+  #msg-mobile-reader-controls .msg-speed-row,
+  #msg-mobile-reader-controls .msg-option-row {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width:700px){
+  #app.msg-mobile-list-screen{overflow-x:hidden!important;overflow-y:auto!important;overscroll-behavior-y:contain}
+  #app.msg-mobile-list-screen textarea{resize:none!important;max-width:100%!important}
+  #app.msg-mobile-list-screen input,#app.msg-mobile-list-screen select,#app.msg-mobile-list-screen button{max-width:100%}
+  #app.msg-mobile-reader-screen #reader{overscroll-behavior:contain;scrollbar-gutter:stable}
+}
+
+/* v8.5.6: lock the mobile focus anchor into its own top layout row.
+   The overlay no longer participates in page-position calculations, so a
+   page/virtual-render refresh cannot nudge it downward. Reader text always
+   occupies the separate row below it. */
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top {
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    align-content: stretch !important;
+    overflow: hidden !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top .focus-anchor-overlay:not([hidden]) {
+    position: relative !important;
+    inset: auto !important;
+    grid-row: 1 !important;
+    align-self: start !important;
+    justify-self: center !important;
+    transform: none !important;
+    margin: 8px 12px 4px !important;
+    width: calc(100% - 24px) !important;
+    max-width: 46rem !important;
+    flex: 0 0 auto !important;
+    cursor: default !important;
+    touch-action: auto !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader {
+    grid-row: 2 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding-top: 10px !important;
+    overflow-y: auto !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader.focus-anchor-clearance {
+    padding-top: 10px !important;
+  }
+}
+
+/* v8.5.7 — rebuild the mobile reader against the actual reader DOM. */
+@media (max-width: 700px) {
+  #app.msg-mobile-reader-screen .reader-page-panel {
+    display: grid !important;
+    grid-template-rows: 42px minmax(0, 1fr) var(--msg-mobile-reader-controls) !important;
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+
+  #app.msg-mobile-reader-screen .reader-title-row {
+    position: relative !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    max-height: 42px !important;
+    padding: 7px 64px 7px 12px !important;
+    overflow: visible !important;
+  }
+
+  #app.msg-mobile-reader-screen .reader-title-copy {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  #app.msg-mobile-reader-screen .reader-layout,
+  #app.msg-mobile-reader-screen .reader-center-column {
+    display: grid !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top {
+    position: relative !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
+    align-content: stretch !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top .focus-anchor-overlay:not([hidden]) {
+    position: relative !important;
+    inset: auto !important;
+    grid-row: 1 !important;
+    align-self: start !important;
+    justify-self: stretch !important;
+    transform: none !important;
+    width: auto !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    margin: 6px 10px 4px !important;
+    padding: .18em .48em .16em !important;
+    line-height: 1 !important;
+    cursor: default !important;
+    touch-action: pan-y !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top .focus-anchor-overlay .focus-anchor-stage {
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader,
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader.focus-anchor-clearance {
+    position: relative !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    margin: 0 !important;
+    padding: 12px 16px 22px !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior-y: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    touch-action: pan-y !important;
+  }
+
+  #app.msg-mobile-reader-screen #reader-frame.msg-anchor-top #reader.focus-anchor-clearance {
+    --focus-anchor-clearance: 0px !important;
+  }
+}
+
+
+
+/* v8.5.9: one shared bottom section for desktop and mobile. */
+.shared-bottom-section nav button span[aria-hidden="true"] {
+  display: none;
+}
+
+@media (min-width: 701px) {
+  .shared-bottom-section {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 16px 28px;
+  }
+
+  .shared-bottom-section nav {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .shared-bottom-section nav button {
+    min-height: 38px;
+  }
+
+  .shared-bottom-section small {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 700px) {
+  #msg-shared-bottom {
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    z-index: 10020 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: calc(var(--msg-mobile-nav) + env(safe-area-inset-bottom, 0)) !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 5px 8px env(safe-area-inset-bottom, 0) !important;
+    display: block !important;
+    border: 0 !important;
+    border-top: 1px solid rgba(20, 33, 61, .12) !important;
+    border-radius: 0 !important;
+    background: rgba(255,255,255,.98) !important;
+    box-shadow: none !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    overflow: hidden !important;
+  }
+
+  #msg-shared-bottom .site-footer-brand,
+  #msg-shared-bottom > small {
+    display: none !important;
+  }
+
+  #msg-shared-bottom nav {
+    width: 100%;
+    height: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+  }
+
+  #msg-shared-bottom nav button {
+    border: 0;
+    border-radius: 12px;
+    background: transparent;
+    color: #52606d;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 4px;
+    font: inherit;
+    font-size: 11px;
+  }
+
+  #msg-shared-bottom nav button span[aria-hidden="true"] {
+    display: inline;
+    font-size: 21px;
+    line-height: 1;
+  }
+
+  #msg-shared-bottom nav button.active {
+    color: #1769aa;
+    background: #eaf3fb;
+    font-weight: 700;
+  }
+
+  #app .mobile-bottom-nav,
+  #app .bottom-navigation,
+  #app .bottom-nav,
+  #app .sticky-bottom-bar,
+  #app .page-bottom-actions,
+  #app .library-quick-actions,
+  #app .reader-viewer-footer {
+    display: none !important;
+  }
+}
+
+
+
+/* v8.6.4 — dedicated mobile navigation plus one informational footer. */
+@media (max-width: 700px) {
+  :root { --msg-mobile-nav: 64px; }
+
+  #app.app-shell {
+    inset: var(--msg-mobile-header) 0 var(--msg-mobile-nav) 0 !important;
+  }
+
+  #msg-mobile-nav {
+    position: fixed !important;
+    inset: auto 0 0 0 !important;
+    z-index: 10020 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: calc(var(--msg-mobile-nav) + env(safe-area-inset-bottom, 0)) !important;
+    display: grid !important;
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 0 !important;
+    padding: 5px 8px env(safe-area-inset-bottom, 0) !important;
+    border-top: 1px solid rgba(20, 33, 61, .12) !important;
+    background: rgba(255,255,255,.98) !important;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  #msg-mobile-nav button {
+    border: 0 !important;
+    border-radius: 12px !important;
+    background: transparent !important;
+    color: #52606d !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 2px !important;
+    min-width: 0 !important;
+    padding: 4px !important;
+    font: inherit !important;
+    font-size: 11px !important;
+  }
+
+  #msg-mobile-nav button span:first-child {
+    font-size: 21px !important;
+    line-height: 1 !important;
+  }
+
+  #msg-mobile-nav button.active {
+    color: #1769aa !important;
+    background: #eaf3fb !important;
+    font-weight: 700 !important;
+  }
+
+  #msg-shared-bottom {
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    display: grid !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 12px 0 0 !important;
+    padding: 8px 12px 10px !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-top: 1px solid rgba(100,116,139,.18) !important;
+    border-radius: 0 !important;
+    background: rgba(248,250,252,.96) !important;
+    box-shadow: none !important;
+    text-align: left !important;
+  }
+
+  #msg-shared-bottom[hidden] { display: none !important; }
+  #msg-shared-bottom .site-footer-copy,
+  #msg-shared-bottom nav,
+  #msg-shared-bottom .site-footer-version { display: flex !important; }
+  #msg-shared-bottom .site-footer-copy { flex-direction: column !important; align-items: flex-start !important; }
+  #msg-shared-bottom nav { justify-content: flex-start !important; flex-wrap: wrap !important; gap: 9px !important; }
+}

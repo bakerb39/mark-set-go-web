@@ -6,17 +6,35 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=7.7.8" rel="stylesheet"/>
+<link href="/styles.css?v=9.2.5-format-cleanup" rel="stylesheet"/>
+<link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
+<link href="/ask-mark-hub.css?v=9.2.5-format-cleanup" rel="stylesheet"/>
+<link href="/mobile-simple.css?v=8.5.9" rel="stylesheet"/>
+<link rel="stylesheet" href="/button-feedback.css?v=8.6.6">
+<link href="/theme-system.css?v=9.2.4-shared-theme" rel="stylesheet"/>
+<link rel="stylesheet" href="/theme-overrides.css?v=9.0.7-unified-theme">
+<link rel="stylesheet" href="/reading-goals.css?v=9.2.0-book-id">
 <script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/SessionManager.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/ReaderEngine.js?v=3.2.1-stable-recovery"></script>
-<script defer src="/reader/VirtualRenderer.js?v=3.2.1-stable-recovery"></script>
+<script defer src="/reader/VirtualRenderer.js?v=7.7.15.4-native-selection"></script>
   <script defer src="/modules/reading/digital-sign-mode.js?v=7.2.1"></script>
   <script defer src="/modules/reading/pacman-mode.js?v=7.2.2"></script>
   <script defer src="/modules/pages/help-page.js?v=7.2.1"></script>
   <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
-  <script defer src="/auth.js?v=7.7.8"></script>
-  <script defer src="/app.js?v=7.7.12"></script>
+  <script defer src="/auth.js?v=9.0.9-no-email-greeting"></script>
+  <script defer src="/cloud-data.js?v=8.1.2"></script>
+  <script defer src="/app.js?v=9.2.5-format-cleanup"></script>
+  <script defer src="/cloud-preferences.js?v=8.1.2"></script>
+  <script defer src="/cloud-library.js?v=8.1.2"></script>
+  <script defer src="/cloud-document.js?v=8.1.2"></script>
+  <script defer src="/cloud-productivity.js?v=8.1.2"></script>
+  <script defer src="/document-manager.js?v=8.1.2"></script>
+  <script defer src="/read-anything.js?v=9.2.5-format-cleanup"></script>
+  <script defer src="/ask-mark-hub.js?v=9.2.5-format-cleanup"></script>
+  <script defer src="/personalization.js?v=9.0.9-no-email-greeting"></script>
+  <script defer src="/reading-goals.js?v=9.1.6-chat-only"></script>
+  <script defer src="/mobile-simple.js?v=8.5.9"></script>
 </head>
 <body>
 <header class="site-header">
@@ -39,6 +57,11 @@
     <span class="menu-copy"><strong>My Reading</strong><small>Reading list, statuses, and saved editions</small></span>
   </button>
 
+  <button data-read="upload" type="button" role="menuitem">
+    <span class="menu-icon icon-import">⇧</span>
+    <span class="menu-copy"><strong>Read Anything</strong><small>Import a webpage, document, book, or pasted text</small></span>
+  </button>
+
   <div class="menu-divider"></div>
   <div class="menu-section-label">Collections</div>
 
@@ -55,14 +78,15 @@
       <span class="menu-icon icon-vocab">Aa</span>
       <span>Definitions</span>
     </button>
-    <button data-read="upload" type="button" role="menuitem">
-      <span class="menu-icon icon-import">⇧</span>
-      <span>Imports</span>
-    </button>
   </div>
 
   <div class="menu-divider"></div>
-  <div class="menu-section-label">Insights</div>
+  <div class="menu-section-label">Insights &amp; Action</div>
+
+  <button data-action="reading-goals" type="button" role="menuitem">
+    <span class="menu-icon icon-progress">◎</span>
+    <span class="menu-copy"><strong>Reading Goals</strong><small>Books, deadlines, speed, and comprehension targets</small></span>
+  </button>
 
   <button data-action="progress-awards" type="button" role="menuitem">
     <span class="menu-icon icon-progress">↗</span>
@@ -82,7 +106,7 @@
 <button data-action="browse" type="button"><span class="menu-icon">⌕</span> Browse Libraries</button>
 <button data-read="great-books" type="button"><span class="menu-icon">★</span> Great Books</button>
 <button data-read="bible" type="button"><span class="menu-icon">✦</span> Bible Study</button>
-<button data-read="upload" type="button"><span class="menu-icon">⇧</span> Import Book</button>
+<button data-read="upload" type="button"><span class="menu-icon">⇧</span> Read Anything</button>
 <button data-action="my-links" type="button"><span class="menu-icon">↗</span> My Links</button>
 </div>
 </details>
@@ -96,13 +120,7 @@
 </div>
 </details>
 
-<details class="top-nav-menu ask-mark-menu">
-<summary><span class="nav-icon" aria-hidden="true">✦</span> Ask Mark</summary>
-<div class="menu-popover">
-<button data-action="ai-center" type="button"><span class="menu-icon">✦</span> Reading Companion</button>
-<button data-action="mark-notebook" type="button"><span class="menu-icon">▤</span> Mark’s Notebook</button>
-</div>
-</details>
+<button class="top-level-nav-button" data-action="mark-notebook" type="button"><span class="nav-icon" aria-hidden="true">▤</span> My Notebook</button>
 
 <button class="top-level-nav-button" data-action="music" type="button"><span class="nav-icon" aria-hidden="true">♫</span> Music &amp; Focus</button>
 
@@ -133,16 +151,19 @@
 <iframe allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen="" loading="lazy" id="music-player" referrerpolicy="strict-origin-when-cross-origin" title="Spotify or YouTube music player"></iframe>
 </div>
 </aside>
-<footer class="site-footer">
-<div class="site-footer-brand"><strong>Mark, Set, Go!</strong><span>Independent reading and lifelong-learning software by Brian Baker.</span></div>
-<nav aria-label="Footer links">
+<footer class="site-footer" id="msg-shared-bottom">
+<div class="site-footer-copy">
+<strong>Mark, Set, Go!</strong>
+<small>© 2026 Brian Baker. All rights reserved.</small>
+</div>
+<nav aria-label="Company information">
 <button type="button" data-action="about">About</button>
 <button type="button" data-action="contact">Contact</button>
 <button type="button" data-action="privacy">Privacy</button>
 <button type="button" data-action="terms">Terms</button>
-<button type="button" data-action="help">Help</button>
 </nav>
-<small>© 2026 Brian Baker. All rights reserved. Version 7.7.8.</small>
+<span class="site-footer-version">Early Access · v8.8.0</span>
 </footer>
+<script defer src="/button-feedback.js?v=8.6.6"></script>
 </body>
 </html>
