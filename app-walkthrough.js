@@ -14,9 +14,25 @@
   const $ = (selector, scope = document) => scope.querySelector(selector);
   const $$ = (selector, scope = document) => Array.from(scope.querySelectorAll(selector));
 
+  function isVisibleElement(element) {
+    if (!element?.isConnected) return false;
+    const style = window.getComputedStyle(element);
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+    const rect = element.getBoundingClientRect();
+    return rect.width >= 2 && rect.height >= 2;
+  }
+
+  function visibleMatch(selector, scope = document) {
+    if (!selector) return null;
+    return $$(selector, scope).find(isVisibleElement) || null;
+  }
+
   function closeHeaderMenus(except = null) {
-    $$('.site-header nav > details[open]').forEach((menu) => {
-      if (menu !== except) menu.open = false;
+    $$('.site-header nav > details').forEach((menu) => {
+      if (menu !== except) {
+        menu.open = false;
+        menu.classList.remove('msg-walkthrough-open-menu');
+      }
     });
   }
 
@@ -25,11 +41,17 @@
   }
 
   async function openHeaderMenu(selector) {
-    const menu = headerMenuContaining(selector) || $(selector);
+    const requested = visibleMatch(selector) || $(selector);
+    const menu = requested?.matches?.('.site-header nav > details')
+      ? requested
+      : requested?.closest?.('.site-header nav > details');
     if (!menu) return;
+
     closeHeaderMenus(menu);
-    if (menu.matches('details')) menu.open = true;
-    await wait();
+    $$('.site-header nav > details').forEach((item) => item.classList.remove('msg-walkthrough-open-menu'));
+    menu.classList.add('msg-walkthrough-open-menu');
+    menu.open = true;
+    await wait(110);
   }
 
   async function prepareReader() {
@@ -74,17 +96,17 @@
     await wait(180);
 
     if (view === 'chat') {
-      const back = $('[data-askmark-view-panel]:not([hidden]) [data-askmark-back]');
+      const back = visibleMatch('[data-askmark-view-panel]:not([hidden]) [data-askmark-back]');
       if (back) back.click();
     } else {
-      const viewButton = $(`[data-askmark-view="${view}"]`);
+      const viewButton = visibleMatch(`[data-askmark-view="${view}"]`);
       if (viewButton) viewButton.click();
     }
     await wait(120);
   }
 
   async function closeAskMark() {
-    const close = $('[data-askmark-close]');
+    const close = visibleMatch('[data-askmark-close]');
     if (close) close.click();
     await wait();
   }
@@ -408,6 +430,7 @@
       <div class="msg-walkthrough-mask msg-walkthrough-mask-right"></div>
       <div class="msg-walkthrough-mask msg-walkthrough-mask-bottom"></div>
       <div class="msg-walkthrough-outline" aria-hidden="true"></div>
+      <div class="msg-walkthrough-connector" aria-hidden="true"></div>
       <section class="msg-walkthrough-card" role="dialog" aria-modal="true" aria-labelledby="msg-walkthrough-title">
         <div class="msg-walkthrough-meta"><span data-walkthrough-count></span><button type="button" data-walkthrough-exit aria-label="Exit walkthrough">×</button></div>
         <h2 id="msg-walkthrough-title" data-walkthrough-title></h2>
@@ -449,6 +472,8 @@
   function clearTarget() {
     if (activeTarget) activeTarget.classList.remove(HIGHLIGHT_CLASS);
     activeTarget = null;
+    const connector = root && $('.msg-walkthrough-connector', root);
+    if (connector) connector.style.display = 'none';
   }
 
   function schedulePosition() {
@@ -457,13 +482,16 @@
   }
 
   function positionOverlay() {
-    if (!root || root.hidden || !activeTarget?.isConnected) return;
+    if (!root || root.hidden || !activeTarget?.isConnected || !isVisibleElement(activeTarget)) return;
+
     const rect = activeTarget.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
     const pad = 7;
-    const left = Math.max(6, rect.left - pad);
-    const top = Math.max(6, rect.top - pad);
-    const right = Math.min(window.innerWidth - 6, rect.right + pad);
-    const bottom = Math.min(window.innerHeight - 6, rect.bottom + pad);
+    const left = Math.max(6, Math.min(viewportWidth - 6, rect.left - pad));
+    const top = Math.max(6, Math.min(viewportHeight - 6, rect.top - pad));
+    const right = Math.max(left + 2, Math.min(viewportWidth - 6, rect.right + pad));
+    const bottom = Math.max(top + 2, Math.min(viewportHeight - 6, rect.bottom + pad));
     const width = Math.max(12, right - left);
     const height = Math.max(12, bottom - top);
 
@@ -479,36 +507,102 @@
       bottom: $('.msg-walkthrough-mask-bottom', root)
     };
     Object.assign(masks.top.style, { left: '0px', top: '0px', width: '100vw', height: `${top}px` });
-    Object.assign(masks.bottom.style, { left: '0px', top: `${bottom}px`, width: '100vw', height: `${Math.max(0, window.innerHeight - bottom)}px` });
+    Object.assign(masks.bottom.style, { left: '0px', top: `${bottom}px`, width: '100vw', height: `${Math.max(0, viewportHeight - bottom)}px` });
     Object.assign(masks.left.style, { left: '0px', top: `${top}px`, width: `${left}px`, height: `${height}px` });
-    Object.assign(masks.right.style, { left: `${right}px`, top: `${top}px`, width: `${Math.max(0, window.innerWidth - right)}px`, height: `${height}px` });
+    Object.assign(masks.right.style, { left: `${right}px`, top: `${top}px`, width: `${Math.max(0, viewportWidth - right)}px`, height: `${height}px` });
 
     const card = $('.msg-walkthrough-card', root);
-    const cardWidth = Math.min(390, window.innerWidth - 24);
+    const cardWidth = Math.min(390, viewportWidth - 24);
     card.style.width = `${cardWidth}px`;
+    card.style.left = '12px';
+    card.style.top = '12px';
+
     const cardRect = card.getBoundingClientRect();
-    let cardLeft = Math.min(Math.max(12, left), window.innerWidth - cardWidth - 12);
-    let cardTop = bottom + 14;
-    if (cardTop + cardRect.height > window.innerHeight - 12) cardTop = top - cardRect.height - 14;
-    if (cardTop < 12) {
-      cardTop = Math.min(window.innerHeight - cardRect.height - 12, 12);
-      if (right + cardWidth + 16 < window.innerWidth) cardLeft = right + 12;
-      else if (left - cardWidth - 16 > 0) cardLeft = left - cardWidth - 12;
+    const cardHeight = Math.min(cardRect.height, viewportHeight - 24);
+    const gap = 16;
+    const targetCenterX = (left + right) / 2;
+    const targetCenterY = (top + bottom) / 2;
+
+    const candidates = [
+      { side:'right', fits:right + gap + cardWidth <= viewportWidth - 12, left:right + gap, top:targetCenterY - cardHeight/2 },
+      { side:'left', fits:left - gap - cardWidth >= 12, left:left - gap - cardWidth, top:targetCenterY - cardHeight/2 },
+      { side:'bottom', fits:bottom + gap + cardHeight <= viewportHeight - 12, left:targetCenterX - cardWidth/2, top:bottom + gap },
+      { side:'top', fits:top - gap - cardHeight >= 12, left:targetCenterX - cardWidth/2, top:top - gap - cardHeight }
+    ];
+
+    const targetInMenu = !!activeTarget.closest('.site-header .menu-popover');
+    const preferred = targetInMenu ? ['right','left','bottom','top'] : ['bottom','top','right','left'];
+    const candidate = preferred.map(side => candidates.find(item => item.side === side)).find(item => item?.fits)
+      || candidates.find(item => item.fits)
+      || { side:'floating', left:targetCenterX-cardWidth/2, top:targetCenterY-cardHeight/2 };
+
+    const cardLeft = Math.max(12, Math.min(viewportWidth-cardWidth-12, candidate.left));
+    const cardTop = Math.max(12, Math.min(viewportHeight-cardHeight-12, candidate.top));
+    Object.assign(card.style, { left:`${cardLeft}px`, top:`${cardTop}px` });
+    card.dataset.walkthroughSide = candidate.side;
+
+    const connector = $('.msg-walkthrough-connector', root);
+    if (connector) {
+      const placedCard = card.getBoundingClientRect();
+      let x1=targetCenterX, y1=targetCenterY;
+      let x2=Math.max(placedCard.left,Math.min(targetCenterX,placedCard.right));
+      let y2=Math.max(placedCard.top,Math.min(targetCenterY,placedCard.bottom));
+
+      if (candidate.side === 'right') {
+        x1=right; x2=placedCard.left;
+        y1=y2=Math.max(placedCard.top+18,Math.min(targetCenterY,placedCard.bottom-18));
+      } else if (candidate.side === 'left') {
+        x1=left; x2=placedCard.right;
+        y1=y2=Math.max(placedCard.top+18,Math.min(targetCenterY,placedCard.bottom-18));
+      } else if (candidate.side === 'bottom') {
+        y1=bottom; y2=placedCard.top;
+        x1=x2=Math.max(placedCard.left+18,Math.min(targetCenterX,placedCard.right-18));
+      } else if (candidate.side === 'top') {
+        y1=top; y2=placedCard.bottom;
+        x1=x2=Math.max(placedCard.left+18,Math.min(targetCenterX,placedCard.right-18));
+      }
+
+      const dx=x2-x1, dy=y2-y1;
+      const length=Math.max(0,Math.hypot(dx,dy));
+      const angle=Math.atan2(dy,dx)*180/Math.PI;
+      Object.assign(connector.style,{
+        display:length>=5?'block':'none',
+        left:`${x1}px`, top:`${y1}px`, width:`${length}px`,
+        transform:`rotate(${angle}deg)`
+      });
     }
-    Object.assign(card.style, { left: `${Math.max(12, cardLeft)}px`, top: `${Math.max(12, cardTop)}px` });
   }
 
   async function resolveTarget(step) {
-    let target = typeof step.selector === 'function' ? step.selector() : $(step.selector);
-    if (!target && step.fallbackSelector) target = $(step.fallbackSelector);
+    let target = null;
+
+    if (typeof step.selector === 'function') {
+      const candidate = step.selector();
+      target = isVisibleElement(candidate) ? candidate : null;
+    } else {
+      target = visibleMatch(step.selector);
+    }
+
+    if (!target && step.fallbackSelector) target = visibleMatch(step.fallbackSelector);
+
+    if (!target) {
+      await wait(140);
+      if (typeof step.selector === 'function') {
+        const candidate = step.selector();
+        target = isVisibleElement(candidate) ? candidate : null;
+      } else {
+        target = visibleMatch(step.selector);
+      }
+    }
     if (!target) return null;
 
-    const rect = target.getBoundingClientRect();
-    if (rect.top < 72 || rect.bottom > window.innerHeight - 20) {
-      target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
-      await wait(80);
+    let rect = target.getBoundingClientRect();
+    if (rect.top < 72 || rect.bottom > window.innerHeight - 20 || rect.left < 4 || rect.right > window.innerWidth - 4) {
+      target.scrollIntoView({ block:'center', inline:'nearest', behavior:'auto' });
+      await wait(100);
     }
-    return target;
+
+    return isVisibleElement(target) ? target : null;
   }
 
   async function goTo(index) {
@@ -555,6 +649,7 @@
     finishing = true;
     clearTarget();
     closeHeaderMenus();
+    $$('.site-header nav > details').forEach((menu) => menu.classList.remove('msg-walkthrough-open-menu'));
     if (root) root.hidden = true;
     document.documentElement.classList.remove(ACTIVE_CLASS);
     document.body.classList.remove(ACTIVE_CLASS);

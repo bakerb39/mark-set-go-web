@@ -10360,3 +10360,50 @@ body.msg-walkthrough-active {
 @media (max-width:700px) {
   .msg-walkthrough-card { max-width:calc(100vw - 20px); }
 }
+
+
+/* v9.2.46 walkthrough menu/anchoring reliability */
+.msg-walkthrough-connector {
+  position:fixed;
+  z-index:2147483002;
+  height:2px;
+  border-radius:999px;
+  background:#d3a928;
+  box-shadow:0 0 0 1px rgba(255,255,255,.65),0 2px 8px rgba(0,0,0,.22);
+  transform-origin:0 50%;
+  pointer-events:none;
+}
+
+html.msg-walkthrough-active .site-header {
+  position:relative;
+  z-index:2147483001 !important;
+}
+
+html.msg-walkthrough-active .site-header nav > details.msg-walkthrough-open-menu {
+  position:relative !important;
+  z-index:2147483003 !important;
+  overflow:visible !important;
+}
+
+html.msg-walkthrough-active .site-header nav > details.msg-walkthrough-open-menu > summary {
+  position:relative !important;
+  z-index:2147483004 !important;
+}
+
+html.msg-walkthrough-active .site-header nav > details.msg-walkthrough-open-menu > .menu-popover,
+html.msg-walkthrough-active .site-header nav > details.msg-walkthrough-open-menu .professional-library-menu {
+  display:block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  z-index:2147483004 !important;
+  pointer-events:auto !important;
+}
+
+.msg-walkthrough-card {
+  max-height:calc(100vh - 24px);
+  overflow:auto;
+}
+
+@media (max-width:700px) {
+  .msg-walkthrough-connector { display:none !important; }
+}
