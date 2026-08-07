@@ -9779,3 +9779,40 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
 .fullscreen-format-scope legend{padding:0 .3rem;font-weight:700;color:#17324d}
 .fullscreen-format-actions{display:flex;gap:.55rem;flex-wrap:wrap}
 @media(max-width:700px){.fullscreen-format-levels{grid-template-columns:1fr}}
+
+
+/* v9.2.31 goal accountability spacing correction */
+.goal-action-integration,
+.goal-progress-integration {
+  overflow:hidden;
+}
+
+.goal-action-integration > .section-heading,
+.goal-progress-integration > .section-heading {
+  box-sizing:border-box;
+  width:100%;
+  padding:.85rem 1rem .75rem !important;
+  margin:0 !important;
+}
+
+.goal-action-integration > .section-heading > div,
+.goal-progress-integration > .section-heading > div {
+  min-width:0;
+}
+
+.goal-action-integration > .section-heading .source-category,
+.goal-progress-integration > .section-heading .source-category {
+  margin-left:0 !important;
+}
+
+.goal-action-integration > .goal-progress-kpis,
+.goal-progress-integration > .goal-progress-kpis {
+  margin-left:.85rem;
+  margin-right:.85rem;
+}
+
+.goal-action-integration > .fine-print {
+  margin-left:1rem !important;
+  margin-right:1rem !important;
+  margin-bottom:.9rem !important;
+}
