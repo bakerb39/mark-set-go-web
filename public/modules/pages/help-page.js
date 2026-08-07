@@ -17,7 +17,7 @@ function renderHelp() {
     .map(([id,label]) => `<a href="#help-${id}">${label}</a>`)
     .join('');
   app.innerHTML=`<section class="panel help-page">
-    <div class="help-hero"><div><span class="help-eyebrow">Mark, Set, Go! Guide</span><h1>Help</h1><p>Current guidance for reading, selecting passages, asking Mark, saving insights, importing books, and protecting your place.</p></div>
+    <div class="help-hero"><div><span class="help-eyebrow">Mark, Set, Go! Guide</span><h1>Help</h1><p>Current guidance for reading, selecting passages, asking Mark, saving insights, importing books, and protecting your place.</p><button class="primary help-walkthrough-launch" id="start-app-walkthrough" type="button"><span aria-hidden="true">▶</span> Start App Walkthrough</button></div>
     <label class="help-search"><span>Search Help</span><input id="help-search-input" type="search" placeholder="Try “Mark”, “notebook”, “PDF”, “fullscreen”…"></label></div>
     <div class="help-layout">
       <aside class="help-toc"><strong>On this page</strong>${helpTocHtml}</aside>
@@ -91,6 +91,7 @@ function renderHelp() {
     const query=search.value.trim().toLowerCase();
     app.querySelectorAll('[data-help-section]').forEach(section=>section.hidden=Boolean(query&&!section.textContent.toLowerCase().includes(query)));
   });
+  app.querySelector('#start-app-walkthrough')?.addEventListener('click',()=>window.MarkSetGoWalkthrough?.start?.());
 }
 
 window.MarkSetGoModules = window.MarkSetGoModules || {};

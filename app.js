@@ -432,6 +432,7 @@ function buildReaderSessionSnapshot() {
 }
 
 function persistReaderSession({ immediate = false } = {}) {
+  if (walkthroughReaderSessionActive) return;
   const save = () => {
     readerSessionSaveTimer = null;
     const snapshot = buildReaderSessionSnapshot();
@@ -3602,6 +3603,75 @@ function renderEmptyReader() {
       </div>
     </section>`;
 }
+
+let walkthroughReaderBackup = null;
+let walkthroughReaderUsedDemo = false;
+let walkthroughReaderSessionActive = false;
+
+window.MarkSetGoWalkthroughReader = Object.freeze({
+  async prepare() {
+    if (walkthroughReaderBackup === null) {
+      let snapshot = buildReaderSessionSnapshot() || activeReaderSnapshot || null;
+      if (!snapshot) {
+        try { snapshot = await readReaderSession(); } catch {}
+      }
+      walkthroughReaderBackup = snapshot ? JSON.parse(JSON.stringify(snapshot)) : false;
+    }
+
+    walkthroughReaderSessionActive = true;
+
+    // Once the tour has opened the real Reader, keep using that live DOM rather
+    // than re-rendering a large book for every individual tour step.
+    if (app.querySelector('#reader') && app.querySelector('.reader-page-panel')) {
+      return { demo: walkthroughReaderUsedDemo };
+    }
+
+    const sourceSnapshot = walkthroughReaderBackup && walkthroughReaderBackup !== false
+      ? JSON.parse(JSON.stringify(walkthroughReaderBackup))
+      : null;
+
+    if (sourceSnapshot?.title && sourceSnapshot?.currentText) {
+      activeReaderSnapshot = sourceSnapshot;
+      applyReaderSessionSnapshot(sourceSnapshot);
+      walkthroughReaderUsedDemo = false;
+      return { demo: false };
+    }
+
+    walkthroughReaderUsedDemo = true;
+    renderReaderWithText(
+      'Walkthrough Sample',
+      'Reading is not simply moving quickly across a page. Strong readers coordinate attention, pace, comprehension, and memory. Mark, Set, Go! gives you tools to practice each of those skills while keeping your place in the text.',
+      { type: 'walkthrough', ephemeral: true }
+    );
+    return { demo: true };
+  },
+
+  async restore() {
+    stopReader();
+    walkthroughReaderSessionActive = false;
+    if (walkthroughReaderBackup && walkthroughReaderBackup !== false) {
+      const snapshot = JSON.parse(JSON.stringify(walkthroughReaderBackup));
+      activeReaderSnapshot = snapshot;
+      applyReaderSessionSnapshot(snapshot);
+      await writeReaderSession(snapshot);
+      try {
+        const totalWords = splitWords(snapshot.currentText || '').length;
+        localStorage.setItem(READER_SESSION_META_KEY, JSON.stringify({
+          documentId: snapshot.documentId || '',
+          title: snapshot.title || 'Untitled',
+          index: Math.max(0, Number(snapshot.index) || 0),
+          totalWords: Math.max(0, totalWords),
+          savedAt: new Date().toISOString()
+        }));
+      } catch {}
+    } else if (walkthroughReaderUsedDemo) {
+      activeReaderSnapshot = null;
+      await clearReaderSession();
+    }
+    walkthroughReaderBackup = null;
+    walkthroughReaderUsedDemo = false;
+  }
+});
 
 function renderCurrentReader() {
   if (!activeReaderSnapshot?.title || !activeReaderSnapshot?.currentText) {
