@@ -9816,3 +9816,63 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
   margin-right:1rem !important;
   margin-bottom:.9rem !important;
 }
+
+
+/* v9.2.32 unified app page headlines
+   One visual standard for top-level non-reader page titles. */
+#app > .panel:not(.reader-page-panel) h1,
+#app > .platform-page h1,
+#app .my-library-hub h1,
+#app .reading-goals-page h1,
+#app .progress-analytics-page h1,
+#app .global-notebook-page h1,
+#app .action-center-page h1,
+#app .browse-hub h1,
+#app .ai-center h1,
+#app .knowledge-graph-page h1,
+#app .help-page h1,
+#app .library-page h1 {
+  font-family:inherit !important;
+  font-size:clamp(1.9rem, 3vw, 2.35rem) !important;
+  line-height:1.08 !important;
+  font-weight:800 !important;
+  letter-spacing:-.025em !important;
+  color:#0b3b67 !important;
+  opacity:1 !important;
+  text-shadow:none !important;
+}
+
+/* Keep the top-level title spacing consistent regardless of page-specific hero markup. */
+#app > .panel:not(.reader-page-panel) h1:first-of-type,
+#app > .platform-page h1:first-of-type,
+#app .my-library-hub h1:first-of-type,
+#app .reading-goals-page h1:first-of-type,
+#app .progress-analytics-page h1:first-of-type,
+#app .global-notebook-page h1:first-of-type,
+#app .action-center-page h1:first-of-type,
+#app .browse-hub h1:first-of-type,
+#app .ai-center h1:first-of-type,
+#app .knowledge-graph-page h1:first-of-type,
+#app .help-page h1:first-of-type,
+#app .library-page h1:first-of-type {
+  margin-top:0 !important;
+  margin-bottom:.35rem !important;
+}
+
+/* Mobile uses the same hierarchy, simply scaled down uniformly. */
+@media (max-width:700px) {
+  #app > .panel:not(.reader-page-panel) h1,
+  #app > .platform-page h1,
+  #app .my-library-hub h1,
+  #app .reading-goals-page h1,
+  #app .progress-analytics-page h1,
+  #app .global-notebook-page h1,
+  #app .action-center-page h1,
+  #app .browse-hub h1,
+  #app .ai-center h1,
+  #app .knowledge-graph-page h1,
+  #app .help-page h1,
+  #app .library-page h1 {
+    font-size:1.85rem !important;
+  }
+}
