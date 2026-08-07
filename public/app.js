@@ -7749,11 +7749,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
           <div id="fullscreen-control-strip" class="fullscreen-control-strip" aria-label="Fullscreen reader controls">
             <button id="fullscreen-options-toggle" class="fullscreen-options-toggle" type="button" aria-expanded="false" aria-controls="fullscreen-options-menu">Options ▾</button>
             <button id="fullscreen-mark-toggle" class="fullscreen-mark-toggle" type="button" aria-expanded="false" aria-controls="fullscreen-mark-drawer"><span aria-hidden="true">✦</span> Ask Mark</button>
-            <button id="fullscreen-controls-close" class="fullscreen-controls-close" type="button" aria-label="Hide fullscreen controls" title="Hide controls">×</button>
+            <button id="fullscreen-controls-close" class="fullscreen-controls-close" type="button" aria-label="Exit full screen and return to Reader" title="Return to regular Reader">×</button>
             <section id="fullscreen-options-menu" class="fullscreen-options-menu" hidden>
               <div class="fullscreen-options-header">
                 <strong>Reader controls</strong>
-                <span>Compact fullscreen settings</span>
+                <span>Same Reader controls, full-screen layout</span>
               </div>
 
               <details class="fullscreen-option-group" open>
@@ -7846,13 +7846,13 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <button id="fullscreen-mark-close" type="button" aria-label="Close Mark">×</button>
               </header>
               <nav class="fullscreen-mark-tabs" aria-label="Ask Mark fullscreen tabs">
-                <button type="button" data-fs-mark-tab="selection" class="active">Selection</button>
+                <button type="button" data-fs-mark-tab="selection" class="active">Ask Mark</button>
                 <button type="button" data-fs-mark-tab="notebook">Notebook</button>
-                <button type="button" data-fs-mark-tab="history">History</button>
+                <button type="button" data-fs-mark-tab="format">Format</button>
               </nav>
               <div id="fullscreen-mark-selection" data-fs-mark-panel="selection"></div>
               <div id="fullscreen-mark-notebook" data-fs-mark-panel="notebook" hidden></div>
-              <div id="fullscreen-mark-history" data-fs-mark-panel="history" hidden></div>
+              <div id="fullscreen-mark-format" data-fs-mark-panel="format" hidden></div>
             </aside>
           <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text" title="Click a word to move the reading position; click empty space to pause or resume"></article>
           </div>
@@ -8315,18 +8315,77 @@ function renderFullscreenMarkNotebook() {
   if(!panel)return;
   renderNotebookCollection(panel,markRecordsForCurrentBook(MARK_INSIGHTS_KEY),{title:`${state.title||'Current Book'} Notebook`});
 }
-function renderFullscreenMarkHistory() {
-  const panel=app.querySelector('#fullscreen-mark-history'); if(!panel)return;
-  const items=markRecordsForCurrentBook(MARK_HISTORY_KEY);
-  panel.innerHTML=`<div class="mark-list-heading"><strong>Conversation History</strong><small>${items.length} requests</small></div>${items.length?items.map(item=>`<article class="mark-record"><span>${escapeHtml(item.action)}${item.question?` · ${escapeHtml(item.question)}`:''}</span><blockquote>${escapeHtml(item.selection.slice(0,250))}${item.selection.length>250?'…':''}</blockquote><p>${escapeHtml(item.result?.response?.slice(0,420)||'')}</p><div><button type="button" data-mark-jump="${item.startIndex}">Return to passage</button></div></article>`).join(''):'<p class="mark-empty-note">Your Ask Mark requests will appear here.</p>'}`;
-  bindMarkRecordButtons(panel,MARK_HISTORY_KEY);
+function renderFullscreenMarkFormat() {
+  const panel = app.querySelector('#fullscreen-mark-format');
+  if (!panel) return;
+
+  const hasSelection = Boolean(state.markSelection || state.markPersistentSelection);
+  panel.innerHTML = `
+    <div class="fullscreen-format-panel">
+      <div class="mark-list-heading"><strong>Format text</strong><small>Same formatter available in regular Ask Mark</small></div>
+      <div class="fullscreen-format-levels">
+        <button type="button" data-fs-format-level="light"><strong>Light</strong><small>Characters, spacing, punctuation</small></button>
+        <button type="button" data-fs-format-level="standard"><strong>Standard</strong><small>OCR cleanup, paragraphs, page artifacts</small></button>
+        <button type="button" class="active" data-fs-format-level="deep"><strong>AI Deep Clean</strong><small>Context-aware cleanup and structure</small></button>
+      </div>
+      <fieldset class="fullscreen-format-scope">
+        <legend>Apply to</legend>
+        <label><input type="radio" name="fs-format-scope" value="document" ${hasSelection ? '' : 'checked'}> Entire document</label>
+        <label><input type="radio" name="fs-format-scope" value="selection" ${hasSelection ? 'checked' : ''}> Highlighted passage</label>
+      </fieldset>
+      <div class="fullscreen-format-actions">
+        <button class="primary" type="button" data-fs-format-apply>Format Text</button>
+        <button class="secondary" type="button" data-fs-format-original>Restore Original</button>
+      </div>
+      <p class="status" data-fs-format-status></p>
+    </div>`;
+
+  panel.querySelectorAll('[data-fs-format-level]').forEach((button) => {
+    button.addEventListener('click', () => {
+      panel.querySelectorAll('[data-fs-format-level]').forEach((item) => item.classList.toggle('active', item === button));
+    });
+  });
+
+  panel.querySelector('[data-fs-format-apply]')?.addEventListener('click', async () => {
+    const status = panel.querySelector('[data-fs-format-status]');
+    try {
+      const api = window.MarkSetGoReadAnything;
+      if (!api?.applyCleanup) throw new Error('The formatter is not available.');
+      const level = panel.querySelector('[data-fs-format-level].active')?.dataset.fsFormatLevel || 'deep';
+      const scope = panel.querySelector('input[name="fs-format-scope"]:checked')?.value || 'document';
+      const selectionRange = scope === 'selection' ? window.MarkSetGoCurrentReaderDocument?.getSelectionRange?.() : null;
+      const selected = String(selectionRange?.text || state.markSelection?.text || state.markPersistentSelection?.text || '');
+
+      if (scope === 'selection' && !selected) throw new Error('Highlight a passage first, or choose Entire document.');
+      if (scope === 'document' && !api.hasActiveDocument?.()) throw new Error('The current Reader text could not be accessed.');
+
+      if (status) status.textContent = level === 'deep' ? 'AI Deep Clean is reviewing the text…' : 'Formatting text…';
+      await api.applyCleanup(level, scope, selected, selectionRange);
+      if (status) status.textContent = 'Formatting complete.';
+    } catch (error) {
+      if (status) status.textContent = error?.message || 'Formatting could not be completed.';
+    }
+  });
+
+  panel.querySelector('[data-fs-format-original]')?.addEventListener('click', async () => {
+    const status = panel.querySelector('[data-fs-format-status]');
+    try {
+      const api = window.MarkSetGoReadAnything;
+      if (!api?.restoreOriginal) throw new Error('The original version is unavailable.');
+      await api.restoreOriginal();
+      if (status) status.textContent = 'Original text restored.';
+    } catch (error) {
+      if (status) status.textContent = error?.message || 'The original could not be restored.';
+    }
+  });
 }
+
 function activateFullscreenMarkTab(tab='selection'){
   app.querySelectorAll('[data-fs-mark-tab]').forEach(b=>b.classList.toggle('active',b.dataset.fsMarkTab===tab));
   app.querySelectorAll('[data-fs-mark-panel]').forEach(p=>p.hidden=p.dataset.fsMarkPanel!==tab);
   if(tab==='selection')renderFullscreenMarkSelection();
   if(tab==='notebook')renderFullscreenMarkNotebook();
-  if(tab==='history')renderFullscreenMarkHistory();
+  if(tab==='format')renderFullscreenMarkFormat();
 }
 
 function syncBookPageControlsPlacement(readerFrame=app.querySelector('#reader-frame')) {
@@ -8447,10 +8506,13 @@ function bindFullscreenOptions(readerFrame) {
   close.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
+
+    // X means "return to the regular Reader", never "hide the controls".
+    // Delegate to the existing fullscreen button so its protected position/
+    // playback snapshot and restore path remains the single source of truth.
     closeMenu();
     closeMarkDrawer();
-    strip.classList.add('controls-hidden');
-    readerFrame.classList.add('fullscreen-controls-hidden');
+    app.querySelector('#toggle-reader-fullscreen')?.click();
   });
 
   pairs.forEach(([mirrorSelector, mainSelector]) => {
@@ -13852,7 +13914,8 @@ function showActionToast(action) {
   const toast = document.createElement('aside');
   toast.className = 'action-notification-toast';
   toast.innerHTML = `<div><strong>Action reminder</strong><p>${escapeHtml(actionNotificationMessage(action))}</p></div><div class="action-toast-buttons"><button type="button" class="secondary" data-toast-snooze>Snooze 15m</button><button type="button" class="primary" data-toast-open>Open</button><button type="button" class="icon-button" data-toast-close aria-label="Dismiss">×</button></div>`;
-  document.body.appendChild(toast);
+  const toastHost = document.fullscreenElement || document.body;
+  toastHost.appendChild(toast);
   toast.querySelector('[data-toast-open]')?.addEventListener('click', () => { toast.remove(); renderActionCenter(); });
   toast.querySelector('[data-toast-close]')?.addEventListener('click', () => toast.remove());
   toast.querySelector('[data-toast-snooze]')?.addEventListener('click', () => {
@@ -13871,22 +13934,44 @@ async function requestActionBrowserNotifications() {
 function checkActionNotifications() {
   const settings = readActionNotificationSettings();
   const now = new Date();
-  if (isActionQuietTime(now)) return;
+  const quiet = isActionQuietTime(now);
   const log = readActionNotificationLog();
   let changed = false;
+
   readActions().filter((action) => action.status !== 'completed').forEach((action) => {
     const notifyAt = reminderTimeForAction(action);
     if (!notifyAt || notifyAt > now) return;
     if (action.snoozedUntil && new Date(action.snoozedUntil) > now) return;
+
     const signature = `${action.updatedAt || action.createdAt || ''}|${action.dueAt}|${action.reminder}`;
     if (log[action.id] === signature) return;
-    if (settings.inApp) showActionToast(action);
-    if (settings.browser && 'Notification' in window && Notification.permission === 'granted') {
-      const notification = new Notification('Mark, Set, Go! action reminder', { body: actionNotificationMessage(action), tag: `msg-action-${action.id}` });
-      notification.onclick = () => { window.focus(); renderActionCenter(); notification.close(); };
+
+    let delivered = false;
+
+    // In-app reminders are part of the app workflow and should appear whenever
+    // the app is open, including during configured browser-notification quiet hours.
+    if (settings.inApp) {
+      showActionToast(action);
+      delivered = true;
     }
-    log[action.id] = signature; changed = true;
+
+    // Quiet hours apply only to intrusive browser/system notifications.
+    if (!quiet && settings.browser && 'Notification' in window && Notification.permission === 'granted') {
+      const notification = new Notification('Mark, Set, Go! action reminder', {
+        body: actionNotificationMessage(action),
+        tag: `msg-action-${action.id}`
+      });
+      notification.onclick = () => { window.focus(); renderActionCenter(); notification.close(); };
+      delivered = true;
+    }
+
+    // Do not mark a reminder delivered if every enabled channel was suppressed.
+    if (delivered) {
+      log[action.id] = signature;
+      changed = true;
+    }
   });
+
   if (changed) writeActionNotificationLog(log);
 }
 

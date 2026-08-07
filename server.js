@@ -303,27 +303,47 @@ app.put('/api/account/preferences', async (req, res) => {
 });
 
 app.get('/api/account/library', async (req, res) => {
+  const client = await pool?.connect().catch(() => null);
   try {
     const user = await requireAccountUser(req, res);
     if (!user) return;
-    const result = await query(`
+    if (!client) return res.status(503).json({ error: 'The account database is unavailable.' });
+
+    // Account-library records are useful only when readable cloud text exists.
+    // Remove legacy/orphan metadata rows at the source so they cannot reappear
+    // in any browser, bootstrap payload, count, badge, or library card.
+    await client.query(`
+      delete from library_books b
+      where b.user_id = $1
+        and not exists (
+          select 1
+          from account_documents d
+          where d.user_id = b.user_id
+            and d.book_id = b.id
+        )
+    `, [user.id]);
+
+    const result = await client.query(`
       select b.id, b.client_record_id, b.title, b.author, b.source_type, b.source_id,
              b.source_url, b.cover_url, b.metadata, b.added_at, b.updated_at,
              p.mode, p.playback_index, p.viewport_anchor_index, p.viewport_offset_px,
              p.word_index, p.scroll_ratio, p.page_number, p.position_data,
              p.updated_at as progress_updated_at,
-             (d.book_id is not null) as document_stored, d.raw_bytes as document_raw_bytes,
+             true as document_stored, d.raw_bytes as document_raw_bytes,
              d.compressed_bytes as document_compressed_bytes, d.updated_at as document_updated_at
       from library_books b
+      join account_documents d on d.user_id = b.user_id and d.book_id = b.id
       left join reading_positions p on p.user_id = b.user_id and p.book_id = b.id
-      left join account_documents d on d.user_id = b.user_id and d.book_id = b.id
       where b.user_id = $1
-      order by coalesce(p.updated_at, b.updated_at) desc
+      order by coalesce(p.updated_at, d.updated_at, b.updated_at) desc
     `, [user.id]);
+
     res.json({ books: result.rows });
   } catch (error) {
     console.error('Library load failed:', error);
     res.status(500).json({ error: 'Unable to load the library.' });
+  } finally {
+    client?.release();
   }
 });
 
@@ -659,11 +679,72 @@ app.post('/api/email/sync-goals', (req, res) => {
 });
 function goalProgressEmail(record){ const g=record?.goalProgress; if(!g?.enabled||!g?.emailProgress)return {html:'',text:''}; return {html:`<div style="margin-top:18px;padding:14px;background:#eef8ff;border-radius:10px"><strong>Reading goal progress</strong><p>${g.completedBooks} of ${g.annualBooks} books · ${g.annualPercent}% of annual challenge<br>${g.currentWeeklyMinutes}/${g.weeklyMinutes} minutes this week · ${g.avgWpm||'—'}/${g.targetWpm} WPM · ${g.avgComprehension||'—'}/${g.targetComprehension}% comprehension</p></div>`,text:` Reading goals: ${g.completedBooks}/${g.annualBooks} books (${g.annualPercent}%), ${g.currentWeeklyMinutes}/${g.weeklyMinutes} weekly minutes, ${g.avgWpm||'—'}/${g.targetWpm} WPM, ${g.avgComprehension||'—'}/${g.targetComprehension}% comprehension.`}; }
 
-app.post('/api/email/sync-actions', (req, res) => {
-  const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
-  if (!record?.active) return res.status(404).json({error:'Save email preferences first.'});
-  record.actions=(Array.isArray(req.body?.actions)?req.body.actions:[]).slice(0,200).map(a=>({id:String(a.id||'').slice(0,100),title:String(a.title||'').slice(0,180),dueAt:a.dueAt||'',reminder:a.reminder||'none',status:a.status||'active',sourceTitle:String(a.sourceTitle||'').slice(0,180),updatedAt:a.updatedAt||'',lastEmailSignature:a.lastEmailSignature||''}));
-  record.updatedAt=new Date().toISOString(); emailSubscriptions.set(clientId,record); res.json({ok:true,count:record.actions.length});
+app.post('/api/email/sync-actions', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+
+    const clientId = String(req.body?.clientId || '').trim().slice(0,100);
+    const incoming = (Array.isArray(req.body?.actions) ? req.body.actions : []).slice(0,200);
+    const prefResult = await query(
+      'select email, reminders, newsletter, notes, notes_frequency, timezone, active, actions from user_email_preferences where user_id=$1',
+      [user.id]
+    );
+    const pref = prefResult.rows[0];
+    if (!pref?.active) return res.status(404).json({ error:'Save email preferences first.' });
+
+    const existing = new Map(
+      (Array.isArray(pref.actions) ? pref.actions : []).map((action) => [String(action.id || ''), action])
+    );
+
+    const actions = incoming.map((a) => {
+      const normalized = {
+        id:String(a.id||'').slice(0,100),
+        title:String(a.title||'').slice(0,180),
+        dueAt:a.dueAt||'',
+        reminder:a.reminder||'none',
+        status:a.status||'active',
+        sourceTitle:String(a.sourceTitle||'').slice(0,180),
+        updatedAt:a.updatedAt||'',
+        lastEmailSignature:''
+      };
+      const previous = existing.get(normalized.id);
+      const sameSchedule = previous
+        && previous.dueAt === normalized.dueAt
+        && previous.reminder === normalized.reminder
+        && previous.updatedAt === normalized.updatedAt;
+      if (sameSchedule) normalized.lastEmailSignature = previous.lastEmailSignature || '';
+      return normalized;
+    });
+
+    await query(
+      'update user_email_preferences set actions=$2::jsonb, updated_at=now() where user_id=$1',
+      [user.id, JSON.stringify(actions)]
+    );
+
+    // Keep the in-process cache synchronized for local/dev and immediate sends.
+    if (clientId) {
+      const record = {
+        ...(emailSubscriptions.get(clientId) || {}),
+        clientId,
+        email: pref.email,
+        reminders: Boolean(pref.reminders),
+        newsletter: Boolean(pref.newsletter),
+        notes: Boolean(pref.notes),
+        notesFrequency: pref.notes_frequency || 'weekly',
+        timezone: pref.timezone || 'America/New_York',
+        active: Boolean(pref.active),
+        actions,
+        updatedAt: new Date().toISOString()
+      };
+      emailSubscriptions.set(clientId, record);
+    }
+
+    res.json({ ok:true, count:actions.length, durable:true });
+  } catch (error) {
+    console.error('Action reminder sync failed:', error);
+    res.status(500).json({ error:'Unable to save action reminders.' });
+  }
 });
 app.post('/api/email/test', async (req,res)=>{
   const clientId=String(req.body?.clientId||'').trim().slice(0,100); const record=emailSubscriptions.get(clientId);
@@ -718,17 +799,73 @@ app.post('/api/email/newsletter-preview', async (req,res)=>{
 app.get('/api/email/unsubscribe', (req,res)=>{ const id=String(req.query.clientId||''); const record=emailSubscriptions.get(id); if(record){record.active=false;record.newsletter=false;record.reminders=false;record.notes=false;} res.type('html').send('<h1>You are unsubscribed</h1><p>You will no longer receive Mark, Set, Go! emails.</p>'); });
 
 setInterval(async()=>{
-  if(!emailConfigured()) return; const now=Date.now(); const offsets={at_time:0,min10:10,min30:30,hour1:60,day1:1440};
-  for(const record of emailSubscriptions.values()){
-    if(!record.active||!record.reminders) continue;
-    for(const action of record.actions||[]){
-      if(action.status==='completed'||!action.dueAt||action.reminder==='none') continue;
-      const due=Date.parse(action.dueAt); if(!Number.isFinite(due)) continue;
-      const notifyAt=due-(offsets[action.reminder]??0)*60000; const signature=`${action.id}|${action.dueAt}|${action.reminder}|${action.updatedAt}`;
-      if(now<notifyAt||now-notifyAt>10*60000||action.lastEmailSignature===signature) continue;
-      try { const gp=goalProgressEmail(record); await sendResendEmail({to:record.email,subject:`Reminder: ${action.title}`,html:emailFrame('Reading action reminder',`<p><strong>${escapeEmail(action.title)}</strong></p><p>Due ${escapeEmail(new Date(due).toLocaleString())}${action.sourceTitle?` · ${escapeEmail(action.sourceTitle)}`:''}</p>${gp.html}`,record.clientId),text:`Reminder: ${action.title}. Due ${new Date(due).toLocaleString()}.${gp.text}`}); action.lastEmailSignature=signature; }
-      catch(error){ console.error('Email reminder failed:',error.message); }
+  if(!emailConfigured()) return;
+
+  const now = Date.now();
+  const offsets = { at_time:0, min10:10, min30:30, hour1:60, day1:1440 };
+
+  try {
+    const result = await query(`
+      select user_id, email, reminders, newsletter, notes, notes_frequency, timezone, active, actions
+      from user_email_preferences
+      where active=true and reminders=true
+    `);
+
+    for (const pref of result.rows) {
+      const actions = Array.isArray(pref.actions) ? pref.actions : [];
+      let changed = false;
+
+      for (const action of actions) {
+        if(action.status==='completed'||!action.dueAt||action.reminder==='none') continue;
+        const due=Date.parse(action.dueAt);
+        if(!Number.isFinite(due)) continue;
+
+        const notifyAt=due-(offsets[action.reminder]??0)*60000;
+        const signature=`${action.id}|${action.dueAt}|${action.reminder}|${action.updatedAt}`;
+
+        // Never lose a reminder merely because Render slept/restarted or the
+        // scheduler woke more than ten minutes late. Send the first time the
+        // server observes that it is due, then persist the signature.
+        if(now<notifyAt || action.lastEmailSignature===signature) continue;
+
+        try {
+          const record = {
+            email: pref.email,
+            reminders: pref.reminders,
+            newsletter: pref.newsletter,
+            notes: pref.notes,
+            notesFrequency: pref.notes_frequency,
+            timezone: pref.timezone,
+            active: pref.active,
+            actions
+          };
+          const gp=goalProgressEmail(record);
+          await sendResendEmail({
+            to:pref.email,
+            subject:`Reminder: ${action.title}`,
+            html:emailFrame(
+              'Reading action reminder',
+              `<p><strong>${escapeEmail(action.title)}</strong></p><p>Due ${escapeEmail(new Date(due).toLocaleString())}${action.sourceTitle?` · ${escapeEmail(action.sourceTitle)}`:''}</p>${gp.html}`,
+              ''
+            ),
+            text:`Reminder: ${action.title}. Due ${new Date(due).toLocaleString()}.${gp.text}`
+          });
+          action.lastEmailSignature=signature;
+          changed=true;
+        } catch(error) {
+          console.error('Email reminder failed:',error.message);
+        }
+      }
+
+      if(changed) {
+        await query(
+          'update user_email_preferences set actions=$2::jsonb, updated_at=now() where user_id=$1',
+          [pref.user_id, JSON.stringify(actions)]
+        );
+      }
     }
+  } catch (error) {
+    console.error('Reminder scheduler failed:', error.message);
   }
 },60000).unref();
 

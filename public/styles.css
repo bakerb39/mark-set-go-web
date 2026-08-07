@@ -9767,3 +9767,15 @@ progress::-webkit-progress-value, .library-progress-track > span { background: v
 #app .action-center-hero p {
   color:#496983 !important;
 }
+
+
+/* v9.2.29 fullscreen parity + formatter */
+.fullscreen-format-panel{display:grid;gap:.85rem;padding:.75rem}
+.fullscreen-format-levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
+.fullscreen-format-levels button{display:grid;gap:.18rem;text-align:left;padding:.65rem;border:1px solid #c9ddeb;border-radius:10px;background:#fff;color:#17324d}
+.fullscreen-format-levels button.active{border-color:#c8911d;box-shadow:0 0 0 2px rgba(200,145,29,.16)}
+.fullscreen-format-levels small{color:#58738a}
+.fullscreen-format-scope{display:flex;gap:1rem;flex-wrap:wrap;border:1px solid #d6e5ef;border-radius:10px;padding:.7rem .8rem}
+.fullscreen-format-scope legend{padding:0 .3rem;font-weight:700;color:#17324d}
+.fullscreen-format-actions{display:flex;gap:.55rem;flex-wrap:wrap}
+@media(max-width:700px){.fullscreen-format-levels{grid-template-columns:1fr}}
