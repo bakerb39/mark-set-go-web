@@ -1,6 +1,10 @@
 (() => {
   'use strict';
 
+  if (window.__MSG_APP_HELP_MARK_ACTIVE__) return;
+  window.__MSG_APP_HELP_MARK_ACTIVE__ = true;
+  document.querySelectorAll('.app-help-mark-host').forEach((node) => node.remove());
+
   const app = document.getElementById('app');
   if (!app) return;
   const knowledge = window.MarkSetGoPageHelpKnowledge || { global: {}, pages: {} };
@@ -88,6 +92,7 @@
   const form = host.querySelector('[data-app-help-form]');
   const input = host.querySelector('[data-app-help-input]');
   let activePageKey = '';
+  let requestInFlight = false;
 
   function syncVisibility() {
     const developerRoute = new URLSearchParams(location.search).has('debug') || new URLSearchParams(location.search).has('features');
@@ -132,6 +137,8 @@
   }
 
   async function ask(question) {
+    if (requestInFlight) return;
+    requestInFlight = true;
     const ctx = pageContext();
     appendMessage('You', question);
     const pending = appendMessage('Mark', 'Checking the help for this page…');
@@ -147,12 +154,18 @@
       pending.querySelector('p').textContent = error.message || 'I could not answer that help question.';
     }
     conversation.scrollTop = conversation.scrollHeight;
+    requestInFlight = false;
   }
 
   openButton.addEventListener('click', openPanel);
   host.querySelector('[data-app-help-close]').addEventListener('click', closePanel);
   form.addEventListener('submit', (event) => {
-    event.preventDefault(); const question = input.value.trim(); if (!question) return; input.value = ''; ask(question);
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const question = input.value.trim();
+    if (!question || requestInFlight) return;
+    input.value = '';
+    ask(question);
   });
 
   document.addEventListener('click', () => requestAnimationFrame(() => { syncVisibility(); if (!panel.hidden) syncPageLabel(); }), { capture: true, passive: true });

@@ -31,36 +31,25 @@
 
   function setButtonLabel(el, markText, bethText) {
     if (!el) return;
-    const img = el.querySelector('img');
     const desired = id === 'beth' ? bethText : markText;
-    if (img) {
-      Array.from(el.childNodes).forEach((node) => {
-        if (node.nodeType === Node.TEXT_NODE) node.nodeValue = '';
-      });
-      let span = el.querySelector('[data-companion-label]');
-      if (!span) {
-        span = document.createElement('span');
-        span.dataset.companionLabel = '1';
-        el.appendChild(span);
-      }
-      span.textContent = desired;
-    } else {
-      const icon = el.querySelector('[aria-hidden="true"]');
-      if (icon) {
-        let label = el.querySelector('[data-companion-label]');
-        if (!label) {
-          Array.from(el.childNodes).forEach((node) => {
-            if (node.nodeType === Node.TEXT_NODE) node.nodeValue = '';
-          });
-          label = document.createElement('span');
-          label.dataset.companionLabel = '1';
-          el.appendChild(label);
-        }
-        label.textContent = desired;
-      } else {
-        el.textContent = desired;
-      }
+    const hasVisual = !!el.querySelector('img,[aria-hidden="true"]');
+    if (!hasVisual) { el.textContent = desired; return; }
+
+    // Reuse the button's existing text span when one exists. Earlier builds
+    // appended a second companion span beside the original label, producing
+    // "Ask Mark Ask Mark" after persona refreshes.
+    const directSpans = Array.from(el.children).filter((child) => child.tagName === 'SPAN');
+    let label = directSpans[0];
+    directSpans.slice(1).forEach((child) => child.remove());
+    Array.from(el.childNodes).forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE) node.nodeValue = '';
+    });
+    if (!label) {
+      label = document.createElement('span');
+      el.appendChild(label);
     }
+    label.dataset.companionLabel = '1';
+    label.textContent = desired;
   }
 
   function applyAvatar(img) {
@@ -107,6 +96,12 @@
       if (!img.dataset.msgMarkSrc) img.dataset.msgMarkSrc = img.src;
       img.src = id === 'beth' ? CONFIG.beth.home : img.dataset.msgMarkSrc;
       img.alt = cfg().name;
+    });
+    qsa('.home-mark-card strong', root).forEach((el) => {
+      if (/^Meet (Mark|Beth)\.$/.test((el.textContent || '').trim())) el.textContent = `Meet ${cfg().name}.`;
+    });
+    qsa('.home-mark-avatar', root).forEach((img) => {
+      if (img instanceof HTMLImageElement) img.alt = `${cfg().name}, your reading companion.`;
     });
   }
 
