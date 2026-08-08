@@ -15194,8 +15194,6 @@ function renderMyLibraryHub() {
   const readingList = getReadingList();
   const progress = Object.values(readStoredObject(READING_PROGRESS_KEY))
     .sort((a, b) => new Date(b.lastReadAt || 0) - new Date(a.lastReadAt || 0));
-  const modernGuideItems = readModernGuideLibrary()
-    .sort((a, b) => new Date(b.lastOpenedAt || 0) - new Date(a.lastOpenedAt || 0));
   const activity = readStoredArray(READING_ACTIVITY_KEY);
   const comprehension = getComprehensionResults();
   const bookmarks = getBookmarks();
@@ -15331,34 +15329,6 @@ function renderMyLibraryHub() {
     requestAnimationFrame(() => requestAnimationFrame(() => jumpToWordIndex(resumeIndex)));
   };
 
-  const modernGuideCards = modernGuideItems.map((guide) => {
-    const progressRecord = progress.find((item) => String(item.documentId || '') === String(guide.documentId || ''));
-    const percent = progressRecord?.totalWords
-      ? Math.min(100, Math.round((Number(progressRecord.furthestWord) || 0) / Number(progressRecord.totalWords) * 100))
-      : 0;
-    const lastOpened = guide.lastOpenedAt
-      ? new Date(guide.lastOpenedAt).toLocaleDateString(undefined, { month:'short', day:'numeric' })
-      : 'Recently';
-
-    return `<article class="library-modern-guide-card">
-      <div class="library-modern-guide-cover" aria-hidden="true">
-        <span>GUIDE</span>
-        <strong>${escapeHtml((guide.originalTitle || guide.title || 'G').slice(0,1).toUpperCase())}</strong>
-      </div>
-      <div class="library-modern-guide-copy">
-        <span class="source-category">${guide.customGuide ? 'My Guide' : 'Modern Guide'}</span>
-        <h3>${escapeHtml(guide.originalTitle || guide.title || 'Untitled Guide')}</h3>
-        ${guide.author ? `<p>${escapeHtml(guide.author)}</p>` : ''}
-        <small>${percent}% complete · Opened ${escapeHtml(lastOpened)}</small>
-        <div class="library-progress-track"><span style="width:${percent}%"></span></div>
-        <div class="library-book-actions">
-          <button class="primary" type="button" data-library-guide-document="${escapeHtml(guide.documentId)}">Open guide</button>
-          ${guide.buyUrl ? `<a class="secondary button-link" href="${escapeHtml(guide.buyUrl)}" target="_blank" rel="noopener noreferrer">Buy original</a>` : ''}
-        </div>
-      </div>
-    </article>`;
-  }).join('');
-
   const continueCards = progress.slice(0, 6).map((item, index) => {
     const difficulty = storedDifficultyForProgress(item);
     const percent = item.totalWords
@@ -15372,7 +15342,7 @@ function renderMyLibraryHub() {
         <span class="${libraryRecencyClass(item.lastReadAt)}" title="${escapeHtml(libraryRecencyLabel(item.lastReadAt))}">${escapeHtml((item.title || 'B').slice(0, 1).toUpperCase())}</span>
       </button>
       <div class="continue-card-copy">
-        <span class="source-category">${item.source?.type === 'modern-guide' ? 'Modern Guide' : (index === 0 ? 'Continue reading' : 'Recent')}</span>
+        <span class="source-category">${item.source?.type === 'modern-guide' ? (item.source?.customGuide ? 'My Guide' : 'Modern Guide') : (index === 0 ? 'Continue reading' : 'Recent')}</span>
         <h3>${escapeHtml(item.title || 'Untitled')}</h3>
         <p>${percent}% complete · Last read ${escapeHtml(lastRead)}</p>
         ${difficulty ? difficultyBadge(difficulty, {title:item.title}) : ''}
@@ -15401,25 +15371,13 @@ function renderMyLibraryHub() {
         </div>
       </header>
 
-      ${modernGuideItems.length ? `
-        <section class="library-modern-guides-section">
-          <div class="section-heading">
-            <div>
-              <span class="source-category">Guides</span>
-              <h2>My Modern Guides</h2>
-              <p>Guides you have opened or created stay here alongside your books.</p>
-            </div>
-            <button class="secondary" type="button" data-action="browse">Find more guides</button>
-          </div>
-          <div class="library-modern-guides-grid">${modernGuideCards}</div>
-        </section>` : ''}
 
       <section class="library-focus-grid">
         <article class="library-primary-focus">
           ${primaryBook ? `
             <div class="focus-book-cover ${libraryRecencyClass(primaryBook.lastReadAt)}" aria-label="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}" title="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}">${escapeHtml((primaryBook.title || 'B').slice(0,1).toUpperCase())}</div>
             <div class="focus-book-copy">
-              <span class="source-category">${primaryBook.source?.type === 'modern-guide' ? 'Modern Guide · Your next step' : 'Your next step'}</span>
+              <span class="source-category">${primaryBook.source?.type === 'modern-guide' ? `${primaryBook.source?.customGuide ? 'My Guide' : 'Modern Guide'} · Your next step` : 'Your next step'}</span>
               <h2>${escapeHtml(primaryBook.title || 'Continue reading')}</h2>
               <p>${primaryPercent}% complete. Pick up at the exact place you left off.</p>
               ${primaryDifficulty ? difficultyBadge(primaryDifficulty, {title:primaryBook.title}) : ''}
@@ -15480,9 +15438,6 @@ function renderMyLibraryHub() {
   });
   app.querySelectorAll('[data-library-delete]').forEach((button) => {
     button.addEventListener('click', () => deleteStoredDocument(button.dataset.libraryDelete, button.dataset.libraryTitle || 'this book'));
-  });
-  app.querySelectorAll('[data-library-guide-document]').forEach((button) => {
-    button.addEventListener('click', () => openStoredDocument(button.dataset.libraryGuideDocument));
   });
   document.dispatchEvent(new CustomEvent('marksetgo:library-rendered'));
 }
