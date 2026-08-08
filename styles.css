@@ -1973,7 +1973,7 @@ body.resizing-reader-panes { cursor: col-resize; user-select: none; }
 .focus-anchor-overlay {
   position: absolute;
   z-index: 5;
-  top: 3.2rem;
+  top: 2.7rem;
   left: 50%;
   transform: translateX(-50%);
   width: min(82%, 46rem);

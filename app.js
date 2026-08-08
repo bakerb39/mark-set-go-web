@@ -3333,7 +3333,7 @@ function applyFocusAnchorReaderClearance() {
   // The reserved amount is based on the anchor's default top placement,
   // not its current dragged position.
   const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
-  const defaultTop = 3.2 * rootFontSize;
+  const defaultTop = 2.7 * rootFontSize;
   const overlayHeight = Math.max(42, overlay.getBoundingClientRect().height || 0);
 
   // Match the original dynamic top-band result at the default top position:
@@ -3366,7 +3366,7 @@ function applyFocusAnchorPosition(overlay) {
       overlay.style.transform = 'translate(-50%, -50%)';
     } else {
       overlay.style.left = '50%';
-      overlay.style.top = '3.2rem';
+      overlay.style.top = '2.7rem';
       overlay.style.transform = 'translateX(-50%)';
     }
   }
