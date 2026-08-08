@@ -2,7 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
-  const WALKTHROUGH_BUILD = '9.3.6';
+  const WALKTHROUGH_BUILD = '9.3.7';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -836,6 +836,7 @@
 
   function clearTarget() {
     stopTargetTracking();
+    restoreWalkthroughSelectionToolbar();
     if (activeTarget) activeTarget.classList.remove(HIGHLIGHT_CLASS);
     activeTarget = null;
     hideTopHighlight();
@@ -885,9 +886,91 @@
     host.style.bottom = `${bottom}px`;
   }
 
+  let walkthroughToolbarOriginalStyle = null;
+
+  function restoreWalkthroughSelectionToolbar() {
+    const toolbar = document.getElementById('mark-selection-toolbar');
+    if (!toolbar || walkthroughToolbarOriginalStyle === null) return;
+    if (walkthroughToolbarOriginalStyle) toolbar.setAttribute('style', walkthroughToolbarOriginalStyle);
+    else toolbar.removeAttribute('style');
+    toolbar.classList.remove('msg-walkthrough-selection-toolbar-pinned');
+    walkthroughToolbarOriginalStyle = null;
+  }
+
+  function getWalkthroughSelectionRect() {
+    try {
+      const selection = window.getSelection?.();
+      if (selection && selection.rangeCount) {
+        const rect = selection.getRangeAt(0).getBoundingClientRect();
+        if (rect && rect.width > 2 && rect.height > 2 && rect.bottom > 0 && rect.top < window.innerHeight) return rect;
+      }
+    } catch (_) {}
+
+    const reader = document.getElementById('reader');
+    if (!reader) return null;
+    const marked = reader.querySelector('.selected, .selection, .reader-selected, .is-selected, [data-selected="true"]');
+    if (marked && isVisibleElement(marked)) return marked.getBoundingClientRect();
+    const rr = reader.getBoundingClientRect();
+    if (rr.width < 2 || rr.height < 2) return null;
+    return {
+      left: rr.left + rr.width * .28,
+      right: rr.left + rr.width * .72,
+      top: rr.top + Math.min(rr.height * .36, 220),
+      bottom: rr.top + Math.min(rr.height * .36, 220) + 28,
+      width: rr.width * .44,
+      height: 28
+    };
+  }
+
+  function pinWalkthroughSelectionToolbar() {
+    const step = steps[currentIndex];
+    if (!step || !['Highlight a passage', 'Selection actions'].includes(step.title)) {
+      restoreWalkthroughSelectionToolbar();
+      return;
+    }
+    const toolbar = document.getElementById('mark-selection-toolbar');
+    if (!toolbar || toolbar.hidden || !isVisibleElement(toolbar)) return;
+    if (walkthroughToolbarOriginalStyle === null) walkthroughToolbarOriginalStyle = toolbar.getAttribute('style') || '';
+
+    const anchor = getWalkthroughSelectionRect();
+    const reader = document.getElementById('reader');
+    const readerRect = reader?.getBoundingClientRect?.();
+    if (!anchor || !readerRect) return;
+
+    toolbar.classList.add('msg-walkthrough-selection-toolbar-pinned');
+    toolbar.style.setProperty('position', 'fixed', 'important');
+    toolbar.style.setProperty('z-index', '2147483646', 'important');
+    toolbar.style.setProperty('margin', '0', 'important');
+    toolbar.style.setProperty('transform', 'none', 'important');
+    toolbar.style.setProperty('bottom', 'auto', 'important');
+    toolbar.style.setProperty('right', 'auto', 'important');
+    toolbar.style.setProperty('visibility', 'visible', 'important');
+    toolbar.style.setProperty('opacity', '1', 'important');
+
+    // Measure at its real rendered size, then center it over the selected passage.
+    const tr = toolbar.getBoundingClientRect();
+    const width = Math.min(tr.width || toolbar.offsetWidth || 640, window.innerWidth - 20);
+    const height = tr.height || toolbar.offsetHeight || 42;
+    const centerX = (anchor.left + anchor.right) / 2;
+    let left = centerX - width / 2;
+    const minLeft = Math.max(10, readerRect.left + 8);
+    const maxLeft = Math.min(window.innerWidth - width - 10, readerRect.right - width - 8);
+    left = Math.max(minLeft, Math.min(maxLeft, left));
+
+    let top = anchor.top - height - 10;
+    const readerTop = Math.max(10, readerRect.top + 8);
+    const readerBottom = Math.min(window.innerHeight - 10, readerRect.bottom - 8);
+    if (top < readerTop) top = anchor.bottom + 10;
+    if (top + height > readerBottom) top = Math.max(readerTop, anchor.top - height - 10);
+
+    toolbar.style.setProperty('left', `${Math.round(left)}px`, 'important');
+    toolbar.style.setProperty('top', `${Math.round(top)}px`, 'important');
+  }
+
   function positionOverlay() {
     if (!root || root.hidden || !activeTarget?.isConnected || !isVisibleElement(activeTarget)) return;
 
+    pinWalkthroughSelectionToolbar();
     const rect = activeTarget.getBoundingClientRect();
     positionTopHighlight(rect);
     positionPresenterForTarget(rect);
@@ -944,8 +1027,14 @@
 
     card.style.width = `${Math.round(cardWidth)}px`;
     card.style.left = `${Math.round(cardLeft)}px`;
-    card.style.bottom = compact ? '92px' : '96px';
-    card.style.top = 'auto';
+    const selectionToolbarStep = steps[currentIndex] && ['Highlight a passage', 'Selection actions'].includes(steps[currentIndex].title);
+    if (selectionToolbarStep && rect.top > viewportHeight * .48) {
+      card.style.top = compact ? '14px' : '18px';
+      card.style.bottom = 'auto';
+    } else {
+      card.style.bottom = compact ? '92px' : '96px';
+      card.style.top = 'auto';
+    }
 
     const dockWidth = Math.max(300, Math.min(1180, viewportWidth - sideMargin * 2));
     dock.style.width = `${Math.round(dockWidth)}px`;
