@@ -276,6 +276,36 @@
     });
   }
 
+  let companionChatObserver = null;
+  let companionChatObservedRoot = null;
+
+  function findCompanionChatRoot() {
+    const selectors = [
+      '#mark-panel', '#ask-mark-panel', '.mark-shell', '.askmark-shell',
+      '.askmark-panel', '.ask-mark-panel', '.askmark-view',
+      '[data-askmark-view-panel]', '[data-panel="mark"]', '[data-panel="ask-mark"]'
+    ];
+    for (const selector of selectors) {
+      const el = document.querySelector(selector);
+      if (el) return el;
+    }
+    return null;
+  }
+
+  function ensureCompanionChatObserver() {
+    const root = findCompanionChatRoot();
+    if (!root || root === companionChatObservedRoot) return;
+    companionChatObserver?.disconnect();
+    companionChatObservedRoot = root;
+    companionChatObserver = new MutationObserver((mutations) => {
+      // This observer is scoped ONLY to the companion/chat panel. It never
+      // observes the reader, selection surface, or right-click/context menu.
+      if (!mutations.some((m) => m.addedNodes?.length || m.type === 'characterData')) return;
+      window.queueMicrotask(() => applyCompanionChatIdentity());
+    });
+    companionChatObserver.observe(root, { childList:true, subtree:true, characterData:true });
+  }
+
   function profileLikelyOpen() {
     if (document.querySelector('.companion-persona-settings')) return true;
     return !!document.querySelector('[data-page="profile"],.profile-page,.profile-preferences,.experience-profile');
@@ -343,6 +373,7 @@
     applyImages(document);
     applyFrontpageCompanionMode(document);
     applyCompanionChatIdentity();
+    ensureCompanionChatObserver();
     updateProfileControl();
   }
 
