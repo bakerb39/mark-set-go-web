@@ -12944,3 +12944,52 @@ html[data-companion="beth"] .home-mark-icon-stage.companion-frontpage-badge-mode
 html[data-companion="beth"] .home-mark-icon-stage.companion-frontpage-badge-mode{
   background:transparent !important;
 }
+
+
+/* v9.4.5 Ask Mark/Beth reader-button avatar follows selected companion. */
+#toggle-mark-panel.msg-companion-avatar-fallback,
+.reader-pane-buttons .mark-pane-button.msg-companion-avatar-fallback,
+.ask-mark-button.msg-companion-avatar-fallback,
+[data-action="ask-mark"].msg-companion-avatar-fallback{
+  display:inline-flex !important;
+  align-items:center !important;
+  gap:6px !important;
+}
+#toggle-mark-panel.msg-companion-avatar-fallback::before,
+.reader-pane-buttons .mark-pane-button.msg-companion-avatar-fallback::before,
+.ask-mark-button.msg-companion-avatar-fallback::before,
+[data-action="ask-mark"].msg-companion-avatar-fallback::before{
+  content:"" !important;
+  flex:0 0 26px !important;
+  width:26px !important;
+  height:26px !important;
+  border-radius:50% !important;
+  background-image:var(--msg-companion-button-avatar) !important;
+  background-size:cover !important;
+  background-position:center !important;
+  background-repeat:no-repeat !important;
+  border:1px solid #d9ae35 !important;
+  box-shadow:0 0 0 1px rgba(255,255,255,.18) !important;
+}
+/* Hide only a legacy decorative icon when the fallback portrait is active.
+   Text spans remain visible. */
+#toggle-mark-panel.msg-companion-avatar-fallback > svg:first-child,
+#toggle-mark-panel.msg-companion-avatar-fallback > .icon:first-child,
+#toggle-mark-panel.msg-companion-avatar-fallback > .mark-icon:first-child,
+.reader-pane-buttons .mark-pane-button.msg-companion-avatar-fallback > svg:first-child,
+.reader-pane-buttons .mark-pane-button.msg-companion-avatar-fallback > .icon:first-child,
+.reader-pane-buttons .mark-pane-button.msg-companion-avatar-fallback > .mark-icon:first-child{
+  display:none !important;
+}
+#toggle-mark-panel img,
+.reader-pane-buttons .mark-pane-button img,
+.ask-mark-button img,
+[data-action="ask-mark"] img{
+  width:26px !important;
+  height:26px !important;
+  flex:0 0 26px !important;
+  border-radius:50% !important;
+  object-fit:cover !important;
+  object-position:center !important;
+  border:1px solid #d9ae35 !important;
+}

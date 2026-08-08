@@ -166,6 +166,43 @@
     });
   }
 
+  function applyAskCompanionButtonAvatar() {
+    const buttons = document.querySelectorAll([
+      '#toggle-mark-panel',
+      '.reader-pane-buttons .mark-pane-button',
+      '.ask-mark-button',
+      '[data-action="ask-mark"]'
+    ].join(','));
+
+    buttons.forEach((button) => {
+      if (!(button instanceof HTMLElement)) return;
+      const desiredSrc = state.id === 'beth' ? BETH_AVATAR : MARK_AVATAR;
+      const desiredName = state.id === 'beth' ? 'Beth' : 'Mark';
+
+      /* Prefer the button's real image when it has one. This avoids adding a
+         second icon on builds where the Ask companion control already renders
+         a portrait. */
+      const img = button.querySelector('img');
+      if (img instanceof HTMLImageElement) {
+        if (!img.dataset.msgOriginalCompanionButtonSrc) {
+          img.dataset.msgOriginalCompanionButtonSrc = img.getAttribute('src') || '';
+        }
+        img.src = state.id === 'beth'
+          ? desiredSrc
+          : (img.dataset.msgOriginalCompanionButtonSrc || desiredSrc);
+        img.alt = desiredName;
+        button.classList.remove('msg-companion-avatar-fallback');
+        return;
+      }
+
+      /* Some reader builds render the old Mark medallion as an icon/span rather
+         than an <img>. In that case CSS supplies one persona-aware portrait and
+         suppresses only the legacy icon inside this button. */
+      button.classList.add('msg-companion-avatar-fallback');
+      button.style.setProperty('--msg-companion-button-avatar', `url("${desiredSrc}")`);
+    });
+  }
+
   function applyKnownReaderLabels() {
     /* Target only visible companion labels inside protected reader UI. This
        avoids walking/mutating the reader or word context-menu DOM. */
@@ -252,6 +289,7 @@
     document.documentElement.dataset.companion = state.id;
     applyText(document.body, { includeProtected });
     applyKnownReaderLabels();
+    applyAskCompanionButtonAvatar();
     applyImages(document);
     applyFrontpageCompanionMode(document);
     updateProfileControl();
