@@ -11018,3 +11018,101 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
     margin:.35rem .3rem .35rem 0 !important;
   }
 }
+
+
+/* v9.2.69 global icon hover/focus treatment */
+:where(
+  .icon-button,
+  button[aria-label],
+  .reader-toolbar button,
+  .reader-title-row button,
+  .reader-side-panel button,
+  .site-header button,
+  .site-header summary,
+  .library-quick-actions button,
+  .library-book-actions button,
+  .browse-hero-actions button,
+  .browse-layout-toggle button,
+  .modern-guide-inline-action,
+  .mark-action-button,
+  .askmark-icon-button
+):not(:disabled):hover,
+:where(
+  .icon-button,
+  button[aria-label],
+  .reader-toolbar button,
+  .reader-title-row button,
+  .reader-side-panel button,
+  .site-header button,
+  .site-header summary,
+  .library-quick-actions button,
+  .library-book-actions button,
+  .browse-hero-actions button,
+  .browse-layout-toggle button,
+  .modern-guide-inline-action,
+  .mark-action-button,
+  .askmark-icon-button
+):not(:disabled):focus-visible {
+  background:#5aa6e8 !important;
+  color:#fff !important;
+  border-color:#5aa6e8 !important;
+  box-shadow:0 6px 16px rgba(38,103,169,.24) !important;
+  transform:translateY(-1px);
+  text-decoration:none !important;
+}
+
+:where(
+  .icon-button,
+  button[aria-label],
+  .reader-toolbar button,
+  .reader-title-row button,
+  .reader-side-panel button,
+  .site-header button,
+  .site-header summary,
+  .library-quick-actions button,
+  .library-book-actions button,
+  .browse-hero-actions button,
+  .browse-layout-toggle button,
+  .modern-guide-inline-action,
+  .mark-action-button,
+  .askmark-icon-button
+):not(:disabled):focus-visible {
+  outline:2px solid rgba(239,193,72,.78) !important;
+  outline-offset:2px;
+}
+
+/* Keep icon glyphs bright when nested elements define their own color. */
+:where(
+  .icon-button,
+  button[aria-label],
+  .reader-toolbar button,
+  .reader-title-row button,
+  .reader-side-panel button,
+  .site-header button,
+  .site-header summary,
+  .library-quick-actions button,
+  .library-book-actions button,
+  .browse-hero-actions button,
+  .browse-layout-toggle button,
+  .modern-guide-inline-action,
+  .mark-action-button,
+  .askmark-icon-button
+):not(:disabled):hover *,
+:where(
+  .icon-button,
+  button[aria-label],
+  .reader-toolbar button,
+  .reader-title-row button,
+  .reader-side-panel button,
+  .site-header button,
+  .site-header summary,
+  .library-quick-actions button,
+  .library-book-actions button,
+  .browse-hero-actions button,
+  .browse-layout-toggle button,
+  .modern-guide-inline-action,
+  .mark-action-button,
+  .askmark-icon-button
+):not(:disabled):focus-visible * {
+  color:inherit !important;
+}
