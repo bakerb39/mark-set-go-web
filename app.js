@@ -189,7 +189,55 @@ const READER_SESSION_META_KEY = 'markSetGoReaderSessionMetaV1';
 // this browser/app session. Persistent IndexedDB is reserved for Home > Resume.
 let activeReaderSnapshot = null;
 
+function teardownReaderViewBindings() {
+  // Reader views are rebuilt in-place. Document/window listeners outlive the
+  // discarded Reader DOM unless they are explicitly removed here. Keep this
+  // teardown idempotent so every navigation path can safely call it.
+  if (state.spacebarHandler) {
+    document.removeEventListener('keydown', state.spacebarHandler);
+    state.spacebarHandler = null;
+  }
+  if (state.fullscreenChangeHandler) {
+    document.removeEventListener('fullscreenchange', state.fullscreenChangeHandler);
+    state.fullscreenChangeHandler = null;
+  }
+  if (state.fullscreenKeyHandler) {
+    document.removeEventListener('keydown', state.fullscreenKeyHandler);
+    state.fullscreenKeyHandler = null;
+  }
+  if (state.fullscreenOptionsKeyHandler) {
+    document.removeEventListener('keydown', state.fullscreenOptionsKeyHandler);
+    state.fullscreenOptionsKeyHandler = null;
+  }
+  if (state.fullscreenOptionsChangeHandler) {
+    document.removeEventListener('fullscreenchange', state.fullscreenOptionsChangeHandler);
+    state.fullscreenOptionsChangeHandler = null;
+  }
+  if (state.fullscreenOptionsObserver) {
+    state.fullscreenOptionsObserver.disconnect();
+    state.fullscreenOptionsObserver = null;
+  }
+
+  // The delegated dictionary listeners are intentionally installed once, but
+  // their runner closure belongs to the current Reader. Drop that closure as
+  // soon as the Reader is left so it cannot retain detached Reader/menu nodes.
+  window.__msgDictionaryActionRunner = null;
+  closeDictionaryMenu();
+
+  // Release the previous book-page ResizeObserver target. The observer itself
+  // is reused when a new Reader is opened.
+  if (typeof bookPageResizeObserver !== 'undefined' && bookPageResizeObserver && observedBookReader) {
+    try { bookPageResizeObserver.unobserve(observedBookReader); } catch {}
+    observedBookReader = null;
+    observedBookReaderWidth = 0;
+    observedBookReaderHeight = 0;
+  }
+
+  document.body.classList.remove('viewer-fullscreen-open');
+}
+
 function clearActiveReaderPane() {
+  teardownReaderViewBindings();
   stopReader();
   activeReaderSnapshot = null;
   try { readerEngine.reset?.(); } catch {}
@@ -4467,6 +4515,7 @@ function renderCurrentReader() {
 
 
 function renderHome() {
+  teardownReaderViewBindings();
   stopReader();
 
   let resumeMeta = null;
@@ -8534,6 +8583,7 @@ function showBookDifficultyDialog(payload) {
     if (!request) return;
     dialog.close();
     ReaderContinuity?.saveBeforeNavigation?.();
+    teardownReaderViewBindings();
     renderAiCenter();
     window.setTimeout(() => {
       const input = app.querySelector('textarea, input[type="text"]');
@@ -17217,6 +17267,7 @@ function renderGlobalNotebookEntries(){
 }
 
 function renderGlobalNotebook(){
+  teardownReaderViewBindings();
   stopReader();
   app.dataset.viewKey='mark-notebook';
   app.innerHTML=`<section class="platform-page global-notebook-page">
@@ -17819,6 +17870,7 @@ document.addEventListener('click', (event) => {
   try {
     captureCurrentViewPosition();
     ReaderContinuity.saveBeforeNavigation();
+    teardownReaderViewBindings();
   } catch (error) {
     console.warn('Help navigation could not save the current view:', error);
   }
@@ -17972,6 +18024,7 @@ document.addEventListener('click', (event) => {
 
   if (test) {
     ReaderContinuity.saveBeforeNavigation();
+    teardownReaderViewBindings();
     closeMenus();
     renderWpmTest(test.dataset.test);
     restoreViewPosition(targetView);
@@ -17980,6 +18033,7 @@ document.addEventListener('click', (event) => {
 
   if (read) {
     ReaderContinuity.saveBeforeNavigation();
+    teardownReaderViewBindings();
     closeMenus();
     renderReader(read.dataset.read);
     restoreViewPosition(targetView);
@@ -17997,7 +18051,10 @@ document.addEventListener('click', (event) => {
   }
 
   const actionName = action.dataset.action;
-  if (actionName !== 'reader') ReaderContinuity.saveBeforeNavigation();
+  if (actionName !== 'reader') {
+    ReaderContinuity.saveBeforeNavigation();
+    teardownReaderViewBindings();
+  }
   closeMenus();
 
   if (actionName === 'reader') {
