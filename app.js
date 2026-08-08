@@ -12532,13 +12532,19 @@ function bindDictionaryMenu(reader) {
     // Keep reader-surface and selection handlers from owning the menu press.
     event.stopImmediatePropagation();
   }, true);
-  document.addEventListener('pointerdown', (event) => {
-    // Close only for a primary-button press outside the custom menu. A generic
-    // document click listener can run after a right-click on some browsers and
-    // hide the menu immediately after it opens.
-    if (event.button !== 0 || menu.contains(event.target)) return;
-    closeDictionaryMenu();
-  }, true);
+  // Install the outside-click closer only once and resolve the live menu at
+  // event time. Reader navigation replaces #word-context-menu; a listener that
+  // closes over an older detached menu will otherwise treat clicks on the new
+  // menu as outside clicks and hide it before pointerup/click can run.
+  if (!window.__msgDictionaryOutsideCloseInstalled) {
+    window.__msgDictionaryOutsideCloseInstalled = true;
+    document.addEventListener('pointerdown', (event) => {
+      if (event.button !== 0) return;
+      const liveMenu = app.querySelector('#word-context-menu');
+      if (!liveMenu || liveMenu.hidden || liveMenu.contains(event.target)) return;
+      closeDictionaryMenu();
+    }, true);
+  }
   window.addEventListener('blur', closeDictionaryMenu);
   reader.addEventListener('scroll', closeDictionaryMenu, { passive: true });
   reader.addEventListener('scroll', () => updateReaderBookmarkMarkers(), { passive: true });
