@@ -6,7 +6,7 @@
   const knowledge = window.MarkSetGoPageHelpKnowledge || { global: {}, pages: {} };
   const pages = knowledge.pages || {};
   const MARK_AVATAR = '/assets/ask-mark/ask-mark-avatar.png';
-  const BETH_AVATAR = '/assets/companions/beth/beth-avatar.png';
+  const BETH_AVATAR = '/assets/companions/beth/beth-universal-v1.png';
   const companion = () => window.MSGCompanion?.config || { id:'mark', name:'Mark', ask:'Ask Mark', avatar:MARK_AVATAR };
   const companionAvatar = () => companion().id === 'beth' ? BETH_AVATAR : MARK_AVATAR;
 
