@@ -173,6 +173,7 @@
 
   function getCompanionProgress(context={}) {
     const goals=getGoals();
+    const experience=window.MarkSetGoExperienceProfile?.get?.() || {features:{}};
     const learning=window.MarkSetGoLearningMetrics?.getSummary?.() || null;
     if(!goals.enabled && !(learning?.totalActivities>0)) return null;
 
@@ -214,19 +215,19 @@
       parts.push(`This week you’ve logged ${m.weeklyMinutes} of ${weeklyTarget} reading minutes (${weeklyPercent}%).`);
     }
 
-    if(learning?.comprehensionChecks>0){
+    if(experience.features?.learn!==false && learning?.comprehensionChecks>0){
       parts.push(`Across ${learning.comprehensionChecks} comprehension check${learning.comprehensionChecks===1?'':'s'}, your average is ${learning.comprehensionAverage}%.`);
     }
-    if(learning?.wpmTests>0){
+    if(experience.features?.learn!==false && learning?.wpmTests>0){
       parts.push(`You’ve completed ${learning.wpmTests} WPM test${learning.wpmTests===1?'':'s'}; your best recorded test is ${learning.bestWpm} WPM.`);
     }
-    if(learning?.mnemonicsCreated>0){
+    if(experience.features?.mnemonics!==false && learning?.mnemonicsCreated>0){
       parts.push(`You’ve created ${learning.mnemonicsCreated} mnemonic${learning.mnemonicsCreated===1?'':'s'} across ${learning.mnemonicBooks} book${learning.mnemonicBooks===1?'':'s'}.`);
     }
-    if(learning?.languageLessons>0){
+    if(experience.features?.languageLearning!==false && learning?.languageLessons>0){
       parts.push(`You’ve completed ${learning.languageLessons} language lesson${learning.languageLessons===1?'':'s'}${learning.languagesPracticed?.length?` in ${learning.languagesPracticed.slice(0,3).join(', ')}`:''}.`);
     }
-    if(learning?.courseOpens>0){
+    if(experience.features?.learningCourses!==false && learning?.courseOpens>0){
       parts.push(`You’ve explored ${learning.courseOpens} outside course or lecture link${learning.courseOpens===1?'':'s'} connected to your reading.`);
     }
 

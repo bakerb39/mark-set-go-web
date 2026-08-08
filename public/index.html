@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=9.2.74-learning-metrics" rel="stylesheet"/>
+<link href="/styles.css?v=9.2.75-custom-experience-profile" rel="stylesheet"/>
 <link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
 <link href="/ask-mark-hub.css?v=9.2.11-contents-responsive-fix" rel="stylesheet"/>
 <link href="/mobile-simple.css?v=8.5.9" rel="stylesheet"/>
@@ -24,7 +24,8 @@
   <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
   <script defer src="/auth.js?v=9.0.9-no-email-greeting"></script>
   <script defer src="/cloud-data.js?v=8.1.2"></script>
-  <script defer src="/app.js?v=9.2.74-learning-metrics"></script>
+  <script defer src="/app.js?v=9.2.75-custom-experience-profile"></script>
+<script>window.addEventListener("DOMContentLoaded",()=>window.MarkSetGoExperienceProfile?.apply?.());</script>
   <script defer src="/cloud-preferences.js?v=8.1.2"></script>
   <script defer src="/cloud-library.js?v=9.2.36-cloud-delete"></script>
   <script defer src="/cloud-document.js?v=9.2.18-cloud-remove-unified"></script>
@@ -34,7 +35,7 @@
   <script defer src="/ask-mark-hub.js?v=9.2.65-discuss-with-mark"></script>
   <script defer src="/app-walkthrough.js?v=9.2.48-walkthrough-menu-mirror"></script>
   <script defer src="/personalization.js?v=9.0.9-no-email-greeting"></script>
-  <script defer src="/reading-goals.js?v=9.2.74-learning-metrics"></script>
+  <script defer src="/reading-goals.js?v=9.2.75-custom-experience-profile"></script>
   <script defer src="/mobile-simple.js?v=8.5.9"></script>
 </head>
 <body>
@@ -71,11 +72,11 @@
         <span class="menu-icon">⌕</span>
         <span class="menu-copy"><strong>Browse Home</strong><small>Search everything and explore the full catalog</small></span>
       </button>
-      <button data-read="great-books" type="button" role="menuitem">
+      <button data-read="great-books" data-feature-gate="greatBooks" type="button" role="menuitem">
         <span class="menu-icon">★</span>
         <span class="menu-copy"><strong>Great Books</strong><small>Explore the Great Books collection</small></span>
       </button>
-      <button data-read="bible" type="button" role="menuitem">
+      <button data-read="bible" data-feature-gate="bibleStudy" type="button" role="menuitem">
         <span class="menu-icon">✦</span>
         <span class="menu-copy"><strong>Bible Study</strong><small>Translations, commentary, and study tools</small></span>
       </button>
@@ -126,12 +127,12 @@
     <span class="menu-copy"><strong>Reading Goals</strong><small>Books, deadlines, speed, and comprehension targets</small></span>
   </button>
 
-  <button data-action="progress-awards" type="button" role="menuitem">
+  <button data-action="progress-awards" data-feature-gate="goals" type="button" role="menuitem">
     <span class="menu-icon icon-progress">↗</span>
     <span class="menu-copy"><strong>Progress &amp; Awards</strong><small>Statistics, goals, coaching, and trophies</small></span>
   </button>
 
-  <button data-action="action-center" type="button" role="menuitem">
+  <button data-action="action-center" data-feature-gate="actionCenter" type="button" role="menuitem">
     <span class="menu-icon icon-actions">✓</span>
     <span class="menu-copy"><strong>Action Center</strong><small>Turn reading insights into scheduled action</small></span>
   </button>
@@ -139,7 +140,7 @@
 </details>
 
 
-<details class="top-nav-menu learn-menu-root">
+<details class="top-nav-menu learn-menu-root" data-feature-gate="learn">
 <summary><span class="nav-icon" aria-hidden="true">↗</span> Learn</summary>
 <div class="menu-popover learn-nav-popover" role="menu">
   <button data-action="reading-skills" type="button" role="menuitem">
@@ -185,7 +186,9 @@
 
 <button class="top-level-nav-button" data-action="mark-notebook" type="button"><span class="nav-icon" aria-hidden="true">▤</span> My Notebook</button>
 
-<button class="top-level-nav-button" data-action="music" type="button"><span class="nav-icon" aria-hidden="true">♫</span> Music &amp; Focus</button>
+<button class="top-level-nav-button" data-action="music" data-feature-gate="music" type="button"><span class="nav-icon" aria-hidden="true">♫</span> Music &amp; Focus</button>
+
+<button class="top-level-nav-button" data-action="profile-preferences" type="button"><span class="nav-icon" aria-hidden="true">◉</span> Profile</button>
 
 <details class="company-menu">
 <summary><span class="nav-icon" aria-hidden="true">ⓘ</span> About Us</summary>

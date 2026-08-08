@@ -4538,7 +4538,102 @@ function readingSkillBookOptions(books, placeholder = 'Choose a book…') {
   ).join('')}`;
 }
 
+
+function renderProfilePreferences() {
+  finalizeReadingSession();
+  stopReader();
+  const current=getExperienceProfile();
+
+  const featureRows=[
+    ['learn','Learn','Reading Skills, quizzes, Great Ideas, and learning tools'],
+    ['music','Music & Focus','Music and focus tools'],
+    ['goals','Reading Goals','Goals, deadlines, and coaching targets'],
+    ['actionCenter','Action Center','Reading-driven actions and reminders'],
+    ['modernGuides','Modern Guides','Interactive modern book guides'],
+    ['greatBooks','Great Books','Great Books collection and study'],
+    ['bibleStudy','Bible Study','Bible reading and study tools'],
+    ['languageLearning','Language Learning','Lessons generated from your reading'],
+    ['mnemonics','Mnemonics','Memory aids tied to your books'],
+    ['learningCourses','Courses & Learning Modules','YouTube, Coursera, Udemy, and related learning links'],
+    ['advancedReaderTools','Advanced Reader Tools','Less-common reading modes and advanced controls']
+  ];
+
+  app.innerHTML=`
+    <section class="platform-page profile-preferences-page">
+      <header class="platform-hero">
+        <div>
+          <span class="source-category">Profile</span>
+          <h1>Customize My Experience</h1>
+          <p>Keep the interface simple by showing only the tools you want. Turning a feature off hides it; your saved data is not deleted.</p>
+        </div>
+      </header>
+
+      <section class="profile-preset-card">
+        <div class="section-heading">
+          <div><span class="source-category">Quick setup</span><h2>Choose an experience</h2><p>Start with a preset, then adjust individual features below.</p></div>
+        </div>
+        <div class="profile-preset-grid">
+          ${Object.entries(EXPERIENCE_PRESETS).map(([key,preset])=>`
+            <button class="profile-preset-option ${current.preset===key?'active':''}" type="button" data-profile-preset="${escapeHtml(key)}" aria-pressed="${current.preset===key}">
+              <strong>${escapeHtml(preset.label)}</strong>
+              <small>${escapeHtml(preset.description)}</small>
+            </button>`).join('')}
+        </div>
+      </section>
+
+      <section class="profile-feature-card">
+        <div class="section-heading">
+          <div><span class="source-category">Interface</span><h2>Choose what appears</h2><p>These choices control navigation and feature visibility across the app.</p></div>
+        </div>
+        <div class="profile-feature-list">
+          ${featureRows.map(([key,label,description])=>`
+            <label class="profile-feature-row">
+              <span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small></span>
+              <input type="checkbox" data-profile-feature="${escapeHtml(key)}" ${current.features[key]!==false?'checked':''}>
+            </label>`).join('')}
+        </div>
+      </section>
+
+      <section class="profile-feature-card">
+        <div class="section-heading">
+          <div><span class="source-category">Mark</span><h2>Personalized coaching</h2><p>Mark uses the tools you enable when offering suggestions, encouragement, and next steps.</p></div>
+        </div>
+        <p class="profile-note">For example, if Mnemonics is hidden, Mark will not suggest mnemonic practice. If Reading Goals is enabled, goal progress remains available to Mark.</p>
+      </section>
+    </section>`;
+
+  const saveFromControls=()=>{
+    const features={...current.features};
+    app.querySelectorAll('[data-profile-feature]').forEach((input)=>{
+      features[input.dataset.profileFeature]=Boolean(input.checked);
+    });
+    saveExperienceProfile({preset:'custom',features});
+    app.querySelectorAll('[data-profile-preset]').forEach((button)=>{
+      button.classList.remove('active');
+      button.setAttribute('aria-pressed','false');
+    });
+  };
+
+  app.querySelectorAll('[data-profile-feature]').forEach((input)=>input.addEventListener('change',saveFromControls));
+
+  app.querySelectorAll('[data-profile-preset]').forEach((button)=>button.addEventListener('click',()=>{
+    const key=button.dataset.profilePreset;
+    const preset=EXPERIENCE_PRESETS[key];
+    if(!preset) return;
+    const saved=saveExperienceProfile({preset:key,features:preset.features});
+    app.querySelectorAll('[data-profile-preset]').forEach((item)=>{
+      const active=item===button;
+      item.classList.toggle('active',active);
+      item.setAttribute('aria-pressed',String(active));
+    });
+    app.querySelectorAll('[data-profile-feature]').forEach((input)=>{
+      input.checked=saved.features[input.dataset.profileFeature]!==false;
+    });
+  }));
+}
+
 function renderReadingSkillsHub() {
+  if (!experienceFeatureEnabled('learn')) return renderProfilePreferences();
   finalizeReadingSession();
   stopReader();
   const books = readingSkillBooks();
@@ -4675,6 +4770,7 @@ function renderComprehensionLibrary() {
 }
 
 function renderMnemonicsPage() {
+  if (!experienceFeatureEnabled('mnemonics')) return renderProfilePreferences();
   finalizeReadingSession();
   stopReader();
   const books = readingSkillBooks();
@@ -4754,6 +4850,7 @@ function renderMnemonicsPage() {
 }
 
 function renderLanguageLearningPage() {
+  if (!experienceFeatureEnabled('languageLearning')) return renderProfilePreferences();
   finalizeReadingSession();
   stopReader();
   const books = readingSkillBooks();
@@ -4848,6 +4945,7 @@ function learningCourseLinks(title) {
 }
 
 function renderLearningCoursesPage() {
+  if (!experienceFeatureEnabled('learningCourses')) return renderProfilePreferences();
   finalizeReadingSession();
   stopReader();
   const books = readingSkillBooks();
@@ -5097,6 +5195,135 @@ const READING_GOAL_KEY = 'markSetGoAnnualReadingGoalV1';
 const READING_AWARDS_KEY = 'markSetGoReadingAwardsV1';
 
 const LEARNING_ACTIVITY_KEY = 'markSetGoLearningActivityV1';
+
+const PROFILE_EXPERIENCE_KEY = 'markSetGoExperienceProfileV1';
+
+const EXPERIENCE_PRESETS = Object.freeze({
+  simple:{
+    label:'Simple Reader',
+    description:'Keep the interface focused on reading, your library, Mark, and notes.',
+    features:{
+      learn:false,
+      music:false,
+      goals:false,
+      actionCenter:false,
+      modernGuides:true,
+      bibleStudy:false,
+      greatBooks:false,
+      languageLearning:false,
+      mnemonics:false,
+      learningCourses:false,
+      advancedReaderTools:false
+    }
+  },
+  improvement:{
+    label:'Reading Improvement',
+    description:'Focus on speed, comprehension, goals, and measurable reading growth.',
+    features:{
+      learn:true,
+      music:true,
+      goals:true,
+      actionCenter:true,
+      modernGuides:true,
+      bibleStudy:false,
+      greatBooks:true,
+      languageLearning:false,
+      mnemonics:true,
+      learningCourses:false,
+      advancedReaderTools:true
+    }
+  },
+  scholar:{
+    label:'Student / Scholar',
+    description:'Reading, learning tools, Great Ideas, languages, courses, and deeper study.',
+    features:{
+      learn:true,
+      music:true,
+      goals:true,
+      actionCenter:true,
+      modernGuides:true,
+      bibleStudy:true,
+      greatBooks:true,
+      languageLearning:true,
+      mnemonics:true,
+      learningCourses:true,
+      advancedReaderTools:true
+    }
+  },
+  full:{
+    label:'Full Experience',
+    description:'Show the complete Mark, Set, Go! feature set.',
+    features:{
+      learn:true,
+      music:true,
+      goals:true,
+      actionCenter:true,
+      modernGuides:true,
+      bibleStudy:true,
+      greatBooks:true,
+      languageLearning:true,
+      mnemonics:true,
+      learningCourses:true,
+      advancedReaderTools:true
+    }
+  }
+});
+
+function normalizeExperienceProfile(value = {}) {
+  const presetKey = EXPERIENCE_PRESETS[value.preset] ? value.preset : 'full';
+  const base = EXPERIENCE_PRESETS[presetKey].features;
+  return {
+    preset:presetKey,
+    features:{
+      ...base,
+      ...(value.features && typeof value.features === 'object' ? value.features : {})
+    }
+  };
+}
+
+function getExperienceProfile() {
+  try {
+    const saved=JSON.parse(localStorage.getItem(PROFILE_EXPERIENCE_KEY)||'null');
+    return normalizeExperienceProfile(saved || { preset:'full' });
+  } catch {
+    return normalizeExperienceProfile({ preset:'full' });
+  }
+}
+
+function saveExperienceProfile(profile) {
+  const normalized=normalizeExperienceProfile(profile);
+  localStorage.setItem(PROFILE_EXPERIENCE_KEY, JSON.stringify(normalized));
+  applyExperienceProfile(normalized);
+  return normalized;
+}
+
+function experienceFeatureEnabled(feature) {
+  return getExperienceProfile().features?.[feature] !== false;
+}
+
+function applyExperienceProfile(profile = getExperienceProfile()) {
+  const rootEl=document.documentElement;
+  const features=profile.features || {};
+  Object.entries(features).forEach(([key,enabled]) => {
+    rootEl.dataset[`feature${key.charAt(0).toUpperCase()}${key.slice(1)}`]=enabled ? 'on' : 'off';
+  });
+
+  document.querySelectorAll('[data-feature-gate]').forEach((element) => {
+    const key=element.getAttribute('data-feature-gate');
+    const enabled=features[key] !== false;
+    element.hidden=!enabled;
+    element.setAttribute('aria-hidden', String(!enabled));
+  });
+}
+
+window.MarkSetGoExperienceProfile = Object.freeze({
+  get:getExperienceProfile,
+  save:saveExperienceProfile,
+  enabled:experienceFeatureEnabled,
+  presets:EXPERIENCE_PRESETS,
+  apply:applyExperienceProfile
+});
+
 
 function readLearningActivity() {
   return readStoredArray(LEARNING_ACTIVITY_KEY);
@@ -16892,6 +17119,7 @@ document.addEventListener('click', (event) => {
   if (actionName === 'browse') renderBrowseHub();
   if (actionName === 'my-links') renderMyLinks();
   if (actionName === 'my-library') renderMyLibraryHub();
+  if (actionName === 'profile-preferences') renderProfilePreferences();
   if (actionName === 'ai-center') renderAiCenter();
   if (actionName === 'mark-notebook') renderGlobalNotebook();
   if (actionName === 'knowledge-graph') renderKnowledgeGraph();
