@@ -4344,6 +4344,83 @@ window.MarkSetGoWalkthroughReader = Object.freeze({
     return { demo: true };
   },
 
+  async demoSelection() {
+    await this.prepare();
+    const reader=app.querySelector('#reader');
+    if(!reader || !state.words?.length) return false;
+
+    pauseReader();
+    const start=Math.max(0,Math.min(state.words.length-1,Number(state.index)||0));
+    const end=Math.min(state.words.length,start+Math.min(18,Math.max(8,state.words.length-start)));
+    const text=state.words.slice(start,end).map(word=>typeof word==='string'?word:(word?.text||'')).join(' ').trim();
+    if(!text) return false;
+
+    const selection={
+      text,
+      startIndex:start,
+      endIndex:end,
+      documentId:state.documentId||'',
+      title:state.title||'Walkthrough Sample',
+      chapter:tocTitleForWordIndex(start)||'',
+      createdAt:new Date().toISOString(),
+      origin:'walkthrough'
+    };
+    state.markSelection=selection;
+    state.markPersistentSelection={...selection};
+    state.markSelectionLocked=true;
+    persistMarkSelectionHighlight(selection);
+
+    const nodes=Array.from(reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]'))
+      .filter(element=>{
+        const elementStart=Number(element.dataset.index ?? element.dataset.startIndex);
+        const elementEnd=Number.isFinite(Number(element.dataset.endIndex))?Number(element.dataset.endIndex):elementStart+1;
+        return Number.isFinite(elementStart)&&elementStart<end&&elementEnd>start;
+      });
+    const rect=nodes[0]?.getBoundingClientRect?.() || reader.getBoundingClientRect();
+    showMarkToolbar(selection,{
+      left:rect.left,
+      top:Math.max(70,rect.top),
+      width:Math.max(160,Math.min(420,rect.width||320)),
+      height:Math.max(24,rect.height||28)
+    });
+    renderMarkSelectionCard();
+    return true;
+  },
+
+  async demoScrub() {
+    await this.prepare();
+    const reader=app.querySelector('#reader');
+    if(!reader || !state.words?.length) return false;
+    pauseReader();
+    const target=Math.max(0,Math.min(state.words.length-1,Math.floor(state.words.length*.45)));
+    state.index=target;
+    updateReaderStatus(`Walkthrough: moved to word ${target+1} of ${state.words.length}.`);
+    const mode=state.renderedMode||getSelectedMode();
+    const groupSize=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);
+    if(state.bookPages) scheduleBookPageReflow({delay:0,anchorIndex:target});
+    else restoreReadingAnchor(reader,mode,groupSize,target);
+    persistReaderSession({immediate:true});
+    return true;
+  },
+
+  async clearDemoSelection() {
+    clearMarkSelectionForReadingResume();
+    return true;
+  },
+
+  async openWordActions() {
+    await this.prepare();
+    const reader=app.querySelector('#reader');
+    const word=reader?.querySelector('.reader-word[data-index], .reader-group[data-start-index]');
+    const menu=app.querySelector('#word-context-menu');
+    if(!word || !menu) return false;
+    const rect=word.getBoundingClientRect();
+    menu.hidden=false;
+    menu.style.left=`${Math.max(10,Math.min(window.innerWidth-210,rect.left))}px`;
+    menu.style.top=`${Math.max(70,Math.min(window.innerHeight-170,rect.bottom+6))}px`;
+    return true;
+  },
+
   async restore() {
     stopReader();
     walkthroughReaderSessionActive = false;
@@ -9774,27 +9851,69 @@ function modernGuideContextRange(markerIndex) {
 }
 
 function openModernGuideContextInAskMark(markerIndex) {
+  const source = state?.source || {};
+  if (source?.type !== 'modern-guide') return;
+
   const context = modernGuideContextRange(markerIndex);
   if (!context.text) return;
 
-  if (isReaderRunning()) pauseReader();
-  state.index = Math.max(0, Number(markerIndex) || 0);
-  state.markSelection = {
+  const reader = app.querySelector('#reader');
+  const wasRunning = isReaderRunning();
+  if (wasRunning) pauseReader();
+
+  // Preserve the actual guide action position as the Reader's canonical cursor,
+  // but keep the Ask Mark selection as the full section range.
+  const actionIndex = Math.max(0, Math.min(
+    Math.max(0, state.words.length - 1),
+    Number.isFinite(Number(markerIndex)) ? Number(markerIndex) : context.startIndex
+  ));
+  state.index = actionIndex;
+
+  const selection = {
     text: context.text,
     startIndex: context.startIndex,
-    endIndex: context.endIndex
+    endIndex: context.endIndex,
+    documentId: state.documentId || '',
+    title: state.title || source.originalTitle || 'Modern Guide',
+    chapter: tocTitleForWordIndex(context.startIndex) || '',
+    createdAt: new Date().toISOString(),
+    origin: 'modern-guide-section'
   };
-  state.markPersistentSelection = { ...state.markSelection };
-  state.markSelectionLocked = true;
 
+  state.markSelection = selection;
+  state.markPersistentSelection = { ...selection };
+  state.markSelectionLocked = true;
+  state.markSuppressNextReaderClick = true;
+
+  // Open the existing Ask Mark selection path; do not create a parallel guide chat.
   openMarkPanel('selection');
   renderMarkSelectionCard();
+
   requestAnimationFrame(() => requestAnimationFrame(() => {
-    applyPersistentMarkSelectionHighlight();
+    // The panel opening can cause a Reader repaint. Re-assert the canonical
+    // selection after that repaint so the section remains highlighted.
+    state.markSelection = { ...selection };
+    state.markPersistentSelection = { ...selection };
+    state.markSelectionLocked = true;
+    persistMarkSelectionHighlight(selection);
+
+    // Explicitly tell the premium Ask Mark shell that the guide selection is
+    // ready. This avoids depending only on MutationObserver timing.
+    document.dispatchEvent(new CustomEvent('marksetgo:guide-section-selected', {
+      detail: {
+        title: source.originalTitle || state.title || 'this guide',
+        text: context.text,
+        startIndex: context.startIndex,
+        endIndex: context.endIndex,
+        documentId: state.documentId || ''
+      }
+    }));
+
     window.MarkSetGoGuideSectionWelcome?.({
-      title: source?.originalTitle || state?.title || 'this guide',
+      title: source.originalTitle || state.title || 'this guide',
       text: context.text
     });
+
     const input = document.querySelector('[data-askmark-input]');
     input?.focus();
   }));

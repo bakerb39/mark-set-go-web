@@ -12616,3 +12616,51 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
   pointer-events:auto !important;
   cursor:pointer !important;
 }
+
+
+/* v9.3.0 walkthrough modes + expanded Help */
+.msg-walkthrough-mode-picker {
+  position:fixed;
+  z-index:2147483646;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-50%);
+  width:min(680px,calc(100vw - 30px));
+  padding:24px;
+  border:1px solid #d9c083;
+  border-radius:20px;
+  background:#fffdf8;
+  color:#173f6d;
+  box-shadow:0 24px 70px rgba(0,0,0,.34);
+  pointer-events:auto;
+}
+.msg-walkthrough-mode-picker[hidden]{display:none!important}
+.msg-walkthrough-mode-picker h2{margin:4px 0 8px;color:#173f6d}
+.msg-walkthrough-mode-picker>p{margin:0 0 18px;color:#5d7083;line-height:1.5}
+.msg-walkthrough-mode-options{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.msg-walkthrough-mode-options button{
+  min-height:128px;
+  display:grid;
+  align-content:start;
+  gap:7px;
+  padding:16px;
+  border:1px solid #cbd9e6;
+  border-radius:14px;
+  background:#f8fbfe;
+  color:#173f6d;
+  text-align:left;
+  cursor:pointer;
+}
+.msg-walkthrough-mode-options button:hover,
+.msg-walkthrough-mode-options button:focus-visible{
+  border-color:#d6aa36;
+  background:#fff9e9;
+  box-shadow:0 0 0 3px rgba(214,170,54,.13);
+}
+.msg-walkthrough-mode-options strong{font-size:1rem}
+.msg-walkthrough-mode-options small{color:#60758a;line-height:1.45}
+.help-walkthrough-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.help-section .help-card-grid article button{margin-top:auto}
+@media(max-width:650px){
+  .msg-walkthrough-mode-options{grid-template-columns:1fr}
+}

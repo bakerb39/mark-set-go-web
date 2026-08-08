@@ -2,7 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
-  const WALKTHROUGH_BUILD = '9.2.97';
+  const WALKTHROUGH_BUILD = '9.3.0';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -231,7 +231,7 @@
     await wait();
   }
 
-  const steps = [
+  const fullSteps = [
     {
       title: 'Welcome to the walkthrough',
       text: 'Mark will guide you through the full experience: your Library, learning tools, Reader controls, Ask Mark, and the main places you will use most often.',
@@ -515,12 +515,145 @@
       prepare: async () => { await openAskMark('tools'); }
     },
     {
+      title: 'Scrub or jump through the text',
+      text: 'You can move your reading position directly instead of replaying everything in between. Clicking a word moves the canonical Reader position there; in Book Pages you can also jump by page.',
+      selector: '#reader',
+      prepare: async () => {
+        await closeAskMark();
+        await prepareReader();
+        await window.MarkSetGoWalkthroughReader?.demoScrub?.();
+      }
+    },
+    {
+      title: 'Highlight a passage',
+      text: 'Drag across any passage to select it. Reading pauses, the passage remains highlighted, and the contextual action toolbar appears without losing your underlying reading position.',
+      selector: '#reader',
+      prepare: async () => {
+        await closeAskMark();
+        await prepareReader();
+        await window.MarkSetGoWalkthroughReader?.demoSelection?.();
+      }
+    },
+    {
+      title: 'Selection actions',
+      text: 'The selection toolbar gives you fast actions: Explain, Summarize, Simplify, Context, Compare, Save, or send the passage into Ask Mark for a deeper conversation.',
+      selector: '#mark-selection-toolbar',
+      prepare: async () => {
+        await prepareReader();
+        await window.MarkSetGoWalkthroughReader?.demoSelection?.();
+      }
+    },
+    {
+      title: 'Right-click word tools',
+      text: 'Right-click a word for Look up word, Save definition, Add note, or Add bookmark. These are designed for quick reading actions without leaving the page.',
+      selector: '#word-context-menu',
+      prepare: async () => {
+        await prepareReader();
+        await window.MarkSetGoWalkthroughReader?.openWordActions?.();
+      }
+    },
+    {
+      title: 'Ask Mark input',
+      text: 'Ask a custom question about the current passage here. Mark keeps the selected reading context while you continue the conversation.',
+      selector: '[data-askmark-input]',
+      prepare: async () => { await openAskMark('chat'); }
+    },
+    {
+      title: 'More actions',
+      text: 'The + button opens Mark’s additional study tools for the current reading.',
+      selector: '[data-askmark-more]',
+      prepare: async () => {
+        await openAskMark('chat');
+        const button=visibleMatch('[data-askmark-more]');
+        const menu=visibleMatch('[data-askmark-more-menu]');
+        if(button && menu?.hidden) button.click();
+        await wait(80);
+      }
+    },
+    {
+      title: 'Study guide',
+      text: 'Build a focused study guide from the current reading when you want a structured review instead of a normal chat answer.',
+      selector: '[data-askmark-more-menu] [data-askmark-prompt*="study guide"]',
+      prepare: async () => {
+        await openAskMark('chat');
+        const menu=visibleMatch('[data-askmark-more-menu]');
+        if(menu) menu.hidden=false;
+      }
+    },
+    {
+      title: 'Flash cards',
+      text: 'Create visual flash cards from the current reading. Cards flip between a retrieval prompt and the answer so you can actively review.',
+      selector: '[data-askmark-more-menu] [data-askmark-tool="flashcards"]',
+      prepare: async () => {
+        await openAskMark('chat');
+        const menu=visibleMatch('[data-askmark-more-menu]');
+        if(menu) menu.hidden=false;
+      }
+    },
+    {
+      title: 'Historical context',
+      text: 'Ask Mark for historical background when context matters to understanding the passage.',
+      selector: '[data-askmark-more-menu] [data-premium-mark-action="context"]',
+      prepare: async () => {
+        await openAskMark('chat');
+        const menu=visibleMatch('[data-askmark-more-menu]');
+        if(menu) menu.hidden=false;
+      }
+    },
+    {
+      title: 'Key ideas',
+      text: 'Pull out the most important claims, concepts, or relationships in the current reading.',
+      selector: '[data-askmark-more-menu] [data-askmark-prompt*="key ideas"]',
+      prepare: async () => {
+        await openAskMark('chat');
+        const menu=visibleMatch('[data-askmark-more-menu]');
+        if(menu) menu.hidden=false;
+      }
+    },
+    {
+      title: 'Memory tools',
+      text: 'Build structured memory anchors with what to remember, the anchor itself, why it works, and a self-test question.',
+      selector: '[data-askmark-more-menu] [data-askmark-tool="memory"]',
+      prepare: async () => {
+        await openAskMark('chat');
+        const menu=visibleMatch('[data-askmark-more-menu]');
+        if(menu) menu.hidden=false;
+      }
+    },
+    {
+      title: 'Comprehension check',
+      text: 'Generate a comprehension quiz for the current reading and track how well you understood it.',
+      selector: '[data-askmark-more-menu] [data-askmark-comprehension]',
+      prepare: async () => {
+        await openAskMark('chat');
+        const menu=visibleMatch('[data-askmark-more-menu]');
+        if(menu) menu.hidden=false;
+      }
+    },
+    {
+      title: 'Reading controls in Ask Mark',
+      text: 'The Reading Tools view keeps Reader controls, Media, and Translation & Word Tools available inside the Ask Mark pane so you do not have to leave the reading session.',
+      selector: '[data-askmark-view-panel="tools"]',
+      prepare: async () => { await openAskMark('tools'); }
+    },
+    {
       title: 'Full screen',
-      text: 'Full screen keeps the core Reader tools available in a compact overlay while giving the text more room.',
+      text: 'Full screen gives the text more room while preserving Reader controls and Ask Mark access. Use the X to return to the normal Reader instead of leaving your reading session.',
       selector: '#toggle-reader-fullscreen',
       prepare: async () => { await closeAskMark(); await prepareReader(); }
     }
   ];
+
+  const simpleStepTitles = new Set([
+    'Welcome to the walkthrough','Reader','My Library','My Reading','Browse inside My Library','Read Anything',
+    'Learn','Reading Skills','My Notebook','Music & Focus','Profile','Help',
+    'Reading settings','Reading speed','Display settings','Marks & Contents','Ask Mark',
+    'Scrub or jump through the text','Highlight a passage','Selection actions','Ask Mark input',
+    'More actions','Full screen'
+  ]);
+
+  let steps = fullSteps;
+  let walkthroughMode = 'full';
 
   function ensureRoot() {
     if (root?.isConnected) return root;
@@ -534,6 +667,16 @@
       <div class="msg-walkthrough-mask msg-walkthrough-mask-bottom"></div>
       <div class="msg-walkthrough-outline" aria-hidden="true"></div>
       <div class="msg-walkthrough-connector" aria-hidden="true"></div>
+      <section class="msg-walkthrough-mode-picker" data-walkthrough-mode-picker hidden role="dialog" aria-modal="true" aria-labelledby="walkthrough-mode-title">
+        <span class="help-eyebrow">Choose your tour</span>
+        <h2 id="walkthrough-mode-title">How much would you like to see?</h2>
+        <p>You can take a quick orientation or the complete guided tour. You can restart either one from Help at any time.</p>
+        <div class="msg-walkthrough-mode-options">
+          <button type="button" data-walkthrough-mode="simple"><strong>Simple Overview</strong><small>Core navigation, Reader basics, highlighting, Ask Mark, and the most important controls.</small></button>
+          <button type="button" data-walkthrough-mode="full"><strong>Full Experience</strong><small>Every major menu, Reader workflow, selection tools, Ask Mark study tools, learning features, and advanced controls.</small></button>
+        </div>
+        <button type="button" class="secondary" data-walkthrough-cancel>Cancel</button>
+      </section>
       <aside class="msg-walkthrough-host" aria-hidden="true">
         <figure class="msg-walkthrough-mark-figure">
           <img class="msg-walkthrough-mark-illustration" src="/assets/walkthrough/mark-walkthrough-guide.png" alt="">
@@ -556,6 +699,20 @@
     document.body.appendChild(root);
 
     root.addEventListener('click', (event) => {
+      const modeButton=event.target.closest('[data-walkthrough-mode]');
+      const cancelButton=event.target.closest('[data-walkthrough-cancel]');
+      if(modeButton){
+        event.preventDefault();
+        event.stopPropagation();
+        beginMode(modeButton.dataset.walkthroughMode);
+        return;
+      }
+      if(cancelButton){
+        event.preventDefault();
+        event.stopPropagation();
+        finish();
+        return;
+      }
       const control = event.target.closest('[data-walkthrough-next],[data-walkthrough-prev],[data-walkthrough-exit]');
       if (!control || !root.contains(control)) return;
       event.preventDefault();
@@ -694,6 +851,16 @@
     if (connector) connector.style.display = 'none';
   }
 
+  function visibleWalkthroughTarget(original) {
+    if(!original) return null;
+    const inMenu=original.closest?.('.site-header .menu-popover');
+    if(inMenu && menuMirrorSource?.contains(original)){
+      const mirrored=mirrorForOriginal(original);
+      if(mirrored) return mirrored;
+    }
+    return isVisibleElement(original)?original:null;
+  }
+
   async function resolveTarget(step) {
     let original = typeof step.selector === 'function' ? step.selector() : $(step.selector);
     if (!original && step.fallbackSelector) original = $(step.fallbackSelector);
@@ -748,7 +915,10 @@
 
     $('[data-walkthrough-title]', root).textContent = step.title;
     $('[data-walkthrough-text]', root).textContent = step.text;
-    $('[data-walkthrough-section]', root).textContent = step.title.includes('Reader') || currentIndex > 34 ? 'Reader tour' : (step.title.includes('Learn') || (currentIndex >= 18 && currentIndex <= 26) ? 'Learn' : (currentIndex >= 2 && currentIndex <= 17 ? 'My Library' : 'Full experience'));
+    const libraryTitles=new Set(['My Library','Library Home','My Reading','Browse inside My Library','Browse Home','Great Books','Bible Study','Read Anything','Collections','Bookmarks','Book Notes','Random Notes','Definitions','My Links','Progress & Awards','Action Center']);
+    const learnTitles=new Set(['Learn','Reading Skills','Learning Tools','WPM Test','Comprehension Quizzes','Great Ideas / Syntopicon','Mnemonics','Language Learning','Courses & Learning Modules']);
+    const readerTitles=new Set(['Reading settings','Reading mode','Reading speed','Display settings','Reader theme','Book pages','Marks & Contents','Ask Mark','Ask Mark conversation','Format','Reader tools in Ask Mark','Scrub or jump through the text','Highlight a passage','Selection actions','Right-click word tools','Ask Mark input','More actions','Study guide','Flash cards','Historical context','Key ideas','Memory tools','Comprehension check','Reading controls in Ask Mark','Full screen']);
+    $('[data-walkthrough-section]', root).textContent = libraryTitles.has(step.title)?'My Library':learnTitles.has(step.title)?'Learn':readerTitles.has(step.title)?'Reader & Ask Mark':(walkthroughMode==='simple'?'Simple overview':'Full experience');
     $('[data-walkthrough-count]', root).textContent = `${currentIndex + 1} / ${steps.length}`;
     const progress = $('[data-walkthrough-progress]', root);
     if (progress) progress.style.width = `${Math.max(2, ((currentIndex + 1) / steps.length) * 100)}%`;
@@ -757,14 +927,46 @@
     schedulePosition();
   }
 
-  async function start() {
-    finishing = false;
+  function showModePicker() {
     ensureRoot();
-    root.hidden = false;
+    clearTarget();
+    clearMenuMirror();
+    closeHeaderMenus();
+    root.hidden=false;
+    $('.msg-walkthrough-mode-picker',root).hidden=false;
+    $('.msg-walkthrough-host',root).hidden=true;
+    $('.msg-walkthrough-card',root).hidden=true;
+    $('.msg-walkthrough-dock',root).hidden=true;
+    $$('.msg-walkthrough-mask',root).forEach(mask=>mask.style.cssText='left:0;top:0;width:100vw;height:100vh;');
     document.documentElement.classList.add(ACTIVE_CLASS);
     document.body.classList.add(ACTIVE_CLASS);
-    currentIndex = 0;
+  }
+
+  async function beginMode(mode='full') {
+    walkthroughMode=mode==='simple'?'simple':'full';
+    steps=walkthroughMode==='simple'
+      ? fullSteps.filter(step=>simpleStepTitles.has(step.title))
+      : fullSteps;
+    currentIndex=0;
+    const picker=$('.msg-walkthrough-mode-picker',root);
+    if(picker) picker.hidden=true;
+    $('.msg-walkthrough-host',root).hidden=false;
+    $('.msg-walkthrough-card',root).hidden=false;
+    $('.msg-walkthrough-dock',root).hidden=false;
     await goTo(0);
+  }
+
+  async function start(mode='choose') {
+    finishing=false;
+    ensureRoot();
+    if(mode==='simple'||mode==='full'){
+      root.hidden=false;
+      document.documentElement.classList.add(ACTIVE_CLASS);
+      document.body.classList.add(ACTIVE_CLASS);
+      await beginMode(mode);
+      return;
+    }
+    showModePicker();
   }
 
   async function finish() {
@@ -789,5 +991,5 @@
     finishing = false;
   }
 
-  window.MarkSetGoWalkthrough = Object.freeze({ start, finish });
+  window.MarkSetGoWalkthrough = Object.freeze({ start, finish, startSimple:()=>start('simple'), startFull:()=>start('full') });
 })();
