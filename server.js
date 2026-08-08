@@ -1688,9 +1688,12 @@ app.post('/api/app-help', async (req, res) => {
   const pageKey = String(req.body?.pageKey || 'unknown').trim().slice(0, 120);
   const pageTitle = String(req.body?.pageTitle || 'Current page').trim().slice(0, 200);
   const question = String(req.body?.question || '').trim().slice(0, 800);
-  const helpTopics = Array.isArray(req.body?.helpTopics)
-    ? req.body.helpTopics.map(item => String(item || '').trim()).filter(Boolean).slice(0, 12)
-    : [];
+  const safeObject = (value, maxChars) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    try { return JSON.parse(JSON.stringify(value).slice(0, maxChars)); } catch { return {}; }
+  };
+  const pageHelp = safeObject(req.body?.pageHelp, 14000);
+  const globalHelp = safeObject(req.body?.globalHelp, 7000);
   if (!question) return res.status(400).json({ error: 'Enter a help question.' });
 
   const schema = {
@@ -1698,12 +1701,15 @@ app.post('/api/app-help', async (req, res) => {
     properties: { inScope: { type: 'boolean' }, answer: { type: 'string' } }
   };
   const prompt = `You are Mark, the in-app help companion for Mark, Set, Go!.
-Your ONLY job in this mode is to answer questions about how to use the CURRENT APP PAGE or how the controls/features on that page work.
-Do not answer general knowledge, book-content, personal advice, current events, coding, or unrelated questions.
-Do not pretend a feature exists unless it is supported by the supplied page-help topics.
+Your ONLY job in this mode is to answer questions about how to use the CURRENT APP PAGE, the controls/features described for that page, or closely related navigation needed to complete a task from that page.
+Use the supplied STORED PAGE HELP as the primary authority and GLOBAL APP HELP only for supporting navigation/context.
+Do not answer general knowledge, book-content questions, personal advice, current events, coding, or unrelated questions.
+Do not discuss highlighted reading text in this mode.
+Do not invent controls, behavior, storage guarantees, or features that are not supported by the supplied help knowledge.
+When the user asks how to accomplish something, give short concrete steps and name the actual control/page when the knowledge supplies one.
+When troubleshooting, distinguish what the help knowledge confirms from what may require checking another part of the app.
 If the question is outside this narrow app-help scope, set inScope=false and answer briefly: "I can help with how to use this page. Ask me about its controls, options, or where to go next."
-If it is in scope, set inScope=true and give concise step-by-step guidance grounded only in the supplied current-page context.
-Do not discuss highlighted reading text in this mode.`;
+If it is in scope, set inScope=true.`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -1715,7 +1721,7 @@ Do not discuss highlighted reading text in this mode.`;
         store: false,
         input: [
           { role: 'developer', content: [{ type: 'input_text', text: prompt }] },
-          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ pageKey, pageTitle, helpTopics, question }) }] }
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ pageKey, pageTitle, storedPageHelp: pageHelp, globalAppHelp: globalHelp, question }) }] }
         ],
         text: { format: { type: 'json_schema', name: 'app_help_response', strict: true, schema } }
       })

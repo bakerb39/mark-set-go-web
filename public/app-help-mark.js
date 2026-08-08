@@ -3,51 +3,55 @@
 
   const app = document.getElementById('app');
   if (!app) return;
+  const knowledge = window.MarkSetGoPageHelpKnowledge || { global: {}, pages: {} };
+  const pages = knowledge.pages || {};
+  const MARK_AVATAR = '/assets/ask-mark-avatar.png';
 
-  const PAGE_HELP = {
-    home: ['Start or continue reading', 'Open My Library', 'Use Browse or Read Anything', 'Open Help for walkthroughs'],
-    'my-library': ['Continue saved books', 'Manage your reading list', 'Open Collections', 'Browse or import a book', 'Open Progress & Awards or Action Center'],
-    'my-reading': ['Manage active reading', 'Change reading status', 'Resume a saved edition', 'Import new reading'],
-    browse: ['Find books and reading sources', 'Use DRM-Free Books', 'Open Great Books or Bible Study', 'Use Read Anything'],
-    'drm-free': ['Search by title, author, subject, or keyword', 'Filter category, rights, format, source, language, and year', 'Open or download supported editions'],
-    'mark-notebook': ['Review saved passages and Mark responses', 'Review personal notes', 'Return to saved reading locations', 'Export notebook content'],
-    'library-notes': ['Review notes saved from books', 'Return to the related reading when available'],
-    'random-notes': ['Create notes unrelated to a specific book', 'Review saved random notes'],
-    'vocabulary-builder': ['Review saved definitions', 'Return to source reading when available'],
-    'progress-awards': ['Review reading progress', 'Check comprehension and WPM trends', 'Review goals, streaks, and awards'],
-    'reading-goals': ['Create or review reading goals', 'Track deadlines and progress', 'Use encouragement and progress updates'],
-    'action-center': ['Review reading actions and reminders', 'Create follow-up tasks from reading insights'],
-    music: ['Choose focus music', 'Open supported Spotify or YouTube playback', 'Use saved music while reading'],
-    help: ['Search the full Help guide', 'Start the Simple Overview', 'Start the Full Experience walkthrough', 'Read troubleshooting guidance'],
-    about: ['Learn what Mark, Set, Go! is and what it is designed to do'],
-    contact: ['Find contact and support information'],
-    privacy: ['Review privacy and data-handling information'],
-    terms: ['Review application terms'],
-    default: ['Use the controls visible on this page', 'Use the top navigation to move between Library, Learn, Notebook, Music, Help, and related features']
+  const ALIASES = {
+    'customize my experience':'profile-preferences', 'my library':'my-library', 'my reading':'my-reading',
+    'drm-free books':'drm-free', 'drm free books':'drm-free', 'read anything':'read-anything',
+    'my notebook':'mark-notebook', "mark's notebook":'mark-notebook', 'reading notes':'library-notes',
+    'random notes':'random-notes', 'vocabulary builder':'vocabulary-builder', 'definitions':'vocabulary-builder',
+    'progress & awards':'progress-awards', 'progress and awards':'progress-awards', 'reading goals':'reading-goals',
+    'action center':'action-center', 'reading skills':'reading-skills', 'comprehension':'comprehension-library',
+    'mnemonics':'mnemonics', 'language learning':'language-learning', 'courses & learning modules':'learning-courses',
+    'courses and learning modules':'learning-courses', 'great ideas':'syntopicon', 'syntopicon':'syntopicon',
+    'bible study':'bible-study', 'great books':'great-books', 'music & focus':'music', 'music and focus':'music',
+    'my links':'my-links', 'help':'help', 'about':'about', 'contact & support':'contact', 'privacy':'privacy', 'terms':'terms'
   };
 
+  function normalized(value='') { return String(value).replace(/\s+/g, ' ').trim().toLowerCase(); }
+
+  function inferKey() {
+    const explicit = normalized(app.dataset.viewKey);
+    if (explicit && pages[explicit]) return explicit;
+
+    const section = app.firstElementChild;
+    const classes = normalized(section?.className || '');
+    const heading = normalized(app.querySelector('h1')?.textContent || '');
+    if (ALIASES[heading]) return ALIASES[heading];
+
+    const classTests = [
+      ['profile-preferences-page','profile-preferences'], ['reading-skills-page','reading-skills'],
+      ['learning-tool-page', heading.includes('mnemonic') ? 'mnemonics' : heading.includes('language') ? 'language-learning' : heading.includes('course') ? 'learning-courses' : 'reading-skills'],
+      ['global-notebook-page','mark-notebook'], ['drm-free','drm-free'], ['browse','browse'], ['library','my-library']
+    ];
+    for (const [needle,key] of classTests) if (classes.includes(needle) && pages[key]) return key;
+
+    const whole = normalized(`${heading} ${section?.querySelector('.source-category')?.textContent || ''}`);
+    for (const [label,key] of Object.entries(ALIASES)) if (whole.includes(label) && pages[key]) return key;
+    return explicit || 'default';
+  }
+
   function pageContext() {
-    const key = String(app.dataset.viewKey || '').trim().toLowerCase();
+    const key = inferKey();
+    const pageHelp = pages[key] || pages.default || {};
     const heading = app.querySelector('h1')?.textContent?.replace(/\s+/g, ' ').trim() || '';
-    const title = heading || key || 'Current page';
-    const lower = `${key} ${heading}`.toLowerCase();
-    let topicKey = key;
-    if (!PAGE_HELP[topicKey]) {
-      if (lower.includes('library')) topicKey = 'my-library';
-      else if (lower.includes('notebook')) topicKey = 'mark-notebook';
-      else if (lower.includes('goal')) topicKey = 'reading-goals';
-      else if (lower.includes('progress') || lower.includes('award')) topicKey = 'progress-awards';
-      else if (lower.includes('action center')) topicKey = 'action-center';
-      else if (lower.includes('definition') || lower.includes('vocabulary')) topicKey = 'vocabulary-builder';
-      else if (lower.includes('music')) topicKey = 'music';
-      else if (lower.includes('help')) topicKey = 'help';
-      else topicKey = 'default';
-    }
-    return { key: key || topicKey, title, topics: PAGE_HELP[topicKey] || PAGE_HELP.default };
+    return { key, title: heading || pageHelp.title || 'Current page', pageHelp, globalHelp: knowledge.global || {} };
   }
 
   function isReaderPage() {
-    return String(app.dataset.viewKey || '').toLowerCase() === 'reader' || !!app.querySelector('#reader-frame, #reader');
+    return normalized(app.dataset.viewKey) === 'reader' || !!app.querySelector('#reader-frame, #reader');
   }
 
   function escapeHtml(value='') {
@@ -57,9 +61,14 @@
   const host = document.createElement('div');
   host.className = 'app-help-mark-host';
   host.innerHTML = `
-    <button type="button" class="app-help-mark-button" data-app-help-open aria-haspopup="dialog" aria-expanded="false">✦ <span>Ask Mark</span></button>
+    <button type="button" class="app-help-mark-button" data-app-help-open aria-haspopup="dialog" aria-expanded="false">
+      <img src="${MARK_AVATAR}" alt="" aria-hidden="true"><span>Ask Mark</span>
+    </button>
     <aside class="app-help-mark-panel" data-app-help-panel hidden role="dialog" aria-modal="false" aria-label="Ask Mark app help">
-      <header><div><small>App help</small><strong>Ask Mark</strong></div><button type="button" data-app-help-close aria-label="Close">×</button></header>
+      <header>
+        <div class="app-help-mark-identity"><img src="${MARK_AVATAR}" alt="Mark"><div><small>App help</small><strong>Ask Mark</strong></div></div>
+        <button type="button" data-app-help-close aria-label="Close">×</button>
+      </header>
       <div class="app-help-mark-page" data-app-help-page></div>
       <div class="app-help-mark-conversation" data-app-help-conversation aria-live="polite"></div>
       <form data-app-help-form>
@@ -75,6 +84,7 @@
   const conversation = host.querySelector('[data-app-help-conversation]');
   const form = host.querySelector('[data-app-help-form]');
   const input = host.querySelector('[data-app-help-input]');
+  let activePageKey = '';
 
   function syncVisibility() {
     const reader = isReaderPage();
@@ -85,6 +95,8 @@
   function syncPageLabel() {
     const ctx = pageContext();
     pageNode.textContent = `Help for: ${ctx.title}`;
+    if (activePageKey && activePageKey !== ctx.key) conversation.innerHTML = '';
+    activePageKey = ctx.key;
   }
 
   function openPanel() {
@@ -93,7 +105,7 @@
     openButton.setAttribute('aria-expanded', 'true');
     if (!conversation.children.length) {
       const ctx = pageContext();
-      conversation.innerHTML = `<div class="app-help-mark-message mark"><strong>Mark</strong><p>I can answer questions about how to use <b>${escapeHtml(ctx.title)}</b>. I’ll keep answers limited to app help for this page.</p></div>`;
+      conversation.innerHTML = `<div class="app-help-mark-message mark"><div class="app-help-mark-message-author"><img src="${MARK_AVATAR}" alt=""><strong>Mark</strong></div><p>I can help you use <b>${escapeHtml(ctx.title)}</b>. Ask me what something does, how to complete a task here, or where to go next.</p></div>`;
     }
     input.focus();
   }
@@ -106,7 +118,10 @@
   function appendMessage(who, text) {
     const div = document.createElement('div');
     div.className = `app-help-mark-message ${who === 'You' ? 'user' : 'mark'}`;
-    div.innerHTML = `<strong>${escapeHtml(who)}</strong><p>${escapeHtml(text)}</p>`;
+    const author = who === 'Mark'
+      ? `<div class="app-help-mark-message-author"><img src="${MARK_AVATAR}" alt=""><strong>Mark</strong></div>`
+      : `<strong>${escapeHtml(who)}</strong>`;
+    div.innerHTML = `${author}<p>${escapeHtml(text)}</p>`;
     conversation.appendChild(div);
     conversation.scrollTop = conversation.scrollHeight;
     return div;
@@ -118,9 +133,8 @@
     const pending = appendMessage('Mark', 'Checking the help for this page…');
     try {
       const response = await fetch('/api/app-help', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({ pageKey: ctx.key, pageTitle: ctx.title, helpTopics: ctx.topics, question })
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ pageKey: ctx.key, pageTitle: ctx.title, pageHelp: ctx.pageHelp, globalHelp: ctx.globalHelp, question })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'I could not answer that help question.');
@@ -134,20 +148,10 @@
   openButton.addEventListener('click', openPanel);
   host.querySelector('[data-app-help-close]').addEventListener('click', closePanel);
   form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const question = input.value.trim();
-    if (!question) return;
-    input.value = '';
-    ask(question);
+    event.preventDefault(); const question = input.value.trim(); if (!question) return; input.value = ''; ask(question);
   });
 
-  // Navigation in this app is click-driven. One passive capture listener updates
-  // button visibility after the existing page renderer has run. No observer,
-  // repeated timer, DOM rewrite, reader hook, or selection hook is used.
-  document.addEventListener('click', () => requestAnimationFrame(() => {
-    syncVisibility();
-    if (!panel.hidden) syncPageLabel();
-  }), { capture: true, passive: true });
+  document.addEventListener('click', () => requestAnimationFrame(() => { syncVisibility(); if (!panel.hidden) syncPageLabel(); }), { capture: true, passive: true });
   window.addEventListener('popstate', () => requestAnimationFrame(syncVisibility));
   window.addEventListener('hashchange', () => requestAnimationFrame(syncVisibility));
   syncVisibility();
