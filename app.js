@@ -8864,8 +8864,60 @@ function getMarkRecords(key) {
   try { const value=JSON.parse(localStorage.getItem(key)||'[]'); return Array.isArray(value)?value:[]; }
   catch { return []; }
 }
-function saveMarkRecords(key, records) { try { localStorage.setItem(key,JSON.stringify(records.slice(0,300))); } catch {} }
+function saveMarkRecords(key, records) {
+  const requested=Array.isArray(records) ? records.slice(0,300) : [];
+  let candidate=requested;
+
+  while(candidate.length){
+    try {
+      localStorage.setItem(key,JSON.stringify(candidate));
+      const verified=getMarkRecords(key);
+      return verified.length>0 && verified[0]?.id===candidate[0]?.id;
+    } catch(error) {
+      if(error?.name!=='QuotaExceededError' && error?.name!=='NS_ERROR_DOM_QUOTA_REACHED'){
+        console.warn('Notebook records could not be saved.',error);
+        return false;
+      }
+
+      // Preserve the newest entry while progressively dropping old notebook
+      // history if browser storage is tight. Never silently claim success.
+      if(candidate.length===1){
+        console.warn('Notebook storage is full; the newest entry could not be saved.',error);
+        return false;
+      }
+      candidate=candidate.slice(0,Math.max(1,Math.floor(candidate.length*.8)));
+    }
+  }
+  return false;
+}
 function markRecordsForCurrentBook(key) { return getMarkRecords(key).filter(item=>item.documentId===state.documentId); }
+
+const MARK_NOTEBOOK_SAVE_PAYLOADS=new Map();
+
+function registerMarkNotebookSavePayload(payload={}) {
+  const id=`mark-save-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+  MARK_NOTEBOOK_SAVE_PAYLOADS.set(id,payload);
+  // Avoid unbounded retained response payloads during long reading sessions.
+  if(MARK_NOTEBOOK_SAVE_PAYLOADS.size>40){
+    const oldest=MARK_NOTEBOOK_SAVE_PAYLOADS.keys().next().value;
+    MARK_NOTEBOOK_SAVE_PAYLOADS.delete(oldest);
+  }
+  return id;
+}
+
+function saveRegisteredMarkNotebookInsight(id) {
+  const payload=MARK_NOTEBOOK_SAVE_PAYLOADS.get(String(id||''));
+  if(!payload) return {ok:false,error:'This Ask Mark response is no longer available to save.'};
+  const result=saveMarkInsight(payload);
+  if(result?.ok) MARK_NOTEBOOK_SAVE_PAYLOADS.delete(String(id||''));
+  return result;
+}
+
+window.MarkSetGoNotebook = Object.freeze({
+  saveInsight:saveRegisteredMarkNotebookInsight,
+  count:()=>getMarkRecords(MARK_INSIGHTS_KEY).length
+});
+
 
 function nearestWordIndexForSelection(selectedText) {
   const selectedWords=splitWords(String(selectedText||'')).slice(0,12).map(w=>String(w).toLowerCase().replace(/[^\p{L}\p{N}'’-]+/gu,''));
@@ -9008,34 +9060,80 @@ function renderMarkSelectionCard(){
   bindMarkPanelActions();
 }
 function renderMarkResult(result, action){
-  const panels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean); if(!panels.length)return;
-  panels.forEach(panel=>{panel.hidden=false;panel.innerHTML=`<div class="mark-response-heading"><span>Ask Mark</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<button type="button" class="secondary" data-save-mark-response>Save to notebook</button>`;panel.querySelector('[data-save-mark-response]')?.addEventListener('click',()=>saveMarkInsight({action,result}));});
+  const selected=state.markSelection ? {...state.markSelection} : null;
+  const savePayload={
+    action,
+    result,
+    selection:selected?.text || '',
+    documentId:selected?.documentId || state.documentId || '',
+    title:selected?.title || state.title || '',
+    startIndex:Number(selected?.startIndex)||0,
+    chapter:selected?.chapter || ''
+  };
+  const saveId=registerMarkNotebookSavePayload(savePayload);
+
+  const panels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean);
+  if(!panels.length)return;
+
+  panels.forEach(panel=>{
+    panel.hidden=false;
+    panel.innerHTML=`<div class="mark-response-heading"><span>Ask Mark</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<button type="button" class="secondary" data-save-mark-response data-mark-save-id="${escapeHtml(saveId)}">Save to notebook</button>`;
+
+    panel.querySelector('[data-save-mark-response]')?.addEventListener('click',(event)=>{
+      const button=event.currentTarget;
+      const saved=saveRegisteredMarkNotebookInsight(button.dataset.markSaveId);
+      if(saved?.ok){
+        button.disabled=true;
+        button.textContent='Saved to notebook';
+      }else{
+        button.textContent='Save failed — try again';
+        window.setTimeout(()=>{ if(!button.disabled) button.textContent='Save to notebook'; },2200);
+      }
+    });
+  });
 }
 function saveMarkInsight(extra={}){
   const selected=state.markSelection;
-  const selectionText=selected?.text || String(extra.selection || '').trim();
+  const selectionText=String(extra.selection || selected?.text || '').trim();
   const noteText=String(extra.note || '').trim();
-  if(!selectionText && !noteText && !extra.result?.response) return;
+  if(!selectionText && !noteText && !extra.result?.response){
+    return {ok:false,error:'There is nothing to save.'};
+  }
 
   const record={
     id:`mark-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
     recordType:extra.recordType || (extra.result ? 'mark-response' : noteText ? 'personal-note' : 'passage'),
-    documentId:selected?.documentId || state.documentId || extra.documentId || '',
-    title:selected?.title || state.title || extra.title || app.querySelector('h1')?.textContent?.trim() || 'Mark, Set, Go!',
+    documentId:extra.documentId || selected?.documentId || state.documentId || '',
+    title:extra.title || selected?.title || state.title || app.querySelector('h1')?.textContent?.trim() || 'Mark, Set, Go!',
     selection:selectionText,
-    startIndex:Number.isFinite(Number(selected?.startIndex)) ? Number(selected.startIndex) : (Number(extra.startIndex) || 0),
-    chapter:selected?.chapter || extra.chapter || '',
+    startIndex:Number.isFinite(Number(extra.startIndex))
+      ? Number(extra.startIndex)
+      : (Number.isFinite(Number(selected?.startIndex)) ? Number(selected.startIndex) : 0),
+    chapter:extra.chapter || selected?.chapter || '',
     note:noteText,
     pageContext:extra.pageContext || app.dataset.viewKey || 'app',
     createdAt:new Date().toISOString(),
     ...extra
   };
 
-  saveMarkRecords(MARK_INSIGHTS_KEY,[record,...getMarkRecords(MARK_INSIGHTS_KEY)]);
+  const saved=saveMarkRecords(MARK_INSIGHTS_KEY,[record,...getMarkRecords(MARK_INSIGHTS_KEY)]);
+  if(!saved){
+    updateReaderStatus?.('Notebook save failed. Browser storage may be full.');
+    return {ok:false,error:'Notebook save failed. Browser storage may be full.'};
+  }
+
+  const verified=getMarkRecords(MARK_INSIGHTS_KEY).some((item)=>item.id===record.id);
+  if(!verified){
+    updateReaderStatus?.('Notebook save could not be verified.');
+    return {ok:false,error:'Notebook save could not be verified.'};
+  }
+
   renderMarkNotebook();
   renderFullscreenMarkNotebook();
   renderGlobalNotebookEntries();
+  document.dispatchEvent(new CustomEvent('marksetgo:notebook-saved',{detail:{record}}));
   updateReaderStatus?.('Saved to Mark’s notebook.');
+  return {ok:true,record};
 }
 function openComparisonWorkspace(){
   const selected=state.markSelection;

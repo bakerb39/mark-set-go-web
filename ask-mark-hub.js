@@ -281,19 +281,36 @@
     const messages = $$('[data-askmark-conversation] .askmark-message', shell);
     const latestMessage = messages[messages.length - 1];
     const premiumSaveButton = latestMessage?.querySelector('[data-save-mark-response]');
-    const legacySaveButton = response.querySelector('[data-save-mark-response]');
-    if (premiumSaveButton && legacySaveButton) {
+    if (premiumSaveButton) {
       premiumSaveButton.addEventListener('click', () => {
-        legacySaveButton.click();
-        premiumSaveButton.disabled = true;
-        premiumSaveButton.textContent = 'Saved to notebook';
-      }, { once: true });
+        const saveId=premiumSaveButton.dataset.markSaveId;
+        const saved=window.MarkSetGoNotebook?.saveInsight?.(saveId);
+        if(saved?.ok){
+          premiumSaveButton.disabled=true;
+          premiumSaveButton.textContent='Saved to notebook';
+        }else{
+          premiumSaveButton.textContent='Save failed — try again';
+          window.setTimeout(()=>{
+            if(!premiumSaveButton.disabled) premiumSaveButton.textContent='Save to notebook';
+          },2200);
+        }
+      });
     }
 
     response.hidden = true;
     const conversation = $('[data-askmark-conversation]', shell);
     if (conversation) conversation.scrollTop = conversation.scrollHeight;
   }
+
+
+  document.addEventListener('marksetgo:notebook-saved',()=>{
+    if(!shell) return;
+    const notebookPanel=$('[data-askmark-view-panel="notebook"]',shell);
+    if(notebookPanel?.classList.contains('is-active')){
+      const legacyNotebook=$('#mark-notebook-panel',legacyHost || document);
+      if(legacyNotebook) $('[data-notebook-slot]',shell)?.appendChild(legacyNotebook);
+    }
+  });
 
   function syncSelection() {
     if (!shell) return;

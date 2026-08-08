@@ -484,3 +484,16 @@
 @media (prefers-reduced-motion:reduce) {
   .askmark-flashcard-inner { transition:none; }
 }
+
+
+/* v9.2.83 reliable notebook save feedback */
+.askmark-rich-response [data-save-mark-response] {
+  margin-top:.65rem;
+}
+.askmark-rich-response [data-save-mark-response]:disabled {
+  opacity:1;
+  background:#eaf4ee !important;
+  border-color:#91b49c !important;
+  color:#275c39 !important;
+  cursor:default;
+}
