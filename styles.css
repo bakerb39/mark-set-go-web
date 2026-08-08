@@ -12288,3 +12288,13 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
     display:none !important;
   }
 }
+
+
+/* v9.2.88 Focus Anchor true-overlay behavior
+   Dragging the anchor in the normal Reader must never reflow book text. */
+.reader-frame:not(:fullscreen):not(.fullscreen-fallback) > .interactive-reader.focus-anchor-clearance {
+  padding-top:0 !important;
+}
+.reader-frame:not(:fullscreen):not(.fullscreen-fallback) > .interactive-reader {
+  --focus-anchor-clearance:0px !important;
+}

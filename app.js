@@ -3307,26 +3307,21 @@ function applyFocusAnchorReaderClearance() {
   const overlay = app.querySelector('#focus-anchor-overlay');
   const frame = overlay?.closest('.reader-frame');
   const reader = frame?.querySelector('.interactive-reader');
-  if (!overlay || !frame || !reader || overlay.hidden) {
-    if (reader) {
-      reader.classList.remove('focus-anchor-clearance');
-      reader.style.removeProperty('--focus-anchor-clearance');
-    }
-    return;
-  }
 
-  // Only reserve top space while the anchor is in the upper portion of the viewer.
-  // If the reader intentionally drags it lower, do not push half the book off screen.
-  const frameRect = frame.getBoundingClientRect();
-  const overlayRect = overlay.getBoundingClientRect();
-  const overlayCenterY = overlayRect.top + (overlayRect.height / 2);
-  const relativeCenter = overlayCenterY - frameRect.top;
-  if (relativeCenter > frameRect.height * 0.38) {
+  if (!reader) return;
+
+  // Normal Reader: the Focus Anchor is a true overlay. Moving it must never
+  // change the Reader's padding or push book text down.
+  //
+  // Fullscreen still uses its dedicated stable top band behavior.
+  if (!overlay || overlay.hidden || !focusAnchorIsFullscreen(overlay)) {
     reader.classList.remove('focus-anchor-clearance');
     reader.style.removeProperty('--focus-anchor-clearance');
     return;
   }
 
+  const overlayRect = overlay.getBoundingClientRect();
+  const frameRect = frame.getBoundingClientRect();
   const clearance = Math.max(72, Math.ceil(overlayRect.bottom - frameRect.top + 14));
   reader.classList.add('focus-anchor-clearance');
   reader.style.setProperty('--focus-anchor-clearance', `${clearance}px`);
