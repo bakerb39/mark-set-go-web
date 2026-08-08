@@ -12016,6 +12016,9 @@ function openWordPanelForDictionary() {
 async function performDictionaryLookup(saveAfter = false, target = 'tools', contextOverride = null) {
   const context = contextOverride || state.contextWord;
   if (!context) return;
+  if (target === 'mark') {
+    console.info('[RC-DIAG 3] Ask Mark lookup dispatched', { word: context.word, index: context.index, appConnected: app.isConnected, markResponsePresentBeforeOpen: !!app.querySelector('#mark-response') });
+  }
 
   if (target === 'mark') {
     openMarkPanel('selection');
@@ -12034,6 +12037,10 @@ async function performDictionaryLookup(saveAfter = false, target = 'tools', cont
   try {
     const result = await lookupDictionaryWord(context.word);
     showDictionaryResult(result.word, result.definition, result.partOfSpeech, result.example, false, target);
+    if (target === 'mark') {
+      const responseNode = app.querySelector('#mark-response');
+      console.info('[RC-DIAG 3R] dictionary result written', { word: result.word, responsePresent: !!responseNode, responseConnected: !!responseNode?.isConnected, responseHidden: responseNode?.hidden, responseLength: responseNode?.textContent?.trim()?.length || 0 });
+    }
     if (saveAfter) saveCurrentDefinition(result, context, target);
   } catch (error) {
     const panel = target === 'mark' ? app.querySelector('#mark-response') : app.querySelector('#word-result');
@@ -12355,6 +12362,7 @@ function bindDictionaryMenu(reader) {
   reader.addEventListener('contextmenu', (event) => {
     const context = contextWordFromEvent(event);
     if (!context) return;
+    console.info('[RC-DIAG 1] menu opened', { word: context.word, index: context.index, readerConnected: reader.isConnected, appConnected: app.isConnected });
     event.preventDefault();
     event.stopImmediatePropagation();
 
@@ -12428,6 +12436,7 @@ function bindDictionaryMenu(reader) {
     closeDictionaryMenu();
 
     if (action === 'lookup') {
+      console.info('[RC-DIAG 2] lookup clicked', { word: stableContext.word, index: stableContext.index, menuConnected: menu.isConnected, readerConnected: reader.isConnected });
       performDictionaryLookup(false, 'mark', stableContext);
       return true;
     }
@@ -17172,13 +17181,6 @@ function renderGlobalNotebookEntries(){
 
 function renderGlobalNotebook(){
   stopReader();
-
-  // Notebook is a normal document page, not a Reader/fullscreen surface.
-  // Clear only scroll locks that can survive navigation away from the Reader.
-  document.body.classList.remove('viewer-fullscreen-open');
-  document.body.style.removeProperty('overflow');
-  document.documentElement.style.removeProperty('overflow');
-
   app.dataset.viewKey='mark-notebook';
   app.innerHTML=`<section class="platform-page global-notebook-page">
     <header class="platform-hero">
@@ -17191,18 +17193,6 @@ function renderGlobalNotebook(){
     </div>
     <div id="global-notebook-entries"></div>
   </section>`;
-
-  // Override the older nested-scroll experiment for this page only. The
-  // browser/document owns vertical scrolling, like the other app pages.
-  const notebookPage = app.querySelector('.global-notebook-page');
-  if (notebookPage) {
-    notebookPage.style.setProperty('max-height', 'none', 'important');
-    notebookPage.style.setProperty('height', 'auto', 'important');
-    notebookPage.style.setProperty('overflow-y', 'visible', 'important');
-    notebookPage.style.setProperty('overflow-x', 'visible', 'important');
-    notebookPage.style.removeProperty('overscroll-behavior-y');
-    notebookPage.style.removeProperty('scrollbar-gutter');
-  }
 
   app.querySelector('#global-notebook-search')?.addEventListener('input',renderGlobalNotebookEntries);
   app.querySelector('#add-global-notebook-note')?.addEventListener('click',()=>{

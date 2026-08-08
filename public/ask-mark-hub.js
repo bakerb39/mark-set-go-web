@@ -273,7 +273,11 @@
 
   function syncLegacyResponse() {
     if (!shell?.isConnected || !legacyHost?.isConnected) configureShell();
-    const response = getLegacySelectionPanel()?.querySelector('#mark-response');
+    const livePanel = getLegacySelectionPanel();
+    const response = livePanel?.querySelector('#mark-response');
+    if (response && !response.hidden && response.textContent.trim()) {
+      console.info('[RC-DIAG hub] live response detected', { panelConnected: !!livePanel?.isConnected, responseConnected: !!response.isConnected, responseLength: response.textContent.trim().length, shellConnected: !!shell?.isConnected });
+    }
     if (!response || response.hidden || !response.textContent.trim()) return;
     const thinking = $('.askmark-message.is-thinking', shell);
     const body = response.cloneNode(true);
@@ -284,6 +288,7 @@
     </article>`;
     if (thinking) thinking.outerHTML = markup;
     else $('[data-askmark-conversation]', shell)?.insertAdjacentHTML('beforeend', markup);
+    console.info('[RC-DIAG 4] response rendered in Ask Mark', { shellConnected: !!shell?.isConnected, usedThinkingSlot: !!thinking });
 
     const messages = $$('[data-askmark-conversation] .askmark-message', shell);
     const latestMessage = messages[messages.length - 1];
