@@ -16222,6 +16222,219 @@ function renderUpload() {
 }
 
 
+
+const DRM_FREE_CATEGORIES = [
+  ['all','All categories'],
+  ['fiction','Fiction'],['literature','Literature'],['classics','Classics'],
+  ['mystery','Mystery'],['thriller','Thriller'],['science-fiction','Science Fiction'],
+  ['fantasy','Fantasy'],['romance','Romance'],['history','History'],
+  ['biography','Biography'],['philosophy','Philosophy'],['religion','Religion'],
+  ['science','Science'],['mathematics','Mathematics'],['technology','Technology'],
+  ['programming','Programming'],['business','Business'],['economics','Economics'],
+  ['politics','Politics & Society'],['psychology','Psychology'],['education','Education'],
+  ['children','Children & YA'],['poetry','Poetry'],['drama','Drama'],['reference','Reference']
+];
+
+function drmFreeFormatButtons(book={}) {
+  const formats=Array.isArray(book.formats)?book.formats:[];
+  return formats.filter(format=>['epub','pdf'].includes(format)).map(format=>`
+    <button class="secondary" type="button"
+      data-drm-download-provider="${escapeHtml(book.provider||'')}"
+      data-drm-download-id="${escapeHtml(book.id||'')}"
+      data-drm-download-format="${escapeHtml(format)}"
+      data-drm-download-title="${escapeHtml(book.title||'book')}">↓ ${escapeHtml(format.toUpperCase())}</button>`).join('');
+}
+
+function drmFreeBookCard(book={}) {
+  const subjects=[...(book.categories||[]),...(book.subjects||[])].filter(Boolean).slice(0,4);
+  const formatText=(book.formats||[]).map(format=>format==='text'?'TXT':String(format).toUpperCase()).join(' · ');
+  return `
+    <article class="drm-free-result-card">
+      <div class="drm-free-cover">
+        ${book.cover?`<img src="${escapeHtml(book.cover)}" alt="Cover of ${escapeHtml(book.title||'')}" loading="lazy" referrerpolicy="no-referrer">`:`<div class="drm-free-cover-placeholder">OPEN<br>BOOK</div>`}
+        <span class="drm-free-rights-badge">Free · DRM-free</span>
+      </div>
+      <div class="drm-free-result-copy">
+        <div class="drm-free-source-line"><span>${escapeHtml(book.sourceLabel||book.provider||'Open source')}</span>${book.downloadCount?`<small>${Number(book.downloadCount).toLocaleString()} downloads</small>`:''}</div>
+        <h3>${escapeHtml(book.title||'Untitled')}</h3>
+        <p class="drm-free-author">${escapeHtml(book.author||'Unknown author')}</p>
+        ${book.description?`<p>${escapeHtml(book.description)}</p>`:''}
+        ${subjects.length?`<div class="drm-free-tags">${subjects.map(value=>`<span>${escapeHtml(value)}</span>`).join('')}</div>`:''}
+        <small class="drm-free-formats">${escapeHtml(formatText||'Readable online')}${book.year?` · ${escapeHtml(String(book.year))}`:''}${book.publisher?` · ${escapeHtml(book.publisher)}`:''}</small>
+        ${book.license?`<small class="drm-free-license">${escapeHtml(book.license)}</small>`:''}
+        <div class="drm-free-actions">
+          ${book.readable?`<button class="primary" type="button" data-drm-read-provider="${escapeHtml(book.provider||'')}" data-drm-read-id="${escapeHtml(book.id||'')}">▸ Read now</button>`:''}
+          ${['gutenberg','standardebooks'].includes(book.provider)?drmFreeFormatButtons(book):''}
+          ${book.downloadUrl?`<a class="secondary button-link" href="${escapeHtml(book.downloadUrl)}" target="_blank" rel="noopener noreferrer">Download ${escapeHtml(String(book.downloadFormat||'book').toUpperCase())} ↗</a>`:''}
+          ${book.externalUrl?`<a class="secondary button-link" href="${escapeHtml(book.externalUrl)}" target="_blank" rel="noopener noreferrer">Book page ↗</a>`:''}
+        </div>
+      </div>
+    </article>`;
+}
+
+function drmFreeStoreCard(store={}) {
+  return `
+    <article class="drm-free-store-card">
+      <span class="source-category">DRM-free store / publisher</span>
+      <h3>${escapeHtml(store.name||'Store')}</h3>
+      <p>${escapeHtml(store.note||'')}</p>
+      <div class="drm-free-tags">
+        ${(store.categories||[]).slice(0,6).map(value=>`<span>${escapeHtml(value.replaceAll('-',' '))}</span>`).join('')}
+      </div>
+      <small>${escapeHtml((store.formats||[]).map(x=>x.toUpperCase()).join(' · '))}</small>
+      <a class="primary button-link" href="${escapeHtml(store.url||'#')}" target="_blank" rel="noopener noreferrer">Search this store ↗</a>
+    </article>`;
+}
+
+async function downloadDrmFreeEdition({provider,id,format,title}) {
+  const response=await fetch(`/api/library/download?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}&format=${encodeURIComponent(format)}`);
+  if(!response.ok){
+    let error={};
+    try{error=await response.json();}catch{}
+    throw new Error(error.error||`The ${format.toUpperCase()} edition could not be downloaded.`);
+  }
+  const blob=await response.blob();
+  const url=URL.createObjectURL(blob);
+  const anchor=document.createElement('a');
+  anchor.href=url;
+  anchor.download=`${String(title||'book').replace(/[<>:"/\\|?*]+/g,' ').trim()||'book'}.${format}`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+
+function renderDrmFreeBookFinder(initial={}) {
+  stopReader();
+  const initialQuery=String(initial.query||'');
+  const initialCategory=String(initial.category||'all');
+  app.innerHTML=`
+    <section class="platform-page drm-free-finder">
+      <header class="platform-hero drm-free-hero">
+        <div>
+          <button class="text-link" type="button" data-action="browse">← Back to Browse</button>
+          <span class="source-category">Download & discover</span>
+          <h1>DRM-Free Book Finder</h1>
+          <p>Search free/open books you can read or download, then discover DRM-free stores and publishers for modern titles. Search by title, author, subject, category, language, source, and format.</p>
+        </div>
+        <div class="drm-free-hero-note">
+          <strong>Portable books, not locked files</strong>
+          <span>Free results come from supported open catalogs. Commercial results link to stores that sell DRM-free editions.</span>
+        </div>
+      </header>
+
+      <form id="drm-free-search" class="drm-free-search-panel">
+        <label class="drm-free-query"><span>Search</span><input id="drm-free-query" type="search" value="${escapeHtml(initialQuery)}" placeholder="Title, author, subject, idea, or keyword…" autocomplete="off"></label>
+        <label><span>Category</span><select id="drm-free-category">${DRM_FREE_CATEGORIES.map(([value,label])=>`<option value="${escapeHtml(value)}" ${initialCategory===value?'selected':''}>${escapeHtml(label)}</option>`).join('')}</select></label>
+        <label><span>Availability</span><select id="drm-free-availability"><option value="all">Free + paid DRM-free</option><option value="free">Free downloads only</option><option value="paid">DRM-free stores only</option></select></label>
+        <label><span>Format</span><select id="drm-free-format"><option value="all">Any format</option><option value="epub">EPUB</option><option value="pdf">PDF</option><option value="text">TXT / text</option><option value="mobi">MOBI</option></select></label>
+        <label><span>Source</span><select id="drm-free-source"><option value="all">All supported sources</option><option value="gutenberg">Project Gutenberg</option><option value="standardebooks">Standard Ebooks</option><option value="openlibrary">Open Library — public editions</option><option value="doab">DOAB — scholarly open access</option><option value="oapen">OAPEN — scholarly open access</option><option value="commercial">DRM-free stores/publishers</option></select></label>
+        <label><span>Rights</span><select id="drm-free-license"><option value="all">Public domain + open access</option><option value="public-domain">Public domain</option><option value="open-access">Open access</option></select></label>
+        <label><span>Language</span><select id="drm-free-language"><option value="en">English</option><option value="fr">French</option><option value="de">German</option><option value="es">Spanish</option><option value="it">Italian</option><option value="pt">Portuguese</option><option value="la">Latin</option><option value="el">Greek</option><option value="all">Any language</option></select></label>
+        <label><span>From year</span><input id="drm-free-year-from" type="number" min="0" max="2100" placeholder="e.g. 1900"></label>
+        <label><span>To year</span><input id="drm-free-year-to" type="number" min="0" max="2100" placeholder="e.g. 2026"></label>
+        <label><span>Sort</span><select id="drm-free-sort"><option value="popular">Popular / relevance</option><option value="newest">Newest</option><option value="oldest">Oldest</option><option value="title">Title</option><option value="author">Author</option><option value="downloads">Downloads</option></select></label>
+        <button class="primary" type="submit">Search DRM-free books</button>
+      </form>
+
+      <div class="drm-free-category-shortcuts" aria-label="Popular DRM-free categories">
+        ${DRM_FREE_CATEGORIES.slice(1,13).map(([value,label])=>`<button type="button" data-drm-category="${escapeHtml(value)}">${escapeHtml(label)}</button>`).join('')}
+      </div>
+
+      <div id="drm-free-status" class="status">Choose a category or search for a title, author, or subject.</div>
+      <div id="drm-free-results"></div>
+    </section>`;
+
+  const form=app.querySelector('#drm-free-search');
+  const status=app.querySelector('#drm-free-status');
+  const results=app.querySelector('#drm-free-results');
+
+  const runSearch=async()=>{
+    const params=new URLSearchParams({
+      q:app.querySelector('#drm-free-query')?.value.trim()||'',
+      category:app.querySelector('#drm-free-category')?.value||'all',
+      availability:app.querySelector('#drm-free-availability')?.value||'all',
+      format:app.querySelector('#drm-free-format')?.value||'all',
+      source:app.querySelector('#drm-free-source')?.value||'all',
+      license:app.querySelector('#drm-free-license')?.value||'all',
+      language:app.querySelector('#drm-free-language')?.value||'en',
+      yearFrom:app.querySelector('#drm-free-year-from')?.value||'',
+      yearTo:app.querySelector('#drm-free-year-to')?.value||'',
+      sort:app.querySelector('#drm-free-sort')?.value||'popular'
+    });
+    status.className='status';
+    status.textContent='Searching supported DRM-free catalogs…';
+    results.innerHTML='<div class="drm-free-loading">Searching Project Gutenberg, Standard Ebooks, Open Library, DOAB, OAPEN, and the DRM-free source directory…</div>';
+    try{
+      const response=await fetch(`/api/drm-free/search?${params.toString()}`,{cache:'no-store'});
+      const data=await response.json();
+      if(!response.ok) throw new Error(data.error||'DRM-free search failed.');
+      const books=Array.isArray(data.books)?data.books:[];
+      const stores=Array.isArray(data.stores)?data.stores:[];
+      status.className='status success';
+      status.textContent=`Found ${books.length} free/open book${books.length===1?'':'s'}${stores.length?` and ${stores.length} DRM-free source${stores.length===1?'':'s'}`:''}.`;
+      results.innerHTML=`
+        ${books.length?`<section class="drm-free-results-section"><div class="section-heading"><div><span class="source-category">Free & open</span><h2>Books you can read or download</h2><p>Results from supported public-domain/open ebook catalogs.</p></div></div><div class="drm-free-results-grid">${books.map(drmFreeBookCard).join('')}</div></section>`:''}
+        ${stores.length?`<section class="drm-free-results-section"><div class="section-heading"><div><span class="source-category">Buy DRM-free</span><h2>Stores & publishers</h2><p>Search these sources for modern DRM-free books. Verify the individual title and available format before buying.</p></div></div><div class="drm-free-store-grid">${stores.map(drmFreeStoreCard).join('')}</div></section>`:''}
+        ${!books.length&&!stores.length?'<div class="library-empty-state"><span>⌕</span><h3>No matches yet</h3><p>Try a broader subject, another category, or All supported sources.</p></div>':''}
+        <p class="drm-free-coverage-note">${escapeHtml(data.note||'')}</p>`;
+      results.querySelectorAll('[data-drm-read-provider]').forEach(button=>button.addEventListener('click',async()=>{
+        button.disabled=true;
+        const old=button.textContent;
+        button.textContent='Opening…';
+        try{
+          const response=await fetch(`/api/library/read?provider=${encodeURIComponent(button.dataset.drmReadProvider||'')}&id=${encodeURIComponent(button.dataset.drmReadId||'')}&format=best`);
+          const data=await response.json();
+          if(!response.ok) throw new Error(data.error||'The book could not be opened.');
+          renderReaderWithText(data.title||'DRM-Free Book',data.text||'',{
+            type:'drm-free-library',
+            provider:button.dataset.drmReadProvider||'',
+            id:button.dataset.drmReadId||'',
+            title:data.title||'DRM-Free Book',
+            author:data.author||'',
+            sourceUrl:data.sourceUrl||''
+          });
+        }catch(error){
+          window.alert(error?.message||'The book could not be opened.');
+          button.disabled=false;
+          button.textContent=old;
+        }
+      }));
+      results.querySelectorAll('[data-drm-download-provider]').forEach(button=>button.addEventListener('click',async()=>{
+        button.disabled=true;
+        const old=button.textContent;
+        button.textContent='Downloading…';
+        try{
+          await downloadDrmFreeEdition({
+            provider:button.dataset.drmDownloadProvider||'',
+            id:button.dataset.drmDownloadId||'',
+            format:button.dataset.drmDownloadFormat||'epub',
+            title:button.dataset.drmDownloadTitle||'book'
+          });
+        }catch(error){
+          window.alert(error?.message||'The edition could not be downloaded.');
+        }finally{
+          button.disabled=false;
+          button.textContent=old;
+        }
+      }));
+    }catch(error){
+      status.className='status error';
+      status.textContent=error?.message||'DRM-free search failed.';
+      results.innerHTML='';
+    }
+  };
+
+  form?.addEventListener('submit',event=>{event.preventDefault();runSearch();});
+  app.querySelectorAll('[data-drm-category]').forEach(button=>button.addEventListener('click',()=>{
+    app.querySelector('#drm-free-category').value=button.dataset.drmCategory||'all';
+    runSearch();
+  }));
+
+  if(initialQuery||initialCategory!=='all') runSearch();
+}
+
+
 function renderBrowseHub() {
   stopReader();
 
@@ -16344,6 +16557,7 @@ function renderBrowseHub() {
           <nav class="browse-hero-tags browse-hero-links" aria-label="Jump to Browse section">
             <a href="#browse-modern-guides">Modern Guides</a>
             <a href="#browse-free-books">Free Books</a>
+            <a href="#browse-drm-free">DRM-Free Finder</a>
             <a href="#browse-collections">Collections</a>
           </nav>
         </div>
@@ -16399,6 +16613,25 @@ function renderBrowseHub() {
         </div>
       </section>
 
+      <section id="browse-drm-free" class="browse-section drm-free-browse-promo">
+        <div class="drm-free-promo-copy">
+          <span class="source-category">Open & portable ebooks</span>
+          <h2>DRM-Free Book Finder</h2>
+          <p>Search free public-domain books by category, author, subject, language, format, and popularity—then browse a curated directory of stores and publishers that sell modern DRM-free ebooks.</p>
+          <div class="drm-free-promo-actions">
+            <button class="primary" type="button" data-action="drm-free-books">Search DRM-free books</button>
+            <button class="secondary" type="button" data-drm-quick-category="philosophy">Browse Philosophy</button>
+            <button class="secondary" type="button" data-drm-quick-category="history">Browse History</button>
+            <button class="secondary" type="button" data-drm-quick-category="science-fiction">Browse Science Fiction</button>
+          </div>
+        </div>
+        <div class="drm-free-promo-stats">
+          <strong>Free + paid</strong><span>One place to start your search</span>
+          <strong>EPUB / PDF / TXT</strong><span>Filter by usable formats</span>
+          <strong>Read or download</strong><span>Open supported free books directly</span>
+        </div>
+      </section>
+
       <section id="browse-modern-guides" class="browse-section browse-modern-guides-section">
         <div class="section-heading">
           <div>
@@ -16445,6 +16678,10 @@ function renderBrowseHub() {
       app.querySelector('#browse-global-scope')?.value || 'all'
     );
   });
+
+  app.querySelectorAll('[data-drm-quick-category]').forEach((button) => button.addEventListener('click', () => {
+    renderDrmFreeBookFinder({ category:button.dataset.drmQuickCategory || 'all' });
+  }));
 
   app.querySelectorAll('[data-browse-layout]').forEach((button) => button.addEventListener('click', () => {
     localStorage.setItem(BROWSE_LAYOUT_KEY, button.dataset.browseLayout === 'list' ? 'list' : 'tiles');
@@ -17724,6 +17961,7 @@ document.addEventListener('click', (event) => {
   }
   if (actionName === 'home') renderHome();
   if (actionName === 'browse') renderBrowseHub();
+  if (actionName === 'drm-free-books') renderDrmFreeBookFinder();
   if (actionName === 'my-links') renderMyLinks();
   if (actionName === 'my-library') renderMyLibraryHub();
   if (actionName === 'profile-preferences') renderProfilePreferences();

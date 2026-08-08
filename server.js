@@ -3408,6 +3408,448 @@ app.get('/api/weather', async (req, res) => {
 
 
 
+
+// DRM-free discovery catalog.
+// Free/open book results are normalized from machine-readable sources.
+// Commercial entries are store/publisher destinations; they are not scraped
+// into a local copy of copyrighted catalogs.
+const DRM_FREE_COMMERCIAL_SOURCES = [
+  { id:'smashwords', name:'Smashwords', url:'https://www.smashwords.com/', availability:'paid', formats:['epub','pdf','mobi'], categories:['fiction','romance','mystery','thriller','fantasy','science-fiction','nonfiction','indie'], note:'Large independent and self-published catalog. DRM-free by default.' },
+  { id:'baen', name:'Baen Books', url:'https://www.baen.com/', availability:'mixed', formats:['epub','mobi'], categories:['science-fiction','fantasy'], note:'Science fiction and fantasy publisher with DRM-free ebooks and a free library.' },
+  { id:'storybundle', name:'StoryBundle', url:'https://storybundle.com/', availability:'paid', formats:['epub','mobi'], categories:['science-fiction','fantasy','mystery','nonfiction','comics'], note:'Rotating themed bundles of DRM-free ebooks.' },
+  { id:'weightless', name:'Weightless Books', url:'https://weightlessbooks.com/', availability:'paid', formats:['epub','pdf'], categories:['science-fiction','fantasy','literature','comics','magazines'], note:'Curated independent speculative fiction, magazines, anthologies, and literary titles.' },
+  { id:'ebooks-com', name:'eBooks.com', url:'https://www.ebooks.com/', availability:'paid', formats:['epub','pdf'], categories:['fiction','nonfiction','history','business','science','technology','biography','religion','psychology'], note:'Large general ebook store; use its DRM-free filters and verify the individual title.' },
+  { id:'humble', name:'Humble Bundle', url:'https://www.humblebundle.com/books', availability:'paid', formats:['epub','pdf','mobi'], categories:['technology','science-fiction','fantasy','comics','nonfiction','games'], note:'Rotating DRM-free ebook bundles, often grouped by publisher or topic.' },
+  { id:'fanatical', name:'Fanatical', url:'https://www.fanatical.com/en/bundle/books', availability:'paid', formats:['epub','pdf'], categories:['technology','science-fiction','fantasy','nonfiction'], note:'Discounted rotating book bundles; verify the formats listed for the current bundle.' },
+  { id:'bookshop', name:'Bookshop.org', url:'https://bookshop.org/ebooks', availability:'paid', formats:['epub'], categories:['fiction','nonfiction','history','biography','science','politics','philosophy','religion'], note:'Mainstream catalog with DRM status shown per ebook; supports independent bookstores.' },
+  { id:'pragmatic', name:'Pragmatic Bookshelf', url:'https://pragprog.com/', availability:'paid', formats:['epub','pdf','mobi'], categories:['technology','programming','software','business'], note:'Technical and software-development books sold in DRM-free formats.' },
+  { id:'nostarch', name:'No Starch Press', url:'https://nostarch.com/', availability:'paid', formats:['epub','pdf','mobi'], categories:['technology','programming','cybersecurity','science','math'], note:'Technical, cybersecurity, programming, hardware, science, and math books.' },
+  { id:'manning', name:'Manning', url:'https://www.manning.com/', availability:'paid', formats:['epub','pdf'], categories:['technology','programming','data-science','ai','software'], note:'Software, data, AI, and engineering books; direct ebook purchases are DRM-free.' },
+  { id:'leanpub', name:'Leanpub', url:'https://leanpub.com/', availability:'paid', formats:['epub','pdf'], categories:['technology','programming','business','data-science','nonfiction'], note:'Author-published technical and nonfiction books, generally DRM-free.' },
+  { id:'tor', name:'Tor / Tor Publishing Group', url:'https://torpublishinggroup.com/', availability:'paid', formats:['epub'], categories:['science-fiction','fantasy','fiction'], note:'Major science-fiction and fantasy publisher known for DRM-free ebook policy.' }
+];
+
+const DRM_FREE_CATEGORY_TOPICS = {
+  fiction:'fiction',
+  literature:'literature',
+  classics:'classics',
+  mystery:'mystery',
+  thriller:'thriller',
+  'science-fiction':'science fiction',
+  fantasy:'fantasy',
+  romance:'romance',
+  history:'history',
+  biography:'biography',
+  philosophy:'philosophy',
+  religion:'religion',
+  science:'science',
+  mathematics:'mathematics',
+  technology:'technology',
+  programming:'programming',
+  business:'business',
+  economics:'economics',
+  politics:'politics',
+  psychology:'psychology',
+  education:'education',
+  children:'children',
+  poetry:'poetry',
+  drama:'drama',
+  reference:'reference'
+};
+
+function normalizeDrmFreeCategory(value='') {
+  const raw=String(value||'').trim().toLowerCase();
+  return Object.prototype.hasOwnProperty.call(DRM_FREE_CATEGORY_TOPICS,raw) ? raw : 'all';
+}
+
+function drmFreeBookFormats(formats={}) {
+  const keys=Object.keys(formats||{});
+  const list=[];
+  if(keys.some(key=>/application\/epub\+zip/i.test(key))) list.push('epub');
+  if(keys.some(key=>/application\/pdf/i.test(key))) list.push('pdf');
+  if(keys.some(key=>/^text\/plain/i.test(key))) list.push('text');
+  return list;
+}
+
+function normalizeDrmFreeGutenberg(raw) {
+  const formats=drmFreeBookFormats(raw?.formats||{});
+  const cover=Object.entries(raw?.formats||{}).find(([mime,url])=>/^image\//i.test(mime)&&typeof url==='string')?.[1]||'';
+  return {
+    kind:'book',
+    rights:'public-domain',
+    availability:'free',
+    provider:'gutenberg',
+    sourceLabel:'Project Gutenberg',
+    id:String(raw?.id||''),
+    title:String(raw?.title||'Untitled'),
+    author:authorNames(raw?.authors),
+    language:Array.isArray(raw?.languages)?raw.languages.join(', '):'',
+    subjects:Array.isArray(raw?.subjects)?raw.subjects.slice(0,8):[],
+    categories:Array.isArray(raw?.bookshelves)?raw.bookshelves.slice(0,6):[],
+    formats,
+    cover,
+    downloadCount:Number(raw?.download_count||0),
+    readable:formats.includes('text')||formats.includes('epub'),
+    externalUrl:raw?.id?`https://www.gutenberg.org/ebooks/${raw.id}`:''
+  };
+}
+
+async function searchDrmFreeGutenberg({q='',category='all',language='en',limit=24}={}) {
+  const params=new URLSearchParams();
+  if(q) params.set('search',q);
+  if(category!=='all') params.set('topic',DRM_FREE_CATEGORY_TOPICS[category]||category);
+  if(language && language!=='all') params.set('languages',language);
+  const payload=await fetchJsonWithRetry(`${GUTENDEX_BASE}/books/?${params}`,{
+    timeoutMs:18000,attempts:1,cacheTtlMs:LIBRARY_CACHE_MS
+  });
+  return (payload.results||[]).slice(0,limit).map(normalizeDrmFreeGutenberg);
+}
+
+async function searchDrmFreeStandardEbooks({q='',category='all',limit=24}={}) {
+  const {buffer}=await fetchBuffer('https://standardebooks.org/opds/all',{
+    timeoutMs:25000,maxBytes:9*1024*1024,
+    headers:{Accept:'application/atom+xml,application/xml,text/xml'}
+  });
+  const $=cheerio.load(buffer.toString('utf8'),{xmlMode:true});
+  const needle=String(q||'').trim().toLowerCase();
+  const categoryNeedle=category==='all'?'':String(DRM_FREE_CATEGORY_TOPICS[category]||category).toLowerCase();
+  const results=[];
+  $('entry').each((_i,node)=>{
+    if(results.length>=limit) return;
+    const entry=$(node);
+    const title=entry.find('title').first().text().trim();
+    const author=entry.find('author name').map((_j,n)=>$(n).text().trim()).get().join(', ');
+    const summary=stripMarkup(entry.find('summary,content').first().text()).trim();
+    const subjects=entry.find('category').map((_j,n)=>$(n).attr('term')||$(n).text()).get().filter(Boolean);
+    const haystack=[title,author,summary,...subjects].join(' ').toLowerCase();
+    if(needle && !haystack.includes(needle)) return;
+    if(categoryNeedle && !haystack.includes(categoryNeedle)) return;
+
+    const acquisition=entry.find('link').filter((_j,n)=>
+      /opds-spec\.org\/acquisition/i.test($(n).attr('rel')||'') &&
+      /epub/i.test($(n).attr('type')||'')
+    ).first().attr('href')||'';
+    if(!acquisition) return;
+    const alternate=entry.find('link[rel="alternate"]').first().attr('href')||entry.find('id').first().text().trim();
+    const cover=entry.find('link').filter((_j,n)=>/image\/jpeg|image\/png/i.test($(n).attr('type')||'')).first().attr('href')||'';
+    results.push({
+      kind:'book',
+      rights:'public-domain',
+      availability:'free',
+      provider:'standardebooks',
+      sourceLabel:'Standard Ebooks',
+      id:Buffer.from(acquisition).toString('base64url'),
+      title:title||'Untitled',
+      author,
+      language:'en',
+      subjects:subjects.slice(0,8),
+      categories:subjects.slice(0,6),
+      formats:['epub'],
+      cover,
+      downloadCount:0,
+      readable:true,
+      externalUrl:alternate,
+      description:summary.slice(0,360)
+    });
+  });
+  return results;
+}
+
+
+function dspaceMetadataMap(item={}) {
+  const map={};
+  const values=Array.isArray(item.metadata)
+    ? item.metadata
+    : Array.isArray(item?.expand?.metadata)
+      ? item.expand.metadata
+      : [];
+  values.forEach(entry=>{
+    const key=String(entry?.key||[
+      entry?.schema,
+      entry?.element,
+      entry?.qualifier
+    ].filter(Boolean).join('.')).trim();
+    const value=String(entry?.value||'').trim();
+    if(!key||!value) return;
+    if(!map[key]) map[key]=[];
+    map[key].push(value);
+  });
+  return map;
+}
+
+function firstMetadata(meta, keys=[]) {
+  for(const key of keys){
+    const value=meta[key];
+    if(Array.isArray(value)&&value.length) return value[0];
+  }
+  return '';
+}
+
+function allMetadata(meta, keys=[]) {
+  const out=[];
+  keys.forEach(key=>{
+    const values=Array.isArray(meta[key])?meta[key]:[];
+    values.forEach(value=>{ if(value&&!out.includes(value)) out.push(value); });
+  });
+  return out;
+}
+
+function extractDspaceBitstreams(item={}) {
+  const raw=Array.isArray(item.bitstreams)
+    ? item.bitstreams
+    : Array.isArray(item?.expand?.bitstreams)
+      ? item.expand.bitstreams
+      : [];
+  return raw.map(bitstream=>({
+    name:String(bitstream?.name||bitstream?.bundleName||''),
+    mime:String(bitstream?.mimeType||bitstream?.format||bitstream?.formatDescription||'').toLowerCase(),
+    url:String(bitstream?.retrieveLink||bitstream?.downloadUrl||bitstream?.link||'')
+  })).filter(item=>item.url);
+}
+
+function normalizeOpenAccessDspaceBook(raw,{provider,sourceLabel,baseUrl}={}) {
+  const meta=dspaceMetadataMap(raw);
+  const title=firstMetadata(meta,['dc.title','dc.title.other'])||String(raw?.name||'Untitled');
+  const authors=allMetadata(meta,['dc.contributor.author','dc.creator','dc.contributor.editor']);
+  const subjects=allMetadata(meta,['dc.subject','dc.subject.other','dc.subject.classification']).slice(0,10);
+  const languages=allMetadata(meta,['dc.language.iso','dc.language']).slice(0,3);
+  const date=firstMetadata(meta,['dc.date.issued','dc.date.available','dc.date.created']);
+  const license=firstMetadata(meta,['dc.rights','dc.rights.uri','dc.rights.license']);
+  const publisher=firstMetadata(meta,['dc.publisher']);
+  const description=firstMetadata(meta,['dc.description.abstract','dc.description']);
+  const handle=String(raw?.handle||firstMetadata(meta,['dc.identifier.uri'])||'');
+  const bitstreams=extractDspaceBitstreams(raw);
+  const pdf=bitstreams.find(file=>/pdf/.test(file.mime)||/\.pdf(?:$|\?)/i.test(file.url)||/\.pdf$/i.test(file.name));
+  const epub=bitstreams.find(file=>/epub/.test(file.mime)||/\.epub(?:$|\?)/i.test(file.url)||/\.epub$/i.test(file.name));
+  const formats=[];
+  if(epub) formats.push('epub');
+  if(pdf) formats.push('pdf');
+
+  const absolutize=(url)=>{
+    if(!url) return '';
+    try{return new URL(url,baseUrl).toString();}catch{return '';}
+  };
+  const externalUrl=/^https?:\/\//i.test(handle)
+    ? handle
+    : handle
+      ? `${baseUrl.replace(/\/$/,'')}/handle/${handle}`
+      : baseUrl;
+
+  return {
+    kind:'book',
+    rights:'open-access',
+    availability:'free',
+    provider,
+    sourceLabel,
+    id:String(raw?.uuid||raw?.id||handle||title),
+    title,
+    author:authors.join(', '),
+    year:String(date||'').match(/\d{4}/)?.[0]||'',
+    language:languages.join(', '),
+    subjects,
+    categories:subjects.slice(0,6),
+    formats,
+    cover:'',
+    downloadCount:0,
+    readable:false,
+    externalUrl,
+    downloadUrl:absolutize(epub?.url||pdf?.url||''),
+    downloadFormat:epub?'epub':pdf?'pdf':'',
+    license,
+    publisher,
+    description:String(description||'').replace(/\s+/g,' ').trim().slice(0,420)
+  };
+}
+
+async function searchOpenAccessDspace({endpoint,provider,sourceLabel,baseUrl,q='',category='all',language='all',yearFrom='',yearTo='',limit=24}={}) {
+  const parts=[];
+  const searchText=String(q||'').trim();
+  if(searchText) parts.push(searchText);
+  if(category!=='all') parts.push(`dc.subject:${JSON.stringify(DRM_FREE_CATEGORY_TOPICS[category]||category)}`);
+  if(language&&language!=='all') parts.push(`dc.language.iso:${JSON.stringify(language)}`);
+  if(yearFrom) parts.push(`dc.date.issued_dt:[${yearFrom}-01-01 TO *]`);
+  if(yearTo) parts.push(`dc.date.issued_dt:[* TO ${yearTo}-12-31]`);
+  const query=parts.length?parts.join(' AND '):'*';
+
+  const params=new URLSearchParams({
+    query,
+    expand:'metadata,bitstreams',
+    limit:String(Math.max(1,Math.min(50,limit)))
+  });
+  const payload=await fetchJsonWithRetry(`${endpoint}?${params}`,{
+    timeoutMs:22000,attempts:1,cacheTtlMs:LIBRARY_CACHE_MS
+  });
+  const rows=Array.isArray(payload)
+    ? payload
+    : Array.isArray(payload?.items)
+      ? payload.items
+      : Array.isArray(payload?.results)
+        ? payload.results
+        : [];
+  return rows.slice(0,limit).map(item=>normalizeOpenAccessDspaceBook(item,{provider,sourceLabel,baseUrl}));
+}
+
+async function searchDrmFreeDoab(options={}) {
+  return searchOpenAccessDspace({
+    ...options,
+    endpoint:'https://directory.doabooks.org/rest/search',
+    provider:'doab',
+    sourceLabel:'DOAB',
+    baseUrl:'https://directory.doabooks.org'
+  });
+}
+
+async function searchDrmFreeOapen(options={}) {
+  return searchOpenAccessDspace({
+    ...options,
+    endpoint:'https://library.oapen.org/rest/search',
+    provider:'oapen',
+    sourceLabel:'OAPEN',
+    baseUrl:'https://library.oapen.org'
+  });
+}
+
+async function searchDrmFreeOpenLibrary({q='',category='all',language='all',yearFrom='',yearTo='',limit=24}={}) {
+  const terms=[];
+  if(q) terms.push(String(q).trim());
+  if(category!=='all') terms.push(`subject_key:${JSON.stringify((DRM_FREE_CATEGORY_TOPICS[category]||category).replace(/\s+/g,'_'))}`);
+  terms.push('ebook_access:public');
+  if(language&&language!=='all') terms.push(`language:${language}`);
+  if(yearFrom||yearTo) terms.push(`first_publish_year:[${yearFrom||0} TO ${yearTo||3000}]`);
+  const params=new URLSearchParams({
+    q:terms.join(' '),
+    limit:String(Math.max(1,Math.min(50,limit))),
+    fields:'key,title,author_name,first_publish_year,cover_i,language,ebook_access,ia,subject'
+  });
+  const payload=await fetchJsonWithRetry(`https://openlibrary.org/search.json?${params}`,{
+    timeoutMs:20000,attempts:1,cacheTtlMs:LIBRARY_CACHE_MS,
+    headers:{'User-Agent':'MarkSetGoWeb/2.0 (DRM-free book discovery)'}
+  });
+  return (payload.docs||[]).slice(0,limit).map(book=>{
+    const archiveId=Array.isArray(book.ia)?book.ia[0]:'';
+    return {
+      kind:'book',
+      rights:'public-access',
+      availability:'free',
+      provider:archiveId?'internetarchive':'openlibrary',
+      sourceLabel:'Open Library',
+      id:archiveId||String(book.key||'').replace('/works/',''),
+      title:book.title||'Untitled',
+      author:authorNames(book.author_name),
+      year:book.first_publish_year||'',
+      language:Array.isArray(book.language)?book.language.slice(0,3).join(', '):'',
+      subjects:Array.isArray(book.subject)?book.subject.slice(0,8):[],
+      categories:Array.isArray(book.subject)?book.subject.slice(0,6):[],
+      formats:archiveId?['text']:[],
+      cover:book.cover_i?`https://covers.openlibrary.org/b/id/${book.cover_i}-M.jpg`:'',
+      downloadCount:0,
+      readable:Boolean(archiveId),
+      externalUrl:book.key?`https://openlibrary.org${book.key}`:'https://openlibrary.org/',
+      description:archiveId?'Publicly readable edition linked through Open Library / Internet Archive.':'Public-access catalog record from Open Library.'
+    };
+  });
+}
+
+function searchDrmFreeCommercialSources({q='',category='all',format='all'}={}) {
+  const needle=String(q||'').trim().toLowerCase();
+  return DRM_FREE_COMMERCIAL_SOURCES.filter(source=>{
+    const haystack=[source.name,source.note,...source.categories,...source.formats].join(' ').toLowerCase();
+    if(needle && !haystack.includes(needle)) return false;
+    if(category!=='all' && !source.categories.includes(category)) return false;
+    if(format!=='all' && !source.formats.includes(format)) return false;
+    return true;
+  }).map(source=>({kind:'store',...source,rights:'commercial-drm-free',sourceLabel:source.name}));
+}
+
+app.get('/api/drm-free/search', async (req,res)=>{
+  const q=String(req.query.q||'').trim().slice(0,180);
+  const category=normalizeDrmFreeCategory(req.query.category);
+  const availability=String(req.query.availability||'all').toLowerCase();
+  const format=String(req.query.format||'all').toLowerCase();
+  const source=String(req.query.source||'all').toLowerCase();
+  const language=String(req.query.language||'en').toLowerCase();
+  const sort=String(req.query.sort||'popular').toLowerCase();
+  const yearFrom=String(req.query.yearFrom||'').replace(/\D/g,'').slice(0,4);
+  const yearTo=String(req.query.yearTo||'').replace(/\D/g,'').slice(0,4);
+  const license=String(req.query.license||'all').toLowerCase();
+
+  if(!['all','free','paid'].includes(availability)) return res.status(400).json({error:'Unknown availability filter.'});
+  if(!['all','epub','pdf','text','mobi'].includes(format)) return res.status(400).json({error:'Unknown format filter.'});
+  if(!['all','gutenberg','standardebooks','openlibrary','doab','oapen','commercial'].includes(source)) return res.status(400).json({error:'Unknown DRM-free source.'});
+  if(!['all','public-domain','open-access'].includes(license)) return res.status(400).json({error:'Unknown rights filter.'});
+
+  const cacheKey=`drmfree:${q}:${category}:${availability}:${format}:${source}:${language}:${sort}:${yearFrom}:${yearTo}:${license}`;
+  const cached=librarySearchCache.get(cacheKey);
+  if(cached&&cached.expiresAt>Date.now()) return res.json(cached.payload);
+
+  const tasks=[];
+  const labels=[];
+  if(availability!=='paid' && (source==='all'||source==='gutenberg')){
+    labels.push('gutenberg');
+    tasks.push(searchDrmFreeGutenberg({q,category,language,limit:32}));
+  }
+  if(availability!=='paid' && (source==='all'||source==='standardebooks')){
+    labels.push('standardebooks');
+    tasks.push(searchDrmFreeStandardEbooks({q,category,limit:24}));
+  }
+  if(availability!=='paid' && (source==='all'||source==='openlibrary')){
+    labels.push('openlibrary');
+    tasks.push(searchDrmFreeOpenLibrary({q,category,language,yearFrom,yearTo,limit:24}));
+  }
+  if(availability!=='paid' && license!=='public-domain' && (source==='all'||source==='doab')){
+    labels.push('doab');
+    tasks.push(searchDrmFreeDoab({q,category,language,yearFrom,yearTo,limit:24}));
+  }
+  if(availability!=='paid' && license!=='public-domain' && (source==='all'||source==='oapen')){
+    labels.push('oapen');
+    tasks.push(searchDrmFreeOapen({q,category,language,yearFrom,yearTo,limit:24}));
+  }
+
+  const settled=await Promise.allSettled(tasks);
+  let books=[];
+  const errors=[];
+  settled.forEach((result,index)=>{
+    if(result.status==='fulfilled') books.push(...result.value);
+    else errors.push({source:labels[index],error:result.reason?.message||'Unavailable'});
+  });
+
+  if(format!=='all') books=books.filter(book=>Array.isArray(book.formats)&&book.formats.includes(format));
+  if(license==='public-domain') books=books.filter(book=>book.rights==='public-domain');
+  if(license==='open-access') books=books.filter(book=>book.rights==='open-access'||book.rights==='public-access');
+  if(yearFrom) books=books.filter(book=>!book.year||Number(book.year)>=Number(yearFrom));
+  if(yearTo) books=books.filter(book=>!book.year||Number(book.year)<=Number(yearTo));
+
+  const seen=new Set();
+  books=books.filter(book=>{
+    const key=`${String(book.title||'').toLowerCase()}|${String(book.author||'').toLowerCase()}`;
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  if(sort==='title') books.sort((a,b)=>String(a.title).localeCompare(String(b.title)));
+  else if(sort==='author') books.sort((a,b)=>String(a.author).localeCompare(String(b.author)));
+  else if(sort==='newest') books.sort((a,b)=>Number(b.year||0)-Number(a.year||0));
+  else if(sort==='oldest') books.sort((a,b)=>Number(a.year||9999)-Number(b.year||9999));
+  else if(sort==='downloads') books.sort((a,b)=>Number(b.downloadCount||0)-Number(a.downloadCount||0));
+  else books.sort((a,b)=>Number(b.downloadCount||0)-Number(a.downloadCount||0));
+
+  const stores=(availability!=='free' && (source==='all'||source==='commercial'))
+    ? searchDrmFreeCommercialSources({q,category,format})
+    : [];
+
+  const payload={
+    query:q,category,availability,format,source,language,sort,yearFrom,yearTo,license,
+    books:books.slice(0,80),
+    stores:stores.slice(0,30),
+    errors,
+    note:'Federated search covers supported public-domain/open-access catalogs plus a curated commercial DRM-free directory. No single complete index of every DRM-free ebook on the internet exists, so coverage will expand source by source.'
+  };
+  librarySearchCache.set(cacheKey,{payload,expiresAt:Date.now()+LIBRARY_CACHE_MS});
+  return res.json(payload);
+});
+
+
 // Unified public-library search and reading endpoints.
 const librarySearchCache = new Map();
 const LIBRARY_CACHE_MS = 15 * 60 * 1000;
@@ -3624,6 +4066,7 @@ app.get('/api/library/download', async (req, res) => {
     }
     const { buffer, contentType } = await fetchBuffer(sourceUrl, { maxBytes: format === 'pdf' ? 100 * 1024 * 1024 : 60 * 1024 * 1024, timeoutMs:45000 });
     res.setHeader('Content-Type', format === 'epub' ? 'application/epub+zip' : (contentType || 'application/pdf'));
+    res.setHeader('Content-Disposition', `attachment; filename="mark-set-go-book.${format}"`);
     res.setHeader('Cache-Control', 'private, max-age=300');
     return res.send(buffer);
   } catch (error) {

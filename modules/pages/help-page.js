@@ -8,6 +8,8 @@ function renderHelp() {
     ['start','Quick Start'],
     ['walkthrough','Walkthroughs'],
     ['library','My Library & Browse'],
+    ['drmfree','DRM-Free & Open Book Finder'],
+    ['drm-free','DRM-Free Book Finder'],
     ['reader','Reader Basics'],
     ['controls','Reading & Display Controls'],
     ['position','Position, Scrubbing & Book Pages'],
@@ -68,16 +70,44 @@ function renderHelp() {
           </div>
         </section>
 
+        <section class="help-section" id="help-drmfree" data-help-section>
+          <h2>DRM-Free & Open Book Finder</h2>
+          <p>Use Browse → DRM-Free Book Finder to search supported public-domain and open-access catalogs alongside a directory of commercial DRM-free stores and publishers.</p>
+          <ul>
+            <li><strong>Search:</strong> title, author, subject, idea, or keyword.</li>
+            <li><strong>Category:</strong> fiction, history, philosophy, science, technology, business, religion, and more.</li>
+            <li><strong>Rights:</strong> public domain or open access.</li>
+            <li><strong>Availability:</strong> free downloads or commercial DRM-free sources.</li>
+            <li><strong>Format:</strong> EPUB, PDF, TXT/text, or MOBI where a source provides it.</li>
+            <li><strong>Language and year:</strong> narrow by language and publication date range.</li>
+            <li><strong>Sources:</strong> Project Gutenberg, Standard Ebooks, Open Library public editions, DOAB, OAPEN, and a curated commercial DRM-free directory.</li>
+          </ul>
+          <p>No global database contains every DRM-free ebook on the internet. The Finder uses a federated-source approach and can expand as additional publishers and stores expose reliable feeds or APIs.</p>
+        </section>
+
         <section class="help-section" id="help-library" data-help-section>
           <h2>My Library & Browse</h2>
           <p><strong>My Library</strong> is the main home for your reading life.</p>
           <ul>
             <li><strong>Library Home:</strong> continue reading and manage saved books.</li>
             <li><strong>My Reading:</strong> active reading list, statuses, saved editions, and direct intake actions.</li>
-            <li><strong>Browse:</strong> Browse Home, Great Books, Bible Study, and Read Anything.</li>
+            <li><strong>Browse:</strong> Browse Home, DRM-Free Books, Great Books, Bible Study, and Read Anything.</li>
             <li><strong>Collections:</strong> Bookmarks, Book Notes, Random Notes, Definitions, and My Links.</li>
             <li><strong>Progress & Awards:</strong> reading and learning metrics, goals, streaks, and achievements.</li>
             <li><strong>Action Center:</strong> convert reading insights into actions, reminders, or scheduled follow-up.</li>
+          </ul>
+        </section>
+
+        <section class="help-section" id="help-drm-free" data-help-section>
+          <h2>DRM-Free Book Finder</h2>
+          <p>Open <strong>My Library → Browse → DRM-Free Books</strong> to search supported open catalogs and a curated directory of DRM-free ebook stores and publishers.</p>
+          <ul>
+            <li>Search by title, author, subject, or keyword.</li>
+            <li>Filter by category, free/paid availability, EPUB/PDF/TXT/MOBI, source, language, and sort order.</li>
+            <li>Project Gutenberg and Standard Ebooks results can open directly in the Reader when a readable edition is available.</li>
+            <li>Use the EPUB/PDF download buttons to save supported free editions to your device.</li>
+            <li>Commercial results link to the seller or publisher. Verify the individual title is DRM-free before purchasing.</li>
+            <li>The finder is a growing federated catalog, not a claim to index every DRM-free book on the internet.</li>
           </ul>
         </section>
 
