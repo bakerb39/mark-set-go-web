@@ -76,7 +76,12 @@
     // Global app-help companion identity is owned exclusively by app-help-mark.js.
     // Do not rewrite its label/avatar here; competing writers caused mixed Mark/Beth UI.
 
-    setButtonLabel(root.querySelector('#toggle-mark-panel'), 'Ask Mark', 'Ask Beth');
+    const readerCompanionButton = root.querySelector('#toggle-mark-panel');
+    setButtonLabel(readerCompanionButton, 'Ask Mark', 'Ask Beth');
+    // Keep the Reader companion button's avatar and label on the same persona.
+    // Previously only the label changed, leaving Mark's avatar beside "Ask Beth".
+    applyAvatar(readerCompanionButton?.querySelector(':scope > img'));
+
     setButtonLabel(root.querySelector('#fullscreen-mark-toggle'), 'Ask Mark', 'Ask Beth');
     qsa('.askmark-brand-copy h2', root).forEach((el) => setText(el, 'Ask Mark', 'Ask Beth'));
     qsa('.reader-control-header strong', root).forEach((el) => {

@@ -11,6 +11,6 @@
     "debug": "/?debug",
     "features": "/?features"
   },
-  "notes": "Fixes mixed companion identity on the floating app-help button by giving app-help-mark.js exclusive ownership of both label and avatar. Explicit event/navigation sync only; no MutationObserver.",
-  "version": "9.6.5"
+  "notes": "Fixes Reader #toggle-mark-panel mixed identity: Ask Beth now updates the button avatar to Beth as well as the label. Chromium component tested with exact production companion-persona-safe.js; no MutationObserver.",
+  "version": "9.6.6"
 }
