@@ -17172,6 +17172,13 @@ function renderGlobalNotebookEntries(){
 
 function renderGlobalNotebook(){
   stopReader();
+
+  // Notebook is a normal document page, not a Reader/fullscreen surface.
+  // Clear only scroll locks that can survive navigation away from the Reader.
+  document.body.classList.remove('viewer-fullscreen-open');
+  document.body.style.removeProperty('overflow');
+  document.documentElement.style.removeProperty('overflow');
+
   app.dataset.viewKey='mark-notebook';
   app.innerHTML=`<section class="platform-page global-notebook-page">
     <header class="platform-hero">
@@ -17184,6 +17191,18 @@ function renderGlobalNotebook(){
     </div>
     <div id="global-notebook-entries"></div>
   </section>`;
+
+  // Override the older nested-scroll experiment for this page only. The
+  // browser/document owns vertical scrolling, like the other app pages.
+  const notebookPage = app.querySelector('.global-notebook-page');
+  if (notebookPage) {
+    notebookPage.style.setProperty('max-height', 'none', 'important');
+    notebookPage.style.setProperty('height', 'auto', 'important');
+    notebookPage.style.setProperty('overflow-y', 'visible', 'important');
+    notebookPage.style.setProperty('overflow-x', 'visible', 'important');
+    notebookPage.style.removeProperty('overscroll-behavior-y');
+    notebookPage.style.removeProperty('scrollbar-gutter');
+  }
 
   app.querySelector('#global-notebook-search')?.addEventListener('input',renderGlobalNotebookEntries);
   app.querySelector('#add-global-notebook-note')?.addEventListener('click',()=>{
