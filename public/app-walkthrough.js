@@ -2,7 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
-  const WALKTHROUGH_BUILD = '9.3.5';
+  const WALKTHROUGH_BUILD = '9.3.6';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -14,6 +14,7 @@
   let menuMirrorSource = null;
   const TOP_HIGHLIGHT_ID = 'msg-walkthrough-top-highlight';
   let topHighlightObserver = null;
+  let trackingRaf = 0;
 
   const wait = (ms = 70) => new Promise((resolve) => window.setTimeout(resolve, ms));
   const $ = (selector, scope = document) => scope.querySelector(selector);
@@ -799,12 +800,14 @@
     const top = Math.max(2, Math.min(viewportHeight - 2, rect.top - pad));
     const right = Math.max(left + 2, Math.min(viewportWidth - 2, rect.right + pad));
     const bottom = Math.max(top + 2, Math.min(viewportHeight - 2, rect.bottom + pad));
+    const targetRadius = activeTarget ? window.getComputedStyle(activeTarget).borderRadius : '8px';
     Object.assign(highlight.style, {
       display: 'block',
       left: `${Math.round(left)}px`,
       top: `${Math.round(top)}px`,
       width: `${Math.max(8, Math.round(right - left))}px`,
       height: `${Math.max(8, Math.round(bottom - top))}px`,
+      borderRadius: targetRadius && targetRadius !== '0px' ? targetRadius : '7px',
       zIndex: '2147483647'
     });
     if (highlight.parentNode === document.body && document.body.lastElementChild !== highlight) {
@@ -812,7 +815,27 @@
     }
   }
 
+  function stopTargetTracking() {
+    if (trackingRaf) window.cancelAnimationFrame(trackingRaf);
+    trackingRaf = 0;
+  }
+
+  function startTargetTracking() {
+    stopTargetTracking();
+    const tick = () => {
+      if (!root || root.hidden || !activeTarget?.isConnected) {
+        trackingRaf = 0;
+        return;
+      }
+      positionMenuMirror();
+      positionOverlay();
+      trackingRaf = window.requestAnimationFrame(tick);
+    };
+    trackingRaf = window.requestAnimationFrame(tick);
+  }
+
   function clearTarget() {
+    stopTargetTracking();
     if (activeTarget) activeTarget.classList.remove(HIGHLIGHT_CLASS);
     activeTarget = null;
     hideTopHighlight();
@@ -1007,6 +1030,23 @@
     $('[data-walkthrough-prev]', root).disabled = currentIndex === 0;
     $('[data-walkthrough-next]', root).textContent = currentIndex === steps.length - 1 ? 'Finish' : 'Next →';
     schedulePosition();
+    startTargetTracking();
+    // Menus can reflow after opening (fonts, nested sections, scrollbars, portals).
+    // Re-resolve the target after those layout changes so the frame never stays
+    // attached to the previous row or an early geometry snapshot.
+    window.setTimeout(async () => {
+      if (!root || root.hidden || currentIndex !== index) return;
+      const refreshed = await resolveTarget(step);
+      if (!refreshed || currentIndex !== index) return;
+      if (activeTarget && activeTarget !== refreshed) activeTarget.classList.remove(HIGHLIGHT_CLASS);
+      activeTarget = refreshed;
+      activeTarget.classList.add(HIGHLIGHT_CLASS);
+      positionOverlay();
+    }, 120);
+    window.setTimeout(() => {
+      if (!root || root.hidden || currentIndex !== index || !activeTarget?.isConnected) return;
+      positionOverlay();
+    }, 320);
   }
 
   function showModePicker() {
