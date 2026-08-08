@@ -202,6 +202,19 @@
     });
   }
 
+  function normalizeReadingStatus(root = document.body) {
+    if (!root) return;
+    const desired = `${current().name} is reading`;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const node of nodes) {
+      const value = node.nodeValue || '';
+      if (!/Ask (?:Mark|Beth) is reading/.test(value)) continue;
+      node.nodeValue = value.replace(/Ask (?:Mark|Beth) is reading/g, desired);
+    }
+  }
+
   function applyKnownReaderLabels() {
     /* Target only visible companion labels inside protected reader UI. This
        avoids walking/mutating the reader or word context-menu DOM. */
@@ -368,6 +381,7 @@
   function applyAll({ includeProtected = false } = {}) {
     document.documentElement.dataset.companion = state.id;
     applyText(document.body, { includeProtected });
+    normalizeReadingStatus(document.body);
     applyKnownReaderLabels();
     applyAskCompanionButtonAvatar();
     applyImages(document);
