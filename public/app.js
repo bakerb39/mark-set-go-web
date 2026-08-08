@@ -4542,7 +4542,7 @@ function readingSkillBookOptions(books, placeholder = 'Choose a book…') {
 function renderProfilePreferences() {
   finalizeReadingSession();
   stopReader();
-  const current=getExperienceProfile();
+  let current=getExperienceProfile();
 
   const featureRows=[
     ['learn','Learn','Reading Skills, quizzes, Great Ideas, and learning tools'],
@@ -4575,10 +4575,12 @@ function renderProfilePreferences() {
         <div class="profile-preset-grid">
           ${Object.entries(EXPERIENCE_PRESETS).map(([key,preset])=>`
             <button class="profile-preset-option ${current.preset===key?'active':''}" type="button" data-profile-preset="${escapeHtml(key)}" aria-pressed="${current.preset===key}">
+              <span class="profile-preset-check" aria-hidden="true">${current.preset===key?'✓':''}</span>
               <strong>${escapeHtml(preset.label)}</strong>
               <small>${escapeHtml(preset.description)}</small>
             </button>`).join('')}
         </div>
+        <p id="profile-save-status" class="status profile-save-status" role="status" aria-live="polite"></p>
       </section>
 
       <section class="profile-feature-card">
@@ -4602,34 +4604,74 @@ function renderProfilePreferences() {
       </section>
     </section>`;
 
+  const status=app.querySelector('#profile-save-status');
+
+  const reflectPresetSelection=(selectedKey='')=>{
+    app.querySelectorAll('[data-profile-preset]').forEach((button)=>{
+      const active=button.dataset.profilePreset===selectedKey;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',String(active));
+      const check=button.querySelector('.profile-preset-check');
+      if(check) check.textContent=active ? '✓' : '';
+    });
+  };
+
+  const reflectFeatureControls=(profile)=>{
+    app.querySelectorAll('[data-profile-feature]').forEach((input)=>{
+      input.checked=profile.features?.[input.dataset.profileFeature]!==false;
+    });
+  };
+
+  const announceSave=(saved,label)=>{
+    if(!status) return;
+    status.className=`status profile-save-status ${saved.persisted ? 'success' : ''}`;
+    status.textContent=saved.persisted
+      ? `${label} is now active.`
+      : `${label} is active for this session. Browser storage is full, so this choice may need to be selected again later.`;
+  };
+
   const saveFromControls=()=>{
     const features={...current.features};
     app.querySelectorAll('[data-profile-feature]').forEach((input)=>{
       features[input.dataset.profileFeature]=Boolean(input.checked);
     });
-    saveExperienceProfile({preset:'custom',features});
-    app.querySelectorAll('[data-profile-preset]').forEach((button)=>{
-      button.classList.remove('active');
-      button.setAttribute('aria-pressed','false');
-    });
+
+    const saved=saveExperienceProfile({preset:'custom',features});
+    current=normalizeExperienceProfile(saved);
+    reflectPresetSelection('');
+    announceSave(saved,'Custom experience');
   };
 
-  app.querySelectorAll('[data-profile-feature]').forEach((input)=>input.addEventListener('change',saveFromControls));
+  app.querySelectorAll('[data-profile-feature]').forEach((input)=>{
+    input.addEventListener('change',saveFromControls);
+  });
 
-  app.querySelectorAll('[data-profile-preset]').forEach((button)=>button.addEventListener('click',()=>{
-    const key=button.dataset.profilePreset;
-    const preset=EXPERIENCE_PRESETS[key];
-    if(!preset) return;
-    const saved=saveExperienceProfile({preset:key,features:preset.features});
-    app.querySelectorAll('[data-profile-preset]').forEach((item)=>{
-      const active=item===button;
-      item.classList.toggle('active',active);
-      item.setAttribute('aria-pressed',String(active));
+  app.querySelectorAll('[data-profile-preset]').forEach((button)=>{
+    button.addEventListener('click',(event)=>{
+      event.preventDefault();
+      const key=button.dataset.profilePreset;
+      const preset=EXPERIENCE_PRESETS[key];
+      if(!preset) return;
+
+      const saved=saveExperienceProfile({
+        preset:key,
+        features:{...preset.features}
+      });
+
+      current=normalizeExperienceProfile(saved);
+      reflectPresetSelection(key);
+      reflectFeatureControls(current);
+      announceSave(saved,preset.label);
     });
-    app.querySelectorAll('[data-profile-feature]').forEach((input)=>{
-      input.checked=saved.features[input.dataset.profileFeature]!==false;
-    });
-  }));
+  });
+
+  // Keep the page synchronized if the profile is changed by another app control.
+  const onProfileChange=(event)=>{
+    current=normalizeExperienceProfile(event.detail?.profile || getExperienceProfile());
+    reflectPresetSelection(current.preset === 'custom' ? '' : current.preset);
+    reflectFeatureControls(current);
+  };
+  document.addEventListener('marksetgo:experience-profile-changed',onProfileChange,{once:true});
 }
 
 function renderReadingSkillsHub() {
@@ -5270,31 +5312,56 @@ const EXPERIENCE_PRESETS = Object.freeze({
 });
 
 function normalizeExperienceProfile(value = {}) {
-  const presetKey = EXPERIENCE_PRESETS[value.preset] ? value.preset : 'full';
-  const base = EXPERIENCE_PRESETS[presetKey].features;
+  const requestedPreset=String(value?.preset || '').trim();
+  const presetKey=EXPERIENCE_PRESETS[requestedPreset] ? requestedPreset : (requestedPreset === 'custom' ? 'custom' : 'full');
+  const basePreset=presetKey === 'custom' ? EXPERIENCE_PRESETS.full : EXPERIENCE_PRESETS[presetKey];
+
   return {
     preset:presetKey,
     features:{
-      ...base,
+      ...basePreset.features,
       ...(value.features && typeof value.features === 'object' ? value.features : {})
     }
   };
 }
 
+let activeExperienceProfile=null;
+
 function getExperienceProfile() {
+  if (activeExperienceProfile) {
+    return normalizeExperienceProfile(activeExperienceProfile);
+  }
+
   try {
     const saved=JSON.parse(localStorage.getItem(PROFILE_EXPERIENCE_KEY)||'null');
-    return normalizeExperienceProfile(saved || { preset:'full' });
+    activeExperienceProfile=normalizeExperienceProfile(saved || { preset:'full' });
   } catch {
-    return normalizeExperienceProfile({ preset:'full' });
+    activeExperienceProfile=normalizeExperienceProfile({ preset:'full' });
   }
+  return normalizeExperienceProfile(activeExperienceProfile);
 }
 
 function saveExperienceProfile(profile) {
   const normalized=normalizeExperienceProfile(profile);
-  localStorage.setItem(PROFILE_EXPERIENCE_KEY, JSON.stringify(normalized));
+
+  // Apply the choice immediately. Persistence failure must never make the
+  // preset buttons appear broken (localStorage may already be near quota).
+  activeExperienceProfile=normalized;
   applyExperienceProfile(normalized);
-  return normalized;
+
+  let persisted=true;
+  try {
+    localStorage.setItem(PROFILE_EXPERIENCE_KEY, JSON.stringify(normalized));
+  } catch (error) {
+    persisted=false;
+    console.warn('Experience profile could not be persisted in localStorage.', error);
+  }
+
+  document.dispatchEvent(new CustomEvent('marksetgo:experience-profile-changed', {
+    detail:{ profile:normalized, persisted }
+  }));
+
+  return { ...normalized, persisted };
 }
 
 function experienceFeatureEnabled(feature) {
@@ -5302,8 +5369,12 @@ function experienceFeatureEnabled(feature) {
 }
 
 function applyExperienceProfile(profile = getExperienceProfile()) {
+  const normalized=normalizeExperienceProfile(profile);
+  activeExperienceProfile=normalized;
+
   const rootEl=document.documentElement;
-  const features=profile.features || {};
+  const features=normalized.features || {};
+
   Object.entries(features).forEach(([key,enabled]) => {
     rootEl.dataset[`feature${key.charAt(0).toUpperCase()}${key.slice(1)}`]=enabled ? 'on' : 'off';
   });
@@ -5314,6 +5385,8 @@ function applyExperienceProfile(profile = getExperienceProfile()) {
     element.hidden=!enabled;
     element.setAttribute('aria-hidden', String(!enabled));
   });
+
+  return normalized;
 }
 
 window.MarkSetGoExperienceProfile = Object.freeze({

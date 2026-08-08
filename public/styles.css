@@ -11647,3 +11647,32 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
 @media (max-width:520px) {
   .profile-preset-grid { grid-template-columns:1fr; }
 }
+
+
+/* v9.2.76 experience preset interaction fix */
+.profile-preset-option {
+  position:relative;
+}
+.profile-preset-check {
+  position:absolute;
+  top:9px;
+  right:10px;
+  width:22px;
+  height:22px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  background:transparent;
+  color:#245f91;
+  font-size:.78rem;
+  font-weight:900;
+}
+.profile-preset-option.active .profile-preset-check {
+  background:#245f91;
+  color:#fff;
+}
+.profile-save-status {
+  min-height:20px;
+  margin:10px 2px 0;
+  font-size:.78rem;
+}
