@@ -11116,3 +11116,84 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
 ):not(:disabled):focus-visible * {
   color:inherit !important;
 }
+
+
+/* v9.2.70 Browse nested under My Library */
+.library-browse-submenu {
+  margin:4px 0 2px;
+  border:1px solid rgba(61,103,150,.13);
+  border-radius:12px;
+  background:rgba(238,245,252,.48);
+  overflow:hidden;
+}
+
+.library-browse-submenu > summary {
+  display:grid;
+  grid-template-columns:32px minmax(0,1fr) 18px;
+  align-items:center;
+  gap:10px;
+  min-height:48px;
+  padding:9px 11px;
+  list-style:none;
+  cursor:pointer;
+  color:inherit;
+}
+
+.library-browse-submenu > summary::-webkit-details-marker {
+  display:none;
+}
+
+.library-browse-submenu > summary:hover,
+.library-browse-submenu > summary:focus-visible {
+  background:#5aa6e8 !important;
+  color:#fff !important;
+}
+
+.library-browse-submenu > summary:hover *,
+.library-browse-submenu > summary:focus-visible * {
+  color:inherit !important;
+}
+
+.library-submenu-chevron {
+  font-size:1.3rem;
+  line-height:1;
+  transition:transform .16s ease;
+  opacity:.7;
+}
+
+.library-browse-submenu[open] .library-submenu-chevron {
+  transform:rotate(90deg);
+}
+
+.library-submenu-items {
+  display:grid;
+  gap:2px;
+  padding:4px 6px 7px 38px;
+  border-top:1px solid rgba(61,103,150,.10);
+  background:#fff;
+}
+
+.library-submenu-items > button {
+  width:100%;
+  min-height:44px;
+  display:grid;
+  grid-template-columns:28px minmax(0,1fr);
+  align-items:center;
+  gap:9px;
+  padding:7px 9px;
+  border:0;
+  border-radius:9px;
+  background:transparent;
+  text-align:left;
+}
+
+.library-submenu-items > button:hover,
+.library-submenu-items > button:focus-visible {
+  background:#e8f2fd;
+}
+
+@media (max-width:700px) {
+  .library-submenu-items {
+    padding-left:20px;
+  }
+}

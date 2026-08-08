@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=9.2.69-global-icon-hover" rel="stylesheet"/>
+<link href="/styles.css?v=9.2.70-library-browse-submenu" rel="stylesheet"/>
 <link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
 <link href="/ask-mark-hub.css?v=9.2.11-contents-responsive-fix" rel="stylesheet"/>
 <link href="/mobile-simple.css?v=8.5.9" rel="stylesheet"/>
@@ -22,7 +22,7 @@
   <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
   <script defer src="/auth.js?v=9.0.3-auth-profile"></script>
   <script defer src="/cloud-data.js?v=8.1.2"></script>
-  <script defer src="/app.js?v=9.2.68-guide-resume-text-fallback"></script>
+  <script defer src="/app.js?v=9.2.70-library-browse-submenu"></script>
   <script defer src="/cloud-preferences.js?v=8.1.2"></script>
   <script defer src="/cloud-library.js?v=9.2.36-cloud-delete"></script>
   <script defer src="/cloud-document.js?v=9.2.18-cloud-remove-unified"></script>
@@ -59,6 +59,32 @@
     <span class="menu-copy"><strong>Read Anything</strong><small>Import a webpage, document, book, or pasted text</small></span>
   </button>
 
+  <details class="library-browse-submenu">
+    <summary role="button" aria-label="Expand Browse and Discover">
+      <span class="menu-icon icon-browse">⌕</span>
+      <span class="menu-copy"><strong>Browse</strong><small>Find guides, free books, libraries, and collections</small></span>
+      <span class="library-submenu-chevron" aria-hidden="true">›</span>
+    </summary>
+    <div class="library-submenu-items">
+      <button data-action="browse" type="button" role="menuitem">
+        <span class="menu-icon">⌕</span>
+        <span class="menu-copy"><strong>Browse Home</strong><small>Search everything and explore the full catalog</small></span>
+      </button>
+      <button data-read="great-books" type="button" role="menuitem">
+        <span class="menu-icon">★</span>
+        <span class="menu-copy"><strong>Great Books</strong><small>Explore the Great Books collection</small></span>
+      </button>
+      <button data-read="bible" type="button" role="menuitem">
+        <span class="menu-icon">✦</span>
+        <span class="menu-copy"><strong>Bible Study</strong><small>Translations, commentary, and study tools</small></span>
+      </button>
+      <button data-action="my-links" type="button" role="menuitem">
+        <span class="menu-icon">↗</span>
+        <span class="menu-copy"><strong>My Links</strong><small>Open saved reading and research websites</small></span>
+      </button>
+    </div>
+  </details>
+
   <div class="menu-divider"></div>
   <div class="menu-section-label">Collections</div>
 
@@ -92,16 +118,6 @@
 </div>
 </details>
 
-<details class="top-nav-menu">
-<summary><span class="nav-icon" aria-hidden="true">⌕</span> Browse</summary>
-<div class="menu-popover">
-<button data-action="browse" type="button"><span class="menu-icon">⌕</span> Browse Libraries</button>
-<button data-read="great-books" type="button"><span class="menu-icon">★</span> Great Books</button>
-<button data-read="bible" type="button"><span class="menu-icon">✦</span> Bible Study</button>
-<button data-read="upload" type="button"><span class="menu-icon">⇧</span> Read Anything</button>
-<button data-action="my-links" type="button"><span class="menu-icon">↗</span> My Links</button>
-</div>
-</details>
 
 <details>
 <summary><span class="nav-icon" aria-hidden="true">↗</span> Learn</summary>

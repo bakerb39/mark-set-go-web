@@ -16115,6 +16115,14 @@ document.addEventListener('click', (event) => {
     return;
   }
 
+  // Browse now lives as an expandable subsection inside My Library. Let its
+  // native <details> toggle without treating that nested summary as a request
+  // to close the parent navigation menu.
+  const nestedLibrarySubmenu = event.target.closest('.library-browse-submenu');
+  if (nestedLibrarySubmenu) {
+    return;
+  }
+
   const activeMenu = event.target.closest('.site-header nav > details');
   if (activeMenu) {
     if (event.target.closest('summary')) closeTopNavigationMenus(activeMenu);
