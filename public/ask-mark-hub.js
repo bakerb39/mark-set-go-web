@@ -24,7 +24,6 @@
 
   let shell = null;
   let legacyHost = null;
-  let selectionObserver = null;
   let installAttempts = 0;
 
   const QUICK_ACTIONS = [
@@ -286,11 +285,14 @@
     const body = response.cloneNode(true);
     body.querySelectorAll('button').forEach((button) => button.classList.add('askmark-inline-action'));
     body.querySelectorAll('.mark-response-heading span').forEach((node) => { node.textContent = companionAsk(); });
-    const markup = `<article class="askmark-message mark-message">
+    const isPending = Boolean(body.querySelector('.status:not(.error)'));
+    const pending = $('[data-askmark-legacy-pending="1"]', shell);
+    const markup = `<article class="askmark-message mark-message"${isPending ? ' data-askmark-legacy-pending="1"' : ''}>
       <img src="${companionAvatar()}" alt="${companionName()}">
       <div><span>${companionName()}</span><div class="askmark-rich-response">${body.innerHTML}</div></div>
     </article>`;
     if (thinking) thinking.outerHTML = markup;
+    else if (pending) pending.outerHTML = markup;
     else $('[data-askmark-conversation]', shell)?.insertAdjacentHTML('beforeend', markup);
 
     const messages = $$('[data-askmark-conversation] .askmark-message', shell);
@@ -317,6 +319,12 @@
     if (conversation) conversation.scrollTop = conversation.scrollHeight;
   }
 
+
+  document.addEventListener('marksetgo:askmark-legacy-updated',()=>{
+    if(!shell) return;
+    syncSelection();
+    syncLegacyResponse();
+  });
 
   document.addEventListener('marksetgo:notebook-saved',()=>{
     if(!shell) return;
@@ -438,7 +446,7 @@
       <article class="askmark-message mark-message ${className}" id="${id}">
         <img src="${companionAvatar()}" alt="${companionName()}">
         <div>
-          <span>Mark · ${escapeHtml(title)}</span>
+          <span>${escapeHtml(companionName())} · ${escapeHtml(title)}</span>
           <div class="askmark-rich-response askmark-study-output">${bodyHtml}</div>
         </div>
       </article>`);
@@ -749,16 +757,6 @@
     shell.appendChild(legacyHost);
     shell.insertAdjacentHTML('beforeend', premiumMarkup());
     bindPremiumEvents();
-
-    const legacySelection = getLegacySelectionPanel();
-    if (legacySelection) {
-      selectionObserver?.disconnect();
-      selectionObserver = new MutationObserver(() => {
-        syncSelection();
-        syncLegacyResponse();
-      });
-      selectionObserver.observe(legacySelection, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden'] });
-    }
 
     syncSelection();
     syncContext();

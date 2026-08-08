@@ -2,7 +2,7 @@
   'use strict';
   window.MSGDeveloperData = {
     build: {
-      current: 'v9.6.3-companion-identity-render-fix',
+      current: 'v9.6.4-companion-dedup-event-sync',
       channel: 'development',
       builtAt: '2026-08-08',
       latestStable: '2026-08-08-right-click-stable',
@@ -19,8 +19,11 @@
       { id:'BUG-002', title:'Right-click actions fail after Reader navigation', area:'Reader', severity:'high', status:'fixed-verified', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:true, notes:'Root cause: stale document pointerdown listener closed over an old context menu. Fixed by resolving the live menu at event time. User verified.' },
       { id:'BUG-003', title:'Read Anything Format control crowds heading and controls', area:'Formatter', severity:'low', status:'fixed-pending-verification', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Added explicit smart-format layout, spacing, button sizing, and mobile wrapping.' },
       { id:'BUG-004', title:'Companion profile state can fail to reflect Mark/Beth consistently', area:'Profile / Companion', severity:'medium', status:'fixed-chromium-verified', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Companion-specific logic uses explicit targeted updates with no MutationObserver. Chromium verification confirms Beth/Mark Reader header, avatar, message author, and lookup badge stay consistent.' },
-      { id:'BUG-005', title:'Global Ask Mark help restoration', area:'App Help', severity:'medium', status:'fixed-pending-verification', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Restored detailed page-aware help and companion avatar; button moved slightly higher.' },
-      { id:'BUG-006', title:'Duplicate Ask Mark/Ask Beth labels and mixed companion identity', area:'Companion UI', severity:'high', status:'fixed-chromium-verified', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Button label now reuses its existing span; Reader companion markup and dictionary/legacy responses render from the selected companion at creation time. Verified in Chromium with Beth selected.' }
+      { id:'BUG-005', title:'Global Ask Mark help restoration', area:'App Help', severity:'medium', status:'fixed-chromium-verified', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Restored detailed page-aware help and companion avatar; Chromium behavior test confirms a single companion label target.' },
+      { id:'BUG-006', title:'Duplicate Ask Mark/Ask Beth labels and mixed companion identity', area:'Companion UI', severity:'high', status:'fixed-chromium-verified', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Button label now reuses its existing span; Reader companion markup and dictionary/legacy responses render from the selected companion at creation time. Verified in Chromium with Beth selected.' },
+      { id:'BUG-007', title:'Word lookup produces duplicate companion responses', area:'Reader / Companion', severity:'high', status:'fixed-chromium-verified', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Removed the duplicate rendered-menu action path and made the Ask Mark/Beth hub update one pending response in place. Chromium test verifies exactly one Word lookup companion message.' },
+      { id:'BUG-008', title:'Beth home hero repeats embedded companion tagline', area:'Home / Companion', severity:'medium', status:'fixed-chromium-verified', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Beth badge mode hides the separate HTML stage caption because the Beth artwork already contains the companion tagline. Chromium computed-style test verifies it is hidden.' },
+      { id:'BUG-009', title:'Ask Mark hub used MutationObserver for legacy response synchronization', area:'Companion architecture', severity:'medium', status:'fixed-chromium-verified', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Replaced the observer with explicit marksetgo:askmark-legacy-updated events dispatched by the Reader response lifecycle.' }
     ],
     features: [
       { id:'FEAT-001', title:'Debug Center', status:'testing', priority:'highest', area:'Platform', summary:'Permanent diagnostics, bug catalog, stable-build manifest, runtime snapshots, event probes, and exportable debug reports.', route:'/?debug' },

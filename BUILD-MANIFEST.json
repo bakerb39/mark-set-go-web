@@ -1,5 +1,5 @@
 {
-  "currentBuild": "v9.6.3-companion-identity-render-fix",
+  "currentBuild": "v9.6.4-companion-dedup-event-sync",
   "channel": "development",
   "date": "2026-08-08",
   "latestStableBuild": "2026-08-08-right-click-stable",
@@ -11,5 +11,5 @@
     "debug": "/?debug",
     "features": "/?features"
   },
-  "notes": "Chromium-verified companion identity rendering: single Ask Mark/Ask Beth help label, matching Reader avatar/name/badges, corrected home Meet Mark/Meet Beth text, and Features workflow ordered Ideas \u2192 Planned \u2192 Testing \u2192 In Progress \u2192 Completed. Right-click baseline preserved."
+  "notes": "Chromium behavior-tested fixes for duplicate companion lookup responses, Beth home tagline duplication, single Ask Mark/Ask Beth help label, consistent Mark/Beth identity, first-person “I’m reading this…” status, and Features workflow order. Ask Mark hub legacy synchronization now uses explicit app events instead of MutationObserver."
 }

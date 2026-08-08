@@ -9139,15 +9139,19 @@ function activateMarkTab(tab){
   if(tab==='history') renderMarkHistory();
   if(tab==='notebook') renderMarkNotebook();
 }
+function notifyAskMarkLegacyUpdated(kind='selection'){
+  document.dispatchEvent(new CustomEvent('marksetgo:askmark-legacy-updated',{detail:{kind}}));
+}
 function renderMarkSelectionCard(){
   const panel=app.querySelector('#mark-selection-panel'); if(!panel) return;
   const selected=state.markSelection;
-  if(!selected){ panel.innerHTML='<div class="mark-empty"><strong>Hi, I’m Ask Mark.</strong><p>Highlight any passage—or use the paragraph shortcut—and I’ll help you understand it without moving your reading position.</p></div>'; return; }
+  if(!selected){ panel.innerHTML='<div class="mark-empty"><strong>Hi, I’m Ask Mark.</strong><p>Highlight any passage—or use the paragraph shortcut—and I’ll help you understand it without moving your reading position.</p></div>'; notifyAskMarkLegacyUpdated('selection'); return; }
   panel.innerHTML=`<div class="mark-selection-card"><span>Current selection · ${splitWords(selected.text).length} words</span><blockquote>${escapeHtml(selected.text.slice(0,1300))}${selected.text.length>1300?'…':''}</blockquote></div>
   <div class="mark-action-grid">${[['explain','💡','Explain'],['summarize','≡','Summarize'],['analyze','🧠','Analyze'],['simplify','A','Simplify'],['context','🏛','Context'],['related','🔗','Related ideas'],['translate','🌍','Translate'],['save','★','Save insight']].map(([id,icon,label])=>`<button type="button" data-mark-action="${id}"><span>${icon}</span>${label}</button>`).join('')}</div>
   <form id="mark-question-form" class="mark-question-form"><label for="mark-question">Ask Mark about this passage</label><div><input id="mark-question" type="text" maxlength="1200" placeholder="What does this mean here?"><button class="primary" type="submit">Ask</button></div></form>
   <div id="mark-response" class="mark-response" hidden></div>`;
   bindMarkPanelActions();
+  notifyAskMarkLegacyUpdated('selection');
 }
 function renderMarkResult(result, action){
   const selected=state.markSelection ? {...state.markSelection} : null;
@@ -9181,6 +9185,7 @@ function renderMarkResult(result, action){
       }
     });
   });
+  notifyAskMarkLegacyUpdated('response');
 }
 function saveMarkInsight(extra={}){
   const selected=state.markSelection;
@@ -9259,13 +9264,14 @@ async function runMarkAction(action,question=''){
   if(action==='related'){openComparisonWorkspace();return;}
   if(action==='define' && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false, 'mark'); return; }
   const responsePanels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean);responsePanels.forEach(p=>{p.hidden=false;p.innerHTML='<p class="status">I’m reading this…</p>';});
+  notifyAskMarkLegacyUpdated('response');
   try{
     const targetLanguage=action==='translate'?(window.prompt('Translate into which language?','Spanish')||'').trim():''; if(action==='translate'&&!targetLanguage)return;
     const response=await fetch('/api/mark-selection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...selected,selection:selected.text,action,question,targetLanguage})});
     const payload=await response.json().catch(()=>({})); if(!response.ok) throw new Error(payload.error||payload.detail||`HTTP ${response.status}`);
     const record={id:`history-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,documentId:state.documentId,title:state.title,selection:selected.text,startIndex:selected.startIndex,chapter:selected.chapter,action,question,result:payload.result,createdAt:new Date().toISOString()};
     saveMarkRecords(MARK_HISTORY_KEY,[record,...getMarkRecords(MARK_HISTORY_KEY)]); renderMarkResult(payload.result,action);
-  } catch(error){responsePanels.forEach(p=>{p.innerHTML=`<p class="status error">${escapeHtml(error.message)}</p>`;});}
+  } catch(error){responsePanels.forEach(p=>{p.innerHTML=`<p class="status error">${escapeHtml(error.message)}</p>`;});notifyAskMarkLegacyUpdated('response');}
 }
 function bindMarkPanelActions(){
   app.querySelectorAll('[data-mark-action]').forEach(button=>button.addEventListener('click',()=>runMarkAction(button.dataset.markAction)));
@@ -11996,6 +12002,7 @@ function showDictionaryResult(word, definition, partOfSpeech = '', example = '',
     if (!panel) return;
     panel.hidden = false;
     panel.innerHTML = dictionaryResultMarkup(word, definition, partOfSpeech, example, saved);
+    notifyAskMarkLegacyUpdated('response');
     return;
   }
   const panel = app.querySelector('#word-result');
@@ -12038,6 +12045,7 @@ async function performDictionaryLookup(saveAfter = false, target = 'tools', cont
     if (markPanel) {
       markPanel.hidden = false;
       markPanel.innerHTML = `<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+      notifyAskMarkLegacyUpdated('response');
     }
   } else {
     openWordPanelForDictionary();
@@ -12058,6 +12066,7 @@ async function performDictionaryLookup(saveAfter = false, target = 'tools', cont
     if (panel) {
       panel.hidden = false;
       panel.innerHTML = `<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status error">${escapeHtml(error.message)}</p>`;
+      notifyAskMarkLegacyUpdated('response');
     }
   }
 }
@@ -12497,7 +12506,9 @@ function bindDictionaryMenu(reader) {
         : null;
       const liveMenu = app.querySelector('#word-context-menu');
       if (!button || !liveMenu || !liveMenu.contains(button)) return;
-      window.__msgDictionaryActionRunner?.(button, event);
+      if (window.__msgDictionaryActionRunner?.(button, event)) {
+        window.__msgDictionaryLastPointerActionAt = performance.now();
+      }
     }, true);
     document.addEventListener('click', (event) => {
       const button = event.target instanceof Element
@@ -12505,36 +12516,20 @@ function bindDictionaryMenu(reader) {
         : null;
       const liveMenu = app.querySelector('#word-context-menu');
       if (!button || !liveMenu || !liveMenu.contains(button)) return;
+      if (performance.now() - Number(window.__msgDictionaryLastPointerActionAt || 0) < 500) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return;
+      }
       window.__msgDictionaryActionRunner?.(button, event);
     }, true);
   }
 
-  // Execute mouse/touch menu choices on pointerup. This occurs before the
-  // synthetic click and is resistant to reader selection/click handlers that
-  // may repaint the DOM between pointerup and click.
-  menu.addEventListener('pointerup', (event) => {
-    if (event.button !== undefined && event.button !== 0) return;
-    const button = event.target instanceof Element
-      ? event.target.closest('[data-dictionary-action]')
-      : null;
-    if (!button || !menu.contains(button)) return;
-    if (runDictionaryAction(button, event)) lastPointerActionAt = performance.now();
-  }, true);
-
-  // Keyboard activation still uses click. Suppress only the synthetic click
-  // immediately following a pointerup action.
-  menu.addEventListener('click', (event) => {
-    const button = event.target instanceof Element
-      ? event.target.closest('[data-dictionary-action]')
-      : null;
-    if (!button || !menu.contains(button)) return;
-    if (performance.now() - lastPointerActionAt < 500) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      return;
-    }
-    runDictionaryAction(button, event);
-  }, true);
+  // Dictionary actions are handled only by the single delegated document bridge
+  // above. Do not also bind pointerup/click handlers to this rendered menu: a
+  // single physical activation would then execute both paths and duplicate
+  // Ask Mark/Beth responses. Keyboard clicks are handled by the delegated
+  // document click listener as well.
 
   menu.addEventListener('pointerdown', (event) => {
     if (event.target instanceof Element && event.target.closest('[data-dictionary-action]')) {

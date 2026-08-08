@@ -142,11 +142,13 @@
       if (!(appSrc.includes('__msgDictionaryOutsideCloseInstalled') && appSrc.includes("app.querySelector('#word-context-menu')"))) tests[tests.length-1].status='fail';
       add('Right-click contextmenu handler exists', appSrc.includes("addEventListener('contextmenu'") ? 'pass':'fail', 'Protected Reader right-click contract.');
       add('First-person reading status', appSrc.includes('I’m reading this…') && !appSrc.includes('Ask Mark is reading the selection…') ? 'pass':'fail', 'Expected “I’m reading this…” wording.');
-      add('Companion module avoids MutationObserver', !companionSrc.includes('MutationObserver') ? 'pass':'fail', 'Targeted event-driven companion updates only.');
+      add('Companion modules avoid MutationObserver', !companionSrc.includes('MutationObserver') && !hubSrc.includes('MutationObserver') ? 'pass':'fail', 'Companion identity and legacy-response sync use explicit events, not DOM observers.');
       add('Companion profile selector present', companionSrc.includes('data-companion-choice') ? 'pass':'fail', 'Mark/Beth profile controls available.');
       add('Companion help button has one label target', companionSrc.includes("querySelector(':scope > span')") ? 'pass':'fail', 'Prevents duplicate Ask Mark / Ask Beth text.');
       add('Reader companion shell renders selected identity', hubSrc.includes('companionAsk()') && hubSrc.includes('companionAvatar()') && hubSrc.includes('companionName()') ? 'pass':'fail', 'Header, avatar, and messages are created from selected companion state.');
       add('Dictionary response uses selected companion', appSrc.includes('currentCompanionIdentity().ask') ? 'pass':'fail', 'Word lookup badge follows Mark/Beth selection.');
+      add('Dictionary action has one execution path', !appSrc.includes("menu.addEventListener('pointerup'") && appSrc.includes('__msgDictionaryDelegationInstalled') ? 'pass':'fail', 'Prevents duplicate lookup responses from local + delegated handlers.');
+      add('Ask companion response sync is event-driven', appSrc.includes('marksetgo:askmark-legacy-updated') && hubSrc.includes('marksetgo:askmark-legacy-updated') && !hubSrc.includes('MutationObserver') ? 'pass':'fail', 'Explicit Reader→companion response lifecycle detected.');
       add('Features workflow order', devSrc.includes("['idea','Ideas'],['planned','Planned'],['testing','Testing'],['in-progress','In Progress'],['complete','Completed']") ? 'pass':'fail', 'Ideas → Planned → Testing → In Progress → Completed.');
       add('Global page-help module loads', helpSrc.includes('MarkSetGoPageHelpKnowledge') ? 'pass':'fail', 'Page-aware non-Reader help restored.');
       add('Formatter layout CSS exists', formatCss.includes('.smart-format-heading') && formatCss.includes('.smart-format-actions') ? 'pass':'fail', 'Professional Format control styling present.');

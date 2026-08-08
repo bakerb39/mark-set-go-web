@@ -103,6 +103,9 @@
       if (/^(Mark|Beth)[’']s Notebook$/.test((el.textContent || '').trim())) el.textContent = id === 'beth' ? 'Beth’s Notebook' : 'Mark’s Notebook';
     });
 
+    qsa('.home-mark-icon-stage', root).forEach((stage) => {
+      stage.classList.toggle('companion-frontpage-badge-mode', id === 'beth');
+    });
     qsa('.home-mark-avatar', root).forEach((img) => {
       if (!(img instanceof HTMLImageElement)) return;
       if (!img.dataset.msgMarkSrc) img.dataset.msgMarkSrc = img.src;
