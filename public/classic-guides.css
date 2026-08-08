@@ -44,3 +44,34 @@
 
 .cg-header-guides-btn{margin-right:6px}
 .cg-header-guides-wrap{margin:10px 0}
+
+.cg-gb-tabs{
+  display:flex;
+  gap:6px;
+  margin:14px 0 18px;
+  padding:5px;
+  width:max-content;
+  max-width:100%;
+  border:1px solid #d8e1ea;
+  border-radius:10px;
+  background:#f4f7fa;
+}
+.cg-gb-tab{
+  border:0;
+  background:transparent;
+  color:#31516d;
+  font-weight:800;
+  padding:9px 14px;
+  border-radius:7px;
+  cursor:pointer;
+}
+.cg-gb-tab.active{
+  background:#0b4b7d;
+  color:#f3c85b;
+}
+.cg-gb-tab:hover{
+  background:#e4eef7;
+}
+.cg-gb-tab.active:hover{
+  background:#0b4b7d;
+}

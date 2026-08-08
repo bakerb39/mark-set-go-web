@@ -7,7 +7,48 @@
 
   function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
   async function json(path){ const r=await fetch(path,{cache:'no-store'}); if(!r.ok) throw new Error(`Could not load ${path}`); return r.json(); }
-  function normalizeGuideTitle(value=''){
+
+  function cgText(el){
+    return (el?.textContent || '').replace(/\s+/g,' ').trim();
+  }
+
+  function isGreatBooksLibraryPage(){
+    return [...document.querySelectorAll('h1,h2')]
+      .some(el => /great books of the western world/i.test(cgText(el)));
+  }
+
+  function findGreatBooksHeading(){
+    return [...document.querySelectorAll('h1,h2')]
+      .find(el => /great books of the western world/i.test(cgText(el))) || null;
+  }
+
+  function ensureGreatBooksTabs(){
+    if(!isGreatBooksLibraryPage()) return false;
+    if(document.querySelector('[data-cg-gb-tabs]')) return true;
+
+    const heading = findGreatBooksHeading();
+    if(!heading) return false;
+
+    const tabs = document.createElement('div');
+    tabs.dataset.cgGbTabs = '1';
+    tabs.className = 'cg-gb-tabs';
+    tabs.innerHTML = `
+      <button type="button" class="cg-gb-tab active" data-cg-gb-view="library">Great Books Library</button>
+      <button type="button" class="cg-gb-tab" data-cg-gb-view="guides">Classic Guides</button>
+    `;
+
+    // Put the section switcher directly beneath the Great Books title/subtitle area.
+    let titleBlock = heading.parentElement;
+    const subtitle = heading.nextElementSibling;
+    if(subtitle && subtitle.tagName && /^(P|DIV)$/i.test(subtitle.tagName)){
+      subtitle.insertAdjacentElement('afterend', tabs);
+    } else {
+      heading.insertAdjacentElement('afterend', tabs);
+    }
+    return true;
+  }
+
+  function normalizeCg(value=''){
     return String(value)
       .toLowerCase()
       .replace(/[’‘]/g, "'")
@@ -16,180 +57,91 @@
       .trim();
   }
 
-  function visibleText(el){
-    return (el?.textContent || '').replace(/\s+/g,' ').trim();
-  }
-
-  function greatBooksHeading(){
-    return [...document.querySelectorAll('h1,h2,h3')]
-      .find(el => /great books of the western world/i.test(visibleText(el)));
-  }
-
-  function isGreatBooksPage(){
-    return Boolean(greatBooksHeading());
-  }
-
-  function sameActionCluster(el){
-    let cur=el;
-    for(let i=0; cur && i<6; i++,cur=cur.parentElement){
-      const t=visibleText(cur);
+  function actionCluster(start){
+    let cur=start;
+    for(let i=0;cur && i<6;i++,cur=cur.parentElement){
+      const t=cgText(cur);
       if(/find\s*&\s*import edition/i.test(t) &&
          /study\s*\/\s*great ideas/i.test(t) &&
          /grokipedia/i.test(t)) return cur;
     }
-    return el?.parentElement || null;
+    return start?.parentElement || null;
   }
 
-  function findAction(root, pattern){
-    if(!root) return null;
-    return [...root.querySelectorAll('button,a,[role="button"]')]
-      .find(el => pattern.test(visibleText(el)));
+  function findAction(root, regex){
+    return [...(root?.querySelectorAll('button,a,[role="button"]') || [])]
+      .find(el => regex.test(cgText(el))) || null;
   }
 
-  function makeButton(label, attrs={}){
-    const b=document.createElement('button');
-    b.type='button';
-    b.textContent=label;
-    Object.entries(attrs).forEach(([k,v]) => {
-      if(k === 'className') b.className=v;
-      else b.dataset[k]=v;
-    });
-    return b;
-  }
-
-  function injectGreatBooksHeaderButton(){
-    const heading=greatBooksHeading();
-    if(!heading) return false;
-    if(document.querySelector('[data-cg-open-library]')) return true;
-
-    // Find the nearest header/container that includes the page title and
-    // the Search Gutenberg / Return to Reader actions.
-    let box=heading.parentElement;
-    for(let i=0; box && i<6; i++,box=box.parentElement){
-      const t=visibleText(box);
-      if(/search gutenberg/i.test(t) && /return to reader/i.test(t)) break;
-    }
-    if(!box) box=heading.parentElement;
-
-    const search=findAction(box,/^search gutenberg$/i);
-    const ret=findAction(box,/^return to reader$/i);
-    const anchor=search || ret;
-
-    const b=makeButton('Classic Guides',{cgOpenLibrary:'1'});
-    b.className=(anchor?.className || '') + ' cg-header-guides-btn';
-
-    if(anchor){
-      anchor.insertAdjacentElement('beforebegin',b);
-    } else {
-      // Fallback: place immediately below the title area.
-      const wrap=document.createElement('div');
-      wrap.className='cg-header-guides-wrap';
-      wrap.appendChild(b);
-      heading.insertAdjacentElement('afterend',wrap);
-    }
-    return true;
-  }
-
-  function titleElementFromRow(row){
-    const candidates=[...row.querySelectorAll('strong,b,h3,h4,a,span,div')];
-    return candidates.find(el => {
-      const t=visibleText(el);
-      return t && t.length < 120 &&
-        !/volume|find\s*&\s*import|study\s*\/\s*great ideas|grokipedia/i.test(t);
-    }) || null;
-  }
-
-  function findGuideForRow(row, ready){
-    const raw=normalizeGuideTitle(visibleText(row));
-    // Match longer guide titles first to avoid accidental partial matches.
-    for(const item of ready){
-      if(raw.includes(item.norm)) return item;
-    }
-    return null;
-  }
-
-  async function injectGreatBooksRowButtons(){
-    if(!isGreatBooksPage()) return false;
-
+  async function ensureGreatBooksGuideButtons(){
+    if(!isGreatBooksLibraryPage()) return false;
     if(!state.catalog.length){
       try{
-        state.catalog=await json(ROOT+'classic-guides-catalog.json');
-      }catch(err){
-        console.error('[Classic Guides] catalog load failed',err);
+        state.catalog = await json(ROOT+'classic-guides-catalog.json');
+      }catch(_e){
         return false;
       }
     }
 
-    const ready=state.catalog
+    const ready = state.catalog
       .filter(x => x.status === 'ready')
-      .map(x => ({...x,norm:normalizeGuideTitle(x.title)}))
-      .sort((a,b)=>b.norm.length-a.norm.length);
+      .map(x => ({...x, norm: normalizeCg(x.title)}))
+      .sort((a,b) => b.norm.length - a.norm.length);
 
-    // Use all clickable elements, not only buttons, because the Great Books
-    // renderer may use <a> or role=button controls.
-    const importActions=[...document.querySelectorAll('button,a,[role="button"]')]
-      .filter(el => /^find\s*&\s*import edition$/i.test(visibleText(el)));
+    const imports = [...document.querySelectorAll('button,a,[role="button"]')]
+      .filter(el => /^find\s*&\s*import edition$/i.test(cgText(el)));
 
-    for(const importAction of importActions){
-      const row=sameActionCluster(importAction);
+    for(const importAction of imports){
+      const row = actionCluster(importAction);
       if(!row || row.querySelector('[data-classic-guide-id]')) continue;
 
-      const guide=findGuideForRow(row,ready);
+      const rowText = normalizeCg(cgText(row));
+      const guide = ready.find(x => rowText.includes(x.norm));
       if(!guide) continue;
 
-      const study=findAction(row,/^study\s*\/\s*great ideas$/i);
-      const grok=findAction(row,/^grokipedia$/i);
+      const study = findAction(row, /^study\s*\/\s*great ideas$/i);
+      const grok = findAction(row, /^grokipedia$/i);
 
-      const b=makeButton('Classic Guide',{classicGuideId:guide.id});
+      const b = document.createElement('button');
+      b.type='button';
+      b.dataset.classicGuideId = guide.id;
       b.className='cg-great-books-btn';
+      b.textContent='Classic Guide';
 
-      if(grok) grok.insertAdjacentElement('beforebegin',b);
-      else if(study) study.insertAdjacentElement('afterend',b);
-      else importAction.insertAdjacentElement('afterend',b);
+      if(grok) grok.insertAdjacentElement('beforebegin', b);
+      else if(study) study.insertAdjacentElement('afterend', b);
+      else importAction.insertAdjacentElement('afterend', b);
     }
     return true;
   }
 
-  function integrateGreatBooksPage(){
-    if(!isGreatBooksPage()) return;
-    injectGreatBooksHeaderButton();
-    injectGreatBooksRowButtons();
+  function integrateIntoGreatBooksLibrary(){
+    if(!isGreatBooksLibraryPage()) return;
+    ensureGreatBooksTabs();
+    ensureGreatBooksGuideButtons();
   }
 
-  function installGreatBooksIntegration(){
-    let timer=0;
-    const schedule=()=>{
-      clearTimeout(timer);
-      timer=setTimeout(integrateGreatBooksPage,25);
+  function installGreatBooksLibraryIntegration(){
+    let queued=false;
+    const refresh=()=>{
+      if(queued) return;
+      queued=true;
+      requestAnimationFrame(()=>{
+        queued=false;
+        integrateIntoGreatBooksLibrary();
+      });
     };
 
-    // Try immediately and again after app startup settles.
-    schedule();
-    setTimeout(integrateGreatBooksPage,250);
-    setTimeout(integrateGreatBooksPage,1000);
+    refresh();
+    setTimeout(refresh,250);
+    setTimeout(refresh,1000);
 
-    const target=document.querySelector('#app') || document.body;
-    const observer=new MutationObserver(schedule);
-    observer.observe(target,{childList:true,subtree:true});
-    window.__classicGuidesGreatBooksObserver=observer;
-
-    // Expose a diagnostic helper for one-command verification.
-    window.MarkSetGoClassicGuidesDebug=()=>{
-      const heading=greatBooksHeading();
-      return {
-        loaded:true,
-        version:'1.4.0',
-        greatBooksPage:Boolean(heading),
-        heading:visibleText(heading),
-        libraryButton:Boolean(document.querySelector('[data-cg-open-library]')),
-        guideButtons:[...document.querySelectorAll('[data-classic-guide-id]')].map(x=>({
-          id:x.dataset.classicGuideId,
-          text:visibleText(x)
-        }))
-      };
-    };
-
-    console.info('[Classic Guides] v1.4.0 loaded');
+    const observer = new MutationObserver(refresh);
+    observer.observe(document.querySelector('#app') || document.body,{
+      childList:true,
+      subtree:true
+    });
+    window.__classicGuidesGreatBooksLibraryObserver = observer;
   }
 
   async function openLibrary(){
@@ -275,23 +227,37 @@
     const out=document.querySelector('#cg-score'); if(out) out.innerHTML=`<strong>${n}/${state.guide.quiz.length} correct.</strong>`;
   }
   document.addEventListener('click',e=>{
-    const libraryBtn=e.target.closest('[data-cg-open-library]');
-    const guideBtn=e.target.closest('[data-classic-guide-id]');
-    if(!libraryBtn && !guideBtn) return;
+    const viewBtn = e.target.closest('[data-cg-gb-view]');
+    const guideBtn = e.target.closest('[data-classic-guide-id]');
 
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    document.querySelectorAll('details[open]').forEach(d=>d.removeAttribute('open'));
+    if(viewBtn){
+      e.preventDefault();
+      e.stopPropagation();
 
-    const run = guideBtn
-      ? openGuide(guideBtn.dataset.classicGuideId)
-      : openLibrary();
+      if(viewBtn.dataset.cgGbView === 'guides'){
+        openLibrary().catch(err=>{
+          if(app()) app().innerHTML=`<p style="padding:30px">Classic Guides could not load: ${esc(err.message)}</p>`;
+        });
+      }
+      return;
+    }
 
-    Promise.resolve(run).catch(err=>{
-      if(app()) app().innerHTML=`<p style="padding:30px">Classic Guides could not load: ${esc(err.message)}</p>`;
-    });
+    if(guideBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      openGuide(guideBtn.dataset.classicGuideId).catch(err=>{
+        if(app()) app().innerHTML=`<p style="padding:30px">Classic Guide could not load: ${esc(err.message)}</p>`;
+      });
+    }
   },true);
-  window.MarkSetGoClassicGuides={open:openLibrary};
-  function init(){ensureCss();installGreatBooksIntegration();}
+
+  window.MarkSetGoClassicGuides={open:openLibrary,openGuide};
+
+
+  function init(){
+    ensureCss();
+    installGreatBooksLibraryIntegration();
+    console.info('[Classic Guides] v2.1.0 Great Books Library integration loaded');
+  }
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
