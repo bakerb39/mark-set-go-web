@@ -2,7 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
-  const WALKTHROUGH_BUILD = '9.3.2';
+  const WALKTHROUGH_BUILD = '9.3.3';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -831,10 +831,20 @@
       right: $('.msg-walkthrough-mask-right', root),
       bottom: $('.msg-walkthrough-mask-bottom', root)
     };
-    Object.assign(masks.top.style, { left: '0px', top: '0px', width: '100vw', height: `${top}px` });
-    Object.assign(masks.bottom.style, { left: '0px', top: `${bottom}px`, width: '100vw', height: `${Math.max(0, viewportHeight - bottom)}px` });
-    Object.assign(masks.left.style, { left: '0px', top: `${top}px`, width: `${left}px`, height: `${height}px` });
-    Object.assign(masks.right.style, { left: `${right}px`, top: `${top}px`, width: `${Math.max(0, viewportWidth - right)}px`, height: `${height}px` });
+    if (targetIsMenuItem) {
+      // For mirrored walkthrough menus, dim the page uniformly and highlight the
+      // menu item itself. Do not cut a spotlight hole behind the menu or the
+      // gold edges will peek out from underneath the dropdown.
+      Object.assign(masks.top.style, { left: '0px', top: '0px', width: '100vw', height: '100vh' });
+      Object.assign(masks.left.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
+      Object.assign(masks.right.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
+      Object.assign(masks.bottom.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
+    } else {
+      Object.assign(masks.top.style, { left: '0px', top: '0px', width: '100vw', height: `${top}px` });
+      Object.assign(masks.bottom.style, { left: '0px', top: `${bottom}px`, width: '100vw', height: `${Math.max(0, viewportHeight - bottom)}px` });
+      Object.assign(masks.left.style, { left: '0px', top: `${top}px`, width: `${left}px`, height: `${height}px` });
+      Object.assign(masks.right.style, { left: `${right}px`, top: `${top}px`, width: `${Math.max(0, viewportWidth - right)}px`, height: `${height}px` });
+    }
 
     const card = $('.msg-walkthrough-card', root);
     const host = $('.msg-walkthrough-host', root);

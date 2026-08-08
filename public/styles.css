@@ -12706,3 +12706,7 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
 #msg-app-walkthrough .msg-walkthrough-outline {
   z-index:2147483642 !important;
 }
+
+
+/* v9.3.3 walkthrough menu spotlight suppression */
+#msg-app-walkthrough .msg-walkthrough-menu-mirror { box-shadow:0 18px 42px rgba(0,0,0,.36) !important; }
