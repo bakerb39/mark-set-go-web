@@ -11676,3 +11676,154 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
   margin:10px 2px 0;
   font-size:.78rem;
 }
+
+
+/* v9.2.79 Learn menu layout repair */
+.site-header .learn-nav-popover {
+  width: 350px;
+  min-width: 350px;
+  max-width: min(350px, calc(100vw - 20px));
+  padding: 8px;
+  overflow: visible;
+}
+
+.site-header .learn-nav-popover > button {
+  min-width: 0;
+  min-height: 54px;
+  display: grid;
+  grid-template-columns: 32px minmax(0,1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: transparent;
+}
+
+.site-header .learn-nav-popover .menu-icon {
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #edf5fd;
+  color: #245f91;
+  font-size: .78rem;
+  font-weight: 850;
+}
+
+.site-header .learn-nav-popover .menu-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  align-content: center;
+}
+
+.site-header .learn-nav-popover .menu-copy strong {
+  display: block;
+  margin: 0;
+  color: #102f55;
+  font-size: .78rem;
+  line-height: 1.2;
+  font-weight: 800;
+}
+
+.site-header .learn-nav-popover .menu-copy small {
+  display: block;
+  margin: 0;
+  color: #66788b;
+  font-size: .64rem;
+  line-height: 1.35;
+  font-weight: 500;
+  white-space: normal;
+}
+
+.site-header .learn-nav-popover > button:hover,
+.site-header .learn-nav-popover > button:focus-visible,
+.site-header .learn-nav-popover .library-submenu-items > button:hover,
+.site-header .learn-nav-popover .library-submenu-items > button:focus-visible {
+  background: #edf5fc;
+  color: #245f91;
+  outline: none;
+}
+
+.site-header .learn-skills-submenu {
+  margin: 6px 0 0;
+  border: 1px solid rgba(54,101,151,.16);
+  border-radius: 11px;
+  background: #f8fbfe;
+  overflow: hidden;
+}
+
+.site-header .learn-skills-submenu > summary {
+  min-height: 52px;
+  grid-template-columns: 32px minmax(0,1fr) 18px;
+  gap: 10px;
+  padding: 9px 10px;
+  color: #183b62;
+  background: #f5f9fd;
+}
+
+.site-header .learn-skills-submenu > summary .menu-copy strong {
+  color: #173f6d;
+}
+
+.site-header .learn-skills-submenu > summary .menu-copy small {
+  color: #6b7c8e;
+}
+
+.site-header .learn-skills-submenu > summary:hover,
+.site-header .learn-skills-submenu > summary:focus-visible {
+  background: #e6f1fc !important;
+  color: #173f6d !important;
+}
+
+.site-header .learn-skills-submenu > summary:hover *,
+.site-header .learn-skills-submenu > summary:focus-visible * {
+  color: inherit !important;
+}
+
+.site-header .learn-skills-submenu .library-submenu-items {
+  gap: 1px;
+  padding: 5px 6px 7px;
+  border-top: 1px solid rgba(61,103,150,.12);
+  background: #fff;
+}
+
+.site-header .learn-skills-submenu .library-submenu-items > button {
+  min-height: 52px;
+  grid-template-columns: 32px minmax(0,1fr);
+  gap: 10px;
+  padding: 8px 9px;
+  border-radius: 8px;
+}
+
+.site-header .learn-skills-submenu .library-submenu-items > button .menu-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.site-header .learn-skills-submenu .library-submenu-items > button .menu-copy strong {
+  font-size: .78rem;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.site-header .learn-skills-submenu .library-submenu-items > button .menu-copy small {
+  font-size: .64rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.site-header .learn-skills-submenu .library-submenu-chevron {
+  color: #58728d;
+}
+
+@media (max-width: 700px) {
+  .site-header .learn-nav-popover {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+  }
+}
