@@ -1,0 +1,877 @@
+{
+  "id": "iliad",
+  "slug": "iliad",
+  "title": "The Iliad",
+  "author": "Homer",
+  "workType": "Epic Poetry",
+  "era": "Ancient Greece",
+  "subtitle": "An Independent Mark, Set, Go! Classic Guide",
+  "dek": "Rage, honor, war, mortality, friendship, pity, and the terrible price of glory.",
+  "atGlance": {
+    "originalStructure": "24 books",
+    "guideDepth": "Reference guide",
+    "greatIdeas": "11 connected ideas",
+    "bestFor": "First reading, rereading, seminar study",
+    "spoilerNote": "This guide discusses the entire poem, including its ending."
+  },
+  "greatIdeas": [
+    {
+      "name": "War",
+      "summary": "Homer presents war as a field of glory, loyalty, terror, waste, and grief. The poem admires martial excellence while repeatedly showing what battle does to bodies, families, and cities.",
+      "questions": [
+        "Can war be glorious and terrible at the same time?",
+        "What does Homer ask us to admire—and what does he ask us to mourn?"
+      ],
+      "connections": [
+        "Thucydides — History of the Peloponnesian War",
+        "Augustine — City of God",
+        "Tolstoy — War and Peace"
+      ]
+    },
+    {
+      "name": "Courage",
+      "summary": "Courage in the poem is not a single virtue. Achilles, Hector, Patroclus, Ajax, and Priam are courageous in different ways: battlefield daring, endurance, loyalty, and the courage to face an enemy without weapons.",
+      "questions": [
+        "Is Priam’s visit to Achilles a form of courage equal to combat?",
+        "When does courage become recklessness?"
+      ],
+      "connections": [
+        "Plato — Laches",
+        "Aristotle — Nicomachean Ethics",
+        "Virgil — Aeneid"
+      ]
+    },
+    {
+      "name": "Honor",
+      "summary": "Honor is public, competitive, and fragile. Gifts, rank, reputation, and visible recognition establish a hero’s standing. Achilles’ withdrawal begins when he believes that Agamemnon has denied the honor his excellence deserves.",
+      "questions": [
+        "What happens when honor depends on other people’s recognition?",
+        "Can a political community survive if its greatest members put honor above common need?"
+      ],
+      "connections": [
+        "Aristotle — Nicomachean Ethics",
+        "Plutarch — Lives",
+        "Shakespeare — Coriolanus"
+      ]
+    },
+    {
+      "name": "Justice",
+      "summary": "The Iliad does not offer a systematic theory of justice, but it repeatedly asks what is owed between leaders, comrades, enemies, gods, families, and the dead.",
+      "questions": [
+        "Is Achilles justly wronged in Book 1?",
+        "Does Hector receive justice, mercy, or something beyond both in Book 24?"
+      ],
+      "connections": [
+        "Plato — Republic",
+        "Aristotle — Nicomachean Ethics",
+        "Aeschylus — Oresteia"
+      ]
+    },
+    {
+      "name": "Anger",
+      "summary": "The poem begins with Achilles’ rage and follows its transformation from wounded pride to grief-driven vengeance. Anger gives Achilles clarity and power, but also isolates him and magnifies destruction.",
+      "questions": [
+        "When is anger morally intelligible?",
+        "What allows Achilles’ rage to loosen its grip?"
+      ],
+      "connections": [
+        "Aristotle — Rhetoric",
+        "Seneca — On Anger",
+        "Dante — Divine Comedy"
+      ]
+    },
+    {
+      "name": "Fate",
+      "summary": "Human beings act in a world where death is certain and some outcomes appear fixed. Yet characters still deliberate, choose, plead, resist, and accept responsibility.",
+      "questions": [
+        "If Hector is fated to die, why do his choices matter?",
+        "How does foreknowledge change the meaning of Achilles’ decision?"
+      ],
+      "connections": [
+        "Sophocles — Oedipus the King",
+        "Virgil — Aeneid",
+        "Boethius — Consolation of Philosophy"
+      ]
+    },
+    {
+      "name": "God",
+      "summary": "The Olympian gods are powerful, partisan, emotional, and deeply entangled in human affairs. They can redirect events without making human motives irrelevant.",
+      "questions": [
+        "Do the gods explain human conflict or magnify it?",
+        "What moral distance separates immortal spectators from mortal sufferers?"
+      ],
+      "connections": [
+        "Plato — Euthyphro",
+        "Augustine — City of God",
+        "Aquinas — Summa Theologica"
+      ]
+    },
+    {
+      "name": "Love",
+      "summary": "Love appears as friendship, marriage, parental attachment, loyalty to comrades, and attachment to home. These bonds reveal the lives war threatens and give grief its force.",
+      "questions": [
+        "How does love alter the meaning of heroism?",
+        "Why is the friendship of Achilles and Patroclus structurally central?"
+      ],
+      "connections": [
+        "Plato — Symposium",
+        "Virgil — Aeneid",
+        "Dante — Divine Comedy"
+      ]
+    },
+    {
+      "name": "Death",
+      "summary": "Mortality is the poem’s deepest horizon. The gods are powerful because they do not die; human actions matter because human beings do.",
+      "questions": [
+        "Does mortality diminish human greatness or make greatness possible?",
+        "What does burial restore that killing destroys?"
+      ],
+      "connections": [
+        "Plato — Phaedo",
+        "Marcus Aurelius — Meditations",
+        "Tolstoy — The Death of Ivan Ilyich"
+      ]
+    },
+    {
+      "name": "Man",
+      "summary": "The Iliad asks what human beings are when stripped of modern assumptions about progress and security: vulnerable, status-seeking, loving, violent, social, mortal, and capable of pity.",
+      "questions": [
+        "What makes Achilles recognizably human?",
+        "Why does Homer linger over the individual identity of people who die?"
+      ],
+      "connections": [
+        "Sophocles — Antigone",
+        "Augustine — Confessions",
+        "Pascal — Pensées"
+      ]
+    },
+    {
+      "name": "Virtue",
+      "summary": "Excellence in Homer is plural. Strength, speed, command, loyalty, prudence, endurance, eloquence, and compassion can all count as forms of excellence—and can conflict.",
+      "questions": [
+        "Is Achilles the best man because he is the best warrior?",
+        "What virtues does Hector possess that Achilles lacks?"
+      ],
+      "connections": [
+        "Plato — Republic",
+        "Aristotle — Nicomachean Ethics",
+        "Marcus Aurelius — Meditations"
+      ]
+    }
+  ],
+  "characters": [
+    {
+      "name": "Achilles",
+      "role": "Greatest Greek warrior",
+      "description": "The poem’s central figure. Brilliant, proud, vulnerable to humiliation, fiercely loving toward Patroclus, and painfully aware that glory at Troy will cost him his life."
+    },
+    {
+      "name": "Hector",
+      "role": "Prince and defender of Troy",
+      "description": "The Trojans’ foremost warrior. His duties as soldier, husband, father, son, and civic defender make him the poem’s clearest counterweight to Achilles."
+    },
+    {
+      "name": "Agamemnon",
+      "role": "Commander of the Greek coalition",
+      "description": "Powerful but insecure in authority. His conflict with Achilles reveals the difference between formal rank and earned excellence."
+    },
+    {
+      "name": "Patroclus",
+      "role": "Achilles’ closest companion",
+      "description": "Compassionate toward the suffering Greeks. His decision to enter battle in Achilles’ armor becomes the poem’s decisive turning point."
+    },
+    {
+      "name": "Priam",
+      "role": "King of Troy",
+      "description": "Father of Hector. In Book 24 he crosses enemy lines and appeals directly to Achilles’ memory of his own father."
+    },
+    {
+      "name": "Andromache",
+      "role": "Hector’s wife",
+      "description": "Through her, the poem makes visible the domestic cost of war and the future that Hector’s death will destroy."
+    },
+    {
+      "name": "Helen",
+      "role": "Spartan queen living in Troy",
+      "description": "A figure of beauty, blame, regret, and self-consciousness. Her scenes complicate any simple account of responsibility for the war."
+    },
+    {
+      "name": "Paris",
+      "role": "Trojan prince",
+      "description": "Helen’s lover and Hector’s brother. Often contrasted with Hector because he enjoys the privileges of the warrior aristocracy without consistently matching Hector’s sense of duty."
+    },
+    {
+      "name": "Odysseus",
+      "role": "Greek strategist and speaker",
+      "description": "A master of persuasion and practical intelligence. He becomes especially important in the embassy to Achilles."
+    },
+    {
+      "name": "Ajax",
+      "role": "Greek champion",
+      "description": "A massive, dependable fighter whose courage is less dazzling than Achilles’ but often more stable and communal."
+    },
+    {
+      "name": "Nestor",
+      "role": "Elder Greek counselor",
+      "description": "Represents memory, tradition, and the authority of age. His long speeches often connect the present crisis with heroic precedent."
+    },
+    {
+      "name": "Zeus",
+      "role": "King of the gods",
+      "description": "Balances competing divine and human claims while attempting to maintain a larger order that even he does not simply abolish."
+    },
+    {
+      "name": "Athena",
+      "role": "Divine ally of the Greeks",
+      "description": "Associated with strategic intelligence and repeatedly intervenes on behalf of favored Greek heroes."
+    },
+    {
+      "name": "Apollo",
+      "role": "Divine ally of Troy",
+      "description": "His anger begins the poem’s plague, and his support helps shape the deaths of Patroclus and others."
+    }
+  ],
+  "bookGuide": [
+    {
+      "book": 1,
+      "title": "The Quarrel",
+      "summary": "Apollo sends plague into the Greek camp after Agamemnon insults Chryses. Forced to return Chryseis, Agamemnon takes Briseis from Achilles. Achilles withdraws from battle and asks his mother Thetis to persuade Zeus to let the Greeks suffer without him.",
+      "watch": "Honor, leadership, anger, and the difference between political authority and personal excellence."
+    },
+    {
+      "book": 2,
+      "title": "The Armies Gather",
+      "summary": "Zeus sends Agamemnon a deceptive dream. After a chaotic test of the troops, the Greeks prepare for battle. The Catalogue of Ships enlarges the poem from a personal quarrel into a vast coalition of peoples and places.",
+      "watch": "How individual fame sits inside collective war; memory as a way of preserving names and communities."
+    },
+    {
+      "book": 3,
+      "title": "Paris and Menelaus",
+      "summary": "Paris proposes single combat with Menelaus. Helen identifies Greek leaders from Troy’s walls. Menelaus nearly wins, but Aphrodite rescues Paris and returns him to Helen.",
+      "watch": "The gap between heroic appearance and heroic duty; Helen’s self-awareness; divine interference."
+    },
+    {
+      "book": 4,
+      "title": "The Truce Is Broken",
+      "summary": "The gods debate the war’s continuation. Athena prompts Pandarus to wound Menelaus, breaking the truce, and general battle begins.",
+      "watch": "Responsibility when gods influence human choices; how peace can be more fragile than war."
+    },
+    {
+      "book": 5,
+      "title": "Diomedes’ Great Day",
+      "summary": "Diomedes dominates the battlefield with Athena’s help and even wounds Aphrodite and Ares.",
+      "watch": "The strange boundary between mortal and divine; heroic excellence temporarily approaching superhuman power."
+    },
+    {
+      "book": 6,
+      "title": "Hector in Troy",
+      "summary": "Battle pauses around several intimate encounters. Diomedes and Glaucus discover ancestral guest-friendship and refuse to fight. Hector returns to Troy, meets Hecuba, Paris, Helen, and finally Andromache and Astyanax.",
+      "watch": "One of the poem’s essential books: family, hospitality, civic duty, and the human world war endangers."
+    },
+    {
+      "book": 7,
+      "title": "Hector and Ajax",
+      "summary": "Hector and Ajax duel without decisive victory, then exchange gifts. Both sides bury their dead, and the Greeks build defensive works.",
+      "watch": "Respect between enemies; ritual as a temporary restraint on violence."
+    },
+    {
+      "book": 8,
+      "title": "Zeus Tips the Balance",
+      "summary": "Zeus forbids the gods to interfere and gives the Trojans battlefield superiority. The Greeks are pushed back toward their ships.",
+      "watch": "What changes when Achilles’ absence becomes strategically undeniable."
+    },
+    {
+      "book": 9,
+      "title": "The Embassy to Achilles",
+      "summary": "Agamemnon offers restitution. Odysseus, Phoenix, and Ajax appeal to Achilles, but he refuses to return, questioning the entire heroic economy in which glory compensates for death.",
+      "watch": "A philosophical center of the poem: What is honor worth? What can recompense injury? Why risk life for reputation?"
+    },
+    {
+      "book": 10,
+      "title": "Night Raid",
+      "summary": "Odysseus and Diomedes conduct a night reconnaissance mission, capture Dolon, and raid the Thracian camp.",
+      "watch": "A different mode of heroism based on stealth, intelligence, and tactical violence."
+    },
+    {
+      "book": 11,
+      "title": "Agamemnon’s Great Day",
+      "summary": "Agamemnon fights brilliantly before being wounded. Other Greek champions also fall back. Nestor encourages Patroclus to persuade Achilles or enter battle in his place.",
+      "watch": "The crisis tightening around Achilles; the cost of his continued withdrawal."
+    },
+    {
+      "book": 12,
+      "title": "The Wall Is Breached",
+      "summary": "The Trojans attack the Greek fortifications. Hector breaks through the gate and the Greeks’ defensive position collapses.",
+      "watch": "Images of barriers, thresholds, and the sense that disaster is now physically entering the Greek camp."
+    },
+    {
+      "book": 13,
+      "title": "Battle at the Ships",
+      "summary": "Poseidon secretly strengthens the Greeks while Hector presses the attack. The fighting becomes increasingly desperate.",
+      "watch": "Collective endurance in the absence of the supreme individual hero."
+    },
+    {
+      "book": 14,
+      "title": "Zeus Deceived",
+      "summary": "Hera seduces and distracts Zeus while Poseidon aids the Greeks. Ajax wounds Hector, temporarily reversing Trojan momentum.",
+      "watch": "Comic and domestic behavior among gods set against mortal suffering below."
+    },
+    {
+      "book": 15,
+      "title": "The Trojans Reach the Ships",
+      "summary": "Zeus awakens, restores Trojan momentum, and Hector leads an assault that reaches the Greek ships.",
+      "watch": "The point at which Achilles’ refusal threatens the expedition with literal destruction."
+    },
+    {
+      "book": 16,
+      "title": "The Death of Patroclus",
+      "summary": "Patroclus begs to enter battle in Achilles’ armor. He drives the Trojans back and kills Sarpedon, but goes too far. Apollo weakens him; Euphorbus wounds him; Hector delivers the final blow.",
+      "watch": "Compassion, imitation, limits, and the transformation of Achilles’ story from anger to grief."
+    },
+    {
+      "book": 17,
+      "title": "Battle for Patroclus’ Body",
+      "summary": "Greeks and Trojans struggle over Patroclus’ corpse and Achilles’ armor. Menelaus and Ajax protect the body while Hector takes the armor.",
+      "watch": "The body of the dead as a focus of honor, identity, and obligation."
+    },
+    {
+      "book": 18,
+      "title": "The Shield of Achilles",
+      "summary": "Achilles learns of Patroclus’ death and reconciles with the need to fight, knowing his own death will follow. Thetis asks Hephaestus for new armor. The shield depicts a whole human world of peace, war, work, celebration, law, nature, and cosmos.",
+      "watch": "The poem expands beyond the battlefield. The shield asks what kind of world exists outside heroic killing."
+    },
+    {
+      "book": 19,
+      "title": "Achilles Reenters the War",
+      "summary": "Achilles and Agamemnon publicly reconcile. Briseis mourns Patroclus. Achilles refuses food until battle and arms himself for combat.",
+      "watch": "Reconciliation that is politically necessary but emotionally incomplete; grief overriding ordinary human needs."
+    },
+    {
+      "book": 20,
+      "title": "Gods and Men in Battle",
+      "summary": "The gods receive permission to intervene openly. Achilles returns to combat and confronts Aeneas and Hector, though divine rescue prevents their deaths at this stage.",
+      "watch": "The narrowing distance between fate and fulfillment."
+    },
+    {
+      "book": 21,
+      "title": "Achilles and the River",
+      "summary": "Achilles’ killing becomes so extreme that the river Scamander rises against him. The gods fight among themselves while Achilles continues toward Troy.",
+      "watch": "Nature itself resisting excessive violence; Achilles becoming almost inhuman in his rage."
+    },
+    {
+      "book": 22,
+      "title": "The Death of Hector",
+      "summary": "Hector remains outside Troy, flees Achilles three times around the walls, then stands to fight after Athena deceives him. Achilles kills him and desecrates his body while Hector’s family watches from the walls.",
+      "watch": "Heroic courage, fear, fate, vengeance, and the deliberate crossing of moral limits."
+    },
+    {
+      "book": 23,
+      "title": "Funeral Games for Patroclus",
+      "summary": "Patroclus is cremated and honored with elaborate funeral games. Competition continues, but Achilles now acts as organizer and distributor of prizes.",
+      "watch": "A controlled alternative to war: competition governed by rules, gifts, recognition, and negotiated disputes."
+    },
+    {
+      "book": 24,
+      "title": "Priam and Achilles",
+      "summary": "The gods insist that Hector’s body be returned. Priam enters Achilles’ shelter, kisses the hands that killed his sons, and asks Achilles to remember Peleus. The two men weep together. Achilles returns Hector’s body and grants time for burial.",
+      "watch": "Pity, mortality, fathers and sons, the restoration of funeral order, and the poem’s movement beyond vengeance."
+    }
+  ],
+  "sections": [
+    {
+      "id": "before-you-read",
+      "title": "Before You Read",
+      "intro": "What kind of book is The Iliad, and what should a first-time reader know before beginning?",
+      "paragraphs": [
+        "The Iliad is an epic poem about a war, but it is not a complete narrative of the Trojan War. It begins in the tenth year of the Greek siege and ends before the fall of Troy. The wooden horse, the sack of the city, and Achilles’ own death belong to the larger mythic tradition, not to the action narrated here.",
+        "The poem concentrates on a much smaller arc: the rage of Achilles. A quarrel over honor causes the Greeks’ greatest warrior to withdraw. His absence permits disaster. The death of Patroclus pulls him back into battle, but the form of his return is more destructive than restorative. Only in the encounter with Priam does the poem discover a way to interrupt the logic of rage.",
+        "For a first reading, do not worry about remembering every warrior’s name. Track the major relationships and recurring questions: What is honor worth? What does a warrior owe his comrades? What is the relationship between glory and death? What happens when anger becomes an identity? How can enemies recognize one another as human?"
+      ],
+      "takeaway": "The Iliad begins with a private injury, expands into collective catastrophe, and ends with shared grief."
+    },
+    {
+      "id": "historical-background",
+      "title": "Historical & Mythological Background",
+      "intro": "The poem remembers a Bronze Age war through the language and institutions of a later Greek world.",
+      "paragraphs": [
+        "Greek tradition placed the Trojan War in the heroic past, commonly associated with the late Bronze Age. The poem itself took shape centuries later through an oral poetic tradition and was probably stabilized in roughly the eighth or seventh century BCE. That chronological distance helps explain why the poem contains layers: memories of Mycenaean-style warrior culture coexist with social practices familiar from later Greek communities.",
+        "Archaeology at Hisarlık in modern Turkey has shown that a major fortified settlement stood at the site long identified with Troy and that several layers suffered destruction. Archaeology cannot confirm Homer’s narrative as literal history, but it makes clear that the poetic tradition grew around a place and a period that were not simply invented from nothing.",
+        "The mythic background begins with the judgment of Paris and his relationship with Helen, wife of Menelaus of Sparta. Greek kings and warriors assemble under Agamemnon to recover her. By the time The Iliad opens, this story is assumed knowledge. The poem is therefore less interested in why the war began than in what prolonged war has done to the people living inside it."
+      ],
+      "takeaway": "Read the poem as heroic memory shaped by centuries of oral tradition, not as a modern historical chronicle."
+    },
+    {
+      "id": "world-of-homer",
+      "title": "The World of Homer",
+      "intro": "Honor, gifts, hospitality, oaths, sacrifice, burial, and public speech organize the social world of the poem.",
+      "paragraphs": [
+        "The heroes of The Iliad live in a competitive status culture. Excellence must be publicly recognized. Prizes taken in war are not merely possessions; they are visible signs of esteem. That is why Agamemnon’s seizure of Briseis is politically explosive. Achilles experiences it as proof that superior achievement does not guarantee proper recognition.",
+        "Gift exchange and hospitality create bonds that can cross political lines. In Book 6, Diomedes and Glaucus discover that their grandfathers were guest-friends. Instead of fighting, they exchange armor. The scene reveals a network of obligations older and wider than the immediate war.",
+        "Burial is another essential obligation. To leave a corpse exposed is to deny the dead their place in human and divine order. Achilles’ treatment of Hector’s body therefore matters as much morally as the killing itself. The return of the body in Book 24 is not a decorative epilogue; it repairs a fundamental breach."
+      ],
+      "takeaway": "Homeric society is held together by visible practices of recognition, reciprocity, hospitality, oath, and funeral duty."
+    },
+    {
+      "id": "major-characters",
+      "title": "Major Characters",
+      "intro": "The poem becomes easier once you understand the small group of figures who carry its moral and emotional weight.",
+      "special": "characters",
+      "takeaway": "Do not reduce the poem to Achilles alone: Hector, Patroclus, Priam, Andromache, Agamemnon, Helen, and the gods create the counterclaims that make Achilles intelligible."
+    },
+    {
+      "id": "structure",
+      "title": "Structure & Narrative Architecture",
+      "intro": "The 24 books form a tightly organized emotional movement rather than a loose sequence of battles.",
+      "paragraphs": [
+        "Books 1–9 establish the crisis created by Achilles’ withdrawal. The poem repeatedly demonstrates that the Greeks need him, while Achilles increasingly questions the values that would justify his return.",
+        "Books 10–15 intensify military pressure. The Trojans reach the Greek ships, turning Achilles’ personal quarrel into an existential threat to the entire expedition.",
+        "Books 16–18 form the decisive hinge: Patroclus enters battle, dies, and is mourned. The new armor made for Achilles visually expands the poem’s moral horizon through the Shield of Achilles.",
+        "Books 19–22 narrate Achilles’ return and the terrifying fulfillment of vengeance. Books 23–24 then slow the poem down through funeral ritual, games, ransom, mourning, and burial. The poem ends not with Troy destroyed but with Hector restored to his family."
+      ],
+      "takeaway": "The poem moves from anger → absence → loss → vengeance → pity."
+    },
+    {
+      "id": "book-by-book",
+      "title": "Book-by-Book Reading Guide",
+      "intro": "Use this roadmap before or after each of the poem’s 24 books.",
+      "special": "bookGuide",
+      "takeaway": "The 24-book structure lets you see how Homer alternates battle, counsel, divine action, domestic scenes, and ritual to control the poem’s emotional pressure."
+    },
+    {
+      "id": "major-themes",
+      "title": "Major Themes",
+      "intro": "The Iliad endures because its themes resist simple answers.",
+      "bullets": [
+        {
+          "title": "Rage and self-mastery",
+          "text": "Achilles’ anger is understandable, socially meaningful, and catastrophically expansive. The poem asks not merely whether anger is justified, but what anger does once it becomes the organizing principle of a life."
+        },
+        {
+          "title": "Honor and recognition",
+          "text": "The heroic world depends on recognition. The quarrel in Book 1 asks whether a community can properly value excellence—and what happens when the best individual no longer trusts the system of rewards."
+        },
+        {
+          "title": "Glory and mortality",
+          "text": "Heroic fame promises survival in memory, but the poem never lets fame cancel death. Achilles’ greatness is inseparable from his knowledge that his life will be short."
+        },
+        {
+          "title": "Friendship and grief",
+          "text": "Patroclus’ death reveals the emotional center beneath Achilles’ public identity. Grief both humanizes Achilles and drives him toward his most extreme violence."
+        },
+        {
+          "title": "Family and the cost of war",
+          "text": "Andromache, Astyanax, Priam, Hecuba, Helen, and the Trojan elders reveal the lives that martial glory threatens to erase."
+        },
+        {
+          "title": "Fate and agency",
+          "text": "Some outcomes are fixed, but choices still disclose character. Hector’s death may be fated; his decision to stand and fight still matters."
+        },
+        {
+          "title": "Pity and reconciliation",
+          "text": "The poem does not end by solving war. It creates a temporary moral space in which enemies recognize shared mortality and perform the duties owed to the dead."
+        }
+      ],
+      "takeaway": "The Iliad is powerful because it lets incompatible values—glory and grief, courage and fear, justice and vengeance—remain in tension."
+    },
+    {
+      "id": "great-ideas",
+      "title": "Great Ideas",
+      "intro": "These are the most important bridges from Homer into the larger Great Books conversation.",
+      "special": "greatIdeas",
+      "takeaway": "Use the Great Ideas not as labels but as questions that travel from Homer into philosophy, history, theology, and later literature."
+    },
+    {
+      "id": "important-passages",
+      "title": "Important Passages to Watch",
+      "intro": "These moments deserve especially slow reading. References are given by book rather than by page because translations differ.",
+      "bullets": [
+        {
+          "title": "Book 1 — Achilles and Agamemnon",
+          "text": "The quarrel defines the poem’s central problem: the relation between rank, merit, honor, insult, and public responsibility."
+        },
+        {
+          "title": "Book 6 — Hector, Andromache, and Astyanax",
+          "text": "The most important domestic scene in the poem. War is seen from the perspective of a family that knows what defeat will mean."
+        },
+        {
+          "title": "Book 9 — Achilles answers the embassy",
+          "text": "Achilles questions the heroic bargain itself. If the brave and the coward both die, what exactly makes glory worth the risk?"
+        },
+        {
+          "title": "Book 16 — Patroclus dies",
+          "text": "The poem’s emotional and structural turning point. Achilles’ absence is now converted into irreversible personal loss."
+        },
+        {
+          "title": "Book 18 — The Shield of Achilles",
+          "text": "Hephaestus depicts cities, marriages, lawsuits, harvest, dance, war, animals, and cosmos. The warrior carries an image of the whole human world he is about to reenter through violence."
+        },
+        {
+          "title": "Book 22 — Hector faces Achilles",
+          "text": "Hector’s fear does not erase his courage. The scene complicates any definition of heroism that excludes terror, hesitation, or the desire to live."
+        },
+        {
+          "title": "Book 24 — Priam supplicates Achilles",
+          "text": "The poem’s moral culmination. Memory of fathers and sons allows killer and bereaved father to recognize a condition shared by all mortals."
+        }
+      ],
+      "takeaway": "If you reread only seven parts of the poem, start with Books 1, 6, 9, 16, 18, 22, and 24."
+    },
+    {
+      "id": "symbols-motifs",
+      "title": "Symbols & Motifs",
+      "intro": "Repeated objects and actions carry arguments that the poem rarely states abstractly.",
+      "bullets": [
+        {
+          "title": "Armor",
+          "text": "Armor transfers identity and status. Patroclus becomes visually Achilles-like; Hector puts on Achilles’ old armor; Achilles’ new armor marks both return and approaching death."
+        },
+        {
+          "title": "The Shield of Achilles",
+          "text": "A miniature world of conflict and peace, labor and celebration, nature and civic order. It enlarges the poem beyond the battlefield."
+        },
+        {
+          "title": "Fire",
+          "text": "Fire repeatedly represents destructive battle energy and the threat that war will consume ships, bodies, and cities."
+        },
+        {
+          "title": "Walls and gates",
+          "text": "Troy’s walls distinguish battlefield from household, exposure from protection, and the doomed city from the forces closing around it."
+        },
+        {
+          "title": "Hands and knees in supplication",
+          "text": "Supplication physically lowers one person before another. Priam’s gesture toward Achilles turns vulnerability into moral power."
+        },
+        {
+          "title": "Funeral ritual",
+          "text": "Burial restores names, bodies, and social bonds after battle has reduced people to corpses and prizes."
+        }
+      ],
+      "takeaway": "Objects in Homer often become moral instruments: armor can lend identity, a shield can contain a world, and a corpse can reveal the limits of vengeance."
+    },
+    {
+      "id": "questions",
+      "title": "Questions to Consider",
+      "intro": "Use these for annotation, discussion, journaling, or an Ask Mark conversation.",
+      "questions": [
+        "Is Achilles right to withdraw in Book 1?",
+        "Which is more important in Homer’s world: rank or excellence?",
+        "Does Achilles fundamentally change, or does Book 24 reveal a capacity that was present all along?",
+        "Is Hector a better man than Achilles? Is he a better hero?",
+        "What does the poem gain by giving the Trojans sympathetic domestic scenes?",
+        "Do the gods reduce human responsibility or make human motives more visible?",
+        "Why does Homer spend so much time naming minor warriors immediately before their deaths?",
+        "What does the Shield of Achilles say about the relation between war and ordinary life?",
+        "Is the killing of Hector the climax of the poem, or is the meeting of Priam and Achilles the true climax?",
+        "Why does The Iliad end with Hector’s funeral rather than with a Greek victory?"
+      ],
+      "takeaway": "The best Iliad questions usually involve conflicts between values rather than simple right-or-wrong answers."
+    },
+    {
+      "id": "connections",
+      "title": "Connections to Other Great Books",
+      "intro": "The Iliad becomes richer when read as the opening move in a much longer conversation.",
+      "connections": [
+        {
+          "work": "The Odyssey — Homer",
+          "link": "From battlefield identity to the problem of returning home. Achilles’ heroic choice is reconsidered from a world where survival, cunning, family, and restoration matter differently."
+        },
+        {
+          "work": "The Oresteia — Aeschylus",
+          "link": "Moves from heroic blood vengeance toward civic judgment. Read after The Iliad to see Greek literature asking how cycles of retaliation might be transformed."
+        },
+        {
+          "work": "Republic — Plato",
+          "link": "Plato inherits Homer’s cultural authority while questioning poetry’s role in moral education and developing a radically different account of justice."
+        },
+        {
+          "work": "Nicomachean Ethics — Aristotle",
+          "link": "Provides a philosophical vocabulary for courage, anger, honor, friendship, and virtue—the same human materials Homer dramatizes narratively."
+        },
+        {
+          "work": "Aeneid — Virgil",
+          "link": "Virgil rewrites Homer for Rome. Aeneas must subordinate personal desire to historical mission in ways that sharply contrast with Achilles’ individual honor."
+        },
+        {
+          "work": "City of God — Augustine",
+          "link": "Offers a theological critique of glory, domination, war, and earthly political greatness."
+        },
+        {
+          "work": "War and Peace — Tolstoy",
+          "link": "Returns to the relation between individual heroism, mass warfare, history, family, death, and the stories cultures tell about military greatness."
+        }
+      ],
+      "takeaway": "Homer supplies situations that later Great Books turn into explicit philosophical, political, theological, and literary arguments."
+    },
+    {
+      "id": "scholars-debate",
+      "title": "What Scholars Debate",
+      "intro": "A serious guide should show where interpretation remains open.",
+      "debates": [
+        {
+          "title": "Who—or what—was Homer?",
+          "sides": "Traditional reading treats Homer as the great poet behind the epics. The 'Homeric Question' asks how much of the poems should instead be understood as the product of a long oral tradition shaped by many performers before textual stabilization."
+        },
+        {
+          "title": "How historical is the Trojan War?",
+          "sides": "Archaeology supports the existence of a major fortified settlement at Troy and Bronze Age conflict, but the relationship between archaeological destruction layers and the poetic war remains uncertain."
+        },
+        {
+          "title": "Does Achilles become morally better?",
+          "sides": "Some readings see Book 24 as genuine moral transformation; others see a temporary return to ordinary human feeling without a complete repudiation of the heroic values that produced the violence."
+        },
+        {
+          "title": "How should we judge the gods?",
+          "sides": "The gods can seem frivolous beside mortal suffering, yet they also embody forces—desire, conflict, favoritism, order—that structure the human world. Readers disagree over how morally evaluative Homer expects us to be."
+        },
+        {
+          "title": "What is the poem’s attitude toward heroism?",
+          "sides": "The poem clearly admires extraordinary excellence, yet it also dwells on fear, mutilation, bereavement, and ruined families. Is it a celebration of heroic culture, a critique, or deliberately both?"
+        },
+        {
+          "title": "Why end with Hector?",
+          "sides": "The decision to end with a Trojan funeral rather than Greek victory shifts the final emphasis from conquest to mortality, ritual, and shared humanity. How far this reframes the entire poem remains a central interpretive question."
+        }
+      ],
+      "takeaway": "The Iliad survives partly because it cannot be reduced to a single thesis about war, heroism, fate, or morality."
+    },
+    {
+      "id": "why-matters",
+      "title": "Why This Book Matters",
+      "intro": "The Iliad is foundational not because readers are obliged to admire it, but because later writers repeatedly return to the human problems it dramatizes.",
+      "paragraphs": [
+        "The poem created durable models of the warrior, the grieving friend, the doomed defender, the bereaved parent, the divided commander, and the dangerous relationship between excellence and pride. Western literature has spent millennia revising, resisting, and reimagining these figures.",
+        "Its treatment of enemies is especially important. Homer allows Greek listeners to experience Hector, Andromache, Priam, and other Trojans as people with claims on sympathy, honor, and memory. The capacity to humanize the opposing side without pretending the conflict does not exist remains one of the poem’s most remarkable achievements.",
+        "Finally, The Iliad refuses the fantasy that victory cancels loss. Its final image is not triumph but burial. Human greatness exists inside mortality, not outside it."
+      ],
+      "takeaway": "The Iliad remains a great book because it makes glory and grief visible at the same time."
+    },
+    {
+      "id": "further-reading",
+      "title": "Further Reading",
+      "intro": "A short path for readers who want to continue beyond the guide.",
+      "bullets": [
+        {
+          "title": "Read The Odyssey next",
+          "text": "Homer’s other epic changes the central problem from battlefield glory to survival, identity, homecoming, and restoration."
+        },
+        {
+          "title": "Read the Oresteia",
+          "text": "Aeschylus takes the heroic logic of revenge and asks how a political community might replace blood vengeance with law."
+        },
+        {
+          "title": "Read Plato and Aristotle on poetry and virtue",
+          "text": "Plato’s Republic challenges the moral authority of poets; Aristotle’s Poetics and Ethics give philosophical frameworks for tragedy, character, courage, anger, and excellence."
+        },
+        {
+          "title": "Compare translations",
+          "text": "Different translations emphasize speed, dignity, literalness, oral energy, or poetic form. Comparing a single major scene across translations is one of the best ways to notice interpretive choices."
+        }
+      ],
+      "takeaway": "The strongest next step is not more summary—it is another primary text in conversation with Homer."
+    },
+    {
+      "id": "about-guide",
+      "title": "About This Guide",
+      "intro": "This guide is designed as a companion to reading, not a substitute for the poem.",
+      "paragraphs": [
+        "Mark, Set, Go! Classic Guides are independent educational companions designed to help readers enter difficult works with enough context to notice what matters. They emphasize structure, themes, interpretive questions, Great Ideas connections, and active reading.",
+        "The guide avoids pretending that major works have one final meaning. Where scholarly interpretation is contested, the goal is to identify the disagreement and give the reader a question worth carrying back into the text.",
+        "For the best experience, use the guide before reading for orientation, during reading for book-by-book support, and after reading for synthesis, discussion, and syntopical connections."
+      ],
+      "takeaway": "Use the guide to return to Homer with better questions."
+    }
+  ],
+  "quiz": [
+    {
+      "q": "What is the immediate cause of Achilles’ withdrawal from battle?",
+      "choices": [
+        "Agamemnon takes Briseis from him",
+        "Hector kills Patroclus",
+        "Zeus orders him home",
+        "Paris challenges him to single combat"
+      ],
+      "answer": 0,
+      "explanation": "Achilles interprets Agamemnon’s seizure of Briseis as a public denial of the honor owed to his excellence."
+    },
+    {
+      "q": "Why is Book 6 especially important?",
+      "choices": [
+        "It contains the fall of Troy",
+        "It shows Hector within his family and city",
+        "Achilles receives new armor",
+        "Priam visits Achilles"
+      ],
+      "answer": 1,
+      "explanation": "Hector’s meetings in Troy, especially with Andromache and Astyanax, reveal the human world the war threatens."
+    },
+    {
+      "q": "What is distinctive about Achilles’ speech in Book 9?",
+      "choices": [
+        "He accepts Agamemnon’s gifts immediately",
+        "He questions whether heroic glory is worth death",
+        "He predicts the fall of Troy in detail",
+        "He challenges Odysseus to combat"
+      ],
+      "answer": 1,
+      "explanation": "Achilles temporarily questions the heroic value system itself, not merely the size of Agamemnon’s compensation."
+    },
+    {
+      "q": "What event transforms Achilles’ anger into grief-driven vengeance?",
+      "choices": [
+        "The plague",
+        "The duel of Paris and Menelaus",
+        "The death of Patroclus",
+        "The building of the Greek wall"
+      ],
+      "answer": 2,
+      "explanation": "Patroclus’ death is the structural and emotional turning point of the poem."
+    },
+    {
+      "q": "Why is the Shield of Achilles important?",
+      "choices": [
+        "It proves Achilles is immortal",
+        "It depicts a whole human world beyond battle",
+        "It contains a prophecy naming Rome",
+        "It belonged to Hector first"
+      ],
+      "answer": 1,
+      "explanation": "Its scenes of cities, law, harvest, celebration, nature, and war enlarge the poem’s moral horizon."
+    },
+    {
+      "q": "What is unusual about Hector’s final confrontation with Achilles?",
+      "choices": [
+        "Hector feels no fear",
+        "Hector initially flees before standing to fight",
+        "Zeus kills Hector",
+        "Achilles refuses to fight him"
+      ],
+      "answer": 1,
+      "explanation": "Hector’s fear makes his eventual decision to stand more complex, not less courageous."
+    },
+    {
+      "q": "What does Achilles do to Hector’s body after killing him?",
+      "choices": [
+        "Returns it immediately",
+        "Burns it secretly",
+        "Desecrates and withholds it",
+        "Gives it to Agamemnon"
+      ],
+      "answer": 2,
+      "explanation": "This violation of funeral duty marks the extremity of Achilles’ vengeance."
+    },
+    {
+      "q": "What finally persuades Achilles to release Hector’s body?",
+      "choices": [
+        "A Greek vote",
+        "Priam’s personal appeal and the memory of Achilles’ father",
+        "A military defeat",
+        "Helen’s request"
+      ],
+      "answer": 1,
+      "explanation": "Priam makes Achilles imagine Peleus and recognize their shared condition as grieving, mortal human beings."
+    },
+    {
+      "q": "How does The Iliad end?",
+      "choices": [
+        "With the wooden horse",
+        "With Achilles’ death",
+        "With Hector’s funeral",
+        "With Troy burning"
+      ],
+      "answer": 2,
+      "explanation": "The poem ends with burial and mourning, not with the military conclusion of the Trojan War."
+    },
+    {
+      "q": "Which statement best describes Homer’s treatment of heroism?",
+      "choices": [
+        "Pure celebration",
+        "Pure condemnation",
+        "Admiration joined to sustained exposure of its human cost",
+        "Indifference to martial excellence"
+      ],
+      "answer": 2,
+      "explanation": "The poem admires extraordinary courage and skill while repeatedly showing grief, mutilation, fear, and ruined households."
+    },
+    {
+      "q": "What does the Diomedes–Glaucus episode reveal?",
+      "choices": [
+        "Guest-friendship can interrupt battlefield hostility",
+        "The gods have abandoned Troy",
+        "Achilles has secretly returned",
+        "Hector plans to surrender"
+      ],
+      "answer": 0,
+      "explanation": "An inherited bond of hospitality proves stronger than the immediate demand to fight."
+    },
+    {
+      "q": "Why do funeral rites matter so much in the poem?",
+      "choices": [
+        "They are merely decorative customs",
+        "They restore social and sacred order to the dead",
+        "They guarantee military victory",
+        "They make heroes immortal"
+      ],
+      "answer": 1,
+      "explanation": "Burial recognizes the dead as persons with names, kin, and claims that survive combat."
+    }
+  ],
+  "actionPlans": [
+    {
+      "name": "Four-Session Orientation",
+      "description": "A fast path for readers who want the poem’s major architecture before or during a first reading.",
+      "steps": [
+        "Session 1: Read Books 1–6. Focus on honor, leadership, and Hector’s family.",
+        "Session 2: Read Books 7–15. Focus on the consequences of Achilles’ absence and the embassy in Book 9.",
+        "Session 3: Read Books 16–22. Track the sequence Patroclus → grief → new armor → vengeance → Hector.",
+        "Session 4: Read Books 23–24. Ask why Homer ends with ritual, games, supplication, and burial."
+      ]
+    },
+    {
+      "name": "Eight-Session Deep Reading",
+      "description": "A slower route built around the poem’s strongest interpretive clusters.",
+      "steps": [
+        "1. Books 1–3: honor, command, Helen, and the causes of conflict.",
+        "2. Books 4–6: battle, gods, hospitality, and Hector’s household.",
+        "3. Books 7–9: respect between enemies and Achilles’ rejection of compensation.",
+        "4. Books 10–15: war without Achilles and the collapsing Greek position.",
+        "5. Books 16–17: Patroclus and the fight over the body.",
+        "6. Books 18–19: grief, the shield, reconciliation, and return.",
+        "7. Books 20–22: Achilles’ violence and Hector’s death.",
+        "8. Books 23–24: funeral competition, Priam, pity, and the final burial."
+      ]
+    },
+    {
+      "name": "Syntopical Follow-Through",
+      "description": "Turn The Iliad into the first node of a Great Ideas reading sequence.",
+      "steps": [
+        "Justice: move from Homer to Aeschylus’ Oresteia and Plato’s Republic.",
+        "Virtue and courage: move to Aristotle’s Nicomachean Ethics.",
+        "War and political order: move to Thucydides and Augustine.",
+        "Fate and human agency: compare Sophocles, Virgil, and Boethius.",
+        "Mortality: compare Plato’s Phaedo, Marcus Aurelius, and Tolstoy."
+      ]
+    }
+  ],
+  "visuals": [
+    {
+      "id": "arc",
+      "title": "The Iliad’s Emotional Arc",
+      "description": "A 24-book timeline showing the movement from rage to pity."
+    },
+    {
+      "id": "relations",
+      "title": "Character Constellation",
+      "description": "How Achilles, Patroclus, Hector, Priam, Agamemnon, and the gods create competing claims."
+    },
+    {
+      "id": "world",
+      "title": "The War’s Human Geography",
+      "description": "A schematic of Greek camp, battlefield, city walls, and Trojan household space."
+    },
+    {
+      "id": "shield",
+      "title": "The Shield of Achilles",
+      "description": "A concentric conceptual diagram of cosmos, cities, work, conflict, and ordinary life."
+    }
+  ]
+}
