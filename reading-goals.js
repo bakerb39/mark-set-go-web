@@ -173,7 +173,8 @@
 
   function getCompanionProgress(context={}) {
     const goals=getGoals();
-    if(!goals.enabled) return null;
+    const learning=window.MarkSetGoLearningMetrics?.getSummary?.() || null;
+    if(!goals.enabled && !(learning?.totalActivities>0)) return null;
 
     const m=getMetrics(goals);
     const title=String(context.title||'').trim();
@@ -213,6 +214,22 @@
       parts.push(`This week you’ve logged ${m.weeklyMinutes} of ${weeklyTarget} reading minutes (${weeklyPercent}%).`);
     }
 
+    if(learning?.comprehensionChecks>0){
+      parts.push(`Across ${learning.comprehensionChecks} comprehension check${learning.comprehensionChecks===1?'':'s'}, your average is ${learning.comprehensionAverage}%.`);
+    }
+    if(learning?.wpmTests>0){
+      parts.push(`You’ve completed ${learning.wpmTests} WPM test${learning.wpmTests===1?'':'s'}; your best recorded test is ${learning.bestWpm} WPM.`);
+    }
+    if(learning?.mnemonicsCreated>0){
+      parts.push(`You’ve created ${learning.mnemonicsCreated} mnemonic${learning.mnemonicsCreated===1?'':'s'} across ${learning.mnemonicBooks} book${learning.mnemonicBooks===1?'':'s'}.`);
+    }
+    if(learning?.languageLessons>0){
+      parts.push(`You’ve completed ${learning.languageLessons} language lesson${learning.languageLessons===1?'':'s'}${learning.languagesPracticed?.length?` in ${learning.languagesPracticed.slice(0,3).join(', ')}`:''}.`);
+    }
+    if(learning?.courseOpens>0){
+      parts.push(`You’ve explored ${learning.courseOpens} outside course or lecture link${learning.courseOpens===1?'':'s'} connected to your reading.`);
+    }
+
     if(!parts.length) return null;
 
     // Keep Mark conversational: prioritize current performance, current book,
@@ -225,6 +242,8 @@
     const weekly=parts.find(p=>/This week/.test(p));
     if(selected.length<4 && annual) selected.push(annual);
     if(selected.length<4 && weekly) selected.push(weekly);
+    const learningPart=parts.find(p=>/WPM test|comprehension check|mnemonic|language lesson|outside course/i.test(p));
+    if(selected.length<5 && learningPart && !selected.includes(learningPart)) selected.push(learningPart);
 
     const encouragement =
       m.avgWpm>=speedTarget && m.avgComprehension>=compTarget
@@ -233,7 +252,9 @@
           ? 'Your understanding is holding up well. Keep building pace gradually rather than sacrificing comprehension.'
           : m.avgWpm>=speedTarget && m.avgComprehension>0
             ? 'Your pace is strong. Give comprehension a little more attention before pushing the speed higher.'
-            : 'Keep the progress steady; consistency matters more than forcing the numbers upward all at once.';
+            : learning?.totalActivities>0
+              ? 'Keep building across the learning tools. A little work in comprehension, memory, and deeper study will reinforce the reading itself.'
+              : 'Keep the progress steady; consistency matters more than forcing the numbers upward all at once.';
 
     const signature=[
       new Date().toISOString().slice(0,10),
@@ -242,6 +263,11 @@
       Math.round((m.annualPercent||0)/5)*5,
       Math.round((m.weeklyMinutes||0)/15)*15,
       Math.round(currentPercent/5)*5,
+      learning?.wpmTests||0,
+      learning?.comprehensionChecks||0,
+      learning?.mnemonicsCreated||0,
+      learning?.languageLessons||0,
+      learning?.courseOpens||0,
       documentId||title
     ].join('|');
 
@@ -249,6 +275,7 @@
       message:`${selected.join(' ')} ${encouragement}`.trim(),
       signature,
       metrics:m,
+      learning,
       goals,
       currentPercent,
       title

@@ -4494,6 +4494,395 @@ const WPM_TEST_OPTIONS = [
   { key: 'cities', label: 'A Tale of Two Cities' }
 ];
 
+function readingSkillBooks() {
+  const progress = Object.values(readStoredObject(READING_PROGRESS_KEY))
+    .filter((item) => item?.documentId && item?.title)
+    .sort((a,b) => new Date(b.lastReadAt || 0) - new Date(a.lastReadAt || 0));
+  const seen = new Set();
+  return progress.filter((item) => {
+    const key = String(item.documentId);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function readingSkillBookText(book) {
+  if (!book?.documentId) return null;
+  let data = null;
+  try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${book.documentId}`) || 'null'); } catch {}
+  if (data?.text) return { title:data.title || book.title, text:data.text, source:data.source || book.source || {} };
+
+  if (book.source?.type === 'modern-guide') {
+    const bundled = await loadBundledModernGuideDocument(book.source);
+    if (bundled?.text) return bundled;
+  }
+
+  if (
+    activeReaderSnapshot?.documentId === book.documentId
+    && activeReaderSnapshot?.currentText
+  ) {
+    return {
+      title:activeReaderSnapshot.title || book.title,
+      text:activeReaderSnapshot.currentText,
+      source:activeReaderSnapshot.source || book.source || {}
+    };
+  }
+
+  return null;
+}
+
+function readingSkillBookOptions(books, placeholder = 'Choose a book…') {
+  return `<option value="">${escapeHtml(placeholder)}</option>${books.map((book) =>
+    `<option value="${escapeHtml(book.documentId)}">${escapeHtml(book.title)}</option>`
+  ).join('')}`;
+}
+
+function renderReadingSkillsHub() {
+  finalizeReadingSession();
+  stopReader();
+  const books = readingSkillBooks();
+  const results = getComprehensionResults();
+
+  app.innerHTML = `
+    <section class="platform-page reading-skills-page">
+      <header class="platform-hero">
+        <div>
+          <span class="source-category">Learn</span>
+          <h1>Reading Skills</h1>
+          <p>Build speed, comprehension, memory, language ability, and deeper understanding from the books you are actually reading.</p>
+        </div>
+        <button class="secondary" type="button" data-action="reader">Return to Reader</button>
+      </header>
+
+      <div class="reading-skills-summary">
+        <article><strong>${books.length}</strong><span>books available for practice</span></article>
+        <article><strong>${results.length}</strong><span>comprehension checks completed</span></article>
+      </div>
+
+      <div class="reading-skills-grid reading-skills-primary">
+        <button class="reading-skill-card" type="button" data-test="wpm"><span>⏱</span><div><h2>WPM Test</h2><p>Measure your natural reading speed and track improvement.</p></div></button>
+        <button class="reading-skill-card" type="button" data-action="comprehension-library"><span>✓</span><div><h2>Comprehension Quizzes</h2><p>Generate quizzes from current or previously read books.</p></div></button>
+        <button class="reading-skill-card" type="button" data-read="syntopicon"><span>★</span><div><h2>Great Ideas / Syntopicon</h2><p>Compare major ideas across books and traditions.</p></div></button>
+      </div>
+
+      <details class="reading-skills-more">
+        <summary><span><strong>More learning tools</strong><small>Memory, language practice, and outside courses</small></span><span aria-hidden="true">›</span></summary>
+        <div class="reading-skills-grid">
+          <button class="reading-skill-card" type="button" data-action="mnemonics"><span>M</span><div><h2>Mnemonics</h2><p>Create memorable devices for arguments, people, events, themes, and concepts.</p></div></button>
+          <button class="reading-skill-card" type="button" data-action="language-learning"><span>文</span><div><h2>Language Learning</h2><p>Turn familiar reading into vocabulary, translation, and comprehension practice.</p></div></button>
+          <button class="reading-skill-card" type="button" data-action="learning-courses"><span>▶</span><div><h2>Courses &amp; Learning Modules</h2><p>Find videos and courses that deepen what you are reading.</p></div></button>
+        </div>
+      </details>
+    </section>`;
+}
+
+async function generateBookComprehensionQuiz(book, button = null) {
+  const original = button?.textContent;
+  try {
+    if (button) { button.disabled = true; button.textContent = 'Generating quiz…'; }
+    const data = await readingSkillBookText(book);
+    if (!data?.text) throw new Error('The text for this book is not available in this browser.');
+
+    const words = splitWords(data.text);
+    if (words.length < 120) throw new Error('There is not enough saved text to create a quiz.');
+    const progressIndex = Math.max(120, Math.min(words.length, Number(book.lastWord) || Number(book.furthestWord) || words.length));
+    const startIndex = Math.max(0, progressIndex - Math.min(1600, progressIndex));
+    const passageWords = words.slice(startIndex, progressIndex);
+    const context = {
+      passage:passageWords.join(' '),
+      words:passageWords.length,
+      startIndex,
+      endIndex:progressIndex
+    };
+
+    const response = await fetch('/api/comprehension', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({ title:book.title, passage:context.passage })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
+
+    // Existing quiz UI relies on current Reader state for result metadata.
+    const old = {
+      documentId:state.documentId,
+      title:state.title,
+      words:state.words,
+      wpm:state.wpm
+    };
+    state.documentId = book.documentId;
+    state.title = book.title;
+    state.words = words;
+
+    if (!app.querySelector('#comprehension-dialog')) {
+      const dialog = document.createElement('dialog');
+      dialog.id = 'comprehension-dialog';
+      app.append(dialog);
+    }
+    renderComprehensionQuiz(payload, context);
+
+    const dialog = app.querySelector('#comprehension-dialog');
+    dialog?.addEventListener('close', () => {
+      state.documentId = old.documentId;
+      state.title = old.title;
+      state.words = old.words;
+      state.wpm = old.wpm;
+    }, { once:true });
+  } catch (error) {
+    window.alert(`Comprehension quiz unavailable: ${error.message}`);
+  } finally {
+    if (button) { button.disabled = false; button.textContent = original || 'Start quiz'; }
+  }
+}
+
+function renderComprehensionLibrary() {
+  finalizeReadingSession();
+  stopReader();
+  const books = readingSkillBooks();
+  const results = getComprehensionResults();
+  const latestByBook = new Map();
+  results.forEach((result) => {
+    if (!latestByBook.has(result.documentId)) latestByBook.set(result.documentId, result);
+  });
+
+  app.innerHTML = `
+    <section class="platform-page learning-tool-page">
+      <header class="platform-hero">
+        <div><span class="source-category">Reading Skills</span><h1>Comprehension Quizzes</h1><p>Quiz yourself on books you are reading now or have read previously.</p></div>
+        <button class="secondary" type="button" data-action="reading-skills">Reading Skills</button>
+      </header>
+
+      <div class="learning-book-grid">
+        ${books.length ? books.map((book) => {
+          const last = latestByBook.get(book.documentId);
+          const pct = book.totalWords ? Math.min(100,Math.round((Number(book.furthestWord)||0)/Number(book.totalWords)*100)) : 0;
+          return `<article class="learning-book-card">
+            <span class="source-category">${book.source?.type === 'modern-guide' ? 'Guide' : 'Book'}</span>
+            <h2>${escapeHtml(book.title)}</h2>
+            <p>${pct}% read${last ? ` · Last quiz ${last.scorePercent}%` : ' · No quiz yet'}</p>
+            <button class="primary" type="button" data-book-quiz="${escapeHtml(book.documentId)}">Start quiz</button>
+          </article>`;
+        }).join('') : '<div class="empty-library"><h2>No reading history yet</h2><p>Open a book in the Reader and it will become available here.</p></div>'}
+      </div>
+    </section>`;
+
+  app.querySelectorAll('[data-book-quiz]').forEach((button) => button.addEventListener('click', async () => {
+    const book = books.find((item) => String(item.documentId) === String(button.dataset.bookQuiz));
+    if (book) await generateBookComprehensionQuiz(book, button);
+  }));
+}
+
+function renderMnemonicsPage() {
+  finalizeReadingSession();
+  stopReader();
+  const books = readingSkillBooks();
+
+  app.innerHTML = `
+    <section class="platform-page learning-tool-page">
+      <header class="platform-hero">
+        <div><span class="source-category">Reading Skills</span><h1>Mnemonics</h1><p>Create memory aids for the books and guides you are reading or have already read.</p></div>
+        <button class="secondary" type="button" data-action="reading-skills">Reading Skills</button>
+      </header>
+
+      <section class="learning-generator-card">
+        <div class="learning-generator-fields">
+          <label>Book<select id="mnemonic-book">${readingSkillBookOptions(books)}</select></label>
+          <label>What should I remember?<input id="mnemonic-focus" maxlength="240" placeholder="Optional: characters, argument, timeline, major concepts…"></label>
+          <label>Mnemonic style<select id="mnemonic-style"><option value="mixed">Best mix</option><option value="acronym">Acronym / acrostic</option><option value="story">Memory story</option><option value="visual">Visual associations</option><option value="palace">Memory palace</option></select></label>
+        </div>
+        <button id="generate-mnemonics" class="primary" type="button">Create mnemonics</button>
+        <p id="mnemonic-status" class="status"></p>
+      </section>
+
+      <div id="mnemonic-output"></div>
+    </section>`;
+
+  app.querySelector('#generate-mnemonics')?.addEventListener('click', async (event) => {
+    const id = app.querySelector('#mnemonic-book').value;
+    const book = books.find((item) => String(item.documentId) === String(id));
+    if (!book) return app.querySelector('#mnemonic-book').focus();
+
+    const button = event.currentTarget;
+    const status = app.querySelector('#mnemonic-status');
+    const output = app.querySelector('#mnemonic-output');
+    button.disabled = true;
+    button.textContent = 'Creating…';
+    status.textContent = 'Mark is building memory aids from this reading…';
+
+    try {
+      const data = await readingSkillBookText(book);
+      if (!data?.text) throw new Error('The text for this book is not available.');
+      const words = splitWords(data.text);
+      const end = Math.max(1, Math.min(words.length, Number(book.lastWord)||Number(book.furthestWord)||words.length));
+      const sample = words.slice(Math.max(0,end-4500),end).join(' ');
+      const response = await fetch('/api/mnemonics', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          title:book.title,
+          focus:app.querySelector('#mnemonic-focus').value.trim(),
+          style:app.querySelector('#mnemonic-style').value,
+          sample
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || payload.detail || `HTTP ${response.status}`);
+
+      output.innerHTML = `<section class="mnemonic-results">
+        <div class="section-heading"><div><span class="source-category">Memory Plan</span><h2>${escapeHtml(book.title)}</h2></div></div>
+        <div class="mnemonic-grid">${(payload.mnemonics || []).map((item) => `<article>
+          <span>${escapeHtml(item.type)}</span><h3>${escapeHtml(item.name)}</h3><p>${escapeHtml(item.device)}</p><small>${escapeHtml(item.use)}</small>
+        </article>`).join('')}</div>
+      </section>`;
+      recordLearningActivity('mnemonic', {
+        documentId:book.documentId,
+        title:book.title,
+        count:(payload.mnemonics || []).length || 1,
+        style:app.querySelector('#mnemonic-style').value
+      });
+      status.textContent = 'Mnemonics ready.';
+    } catch (error) {
+      status.className = 'status error';
+      status.textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Create mnemonics';
+    }
+  });
+}
+
+function renderLanguageLearningPage() {
+  finalizeReadingSession();
+  stopReader();
+  const books = readingSkillBooks();
+
+  app.innerHTML = `
+    <section class="platform-page learning-tool-page">
+      <header class="platform-hero">
+        <div><span class="source-category">Reading Skills</span><h1>Language Learning</h1><p>Use familiar books as a foundation for vocabulary, translation, and reading-comprehension practice.</p></div>
+        <button class="secondary" type="button" data-action="reading-skills">Reading Skills</button>
+      </header>
+
+      <section class="learning-generator-card">
+        <div class="learning-generator-fields">
+          <label>Book<select id="language-book">${readingSkillBookOptions(books)}</select></label>
+          <label>Language<select id="learning-language">
+            <option value="Spanish">Spanish</option><option value="French">French</option><option value="German">German</option>
+            <option value="Italian">Italian</option><option value="Portuguese">Portuguese</option><option value="Latin">Latin</option>
+            <option value="Ancient Greek">Ancient Greek</option><option value="Modern Greek">Modern Greek</option>
+          </select></label>
+          <label>Level<select id="learning-level"><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
+        </div>
+        <button id="create-language-lesson" class="primary" type="button">Create lesson</button>
+        <p id="language-status" class="status"></p>
+      </section>
+
+      <div id="language-output"></div>
+    </section>`;
+
+  app.querySelector('#create-language-lesson')?.addEventListener('click', async (event) => {
+    const id = app.querySelector('#language-book').value;
+    const book = books.find((item) => String(item.documentId) === String(id));
+    if (!book) return app.querySelector('#language-book').focus();
+    const button = event.currentTarget;
+    const status = app.querySelector('#language-status');
+    button.disabled = true; button.textContent = 'Creating…';
+    status.textContent = 'Building a lesson from your reading…';
+    try {
+      const data = await readingSkillBookText(book);
+      if (!data?.text) throw new Error('The text for this book is not available.');
+      const words = splitWords(data.text);
+      const end = Math.max(1, Math.min(words.length, Number(book.lastWord)||Number(book.furthestWord)||words.length));
+      const sample = words.slice(Math.max(0,end-1200),end).join(' ');
+      const response = await fetch('/api/language-lesson', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          title:book.title,
+          language:app.querySelector('#learning-language').value,
+          level:app.querySelector('#learning-level').value,
+          sample
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || payload.detail || `HTTP ${response.status}`);
+
+      const lesson = payload.lesson || {};
+      app.querySelector('#language-output').innerHTML = `<section class="language-lesson">
+        <div class="section-heading"><div><span class="source-category">${escapeHtml(app.querySelector('#learning-language').value)} practice</span><h2>${escapeHtml(book.title)}</h2></div></div>
+        <article><h3>Reading passage</h3><p>${escapeHtml(lesson.passage || '')}</p></article>
+        <article><h3>Vocabulary</h3><div class="language-vocab-grid">${(lesson.vocabulary || []).map((item) => `<div><strong>${escapeHtml(item.term)}</strong><span>${escapeHtml(item.meaning)}</span></div>`).join('')}</div></article>
+        <article><h3>Language notes</h3><ul>${(lesson.notes || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul></article>
+        <article><h3>Practice</h3><ol>${(lesson.exercises || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ol></article>
+      </section>`;
+      recordLearningActivity('language-lesson', {
+        documentId:book.documentId,
+        title:book.title,
+        language:app.querySelector('#learning-language').value,
+        level:app.querySelector('#learning-level').value,
+        vocabularyCount:(lesson.vocabulary || []).length
+      });
+      status.textContent = 'Lesson ready.';
+    } catch (error) {
+      status.className = 'status error';
+      status.textContent = error.message;
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Create lesson';
+    }
+  });
+}
+
+function learningCourseLinks(title) {
+  const query = encodeURIComponent(title);
+  const subject = encodeURIComponent(`${title} course`);
+  return [
+    { name:'YouTube', label:'Videos & lectures', url:`https://www.youtube.com/results?search_query=${subject}` },
+    { name:'Coursera', label:'Courses', url:`https://www.coursera.org/search?query=${query}` },
+    { name:'Udemy', label:'Courses', url:`https://www.udemy.com/courses/search/?q=${query}` },
+    { name:'edX', label:'University courses', url:`https://www.edx.org/search?q=${query}` },
+    { name:'Khan Academy', label:'Lessons & background', url:`https://www.khanacademy.org/search?page_search_query=${query}` }
+  ];
+}
+
+function renderLearningCoursesPage() {
+  finalizeReadingSession();
+  stopReader();
+  const books = readingSkillBooks();
+
+  app.innerHTML = `
+    <section class="platform-page learning-tool-page">
+      <header class="platform-hero">
+        <div><span class="source-category">Reading Skills</span><h1>Courses &amp; Learning Modules</h1><p>Find lectures, courses, and supporting learning material related to the books you are reading.</p></div>
+        <button class="secondary" type="button" data-action="reading-skills">Reading Skills</button>
+      </header>
+
+      <div class="learning-course-books">
+        ${books.length ? books.map((book) => `<article class="learning-course-book">
+          <div><span class="source-category">${book.source?.type === 'modern-guide' ? 'Guide' : 'Reading'}</span><h2>${escapeHtml(book.title)}</h2></div>
+          <div class="learning-provider-links">
+            ${learningCourseLinks(book.source?.originalTitle || book.title).map((provider) =>
+              `<a class="secondary button-link" href="${escapeHtml(provider.url)}" target="_blank" rel="noopener noreferrer" data-learning-course-provider="${escapeHtml(provider.name)}" data-learning-course-book="${escapeHtml(book.documentId)}" data-learning-course-title="${escapeHtml(book.title)}"><strong>${escapeHtml(provider.name)}</strong><small>${escapeHtml(provider.label)}</small></a>`
+            ).join('')}
+          </div>
+        </article>`).join('') : '<div class="empty-library"><h2>No books available yet</h2><p>Open a book in the Reader and course links will appear here.</p></div>'}
+      </div>
+    </section>`;
+
+  app.querySelectorAll('[data-learning-course-provider]').forEach((link) => {
+    link.addEventListener('click', () => {
+      recordLearningActivity('course-open', {
+        provider:link.dataset.learningCourseProvider || '',
+        documentId:link.dataset.learningCourseBook || '',
+        title:link.dataset.learningCourseTitle || ''
+      });
+    });
+  });
+}
+
+
 async function renderWpmTest(key = 'wpm') {
   stopReader();
 
@@ -4585,6 +4974,11 @@ async function renderWpmTest(key = 'wpm') {
         const elapsedMinutes = (performance.now() - startedAt) / 60000;
         const measured = Math.max(1, Math.round(words.length / elapsedMinutes));
         state.wpm = measured;
+        recordLearningActivity('wpm-test', {
+          wpm:measured,
+          passageKey:selector.value,
+          words:words.length
+        });
         start.disabled = false;
         stop.disabled = true;
         selector.disabled = false;
@@ -4701,6 +5095,73 @@ const COMPREHENSION_RESULTS_KEY = 'markSetGoComprehensionV1';
 const COMPREHENSION_POSITION_KEY = 'markSetGoComprehensionPositionV1';
 const READING_GOAL_KEY = 'markSetGoAnnualReadingGoalV1';
 const READING_AWARDS_KEY = 'markSetGoReadingAwardsV1';
+
+const LEARNING_ACTIVITY_KEY = 'markSetGoLearningActivityV1';
+
+function readLearningActivity() {
+  return readStoredArray(LEARNING_ACTIVITY_KEY);
+}
+
+function recordLearningActivity(type, detail = {}) {
+  if (!type) return null;
+  const event = {
+    id:`learning-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    type:String(type),
+    createdAt:new Date().toISOString(),
+    ...detail
+  };
+  const events = readLearningActivity();
+  events.unshift(event);
+  try {
+    localStorage.setItem(LEARNING_ACTIVITY_KEY, JSON.stringify(events.slice(0, 600)));
+  } catch (error) {
+    console.warn('Learning activity could not be saved.', error);
+  }
+  return event;
+}
+
+function learningMetricsSummary() {
+  const events = readLearningActivity();
+  const comprehension = getComprehensionResults();
+  const byType = (type) => events.filter((item) => item.type === type);
+  const wpmTests = byType('wpm-test');
+  const mnemonicEvents = byType('mnemonic');
+  const languageEvents = byType('language-lesson');
+  const courseEvents = byType('course-open');
+  const ideaEvents = byType('great-ideas');
+
+  const wpmValues = wpmTests.map((item) => Number(item.wpm) || 0).filter(Boolean);
+  const comprehensionValues = comprehension.map((item) => Number(item.scorePercent) || 0).filter((value) => Number.isFinite(value));
+  const distinctLanguages = [...new Set(languageEvents.map((item) => String(item.language || '')).filter(Boolean))];
+  const distinctCourseProviders = [...new Set(courseEvents.map((item) => String(item.provider || '')).filter(Boolean))];
+  const distinctMnemonicBooks = [...new Set(mnemonicEvents.map((item) => String(item.documentId || item.title || '')).filter(Boolean))];
+
+  return {
+    totalActivities:events.length + comprehension.length,
+    wpmTests:wpmTests.length,
+    latestWpm:wpmValues[0] || 0,
+    bestWpm:wpmValues.length ? Math.max(...wpmValues) : 0,
+    comprehensionChecks:comprehension.length,
+    comprehensionAverage:comprehensionValues.length
+      ? Math.round(comprehensionValues.reduce((sum,value) => sum + value,0) / comprehensionValues.length)
+      : 0,
+    bestComprehension:comprehensionValues.length ? Math.max(...comprehensionValues) : 0,
+    greatIdeasSessions:ideaEvents.length,
+    mnemonicsCreated:mnemonicEvents.reduce((sum,item) => sum + Math.max(1,Number(item.count)||1),0),
+    mnemonicBooks:distinctMnemonicBooks.length,
+    languageLessons:languageEvents.length,
+    languagesPracticed:distinctLanguages,
+    courseOpens:courseEvents.length,
+    courseProviders:distinctCourseProviders,
+    recent:events.slice(0,8)
+  };
+}
+
+window.MarkSetGoLearningMetrics = Object.freeze({
+  getSummary:learningMetricsSummary,
+  record:recordLearningActivity
+});
+
 
 
 function openReadingLibraryDb() {
@@ -5178,6 +5639,7 @@ function renderProgressDashboard() {
     : 0;
   const earned=awards.definitions.filter((item)=>item.earned).length;
   const goalPercent=Math.min(100,Math.round(awards.completed/Math.max(1,goal)*100));
+  const learning=learningMetricsSummary();
 
   const modeCounts = activity.reduce((map,item)=>{
     const label=({
@@ -5213,7 +5675,7 @@ function renderProgressDashboard() {
       <article class="progress-stat"><span>Reading time</span><strong>${formatDuration(totalSeconds)}</strong><small>${awards.activeDays} active days</small></article>
       <article class="progress-stat"><span>Average pace</span><strong>${averageWpm||'—'}</strong><small>WPM</small></article>
       <article class="progress-stat"><span>Comprehension</span><strong>${awards.compAverage||'—'}${awards.compAverage?'%':''}</strong><small>${comprehension.length} checks</small></article>
-      <article class="progress-stat"><span>Effective pace</span><strong>${effectiveWpm||'—'}</strong><small>WPM × comprehension</small></article>
+      <article class="progress-stat"><span>Learning activity</span><strong>${learning.totalActivities.toLocaleString()}</strong><small>quizzes, skills &amp; study</small></article>
       <article class="progress-stat"><span>Current streak</span><strong>${awards.streak}</strong><small>${awards.streak===1?'day':'days'}</small></article>
     </div>
 
@@ -5231,6 +5693,82 @@ function renderProgressDashboard() {
       </div>
       <div class="annual-goal-meter"><span style="width:${goalPercent}%"></span></div>
       <strong class="annual-goal-percent">${goalPercent}%</strong>
+    </section>
+
+    <section class="learning-progress-overview">
+      <div class="section-heading">
+        <div><span class="source-category">Learning</span><h2>Learning progress</h2><p>Your core reading KPIs stay visible above. Open a category when you want the details.</p></div>
+        <button class="secondary" type="button" data-action="reading-skills">Open Reading Skills</button>
+      </div>
+
+      <div class="learning-progress-details">
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Reading Speed</strong><small>WPM tests and effective pace</small></span><span>${learning.latestWpm || averageWpm || '—'} WPM</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>WPM tests</span><strong>${learning.wpmTests}</strong><small>completed</small></article>
+              <article><span>Latest test</span><strong>${learning.latestWpm || '—'}</strong><small>WPM</small></article>
+              <article><span>Best test</span><strong>${learning.bestWpm || '—'}</strong><small>WPM</small></article>
+              <article><span>Recorded pace</span><strong>${averageWpm || '—'}</strong><small>session average</small></article>
+              <article><span>Effective pace</span><strong>${effectiveWpm || '—'}</strong><small>WPM × comprehension</small></article>
+            </div>
+            <button class="secondary" type="button" data-test="wpm">Take WPM Test</button>
+          </div>
+        </details>
+
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Comprehension Quizzes</strong><small>Understanding across current and past books</small></span><span>${learning.comprehensionAverage || '—'}${learning.comprehensionAverage ? '%' : ''}</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Checks</span><strong>${learning.comprehensionChecks}</strong><small>completed</small></article>
+              <article><span>Average</span><strong>${learning.comprehensionAverage || '—'}${learning.comprehensionAverage ? '%' : ''}</strong><small>all checks</small></article>
+              <article><span>Best</span><strong>${learning.bestComprehension || '—'}${learning.bestComprehension ? '%' : ''}</strong><small>highest score</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="comprehension-library">Open quizzes</button>
+          </div>
+        </details>
+
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Great Ideas / Syntopicon</strong><small>Cross-book conceptual study</small></span><span>${learning.greatIdeasSessions} sessions</span></summary>
+          <div class="progress-collapsible-body">
+            <p>You have opened Great Ideas / Syntopicon ${learning.greatIdeasSessions} time${learning.greatIdeasSessions===1?'':'s'} since learning tracking began.</p>
+            <button class="secondary" type="button" data-read="syntopicon">Explore Great Ideas</button>
+          </div>
+        </details>
+
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Mnemonics</strong><small>Memory aids tied to your books</small></span><span>${learning.mnemonicsCreated} created</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Mnemonics</span><strong>${learning.mnemonicsCreated}</strong><small>created</small></article>
+              <article><span>Books covered</span><strong>${learning.mnemonicBooks}</strong><small>books / guides</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="mnemonics">Create mnemonics</button>
+          </div>
+        </details>
+
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Language Learning</strong><small>Lessons generated from your reading</small></span><span>${learning.languageLessons} lessons</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Lessons</span><strong>${learning.languageLessons}</strong><small>completed</small></article>
+              <article><span>Languages</span><strong>${learning.languagesPracticed.length}</strong><small>${escapeHtml(learning.languagesPracticed.slice(0,3).join(', ') || 'none yet')}</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="language-learning">Practice a language</button>
+          </div>
+        </details>
+
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Courses &amp; Learning Modules</strong><small>Outside learning connected to your books</small></span><span>${learning.courseOpens} opened</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Course links opened</span><strong>${learning.courseOpens}</strong><small>tracked</small></article>
+              <article><span>Providers explored</span><strong>${learning.courseProviders.length}</strong><small>${escapeHtml(learning.courseProviders.slice(0,4).join(', ') || 'none yet')}</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="learning-courses">Find courses</button>
+          </div>
+        </details>
+      </div>
     </section>
 
     <div class="progress-chart-grid">
@@ -5316,6 +5854,7 @@ function renderProgressDashboard() {
     localStorage.removeItem(READING_ACTIVITY_KEY);
     localStorage.removeItem(COMPREHENSION_RESULTS_KEY);
     localStorage.removeItem(READING_AWARDS_KEY);
+    localStorage.removeItem(LEARNING_ACTIVITY_KEY);
     renderProgressDashboard();
   });
 
@@ -5349,7 +5888,8 @@ function renderProgressDashboard() {
             activeDays:awards.activeDays,
             completedBooks:awards.completed,
             annualGoal:goal,
-            recentImprovementWpm:awards.improvement
+            recentImprovementWpm:awards.improvement,
+            learning
           },
           daily:daily.slice(-14).map(({label,words,minutes,wpm,sessions})=>({label,words,minutes,wpm,sessions})),
           weekly
@@ -6001,6 +6541,19 @@ function renderReadingList() {
     <section class="panel reading-list-page">
       <div class="library-heading"><div><h1>My Reading</h1><p>Keep your reading list, locally saved books, and progress together.</p></div></div>
       ${myReadingTabs('list')}
+
+      <section class="my-reading-intake" aria-labelledby="my-reading-intake-title">
+        <div class="my-reading-intake-copy">
+          <span class="source-category">Add something to read</span>
+          <h2 id="my-reading-intake-title">Bring reading into your library</h2>
+        </div>
+        <div class="my-reading-intake-actions">
+          <button class="secondary" type="button" data-read="upload"><span aria-hidden="true">⇧</span><span>Import file</span></button>
+          <button class="secondary" type="button" data-read="url"><span aria-hidden="true">↗</span><span>Read from URL</span></button>
+          <button class="primary" type="button" data-read="book-builder"><span aria-hidden="true">✎</span><span>Create Book / Guide</span></button>
+        </div>
+      </section>
+
       <form id="reading-list-form" class="reading-list-form">
         <label>Title<input id="reading-list-title" required placeholder="Book title"></label>
         <label>Author<input id="reading-list-author" placeholder="Author"></label>
@@ -13028,6 +13581,7 @@ function renderSyntopiconResult(analysis, meta) {
 }
 
 function renderSyntopicon() {
+  recordLearningActivity('great-ideas', { title:state?.title || '' });
   stopReader();
   const lastBible = getLastBiblePassage();
   const language = getStudyLanguage();
@@ -14733,19 +15287,20 @@ function renderUpload() {
         </div>
       </header>
 
-      <div class="import-format-grid" aria-label="Supported formats">
-        <article><span class="import-format-icon epub">E</span><div><strong>EPUB / EPUB3</strong><small>Preserves reading order and table of contents when available.</small></div></article>
-        <article><span class="import-format-icon pdf">PDF</span><div><strong>Text-based PDF</strong><small>Extracts selectable text and preserves PDF page markers.</small></div></article>
-        <article><span class="import-format-icon text">TXT</span><div><strong>Plain Text</strong><small>Imports UTF-8 text directly into the Reader.</small></div></article>
-      </div>
+      <div class="import-compact-row">
+        <div class="import-format-chips" aria-label="Supported formats">
+          <span><strong>EPUB</strong><small>Book + TOC</small></span>
+          <span><strong>PDF</strong><small>Selectable text</small></span>
+          <span><strong>TXT</strong><small>Plain text</small></span>
+        </div>
 
-      <label class="import-drop-zone" for="text-file">
-        <span class="import-upload-icon">⇧</span>
-        <strong>Choose EPUB, PDF, or TXT</strong>
-        <small>PDF files up to 100 MB. Scanned PDFs require OCR and are detected automatically.</small>
-        <input id="text-file" type="file"
-          accept=".epub,application/epub+zip,.pdf,application/pdf,.txt,text/plain">
-      </label>
+        <label class="import-drop-zone compact" for="text-file">
+          <span class="import-upload-icon">⇧</span>
+          <span><strong>Choose a file</strong><small>EPUB, PDF, or TXT · PDF up to 100 MB</small></span>
+          <input id="text-file" type="file"
+            accept=".epub,application/epub+zip,.pdf,application/pdf,.txt,text/plain">
+        </label>
+      </div>
 
       <div id="pdf-import-progress" class="pdf-import-progress" hidden>
         <div class="pdf-progress-heading">
@@ -14757,10 +15312,10 @@ function renderUpload() {
 
       <div id="upload-status" class="status import-status" role="status" aria-live="polite"></div>
 
-      <aside class="pdf-import-note">
-        <strong>About PDF imports</strong>
+      <details class="pdf-import-note compact-note">
+        <summary>PDF import details</summary>
         <p>Modern PDFs with selectable text work best. Page labels such as <em>PDF Page 12</em> are inserted into the extracted text so notes, AI questions, and reading progress retain a connection to the source pages. Image-only scans are not silently imported as blank documents.</p>
-      </aside>
+      </details>
     </section>`;
 
   app.querySelector('#text-file').addEventListener('change', async (event) => {
@@ -15426,7 +15981,7 @@ function renderMyLibraryHub() {
         </div>
 
         <div class="library-header-actions">
-          <button class="secondary" type="button" data-read="book-builder">Create a Book</button>
+          <button class="secondary" type="button" data-action="my-reading">My Reading</button>
           <button class="secondary" type="button" data-action="browse">Browse books</button>
           <button class="primary" type="button" data-action="reader">Open Reader</button>
         </div>
@@ -16118,7 +16673,7 @@ document.addEventListener('click', (event) => {
   // Browse now lives as an expandable subsection inside My Library. Let its
   // native <details> toggle without treating that nested summary as a request
   // to close the parent navigation menu.
-  const nestedLibrarySubmenu = event.target.closest('.library-browse-submenu');
+  const nestedLibrarySubmenu = event.target.closest('.library-browse-submenu, .library-collections-submenu');
   if (nestedLibrarySubmenu) {
     return;
   }
@@ -16351,6 +16906,11 @@ document.addEventListener('click', (event) => {
   if (actionName === 'progress-dashboard' || actionName === 'progress-awards') renderProgressDashboard();
   if (actionName === 'action-center') renderActionCenter();
   if (actionName === 'vocabulary-builder') renderVocabularyBuilder();
+  if (actionName === 'reading-skills') renderReadingSkillsHub();
+  if (actionName === 'comprehension-library') renderComprehensionLibrary();
+  if (actionName === 'mnemonics') renderMnemonicsPage();
+  if (actionName === 'language-learning') renderLanguageLearningPage();
+  if (actionName === 'learning-courses') renderLearningCoursesPage();
 
   restoreViewPosition(targetView);
 });

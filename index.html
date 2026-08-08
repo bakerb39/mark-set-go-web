@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=9.2.70-library-browse-submenu" rel="stylesheet"/>
+<link href="/styles.css?v=9.2.74-learning-metrics" rel="stylesheet"/>
 <link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
 <link href="/ask-mark-hub.css?v=9.2.11-contents-responsive-fix" rel="stylesheet"/>
 <link href="/mobile-simple.css?v=8.5.9" rel="stylesheet"/>
@@ -22,7 +22,7 @@
   <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
   <script defer src="/auth.js?v=9.0.3-auth-profile"></script>
   <script defer src="/cloud-data.js?v=8.1.2"></script>
-  <script defer src="/app.js?v=9.2.70-library-browse-submenu"></script>
+  <script defer src="/app.js?v=9.2.74-learning-metrics"></script>
   <script defer src="/cloud-preferences.js?v=8.1.2"></script>
   <script defer src="/cloud-library.js?v=9.2.36-cloud-delete"></script>
   <script defer src="/cloud-document.js?v=9.2.18-cloud-remove-unified"></script>
@@ -54,10 +54,7 @@
     <span class="menu-copy"><strong>My Reading</strong><small>Reading list, statuses, and saved editions</small></span>
   </button>
 
-  <button data-read="upload" type="button" role="menuitem">
-    <span class="menu-icon icon-import">⇧</span>
-    <span class="menu-copy"><strong>Read Anything</strong><small>Import a webpage, document, book, or pasted text</small></span>
-  </button>
+  
 
   <details class="library-browse-submenu">
     <summary role="button" aria-label="Expand Browse and Discover">
@@ -78,30 +75,44 @@
         <span class="menu-icon">✦</span>
         <span class="menu-copy"><strong>Bible Study</strong><small>Translations, commentary, and study tools</small></span>
       </button>
-      <button data-action="my-links" type="button" role="menuitem">
-        <span class="menu-icon">↗</span>
-        <span class="menu-copy"><strong>My Links</strong><small>Open saved reading and research websites</small></span>
+      <button data-read="upload" type="button" role="menuitem">
+        <span class="menu-icon">⇧</span>
+        <span class="menu-copy"><strong>Read Anything</strong><small>Import a book, document, URL, or text</small></span>
       </button>
+      
     </div>
   </details>
 
   <div class="menu-divider"></div>
-  <div class="menu-section-label">Collections</div>
-
-  <div class="library-menu-grid">
-    <button data-action="library-bookmarks" type="button" role="menuitem">
-      <span class="menu-icon icon-bookmark">🔖</span>
-      <span>Bookmarks</span>
-    </button>
-    <button data-action="library-notes" type="button" role="menuitem">
-      <span class="menu-icon icon-notes">✎</span>
-      <span>Notes</span>
-    </button>
-    <button data-action="vocabulary-builder" type="button" role="menuitem">
-      <span class="menu-icon icon-vocab">Aa</span>
-      <span>Definitions</span>
-    </button>
-  </div>
+  <details class="library-browse-submenu library-collections-submenu">
+    <summary role="button" aria-label="Expand Collections">
+      <span class="menu-icon icon-collections">▤</span>
+      <span class="menu-copy"><strong>Collections</strong><small>Bookmarks, book notes, random notes, definitions, and links</small></span>
+      <span class="library-submenu-chevron" aria-hidden="true">›</span>
+    </summary>
+    <div class="library-submenu-items">
+      <button data-action="library-bookmarks" type="button" role="menuitem">
+        <span class="menu-icon icon-bookmark">🔖</span>
+        <span class="menu-copy"><strong>Bookmarks</strong><small>Saved places in your books</small></span>
+      </button>
+      <button data-action="library-notes" type="button" role="menuitem">
+        <span class="menu-icon icon-notes">✎</span>
+        <span class="menu-copy"><strong>Book Notes</strong><small>Notes connected to your reading</small></span>
+      </button>
+      <button data-action="random-notes" type="button" role="menuitem">
+        <span class="menu-icon icon-random-notes">✦</span>
+        <span class="menu-copy"><strong>Random Notes</strong><small>Ideas and notes not tied to a specific book</small></span>
+      </button>
+      <button data-action="vocabulary-builder" type="button" role="menuitem">
+        <span class="menu-icon icon-vocab">Aa</span>
+        <span class="menu-copy"><strong>Definitions</strong><small>Saved vocabulary and word meanings</small></span>
+      </button>
+      <button data-action="my-links" type="button" role="menuitem">
+        <span class="menu-icon icon-links">↗</span>
+        <span class="menu-copy"><strong>My Links</strong><small>Saved reading and research websites</small></span>
+      </button>
+    </div>
+  </details>
 
   <div class="menu-divider"></div>
   <div class="menu-section-label">Insights &amp; Action</div>
@@ -119,12 +130,47 @@
 </details>
 
 
-<details>
+<details class="top-nav-menu learn-menu-root">
 <summary><span class="nav-icon" aria-hidden="true">↗</span> Learn</summary>
-<div class="menu-popover">
-<button data-read="syntopicon" type="button"><span class="menu-icon menu-icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M8.2 14.2A6 6 0 1 1 15.8 14.2C14.7 15.1 14 16.2 14 18h-4c0-1.8-.7-2.9-1.8-3.8Z"/></svg></span><span>Great Ideas</span></button>
-<button data-test="wpm" type="button"><span class="menu-icon menu-icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/><path d="M12 2v3"/></svg></span><span>WPM Test</span></button>
-<button data-action="vocabulary-builder" type="button"><span class="menu-icon menu-icon-svg" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22Z"/><path d="M20 5.5A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22Z"/></svg></span><span>Vocabulary Builder</span></button>
+<div class="menu-popover learn-nav-popover" role="menu">
+  <button data-action="reading-skills" type="button" role="menuitem">
+    <span class="menu-icon">◎</span>
+    <span class="menu-copy"><strong>Reading Skills</strong><small>Practice speed, comprehension, memory, and deeper study</small></span>
+  </button>
+
+  <details class="library-browse-submenu learn-skills-submenu">
+    <summary role="button" aria-label="Expand Learning Tools">
+      <span class="menu-icon">▤</span>
+      <span class="menu-copy"><strong>Learning Tools</strong><small>Tests, quizzes, ideas, mnemonics, languages, and courses</small></span>
+      <span class="library-submenu-chevron" aria-hidden="true">›</span>
+    </summary>
+    <div class="library-submenu-items">
+      <button data-test="wpm" type="button" role="menuitem">
+        <span class="menu-icon">⏱</span>
+        <span class="menu-copy"><strong>WPM Test</strong><small>Measure your natural reading speed</small></span>
+      </button>
+      <button data-action="comprehension-library" type="button" role="menuitem">
+        <span class="menu-icon">✓</span>
+        <span class="menu-copy"><strong>Comprehension Quizzes</strong><small>Quiz yourself on current and past books</small></span>
+      </button>
+      <button data-read="syntopicon" type="button" role="menuitem">
+        <span class="menu-icon">★</span>
+        <span class="menu-copy"><strong>Great Ideas / Syntopicon</strong><small>Compare important ideas across works</small></span>
+      </button>
+      <button data-action="mnemonics" type="button" role="menuitem">
+        <span class="menu-icon">M</span>
+        <span class="menu-copy"><strong>Mnemonics</strong><small>Create memory aids for books you are reading</small></span>
+      </button>
+      <button data-action="language-learning" type="button" role="menuitem">
+        <span class="menu-icon">文</span>
+        <span class="menu-copy"><strong>Language Learning</strong><small>Practice languages through your reading</small></span>
+      </button>
+      <button data-action="learning-courses" type="button" role="menuitem">
+        <span class="menu-icon">▶</span>
+        <span class="menu-copy"><strong>Courses &amp; Learning Modules</strong><small>Find courses related to your books</small></span>
+      </button>
+    </div>
+  </details>
 </div>
 </details>
 
