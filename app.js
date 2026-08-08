@@ -9121,7 +9121,10 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   // Every successful import/open must create the local document payload immediately.
   // Previously the text was only persisted after actions such as adding a bookmark,
   // allowing cloud metadata to sync while the actual document remained unavailable.
-  persistCurrentDocument();
+  const documentPersisted = persistCurrentDocument();
+  if (!documentPersisted && source?.type === 'modern-guide') {
+    console.warn('Modern Guide opened without a local text copy; My Library will use the bundled guide fallback when available.');
+  }
 
   // Modern Guides are first-class reading items. Register them in My Library
   // as soon as they are opened instead of waiting for a timed reading session
@@ -15187,6 +15190,32 @@ document.addEventListener('marksetgo:auth-changed', scheduleLibraryPersonalizati
 document.addEventListener('marksetgo:auth-ready', scheduleLibraryPersonalization);
 window.addEventListener('marksetgo:auth-ready', scheduleLibraryPersonalization);
 
+
+async function loadBundledModernGuideDocument(source = {}) {
+  const id = String(source?.id || '').trim();
+  if (!id) return null;
+  const shelfItem = MODERN_GUIDE_SHELF.find((item) => item.id === id && item.active);
+  if (!shelfItem) return null;
+
+  const response = await fetch(`/texts/modern-guides/${encodeURIComponent(id)}-guide.txt`, { cache:'no-store' });
+  if (!response.ok) return null;
+  const text = await response.text();
+  if (!text.trim()) return null;
+
+  return {
+    title: `${shelfItem.title} — Mark, Set, Go! Guide`,
+    text,
+    source: {
+      type:'modern-guide',
+      id:shelfItem.id,
+      originalTitle:shelfItem.title,
+      originalAuthor:shelfItem.author,
+      buyUrl:shelfItem.buyUrl,
+      subtitle:`An independent reading guide to ${shelfItem.title}`
+    }
+  };
+}
+
 function renderMyLibraryHub() {
   finalizeReadingSession();
   stopReader();
@@ -15278,8 +15307,41 @@ function renderMyLibraryHub() {
   const openStoredDocument = async (documentId, wordIndex = null) => {
     let data = null;
     try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+
+    const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
+
+    if (!data?.text && record?.source?.type === 'modern-guide') {
+      // Bundled guides can always be reconstructed from their shipped text
+      // file. Older builds sometimes created only the progress record.
+      data = await loadBundledModernGuideDocument(record.source);
+
+      if (data?.text) {
+        // Restore the exact document id expected by this library record after
+        // renderReaderWithText builds the Reader from the reconstructed text.
+        const resumeIndex = Number.isFinite(Number(wordIndex)) ? Number(wordIndex) : Number(record?.lastWord) || 0;
+        renderReaderWithText(data.title, data.text, data.source);
+        requestAnimationFrame(() => requestAnimationFrame(() => jumpToWordIndex(resumeIndex)));
+        return;
+      }
+
+      // A user-created guide cannot be reconstructed from the public guide
+      // shelf. If its active Reader snapshot still has the text, use that.
+      if (
+        record.source?.customGuide
+        && activeReaderSnapshot?.documentId === documentId
+        && activeReaderSnapshot?.currentText
+      ) {
+        applyReaderSessionSnapshot(activeReaderSnapshot, { resumePlayback:false });
+        return;
+      }
+    }
+
     if (!data?.text) {
-      window.alert('This text is not currently stored in this browser.');
+      window.alert(
+        record?.source?.type === 'modern-guide'
+          ? 'This guide record was saved by an older build, but its text is no longer available in this browser. Reopen the guide from Browse once to restore it.'
+          : 'This text is not currently stored in this browser.'
+      );
       return;
     }
 
@@ -15305,7 +15367,6 @@ function renderMyLibraryHub() {
       return;
     }
 
-    const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
     let resumeIndex = Number.isFinite(Number(wordIndex)) ? Number(wordIndex) : Number(record?.lastWord) || 0;
     let matchingSnapshot = null;
 
