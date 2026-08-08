@@ -224,6 +224,58 @@
     });
   }
 
+
+  function applyCompanionChatIdentity() {
+    const roots = new Set();
+    const selectors = [
+      '#mark-panel', '#ask-mark-panel', '.mark-shell', '.askmark-shell',
+      '.askmark-panel', '.ask-mark-panel', '.askmark-view',
+      '[data-askmark-view-panel]', '[data-panel="mark"]', '[data-panel="ask-mark"]'
+    ];
+    document.querySelectorAll(selectors.join(',')).forEach((el) => roots.add(el));
+
+    /* Fallback for builds whose companion panel has no stable class/id: find the
+       visible companion heading, then limit all work to its nearest panel-like box. */
+    document.querySelectorAll('aside,section,div').forEach((el) => {
+      const text = (el.textContent || '').trim();
+      if (!/\bAsk (Mark|Beth)\b/.test(text) || !/READING COMPANION/i.test(text)) return;
+      if (el.querySelector('input,textarea,button') || el.querySelector('.mark-shell,.askmark-view')) roots.add(el);
+    });
+
+    roots.forEach((root) => {
+      /* Only swap standalone author badges/labels such as the MARK shown above
+         companion messages. Do not rewrite arbitrary message/book text. */
+      root.querySelectorAll('*').forEach((el) => {
+        if (!(el instanceof HTMLElement) || el.children.length) return;
+        const value = (el.textContent || '').trim();
+        if (value !== 'MARK' && value !== 'Mark') return;
+        if (!el.dataset.msgOriginalCompanionAuthor) el.dataset.msgOriginalCompanionAuthor = value;
+        el.textContent = state.id === 'beth'
+          ? (value === 'MARK' ? 'BETH' : 'Beth')
+          : el.dataset.msgOriginalCompanionAuthor;
+      });
+
+      root.querySelectorAll('img').forEach((img) => {
+        if (!(img instanceof HTMLImageElement)) return;
+        const src = img.getAttribute('src') || '';
+        const alt = img.getAttribute('alt') || '';
+        const title = img.getAttribute('title') || '';
+        const identityHint = /mark/i.test(`${src} ${alt} ${title}`);
+        const smallAvatar = (img.width && img.width <= 96) || img.className.toString().toLowerCase().includes('avatar');
+        if (!identityHint && !smallAvatar) return;
+        if (!img.dataset.msgOriginalCompanionChatSrc) img.dataset.msgOriginalCompanionChatSrc = src;
+        if (!img.dataset.msgOriginalCompanionChatAlt) img.dataset.msgOriginalCompanionChatAlt = alt;
+        if (state.id === 'beth') {
+          img.src = BETH_AVATAR;
+          img.alt = 'Beth';
+        } else {
+          img.src = img.dataset.msgOriginalCompanionChatSrc || MARK_AVATAR;
+          img.alt = img.dataset.msgOriginalCompanionChatAlt || 'Mark';
+        }
+      });
+    });
+  }
+
   function profileLikelyOpen() {
     if (document.querySelector('.companion-persona-settings')) return true;
     return !!document.querySelector('[data-page="profile"],.profile-page,.profile-preferences,.experience-profile');
@@ -290,6 +342,7 @@
     applyAskCompanionButtonAvatar();
     applyImages(document);
     applyFrontpageCompanionMode(document);
+    applyCompanionChatIdentity();
     updateProfileControl();
   }
 
