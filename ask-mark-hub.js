@@ -50,8 +50,14 @@
     return { title, chapter, progress };
   }
 
+  function liveLegacyRoot() {
+    if (legacyHost?.isConnected) return legacyHost;
+    if (shell?.isConnected) return shell;
+    return document;
+  }
+
   function getLegacySelectionPanel() {
-    return $('#mark-selection-panel', legacyHost || shell || document);
+    return $('#mark-selection-panel', liveLegacyRoot());
   }
 
   function getSelectionText() {
@@ -266,6 +272,7 @@
   }
 
   function syncLegacyResponse() {
+    if (!shell?.isConnected || !legacyHost?.isConnected) configureShell();
     const response = getLegacySelectionPanel()?.querySelector('#mark-response');
     if (!response || response.hidden || !response.textContent.trim()) return;
     const thinking = $('.askmark-message.is-thinking', shell);
@@ -313,7 +320,8 @@
   });
 
   function syncSelection() {
-    if (!shell) return;
+    if (!shell?.isConnected || !legacyHost?.isConnected) configureShell();
+    if (!shell?.isConnected) return;
     const text = getSelectionText();
     const card = $('[data-askmark-selection]', shell);
     const output = $('[data-askmark-selection-text]', shell);
