@@ -314,7 +314,10 @@
       // This observer is scoped ONLY to the companion/chat panel. It never
       // observes the reader, selection surface, or right-click/context menu.
       if (!mutations.some((m) => m.addedNodes?.length || m.type === 'characterData')) return;
-      window.queueMicrotask(() => applyCompanionChatIdentity());
+      window.queueMicrotask(() => {
+        applyCompanionChatIdentity();
+        normalizeReadingStatus(root);
+      });
     });
     companionChatObserver.observe(root, { childList:true, subtree:true, characterData:true });
   }
