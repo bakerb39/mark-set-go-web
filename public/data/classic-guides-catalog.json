@@ -1,0 +1,1172 @@
+[
+  {
+    "id": "iliad",
+    "title": "The Iliad",
+    "author": "Homer",
+    "volume": 3,
+    "era": "Ancient",
+    "category": "Literature",
+    "status": "ready"
+  },
+  {
+    "id": "odyssey",
+    "title": "The Odyssey",
+    "author": "Homer",
+    "volume": 3,
+    "era": "Ancient",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "aeschylus-plays",
+    "title": "Plays",
+    "author": "Aeschylus",
+    "volume": 4,
+    "era": "Ancient",
+    "category": "Drama",
+    "status": "planned"
+  },
+  {
+    "id": "sophocles-plays",
+    "title": "Plays",
+    "author": "Sophocles",
+    "volume": 4,
+    "era": "Ancient",
+    "category": "Drama",
+    "status": "planned"
+  },
+  {
+    "id": "euripides-plays",
+    "title": "Plays",
+    "author": "Euripides",
+    "volume": 4,
+    "era": "Ancient",
+    "category": "Drama",
+    "status": "planned"
+  },
+  {
+    "id": "aristophanes-plays",
+    "title": "Plays",
+    "author": "Aristophanes",
+    "volume": 4,
+    "era": "Ancient",
+    "category": "Drama",
+    "status": "planned"
+  },
+  {
+    "id": "herodotus-history",
+    "title": "The History of the Persian Wars",
+    "author": "Herodotus",
+    "volume": 5,
+    "era": "Ancient",
+    "category": "History",
+    "status": "planned"
+  },
+  {
+    "id": "thucydides-history",
+    "title": "The History of the Peloponnesian War",
+    "author": "Thucydides",
+    "volume": 5,
+    "era": "Ancient",
+    "category": "History",
+    "status": "planned"
+  },
+  {
+    "id": "plato-dialogues",
+    "title": "Dialogues",
+    "author": "Plato",
+    "volume": 6,
+    "era": "Ancient",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "plato-seventh-letter",
+    "title": "The Seventh Letter",
+    "author": "Plato",
+    "volume": 6,
+    "era": "Ancient",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "aristotle-works",
+    "title": "Works",
+    "author": "Aristotle",
+    "volume": "7–8",
+    "era": "Ancient",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "hippocrates-works",
+    "title": "Works",
+    "author": "Hippocrates",
+    "volume": 9,
+    "era": "Ancient",
+    "category": "Science & Medicine",
+    "status": "planned"
+  },
+  {
+    "id": "galen-natural-faculties",
+    "title": "On the Natural Faculties",
+    "author": "Galen",
+    "volume": 9,
+    "era": "Ancient",
+    "category": "Science & Medicine",
+    "status": "planned"
+  },
+  {
+    "id": "euclid-elements",
+    "title": "Elements",
+    "author": "Euclid",
+    "volume": 10,
+    "era": "Ancient",
+    "category": "Mathematics",
+    "status": "planned"
+  },
+  {
+    "id": "archimedes-works",
+    "title": "Works",
+    "author": "Archimedes",
+    "volume": 10,
+    "era": "Ancient",
+    "category": "Mathematics",
+    "status": "planned"
+  },
+  {
+    "id": "nicomachus-arithmetic",
+    "title": "Introduction to Arithmetic",
+    "author": "Nicomachus",
+    "volume": 10,
+    "era": "Ancient",
+    "category": "Mathematics",
+    "status": "planned"
+  },
+  {
+    "id": "lucretius-way-things-are",
+    "title": "The Way Things Are",
+    "author": "Lucretius",
+    "volume": 11,
+    "era": "Ancient",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "epictetus-discourses",
+    "title": "Discourses",
+    "author": "Epictetus",
+    "volume": 11,
+    "era": "Ancient",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "marcus-aurelius-meditations",
+    "title": "Meditations",
+    "author": "Marcus Aurelius",
+    "volume": 11,
+    "era": "Ancient",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "plotinus-enneads",
+    "title": "The Six Enneads",
+    "author": "Plotinus",
+    "volume": 11,
+    "era": "Ancient",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "virgil-aeneid",
+    "title": "The Aeneid",
+    "author": "Virgil",
+    "volume": 12,
+    "era": "Ancient",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "plutarch-lives",
+    "title": "The Lives of the Noble Grecians and Romans",
+    "author": "Plutarch",
+    "volume": 13,
+    "era": "Ancient",
+    "category": "History & Biography",
+    "status": "planned"
+  },
+  {
+    "id": "tacitus-annals",
+    "title": "The Annals",
+    "author": "Tacitus",
+    "volume": 14,
+    "era": "Ancient",
+    "category": "History",
+    "status": "planned"
+  },
+  {
+    "id": "tacitus-histories",
+    "title": "The Histories",
+    "author": "Tacitus",
+    "volume": 14,
+    "era": "Ancient",
+    "category": "History",
+    "status": "planned"
+  },
+  {
+    "id": "ptolemy-almagest",
+    "title": "The Almagest",
+    "author": "Ptolemy",
+    "volume": 15,
+    "era": "Ancient",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "copernicus-revolutions",
+    "title": "On the Revolutions of the Heavenly Spheres",
+    "author": "Nicolaus Copernicus",
+    "volume": 15,
+    "era": "Renaissance",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "kepler-epitome",
+    "title": "Epitome of Copernican Astronomy (Books IV–V)",
+    "author": "Johannes Kepler",
+    "volume": 15,
+    "era": "Early Modern",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "kepler-harmonies",
+    "title": "The Harmonies of the World (Book V)",
+    "author": "Johannes Kepler",
+    "volume": 15,
+    "era": "Early Modern",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "augustine-confessions",
+    "title": "The Confessions",
+    "author": "Saint Augustine",
+    "volume": 16,
+    "era": "Late Antiquity",
+    "category": "Religion & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "augustine-city-of-god",
+    "title": "The City of God",
+    "author": "Saint Augustine",
+    "volume": 16,
+    "era": "Late Antiquity",
+    "category": "Religion & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "augustine-christian-doctrine",
+    "title": "On Christian Doctrine",
+    "author": "Saint Augustine",
+    "volume": 16,
+    "era": "Late Antiquity",
+    "category": "Religion & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "aquinas-summa",
+    "title": "Summa Theologica",
+    "author": "Thomas Aquinas",
+    "volume": "17–18",
+    "era": "Medieval",
+    "category": "Religion & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "dante-divine-comedy",
+    "title": "The Divine Comedy",
+    "author": "Dante",
+    "volume": 19,
+    "era": "Medieval",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "chaucer-troilus",
+    "title": "Troilus and Criseyde",
+    "author": "Geoffrey Chaucer",
+    "volume": 19,
+    "era": "Medieval",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "chaucer-canterbury",
+    "title": "The Canterbury Tales",
+    "author": "Geoffrey Chaucer",
+    "volume": 19,
+    "era": "Medieval",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "calvin-institutes",
+    "title": "Institutes of the Christian Religion",
+    "author": "John Calvin",
+    "volume": 20,
+    "era": "Reformation",
+    "category": "Religion",
+    "status": "planned"
+  },
+  {
+    "id": "machiavelli-prince",
+    "title": "The Prince",
+    "author": "Niccolò Machiavelli",
+    "volume": 21,
+    "era": "Renaissance",
+    "category": "Politics",
+    "status": "planned"
+  },
+  {
+    "id": "hobbes-leviathan",
+    "title": "Leviathan",
+    "author": "Thomas Hobbes",
+    "volume": 21,
+    "era": "Early Modern",
+    "category": "Politics & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "rabelais-gargantua",
+    "title": "Gargantua and Pantagruel",
+    "author": "François Rabelais",
+    "volume": 22,
+    "era": "Renaissance",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "erasmus-praise-of-folly",
+    "title": "Praise of Folly",
+    "author": "Desiderius Erasmus",
+    "volume": 23,
+    "era": "Renaissance",
+    "category": "Literature & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "montaigne-essays",
+    "title": "Essays",
+    "author": "Michel de Montaigne",
+    "volume": 23,
+    "era": "Renaissance",
+    "category": "Philosophy & Literature",
+    "status": "planned"
+  },
+  {
+    "id": "shakespeare-plays",
+    "title": "Plays",
+    "author": "William Shakespeare",
+    "volume": "24–25",
+    "era": "Renaissance",
+    "category": "Drama",
+    "status": "planned"
+  },
+  {
+    "id": "shakespeare-sonnets",
+    "title": "Sonnets",
+    "author": "William Shakespeare",
+    "volume": 25,
+    "era": "Renaissance",
+    "category": "Poetry",
+    "status": "planned"
+  },
+  {
+    "id": "gilbert-loadstone",
+    "title": "On the Loadstone and Magnetic Bodies",
+    "author": "William Gilbert",
+    "volume": 26,
+    "era": "Early Modern",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "galileo-two-new-sciences",
+    "title": "Dialogues Concerning the Two New Sciences",
+    "author": "Galileo",
+    "volume": 26,
+    "era": "Early Modern",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "harvey-heart-blood",
+    "title": "On the Motion of the Heart and Blood in Animals",
+    "author": "William Harvey",
+    "volume": 26,
+    "era": "Early Modern",
+    "category": "Science & Medicine",
+    "status": "planned"
+  },
+  {
+    "id": "harvey-circulation",
+    "title": "On the Circulation of the Blood",
+    "author": "William Harvey",
+    "volume": 26,
+    "era": "Early Modern",
+    "category": "Science & Medicine",
+    "status": "planned"
+  },
+  {
+    "id": "harvey-generation",
+    "title": "On the Generation of Animals",
+    "author": "William Harvey",
+    "volume": 26,
+    "era": "Early Modern",
+    "category": "Science & Medicine",
+    "status": "planned"
+  },
+  {
+    "id": "cervantes-don-quixote",
+    "title": "Don Quixote",
+    "author": "Miguel de Cervantes",
+    "volume": 27,
+    "era": "Early Modern",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "bacon-advancement",
+    "title": "The Advancement of Learning",
+    "author": "Francis Bacon",
+    "volume": 28,
+    "era": "Early Modern",
+    "category": "Philosophy & Science",
+    "status": "planned"
+  },
+  {
+    "id": "bacon-novum-organum",
+    "title": "Novum Organum",
+    "author": "Francis Bacon",
+    "volume": 28,
+    "era": "Early Modern",
+    "category": "Philosophy & Science",
+    "status": "planned"
+  },
+  {
+    "id": "bacon-new-atlantis",
+    "title": "New Atlantis",
+    "author": "Francis Bacon",
+    "volume": 28,
+    "era": "Early Modern",
+    "category": "Literature & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "descartes-rules",
+    "title": "Rules for the Direction of the Mind",
+    "author": "René Descartes",
+    "volume": 28,
+    "era": "Early Modern",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "descartes-method",
+    "title": "Discourse on the Method",
+    "author": "René Descartes",
+    "volume": 28,
+    "era": "Early Modern",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "descartes-meditations",
+    "title": "Meditations on First Philosophy",
+    "author": "René Descartes",
+    "volume": 28,
+    "era": "Early Modern",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "spinoza-ethics",
+    "title": "Ethics",
+    "author": "Benedict de Spinoza",
+    "volume": 28,
+    "era": "Early Modern",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "milton-paradise-lost",
+    "title": "Paradise Lost",
+    "author": "John Milton",
+    "volume": 29,
+    "era": "Early Modern",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "pascal-pensees",
+    "title": "Pensées",
+    "author": "Blaise Pascal",
+    "volume": 30,
+    "era": "Early Modern",
+    "category": "Religion & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "moliere-tartuffe",
+    "title": "Tartuffe",
+    "author": "Molière",
+    "volume": 31,
+    "era": "Early Modern",
+    "category": "Drama",
+    "status": "planned"
+  },
+  {
+    "id": "racine-phaedra",
+    "title": "Phaedra",
+    "author": "Jean Racine",
+    "volume": 31,
+    "era": "Early Modern",
+    "category": "Drama",
+    "status": "planned"
+  },
+  {
+    "id": "newton-principia",
+    "title": "Mathematical Principles of Natural Philosophy",
+    "author": "Isaac Newton",
+    "volume": 32,
+    "era": "Early Modern",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "newton-optics",
+    "title": "Optics",
+    "author": "Isaac Newton",
+    "volume": 32,
+    "era": "Early Modern",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "huygens-light",
+    "title": "Treatise on Light",
+    "author": "Christiaan Huygens",
+    "volume": 32,
+    "era": "Early Modern",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "locke-toleration",
+    "title": "A Letter Concerning Toleration",
+    "author": "John Locke",
+    "volume": 33,
+    "era": "Enlightenment",
+    "category": "Politics & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "locke-second-treatise",
+    "title": "Second Essay on Civil Government",
+    "author": "John Locke",
+    "volume": 33,
+    "era": "Enlightenment",
+    "category": "Politics & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "locke-human-understanding",
+    "title": "An Essay Concerning Human Understanding",
+    "author": "John Locke",
+    "volume": 33,
+    "era": "Enlightenment",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "berkeley-principles",
+    "title": "The Principles of Human Knowledge",
+    "author": "George Berkeley",
+    "volume": 33,
+    "era": "Enlightenment",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "hume-enquiry",
+    "title": "An Enquiry Concerning Human Understanding",
+    "author": "David Hume",
+    "volume": 33,
+    "era": "Enlightenment",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "swift-gullivers-travels",
+    "title": "Gulliver’s Travels",
+    "author": "Jonathan Swift",
+    "volume": 34,
+    "era": "Enlightenment",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "voltaire-candide",
+    "title": "Candide",
+    "author": "Voltaire",
+    "volume": 34,
+    "era": "Enlightenment",
+    "category": "Literature & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "diderot-rameau",
+    "title": "Rameau’s Nephew",
+    "author": "Denis Diderot",
+    "volume": 34,
+    "era": "Enlightenment",
+    "category": "Literature & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "montesquieu-spirit-laws",
+    "title": "The Spirit of Laws",
+    "author": "Montesquieu",
+    "volume": 35,
+    "era": "Enlightenment",
+    "category": "Politics",
+    "status": "planned"
+  },
+  {
+    "id": "rousseau-inequality",
+    "title": "A Discourse on the Origin of Inequality",
+    "author": "Jean-Jacques Rousseau",
+    "volume": 35,
+    "era": "Enlightenment",
+    "category": "Politics & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "rousseau-social-contract",
+    "title": "The Social Contract",
+    "author": "Jean-Jacques Rousseau",
+    "volume": 35,
+    "era": "Enlightenment",
+    "category": "Politics & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "smith-wealth-nations",
+    "title": "The Wealth of Nations",
+    "author": "Adam Smith",
+    "volume": 36,
+    "era": "Enlightenment",
+    "category": "Economics",
+    "status": "planned"
+  },
+  {
+    "id": "gibbon-decline-fall",
+    "title": "The Decline and Fall of the Roman Empire",
+    "author": "Edward Gibbon",
+    "volume": "37–38",
+    "era": "Enlightenment",
+    "category": "History",
+    "status": "planned"
+  },
+  {
+    "id": "kant-pure-reason",
+    "title": "The Critique of Pure Reason",
+    "author": "Immanuel Kant",
+    "volume": 39,
+    "era": "Enlightenment",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "kant-morals",
+    "title": "Fundamental Principles of the Metaphysics of Morals",
+    "author": "Immanuel Kant",
+    "volume": 39,
+    "era": "Enlightenment",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "american-state-papers",
+    "title": "American State Papers",
+    "author": "Various",
+    "volume": 40,
+    "era": "Enlightenment",
+    "category": "Politics & History",
+    "status": "planned"
+  },
+  {
+    "id": "federalist-papers",
+    "title": "The Federalist Papers",
+    "author": "Hamilton, Madison & Jay",
+    "volume": 40,
+    "era": "Enlightenment",
+    "category": "Politics",
+    "status": "planned"
+  },
+  {
+    "id": "mill-on-liberty",
+    "title": "On Liberty",
+    "author": "John Stuart Mill",
+    "volume": 40,
+    "era": "19th Century",
+    "category": "Politics & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "mill-utilitarianism",
+    "title": "Utilitarianism",
+    "author": "John Stuart Mill",
+    "volume": 40,
+    "era": "19th Century",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "boswell-johnson",
+    "title": "The Life of Samuel Johnson",
+    "author": "James Boswell",
+    "volume": 41,
+    "era": "18th Century",
+    "category": "Biography",
+    "status": "planned"
+  },
+  {
+    "id": "lavoisier-chemistry",
+    "title": "Elements of Chemistry",
+    "author": "Antoine Lavoisier",
+    "volume": 42,
+    "era": "Enlightenment",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "faraday-electricity",
+    "title": "Experimental Researches in Electricity",
+    "author": "Michael Faraday",
+    "volume": 42,
+    "era": "19th Century",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "hegel-right",
+    "title": "The Philosophy of Right",
+    "author": "G. W. F. Hegel",
+    "volume": 43,
+    "era": "19th Century",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "hegel-history",
+    "title": "The Philosophy of History",
+    "author": "G. W. F. Hegel",
+    "volume": 43,
+    "era": "19th Century",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "kierkegaard-fear-trembling",
+    "title": "Fear and Trembling",
+    "author": "Søren Kierkegaard",
+    "volume": 43,
+    "era": "19th Century",
+    "category": "Religion & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "nietzsche-beyond-good-evil",
+    "title": "Beyond Good and Evil",
+    "author": "Friedrich Nietzsche",
+    "volume": 43,
+    "era": "19th Century",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "tocqueville-democracy",
+    "title": "Democracy in America",
+    "author": "Alexis de Tocqueville",
+    "volume": 44,
+    "era": "19th Century",
+    "category": "Politics & History",
+    "status": "planned"
+  },
+  {
+    "id": "goethe-faust",
+    "title": "Faust",
+    "author": "Johann Wolfgang von Goethe",
+    "volume": 45,
+    "era": "19th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "balzac-cousin-bette",
+    "title": "Cousin Bette",
+    "author": "Honoré de Balzac",
+    "volume": 45,
+    "era": "19th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "austen-emma",
+    "title": "Emma",
+    "author": "Jane Austen",
+    "volume": 46,
+    "era": "19th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "eliot-middlemarch",
+    "title": "Middlemarch",
+    "author": "George Eliot",
+    "volume": 46,
+    "era": "19th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "dickens-little-dorrit",
+    "title": "Little Dorrit",
+    "author": "Charles Dickens",
+    "volume": 47,
+    "era": "19th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "melville-moby-dick",
+    "title": "Moby Dick",
+    "author": "Herman Melville",
+    "volume": 48,
+    "era": "19th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "twain-huckleberry-finn",
+    "title": "Huckleberry Finn",
+    "author": "Mark Twain",
+    "volume": 48,
+    "era": "19th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "darwin-origin",
+    "title": "The Origin of Species",
+    "author": "Charles Darwin",
+    "volume": 49,
+    "era": "19th Century",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "darwin-descent",
+    "title": "The Descent of Man",
+    "author": "Charles Darwin",
+    "volume": 49,
+    "era": "19th Century",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "communist-manifesto",
+    "title": "Manifesto of the Communist Party",
+    "author": "Karl Marx & Friedrich Engels",
+    "volume": 50,
+    "era": "19th Century",
+    "category": "Politics & Economics",
+    "status": "planned"
+  },
+  {
+    "id": "marx-capital",
+    "title": "Capital, Vol. 1",
+    "author": "Karl Marx",
+    "volume": 50,
+    "era": "19th Century",
+    "category": "Economics & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "tolstoy-war-peace",
+    "title": "War and Peace",
+    "author": "Leo Tolstoy",
+    "volume": 51,
+    "era": "19th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "dostoevsky-brothers-karamazov",
+    "title": "The Brothers Karamazov",
+    "author": "Fyodor Dostoevsky",
+    "volume": 52,
+    "era": "19th Century",
+    "category": "Literature & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "ibsen-dolls-house",
+    "title": "A Doll’s House",
+    "author": "Henrik Ibsen",
+    "volume": 52,
+    "era": "19th Century",
+    "category": "Drama",
+    "status": "planned"
+  },
+  {
+    "id": "james-principles-psychology",
+    "title": "The Principles of Psychology",
+    "author": "William James",
+    "volume": 53,
+    "era": "19th Century",
+    "category": "Psychology",
+    "status": "planned"
+  },
+  {
+    "id": "freud-interpretation-dreams",
+    "title": "The Interpretation of Dreams",
+    "author": "Sigmund Freud",
+    "volume": 54,
+    "era": "20th Century",
+    "category": "Psychology",
+    "status": "planned"
+  },
+  {
+    "id": "freud-civilization",
+    "title": "Civilization and Its Discontents",
+    "author": "Sigmund Freud",
+    "volume": 54,
+    "era": "20th Century",
+    "category": "Psychology",
+    "status": "planned"
+  },
+  {
+    "id": "james-pragmatism",
+    "title": "Pragmatism",
+    "author": "William James",
+    "volume": 55,
+    "era": "20th Century",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "dewey-experience-education",
+    "title": "Experience and Education",
+    "author": "John Dewey",
+    "volume": 55,
+    "era": "20th Century",
+    "category": "Education & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "whitehead-science-modern-world",
+    "title": "Science and the Modern World",
+    "author": "Alfred North Whitehead",
+    "volume": 55,
+    "era": "20th Century",
+    "category": "Philosophy & Science",
+    "status": "planned"
+  },
+  {
+    "id": "russell-problems-philosophy",
+    "title": "The Problems of Philosophy",
+    "author": "Bertrand Russell",
+    "volume": 55,
+    "era": "20th Century",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "wittgenstein-investigations",
+    "title": "Philosophical Investigations",
+    "author": "Ludwig Wittgenstein",
+    "volume": 55,
+    "era": "20th Century",
+    "category": "Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "einstein-relativity",
+    "title": "Relativity: The Special and the General Theory",
+    "author": "Albert Einstein",
+    "volume": 56,
+    "era": "20th Century",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "hardy-apology",
+    "title": "A Mathematician’s Apology",
+    "author": "G. H. Hardy",
+    "volume": 56,
+    "era": "20th Century",
+    "category": "Mathematics",
+    "status": "planned"
+  },
+  {
+    "id": "heisenberg-physics-philosophy",
+    "title": "Physics and Philosophy",
+    "author": "Werner Heisenberg",
+    "volume": 56,
+    "era": "20th Century",
+    "category": "Science & Philosophy",
+    "status": "planned"
+  },
+  {
+    "id": "schrodinger-what-is-life",
+    "title": "What Is Life?",
+    "author": "Erwin Schrödinger",
+    "volume": 56,
+    "era": "20th Century",
+    "category": "Science",
+    "status": "planned"
+  },
+  {
+    "id": "veblen-leisure-class",
+    "title": "The Theory of the Leisure Class",
+    "author": "Thorstein Veblen",
+    "volume": 57,
+    "era": "20th Century",
+    "category": "Social Science",
+    "status": "planned"
+  },
+  {
+    "id": "keynes-general-theory",
+    "title": "The General Theory of Employment, Interest and Money",
+    "author": "John Maynard Keynes",
+    "volume": 57,
+    "era": "20th Century",
+    "category": "Economics",
+    "status": "planned"
+  },
+  {
+    "id": "frazer-golden-bough",
+    "title": "The Golden Bough (Selections)",
+    "author": "James George Frazer",
+    "volume": 58,
+    "era": "20th Century",
+    "category": "Anthropology",
+    "status": "planned"
+  },
+  {
+    "id": "weber-sociology",
+    "title": "Essays in Sociology (Selections)",
+    "author": "Max Weber",
+    "volume": 58,
+    "era": "20th Century",
+    "category": "Social Science",
+    "status": "planned"
+  },
+  {
+    "id": "huizinga-waning",
+    "title": "The Waning of the Middle Ages",
+    "author": "Johan Huizinga",
+    "volume": 58,
+    "era": "20th Century",
+    "category": "History",
+    "status": "planned"
+  },
+  {
+    "id": "conrad-heart-darkness",
+    "title": "Heart of Darkness",
+    "author": "Joseph Conrad",
+    "volume": 59,
+    "era": "20th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "chekhov-uncle-vanya",
+    "title": "Uncle Vanya",
+    "author": "Anton Chekhov",
+    "volume": 59,
+    "era": "20th Century",
+    "category": "Drama",
+    "status": "planned"
+  },
+  {
+    "id": "joyce-portrait",
+    "title": "A Portrait of the Artist as a Young Man",
+    "author": "James Joyce",
+    "volume": 59,
+    "era": "20th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "woolf-lighthouse",
+    "title": "To the Lighthouse",
+    "author": "Virginia Woolf",
+    "volume": 60,
+    "era": "20th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "kafka-metamorphosis",
+    "title": "The Metamorphosis",
+    "author": "Franz Kafka",
+    "volume": 60,
+    "era": "20th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "eliot-waste-land",
+    "title": "The Waste Land",
+    "author": "T. S. Eliot",
+    "volume": 60,
+    "era": "20th Century",
+    "category": "Poetry",
+    "status": "planned"
+  },
+  {
+    "id": "fitzgerald-gatsby",
+    "title": "The Great Gatsby",
+    "author": "F. Scott Fitzgerald",
+    "volume": 60,
+    "era": "20th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "orwell-animal-farm",
+    "title": "Animal Farm",
+    "author": "George Orwell",
+    "volume": 60,
+    "era": "20th Century",
+    "category": "Literature",
+    "status": "planned"
+  },
+  {
+    "id": "beckett-godot",
+    "title": "Waiting for Godot",
+    "author": "Samuel Beckett",
+    "volume": 60,
+    "era": "20th Century",
+    "category": "Drama",
+    "status": "planned"
+  }
+]

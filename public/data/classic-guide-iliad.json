@@ -1,0 +1,182 @@
+{
+  "id": "iliad",
+  "title": "The Iliad",
+  "author": "Homer",
+  "subtitle": "An Independent Classic Reading Guide by Mark, Set, Go!",
+  "dek": "War, honor, rage, mortality, and the cost of glory in Homer’s foundational epic.",
+  "meta": {
+    "readingTime": "70–90 min",
+    "length": "~10,000 words",
+    "category": "Epic Poetry",
+    "bestFor": "Understanding Homer, heroism, fate, and the Greek heroic world"
+  },
+  "tabs": [
+    "Guide",
+    "Key Ideas",
+    "Images",
+    "Notebook",
+    "Ask Mark Chats",
+    "Quiz",
+    "Action Plan"
+  ],
+  "greatIdeas": [
+    "War",
+    "Courage",
+    "Honor",
+    "Justice",
+    "Anger",
+    "Fate",
+    "God",
+    "Love",
+    "Death",
+    "Man",
+    "Virtue"
+  ],
+  "sections": [
+    {
+      "title": "Before You Read",
+      "body": [
+        "The Iliad is not the story of the entire Trojan War. It concentrates on a short period near the end of the war and, more specifically, on the consequences of Achilles’ rage.",
+        "The opening word of the poem is traditionally translated as “rage” or “wrath.” That choice tells you how to read everything that follows: private anger becomes a public catastrophe."
+      ],
+      "remember": "Watch how personal honor, public duty, friendship, and mortality collide."
+    },
+    {
+      "title": "The World of Homer",
+      "body": [
+        "The poem emerged from a long oral tradition. Its heroes inhabit a warrior culture in which reputation, gifts, loyalty, hospitality, and public recognition carry enormous weight.",
+        "The gods intervene constantly, but human beings still make consequential choices. Homer’s world therefore resists a simple opposition between fate and free will."
+      ],
+      "remember": "Divine action does not erase human responsibility."
+    },
+    {
+      "title": "What Starts the Conflict?",
+      "body": [
+        "Agamemnon takes Briseis from Achilles after being forced to return Chryseis. Achilles interprets the act as a public humiliation and withdraws from battle.",
+        "His withdrawal changes the military balance and exposes the entire Greek army to disaster. Homer turns a dispute over honor into a study of leadership and the dangers of wounded pride."
+      ],
+      "remember": "The central war inside the poem is Achilles versus Agamemnon before it is Achilles versus Troy."
+    },
+    {
+      "title": "Achilles",
+      "body": [
+        "Achilles is the greatest Greek warrior, but the poem does not present greatness as simple moral perfection. His excellence is inseparable from pride, anger, grief, and an intense awareness of his own death.",
+        "He knows that choosing glory at Troy means a short life. His heroism is therefore haunted by mortality."
+      ],
+      "remember": "Achilles is powerful because he is both nearly superhuman and painfully human."
+    },
+    {
+      "title": "Hector and Troy",
+      "body": [
+        "Hector provides a crucial counterweight to Achilles. He is a warrior, but also a husband, father, son, and defender of a city whose destruction he can imagine.",
+        "Scenes with Andromache and Astyanax expand the meaning of war beyond battlefield glory. The cost of heroic action is borne by families and communities."
+      ],
+      "remember": "Hector lets us see war from inside the city that will lose."
+    },
+    {
+      "title": "The Gods and Fate",
+      "body": [
+        "Zeus, Hera, Athena, Apollo, Aphrodite, and other gods intervene directly. Their rivalries mirror and magnify human conflicts.",
+        "Yet even Zeus operates within limits. Certain deaths are fated, and the gods cannot simply remake the moral structure of the poem at will."
+      ],
+      "remember": "Ask whether the gods explain events—or reveal the forces already present in human life."
+    },
+    {
+      "title": "Patroclus and the Turning Point",
+      "body": [
+        "Patroclus enters battle wearing Achilles’ armor and drives the Trojans back, but he exceeds Achilles’ instructions and is killed by Hector after divine and human blows combine against him.",
+        "His death transforms Achilles’ anger. The rage once aimed at Agamemnon becomes grief and a consuming desire for vengeance."
+      ],
+      "remember": "Patroclus’ death converts wounded honor into catastrophic grief."
+    },
+    {
+      "title": "Achilles Returns",
+      "body": [
+        "Achilles’ return to battle is magnificent and terrifying. Homer repeatedly blurs the line between heroic excellence and destructive excess.",
+        "The killing of Hector is the climax of Achilles’ vengeance, but not the moral end of the poem."
+      ],
+      "remember": "Victory does not cure Achilles."
+    },
+    {
+      "title": "Priam and Achilles",
+      "body": [
+        "The emotional culmination arrives when Priam enters Achilles’ shelter and asks for Hector’s body. He forces Achilles to imagine his own father and their shared condition as mortal human beings.",
+        "This scene interrupts the logic of revenge. Achilles and Priam grieve together, eat together, and temporarily recognize a humanity deeper than their roles as enemies."
+      ],
+      "remember": "The poem’s deepest victory may be the recovery of pity."
+    },
+    {
+      "title": "Major Themes",
+      "body": [
+        "Rage and self-mastery; honor and reputation; mortality and glory; friendship and grief; fate and agency; leadership; the human cost of war; pity and reconciliation.",
+        "The Iliad rarely gives a simple answer. Its power comes from holding competing values together and forcing the reader to feel their consequences."
+      ],
+      "remember": "Homer asks what human greatness is worth when every human life ends."
+    },
+    {
+      "title": "The Great Ideas",
+      "body": [
+        "The Iliad belongs naturally in the Great Conversation because its questions reappear across philosophy, history, theology, and literature: What is courage? What is justice between unequal people? Is anger ever righteous? Can glory compensate for death?",
+        "Use the Great Ideas links to compare Homer later with Plato on justice, Aristotle on virtue, Augustine on war and desire, and modern writers on violence and mortality."
+      ],
+      "remember": "Read Homer forward into the rest of the Great Books."
+    },
+    {
+      "title": "Why The Iliad Matters",
+      "body": [
+        "The poem helped shape Western ideas of heroism, tragedy, war, leadership, and poetic greatness. But its endurance comes less from cultural prestige than from its extraordinary ability to make enemies visible as human beings.",
+        "The final movement does not celebrate conquest. It ends with mourning and burial."
+      ],
+      "remember": "The Iliad begins with rage and ends with a funeral."
+    }
+  ],
+  "quiz": [
+    {
+      "q": "What drives the central conflict at the beginning of The Iliad?",
+      "choices": [
+        "A dispute over Achilles’ honor",
+        "The abduction of Helen",
+        "A prophecy about Hector",
+        "A rebellion against Zeus"
+      ],
+      "answer": 0
+    },
+    {
+      "q": "Who wears Achilles’ armor and is killed by Hector?",
+      "choices": [
+        "Ajax",
+        "Odysseus",
+        "Patroclus",
+        "Diomedes"
+      ],
+      "answer": 2
+    },
+    {
+      "q": "What changes Achilles most profoundly near the end?",
+      "choices": [
+        "A new prophecy",
+        "Priam’s appeal and shared grief",
+        "A victory feast",
+        "Agamemnon’s punishment"
+      ],
+      "answer": 1
+    },
+    {
+      "q": "Which statement best captures Homer’s treatment of war?",
+      "choices": [
+        "War is purely glorious",
+        "War is meaningless",
+        "War contains glory but exacts terrible human costs",
+        "War is controlled entirely by the gods"
+      ],
+      "answer": 2
+    }
+  ],
+  "actionPlan": [
+    "Before each reading session, identify which character’s sense of honor is at stake.",
+    "Track every moment when a god intervenes and ask what human motive it amplifies.",
+    "Compare Achilles and Hector after Books 6, 18, 22, and 24.",
+    "After finishing, write one paragraph answering: What changes Achilles?",
+    "Open Great Ideas and connect the poem to War, Courage, Honor, Justice, Anger, Fate, and Death."
+  ]
+}
