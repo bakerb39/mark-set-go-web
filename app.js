@@ -3882,11 +3882,11 @@ function renderBookBuilder() {
           </section>
           <section id="builder-import-section" class="book-builder-import">
             <div><strong>Add your text</strong><small>Upload a book/document or paste into the editor below.</small></div>
-            <label class="secondary button-link book-builder-file-button">Upload File<input id="builder-file" type="file" accept=".epub,.pdf,.docx,.txt,.md,.markdown" hidden></label>
+            <label class="secondary button-link book-builder-file-button">Upload File<input id="builder-file" type="file" accept=".epub,.mobi,.azw,.azw3,.prc,.pdf,.docx,.txt,.md,.markdown" hidden></label>
             <span id="builder-file-name" class="book-builder-file-name"></span>
           </section>
           <label class="book-builder-text-label"><span id="builder-text-label">Book text</span>
-            <textarea id="builder-text" spellcheck="false" placeholder="Paste the complete text here, or upload EPUB, PDF, Word, Markdown, or TXT. Chapter headings such as CHAPTER I, BOOK II, PART THREE, Preface, and Epilogue will be detected automatically." required>${escapeHtml(draft.text || '')}</textarea>
+            <textarea id="builder-text" spellcheck="false" placeholder="Paste the complete text here, or upload EPUB, DRM-free MOBI/AZW/AZW3, PDF, Word, Markdown, or TXT. Chapter headings such as CHAPTER I, BOOK II, PART THREE, Preface, and Epilogue will be detected automatically." required>${escapeHtml(draft.text || '')}</textarea>
           </label>
           <fieldset id="builder-cleanup-section" class="book-builder-cleanup">
             <legend>Cleanup level</legend>
@@ -3965,7 +3965,7 @@ function renderBookBuilder() {
     textInput.required = !guideMode;
     textInput.placeholder = guideMode
       ? 'Optional: add your own notes, public-domain text, or other material you may legally use. You can also leave this blank and create a guide from the title and author.'
-      : 'Paste the complete text here, or upload EPUB, PDF, Word, Markdown, or TXT. Chapter headings such as CHAPTER I, BOOK II, PART THREE, Preface, and Epilogue will be detected automatically.';
+      : 'Paste the complete text here, or upload EPUB, DRM-free MOBI/AZW/AZW3, PDF, Word, Markdown, or TXT. Chapter headings such as CHAPTER I, BOOK II, PART THREE, Preface, and Epilogue will be detected automatically.';
     if (submitButton) submitButton.textContent = guideMode ? 'Create guide' : 'Create book';
     if (previewTitle) previewTitle.textContent = guideMode ? 'Guide plan' : 'Table of contents';
     if (pageTitle) pageTitle.textContent = guideMode ? 'Create a Modern Guide' : 'Build an app-ready book';
@@ -3992,6 +3992,7 @@ function renderBookBuilder() {
     const lower = file.name.toLowerCase();
     let parsed = null;
     if (lower.endsWith('.epub')) parsed = await parseEpubFile(file);
+    else if (/\.(mobi|azw3?|prc)$/i.test(lower)) parsed = await parseKindleEbookFile(file);
     else if (lower.endsWith('.pdf')) parsed = await parsePdfFile(file, (message) => { status.textContent = message; });
     else if (lower.endsWith('.docx')) {
       const response = await fetch('/api/import/docx', { method:'POST', headers:{'Content-Type':'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}, body:await file.arrayBuffer() });
@@ -15559,6 +15560,294 @@ async function parseEpubFile(file) {
 }
 
 
+
+function readBigEndianU16(view, offset) {
+  return view.getUint16(offset, false);
+}
+
+function readBigEndianU32(view, offset) {
+  return view.getUint32(offset, false);
+}
+
+function decodeKindleBytes(bytes, encoding = 65001) {
+  const labels = encoding === 65001
+    ? ['utf-8']
+    : encoding === 1252
+      ? ['windows-1252']
+      : ['utf-8', 'windows-1252'];
+
+  for (const label of labels) {
+    try {
+      return new TextDecoder(label, { fatal:false }).decode(bytes);
+    } catch {}
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+function decompressPalmDocRecord(input) {
+  const output=[];
+  let i=0;
+
+  while(i<input.length){
+    const byte=input[i++];
+
+    if(byte===0){
+      output.push(0);
+      continue;
+    }
+
+    if(byte>=1 && byte<=8){
+      const literalEnd=Math.min(input.length,i+byte);
+      for(;i<literalEnd;i+=1) output.push(input[i]);
+      continue;
+    }
+
+    if(byte>=9 && byte<=0x7f){
+      output.push(byte);
+      continue;
+    }
+
+    if(byte>=0x80 && byte<=0xbf){
+      if(i>=input.length) break;
+      const pair=(byte<<8)|input[i++];
+      const distance=(pair>>3)&0x07ff;
+      const length=(pair&0x07)+3;
+      if(!distance || distance>output.length) continue;
+      for(let j=0;j<length;j+=1){
+        output.push(output[output.length-distance]);
+      }
+      continue;
+    }
+
+    output.push(0x20,byte^0x80);
+  }
+
+  return new Uint8Array(output);
+}
+
+function kindlePalmRecordOffsets(view) {
+  if(view.byteLength<86) throw new Error('This file is too small to be a MOBI/AZW eBook.');
+  const recordCount=readBigEndianU16(view,76);
+  if(!recordCount || 78+(recordCount*8)>view.byteLength){
+    throw new Error('This MOBI/AZW file has an invalid Palm database record table.');
+  }
+
+  const offsets=[];
+  for(let i=0;i<recordCount;i+=1){
+    offsets.push(readBigEndianU32(view,78+(i*8)));
+  }
+  offsets.push(view.byteLength);
+
+  for(let i=0;i<offsets.length-1;i+=1){
+    if(offsets[i]>=offsets[i+1] || offsets[i]>=view.byteLength){
+      throw new Error('This MOBI/AZW file contains an invalid record layout.');
+    }
+  }
+  return offsets;
+}
+
+function parseKindleExth(record0, mobiHeaderLength, encoding) {
+  const result={};
+  const exthStart=16+mobiHeaderLength;
+  if(exthStart+12>record0.length) return result;
+
+  const marker=new TextDecoder('ascii').decode(record0.slice(exthStart,exthStart+4));
+  if(marker!=='EXTH') return result;
+
+  const view=new DataView(record0.buffer,record0.byteOffset,record0.byteLength);
+  const totalLength=readBigEndianU32(view,exthStart+4);
+  const recordCount=readBigEndianU32(view,exthStart+8);
+  const end=Math.min(record0.length,exthStart+totalLength);
+  let cursor=exthStart+12;
+
+  for(let i=0;i<recordCount && cursor+8<=end;i+=1){
+    const type=readBigEndianU32(view,cursor);
+    const length=readBigEndianU32(view,cursor+4);
+    if(length<8 || cursor+length>end) break;
+    const data=record0.slice(cursor+8,cursor+length);
+    const value=decodeKindleBytes(data,encoding).replace(/\0/g,'').trim();
+
+    if(type===100 && value && !result.author) result.author=value;
+    if((type===503 || type===501) && value && !result.title) result.title=value;
+    if(type===101 && value && !result.publisher) result.publisher=value;
+    if(type===103 && value && !result.description) result.description=value;
+    cursor+=length;
+  }
+  return result;
+}
+
+function cleanKindleMarkup(raw) {
+  let value=String(raw||'')
+    .replace(/\0/g,'')
+    .replace(/<mbp:pagebreak\b[^>]*\/?>/gi,'\n\n')
+    .replace(/<pagebreak\b[^>]*\/?>/gi,'\n\n')
+    .replace(/<br\s*\/?>/gi,'\n')
+    .replace(/<\/p\s*>/gi,'</p>\n\n')
+    .replace(/<\/div\s*>/gi,'</div>\n')
+    .replace(/<\/h([1-6])\s*>/gi,'</h$1>\n\n');
+
+  try {
+    const doc=new DOMParser().parseFromString(value,'text/html');
+    doc.querySelectorAll('script,style,noscript,svg,canvas').forEach(node=>node.remove());
+
+    doc.querySelectorAll('h1,h2,h3,h4,h5,h6').forEach((heading)=>{
+      const level=heading.tagName.toUpperCase();
+      heading.insertAdjacentText('beforebegin',`\n\n${level} `);
+      heading.insertAdjacentText('afterend','\n\n');
+    });
+
+    value=doc.body?.innerText || doc.documentElement?.textContent || value;
+  } catch {
+    value=value.replace(/<[^>]+>/g,' ');
+  }
+
+  return value
+    .replace(/\r/g,'')
+    .replace(/[ \t]+\n/g,'\n')
+    .replace(/\n[ \t]+/g,'\n')
+    .replace(/[ \t]{2,}/g,' ')
+    .replace(/\n{4,}/g,'\n\n\n')
+    .trim();
+}
+
+async function parseKindleEbookFile(file) {
+  if(!file) throw new Error('Choose a MOBI, AZW, or AZW3 file first.');
+  if(file.size>120*1024*1024){
+    throw new Error('This Kindle-format file is larger than 120 MB. Use a smaller or optimized copy.');
+  }
+
+  const buffer=await file.arrayBuffer();
+  const view=new DataView(buffer);
+  const offsets=kindlePalmRecordOffsets(view);
+  if(offsets.length<3) throw new Error('No readable MOBI/AZW records were found.');
+
+  const record0=new Uint8Array(buffer,offsets[0],offsets[1]-offsets[0]);
+  if(record0.length<32) throw new Error('The MOBI/AZW header is incomplete.');
+
+  const headerView=new DataView(record0.buffer,record0.byteOffset,record0.byteLength);
+  const compression=readBigEndianU16(headerView,0);
+  const textLength=readBigEndianU32(headerView,4);
+  const textRecordCount=readBigEndianU16(headerView,8);
+  const encryptionType=readBigEndianU16(headerView,12);
+
+  if(encryptionType!==0){
+    throw new Error(
+      'This Kindle eBook is DRM/encryption protected. Mark, Set, Go! can import DRM-free MOBI/AZW/AZW3 files, but it does not remove or bypass Kindle DRM.'
+    );
+  }
+
+  const mobiMarker=record0.length>=20
+    ? new TextDecoder('ascii').decode(record0.slice(16,20))
+    : '';
+  if(mobiMarker!=='MOBI'){
+    throw new Error('This file does not contain a supported MOBI/KF8 book header.');
+  }
+
+  const mobiHeaderLength=readBigEndianU32(headerView,20);
+  const encoding=record0.length>=32 ? readBigEndianU32(headerView,28) : 65001;
+
+  if(compression!==1 && compression!==2){
+    if(compression===17480){
+      throw new Error(
+        'This DRM-free Kindle file uses HUFF/CDIC compression, which this importer does not yet decode. Convert your own DRM-free copy to EPUB/MOBI with standard compression, then import it again.'
+      );
+    }
+    throw new Error(`This Kindle file uses unsupported compression type ${compression}.`);
+  }
+
+  const availableTextRecords=Math.min(
+    textRecordCount,
+    Math.max(0,offsets.length-2)
+  );
+  if(!availableTextRecords){
+    throw new Error('The Kindle eBook does not contain readable text records.');
+  }
+
+  const chunks=[];
+  let totalBytes=0;
+  for(let index=1;index<=availableTextRecords;index+=1){
+    const start=offsets[index];
+    const end=offsets[index+1];
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start) continue;
+
+    const rawRecord=new Uint8Array(buffer,start,end-start);
+    const decoded=compression===2 ? decompressPalmDocRecord(rawRecord) : rawRecord;
+    chunks.push(decoded);
+    totalBytes+=decoded.length;
+    if(textLength && totalBytes>=textLength) break;
+  }
+
+  const joined=new Uint8Array(Math.min(textLength||totalBytes,totalBytes));
+  let cursor=0;
+  for(const chunk of chunks){
+    if(cursor>=joined.length) break;
+    const slice=chunk.subarray(0,Math.min(chunk.length,joined.length-cursor));
+    joined.set(slice,cursor);
+    cursor+=slice.length;
+  }
+
+  const metadata=parseKindleExth(record0,mobiHeaderLength,encoding);
+
+  let headerTitle='';
+  try {
+    const fullNameOffset=record0.length>=108 ? readBigEndianU32(headerView,100) : 0;
+    const fullNameLength=record0.length>=108 ? readBigEndianU32(headerView,104) : 0;
+    if(fullNameOffset && fullNameLength && fullNameOffset+fullNameLength<=record0.length){
+      headerTitle=decodeKindleBytes(record0.slice(fullNameOffset,fullNameOffset+fullNameLength),encoding)
+        .replace(/\0/g,'')
+        .trim();
+    }
+  } catch {}
+
+  const rawMarkup=decodeKindleBytes(joined,encoding);
+  const cleaned=cleanKindleMarkup(rawMarkup);
+  if(!cleaned || splitWords(cleaned).length<5){
+    throw new Error('No readable text could be extracted from this DRM-free Kindle eBook.');
+  }
+
+  const fallbackTitle=file.name.replace(/\.(mobi|azw3?|prc)$/i,'');
+  const title=metadata.title || headerTitle || fallbackTitle || 'Imported Kindle eBook';
+  const author=metadata.author || '';
+  const normalized=normalizeImportedBookText(cleaned,{
+    title,
+    author,
+    removePrintedToc:false,
+    removeRepeatedHeaders:true
+  });
+
+  const format=/\.azw3$/i.test(file.name)
+    ? 'AZW3'
+    : /\.azw$/i.test(file.name)
+      ? 'AZW'
+      : 'MOBI';
+
+  return {
+    title,
+    text:normalized.text,
+    source:{
+      type:'kindle-upload',
+      format:format.toLowerCase(),
+      name:file.name,
+      fileSize:file.size,
+      importedAt:new Date().toISOString(),
+      author,
+      publisher:metadata.publisher || '',
+      drmProtected:false,
+      compression,
+      textRecordCount:availableTextRecords,
+      cleanup:normalized.report,
+      documentToc:normalized.toc
+    },
+    stats:{
+      format,
+      textRecords:availableTextRecords,
+      extractedCharacters:normalized.text.length,
+      tocEntries:normalized.toc?.length || 0
+    }
+  };
+}
+
+
 let pdfJsModulePromise = null;
 
 async function loadPdfJs() {
@@ -15812,22 +16101,23 @@ function renderUpload() {
         <div>
           <span class="source-category">Import</span>
           <h1>Import a Book or Document</h1>
-          <p>Open EPUB, PDF, or UTF-8 text files. Processing happens locally in your browser; the original file is not uploaded to the Mark, Set, Go! server.</p>
+          <p>Open EPUB, DRM-free MOBI/AZW/AZW3, PDF, or UTF-8 text files. Processing happens locally in your browser; the original file is not uploaded to the Mark, Set, Go! server.</p>
         </div>
       </header>
 
       <div class="import-compact-row">
         <div class="import-format-chips" aria-label="Supported formats">
           <span><strong>EPUB</strong><small>Book + TOC</small></span>
+          <span><strong>MOBI / AZW3</strong><small>DRM-free eBooks</small></span>
           <span><strong>PDF</strong><small>Selectable text</small></span>
           <span><strong>TXT</strong><small>Plain text</small></span>
         </div>
 
         <label class="import-drop-zone compact" for="text-file">
           <span class="import-upload-icon">⇧</span>
-          <span><strong>Choose a file</strong><small>EPUB, PDF, or TXT · PDF up to 100 MB</small></span>
+          <span><strong>Choose a file</strong><small>EPUB, MOBI, AZW/AZW3, PDF, or TXT</small></span>
           <input id="text-file" type="file"
-            accept=".epub,application/epub+zip,.pdf,application/pdf,.txt,text/plain">
+            accept=".epub,application/epub+zip,.mobi,.azw,.azw3,.prc,application/x-mobipocket-ebook,.pdf,application/pdf,.txt,text/plain">
         </label>
       </div>
 
@@ -15844,6 +16134,10 @@ function renderUpload() {
       <details class="pdf-import-note compact-note">
         <summary>PDF import details</summary>
         <p>Modern PDFs with selectable text work best. Page labels such as <em>PDF Page 12</em> are inserted into the extracted text so notes, AI questions, and reading progress retain a connection to the source pages. Image-only scans are not silently imported as blank documents.</p>
+      </details>
+      <details class="pdf-import-note compact-note">
+        <summary>Kindle-format import details</summary>
+        <p>MOBI, AZW, and AZW3 import is intended for files you are legally able to use. DRM-free PalmDOC/KF8 text is extracted locally in your browser. DRM/encrypted Kindle books are detected and rejected; Mark, Set, Go! does not remove or bypass Kindle DRM. KFX is not supported.</p>
       </details>
     </section>`;
 
@@ -15872,6 +16166,7 @@ function renderUpload() {
 
     try {
       const isEpub = /\.epub$/i.test(file.name) || file.type === 'application/epub+zip';
+      const isKindle = /\.(mobi|azw3?|prc)$/i.test(file.name) || file.type === 'application/x-mobipocket-ebook';
       const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
 
       if (isEpub) {
@@ -15879,6 +16174,16 @@ function renderUpload() {
         status.textContent = 'Opening EPUB…';
         const book = await parseEpubFile(file);
         renderReaderWithText(book.title, book.text, book.source);
+        return;
+      }
+
+      if (isKindle) {
+        progress.hidden = true;
+        status.textContent = 'Opening DRM-free Kindle eBook…';
+        const book = await parseKindleEbookFile(file);
+        status.className = 'status success import-status';
+        status.textContent = `${book.stats.format} text extracted. Opening ${book.title}…`;
+        window.setTimeout(() => renderReaderWithText(book.title, book.text, book.source), 180);
         return;
       }
 

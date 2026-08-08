@@ -20,7 +20,7 @@ function renderHelp() {
     ['learn','Learn & Reading Skills'],
     ['goals','Goals, Progress & Action Center'],
     ['music','Music & Focus'],
-    ['imports','Importing PDF, EPUB, TXT & URLs'],
+    ['imports','Importing EPUB, Kindle, PDF, TXT & URLs'],
     ['guides','Modern Guides'],
     ['fullscreen','Fullscreen'],
     ['profile','Profile & Experience Presets'],
@@ -227,9 +227,10 @@ function renderHelp() {
         </section>
 
         <section class="help-section" id="help-imports" data-help-section>
-          <h2>Importing PDF, EPUB, TXT & URLs</h2>
+          <h2>Importing EPUB, Kindle, PDF, TXT & URLs</h2>
           <ul>
             <li><strong>EPUB:</strong> import book text, structure, navigation, and supported embedded images.</li>
+            <li><strong>MOBI / AZW / AZW3:</strong> import DRM-free Kindle-format eBooks you are legally able to use. The file is parsed locally; DRM/encrypted books are rejected rather than decrypted. KFX is not supported.</li>
             <li><strong>PDF:</strong> extract readable text and page markers. Image-only/scanned PDFs require OCR.</li>
             <li><strong>TXT:</strong> import plain text.</li>
             <li><strong>URL:</strong> bring supported web articles or pages into the reading workflow.</li>

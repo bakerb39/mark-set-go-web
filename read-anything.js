@@ -1048,7 +1048,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   async function importSimpleFile(file) {
     const lower = file.name.toLowerCase();
     if (lower.endsWith('.docx')) return importDocx(file);
-    if (lower.endsWith('.epub') || lower.endsWith('.pdf')) {
+    if (lower.endsWith('.epub') || lower.endsWith('.pdf') || /\.(mobi|azw3?|prc)$/i.test(lower)) {
       allowLegacyUpload = true;
       const legacy = document.createElement('button');
       legacy.type = 'button';
@@ -1091,8 +1091,8 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
             <form id="read-anything-url-form"><label>Web address<input id="read-anything-url" type="url" required placeholder="https://example.com/article"></label><button class="primary" type="submit">Open in Reader</button></form>
           </section>
           <section class="read-anything-card">
-            <span class="read-anything-icon">⇧</span><h2>Upload a file</h2><p>EPUB, PDF, Word, Markdown, and plain text.</p>
-            <label class="secondary button-link read-anything-file-button">Choose file<input id="read-anything-file" type="file" accept=".epub,.pdf,.docx,.txt,.md,.markdown" hidden></label>
+            <span class="read-anything-icon">⇧</span><h2>Upload a file</h2><p>EPUB, DRM-free MOBI/AZW/AZW3, PDF, Word, Markdown, and plain text.</p>
+            <label class="secondary button-link read-anything-file-button">Choose file<input id="read-anything-file" type="file" accept=".epub,.mobi,.azw,.azw3,.prc,.pdf,.docx,.txt,.md,.markdown" hidden></label>
           </section>
           <section class="read-anything-card">
             <span class="read-anything-icon">📋</span><h2>Paste text</h2><p>Paste an article, notes, manuscript, or other text.</p>
