@@ -7138,7 +7138,6 @@ function unifiedBookCard(book, selectedFormat = 'best') {
     </article>`;
 }
 
-async 
 function browseCatalogText(item = {}) {
   return [
     item.title,
