@@ -3,7 +3,14 @@
   "channel": "development",
   "date": "2026-08-08",
   "latestStableBuild": "2026-08-08-right-click-stable",
-  "stableBasis": ["reader-stable-2026-08-07", "confirmed stale-outside-listener right-click fix"],
-  "routes": {"debug": "/?debug", "features": "/?features"},
-  "notes": "Debug Center and Features Roadmap are source-controlled. Promote this build to stable only after automated regression checks and manual verification of restored UI/companion behaviors."
+  "stableBasis": [
+    "reader-stable-2026-08-07",
+    "confirmed stale-outside-listener right-click fix"
+  ],
+  "routes": {
+    "debug": "/?debug",
+    "features": "/?features"
+  },
+  "notes": "Fixes mixed companion identity on the floating app-help button by giving app-help-mark.js exclusive ownership of both label and avatar. Explicit event/navigation sync only; no MutationObserver.",
+  "version": "9.6.5"
 }

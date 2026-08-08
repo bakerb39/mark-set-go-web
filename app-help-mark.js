@@ -155,17 +155,38 @@
     event.preventDefault(); const question = input.value.trim(); if (!question) return; input.value = ''; ask(question);
   });
 
-  document.addEventListener('click', () => requestAnimationFrame(() => { syncVisibility(); if (!panel.hidden) syncPageLabel(); }), { capture: true, passive: true });
-  window.addEventListener('popstate', () => requestAnimationFrame(syncVisibility));
-  window.addEventListener('hashchange', () => requestAnimationFrame(syncVisibility));
+  document.addEventListener('click', () => requestAnimationFrame(() => { syncCompanionIdentity(); syncVisibility(); if (!panel.hidden) syncPageLabel(); }), { capture: true, passive: true });
+  window.addEventListener('popstate', () => requestAnimationFrame(() => { syncCompanionIdentity(); syncVisibility(); }));
+  window.addEventListener('hashchange', () => requestAnimationFrame(() => { syncCompanionIdentity(); syncVisibility(); }));
 
   function syncCompanionIdentity() {
     const c = companion();
-    const avatar = companionAvatar();
-    openButton.querySelector('img')?.setAttribute('src', avatar);
-    const openLabel = openButton.querySelector('span'); if (openLabel) openLabel.textContent = c.ask;
-    const identityImg = host.querySelector('.app-help-mark-identity img'); if (identityImg) { identityImg.src = avatar; identityImg.alt = c.name; }
-    const identityName = host.querySelector('.app-help-mark-identity strong'); if (identityName) identityName.textContent = c.ask;
+    const avatar = c.id === 'beth' ? BETH_AVATAR : MARK_AVATAR;
+
+    // app-help-mark.js is the single owner of the floating help button identity.
+    // Always update label + avatar together from the same companion snapshot.
+    const openImg = openButton.querySelector(':scope > img');
+    if (openImg) {
+      openImg.setAttribute('src', avatar);
+      openImg.setAttribute('alt', c.name);
+      openImg.dataset.companionId = c.id;
+    }
+    const openLabel = openButton.querySelector(':scope > span');
+    if (openLabel) {
+      openLabel.textContent = c.ask;
+      openLabel.dataset.companionId = c.id;
+    }
+    openButton.dataset.companionId = c.id;
+    openButton.setAttribute('aria-label', c.ask);
+
+    const identityImg = host.querySelector('.app-help-mark-identity img');
+    if (identityImg) {
+      identityImg.setAttribute('src', avatar);
+      identityImg.setAttribute('alt', c.name);
+      identityImg.dataset.companionId = c.id;
+    }
+    const identityName = host.querySelector('.app-help-mark-identity strong');
+    if (identityName) identityName.textContent = c.ask;
   }
   window.addEventListener('msg:companion-changed', () => { syncCompanionIdentity(); if (!panel.hidden) syncPageLabel(); });
   syncCompanionIdentity();

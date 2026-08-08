@@ -11,5 +11,6 @@
     "debug": "/?debug",
     "features": "/?features"
   },
-  "notes": "Chromium behavior-tested fixes for duplicate companion lookup responses, Beth home tagline duplication, single Ask Mark/Ask Beth help label, consistent Mark/Beth identity, first-person “I’m reading this…” status, and Features workflow order. Ask Mark hub legacy synchronization now uses explicit app events instead of MutationObserver."
+  "notes": "Fixes mixed companion identity on the floating app-help button by giving app-help-mark.js exclusive ownership of both label and avatar. Explicit event/navigation sync only; no MutationObserver.",
+  "version": "9.6.5"
 }

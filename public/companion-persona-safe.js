@@ -73,9 +73,8 @@
   function applyKnownSurfaces(root = document) {
     document.documentElement.dataset.companion = id;
 
-    qsa('.app-help-mark-button', root).forEach((el) => setButtonLabel(el, 'Ask Mark', 'Ask Beth'));
-    qsa('.app-help-mark-button img,.app-help-mark-identity img', root).forEach(applyAvatar);
-    qsa('.app-help-mark-identity strong', root).forEach((el) => setText(el, 'Ask Mark', 'Ask Beth'));
+    // Global app-help companion identity is owned exclusively by app-help-mark.js.
+    // Do not rewrite its label/avatar here; competing writers caused mixed Mark/Beth UI.
 
     setButtonLabel(root.querySelector('#toggle-mark-panel'), 'Ask Mark', 'Ask Beth');
     setButtonLabel(root.querySelector('#fullscreen-mark-toggle'), 'Ask Mark', 'Ask Beth');
