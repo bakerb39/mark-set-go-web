@@ -12949,3 +12949,15 @@ html[data-companion="beth"] .home-mark-icon-stage.companion-frontpage-badge-mode
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
 }
+
+/* v9.6.9 Beth UI avatar: use the dedicated tight portrait crop for compact controls. */
+html[data-companion="beth"] #toggle-mark-panel img,
+html[data-companion="beth"] .reader-pane-buttons .mark-pane-button img,
+html[data-companion="beth"] .ask-mark-button img,
+html[data-companion="beth"] [data-action="ask-mark"] img {
+  width:30px !important;
+  height:30px !important;
+  flex:0 0 30px !important;
+  object-fit:cover !important;
+  object-position:center !important;
+}
