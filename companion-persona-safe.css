@@ -1,0 +1,5 @@
+.companion-safe-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:12px}
+.companion-safe-grid button{position:relative;display:grid;grid-template-columns:56px 1fr auto;align-items:center;gap:12px;text-align:left;border:1px solid #cad7e5;border-radius:14px;background:#fff;padding:12px 14px;color:#102746;cursor:pointer}
+.companion-safe-grid button:hover{border-color:#7fa5c9;background:#f7fbff}.companion-safe-grid button.is-selected{border-color:#c9a227;box-shadow:0 0 0 2px rgba(201,162,39,.14);background:#fffdf6}
+.companion-safe-grid img{width:54px;height:54px;border-radius:50%;object-fit:cover;border:2px solid #d8bc50;background:#fff}.companion-safe-grid span{display:grid;gap:3px}.companion-safe-grid strong{font-size:1rem}.companion-safe-grid small{color:#607287}.companion-safe-check{font-weight:900;color:#a67c00;opacity:0}.companion-safe-grid button.is-selected .companion-safe-check{opacity:1}
+@media(max-width:620px){.companion-safe-grid{grid-template-columns:1fr}}

@@ -276,3 +276,9 @@
     max-height: calc(100dvh - 64px);
   }
 }
+
+/* v9.6.2: professional smart-format control */
+.smart-format-box{display:grid;gap:12px;padding:16px 18px;border:1px solid #d4e0eb;border-radius:14px;background:#fff;box-shadow:0 5px 16px rgba(16,39,70,.06)}
+.smart-format-heading{display:grid;gap:4px;align-items:start}.smart-format-heading strong{display:block;color:#102746;font-size:1.05rem;line-height:1.2}.smart-format-heading small{display:block;color:#607287;font-size:.82rem;line-height:1.4}
+.smart-format-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.smart-format-actions button{min-height:36px;padding:7px 12px;border-radius:9px;white-space:nowrap}
+@media(max-width:560px){.smart-format-actions{display:grid;grid-template-columns:1fr 1fr}.smart-format-actions button{width:100%}}

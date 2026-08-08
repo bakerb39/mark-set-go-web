@@ -874,7 +874,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     const content = display?.querySelector('.settings-content');
     if (!content || content.querySelector('.smart-format-control')) return;
     const box = document.createElement('div');
-    box.className = 'smart-format-control';
+    box.className = 'smart-format-control smart-format-box';
     box.innerHTML = `<div class="smart-format-heading"><strong>Format</strong><small>Structure this text without rewriting it</small></div><div class="smart-format-actions"><button type="button" class="secondary" data-smart-format="spacing">Clean spacing</button><button type="button" class="secondary" data-smart-format="paragraphs">Paragraphs</button><button type="button" class="secondary" data-smart-format="sections">Sections</button><button type="button" class="primary" data-smart-format="all">Format all</button><button type="button" class="secondary" data-smart-format="original">Original</button></div>`;
     content.appendChild(box);
     box.addEventListener('click', (event) => {

@@ -1,5 +1,5 @@
 /* App Help Ask Mark: intentionally separate from Reader/selection/right-click UI. */
-.app-help-mark-host{position:fixed;right:22px;bottom:22px;z-index:8500;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.app-help-mark-host{position:fixed;right:22px;bottom:54px;z-index:8500;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .app-help-mark-host[hidden]{display:none!important}
 .app-help-mark-button{display:flex;align-items:center;gap:9px;border:1px solid #c9a227;background:#102746;color:#ffd95a;border-radius:999px;padding:7px 15px 7px 7px;font-weight:800;box-shadow:0 8px 24px rgba(16,39,70,.22);cursor:pointer}
 .app-help-mark-button>img{width:34px;height:34px;object-fit:cover;border-radius:50%;border:2px solid #e6c85b;background:#fff;flex:none}
@@ -14,4 +14,4 @@
 .app-help-mark-conversation{max-height:350px;min-height:180px;overflow-y:auto;padding:12px;background:#f8fafc}
 .app-help-mark-message{margin:0 0 10px}.app-help-mark-message>strong,.app-help-mark-message-author strong{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#526579}.app-help-mark-message-author{display:flex;align-items:center;gap:6px}.app-help-mark-message-author img{width:24px;height:24px;object-fit:cover;border-radius:50%;border:1px solid #d5b94f;background:#fff}.app-help-mark-message p{margin:4px 0 0;padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #d9e2ec;line-height:1.45}.app-help-mark-message.user p{background:#edf5fb;margin-left:32px}
 .app-help-mark-panel form{padding:12px;border-top:1px solid #d7e0ea;background:#fff}.app-help-mark-panel form label{display:block;font-size:12px;font-weight:800;margin-bottom:6px}.app-help-mark-panel form>div{display:flex;gap:7px;align-items:flex-end}.app-help-mark-panel textarea{flex:1;resize:vertical;min-height:52px;max-height:130px;border:1px solid #b8c5d3;border-radius:10px;padding:9px;font:inherit}.app-help-mark-panel form button{border:0;border-radius:10px;background:#102746;color:#ffd95a;font-weight:800;padding:10px 14px;cursor:pointer}
-@media(max-width:640px){.app-help-mark-host{right:12px;bottom:12px}.app-help-mark-panel{width:calc(100vw - 24px)}}
+@media(max-width:640px){.app-help-mark-host{right:12px;bottom:42px}.app-help-mark-panel{width:calc(100vw - 24px)}}

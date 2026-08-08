@@ -1,0 +1,9 @@
+{
+  "currentBuild": "v9.6.2-debug-and-roadmap-foundation",
+  "channel": "development",
+  "date": "2026-08-08",
+  "latestStableBuild": "2026-08-08-right-click-stable",
+  "stableBasis": ["reader-stable-2026-08-07", "confirmed stale-outside-listener right-click fix"],
+  "routes": {"debug": "/?debug", "features": "/?features"},
+  "notes": "Debug Center and Features Roadmap are source-controlled. Promote this build to stable only after automated regression checks and manual verification of restored UI/companion behaviors."
+}

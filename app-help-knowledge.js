@@ -39,10 +39,11 @@
       purpose: 'Control which optional tools appear across the app without deleting their saved data.',
       sections: ['Choose an experience preset', 'Choose what appears', 'Personalized coaching'],
       controls: {
+        'Reading companion': 'Choose Mark or Beth. The selected companion is used for app help, Reader companion labels, notebooks, and companion imagery without changing the reading tools themselves.',
         'Experience presets': 'Apply a preconfigured combination of visible features.',
         'Feature switches': 'Show or hide Learn, Music & Focus, Reading Goals, Action Center, Modern Guides, Great Books, Bible Study, Language Learning, Mnemonics, Courses & Learning Modules, and Advanced Reader Tools.'
       },
-      workflows: ['Choose a preset for quick setup, then fine-tune individual feature switches.', 'Turn a feature back on here if its navigation item is missing.'],
+      workflows: ['Choose Mark or Beth first, then choose a preset for quick setup and fine-tune individual feature switches.', 'Turn a feature back on here if its navigation item is missing.'],
       troubleshooting: ['Hidden features are not deleted.', 'If browser storage is full, a preference may apply only for the current session.']
     },
     'my-library': {

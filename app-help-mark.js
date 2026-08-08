@@ -5,7 +5,10 @@
   if (!app) return;
   const knowledge = window.MarkSetGoPageHelpKnowledge || { global: {}, pages: {} };
   const pages = knowledge.pages || {};
-  const MARK_AVATAR = '/assets/ask-mark-avatar.png';
+  const MARK_AVATAR = '/assets/ask-mark/ask-mark-avatar.png';
+  const BETH_AVATAR = '/assets/companions/beth/beth-avatar.png';
+  const companion = () => window.MSGCompanion?.config || { id:'mark', name:'Mark', ask:'Ask Mark', avatar:MARK_AVATAR };
+  const companionAvatar = () => companion().id === 'beth' ? BETH_AVATAR : MARK_AVATAR;
 
   const ALIASES = {
     'customize my experience':'profile-preferences', 'my library':'my-library', 'my reading':'my-reading',
@@ -62,11 +65,11 @@
   host.className = 'app-help-mark-host';
   host.innerHTML = `
     <button type="button" class="app-help-mark-button" data-app-help-open aria-haspopup="dialog" aria-expanded="false">
-      <img src="${MARK_AVATAR}" alt="" aria-hidden="true"><span>Ask Mark</span>
+      <img src="${companionAvatar()}" alt="" aria-hidden="true"><span>${companion().ask}</span>
     </button>
-    <aside class="app-help-mark-panel" data-app-help-panel hidden role="dialog" aria-modal="false" aria-label="Ask Mark app help">
+    <aside class="app-help-mark-panel" data-app-help-panel hidden role="dialog" aria-modal="false" aria-label="Reading companion app help">
       <header>
-        <div class="app-help-mark-identity"><img src="${MARK_AVATAR}" alt="Mark"><div><small>App help</small><strong>Ask Mark</strong></div></div>
+        <div class="app-help-mark-identity"><img src="${companionAvatar()}" alt="${companion().name}"><div><small>App help</small><strong>${companion().ask}</strong></div></div>
         <button type="button" data-app-help-close aria-label="Close">×</button>
       </header>
       <div class="app-help-mark-page" data-app-help-page></div>
@@ -87,9 +90,10 @@
   let activePageKey = '';
 
   function syncVisibility() {
+    const developerRoute = new URLSearchParams(location.search).has('debug') || new URLSearchParams(location.search).has('features');
     const reader = isReaderPage();
-    host.hidden = reader;
-    if (reader) closePanel();
+    host.hidden = reader || developerRoute;
+    if (reader || developerRoute) closePanel();
   }
 
   function syncPageLabel() {
@@ -105,7 +109,7 @@
     openButton.setAttribute('aria-expanded', 'true');
     if (!conversation.children.length) {
       const ctx = pageContext();
-      conversation.innerHTML = `<div class="app-help-mark-message mark"><div class="app-help-mark-message-author"><img src="${MARK_AVATAR}" alt=""><strong>Mark</strong></div><p>I can help you use <b>${escapeHtml(ctx.title)}</b>. Ask me what something does, how to complete a task here, or where to go next.</p></div>`;
+      conversation.innerHTML = `<div class="app-help-mark-message mark"><div class="app-help-mark-message-author"><img src="${companionAvatar()}" alt=""><strong>${escapeHtml(companion().name)}</strong></div><p>I can help you use <b>${escapeHtml(ctx.title)}</b>. Ask me what something does, how to complete a task here, or where to go next.</p></div>`;
     }
     input.focus();
   }
@@ -119,7 +123,7 @@
     const div = document.createElement('div');
     div.className = `app-help-mark-message ${who === 'You' ? 'user' : 'mark'}`;
     const author = who === 'Mark'
-      ? `<div class="app-help-mark-message-author"><img src="${MARK_AVATAR}" alt=""><strong>Mark</strong></div>`
+      ? `<div class="app-help-mark-message-author"><img src="${companionAvatar()}" alt=""><strong>${escapeHtml(companion().name)}</strong></div>`
       : `<strong>${escapeHtml(who)}</strong>`;
     div.innerHTML = `${author}<p>${escapeHtml(text)}</p>`;
     conversation.appendChild(div);
@@ -154,5 +158,16 @@
   document.addEventListener('click', () => requestAnimationFrame(() => { syncVisibility(); if (!panel.hidden) syncPageLabel(); }), { capture: true, passive: true });
   window.addEventListener('popstate', () => requestAnimationFrame(syncVisibility));
   window.addEventListener('hashchange', () => requestAnimationFrame(syncVisibility));
+
+  function syncCompanionIdentity() {
+    const c = companion();
+    const avatar = companionAvatar();
+    openButton.querySelector('img')?.setAttribute('src', avatar);
+    const openLabel = openButton.querySelector('span'); if (openLabel) openLabel.textContent = c.ask;
+    const identityImg = host.querySelector('.app-help-mark-identity img'); if (identityImg) { identityImg.src = avatar; identityImg.alt = c.name; }
+    const identityName = host.querySelector('.app-help-mark-identity strong'); if (identityName) identityName.textContent = c.ask;
+  }
+  window.addEventListener('msg:companion-changed', () => { syncCompanionIdentity(); if (!panel.hidden) syncPageLabel(); });
+  syncCompanionIdentity();
   syncVisibility();
 })();
