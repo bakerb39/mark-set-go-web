@@ -12511,3 +12511,16 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
   .msg-walkthrough-progress-wrap { grid-column:1 / -1; grid-row:1; }
   .msg-walkthrough-dock > button { min-width:0; }
 }
+
+
+/* v9.2.95 walkthrough runtime reset */
+#msg-app-walkthrough .msg-walkthrough-mark-arm,
+#msg-app-walkthrough .msg-walkthrough-mark-head,
+#msg-app-walkthrough .msg-walkthrough-mark-body,
+#msg-app-walkthrough .msg-walkthrough-mark-book,
+#msg-app-walkthrough .msg-walkthrough-mark-label {
+  display:none !important;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.2.95"] .msg-walkthrough-host {
+  display:flex;
+}

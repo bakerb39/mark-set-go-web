@@ -2,6 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
+  const WALKTHROUGH_BUILD = '9.2.95';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -525,6 +526,7 @@
     if (root?.isConnected) return root;
     root = document.createElement('div');
     root.id = ROOT_ID;
+    root.dataset.walkthroughBuild = WALKTHROUGH_BUILD;
     root.innerHTML = `
       <div class="msg-walkthrough-mask msg-walkthrough-mask-top"></div>
       <div class="msg-walkthrough-mask msg-walkthrough-mask-left"></div>
@@ -533,23 +535,24 @@
       <div class="msg-walkthrough-outline" aria-hidden="true"></div>
       <div class="msg-walkthrough-connector" aria-hidden="true"></div>
       <aside class="msg-walkthrough-host" aria-hidden="true">
-        <div class="msg-walkthrough-mark">
-          <div class="msg-walkthrough-mark-arm"></div>
-          <div class="msg-walkthrough-mark-head"><img src="/assets/ask-mark/ask-mark-avatar.png" alt=""></div>
-          <div class="msg-walkthrough-mark-body"></div>
-          <div class="msg-walkthrough-mark-book"></div>
-          <div class="msg-walkthrough-mark-label">Mark</div>
-        </div>
+        <figure class="msg-walkthrough-mark-figure">
+          <img class="msg-walkthrough-mark-illustration" src="/assets/walkthrough/mark-walkthrough-guide.png" alt="">
+          <figcaption>ASK MARK</figcaption>
+        </figure>
       </aside>
       <section class="msg-walkthrough-card" role="dialog" aria-modal="true" aria-labelledby="msg-walkthrough-title">
-        <div class="msg-walkthrough-meta"><span data-walkthrough-count></span><button type="button" data-walkthrough-exit aria-label="Exit walkthrough">×</button></div>
+        <div class="msg-walkthrough-meta"><span data-walkthrough-section>Guided tour</span><button type="button" data-walkthrough-exit aria-label="Exit walkthrough">×</button></div>
         <h2 id="msg-walkthrough-title" data-walkthrough-title></h2>
         <p data-walkthrough-text></p>
-        <div class="msg-walkthrough-actions">
-          <button class="secondary" type="button" data-walkthrough-prev>← Back</button>
-          <button class="primary" type="button" data-walkthrough-next>Next →</button>
+      </section>
+      <div class="msg-walkthrough-dock" role="navigation" aria-label="Walkthrough controls">
+        <button class="secondary" type="button" data-walkthrough-prev>← Back</button>
+        <div class="msg-walkthrough-progress-wrap">
+          <div class="msg-walkthrough-progress-track" aria-hidden="true"><span data-walkthrough-progress></span></div>
+          <strong data-walkthrough-count></strong>
         </div>
-      </section>`;
+        <button class="primary" type="button" data-walkthrough-next>Next →</button>
+      </div>`;
     document.body.appendChild(root);
 
     $('[data-walkthrough-prev]', root)?.addEventListener('click', () => goTo(currentIndex - 1));
@@ -625,78 +628,55 @@
     Object.assign(masks.right.style, { left: `${right}px`, top: `${top}px`, width: `${Math.max(0, viewportWidth - right)}px`, height: `${height}px` });
 
     const card = $('.msg-walkthrough-card', root);
-    const cardWidth = Math.min(390, viewportWidth - 24);
-    card.style.width = `${cardWidth}px`;
-    card.style.left = '12px';
-    card.style.top = '12px';
+    const host = $('.msg-walkthrough-host', root);
+    const dock = $('.msg-walkthrough-dock', root);
+    if (!card || !host || !dock) return;
 
-    const cardRect = card.getBoundingClientRect();
-    const cardHeight = Math.min(cardRect.height, viewportHeight - 24);
-    const gap = 16;
+    const compact = viewportWidth < 960;
+    const hostWidth = compact ? 0 : Math.min(250, Math.max(210, viewportWidth * .19));
+    const sideMargin = compact ? 14 : 22;
+    const cardLeft = compact ? sideMargin : sideMargin + hostWidth - 8;
+    const cardWidth = Math.max(280, Math.min(760, viewportWidth - cardLeft - sideMargin));
+
+    card.style.width = `${Math.round(cardWidth)}px`;
+    card.style.left = `${Math.round(cardLeft)}px`;
+    card.style.bottom = compact ? '92px' : '96px';
+    card.style.top = 'auto';
+
+    const dockWidth = Math.max(300, Math.min(1180, viewportWidth - sideMargin * 2));
+    dock.style.width = `${Math.round(dockWidth)}px`;
+    dock.style.left = `${Math.round((viewportWidth - dockWidth) / 2)}px`;
+    dock.style.bottom = '14px';
+
     const targetCenterX = (left + right) / 2;
     const targetCenterY = (top + bottom) / 2;
-
-    const candidates = [
-      { side:'right', fits:right + gap + cardWidth <= viewportWidth - 12, left:right + gap, top:targetCenterY - cardHeight/2 },
-      { side:'left', fits:left - gap - cardWidth >= 12, left:left - gap - cardWidth, top:targetCenterY - cardHeight/2 },
-      { side:'bottom', fits:bottom + gap + cardHeight <= viewportHeight - 12, left:targetCenterX - cardWidth/2, top:bottom + gap },
-      { side:'top', fits:top - gap - cardHeight >= 12, left:targetCenterX - cardWidth/2, top:top - gap - cardHeight }
-    ];
-
-    const targetInMenu = !!activeTarget.closest('.site-header .menu-popover, .msg-walkthrough-menu-mirror');
-    const preferred = targetInMenu ? ['right','left','bottom','top'] : ['bottom','top','right','left'];
-    const candidate = preferred.map(side => candidates.find(item => item.side === side)).find(item => item?.fits)
-      || candidates.find(item => item.fits)
-      || { side:'floating', left:targetCenterX-cardWidth/2, top:targetCenterY-cardHeight/2 };
-
-    const cardLeft = Math.max(12, Math.min(viewportWidth-cardWidth-12, candidate.left));
-    const cardTop = Math.max(12, Math.min(viewportHeight-cardHeight-12, candidate.top));
-    Object.assign(card.style, { left:`${cardLeft}px`, top:`${cardTop}px` });
-    card.dataset.walkthroughSide = candidate.side;
-
     const connector = $('.msg-walkthrough-connector', root);
     if (connector) {
       const placedCard = card.getBoundingClientRect();
-      let x1=targetCenterX, y1=targetCenterY;
-      let x2=Math.max(placedCard.left,Math.min(targetCenterX,placedCard.right));
-      let y2=Math.max(placedCard.top,Math.min(targetCenterY,placedCard.bottom));
+      let x1 = targetCenterX;
+      let y1 = targetCenterY;
+      let x2 = Math.max(placedCard.left + 18, Math.min(targetCenterX, placedCard.right - 18));
+      let y2 = placedCard.top;
 
-      if (candidate.side === 'right') {
-        x1=right; x2=placedCard.left;
-        y1=y2=Math.max(placedCard.top+18,Math.min(targetCenterY,placedCard.bottom-18));
-      } else if (candidate.side === 'left') {
-        x1=left; x2=placedCard.right;
-        y1=y2=Math.max(placedCard.top+18,Math.min(targetCenterY,placedCard.bottom-18));
-      } else if (candidate.side === 'bottom') {
-        y1=bottom; y2=placedCard.top;
-        x1=x2=Math.max(placedCard.left+18,Math.min(targetCenterX,placedCard.right-18));
-      } else if (candidate.side === 'top') {
-        y1=top; y2=placedCard.bottom;
-        x1=x2=Math.max(placedCard.left+18,Math.min(targetCenterX,placedCard.right-18));
+      if (targetCenterY > placedCard.bottom) {
+        y2 = placedCard.bottom;
+      } else if (targetCenterX < placedCard.left) {
+        x2 = placedCard.left;
+        y2 = Math.max(placedCard.top + 18, Math.min(targetCenterY, placedCard.bottom - 18));
+      } else if (targetCenterX > placedCard.right) {
+        x2 = placedCard.right;
+        y2 = Math.max(placedCard.top + 18, Math.min(targetCenterY, placedCard.bottom - 18));
       }
 
-      const dx=x2-x1, dy=y2-y1;
-      const length=Math.max(0,Math.hypot(dx,dy));
-      const angle=Math.atan2(dy,dx)*180/Math.PI;
-      Object.assign(connector.style,{
-        display:length>=5?'block':'none',
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const length = Math.max(0, Math.hypot(dx,dy));
+      const angle = Math.atan2(dy,dx) * 180 / Math.PI;
+      Object.assign(connector.style, {
+        display:length >= 12 ? 'block' : 'none',
         left:`${x1}px`, top:`${y1}px`, width:`${length}px`,
         transform:`rotate(${angle}deg)`
       });
-    }
-
-    const host = $('.msg-walkthrough-host', root);
-    const arm = $('.msg-walkthrough-mark-arm', root);
-    if (host && arm) {
-      const hostRect = host.getBoundingClientRect();
-      const shoulderX = hostRect.left + Math.min(hostRect.width - 24, 116);
-      const shoulderY = hostRect.top + 92;
-      const armDx = targetCenterX - shoulderX;
-      const armDy = targetCenterY - shoulderY;
-      const armAngle = Math.atan2(armDy, armDx) * 180 / Math.PI;
-      const armLength = Math.max(80, Math.min(210, Math.hypot(armDx, armDy) * 0.16));
-      arm.style.width = `${Math.round(armLength)}px`;
-      arm.style.transform = `rotate(${armAngle}deg)`;
     }
   }
 
@@ -754,7 +734,10 @@
 
     $('[data-walkthrough-title]', root).textContent = step.title;
     $('[data-walkthrough-text]', root).textContent = step.text;
-    $('[data-walkthrough-count]', root).textContent = `${currentIndex + 1} of ${steps.length}`;
+    $('[data-walkthrough-section]', root).textContent = step.title.includes('Reader') || currentIndex > 34 ? 'Reader tour' : (step.title.includes('Learn') || (currentIndex >= 18 && currentIndex <= 26) ? 'Learn' : (currentIndex >= 2 && currentIndex <= 17 ? 'My Library' : 'Full experience'));
+    $('[data-walkthrough-count]', root).textContent = `${currentIndex + 1} / ${steps.length}`;
+    const progress = $('[data-walkthrough-progress]', root);
+    if (progress) progress.style.width = `${Math.max(2, ((currentIndex + 1) / steps.length) * 100)}%`;
     $('[data-walkthrough-prev]', root).disabled = currentIndex === 0;
     $('[data-walkthrough-next]', root).textContent = currentIndex === steps.length - 1 ? 'Finish' : 'Next →';
     schedulePosition();

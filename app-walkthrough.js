@@ -2,6 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
+  const WALKTHROUGH_BUILD = '9.2.95';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -525,6 +526,7 @@
     if (root?.isConnected) return root;
     root = document.createElement('div');
     root.id = ROOT_ID;
+    root.dataset.walkthroughBuild = WALKTHROUGH_BUILD;
     root.innerHTML = `
       <div class="msg-walkthrough-mask msg-walkthrough-mask-top"></div>
       <div class="msg-walkthrough-mask msg-walkthrough-mask-left"></div>
