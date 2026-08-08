@@ -1,0 +1,15 @@
+After deploying these three files, open the Great Books page.
+
+The Iliad row should show:
+Find & Import Edition | Study / Great Ideas | Classic Guide | Grokipedia
+
+To verify the deployed JavaScript itself, run this in DevTools Console:
+
+fetch('/app.js?v=' + Date.now(), {cache:'no-store'})
+  .then(r => r.text())
+  .then(t => console.log('Classic Guide code deployed:', t.includes("Iliad Homer") && t.includes("Classic Guide")));
+
+Expected:
+Classic Guide code deployed: true
+
+If it prints false, Render/GitHub is serving a different app.js than the one uploaded.
