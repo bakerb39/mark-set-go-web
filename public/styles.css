@@ -12524,3 +12524,95 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
 #msg-app-walkthrough[data-walkthrough-build="9.2.95"] .msg-walkthrough-host {
   display:flex;
 }
+
+
+/* v9.2.96 walkthrough polish */
+.msg-walkthrough-host {
+  left:10px !important;
+  bottom:72px !important;
+  width:min(280px, 22vw) !important;
+  height:360px !important;
+  pointer-events:none !important;
+}
+.msg-walkthrough-mark-figure {
+  overflow:visible !important;
+  border-radius:0 !important;
+  filter:drop-shadow(0 14px 28px rgba(0,0,0,.24)) !important;
+}
+.msg-walkthrough-mark-illustration {
+  width:100% !important;
+  height:100% !important;
+  object-fit:contain !important;
+  object-position:left bottom !important;
+  transform:none !important;
+}
+.msg-walkthrough-mark-figure::after {
+  background:linear-gradient(180deg,transparent 68%,rgba(4,22,38,.18) 100%) !important;
+}
+.msg-walkthrough-card,
+.msg-walkthrough-card * {
+  pointer-events:auto !important;
+}
+.msg-walkthrough-dock,
+.msg-walkthrough-dock * {
+  pointer-events:auto !important;
+}
+.msg-walkthrough-dock > button,
+.msg-walkthrough-card [data-walkthrough-exit] {
+  cursor:pointer !important;
+}
+.msg-walkthrough-connector {
+  display:none !important;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.2.96"] .msg-walkthrough-host {
+  display:flex;
+}
+
+
+/* v9.2.97 first-model presenter + natural pointing */
+#msg-app-walkthrough[data-walkthrough-build="9.2.97"] .msg-walkthrough-host {
+  display:flex !important;
+  align-items:flex-end !important;
+  justify-content:flex-start !important;
+  overflow:visible !important;
+  pointer-events:none !important;
+  transition:left .18s ease,bottom .18s ease,width .18s ease,height .18s ease;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.2.97"] .msg-walkthrough-mark-figure {
+  width:100% !important;
+  height:100% !important;
+  overflow:visible !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  filter:drop-shadow(0 14px 28px rgba(0,0,0,.25)) !important;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.2.97"] .msg-walkthrough-mark-illustration {
+  width:100% !important;
+  height:100% !important;
+  max-width:none !important;
+  object-fit:contain !important;
+  object-position:left bottom !important;
+  transform:scaleX(1.08) !important;
+  transform-origin:left bottom !important;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.2.97"] .msg-walkthrough-mark-figure::after {
+  display:none !important;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.2.97"] .msg-walkthrough-mark-figure figcaption {
+  display:none !important;
+}
+#msg-app-walkthrough .msg-walkthrough-connector {
+  display:none !important;
+}
+#msg-app-walkthrough .msg-walkthrough-dock,
+#msg-app-walkthrough .msg-walkthrough-dock * {
+  pointer-events:auto !important;
+}
+#msg-app-walkthrough [data-walkthrough-next],
+#msg-app-walkthrough [data-walkthrough-prev],
+#msg-app-walkthrough [data-walkthrough-exit] {
+  position:relative !important;
+  z-index:2147483647 !important;
+  pointer-events:auto !important;
+  cursor:pointer !important;
+}

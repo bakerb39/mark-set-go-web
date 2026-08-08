@@ -2,7 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
-  const WALKTHROUGH_BUILD = '9.2.95';
+  const WALKTHROUGH_BUILD = '9.2.97';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -555,12 +555,21 @@
       </div>`;
     document.body.appendChild(root);
 
-    $('[data-walkthrough-prev]', root)?.addEventListener('click', () => goTo(currentIndex - 1));
-    $('[data-walkthrough-next]', root)?.addEventListener('click', () => {
-      if (currentIndex >= steps.length - 1) finish();
-      else goTo(currentIndex + 1);
+    root.addEventListener('click', (event) => {
+      const control = event.target.closest('[data-walkthrough-next],[data-walkthrough-prev],[data-walkthrough-exit]');
+      if (!control || !root.contains(control)) return;
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (control.hasAttribute('data-walkthrough-next')) {
+        if (currentIndex >= steps.length - 1) finish();
+        else goTo(currentIndex + 1);
+      } else if (control.hasAttribute('data-walkthrough-prev')) {
+        goTo(currentIndex - 1);
+      } else {
+        finish();
+      }
     });
-    $('[data-walkthrough-exit]', root)?.addEventListener('click', finish);
     window.addEventListener('resize', schedulePosition, { passive: true });
     window.addEventListener('scroll', schedulePosition, { passive: true, capture: true });
     document.addEventListener('keydown', handleKeydown);
@@ -597,10 +606,43 @@
     });
   }
 
+  function positionPresenterForTarget(targetRect) {
+    const host = $('.msg-walkthrough-host', root);
+    if (!host || window.innerWidth < 960) return;
+
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const targetX = (targetRect.left + targetRect.right) / 2;
+    const targetY = (targetRect.top + targetRect.bottom) / 2;
+
+    // Mark's pointing arm is baked into the presenter artwork and points
+    // diagonally up/right. Move Mark horizontally so that natural pointing
+    // direction aims toward the highlighted control instead of drawing a line.
+    const hostWidth = Math.min(300, Math.max(248, viewportWidth * .205));
+    const hostHeight = Math.min(330, Math.max(275, viewportHeight * .36));
+    const anchorX = hostWidth * .74;   // approximate fingertip direction origin
+    const anchorY = hostHeight * .16;
+
+    let left = targetX - anchorX;
+    left = Math.max(8, Math.min(viewportWidth - hostWidth - 8, left));
+
+    // Keep Mark in the lower half for ordinary controls, but let him rise
+    // slightly for low targets so his raised arm still clearly points at them.
+    let bottom = 82;
+    if (targetY > viewportHeight * .58) bottom = 22;
+
+    host.style.width = `${Math.round(hostWidth)}px`;
+    host.style.height = `${Math.round(hostHeight)}px`;
+    host.style.left = `${Math.round(left)}px`;
+    host.style.right = 'auto';
+    host.style.bottom = `${bottom}px`;
+  }
+
   function positionOverlay() {
     if (!root || root.hidden || !activeTarget?.isConnected || !isVisibleElement(activeTarget)) return;
 
     const rect = activeTarget.getBoundingClientRect();
+    positionPresenterForTarget(rect);
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
     const pad = 7;
@@ -633,7 +675,7 @@
     if (!card || !host || !dock) return;
 
     const compact = viewportWidth < 960;
-    const hostWidth = compact ? 0 : Math.min(250, Math.max(210, viewportWidth * .19));
+    const hostWidth = compact ? 0 : Math.min(280, Math.max(240, viewportWidth * .205));
     const sideMargin = compact ? 14 : 22;
     const cardLeft = compact ? sideMargin : sideMargin + hostWidth - 8;
     const cardWidth = Math.max(280, Math.min(760, viewportWidth - cardLeft - sideMargin));
@@ -648,36 +690,8 @@
     dock.style.left = `${Math.round((viewportWidth - dockWidth) / 2)}px`;
     dock.style.bottom = '14px';
 
-    const targetCenterX = (left + right) / 2;
-    const targetCenterY = (top + bottom) / 2;
     const connector = $('.msg-walkthrough-connector', root);
-    if (connector) {
-      const placedCard = card.getBoundingClientRect();
-      let x1 = targetCenterX;
-      let y1 = targetCenterY;
-      let x2 = Math.max(placedCard.left + 18, Math.min(targetCenterX, placedCard.right - 18));
-      let y2 = placedCard.top;
-
-      if (targetCenterY > placedCard.bottom) {
-        y2 = placedCard.bottom;
-      } else if (targetCenterX < placedCard.left) {
-        x2 = placedCard.left;
-        y2 = Math.max(placedCard.top + 18, Math.min(targetCenterY, placedCard.bottom - 18));
-      } else if (targetCenterX > placedCard.right) {
-        x2 = placedCard.right;
-        y2 = Math.max(placedCard.top + 18, Math.min(targetCenterY, placedCard.bottom - 18));
-      }
-
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const length = Math.max(0, Math.hypot(dx,dy));
-      const angle = Math.atan2(dy,dx) * 180 / Math.PI;
-      Object.assign(connector.style, {
-        display:length >= 12 ? 'block' : 'none',
-        left:`${x1}px`, top:`${y1}px`, width:`${length}px`,
-        transform:`rotate(${angle}deg)`
-      });
-    }
+    if (connector) connector.style.display = 'none';
   }
 
   async function resolveTarget(step) {
