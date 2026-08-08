@@ -14938,394 +14938,8 @@ async function renderBibleStudy() {
   });
 }
 
-
-const CLASSIC_GUIDES = {
-  iliad: {
-    id: 'iliad',
-    title: 'The Iliad',
-    author: 'Homer',
-    query: 'Iliad Homer',
-    subtitle: 'An Independent Mark, Set, Go! Classic Guide',
-    overview: 'War, honor, rage, mortality, friendship, pity, and the cost of glory in Homer’s foundational epic.',
-    greatIdeas: ['War', 'Courage', 'Honor', 'Justice', 'Anger', 'Fate', 'God', 'Love', 'Death', 'Man', 'Virtue'],
-    sections: [
-      {
-        title: 'Before You Read',
-        paragraphs: [
-          'The Iliad is not the story of the entire Trojan War. It concentrates on a short period near the end of the war and, more specifically, on the consequences of Achilles’ rage.',
-          'The poem announces its central concern immediately: private anger becomes a public catastrophe. Keep that conflict in view as warriors, kings, friends, families, and gods respond to Achilles’ withdrawal.'
-        ],
-        remember: 'Watch how personal honor, public duty, friendship, and mortality collide.'
-      },
-      {
-        title: 'The World of Homer',
-        paragraphs: [
-          'The poem emerged from a long oral tradition. Its heroes inhabit a warrior culture in which reputation, gifts, loyalty, hospitality, and public recognition carry enormous weight.',
-          'The gods intervene constantly, but human beings still make consequential choices. Homer’s world therefore resists a simple opposition between fate and free will.'
-        ],
-        remember: 'Divine action does not erase human responsibility.'
-      },
-      {
-        title: 'What Starts the Conflict?',
-        paragraphs: [
-          'Agamemnon takes Briseis from Achilles after being forced to return Chryseis. Achilles interprets the act as a public humiliation and withdraws from battle.',
-          'His withdrawal changes the military balance and exposes the entire Greek army to disaster. Homer turns a dispute over honor into a study of leadership and the dangers of wounded pride.'
-        ],
-        remember: 'The central war inside the poem is Achilles versus Agamemnon before it is Achilles versus Troy.'
-      },
-      {
-        title: 'Achilles',
-        paragraphs: [
-          'Achilles is the greatest Greek warrior, but the poem does not present greatness as simple moral perfection. His excellence is inseparable from pride, anger, grief, and an intense awareness of his own death.',
-          'He knows that choosing glory at Troy means a short life. His heroism is therefore haunted by mortality.'
-        ],
-        remember: 'Achilles is powerful because he is both nearly superhuman and painfully human.'
-      },
-      {
-        title: 'Hector and Troy',
-        paragraphs: [
-          'Hector provides a crucial counterweight to Achilles. He is a warrior, but also a husband, father, son, and defender of a city whose destruction he can imagine.',
-          'Scenes with Andromache and Astyanax expand the meaning of war beyond battlefield glory. The cost of heroic action is borne by families and communities.'
-        ],
-        remember: 'Hector lets us see war from inside the city that will lose.'
-      },
-      {
-        title: 'The Gods and Fate',
-        paragraphs: [
-          'Zeus, Hera, Athena, Apollo, Aphrodite, and other gods intervene directly. Their rivalries mirror and magnify human conflicts.',
-          'Yet even Zeus operates within limits. Certain deaths are fated, and the gods cannot simply remake the moral structure of the poem at will.'
-        ],
-        remember: 'Ask whether the gods explain events—or reveal the forces already present in human life.'
-      },
-      {
-        title: 'Patroclus and the Turning Point',
-        paragraphs: [
-          'Patroclus enters battle wearing Achilles’ armor and drives the Trojans back, but he exceeds Achilles’ instructions and is killed by Hector after divine and human blows combine against him.',
-          'His death transforms Achilles’ anger. The rage once aimed at Agamemnon becomes grief and a consuming desire for vengeance.'
-        ],
-        remember: 'Patroclus’ death converts wounded honor into catastrophic grief.'
-      },
-      {
-        title: 'Achilles Returns',
-        paragraphs: [
-          'Achilles’ return to battle is magnificent and terrifying. Homer repeatedly blurs the line between heroic excellence and destructive excess.',
-          'The killing of Hector is the climax of Achilles’ vengeance, but not the moral end of the poem.'
-        ],
-        remember: 'Victory does not cure Achilles.'
-      },
-      {
-        title: 'Priam and Achilles',
-        paragraphs: [
-          'The emotional culmination arrives when Priam enters Achilles’ shelter and asks for Hector’s body. He forces Achilles to imagine his own father and their shared condition as mortal human beings.',
-          'This scene interrupts the logic of revenge. Achilles and Priam grieve together, eat together, and temporarily recognize a humanity deeper than their roles as enemies.'
-        ],
-        remember: 'The poem’s deepest victory may be the recovery of pity.'
-      },
-      {
-        title: 'Major Themes',
-        paragraphs: [
-          'Rage and self-mastery; honor and reputation; mortality and glory; friendship and grief; fate and agency; leadership; the human cost of war; pity and reconciliation.',
-          'The Iliad rarely gives a simple answer. Its power comes from holding competing values together and forcing the reader to feel their consequences.'
-        ],
-        remember: 'Homer asks what human greatness is worth when every human life ends.'
-      },
-      {
-        title: 'The Great Ideas',
-        paragraphs: [
-          'The Iliad belongs naturally in the Great Conversation because its questions reappear across philosophy, history, theology, and literature: What is courage? What is justice between unequal people? Is anger ever righteous? Can glory compensate for death?',
-          'Read Homer forward into Plato on justice, Aristotle on virtue, Augustine on war and desire, and later writers on violence, glory, grief, and mortality.'
-        ],
-        remember: 'Use the poem as an entry point into the Great Conversation.'
-      },
-      {
-        title: 'Why The Iliad Matters',
-        paragraphs: [
-          'The poem helped shape Western ideas of heroism, tragedy, war, leadership, and poetic greatness. But its endurance comes less from cultural prestige than from its extraordinary ability to make enemies visible as human beings.',
-          'The final movement does not celebrate conquest. It ends with mourning and burial.'
-        ],
-        remember: 'The Iliad begins with rage and ends with a funeral.'
-      }
-    ],
-    quiz: [
-      {
-        question: 'What drives the central conflict at the beginning of The Iliad?',
-        choices: ['A dispute over Achilles’ honor', 'The abduction of Helen', 'A prophecy about Hector', 'A rebellion against Zeus'],
-        answer: 0
-      },
-      {
-        question: 'Who wears Achilles’ armor and is killed by Hector?',
-        choices: ['Ajax', 'Odysseus', 'Patroclus', 'Diomedes'],
-        answer: 2
-      },
-      {
-        question: 'What changes Achilles most profoundly near the end of the poem?',
-        choices: ['A new prophecy', 'Priam’s appeal and their shared grief', 'A victory feast', 'Agamemnon’s punishment'],
-        answer: 1
-      },
-      {
-        question: 'Which statement best captures Homer’s treatment of war?',
-        choices: ['War is purely glorious', 'War is meaningless', 'War contains glory but exacts terrible human costs', 'War is controlled entirely by the gods'],
-        answer: 2
-      }
-    ],
-    actionPlan: [
-      'Before each reading session, identify which character’s sense of honor is at stake.',
-      'Track moments when a god intervenes and ask what human motive the intervention amplifies.',
-      'Compare Achilles and Hector after Books 6, 18, 22, and 24.',
-      'After finishing, write one paragraph answering: What changes Achilles?',
-      'Connect the poem to War, Courage, Honor, Justice, Anger, Fate, and Death in the Great Ideas workspace.'
-    ]
-  }
-};
-
-function classicGuideForGreatBook(book) {
-  if (!book) return null;
-  return Object.values(CLASSIC_GUIDES).find((guide) =>
-    String(guide.query || '').toLocaleLowerCase() === String(book.query || '').toLocaleLowerCase()
-  ) || null;
-}
-
-function classicGuideTabs(activeTab = 'Guide') {
-  const tabs = ['Guide', 'Key Ideas', 'Images', 'Notebook', 'Ask Mark Chats', 'Quiz', 'Action Plan'];
-  return `<div class="category-tabs classic-guide-tabs" role="tablist" aria-label="Classic Guide sections">
-    ${tabs.map((tab) => `<button type="button" class="${tab === activeTab ? 'active' : ''}" data-classic-guide-tab="${escapeHtml(tab)}">${escapeHtml(tab)}</button>`).join('')}
-  </div>`;
-}
-
-function renderClassicGuide(guideId = 'iliad', activeTab = 'Guide') {
+function renderGreatBooksLibrary() {
   stopReader();
-  const guide = CLASSIC_GUIDES[guideId];
-  if (!guide) return renderGreatBooksLibrary('guides');
-
-  const tabContent = (() => {
-    if (activeTab === 'Key Ideas') {
-      return `
-        <section class="panel">
-          <div class="section-heading">
-            <div><span class="source-category">Great Ideas</span><h2>Ideas to trace through ${escapeHtml(guide.title)}</h2><p>Use these as bridges from Homer into the wider Great Books conversation.</p></div>
-          </div>
-          <div class="great-books-study-intro">
-            ${guide.greatIdeas.map((idea) => `<article><strong>${escapeHtml(idea)}</strong><span>Trace this idea across the poem and later Great Books.</span></article>`).join('')}
-          </div>
-        </section>`;
-    }
-
-    if (activeTab === 'Images') {
-      return `
-        <section class="panel">
-          <div class="section-heading">
-            <div><span class="source-category">Visual study</span><h2>Images</h2><p>Curated public-domain maps, ancient art, archaeological objects, and character/location visuals will live here.</p></div>
-          </div>
-          <div class="empty-library"><h2>Image collection coming next</h2><p>The guide structure is ready; the visual collection has not been populated yet.</p></div>
-        </section>`;
-    }
-
-    if (activeTab === 'Notebook') {
-      return `
-        <section class="panel">
-          <div class="section-heading">
-            <div><span class="source-category">Your notes</span><h2>Notebook</h2><p>Use My Notebook for notes you make while reading this guide and the original work.</p></div>
-          </div>
-          <button class="primary" type="button" data-action="mark-notebook">Open My Notebook</button>
-        </section>`;
-    }
-
-    if (activeTab === 'Ask Mark Chats') {
-      return `
-        <section class="panel">
-          <div class="section-heading">
-            <div><span class="source-category">Reading companion</span><h2>Ask Mark Chats</h2><p>Guide-specific conversations with Mark will be collected here as this guide is connected to the existing Ask Mark history.</p></div>
-          </div>
-          <div class="empty-library"><h2>No saved guide chats yet</h2><p>Ask Mark integration will use the same companion system already available elsewhere in the app.</p></div>
-        </section>`;
-    }
-
-    if (activeTab === 'Quiz') {
-      return `
-        <section class="panel">
-          <div class="section-heading">
-            <div><span class="source-category">Review</span><h2>${escapeHtml(guide.title)} Quiz</h2><p>Check your grasp of the central conflict, turning points, and themes.</p></div>
-          </div>
-          <div class="classic-guide-quiz">
-            ${guide.quiz.map((item, index) => `
-              <fieldset class="curated-card">
-                <legend><strong>${index + 1}. ${escapeHtml(item.question)}</strong></legend>
-                ${item.choices.map((choice, choiceIndex) => `<label style="display:block;margin:.55rem 0"><input type="radio" name="classic-guide-q${index}" value="${choiceIndex}"> ${escapeHtml(choice)}</label>`).join('')}
-              </fieldset>`).join('')}
-          </div>
-          <div class="source-actions" style="margin-top:1rem">
-            <button class="primary" type="button" data-check-classic-guide-quiz="${escapeHtml(guide.id)}">Check Answers</button>
-          </div>
-          <p id="classic-guide-quiz-score" class="status" aria-live="polite"></p>
-        </section>`;
-    }
-
-    if (activeTab === 'Action Plan') {
-      return `
-        <section class="panel">
-          <div class="section-heading">
-            <div><span class="source-category">Read actively</span><h2>Reading &amp; Study Plan</h2><p>Five concrete ways to turn the guide into deeper reading rather than passive summary.</p></div>
-          </div>
-          <ol>
-            ${guide.actionPlan.map((item) => `<li style="margin:.8rem 0;line-height:1.6">${escapeHtml(item)}</li>`).join('')}
-          </ol>
-        </section>`;
-    }
-
-    return `
-      <section class="panel classic-guide-reading">
-        ${guide.sections.map((section, index) => `
-          <article class="classic-guide-section" style="padding:1.15rem 0;border-bottom:1px solid var(--border-color,#dfe5eb)">
-            <span class="source-category">Section ${index + 1}</span>
-            <h2>${escapeHtml(section.title)}</h2>
-            ${section.paragraphs.map((paragraph) => `<p style="line-height:1.7">${escapeHtml(paragraph)}</p>`).join('')}
-            <p class="library-note"><strong>Key idea to remember:</strong> ${escapeHtml(section.remember)}</p>
-          </article>`).join('')}
-      </section>`;
-  })();
-
-  app.innerHTML = `
-    <section class="panel curated-library great-books-study-library classic-guide-page">
-      <div class="library-heading">
-        <div>
-          <span class="source-category">Great Books · Classic Guide</span>
-          <h1>${escapeHtml(guide.title)}</h1>
-          <p>${escapeHtml(guide.author)} · ${escapeHtml(guide.subtitle)}</p>
-        </div>
-        <div class="source-actions">
-          <button class="secondary" type="button" data-great-books-view="guides">Back to Classic Guides</button>
-          <button class="secondary" type="button" data-action="reader">Return to Reader</button>
-        </div>
-      </div>
-
-      <div class="great-books-study-intro">
-        <article><strong>12</strong><span>guide sections</span></article>
-        <article><strong>${guide.greatIdeas.length}</strong><span>Great Ideas connections</span></article>
-        <article><strong>4</strong><span>review questions</span></article>
-      </div>
-
-      ${classicGuideTabs(activeTab)}
-      ${tabContent}
-    </section>`;
-
-  app.querySelectorAll('[data-classic-guide-tab]').forEach((button) => {
-    button.addEventListener('click', () => renderClassicGuide(guide.id, button.dataset.classicGuideTab));
-  });
-
-  app.querySelectorAll('[data-great-books-view]').forEach((button) => {
-    button.addEventListener('click', () => renderGreatBooksLibrary(button.dataset.greatBooksView));
-  });
-
-  app.querySelector('[data-check-classic-guide-quiz]')?.addEventListener('click', () => {
-    let score = 0;
-    guide.quiz.forEach((item, index) => {
-      const selected = app.querySelector(`input[name="classic-guide-q${index}"]:checked`);
-      if (selected && Number(selected.value) === item.answer) score += 1;
-    });
-    const output = app.querySelector('#classic-guide-quiz-score');
-    if (output) output.innerHTML = `<strong>${score} of ${guide.quiz.length} correct.</strong>`;
-  });
-}
-
-function renderGreatBooksLibrary(view = 'library') {
-  stopReader();
-
-  const classicBooks = greatBooksCatalog.filter((book) => Number(book.volume) > 0);
-  const readyGuides = classicBooks.filter((book) => classicGuideForGreatBook(book));
-  const viewTabs = `
-    <div class="category-tabs" role="tablist" aria-label="Great Books Library sections" style="margin:1rem 0 1.25rem">
-      <button type="button" class="${view === 'library' ? 'active' : ''}" data-great-books-view="library">Great Books Library</button>
-      <button type="button" class="${view === 'guides' ? 'active' : ''}" data-great-books-view="guides">Classic Guides</button>
-    </div>`;
-
-  if (view === 'guides') {
-    const groupedGuides = groupBy(classicBooks, 'volume');
-
-    app.innerHTML = `
-      <section class="panel curated-library great-books-study-library">
-        <div class="library-heading">
-          <div>
-            <span class="source-category">Browse · Study</span>
-            <h1>Great Books of the Western World</h1>
-            <p>The Classic Guides are independent companions to the works in the Great Books Library.</p>
-          </div>
-          <div class="source-actions">
-            <button class="secondary" type="button" data-read="gutenberg">Search Gutenberg</button>
-            <button class="secondary" type="button" data-action="reader">Return to Reader</button>
-          </div>
-        </div>
-
-        ${viewTabs}
-
-        <div class="great-books-study-intro">
-          <article><strong>${readyGuides.length}</strong><span>complete classic ${readyGuides.length === 1 ? 'guide' : 'guides'}</span></article>
-          <article><strong>${classicBooks.length}</strong><span>Great Books works / collections planned</span></article>
-          <article><strong>Great Ideas</strong><span>syntopical connections built into each guide</span></article>
-        </div>
-
-        <div class="list-toolbar-row">
-          <label class="curated-filter">Filter classic guides<input id="classic-guides-filter" type="search" placeholder="Homer, Plato, Shakespeare, justice…"></label>
-          ${listPresentationControls('classic-guides', { collapsible:true, defaultView:'tiles' })}
-        </div>
-
-        <div id="classic-guides-groups" class="curated-groups great-books-volumes presentation-tiles">
-          ${Object.entries(groupedGuides).sort((a,b)=>Number(a[0])-Number(b[0])).map(([volume, books]) => `
-            <details class="curated-era" ${Number(volume) <= 6 ? 'open' : ''}>
-              <summary>Volume ${escapeHtml(volume)} · ${escapeHtml(books[0]?.era || '')} <span>${books.length}</span></summary>
-              <div class="curated-grid">
-                ${books.map((book) => {
-                  const guide = classicGuideForGreatBook(book);
-                  return `<article class="curated-card" data-classic-guide-card data-search-text="${escapeHtml(`${book.title} ${book.author} ${book.era} volume ${book.volume}`.toLowerCase())}">
-                    <div>
-                      <span class="source-category">Volume ${book.volume}</span>
-                      <h2>${escapeHtml(book.title)}</h2>
-                      <p>${escapeHtml(book.author)}</p>
-                    </div>
-                    <div class="great-book-actions">
-                      ${guide
-                        ? `<button class="primary" type="button" data-open-classic-guide="${escapeHtml(guide.id)}">Open Classic Guide</button>`
-                        : '<button class="secondary" type="button" disabled>Guide Coming Soon</button>'}
-                      <button class="secondary" type="button" data-great-books-view="library">Open Great Books Library</button>
-                    </div>
-                  </article>`;
-                }).join('')}
-              </div>
-            </details>`).join('')}
-        </div>
-
-        <p class="library-note">Classic Guides are original Mark, Set, Go! reading companions. The Bible entries are intentionally excluded here because Bible Guides will be handled as their own collection.</p>
-      </section>`;
-
-    bindListPresentationControls({
-      key:'classic-guides',
-      root:'#classic-guides-groups',
-      itemSelector:'[data-classic-guide-card]',
-      groupSelector:'.curated-era',
-      defaultView:'tiles'
-    });
-
-    const guideFilter = app.querySelector('#classic-guides-filter');
-    guideFilter?.addEventListener('input', () => {
-      const query = guideFilter.value.trim().toLowerCase();
-      app.querySelectorAll('[data-classic-guide-card]').forEach((card) => {
-        card.hidden = Boolean(query) && !card.dataset.searchText.includes(query);
-      });
-      app.querySelectorAll('.curated-era').forEach((era) => {
-        era.hidden = !Array.from(era.querySelectorAll('[data-classic-guide-card]')).some((card) => !card.hidden);
-      });
-    });
-
-    app.querySelectorAll('[data-open-classic-guide]').forEach((button) => {
-      button.addEventListener('click', () => renderClassicGuide(button.dataset.openClassicGuide));
-    });
-
-    app.querySelectorAll('[data-great-books-view]').forEach((button) => {
-      button.addEventListener('click', () => renderGreatBooksLibrary(button.dataset.greatBooksView));
-    });
-
-    return;
-  }
-
   const grouped = groupBy(greatBooksCatalog, 'volume');
   app.innerHTML = `
     <section class="panel curated-library great-books-study-library">
@@ -15333,9 +14947,6 @@ function renderGreatBooksLibrary(view = 'library') {
         <div><span class="source-category">Browse · Study</span><h1>Great Books of the Western World</h1><p>The 1990 60-volume framework expanded into individual works, plus the Bible collection referenced by the Syntopicon tradition.</p></div>
         <div class="source-actions"><button class="secondary" type="button" data-read="gutenberg">Search Gutenberg</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
       </div>
-
-      ${viewTabs}
-
       <div class="study-language-bar">
         <div><strong>Study language</strong><span>AI study guides can be generated in another language; imported books can be translated from the Reader.</span></div>
         <select id="great-books-study-language">${studyLanguageOptions(getStudyLanguage())}</select>
@@ -15343,7 +14954,7 @@ function renderGreatBooksLibrary(view = 'library') {
       <div class="great-books-study-intro">
         <article><strong>${greatBooksCatalog.length}</strong><span>individual works / collections</span></article>
         <article><strong>60</strong><span>volume framework</span></article>
-        <article><strong>${readyGuides.length}</strong><span>Classic ${readyGuides.length === 1 ? 'Guide' : 'Guides'} ready</span></article>
+        <article><strong>AI</strong><span>Great Ideas study guides</span></article>
       </div>
       <div class="list-toolbar-row">
         <label class="curated-filter">Filter works, authors, volumes, or ideas<input id="great-books-filter" type="search" placeholder="Plato, justice, Shakespeare, science…"></label>
@@ -15354,23 +14965,20 @@ function renderGreatBooksLibrary(view = 'library') {
           <details class="curated-era" ${Number(volume) <= 6 ? 'open' : ''}>
             <summary>Volume ${escapeHtml(volume)} · ${escapeHtml(books[0]?.era || '')} <span>${books.length}</span></summary>
             <div class="curated-grid">
-              ${books.map((book) => {
-                const guide = classicGuideForGreatBook(book);
-                return `<article class="curated-card" data-great-book-card data-search-text="${escapeHtml(`${book.title} ${book.author} ${book.era} volume ${book.volume}`.toLowerCase())}">
-                  <div><span class="source-category">Volume ${book.volume}</span><h2>${escapeHtml(book.title)}</h2><p>${escapeHtml(book.author)}</p></div>
-                  <div class="great-book-actions">
-                    <button class="primary" type="button" data-load-great-book="${escapeHtml(book.query)}">Find &amp; Import Edition</button>
-                    <button class="secondary" type="button" data-study-great-book="${escapeHtml(book.query)}">Study / Great Ideas</button>
-                    ${guide ? `<button class="secondary" type="button" data-open-classic-guide="${escapeHtml(guide.id)}">Classic Guide</button>` : ''}
-                    <a class="secondary button-link" href="${greatBookGrokipediaUrl(book)}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
-                  </div>
-                  <p class="status book-load-status"></p>
-                </article>`;
-              }).join('')}
+              ${books.map((book) => `<article class="curated-card" data-great-book-card data-search-text="${escapeHtml(`${book.title} ${book.author} ${book.era} volume ${book.volume}`.toLowerCase())}">
+                <div><span class="source-category">Volume ${book.volume}</span><h2>${escapeHtml(book.title)}</h2><p>${escapeHtml(book.author)}</p></div>
+                <div class="great-book-actions">
+                  <button class="primary" type="button" data-load-great-book="${escapeHtml(book.query)}">Find &amp; Import Edition</button>
+                  <button class="secondary" type="button" data-study-great-book="${escapeHtml(book.query)}">Study / Great Ideas</button>
+                  ${book.query === 'Iliad Homer' ? '<button class="secondary" type="button" onclick="window.location.href=\'/classic-guides/iliad.html\'">Classic Guide</button>' : ''}
+                  <a class="secondary button-link" href="${greatBookGrokipediaUrl(book)}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
+                </div>
+                <p class="status book-load-status"></p>
+              </article>`).join('')}
             </div>
           </details>`).join('')}
       </div>
-      <p class="library-note">The reading list follows the 1990 edition’s contents. Find & Import searches all connected public book sources—Standard Ebooks, Internet Archive, Open Library, Wikisource, and Project Gutenberg—and opens only a verified primary/full-text edition. Summaries, excerpts, study guides, and weak title matches are rejected automatically. It may not find works that remain copyrighted or lack a suitable open digital edition. This app does not reproduce Britannica’s copyrighted Syntopicon commentary; its Great Ideas study guides and Classic Guides are original Mark, Set, Go! study material.</p>
+      <p class="library-note">The reading list follows the 1990 edition’s contents. Find & Import searches all connected public book sources—Standard Ebooks, Internet Archive, Open Library, Wikisource, and Project Gutenberg—and opens only a verified primary/full-text edition. Summaries, excerpts, study guides, and weak title matches are rejected automatically. It may not find works that remain copyrighted or lack a suitable open digital edition. This app does not reproduce Britannica’s copyrighted Syntopicon commentary; its Great Ideas study guides are newly generated for syntopical reading.</p>
     </section>`;
 
   bindListPresentationControls({
@@ -15380,15 +14988,9 @@ function renderGreatBooksLibrary(view = 'library') {
     groupSelector:'.curated-era',
     defaultView:'tiles'
   });
-
-  app.querySelectorAll('[data-great-books-view]').forEach((button) => {
-    button.addEventListener('click', () => renderGreatBooksLibrary(button.dataset.greatBooksView));
-  });
-
   app.querySelector('#great-books-study-language')?.addEventListener('change', (event) => setStudyLanguage(event.target.value));
-
   const filter = app.querySelector('#great-books-filter');
-  filter?.addEventListener('input', () => {
+  filter.addEventListener('input', () => {
     const query = filter.value.trim().toLowerCase();
     app.querySelectorAll('[data-great-book-card]').forEach((card) => {
       card.hidden = Boolean(query) && !card.dataset.searchText.includes(query);
@@ -15397,23 +14999,17 @@ function renderGreatBooksLibrary(view = 'library') {
       era.hidden = !Array.from(era.querySelectorAll('[data-great-book-card]')).some((card) => !card.hidden);
     });
   });
-
   app.querySelectorAll('[data-load-great-book]').forEach((button) => {
     button.addEventListener('click', () => {
       const item = greatBooksCatalog.find((book) => book.query === button.dataset.loadGreatBook);
       loadGreatBookEdition(item, button.closest('.curated-card').querySelector('.book-load-status'), button);
     });
   });
-
   app.querySelectorAll('[data-study-great-book]').forEach((button) => {
     button.addEventListener('click', () => {
       const item = greatBooksCatalog.find((book) => book.query === button.dataset.studyGreatBook);
       if (item) renderGreatBookStudy(item, button);
     });
-  });
-
-  app.querySelectorAll('[data-open-classic-guide]').forEach((button) => {
-    button.addEventListener('click', () => renderClassicGuide(button.dataset.openClassicGuide));
   });
 }
 
