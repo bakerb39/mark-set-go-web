@@ -525,3 +525,23 @@
 .askmark-view[data-askmark-view-panel="chat"] {
   -webkit-overflow-scrolling:touch;
 }
+
+
+/* v9.2.87 Reader Tools: one native scroll owner */
+.askmark-view[data-askmark-view-panel="tools"] {
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
+}
+.askmark-view[data-askmark-view-panel="tools"] .askmark-legacy-slot {
+  flex:0 0 auto !important;
+  min-height:auto !important;
+  overflow:visible !important;
+}
+.askmark-view[data-askmark-view-panel="tools"] .askmark-legacy-slot .mark-panel-view,
+.askmark-view[data-askmark-view-panel="tools"] #mark-tools-panel {
+  height:auto !important;
+  max-height:none !important;
+  overflow:visible !important;
+}

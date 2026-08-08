@@ -12174,3 +12174,117 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
     display:none;
   }
 }
+
+
+/* v9.2.87 Reader Tools formatting + native mouse-wheel scrolling */
+
+/* Media and Translation now use the same .settings-panel component as
+   Reading and Display. Undo the v9.2.86 grid experiment and let the shared
+   settings component define identical dimensions. */
+.reader-control-panel .reader-tool-settings-panel {
+  display:block !important;
+  box-sizing:border-box !important;
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+  margin:0 0 8px !important;
+  padding:0 !important;
+  border:1px solid var(--border) !important;
+  border-radius:.48rem !important;
+  background:#f7f9fb !important;
+  overflow:hidden !important;
+}
+
+.reader-control-panel .reader-tool-settings-panel > summary {
+  box-sizing:border-box !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  width:100% !important;
+  min-height:38px !important;
+  gap:.7rem !important;
+  margin:0 !important;
+  padding:.42rem .58rem !important;
+  list-style:none !important;
+  font-size:.78rem !important;
+  font-weight:750 !important;
+  line-height:1.2 !important;
+  white-space:nowrap;
+}
+
+.reader-control-panel .reader-tool-settings-panel > summary > span:first-child {
+  min-width:0 !important;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap !important;
+  color:#18212b !important;
+}
+
+.reader-control-panel .reader-tool-settings-panel > summary .settings-summary {
+  flex:0 1 auto;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap !important;
+  color:var(--muted) !important;
+  font-size:.68rem !important;
+  font-weight:500 !important;
+}
+
+.reader-control-panel .reader-tool-settings-panel > summary::after {
+  content:'▾' !important;
+  flex:0 0 auto;
+  display:block !important;
+  margin-left:auto !important;
+  color:var(--muted) !important;
+  transform:none !important;
+  transition:transform .15s ease;
+}
+
+.reader-control-panel .reader-tool-settings-panel:not([open]) > summary::after {
+  transform:rotate(-90deg) !important;
+}
+
+.reader-control-panel .reader-tool-settings-panel[open] > summary::after {
+  transform:none !important;
+}
+
+.reader-control-panel .reader-tool-settings-panel > .settings-content {
+  padding:.5rem .58rem .55rem !important;
+  border-top:1px solid var(--border) !important;
+}
+
+/* The Reading Tools view itself is the scroll owner inside Ask Mark.
+   Its transplanted legacy panel must flow naturally instead of creating a
+   second invisible/nested scroll box. */
+.askmark-view[data-askmark-view-panel="tools"] {
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+  touch-action:pan-y;
+  scrollbar-gutter:stable;
+}
+
+.askmark-view[data-askmark-view-panel="tools"] .askmark-legacy-slot {
+  flex:0 0 auto !important;
+  min-height:auto !important;
+  overflow:visible !important;
+}
+
+.askmark-view[data-askmark-view-panel="tools"] .askmark-legacy-slot .mark-panel-view,
+.askmark-view[data-askmark-view-panel="tools"] #mark-tools-panel {
+  display:block !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:visible !important;
+  padding:0 !important;
+}
+
+/* Keep the long Translation title on one row; progressively hide only the
+   secondary description if the pane becomes narrow. */
+@media (max-width:430px) {
+  .reader-control-panel .reader-tool-settings-panel > summary .settings-summary {
+    display:none !important;
+  }
+}

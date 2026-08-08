@@ -557,8 +557,17 @@
     // including native middle-button auto-scroll. Only stop the Reader/page
     // from receiving the same wheel gesture.
     shell.addEventListener('wheel',(event)=>{
+      // Native scrolling happens on the actual Ask Mark / Reader Tools
+      // scroller first. We only stop the same gesture from bubbling into
+      // Reader-level wheel/page navigation handlers.
       event.stopPropagation();
-    },{capture:true,passive:true});
+    },{passive:true});
+
+    shell.addEventListener('mousedown',(event)=>{
+      // Preserve the browser's native middle-button auto-scroll while keeping
+      // the Reader beneath Ask Mark from seeing the middle click.
+      if(event.button===1) event.stopPropagation();
+    });
   }
 
   function bindPremiumEvents() {

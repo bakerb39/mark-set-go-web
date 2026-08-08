@@ -11091,8 +11091,8 @@ function arrangeReaderSidePanels() {
     <nav class="mark-tabs" aria-label="Reader tools and Mark tabs"><button type="button" data-mark-tab="tools" class="active">Reader Tools</button><button type="button" data-mark-tab="selection">Mark</button><button type="button" data-mark-tab="notebook">Notebook</button><button type="button" data-mark-tab="history">History</button></nav>
     <div id="mark-tools-panel" data-mark-panel="tools" class="mark-panel-view">
       <div id="reader-control-core" class="reader-control-section"></div>
-      <details class="reader-control-group reader-tool-settings-panel"><summary><span>Media</span><span class="settings-summary">Music &amp; focus</span></summary><div id="reader-control-media" class="reader-control-group-body"></div></details>
-      <details class="reader-control-group reader-tool-settings-panel"><summary><span>Translation &amp; Word Tools</span><span class="settings-summary">Translate, define, save</span></summary><div id="reader-control-language" class="reader-control-group-body"></div></details>
+      <details class="settings-panel reader-tool-settings-panel"><summary><span>Media</span><span class="settings-summary">Music &amp; focus</span></summary><div id="reader-control-media" class="settings-content reader-control-group-body"></div></details>
+      <details class="settings-panel reader-tool-settings-panel"><summary><span>Translation &amp; Word Tools</span><span class="settings-summary">Translate &amp; define</span></summary><div id="reader-control-language" class="settings-content reader-control-group-body"></div></details>
     </div>
     <div id="mark-selection-panel" data-mark-panel="selection" class="mark-panel-view" hidden></div>
     <div id="mark-notebook-panel" data-mark-panel="notebook" class="mark-panel-view" hidden></div>
