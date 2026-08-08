@@ -1,25 +1,18 @@
-CLASSIC GUIDES — FIRST 10 EVALUATION
+UPLOAD THESE TO public/
 
-Upload:
-- app.js -> public/app.js
-- entire classic-guides folder -> public/classic-guides/
+index.html
+app.js
+classic-guides/  (entire folder)
 
-No index.html change is required.
+IMPORTANT:
+index.html now requests:
+  /app.js?v=9.6.8-classic-guides-first-10
 
-Only two app.js edits:
-1. A 10-item Classic Guide path lookup immediately after greatBooksCatalog.
-2. One conditional Classic Guide link in the existing .great-book-actions markup.
+This forces the browser/CDN to request the new app.js instead of the old
+cached v9.6.4-browser-e2e file.
 
-First 10 non-Bible entries:
-1. The Iliad
-2. The Odyssey
-3. Agamemnon
-4. Aeschylus — Plays
-5. Prometheus Bound
-6. The Eumenides
-7. The Libation Bearers
-8. Aristophanes — Plays
-9. The Birds
-10. The Clouds
-
-All other Great Books rows are unchanged.
+Expected first rows:
+The Iliad   ... Study / Great Ideas | Classic Guide | Grokipedia
+The Odyssey ... Study / Great Ideas | Classic Guide | Grokipedia
+Agamemnon   ... Study / Great Ideas | Classic Guide | Grokipedia
+... through the first 10 non-Bible Great Books.
