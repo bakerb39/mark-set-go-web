@@ -26,7 +26,7 @@
   }
 
   function renderBookGuide(guide) {
-    return `<div class="cg-book-list">${guide.bookGuide.map(b => `<article class="cg-book"><div class="cg-book-num">Book ${b.book}</div><h3>${esc(b.title)}</h3><p>${esc(b.summary)}</p><div class="cg-watch"><strong>Watch for:</strong> ${esc(b.watch)}</div></article>`).join('')}</div>`;
+    return `<div class="cg-book-list">${guide.bookGuide.map(b => `<article class="cg-book"><div class="cg-book-num">Book ${b.book}</div><h3>${esc(b.title)}</h3><p>${esc(b.summary)}</p>${b.keyEvents?.length ? `<h4>Key events</h4><ul>${b.keyEvents.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>` : ''}${b.characters?.length ? `<p><strong>Characters in focus:</strong> ${b.characters.map(esc).join(', ')}</p>` : ''}${b.whyItMatters ? `<div class="cg-info"><strong>Why this book matters:</strong><p>${esc(b.whyItMatters)}</p></div>` : ''}<div class="cg-watch"><strong>Watch for:</strong> ${esc(b.watch)}</div>${b.questions?.length ? `<div class="cg-question-list">${b.questions.map(q=>`<div class="cg-question">${esc(q)}</div>`).join('')}</div>` : ''}</article>`).join('')}</div>`;
   }
 
   function renderGreatIdeas(guide) {
@@ -128,7 +128,7 @@
   }
 
   function render(guide) {
-    host.innerHTML = `<div class="cg-topbar"><div class="cg-topbar-inner"><div class="cg-brand">Mark, Set, Go! <span>Classic Guides</span></div><div class="cg-top-actions"><button class="cg-btn" id="cg-back">← Back to Great Books</button><button class="cg-btn gold" data-tab-open="Key Ideas">Great Ideas</button></div></div></div>
+    host.innerHTML = `<div class="cg-topbar"><div class="cg-topbar-inner"><div class="cg-brand">Mark, Set, Go! <span>Classic Guides</span></div><div class="cg-top-actions"><button class="cg-btn" id="cg-back">← Back to Great Books</button><button class="cg-btn primary" id="cg-read-reader">Read Guide in Reader</button><button class="cg-btn gold" data-tab-open="Key Ideas">Great Ideas</button></div></div></div>
       <main class="cg-shell"><header class="cg-hero"><div class="cg-hero-main"><div class="cg-kicker">${esc(guide.era)} · ${esc(guide.workType)} · Great Books</div><h1>${esc(guide.title)}</h1><div class="cg-author">${esc(guide.author)} · ${esc(guide.subtitle)}</div><p class="cg-dek">${esc(guide.dek)}</p></div>
       <div class="cg-tabs">${['Guide','Key Ideas','Images','Notebook','Ask Mark Chats','Quiz','Action Plan'].map(t => `<button class="cg-tab ${t==='Guide'?'active':''}" data-tab="${esc(t)}">${esc(t)}</button>`).join('')}</div></header>
       <div class="cg-layout" id="cg-layout">${toc(guide)}<section class="cg-main-panel" id="cg-main">${renderGuideTab(guide)}</section>${glance(guide)}</div></main>${modal()}`;
@@ -202,6 +202,7 @@
 
   function bind(guide) {
     document.querySelector('#cg-back')?.addEventListener('click', () => history.back());
+    document.querySelector('#cg-read-reader')?.addEventListener('click', () => { window.location.href = `/?classicGuide=${encodeURIComponent(guide.id)}`; });
     document.querySelectorAll('[data-tab]').forEach(b => b.addEventListener('click', () => setTab(guide,b.dataset.tab)));
     document.querySelectorAll('[data-tab-open]').forEach(b => b.addEventListener('click', () => setTab(guide,b.dataset.tabOpen)));
     document.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => document.querySelector(`#section-${b.dataset.jump}`)?.scrollIntoView({behavior:'smooth'})));

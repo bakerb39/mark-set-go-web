@@ -10228,21 +10228,23 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   // Previously the text was only persisted after actions such as adding a bookmark,
   // allowing cloud metadata to sync while the actual document remained unavailable.
   const documentPersisted = persistCurrentDocument();
-  if (!documentPersisted && source?.type === 'modern-guide') {
-    console.warn('Modern Guide opened without a local text copy; My Library will use the bundled guide fallback when available.');
+  if (!documentPersisted && (source?.type === 'modern-guide' || source?.type === 'classic-guide')) {
+    console.warn(`${source?.type === 'classic-guide' ? 'Classic' : 'Modern'} Guide opened without a local text copy.`);
   }
 
   // Modern Guides are first-class reading items. Register them in My Library
   // as soon as they are opened instead of waiting for a timed reading session
   // or navigation checkpoint to create the first progress record.
-  if (source?.type === 'modern-guide') {
+  if (source?.type === 'modern-guide' || source?.type === 'classic-guide') {
     registerCurrentDocumentInMyLibrary({ opened:true });
-    registerModernGuideLibraryItem({
-      documentId: state.documentId,
-      title: state.title,
-      source: state.source,
-      text: state.currentText
-    });
+    if (source?.type === 'modern-guide') {
+      registerModernGuideLibraryItem({
+        documentId: state.documentId,
+        title: state.title,
+        source: state.source,
+        text: state.currentText
+      });
+    }
   }
 
   document.dispatchEvent(new CustomEvent('marksetgo:document-available', {
@@ -11997,7 +11999,7 @@ function currentCompanionIdentity() {
   let selected = 'mark';
   try { selected = localStorage.getItem('msg_companion_persona_v2') || localStorage.getItem('msg_companion_persona_v1') || 'mark'; } catch {}
   return selected === 'beth'
-    ? { id:'beth', name:'Beth', ask:'Ask Beth', avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9' }
+    ? { id:'beth', name:'Beth', ask:'Ask Beth', avatar:'/assets/companions/beth/beth-avatar.png' }
     : { id:'mark', name:'Mark', ask:'Ask Mark', avatar:'/assets/ask-mark/ask-mark-avatar.png' };
 }
 
@@ -17099,7 +17101,7 @@ function renderMyLibraryHub() {
         <span class="${libraryRecencyClass(item.lastReadAt)}" title="${escapeHtml(libraryRecencyLabel(item.lastReadAt))}">${escapeHtml((item.title || 'B').slice(0, 1).toUpperCase())}</span>
       </button>
       <div class="continue-card-copy">
-        <span class="source-category">${item.source?.type === 'modern-guide' ? (item.source?.customGuide ? 'My Guide' : 'Modern Guide') : (index === 0 ? 'Continue reading' : 'Recent')}</span>
+        <span class="source-category">${item.source?.type === 'modern-guide' ? (item.source?.customGuide ? 'My Guide' : 'Modern Guide') : item.source?.type === 'classic-guide' ? 'Classic Guide' : (index === 0 ? 'Continue reading' : 'Recent')}</span>
         <h3>${escapeHtml(item.title || 'Untitled')}</h3>
         <p>${percent}% complete · Last read ${escapeHtml(lastRead)}</p>
         ${difficulty ? difficultyBadge(difficulty, {title:item.title}) : ''}
@@ -17134,7 +17136,7 @@ function renderMyLibraryHub() {
           ${primaryBook ? `
             <div class="focus-book-cover ${libraryRecencyClass(primaryBook.lastReadAt)}" aria-label="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}" title="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}">${escapeHtml((primaryBook.title || 'B').slice(0,1).toUpperCase())}</div>
             <div class="focus-book-copy">
-              <span class="source-category">${primaryBook.source?.type === 'modern-guide' ? `${primaryBook.source?.customGuide ? 'My Guide' : 'Modern Guide'} · Your next step` : 'Your next step'}</span>
+              <span class="source-category">${primaryBook.source?.type === 'modern-guide' ? `${primaryBook.source?.customGuide ? 'My Guide' : 'Modern Guide'} · Your next step` : primaryBook.source?.type === 'classic-guide' ? 'Classic Guide · Your next step' : 'Your next step'}</span>
               <h2>${escapeHtml(primaryBook.title || 'Continue reading')}</h2>
               <p>${primaryPercent}% complete. Pick up at the exact place you left off.</p>
               ${primaryDifficulty ? difficultyBadge(primaryDifficulty, {title:primaryBook.title}) : ''}
@@ -18236,8 +18238,74 @@ window.setInterval(checkActionNotifications, 30000);
 window.setTimeout(checkActionNotifications, 1500);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkActionNotifications(); });
 
+// Classic Guides can hand directly into the Reader while remaining first-class My Library documents.
+function classicGuideReaderText(guide = {}) {
+  const lines = [
+    `${String(guide.title || 'Classic Guide').toUpperCase()} — CLASSIC GUIDE`,
+    guide.author ? `By ${guide.author}` : '',
+    guide.subtitle || '',
+    '',
+    guide.dek || '',
+    ''
+  ];
+  (guide.sections || []).forEach((section, sectionIndex) => {
+    lines.push(`${sectionIndex + 1}. ${String(section.title || '').toUpperCase()}`, section.intro || '');
+    if (section.special === 'bookGuide') {
+      (guide.bookGuide || []).forEach((book) => {
+        lines.push('', `BOOK ${book.book}: ${String(book.title || '').toUpperCase()}`, book.summary || '');
+        if (book.keyEvents?.length) lines.push('Key events:', ...book.keyEvents.map((x) => `• ${x}`));
+        if (book.characters?.length) lines.push(`Characters in focus: ${book.characters.join(', ')}`);
+        if (book.whyItMatters) lines.push(`Why it matters: ${book.whyItMatters}`);
+        if (book.watch) lines.push(`Watch for: ${book.watch}`);
+        if (book.questions?.length) lines.push('Questions to carry into the text:', ...book.questions.map((x) => `• ${x}`));
+      });
+    } else if (section.special === 'characters') {
+      (guide.characters || []).forEach((c) => lines.push('', `${c.name} — ${c.role}`, c.description || ''));
+    } else if (section.special === 'greatIdeas') {
+      (guide.greatIdeas || []).forEach((idea) => lines.push('', idea.name, idea.summary || '', ...(idea.questions || []).map((q) => `• ${q}`)));
+    } else {
+      lines.push(...(section.paragraphs || []));
+      (section.bullets || []).forEach((b) => lines.push('', b.title || '', b.text || ''));
+      (section.questions || []).forEach((q) => lines.push(`• ${q}`));
+      (section.connections || []).forEach((c) => lines.push('', c.work || '', c.link || ''));
+      (section.debates || []).forEach((d) => lines.push('', d.title || '', d.sides || ''));
+    }
+    if (section.takeaway) lines.push('', `Key idea to remember: ${section.takeaway}`);
+    lines.push('');
+  });
+  return lines.filter((line) => line !== null && line !== undefined).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+async function openClassicGuideFromQuery() {
+  const params = new URLSearchParams(window.location.search || '');
+  const guideId = String(params.get('classicGuide') || '').trim().toLowerCase();
+  if (!guideId) return false;
+  const paths = { iliad:'/classic-guides/data/homer/iliad.json' };
+  const dataPath = paths[guideId];
+  if (!dataPath) return false;
+  try {
+    const response = await fetch(dataPath, { cache:'no-store' });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const guide = await response.json();
+    const text = classicGuideReaderText(guide);
+    renderReaderWithText(`${guide.title} — Mark, Set, Go! Classic Guide`, text, {
+      type:'classic-guide',
+      id:guide.id || guideId,
+      originalTitle:guide.title || '',
+      originalAuthor:guide.author || '',
+      subtitle:guide.subtitle || '',
+      guidePath:`/classic-guides/${guideId}.html`
+    });
+    history.replaceState(null, '', window.location.pathname || '/');
+    return true;
+  } catch (error) {
+    console.error('Classic Guide could not open in Reader.', error);
+    return false;
+  }
+}
+
 // v5.16: startup stays lightweight. The last book is restored only after an explicit Resume action.
-renderHome();
+openClassicGuideFromQuery().then((opened) => { if (!opened) renderHome(); });
 
 // Keep top navigation popovers over the page rather than in document flow.
 (function initializeOverlayNavigation() {
