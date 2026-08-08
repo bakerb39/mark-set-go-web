@@ -340,7 +340,7 @@
         <div><span class="companion-persona-kicker">READING COMPANION</span><h2 id="companion-persona-title">Choose your companion</h2></div>
         <p>Use the same reading, study, notebook, and walkthrough features with Mark or Beth.</p>
       </div>
-      <div class="companion-persona-options" role="radiogroup" aria-label="Reading companion">
+      <div class="companion-persona-options" role="radiogroup" aria-label="Reading companion" data-companion-no-swap>
         <button type="button" data-companion-choice="mark" role="radio"><img src="${MARK_AVATAR}" alt="Mark"><span><strong>Mark</strong><small>Ask Mark</small></span><span class="companion-check">✓</span></button>
         <button type="button" data-companion-choice="beth" role="radio"><img src="${BETH_AVATAR}" alt="Beth"><span><strong>Beth</strong><small>Ask Beth</small></span><span class="companion-check">✓</span></button>
       </div>`;
@@ -374,9 +374,25 @@
 
   function updateProfileControl() {
     document.querySelectorAll('[data-companion-choice]').forEach((btn) => {
-      const selected = btn.dataset.companionChoice === state.id;
+      const id = btn.dataset.companionChoice;
+      const selected = id === state.id;
       btn.classList.toggle('is-selected', selected);
       btn.setAttribute('aria-checked', selected ? 'true' : 'false');
+
+      // These option labels describe the two available personas and must never
+      // be rewritten to match the currently selected persona.
+      const option = config[id];
+      if (option) {
+        const strong = btn.querySelector('strong');
+        const small = btn.querySelector('small');
+        const img = btn.querySelector('img');
+        if (strong) strong.textContent = option.name;
+        if (small) small.textContent = option.ask;
+        if (img) {
+          img.src = option.avatar;
+          img.alt = option.name;
+        }
+      }
     });
   }
 
