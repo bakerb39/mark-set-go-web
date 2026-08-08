@@ -1,4 +1,4 @@
-# Mark, Set, Go! — Classic Guides v1
+# Mark, Set, Go! — Classic Guides v1.2
 
 This patch adds Classic Guides as a self-contained feature and deliberately does NOT edit:
 - app.js
@@ -36,3 +36,26 @@ No CSS link is required; the module loads `/classic-guides.css` itself.
 Some Britannica entries are collections (`Plato, Dialogues`, `Aristotle, Works`, `Shakespeare, Plays`, etc.).
 The scaffold keeps a collection entry where the source does not enumerate every component work.
 As we create guides, those collection records should be split into individual-work records.
+
+
+## v1.1 fix
+The v1 script tried to insert the Browse entry only once at initial page load.
+Because Mark, Set, Go! dynamically renders/re-renders its navigation, the Browse
+control may not exist yet or can later be replaced.
+
+v1.1 adds a MutationObserver that safely restores the Classic Guides entry
+whenever the navigation is rendered. No app.js or reader/right-click code is changed.
+
+
+## v1.2 navigation change
+Classic Guides is no longer injected next to Browse.
+
+It is now attached to the existing Great Books navigation area:
+- Great Books
+- Classic Guides
+
+The module looks first for `[data-action="great-books"]`, then
+`[data-action="greatbooks"]`, and finally an exact visible `Great Books`
+navigation label. It also watches for navigation re-renders.
+
+No reader, playback, bookmark, highlight, or right-click code is modified.

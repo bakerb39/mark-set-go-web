@@ -7,17 +7,70 @@
 
   function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
   async function json(path){ const r=await fetch(path,{cache:'no-store'}); if(!r.ok) throw new Error(`Could not load ${path}`); return r.json(); }
-  function insertBrowseButton(){
-    if(document.querySelector('[data-action="classic-guides"]')) return;
-    const browse = document.querySelector('[data-action="browse"]');
-    if(!browse) return;
+  function insertGreatBooksGuideButton(){
+    if(document.querySelector('[data-action="classic-guides"]')) return true;
+
+    // Prefer the existing Great Books navigation control.
+    const greatBooks =
+      document.querySelector('[data-action="great-books"]') ||
+      document.querySelector('[data-action="greatbooks"]') ||
+      [...document.querySelectorAll('button,a')].find(el =>
+        /^great books$/i.test((el.textContent || '').trim())
+      );
+
+    if(!greatBooks) return false;
+
     const b=document.createElement('button');
-    b.type='button'; b.dataset.action='classic-guides'; b.innerHTML='<span class="menu-icon">⌘</span> Classic Guides';
-    browse.insertAdjacentElement('afterend',b);
+    b.type='button';
+    b.dataset.action='classic-guides';
+    b.innerHTML='<span class="menu-icon">⌘</span> Classic Guides';
+
+    // If Great Books is contained in a dropdown/details menu, keep the new
+    // entry in that same Great Books group. Otherwise place it directly
+    // after the Great Books control as a sibling.
+    const details = greatBooks.closest('details');
+    const menu =
+      details?.querySelector('.dropdown-menu, .menu-dropdown, .menu-panel, [role="menu"]') ||
+      greatBooks.parentElement;
+
+    if (menu && menu !== greatBooks.parentElement) {
+      menu.appendChild(b);
+    } else {
+      greatBooks.insertAdjacentElement('afterend', b);
+    }
+    return true;
+  }
+
+  function keepGreatBooksGuideButtonInstalled(){
+    insertGreatBooksGuideButton();
+
+    // The main app may re-render navigation. Restore the entry if that
+    // happens, without modifying app.js.
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector('[data-action="classic-guides"]')) {
+        insertGreatBooksGuideButton();
+      }
+    });
+
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+
+    window.__classicGuidesNavObserver = observer;
+  }
+    });
+
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true
+    });
+
+    window.__classicGuidesNavObserver = observer;
   }
   function ensureCss(){
     if(document.querySelector('link[data-classic-guides-css]')) return;
-    const l=document.createElement('link'); l.rel='stylesheet'; l.href='/classic-guides.css?v=1.0.0'; l.dataset.classicGuidesCss='1'; document.head.appendChild(l);
+    const l=document.createElement('link'); l.rel='stylesheet'; l.href='/classic-guides.css?v=1.2.0'; l.dataset.classicGuidesCss='1'; document.head.appendChild(l);
   }
   async function openLibrary(){
     ensureCss();
@@ -106,6 +159,6 @@
     e.preventDefault(); e.stopImmediatePropagation(); document.querySelectorAll('details[open]').forEach(d=>d.removeAttribute('open')); openLibrary().catch(err=>{if(app())app().innerHTML=`<p style="padding:30px">Classic Guides could not load: ${esc(err.message)}</p>`});
   },true);
   window.MarkSetGoClassicGuides={open:openLibrary};
-  function init(){ensureCss();insertBrowseButton();}
+  function init(){ensureCss();keepGreatBooksGuideButtonInstalled();}
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init); else init();
 })();
