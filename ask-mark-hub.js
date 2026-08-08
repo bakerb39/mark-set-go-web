@@ -167,12 +167,12 @@
           </label>
           <button type="button" class="askmark-send" data-askmark-send aria-label="Send to Ask Mark">➜</button>
           <div class="askmark-more-menu" data-askmark-more-menu hidden>
-            <button type="button" data-askmark-prompt="Create a study guide for this passage."><span>▤</span><strong>Study guide</strong><small>Use current reading</small></button>
-            <button type="button" data-askmark-prompt="Create flash cards for this passage."><span>▱</span><strong>Flash cards</strong><small>Use current reading</small></button>
-            <button type="button" data-premium-mark-action="context"><span>⌛</span><strong>Historical context</strong><small>Use current reading</small></button>
-            <button type="button" data-askmark-prompt="Identify the key ideas in this passage."><span>✦</span><strong>Key ideas</strong><small>Use current reading</small></button>
-            <button type="button" data-askmark-prompt="Create memory tools for this passage."><span>◇</span><strong>Memory tools</strong><small>Use current reading</small></button>
-            <button type="button" data-askmark-comprehension><span>🧠</span><strong>Comprehension</strong><small>Check your understanding</small></button>
+            <button type="button" data-askmark-prompt="Create a study guide for this passage."><span>▤</span><span class="askmark-more-copy"><strong>Study guide</strong><small>Use current reading</small></span></button>
+            <button type="button" data-askmark-tool="flashcards"><span>▱</span><span class="askmark-more-copy"><strong>Flash cards</strong><small>Flip through review cards</small></span></button>
+            <button type="button" data-premium-mark-action="context"><span>⌛</span><span class="askmark-more-copy"><strong>Historical context</strong><small>Use current reading</small></span></button>
+            <button type="button" data-askmark-prompt="Identify the key ideas in this passage."><span>✦</span><span class="askmark-more-copy"><strong>Key ideas</strong><small>Use current reading</small></span></button>
+            <button type="button" data-askmark-tool="memory"><span>◇</span><span class="askmark-more-copy"><strong>Memory tools</strong><small>Build clear recall anchors</small></span></button>
+            <button type="button" data-askmark-comprehension><span>🧠</span><span class="askmark-more-copy"><strong>Comprehension</strong><small>Check your understanding</small></span></button>
           </div>
         </footer>
       </div>`;
@@ -376,6 +376,161 @@
     }
   }
 
+
+  function currentStudyPassage({ maxChars = 14000 } = {}) {
+    const selected = getSelectionText();
+    if (selected) return {
+      title:getBookContext().title,
+      passage:selected.slice(0, maxChars),
+      source:'selection'
+    };
+
+    const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+    const text = String(current?.text || '').replace(/\s+/g,' ').trim();
+    if (!text) return null;
+
+    // No selection: use a bounded excerpt from the active document rather than
+    // sending an entire large book to a study-tool request.
+    return {
+      title:String(current?.title || getBookContext().title || 'Current reading'),
+      passage:text.slice(0, maxChars),
+      source:'current-reading'
+    };
+  }
+
+  function addStructuredMarkMessage(title, bodyHtml, className = '') {
+    const conversation = $('[data-askmark-conversation]', shell);
+    if (!conversation) return null;
+    const id = `askmark-structured-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
+    conversation.insertAdjacentHTML('beforeend', `
+      <article class="askmark-message mark-message ${className}" id="${id}">
+        <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+        <div>
+          <span>Mark · ${escapeHtml(title)}</span>
+          <div class="askmark-rich-response askmark-study-output">${bodyHtml}</div>
+        </div>
+      </article>`);
+    conversation.scrollTop = conversation.scrollHeight;
+    return document.getElementById(id);
+  }
+
+  function renderFlashcardDeck(cards = [], title = '') {
+    if (!cards.length) return addStructuredMarkMessage('Flash cards', '<p>I could not create useful cards from this reading.</p>');
+
+    const message = addStructuredMarkMessage('Flash cards', `
+      <div class="askmark-deck" data-flashcard-deck>
+        <div class="askmark-deck-heading">
+          <div><strong>${escapeHtml(title || 'Current reading')}</strong><small>Tap the card or use Flip to reveal the answer.</small></div>
+          <span data-flashcard-count>1 / ${cards.length}</span>
+        </div>
+        <button class="askmark-flashcard" type="button" data-flashcard-card aria-label="Flip flash card">
+          <span class="askmark-flashcard-inner">
+            <span class="askmark-flashcard-face askmark-flashcard-front">
+              <small data-flashcard-category></small>
+              <strong data-flashcard-question></strong>
+              <em>Tap to flip</em>
+            </span>
+            <span class="askmark-flashcard-face askmark-flashcard-back">
+              <small>Answer</small>
+              <strong data-flashcard-answer></strong>
+              <em data-flashcard-hint></em>
+            </span>
+          </span>
+        </button>
+        <div class="askmark-deck-controls">
+          <button type="button" class="secondary" data-flashcard-prev>← Previous</button>
+          <button type="button" class="primary" data-flashcard-flip>Flip</button>
+          <button type="button" class="secondary" data-flashcard-next>Next →</button>
+        </div>
+      </div>
+    `, 'askmark-flashcard-message');
+
+    if (!message) return;
+    const deck=message.querySelector('[data-flashcard-deck]');
+    const card=message.querySelector('[data-flashcard-card]');
+    let index=0;
+
+    const draw=()=>{
+      const item=cards[index] || {};
+      card.classList.remove('is-flipped');
+      message.querySelector('[data-flashcard-count]').textContent=`${index+1} / ${cards.length}`;
+      message.querySelector('[data-flashcard-category]').textContent=item.category || 'Review';
+      message.querySelector('[data-flashcard-question]').textContent=item.front || '';
+      message.querySelector('[data-flashcard-answer]').textContent=item.back || '';
+      message.querySelector('[data-flashcard-hint]').textContent=item.hint || '';
+      message.querySelector('[data-flashcard-prev]').disabled=index===0;
+      message.querySelector('[data-flashcard-next]').disabled=index===cards.length-1;
+    };
+    const flip=()=>card.classList.toggle('is-flipped');
+    card.addEventListener('click',flip);
+    message.querySelector('[data-flashcard-flip]').addEventListener('click',flip);
+    message.querySelector('[data-flashcard-prev]').addEventListener('click',()=>{ if(index>0){index-=1;draw();} });
+    message.querySelector('[data-flashcard-next]').addEventListener('click',()=>{ if(index<cards.length-1){index+=1;draw();} });
+    draw();
+  }
+
+  function renderMemoryTools(tools = [], title = '') {
+    if (!tools.length) return addStructuredMarkMessage('Memory tools', '<p>I could not create useful memory anchors from this reading.</p>');
+    addStructuredMarkMessage('Memory tools', `
+      <div class="askmark-memory-tools">
+        <div class="askmark-memory-heading">
+          <strong>${escapeHtml(title || 'Current reading')}</strong>
+          <small>Use these as recall anchors—not as substitutes for understanding the text.</small>
+        </div>
+        ${tools.map((item,index)=>`
+          <details class="askmark-memory-card" ${index===0?'open':''}>
+            <summary>
+              <span class="askmark-memory-number">${index+1}</span>
+              <span><strong>${escapeHtml(item.label || 'Memory anchor')}</strong><small>${escapeHtml(item.target || '')}</small></span>
+              <span aria-hidden="true">›</span>
+            </summary>
+            <div class="askmark-memory-body">
+              <div><small>Remember</small><p>${escapeHtml(item.remember || '')}</p></div>
+              <div><small>Anchor</small><p>${escapeHtml(item.anchor || '')}</p></div>
+              <div><small>Why it helps</small><p>${escapeHtml(item.why || '')}</p></div>
+              <div class="askmark-memory-test"><small>Self-test</small><p>${escapeHtml(item.test || '')}</p></div>
+            </div>
+          </details>`).join('')}
+      </div>
+    `, 'askmark-memory-message');
+  }
+
+  async function runStudyTool(tool) {
+    const menu=$('[data-askmark-more-menu]',shell);
+    if(menu) menu.hidden=true;
+
+    const context=currentStudyPassage();
+    const label=tool==='flashcards' ? 'Create visual flash cards.' : 'Create memory tools.';
+    addUserMessage(label);
+
+    if(!context?.passage){
+      const thinking=addThinkingMessage();
+      if(thinking) thinking.querySelector('p').textContent='Open a book or highlight a passage first.';
+      return;
+    }
+
+    const thinking=addThinkingMessage();
+    try {
+      const endpoint=tool==='flashcards' ? '/api/flashcards' : '/api/memory-tools';
+      const response=await fetch(endpoint,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({title:context.title,passage:context.passage})
+      });
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok) throw new Error(payload.error || payload.detail || `HTTP ${response.status}`);
+
+      thinking?.remove();
+      if(tool==='flashcards') renderFlashcardDeck(payload.cards || [],context.title);
+      else renderMemoryTools(payload.tools || [],context.title);
+    } catch(error) {
+      if(thinking) {
+        thinking.classList.remove('is-thinking');
+        thinking.querySelector('p').textContent=error?.message || 'I could not create that study tool.';
+      }
+    }
+  }
+
   function bindPremiumEvents() {
     $('[data-askmark-close]', shell)?.addEventListener('click', () => $('#toggle-mark-panel')?.click());
     $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
@@ -430,6 +585,10 @@
       $('[data-askmark-more-menu]', shell)?.setAttribute('hidden', '');
       window.MarkSetGoStartComprehension?.();
     });
+
+    $$('[data-askmark-tool]', shell).forEach((button) => button.addEventListener('click', () => {
+      runStudyTool(button.dataset.askmarkTool);
+    }));
 
     $$('[data-askmark-prompt]', shell).forEach((button) => button.addEventListener('click', () => {
       $('[data-askmark-more-menu]', shell).hidden = true;

@@ -1471,6 +1471,86 @@ Keep each section compact and useful before or during reading.`;
 
 
 
+
+app.post('/api/flashcards', async (req, res) => {
+  const apiKey=String(process.env.OPENAI_API_KEY||'').trim();
+  if(!apiKey) return res.status(503).json({error:'Flash card generation is not configured.'});
+
+  const title=String(req.body?.title||'Current reading').trim().slice(0,300);
+  const passage=String(req.body?.passage||'').replace(/\s+/g,' ').trim().slice(0,18000);
+  if(!passage) return res.status(400).json({error:'No readable text was supplied.'});
+
+  const schema={type:'object',additionalProperties:false,required:['cards'],properties:{
+    cards:{type:'array',minItems:5,maxItems:10,items:{type:'object',additionalProperties:false,required:['front','back','category','hint'],properties:{
+      front:{type:'string'},back:{type:'string'},category:{type:'string'},hint:{type:'string'}
+    }}}
+  }};
+
+  const instructions=`Create a compact set of high-quality study flash cards for "${title}" using only the supplied reading.
+Prefer important ideas, relationships, arguments, names, definitions, chronology, and cause/effect over trivia.
+Each front must be a clear retrieval question or cue. Each back must be concise enough to review quickly but complete enough to teach.
+Avoid duplicate cards, vague prompts, and questions about the guide/app itself unless that is genuinely the subject of the reading.
+The hint should be a short retrieval cue that does not simply reveal the answer.`;
+
+  try {
+    const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({
+      model:COMPREHENSION_MODEL,reasoning:{effort:'low'},store:false,
+      input:[{role:'developer',content:[{type:'input_text',text:instructions}]},{role:'user',content:[{type:'input_text',text:passage}]}],
+      text:{format:{type:'json_schema',name:'reading_flashcards',strict:true,schema}}
+    })});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok) return res.status(502).json({error:'Unable to create flash cards.',detail:payload?.error?.message||`HTTP ${response.status}`});
+    const outputText=extractOpenAIOutputText(payload);
+    if(!outputText) throw new Error('No structured flash card response.');
+    res.json(JSON.parse(outputText));
+  } catch(error) {
+    console.error('Flash card generation failed:',error);
+    res.status(502).json({error:'Unable to create flash cards.'});
+  }
+});
+
+app.post('/api/memory-tools', async (req, res) => {
+  const apiKey=String(process.env.OPENAI_API_KEY||'').trim();
+  if(!apiKey) return res.status(503).json({error:'Memory tool generation is not configured.'});
+
+  const title=String(req.body?.title||'Current reading').trim().slice(0,300);
+  const passage=String(req.body?.passage||'').replace(/\s+/g,' ').trim().slice(0,18000);
+  if(!passage) return res.status(400).json({error:'No readable text was supplied.'});
+
+  const schema={type:'object',additionalProperties:false,required:['tools'],properties:{
+    tools:{type:'array',minItems:3,maxItems:6,items:{type:'object',additionalProperties:false,required:['label','target','remember','anchor','why','test'],properties:{
+      label:{type:'string'},target:{type:'string'},remember:{type:'string'},anchor:{type:'string'},why:{type:'string'},test:{type:'string'}
+    }}}
+  }};
+
+  const instructions=`Create practical memory tools for a reader studying "${title}", grounded only in the supplied reading.
+Do not produce a generic list of mnemonic techniques. Instead identify the few things in this passage actually worth retaining.
+For each:
+- label: a short memorable name
+- target: what knowledge it helps retain
+- remember: the fact/idea/relationship in concise language
+- anchor: one vivid but academically appropriate association, acronym, contrast, sequence, image, or chunking device
+- why: one sentence explaining why the anchor maps correctly to the reading
+- test: a short retrieval question the reader can answer later without looking
+Make the output easy to scan and useful for serious study. Avoid forced or silly mnemonics when a simple conceptual anchor is better.`;
+
+  try {
+    const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({
+      model:COMPREHENSION_MODEL,reasoning:{effort:'low'},store:false,
+      input:[{role:'developer',content:[{type:'input_text',text:instructions}]},{role:'user',content:[{type:'input_text',text:passage}]}],
+      text:{format:{type:'json_schema',name:'reading_memory_tools',strict:true,schema}}
+    })});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok) return res.status(502).json({error:'Unable to create memory tools.',detail:payload?.error?.message||`HTTP ${response.status}`});
+    const outputText=extractOpenAIOutputText(payload);
+    if(!outputText) throw new Error('No structured memory-tool response.');
+    res.json(JSON.parse(outputText));
+  } catch(error) {
+    console.error('Memory tool generation failed:',error);
+    res.status(502).json({error:'Unable to create memory tools.'});
+  }
+});
+
 app.post('/api/mnemonics', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) return res.status(503).json({ error:'Mnemonic generation is not configured.' });
