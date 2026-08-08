@@ -14,7 +14,7 @@
     if (live?.id) return live;
     const selected = localStorage.getItem(COMPANION_STORAGE_KEY) || localStorage.getItem('msg_companion_persona_v1') || 'mark';
     return selected === 'beth'
-      ? { id:'beth', name:'Beth', ask:'Ask Beth', notebook:"Beth's Notebook", avatar:'/assets/companions/beth/beth-universal-v1.png' }
+      ? { id:'beth', name:'Beth', ask:'Ask Beth', notebook:"Beth's Notebook", avatar:'/assets/companions/beth/beth-avatar.png?v=9.6.8' }
       : { id:'mark', name:'Mark', ask:'Ask Mark', notebook:"Mark's Notebook", avatar:'/assets/ask-mark/ask-mark-avatar.png' };
   };
   const companionName = () => companionConfig().name;

@@ -11997,7 +11997,7 @@ function currentCompanionIdentity() {
   let selected = 'mark';
   try { selected = localStorage.getItem('msg_companion_persona_v2') || localStorage.getItem('msg_companion_persona_v1') || 'mark'; } catch {}
   return selected === 'beth'
-    ? { id:'beth', name:'Beth', ask:'Ask Beth', avatar:'/assets/companions/beth/beth-universal-v1.png' }
+    ? { id:'beth', name:'Beth', ask:'Ask Beth', avatar:'/assets/companions/beth/beth-avatar.png?v=9.6.8' }
     : { id:'mark', name:'Mark', ask:'Ask Mark', avatar:'/assets/ask-mark/ask-mark-avatar.png' };
 }
 

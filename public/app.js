@@ -297,11 +297,6 @@ const ReaderContinuity = {
                 originalAuthor:(snapshot.source || state.source)?.originalAuthor || '',
                 customGuide:Boolean((snapshot.source || state.source)?.customGuide),
                 buyUrl:(snapshot.source || state.source)?.buyUrl || '',
-                guideKind:(snapshot.source || state.source)?.guideKind || '',
-                classicGuideQuery:(snapshot.source || state.source)?.classicGuideQuery || '',
-                classicGuideVolume:(snapshot.source || state.source)?.classicGuideVolume || null,
-                classicGuidePath:(snapshot.source || state.source)?.classicGuidePath || '',
-                subtitle:(snapshot.source || state.source)?.subtitle || '',
                 guideInteractions:(snapshot.source || state.source)?.guideInteractions || null
               }
             : snapshot.source || state.source || existing.source
@@ -3030,177 +3025,21 @@ const greatBooksCatalog = [
   }
 ];
 
-const CLASSIC_GUIDES = Object.freeze({
-  'Iliad Homer': {
-    id:'iliad',
-    title:'The Iliad',
-    author:'Homer',
-    textPath:'/texts/classic-guides/iliad-guide.txt',
-    greatIdea:'War',
-    actionTitle:'Write a one-page reflection on rage, honor, and pity in The Iliad',
-    actionNote:'Choose one scene from Books 1, 6, 9, 16, 18, 22, or 24. Explain how the scene changes your understanding of rage, honor, mortality, or pity, then connect it to one other Great Book.'
-  },
-  'Odyssey Homer': {
-    id:'odyssey',
-    title:'The Odyssey',
-    author:'Homer',
-    textPath:'/texts/classic-guides/odyssey-guide.txt',
-    greatIdea:'Prudence',
-    actionTitle:'Compare one Odyssey homecoming test with a modern test of character',
-    actionNote:'Choose one episode involving disguise, hospitality, temptation, or recognition. Explain what it reveals about identity and practical wisdom.'
-  },
-  'Aeschylus Agamemnon': {
-    id:'agamemnon',
-    title:'Agamemnon',
-    author:'Aeschylus',
-    textPath:'/texts/classic-guides/agamemnon-guide.txt',
-    greatIdea:'Justice',
-    actionTitle:'Trace one act of vengeance in Agamemnon',
-    actionNote:'Identify the injury being answered, the justification offered, and the new injustice created by the retaliation.'
-  },
-  'Aeschylus plays': {
-    id:'aeschylus-plays',
-    title:'Plays',
-    author:'Aeschylus',
-    textPath:'/texts/classic-guides/aeschylus-plays-guide.txt',
-    greatIdea:'Justice',
-    actionTitle:'Map the movement from vengeance toward law in Aeschylus',
-    actionNote:'Use one or more plays to trace how private retaliation becomes a problem for civic order.'
-  },
-  'Aeschylus Prometheus Bound': {
-    id:'prometheus-bound',
-    title:'Prometheus Bound',
-    author:'Aeschylus',
-    textPath:'/texts/classic-guides/prometheus-bound-guide.txt',
-    greatIdea:'Freedom',
-    actionTitle:'Write a short argument about Prometheus and political resistance',
-    actionNote:'Decide whether Prometheus is best understood as benefactor, rebel, martyr, or dangerous challenger to authority, and defend the choice.'
-  },
-  'Aeschylus Eumenides': {
-    id:'eumenides',
-    title:'The Eumenides',
-    author:'Aeschylus',
-    textPath:'/texts/classic-guides/eumenides-guide.txt',
-    greatIdea:'Justice',
-    actionTitle:'Compare blood vengeance with civic trial in The Eumenides',
-    actionNote:'List what the trial system gains, what it suppresses, and why reconciliation requires more than a verdict.'
-  },
-  'Aeschylus Libation Bearers': {
-    id:'libation-bearers',
-    title:'The Libation Bearers',
-    author:'Aeschylus',
-    textPath:'/texts/classic-guides/libation-bearers-guide.txt',
-    greatIdea:'Duty',
-    actionTitle:'Examine Orestes’ conflicting duties',
-    actionNote:'Identify what Orestes owes to father, mother, gods, family, and justice. Explain why no option leaves him morally clean.'
-  },
-  'Aristophanes plays': {
-    id:'aristophanes-plays',
-    title:'Plays',
-    author:'Aristophanes',
-    textPath:'/texts/classic-guides/aristophanes-plays-guide.txt',
-    greatIdea:'Liberty',
-    actionTitle:'Identify one political function of comedy in Aristophanes',
-    actionNote:'Choose a comic device and explain how ridicule becomes a way of criticizing war, education, politics, or public speech.'
-  },
-  'Aristophanes Birds': {
-    id:'the-birds',
-    title:'The Birds',
-    author:'Aristophanes',
-    textPath:'/texts/classic-guides/the-birds-guide.txt',
-    greatIdea:'Government',
-    actionTitle:'Trace how utopia becomes power in The Birds',
-    actionNote:'Identify the moment the imagined alternative begins to reproduce the domination it was meant to escape.'
-  },
-  'Aristophanes Clouds': {
-    id:'the-clouds',
-    title:'The Clouds',
-    author:'Aristophanes',
-    textPath:'/texts/classic-guides/the-clouds-guide.txt',
-    greatIdea:'Education',
-    actionTitle:'Write a short comparison of education and rhetoric in The Clouds',
-    actionNote:'Explain what Aristophanes fears about clever speech when it becomes detached from character, custom, or justice.'
-  }
+const CLASSIC_GUIDE_PATHS = Object.freeze({
+  'Iliad Homer': '/classic-guides/iliad.html',
+  'Odyssey Homer': '/classic-guides/odyssey.html',
+  'Aeschylus Agamemnon': '/classic-guides/agamemnon.html',
+  'Aeschylus plays': '/classic-guides/aeschylus-plays.html',
+  'Aeschylus Prometheus Bound': '/classic-guides/prometheus-bound.html',
+  'Aeschylus Eumenides': '/classic-guides/eumenides.html',
+  'Aeschylus Libation Bearers': '/classic-guides/libation-bearers.html',
+  'Aristophanes plays': '/classic-guides/aristophanes-plays.html',
+  'Aristophanes Birds': '/classic-guides/the-birds.html',
+  'Aristophanes Clouds': '/classic-guides/the-clouds.html'
 });
 
-function classicGuideForGreatBook(book) {
-  return CLASSIC_GUIDES[String(book?.query || '')] || null;
-}
-
-async function openClassicGuideInReader(book, trigger = null) {
-  const guide = classicGuideForGreatBook(book);
-  if (!guide) return;
-
-  const originalLabel = trigger?.textContent || 'Classic Guide';
-  if (trigger) {
-    trigger.disabled = true;
-    trigger.textContent = 'Opening guide…';
-  }
-
-  try {
-    const response = await fetch(guide.textPath, { cache:'no-store' });
-    if (!response.ok) throw new Error(`Could not load the ${guide.title} Classic Guide.`);
-    const text = await response.text();
-    if (!String(text || '').trim()) throw new Error(`The ${guide.title} Classic Guide is empty.`);
-
-    renderReaderWithText(`${guide.title} — Mark, Set, Go! Classic Guide`, text, {
-      type:'modern-guide',
-      guideKind:'classic',
-      id:`classic-${guide.id}`,
-      originalTitle:guide.title,
-      originalAuthor:guide.author,
-      classicGuideQuery:String(book?.query || ''),
-      classicGuideVolume:Number(book?.volume) || null,
-      classicGuidePath:guide.textPath,
-      subtitle:`An independent Classic Guide to ${guide.title}`,
-      guideInteractions:{
-        greatIdea:guide.greatIdea || 'Education',
-        actionTitle:guide.actionTitle || `Reflect on one Great Idea in ${guide.title}`,
-        actionType:'reflection',
-        dueDays:3,
-        dueHour:19,
-        priority:'normal',
-        repeat:'none',
-        reminder:'day1',
-        actionNote:guide.actionNote || `Choose one important idea from ${guide.title} and connect it to another Great Book.`
-      }
-    });
-  } catch (error) {
-    window.alert(error?.message || 'The Classic Guide could not be opened.');
-    if (trigger) {
-      trigger.disabled = false;
-      trigger.textContent = originalLabel;
-    }
-  }
-}
-
-function bindClassicGuideReaderLinks(source = state?.source || {}) {
-  if (source?.type !== 'modern-guide' || source?.guideKind !== 'classic') return;
-
-  app.querySelector('#classic-guide-original-work')?.addEventListener('click', (event) => {
-    event.preventDefault();
-    const title = source.originalTitle || '';
-    renderGreatBooksLibrary();
-    requestAnimationFrame(() => {
-      const filter = app.querySelector('#great-books-filter');
-      if (!filter) return;
-      filter.value = title;
-      filter.dispatchEvent(new Event('input', { bubbles:true }));
-      const card = Array.from(app.querySelectorAll('[data-great-book-card]')).find((item) => !item.hidden);
-      card?.closest('details')?.setAttribute('open','');
-      card?.scrollIntoView({ behavior:'smooth', block:'center' });
-    });
-  });
-
-  app.querySelector('#classic-guide-great-ideas')?.addEventListener('click', (event) => {
-    event.preventDefault();
-    openModernGuideGreatIdea(source);
-  });
-
-  app.querySelector('#classic-guide-library')?.addEventListener('click', (event) => {
-    event.preventDefault();
-    renderGreatBooksLibrary();
-  });
+function classicGuidePathForGreatBook(book) {
+  return CLASSIC_GUIDE_PATHS[String(book?.query || '')] || '';
 }
 
 // Reader state is owned by ReaderEngine (Sprint 1).
@@ -5064,7 +4903,7 @@ function renderComprehensionLibrary() {
           const last = latestByBook.get(book.documentId);
           const pct = book.totalWords ? Math.min(100,Math.round((Number(book.furthestWord)||0)/Number(book.totalWords)*100)) : 0;
           return `<article class="learning-book-card">
-            <span class="source-category">${book.source?.type === 'modern-guide' ? (book.source?.guideKind === 'classic' ? 'Classic Guide' : 'Guide') : 'Book'}</span>
+            <span class="source-category">${book.source?.type === 'modern-guide' ? 'Guide' : 'Book'}</span>
             <h2>${escapeHtml(book.title)}</h2>
             <p>${pct}% read${last ? ` · Last quiz ${last.scorePercent}%` : ' · No quiz yet'}</p>
             <button class="primary" type="button" data-book-quiz="${escapeHtml(book.documentId)}">Start quiz</button>
@@ -5269,7 +5108,7 @@ function renderLearningCoursesPage() {
 
       <div class="learning-course-books">
         ${books.length ? books.map((book) => `<article class="learning-course-book">
-          <div><span class="source-category">${book.source?.type === 'modern-guide' ? (book.source?.guideKind === 'classic' ? 'Classic Guide' : 'Guide') : 'Reading'}</span><h2>${escapeHtml(book.title)}</h2></div>
+          <div><span class="source-category">${book.source?.type === 'modern-guide' ? 'Guide' : 'Reading'}</span><h2>${escapeHtml(book.title)}</h2></div>
           <div class="learning-provider-links">
             ${learningCourseLinks(book.source?.originalTitle || book.title).map((provider) =>
               `<a class="secondary button-link" href="${escapeHtml(provider.url)}" target="_blank" rel="noopener noreferrer" data-learning-course-provider="${escapeHtml(provider.name)}" data-learning-course-book="${escapeHtml(book.documentId)}" data-learning-course-title="${escapeHtml(book.title)}"><strong>${escapeHtml(provider.name)}</strong><small>${escapeHtml(provider.label)}</small></a>`
@@ -5942,11 +5781,6 @@ function finalizeReadingSession() {
           originalAuthor:state.source?.originalAuthor || '',
           customGuide:Boolean(state.source?.customGuide),
           buyUrl:state.source?.buyUrl || '',
-          guideKind:state.source?.guideKind || '',
-          classicGuideQuery:state.source?.classicGuideQuery || '',
-          classicGuideVolume:state.source?.classicGuideVolume || null,
-          classicGuidePath:state.source?.classicGuidePath || '',
-          subtitle:state.source?.subtitle || '',
           guideInteractions:state.source?.guideInteractions || null
         }
       : state.source
@@ -7430,11 +7264,6 @@ function registerCurrentDocumentInMyLibrary({ opened = false } = {}) {
             originalAuthor:state.source?.originalAuthor || '',
             customGuide:Boolean(state.source?.customGuide),
             buyUrl:state.source?.buyUrl || '',
-            guideKind:state.source?.guideKind || '',
-            classicGuideQuery:state.source?.classicGuideQuery || '',
-            classicGuideVolume:state.source?.classicGuideVolume || null,
-            classicGuidePath:state.source?.classicGuidePath || '',
-            subtitle:state.source?.subtitle || '',
             guideInteractions:state.source?.guideInteractions || null
           }
         : state.source
@@ -10072,7 +9901,7 @@ function openModernGuideContextInAskMark(markerIndex) {
     title: state.title || source.originalTitle || 'Modern Guide',
     chapter: tocTitleForWordIndex(context.startIndex) || '',
     createdAt: new Date().toISOString(),
-    origin: source?.guideKind === 'classic' ? 'classic-guide-section' : 'modern-guide-section'
+    origin: 'modern-guide-section'
   };
 
   state.markSelection = selection;
@@ -10425,8 +10254,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       <div class="reader-title-row">
         <div class="reader-title-copy">
           <h1>${escapeHtml(title)}</h1>
-          ${source?.type === 'modern-guide' ? `<div class="modern-guide-reader-note"><span>${source?.guideKind === 'classic' ? 'Classic Guide · Independent educational companion' : 'Independent educational guide'}</span>${source?.originalAuthor ? `<span>Original book by ${escapeHtml(source.originalAuthor)}</span>` : ''}${source?.guideKind !== 'classic' && source?.buyUrl ? `<a href="${escapeHtml(source.buyUrl)}" target="_blank" rel="noopener noreferrer">Buy original on Amazon ↗</a>` : ''}</div>` : ''}
-          <div class="reader-title-links">${source?.guideKind === 'classic' ? `<a id="classic-guide-original-work" href="#">Original Work</a><a id="classic-guide-great-ideas" href="#">Great Ideas</a><a id="classic-guide-library" href="#">Great Books Library</a>` : ''}<a id="grokipedia-book-link" href="${grokipediaSearchUrl(source?.originalTitle || title)}" target="_blank" rel="noopener noreferrer">Read about this book on Grokipedia</a></div>
+          ${source?.type === 'modern-guide' ? `<div class="modern-guide-reader-note"><span>Independent educational guide</span>${source?.originalAuthor ? `<span>Original book by ${escapeHtml(source.originalAuthor)}</span>` : ''}${source?.buyUrl ? `<a href="${escapeHtml(source.buyUrl)}" target="_blank" rel="noopener noreferrer">Buy original on Amazon ↗</a>` : ''}</div>` : ''}
+          <div class="reader-title-links"><a id="grokipedia-book-link" href="${grokipediaSearchUrl(source?.originalTitle || title)}" target="_blank" rel="noopener noreferrer">Read about this book on Grokipedia</a></div>
         </div>
         <div class="reader-music-actions" aria-label="Music for this reading">
           <label class="preferred-music-control media-match-control"><span>Media match</span><select id="media-match-select">${mediaMatchOptionsMarkup()}</select></label>
@@ -10694,7 +10523,6 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   arrangeReaderSidePanels();
   bindAppearance(reader);
   bindReaderMusicControls(title, text, source);
-  bindClassicGuideReaderLinks(source);
   bindReaderFullscreen(readerFrame, fullscreenButton);
   bindFullscreenOptions(readerFrame);
   bindReaderPaneControls();
@@ -12169,7 +11997,7 @@ function currentCompanionIdentity() {
   let selected = 'mark';
   try { selected = localStorage.getItem('msg_companion_persona_v2') || localStorage.getItem('msg_companion_persona_v1') || 'mark'; } catch {}
   return selected === 'beth'
-    ? { id:'beth', name:'Beth', ask:'Ask Beth', avatar:'/assets/companions/beth/beth-universal-v1.png' }
+    ? { id:'beth', name:'Beth', ask:'Ask Beth', avatar:'/assets/companions/beth/beth-avatar.png?v=9.6.8' }
     : { id:'mark', name:'Mark', ask:'Ask Mark', avatar:'/assets/ask-mark/ask-mark-avatar.png' };
 }
 
@@ -15159,7 +14987,7 @@ function renderGreatBooksLibrary() {
                 <div class="great-book-actions">
                   <button class="primary" type="button" data-load-great-book="${escapeHtml(book.query)}">Find &amp; Import Edition</button>
                   <button class="secondary" type="button" data-study-great-book="${escapeHtml(book.query)}">Study / Great Ideas</button>
-                  ${classicGuideForGreatBook(book) ? `<button class="secondary" type="button" data-open-classic-guide="${escapeHtml(book.query)}">Classic Guide</button>` : ''}
+                  ${classicGuidePathForGreatBook(book) ? `<a class="secondary button-link" href="${escapeHtml(classicGuidePathForGreatBook(book))}">Classic Guide</a>` : ''}
                   <a class="secondary button-link" href="${greatBookGrokipediaUrl(book)}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
                 </div>
                 <p class="status book-load-status"></p>
@@ -15198,12 +15026,6 @@ function renderGreatBooksLibrary() {
     button.addEventListener('click', () => {
       const item = greatBooksCatalog.find((book) => book.query === button.dataset.studyGreatBook);
       if (item) renderGreatBookStudy(item, button);
-    });
-  });
-  app.querySelectorAll('[data-open-classic-guide]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const item = greatBooksCatalog.find((book) => book.query === button.dataset.openClassicGuide);
-      if (item) openClassicGuideInReader(item, button);
     });
   });
 }
@@ -17068,19 +16890,6 @@ window.addEventListener('marksetgo:auth-ready', scheduleLibraryPersonalization);
 async function loadBundledModernGuideDocument(source = {}) {
   const id = String(source?.id || '').trim();
   if (!id) return null;
-
-  if (source?.guideKind === 'classic' && source?.classicGuidePath) {
-    const response = await fetch(source.classicGuidePath, { cache:'no-store' });
-    if (!response.ok) return null;
-    const text = await response.text();
-    if (!text.trim()) return null;
-    return {
-      title:`${source.originalTitle || 'Classic Guide'} — Mark, Set, Go! Classic Guide`,
-      text,
-      source:{ ...source }
-    };
-  }
-
   const shelfItem = MODERN_GUIDE_SHELF.find((item) => item.id === id && item.active);
   if (!shelfItem) return null;
 
@@ -17290,7 +17099,7 @@ function renderMyLibraryHub() {
         <span class="${libraryRecencyClass(item.lastReadAt)}" title="${escapeHtml(libraryRecencyLabel(item.lastReadAt))}">${escapeHtml((item.title || 'B').slice(0, 1).toUpperCase())}</span>
       </button>
       <div class="continue-card-copy">
-        <span class="source-category">${item.source?.type === 'modern-guide' ? (item.source?.guideKind === 'classic' ? 'Classic Guide' : (item.source?.customGuide ? 'My Guide' : 'Modern Guide')) : (index === 0 ? 'Continue reading' : 'Recent')}</span>
+        <span class="source-category">${item.source?.type === 'modern-guide' ? (item.source?.customGuide ? 'My Guide' : 'Modern Guide') : (index === 0 ? 'Continue reading' : 'Recent')}</span>
         <h3>${escapeHtml(item.title || 'Untitled')}</h3>
         <p>${percent}% complete · Last read ${escapeHtml(lastRead)}</p>
         ${difficulty ? difficultyBadge(difficulty, {title:item.title}) : ''}
@@ -17325,7 +17134,7 @@ function renderMyLibraryHub() {
           ${primaryBook ? `
             <div class="focus-book-cover ${libraryRecencyClass(primaryBook.lastReadAt)}" aria-label="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}" title="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}">${escapeHtml((primaryBook.title || 'B').slice(0,1).toUpperCase())}</div>
             <div class="focus-book-copy">
-              <span class="source-category">${primaryBook.source?.type === 'modern-guide' ? `${primaryBook.source?.guideKind === 'classic' ? 'Classic Guide' : (primaryBook.source?.customGuide ? 'My Guide' : 'Modern Guide')} · Your next step` : 'Your next step'}</span>
+              <span class="source-category">${primaryBook.source?.type === 'modern-guide' ? `${primaryBook.source?.customGuide ? 'My Guide' : 'Modern Guide'} · Your next step` : 'Your next step'}</span>
               <h2>${escapeHtml(primaryBook.title || 'Continue reading')}</h2>
               <p>${primaryPercent}% complete. Pick up at the exact place you left off.</p>
               ${primaryDifficulty ? difficultyBadge(primaryDifficulty, {title:primaryBook.title}) : ''}

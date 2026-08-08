@@ -12,8 +12,8 @@
     },
     beth: {
       id: 'beth', name: 'Beth', ask: 'Ask Beth', notebook: "Beth's Notebook",
-      avatar: '/assets/companions/beth/beth-universal-v1.png',
-      home: '/assets/companions/beth/beth-universal-v1.png'
+      avatar: '/assets/companions/beth/beth-avatar.png?v=9.6.8',
+      home: '/assets/companions/beth/beth-frontpage-badge.png?v=9.6.8'
     }
   };
 
