@@ -1,12 +1,3 @@
-INTERACTIVE TOOLS
-Use the Modern Guide toolbar while reading:
-• Ask Mark about this section — discusses the passage around your current reading position.
-• Discuss key ideas — opens Ask Mark with a guide-specific coaching prompt.
-• Take guide quiz — opens a six-question comprehension check.
-• Build action plan — opens the Action Center with a suggested experiment already filled in.
-• Explore Great Ideas — opens the Syntopicon with a related Great Idea selected.
-• Buy original — opens an Amazon search for the original book.
-
 ATOMIC HABITS
 An Independent Mark, Set, Go! Reading Guide
 Inspired by the ideas in James Clear's Atomic Habits
@@ -16,6 +7,8 @@ This is an independently written educational reading guide designed for Mark, Se
 
 Suggested use
 Read straight through once for understanding. Then revisit sections 8 through 12 while planning your own habit system. Use Ask Mark to quiz yourself, test examples, and turn the ideas into concrete routines.
+
+[[MSG:BUY]]
 
 1. Why Tiny Changes Matter
 
@@ -31,9 +24,6 @@ That is why bad habits are also dangerous. They often appear harmless in the mom
 
 The practical lesson is reassuring. Improvement does not require heroic intensity every day. It requires consistent direction. Small habits matter because they are easier to repeat, easier to recover, and easier to fit into ordinary life. Ordinary life, not perfect life, is where lasting change occurs.
 
-Reflection
-What area of life would improve most if you made a tiny positive change and repeated it for a year?
-
 2. Goals Help, But Systems Carry the Weight
 
 Goals are not useless. They provide direction. If you do not know what you want, it is difficult to decide what to practice. But goals alone are often overvalued because they focus attention on the result rather than the repeatable process that creates the result.
@@ -47,8 +37,6 @@ A system says, “I study in a distraction-free block from seven to eight each e
 The distinction matters because the system tells you what to do on an ordinary Tuesday. Goals are often exciting at the beginning and irrelevant in the middle. Systems are what remain when the novelty has faded.
 
 Goals can also create strange emotional effects. When a person reaches the goal, motivation can disappear. If the goal was “run a 5K,” the runner may stop training once the race is over. If the goal was “clean the office,” the clutter may gradually return because no continuing system exists. The deeper issue was never the one-time result. It was the need for an ongoing pattern.
-
-A healthy approach is to let goals provide orientation while allowing systems to dominate execution. Ask not only, “What do I want?” but also, “What routine would naturally produce it?” When you find the routine, you have found something more useful than inspiration.
 
 Application prompt
 Rewrite one of your current goals as a system. Example: instead of “improve comprehension,” write “after each reading session I answer three recall questions in Mark, Set, Go!”
@@ -92,7 +80,7 @@ Suppose you leave a book on the pillow in the morning. At night you see the book
 
 Understanding this cycle makes habits less mysterious. Good habits are often those whose cues are visible, whose behavior is easy enough to perform, and whose reward arrives soon enough to reinforce repetition. Bad habits often exploit the same structure more aggressively. A phone buzzes. Curiosity spikes. You check it. You receive stimulation. The cycle becomes familiar.
 
-When trying to build or break a habit, look for the loop. What starts it? What makes it attractive? What behavior follows? What reward keeps it alive? Once you can name those parts, you can redesign them.
+[[MSG:DISCUSS]]
 
 5. The First Law: Make It Obvious
 
@@ -116,9 +104,6 @@ Social environment also shapes attractiveness. We are drawn toward what feels no
 
 Attraction does not require false hype. It means helping the mind see the benefit more vividly. A person who remembers how calm and satisfied they feel after reading before bed is more likely to repeat it than a person who frames reading as mere discipline. The more clearly you connect the habit to a desired experience, the easier it becomes to want it.
 
-Prompt
-How can you make your most important habit feel more inviting before it begins?
-
 7. The Third Law: Make It Easy
 
 People frequently overestimate the role of motivation and underestimate the role of friction. A behavior can be desirable in principle and still fail in practice because too many small obstacles stand in the way.
@@ -140,6 +125,8 @@ That is why immediate satisfaction can help. A check mark on a tracker, a brief 
 Tracking is especially powerful when used simply. You do not need a perfect system. You need something visible enough to remind you that the behavior happened. Even saying “done” in a notebook can reinforce identity and progress.
 
 However, be careful not to worship the metric. The goal of a reading tracker is not the tracker. The goal is reading. The goal of a workout log is not the log. The goal is training. Let measurement support the behavior without replacing the reason for the behavior.
+
+[[MSG:DISCUSS]]
 
 9. How to Break Bad Habits
 
@@ -163,17 +150,11 @@ If you want to read more, create a reading environment. If you want to write, cr
 
 This also explains why one bad habit can disappear in a new location while another habit becomes easier in a place designed for it. Environment cues memory and expectation.
 
-The practical question is simple:
-What does this room make easy?
-What does it make difficult?
-
 A well-designed environment reduces the need for self-negotiation. When good habits are the default, consistency becomes less exhausting.
 
 11. Tracking, Review, and Recovery
 
 Many people sabotage habits after a break. They miss one day and turn it into a story about failure. The wiser principle is: never let a miss become a spiral. Missing once is an event. Repeating the miss until it becomes the new pattern is the real danger.
-
-That is why review matters. Habit systems should include not only performance, but recovery. If a routine breaks because of travel, illness, a deadline, or emotional fatigue, ask: what is the smallest version that keeps identity alive? Maybe reading becomes five minutes. Maybe exercise becomes stretching. Maybe journaling becomes one paragraph.
 
 Review also prevents mindless repetition. A habit can be faithful without being thoughtful. Over time you may need to raise the challenge, adjust the environment, or change the schedule. Habits exist to serve life, not to become lifeless rituals.
 
@@ -185,22 +166,10 @@ I am becoming a person who ____________________.
 Choose one habit:
 ____________________________________________
 
-Make it obvious:
-When and where will it happen?
-
-Make it attractive:
-How can you associate it with something desirable?
-
-Make it easy:
-What is the two-minute version?
-
-Make it satisfying:
-How will you record or acknowledge completion?
-
 Bad habit to reduce:
 ____________________________________________
 
-How will you make it less visible, less attractive, harder, and less satisfying?
+[[MSG:DISCUSS]]
 
 13. Atomic Habits and Reading
 
@@ -246,28 +215,12 @@ Recovery matters. Missing once is not the same as quitting.
 
 15. Questions for Reflection
 
-Which habit in your life would benefit most from being reduced to a smaller, repeatable version?
-
-What identity do your current habits reinforce?
-
-Which environmental cue most often triggers an unhelpful pattern?
-
-What one reading habit would give you the greatest long-term return?
-
-What immediate reward could help reinforce a good habit you are trying to build?
-
 16. A Seven-Day Experiment
-
-Day 1: Choose one tiny habit and write its identity statement.
-Day 2: Make the cue obvious. Prepare the environment.
-Day 3: Make the behavior easier. Reduce friction.
-Day 4: Add an immediate reward or tracking method.
-Day 5: Identify one bad habit and make it harder.
-Day 6: Review results and adjust the plan.
-Day 7: Write one paragraph: What have you learned about your defaults?
 
 Closing thought
 Atomic habits are powerful not because they are dramatic, but because they are repeatable. If you improve the structure of daily life, you do not have to negotiate every good decision from scratch. You gradually become a person whose environment, identity, and routines support the future you want.
+
+[[MSG:DISCUSS]]
 
 17. DEEP DIVE: WHY STARTING SMALL IS A STRATEGIC CHOICE
 
@@ -276,10 +229,6 @@ Starting small is sometimes misunderstood as lowering ambition. It is better und
 This matters because the first task of a new habit is not optimization. It is establishment. Before improving a routine, you need a routine that actually exists. Once the pattern is dependable, intensity can increase. Trying to begin at the final level often creates an impressive first week and an abandoned second week.
 
 Smallness also creates diagnostic information. If you intend to read for ten minutes after breakfast and repeatedly fail, you learn something useful: perhaps breakfast is rushed, the book is not visible, or the phone is winning the cue competition. A tiny habit reveals friction without demanding a heroic response.
-
-ASK MARK
-Ask Mark: Help me shrink one important goal into a version that can survive a bad day.
-Ask Mark: What friction might prevent this habit even if I am motivated?
 
 18. HABIT STACKING AND RELIABLE ANCHORS
 
@@ -297,8 +246,6 @@ Preparation can resemble progress without producing the behavior itself.
 
 Reading about exercise is not exercise. Organizing a writing application is not writing. Comparing productivity systems is not completing the difficult task. Planning has value, but it can become a comfortable substitute for action because it produces the feeling of seriousness without the vulnerability of performance.
 
-Ask yourself: what observable behavior counts as the habit?
-
 For reading, the answer is not “build a better reading list.” It is time spent reading with attention. For writing, it is words or revisions produced. For studying, it is retrieval, problem solving, or explanation—not merely arranging materials.
 
 A useful system makes the boundary between preparation and performance clear.
@@ -312,6 +259,8 @@ A reader could preserve a streak by opening a book for thirty seconds without le
 Use tracking as feedback, not identity. Ask periodically whether the measure still represents what you care about. If comprehension matters, track some form of recall or note-making occasionally. If fitness matters, do not let check marks hide the absence of progressive challenge.
 
 Metrics are useful servants and poor masters.
+
+[[MSG:DISCUSS]]
 
 21. PLATEAUS, BOREDOM, AND THE MIDDLE GAME
 
@@ -327,13 +276,6 @@ For reading, this might mean moving from easier nonfiction to demanding classics
 
 Habits reduce decision fatigue, but automation has a cost: you may stop noticing whether the routine still serves its purpose.
 
-Periodic reflection prevents this. Once a month or quarter, ask:
-What is working?
-What has become mechanical?
-What should be easier?
-What now needs more challenge?
-Which identity am I reinforcing?
-
 The mature habit system combines repetition with review. Stability gives you a platform; reflection keeps the platform from becoming a cage.
 
 23. HABITS AND CHARACTER
@@ -343,9 +285,6 @@ The most interesting consequence of repeated behavior may be moral rather than m
 Keeping a small promise to yourself can strengthen reliability. Practicing patience can change how you respond to people. Reading difficult books can cultivate intellectual humility. Exercising restraint can make future restraint easier.
 
 This does not mean habits mechanically produce virtue. Character involves judgment, purpose, and circumstances. But repetition gives values a physical form. It moves an intention from “I believe this matters” to “this is what I repeatedly do.”
-
-GREAT IDEAS CONNECTION
-Habit connects naturally to Aristotle’s account of character, where repeated action and practice help shape dispositions. Use Great Ideas to compare modern behavioral design with older questions about virtue, education, self-command, and the good life.
 
 24. ATOMIC HABITS WORKBOOK
 
@@ -375,6 +314,10 @@ If I miss once, my restart rule is:
 REVIEW DATE
 I will review this system on:
 
+[[MSG:DISCUSS]]
+
+[[MSG:ACTION]]
+
 25. APPLICATION CASES
 
 Case 1: Reading
@@ -399,19 +342,7 @@ Notice that each system specifies a cue, a minimum action, and some form of feed
 
 Before taking the interactive quiz, answer these without looking back:
 
-Why can tiny actions have large long-term consequences?
-What is the difference between a goal and a system?
-How does identity change the meaning of repetition?
-What are the four parts of the habit loop?
-How do the Four Laws alter the environment around behavior?
-Why is recovery from a miss more important than perfection?
-When should a habit be reviewed rather than repeated automatically?
-
-Then choose Take Guide Quiz in the Modern Guide toolbar.
-
 27. ACTION PLAN
-
-Use Build Action Plan above to send an experiment directly to the Action Center.
 
 A strong first action has four properties:
 It is specific.
@@ -428,3 +359,11 @@ Habits are not a guarantee of success. They are a way of making useful behavior 
 The point is not to become a perfectly optimized machine. It is to create enough structure that important values survive busy days. When your environment, identity, and routines point in the same direction, progress requires less negotiation.
 
 The most useful habit is often the one that allows you to keep becoming the person you have deliberately chosen to be.
+
+[[MSG:IDEAS]]
+
+[[MSG:DISCUSS]]
+
+[[MSG:QUIZ]]
+
+[[MSG:BUY]]

@@ -7,17 +7,10 @@ Focus, attention, deliberate practice, and meaningful output in a distracted wor
 ABOUT THIS GUIDE
 This is an independently written educational guide. It is not the original book and is not affiliated with or endorsed by the author or publisher. It explains selected ideas in original language, adds commentary, reflection, application, and connections to other traditions, and encourages readers to obtain the original work.
 
-INTERACTIVE TOOLS
-Use the Modern Guide toolbar while reading:
-• Ask Mark about this section — discusses the passage around your current reading position.
-• Discuss key ideas — opens Ask Mark with a guide-specific coaching prompt.
-• Take guide quiz — opens a six-question comprehension check.
-• Build action plan — opens the Action Center with a suggested experiment already filled in.
-• Explore Great Ideas — opens the Syntopicon with a related Great Idea selected.
-• Buy original — opens an Amazon search for the original book.
-
 HOW TO USE IT
 Read once for the big picture. On a second pass, stop at the Ask Mark prompts and application exercises. Highlight any paragraph you want to discuss, then use Ask Mark to challenge, compare, simplify, or apply the idea.
+
+[[MSG:BUY]]
 
 1. WHAT DEEP WORK MEANS
 
@@ -28,12 +21,6 @@ Deep work is concentrated effort on a demanding task without frequent distractio
 The contrast is shallow work: coordination, inbox maintenance, status checking, routine administration, and tasks that can often be performed while partially distracted. Shallow work can be necessary. The problem begins when it occupies nearly the entire day and leaves no protected time for difficult thinking.
 
 The modern workday encourages fragmentation. Messages arrive continuously. Meetings divide the calendar into unusable pieces. Notifications make responsiveness feel equivalent to productivity. A person can be busy for ten hours and still spend very little time doing the work that actually develops expertise or produces durable value.
-
-A useful question is therefore not, “How busy was I?” It is, “How much uninterrupted cognitive effort did I invest in something that mattered?”
-
-ASK MARK
-Ask Mark: Help me identify which parts of my work are deep and which are shallow.
-Ask Mark: Give me a 60-minute deep-work experiment I can try tomorrow.
 
 2. WHY CONCENTRATION BECOMES A COMPETITIVE ADVANTAGE
 
@@ -57,21 +44,9 @@ This residue reduces the amount of attention available for the new task. Repeate
 
 One defense is to batch communication and administrative tasks instead of allowing them to puncture every hour. Another is to create a shutdown ritual: capture unfinished tasks, decide the next action, and give the mind permission to stop rehearsing them.
 
-ASK MARK
-Ask Mark: What forms of attention residue are most likely in my workday?
-Ask Mark: Help me design a shutdown ritual.
-
 4. RITUAL BEATS WILLPOWER
 
 If deep work depends on feeling inspired, it will be inconsistent. Rituals reduce negotiation.
-
-A useful deep-work ritual answers practical questions in advance:
-Where will I work?
-When will I begin?
-How long will the session last?
-What will I work on?
-What is prohibited during the session?
-How will I know the session is complete?
 
 The more decisions you can remove from the beginning of a session, the less energy is spent resisting distraction.
 
@@ -100,11 +75,11 @@ If every moment of boredom is immediately filled with a phone, feed, or message,
 
 Practice short periods in which you do not automatically reach for stimulation. Wait in line without checking the phone. Take a walk without audio. Read ten pages without switching apps. These small exercises are not magical, but they reveal how strong the reflex toward distraction has become.
 
+[[MSG:DISCUSS]]
+
 7. SOCIAL MEDIA AND TOOL SELECTION
 
 The useful question about a digital tool is not whether it provides any benefit. Almost every tool provides some benefit. The better question is whether its benefits justify the attention, time, and behavioral cost it creates.
-
-Evaluate tools according to the things you value most. Does the tool materially support them? Could another method provide most of the benefit with less distraction?
 
 This moves the decision from vague fear of missing out toward deliberate tradeoffs.
 
@@ -154,13 +129,6 @@ Day 5: Practice ten minutes of boredom without reaching for stimulation.
 Day 6: Extend the deep-work block or repeat it twice.
 Day 7: Review what produced the best focus and redesign next week.
 
-QUIZ PREVIEW
-1. What distinguishes deep work from shallow work?
-2. Why can task switching reduce cognitive quality?
-3. Why are rituals useful?
-4. What is the purpose of a shallow-work budget?
-5. Why should recovery be considered part of the system?
-
 GREAT IDEAS CONNECTIONS
 Attention — compare with classical discussions of disciplined thought.
 Habit — connect this guide with Atomic Habits.
@@ -169,6 +137,8 @@ Education — ask how deep work changes the meaning of study.
 
 FINAL TAKEAWAY
 The scarce resource is not simply time. It is undivided attention. Protecting attention allows time to become more valuable.
+
+[[MSG:IDEAS]]
 
 13. DEEP DIVE: THE ECONOMICS OF ATTENTION
 
@@ -179,6 +149,8 @@ The cost becomes easy to miss because communication produces immediate visible a
 Yet many forms of valuable work require exactly that invisible period.
 
 Treat attention as capital. Spend it where the return is highest. That means protecting your best cognitive hours from tasks that can be done when energy is lower.
+
+[[MSG:DISCUSS]]
 
 14. THE STARTUP COST OF HARD THINKING
 
@@ -237,7 +209,7 @@ When attention is fragmented, tasks become units to clear. When attention is sus
 
 This matters psychologically. Meaning is often found not only in what the work accomplishes but in doing it well.
 
-Ask Mark: How would my work change if I treated one recurring task as a craft rather than an obligation?
+[[MSG:DISCUSS]]
 
 20. KNOWLEDGE WORK WITHOUT A VISIBLE SCOREBOARD
 
@@ -259,10 +231,6 @@ This suggests a rhythm: gather widely, incubate, then work deeply enough to test
 
 A difficult book is a cognitive project.
 
-Before beginning, define the purpose. Are you reading for argument, historical context, close analysis, or broad understanding? During the session, remove unrelated inputs. After a section, close the book and state the central claim from memory.
-
-Ask Mark can support the process, but use it after your own attempt. If AI immediately explains everything, you can lose the desirable difficulty that builds understanding.
-
 A powerful pattern is:
 Read.
 Recall.
@@ -274,8 +242,6 @@ Then ask Mark.
 Deep work can become performative. Someone may build an elaborate ritual, buy equipment, redesign the office, and spend more time protecting focus than focusing.
 
 It can also become antisocial if used to evade necessary collaboration.
-
-The test is output and fit. Does the system increase the quality of meaningful work while still honoring legitimate responsibilities?
 
 If not, simplify it.
 
@@ -295,57 +261,21 @@ Adjust communication, meetings, and shallow work so the practice can survive nor
 
 25. WORKBOOK: DESIGN YOUR DEEP-WORK RITUAL
 
-PLACE:
-Where will deep work occur?
-
-TIME:
-When does your best concentration usually happen?
-
-DURATION:
-What length can you reliably protect?
-
-TARGET:
-What output will define success?
-
-RULES:
-Phone location?
-Email?
-Browser tabs?
-Music?
-Door or interruption policy?
-
-ENDING:
-What shutdown or restart note will you leave?
-
-REVIEW:
-How will you know whether the ritual is improving your work?
+[[MSG:ACTION]]
 
 26. GREAT IDEAS CONNECTIONS
-
-Education:
-Is learning primarily exposure to information, or disciplined formation of the mind?
 
 Leisure:
 Classical authors often distinguished leisure from mere idleness. Compare deep contemplation with modern busyness.
 
-Work:
-What makes labor meaningful—output, mastery, service, or attention?
-
 Habit:
 Connect ritualized concentration with the behavioral systems in the Atomic Habits guide.
 
+[[MSG:DISCUSS]]
+
 27. FINAL APPLICATION QUESTIONS
 
-What part of your current work most deserves uninterrupted attention?
-What distraction creates the largest switching cost?
-What shallow task could be batched?
-Which hour of your day is cognitively strongest?
-What single output would justify a protected ninety-minute block?
-What boundary would make that block possible?
-
 28. ACTION PLAN
-
-Choose Build Action Plan in the toolbar and schedule one recurring focus experiment.
 
 Do not begin by demanding four hours every day. Create a block you can defend. The first objective is to prove that protected concentration can exist inside your real schedule.
 
@@ -396,6 +326,8 @@ I am afraid this draft will be bad.
 I may discover the plan is wrong.
 
 Then reduce the problem to the next intellectual move. Focus often returns when the ambiguity becomes specific.
+
+[[MSG:DISCUSS]]
 
 33. DEEP WORK IN COLLABORATIVE TEAMS
 
@@ -448,17 +380,7 @@ Attempt first.
 Externalize your reasoning.
 Then use AI to critique, compare, or extend.
 
-Ask Mark works best as a thinking partner, not a substitute for having a thought.
-
 37. THE WEEKLY DEPTH REVIEW
-
-At the end of the week, answer:
-How many focused blocks did I complete?
-Which block produced the most meaningful output?
-What interrupted me most often?
-Which shallow task expanded beyond its value?
-Did I protect my strongest cognitive hours?
-What change would make next week easier?
 
 Do not use the review for guilt. Use it for system design.
 
@@ -489,6 +411,8 @@ Ease of restarting next time.
 
 Then compare the scores. A low score is not failure; it is diagnostic information. If interruption is the recurring weakness, improve the environment. If objective clarity is low, define the deliverable before the session. If restart difficulty is high, strengthen the ending note.
 
+[[MSG:DISCUSS]]
+
 40. A NOTE ON SUSTAINABLE INTENSITY
 
 More deep work is not automatically better.
@@ -500,13 +424,6 @@ The mature goal is not maximum intensity. It is reliable high-quality intensity 
 This prevents deep work from becoming another productivity contest.
 
 41. QUESTIONS TO DISCUSS WITH ASK MARK
-
-What would count as deep work in my actual role?
-Which shallow obligations are legitimate and which are merely habitual?
-How should I protect focus without becoming unavailable to people who need me?
-What signs show that a focus ritual is becoming too rigid?
-Where could AI reduce clerical friction without replacing thinking?
-How can I use Mark, Set, Go! to train sustained attention with difficult books?
 
 42. CLOSING WORKSHEET
 
@@ -525,8 +442,6 @@ Review this after two weeks. Keep what works. Remove what does not. The system s
 Individual focus becomes easier when the surrounding culture supports it.
 
 A team can unintentionally punish deep work by rewarding only visible responsiveness. If everyone is expected to reply within minutes, keep calendars continuously open, and attend every meeting, concentrated work becomes something people attempt after hours.
-
-A healthier culture makes communication expectations explicit. Which channels are urgent? What response time is reasonable? Which hours are protected? Which meetings are optional? What information can be documented asynchronously?
 
 This matters because attention is partly social. A person may be able to silence notifications, but if the organization treats delayed response as negligence, the individual solution will fail.
 
@@ -549,5 +464,8 @@ At the end of two weeks, ask whether your work became more thoughtful, not merel
 
 45. FINAL ASK MARK PROMPT
 
-Ask Mark:
-“Interview me about my current attention habits. Help me identify the single highest-leverage change I could make to protect deep work without neglecting legitimate responsibilities. Then help me convert that change into an Action Center habit.”
+[[MSG:DISCUSS]]
+
+[[MSG:QUIZ]]
+
+[[MSG:BUY]]

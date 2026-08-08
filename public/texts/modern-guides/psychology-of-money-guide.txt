@@ -7,17 +7,10 @@ Behavior, uncertainty, enough, compounding, freedom, and the human side of finan
 ABOUT THIS GUIDE
 This is an independently written educational guide. It is not the original book and is not affiliated with or endorsed by the author or publisher. It explains selected ideas in original language, adds commentary, reflection, application, and connections to other traditions, and encourages readers to obtain the original work.
 
-INTERACTIVE TOOLS
-Use the Modern Guide toolbar while reading:
-• Ask Mark about this section — discusses the passage around your current reading position.
-• Discuss key ideas — opens Ask Mark with a guide-specific coaching prompt.
-• Take guide quiz — opens a six-question comprehension check.
-• Build action plan — opens the Action Center with a suggested experiment already filled in.
-• Explore Great Ideas — opens the Syntopicon with a related Great Idea selected.
-• Buy original — opens an Amazon search for the original book.
-
 HOW TO USE IT
 Read once for the big picture. On a second pass, stop at the Ask Mark prompts and application exercises. Highlight any paragraph you want to discuss, then use Ask Mark to challenge, compare, simplify, or apply the idea.
+
+[[MSG:BUY]]
 
 1. MONEY IS BEHAVIOR BEFORE IT IS MATHEMATICS
 
@@ -28,10 +21,6 @@ We bring childhood, fear, status, memory, social comparison, family expectations
 That means financial intelligence is partly behavioral. Knowing the formula is not enough if fear causes you to abandon the plan, envy causes you to overspend, or overconfidence causes you to take risks you cannot survive.
 
 The first lesson is humility: your financial worldview is not the only rational worldview. It is a product of experience.
-
-ASK MARK
-Ask Mark: What financial beliefs might come from experience rather than objective analysis?
-Ask Mark: Help me separate a financial goal from social comparison.
 
 2. LUCK AND RISK
 
@@ -48,8 +37,6 @@ One of the hardest financial concepts is “enough.”
 If the target constantly rises with income, status, or comparison, wealth can become an endless competition. The danger is taking risks with something important to obtain something unnecessary.
 
 Enough is not lack of ambition. It is the ability to recognize when additional gain no longer justifies additional risk.
-
-Define what money is for. Security? Freedom? Family? Time? Generosity? Exploration? Once the purpose is clear, accumulation becomes a tool instead of a scoreboard.
 
 4. COMPOUNDING REWARDS TIME
 
@@ -79,10 +66,6 @@ Room for error means leaving space between what you expect and what you require.
 
 This is not pessimism. It is respect for uncertainty.
 
-ASK MARK
-Ask Mark: Where could I add margin to a plan without becoming excessively cautious?
-Ask Mark: Explain the difference between volatility and ruin.
-
 7. WEALTH IS OFTEN INVISIBLE
 
 Expensive possessions are visible. Financial reserves usually are not.
@@ -90,6 +73,8 @@ Expensive possessions are visible. Financial reserves usually are not.
 This creates a strange social effect: people can see spending but cannot see the assets not spent. As a result, visible consumption can be mistaken for wealth.
 
 True wealth often consists of options, savings, low obligations, and the ability to absorb shocks. Much of it is precisely what was not converted into visible status.
+
+[[MSG:DISCUSS]]
 
 8. FREEDOM MAY BE MONEY'S BEST DIVIDEND
 
@@ -142,13 +127,6 @@ Money gives me the ability to ____________________.
 Enough for me means ____________________.
 The financial risk I most need to protect against is ____________________.
 
-QUIZ PREVIEW
-1. Why can two intelligent people make different financial decisions?
-2. What is the behavioral requirement of compounding?
-3. Why is survival important to wealth building?
-4. What does room for error accomplish?
-5. Why can wealth be difficult to see?
-
 GREAT IDEAS CONNECTIONS
 Fortune — compare luck and risk with classical ideas about fortune.
 Prudence — connect margin of safety with practical wisdom.
@@ -157,6 +135,10 @@ Liberty — explore the relationship between savings and personal freedom.
 
 FINAL TAKEAWAY
 The most important financial skill may be building behavior that survives uncertainty long enough for good decisions to compound.
+
+[[MSG:IDEAS]]
+
+[[MSG:ACTION]]
 
 13. DEEP DIVE: WHY EXPERIENCE SHAPES RISK
 
@@ -173,6 +155,8 @@ A famous investor or entrepreneur can become a powerful story. Stories help us l
 For every visible winner who took an enormous risk, there may be many invisible people who took a similar risk and failed. Copying the visible behavior without understanding the full distribution of outcomes can be dangerous.
 
 Look for patterns across many cases. Ask what was repeatable skill, what depended on a unique environment, and what may have been luck.
+
+[[MSG:DISCUSS]]
 
 15. TAIL EVENTS
 
@@ -206,9 +190,6 @@ A surprising amount of consumption is aimed at an audience that is not paying as
 
 People often notice an expensive object briefly and then return to thinking about themselves. The purchaser, meanwhile, may carry the financial consequence for years.
 
-This suggests a useful question before status spending:
-Do I want the object itself, or do I want the feeling I imagine other people will have about me?
-
 There is nothing automatically wrong with beautiful possessions. The point is clarity.
 
 19. INDEPENDENCE AS A FINANCIAL GOAL
@@ -239,6 +220,8 @@ Yet every additional rule, account, strategy, or assumption creates something el
 
 Simplicity is not the absence of thought. It is often the result of deciding which variables actually matter.
 
+[[MSG:DISCUSS]]
+
 22. MONEY AND HAPPINESS
 
 Money can reduce misery by improving security, housing, health access, and freedom from constant scarcity. Beyond that, its relationship with happiness becomes more complicated.
@@ -257,12 +240,6 @@ One partner may see savings as safety. Another may experience extreme saving as 
 
 Better conversations identify the underlying value.
 
-Ask:
-What does financial security feel like to you?
-What did money mean in your family growing up?
-Which financial risk scares you most?
-What are we actually trying to make possible?
-
 24. A FINANCIAL BEHAVIOR AUDIT
 
 Review the last month and categorize decisions:
@@ -277,44 +254,9 @@ Avoidance.
 
 Do not judge immediately. Look for patterns.
 
-Which spending produced durable satisfaction?
-Which spending was forgotten quickly?
-Which decisions increased future flexibility?
-Which repeated costs create obligations you no longer value?
-
 25. GREAT IDEAS CONNECTIONS
 
-Prudence:
-How should practical wisdom respond to uncertainty?
-
-Fortune:
-How much of success belongs to skill, and how much to circumstances?
-
-Happiness:
-Is wealth part of flourishing, a means to flourishing, or a distraction from it?
-
-Liberty:
-How does financial margin create the ability to choose?
-
-Temperance:
-What does “enough” mean in a culture organized around more?
-
 26. WORKBOOK: DEFINE ENOUGH
-
-ENOUGH INCOME:
-What level supports your real priorities?
-
-ENOUGH SAVINGS:
-What would make ordinary emergencies less frightening?
-
-ENOUGH STATUS:
-Which purchases are genuinely for you rather than for an imagined audience?
-
-ENOUGH RISK:
-What loss would damage the plan beyond recovery?
-
-ENOUGH TIME:
-What would greater financial flexibility allow you to stop doing or start doing?
 
 27. SCENARIO TEST
 
@@ -324,13 +266,7 @@ Scenario A: Things go roughly as planned.
 Scenario B: Income falls for a year.
 Scenario C: A major opportunity appears but requires six months of flexibility.
 
-Does your current financial structure survive all three?
-Where is the weak point?
-Which small change would add the most resilience?
-
 28. ACTION PLAN
-
-Choose Build Action Plan and write a personal money philosophy rather than a prediction.
 
 Include:
 What money is for.
@@ -339,16 +275,9 @@ Which risks you refuse to take.
 How much uncertainty you want to survive.
 What freedom you are trying to create.
 
+[[MSG:DISCUSS]]
+
 29. FINAL COMPREHENSION CHECK
-
-Why is personal experience relevant to financial behavior?
-How can luck and risk distort lessons from success?
-Why is room for error rational rather than pessimistic?
-What is the difference between getting wealthy and staying wealthy?
-Why might invisible wealth matter more than visible consumption?
-What does financial freedom actually purchase?
-
-Then use Take Guide Quiz to test recall.
 
 30. CLOSING PERSPECTIVE
 
@@ -376,11 +305,6 @@ The exact percentages are personal. The important act is deciding before default
 A market decline tests the emotional assumptions inside an investment plan.
 
 Before a decline, risk tolerance can feel abstract. During a decline, losses become vivid and headlines make uncertainty feel permanent.
-
-A robust plan asks in advance:
-What decline can I tolerate without changing strategy?
-What money should not be exposed to this risk?
-What would cause a legitimate change in the plan rather than a fearful reaction?
 
 The time to design behavior for a crisis is before the crisis.
 
@@ -416,6 +340,8 @@ This fits the broader principle of avoiding ruin. You do not insure every inconv
 
 That is another form of room for error.
 
+[[MSG:DISCUSS]]
+
 36. CAREER CAPITAL AND HUMAN WEALTH
 
 Financial planning is not only about portfolios.
@@ -434,21 +360,11 @@ Generosity complicates purely individual financial models because it introduces 
 
 A sound plan can include giving deliberately rather than treating it as whatever remains.
 
-Ask:
-What causes or people matter to me?
-What level of giving is sustainable?
-How do I balance generosity with responsibilities to my future self and family?
-
 38. RETIREMENT AS A DESIGN QUESTION
 
 Retirement is often represented as a number.
 
 But the more interesting question is what life the number is intended to support.
-
-What will you do with time?
-Which relationships and communities matter?
-Will you continue meaningful work in another form?
-What level of spending supports the desired life?
 
 A target becomes more meaningful when connected to a picture of daily living.
 
@@ -475,9 +391,6 @@ One purchase you valued.
 One purchase you barely remember.
 One decision that increased future flexibility.
 
-End with one question:
-What change would make my financial life simpler?
-
 41. FINAL MONEY CHALLENGE
 
 For thirty days, do not try to optimize every dollar.
@@ -502,15 +415,9 @@ Changing a long-term strategy because of short-term fear.
 
 None of these automatically proves a decision is wrong. They are prompts to slow down and ask better questions.
 
-43. QUESTIONS TO DISCUSS WITH ASK MARK
+[[MSG:DISCUSS]]
 
-What does enough mean for me?
-Which financial decision is being driven most by comparison?
-Where do I lack room for error?
-What risk could remove me from the game?
-Which expense genuinely improves my life?
-What would greater control over my time allow me to do?
-How can I build a plan that is simpler and easier to sustain?
+43. QUESTIONS TO DISCUSS WITH ASK MARK
 
 44. A PERSONAL FINANCE CONSTITUTION
 
@@ -537,8 +444,6 @@ The freedom I want to create:
 The next review date:
 
 The purpose of the worksheet is not certainty. It is coherence. A financial life becomes easier to navigate when decisions can be compared against a small number of principles that actually matter to you.
-
-46. DISCUSSION LAB: HOW MUCH IS ENOUGH?
 
 “Enough” sounds simple until you try to define it.
 
@@ -573,22 +478,11 @@ The result will not tell you what to choose automatically. Some worthwhile choic
 
 48. FINAL ASK MARK PROMPT
 
-Ask Mark:
-“Help me build a personal definition of enough. Ask about security, time, family, learning, generosity, lifestyle, and risk. Then help me write five financial principles I can use when markets or emotions are stressful.”
-
 49. DECISION JOURNAL
 
 Financial memory is selective. After an outcome is known, it becomes easy to believe that the result was obvious.
 
 A decision journal records what you believed before the outcome.
-
-For any important financial choice, write:
-What am I deciding?
-What information do I have?
-What assumptions am I making?
-What could go wrong?
-What would make me change my mind?
-How confident am I?
 
 Months later, review the reasoning rather than judging only the result.
 
@@ -596,10 +490,12 @@ A good decision can have a bad outcome. A bad decision can get lucky. The journa
 
 50. FINAL REFLECTION
 
-The deepest question in personal finance is not “How do I maximize the number?”
-
-It is “What kind of life is the number supposed to support?”
-
 That question can change how you think about work, consumption, saving, risk, and time.
 
 A useful financial system leaves room for uncertainty while moving resources toward what you actually value. It does not require knowing the future. It requires enough humility and margin to remain flexible when the future refuses to cooperate.
+
+[[MSG:DISCUSS]]
+
+[[MSG:QUIZ]]
+
+[[MSG:BUY]]

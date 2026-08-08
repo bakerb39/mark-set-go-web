@@ -86,7 +86,7 @@ window.MarkSetGoCurrentReaderDocument = Object.freeze({
 });
 const virtualRenderer = new VirtualRenderer({
   getState: () => state,
-  setWordContent: (element, word) => setWordContent(element, word),
+  setWordContent: (element, word, index) => setWordContent(element, word, index),
   savedDefinitionAt: (index) => savedDefinitionAt(index),
   noteAt: (index) => noteAt(index),
   refreshReadingGroups: (mode, groupSize) => refreshReadingGroups(mode, groupSize),
@@ -554,76 +554,31 @@ const MODERN_GUIDE_INTERACTIONS = {
     greatIdea: 'Habit',
     actionTitle: 'Run a seven-day tiny-habit experiment',
     actionType: 'experiment',
-    actionNote: 'Choose one identity-based habit. Make the cue obvious, the first step easy, and the completion satisfying. Track it for seven days, then review what helped or created friction.',
-    askPrompt: 'Help me apply the main ideas in this Atomic Habits guide to one change I want to make. Ask me one question at a time before recommending a system.',
-    quiz: [
-      ['Why are systems often more useful than goals for daily behavior?', ['They remove the need for any goal','They define repeatable actions that can produce the result','They guarantee motivation','They make outcomes immediate'], 1],
-      ['What does identity-based change emphasize?', ['Only tracking outcomes','Acting in ways that support the person you want to become','Avoiding all difficult habits','Changing several habits at once'], 1],
-      ['Which sequence best represents the habit loop?', ['Goal, plan, result, review','Cue, craving, response, reward','Desire, punishment, cue, result','Trigger, identity, goal, rest'], 1],
-      ['What does “make it easy” primarily address?', ['Willpower','Friction','Ambition','Rewards'], 1],
-      ['What is a useful response after missing a habit once?', ['Abandon the plan','Increase the goal dramatically','Return quickly before the miss becomes a new pattern','Wait for motivation'], 2],
-      ['Why does environment design matter?', ['It can make desired behaviors more obvious and easier','It eliminates all choice','It makes tracking unnecessary','It replaces identity'], 0]
-    ]
+    actionNote: 'Choose one identity-based habit. Make the cue obvious, the first step easy, and the completion satisfying. Track it for seven days, then review what helped or created friction.'
   },
   'deep-work': {
     greatIdea: 'Education',
     actionTitle: 'Protect one recurring deep-work block',
     actionType: 'habit',
-    actionNote: 'Schedule one distraction-free block for your highest-value cognitive task. Define the output before you begin, silence communication, and review the quality of attention afterward.',
-    askPrompt: 'Help me design a realistic deep-work routine around my current responsibilities. First help me separate my deepest work from shallow maintenance.',
-    quiz: [
-      ['What is the defining feature of deep work?', ['Fast task switching','Uninterrupted concentration on cognitively demanding work','Constant availability','Routine administration'], 1],
-      ['What is attention residue?', ['A memory technique','Attention that remains attached to a previous task after switching','A kind of rest','A scheduling method'], 1],
-      ['Why can rituals improve focus?', ['They remove every interruption permanently','They reduce repeated decisions about how to begin','They make difficult tasks easy','They increase meetings'], 1],
-      ['What is the purpose of a shallow-work budget?', ['To eliminate administration','To keep routine work from consuming all cognitive capacity','To measure salary','To avoid teamwork'], 1],
-      ['Why practice tolerating boredom?', ['To become less curious','To weaken the reflex to seek stimulation whenever attention becomes uncomfortable','To sleep at work','To avoid learning'], 1],
-      ['What should a useful productivity measure emphasize?', ['Visible busyness','Response speed only','Meaningful output and deliberate practice','Number of notifications'], 2]
-    ]
+    actionNote: 'Schedule one distraction-free block for your highest-value cognitive task. Define the output before you begin, silence communication, and review the quality of attention afterward.'
   },
   'psychology-of-money': {
     greatIdea: 'Prudence',
     actionTitle: 'Write a personal money philosophy',
     actionType: 'reflection',
-    actionNote: 'Define what “enough” means, what money is for, which risks could permanently damage your plans, and where you need more room for error.',
-    askPrompt: 'Help me turn the ideas in The Psychology of Money guide into a personal money philosophy focused on behavior, enough, room for error, and long-term freedom.',
-    quiz: [
-      ['Why can intelligent people make very different financial decisions?', ['Math has no rules','Personal experience shapes how people perceive risk and reward','Everyone has the same goals','Markets are predictable'], 1],
-      ['What behavioral quality allows compounding to work over long periods?', ['Impatience','Patience and survival','Constant trading','Perfect forecasts'], 1],
-      ['What does “room for error” mean?', ['Expecting failure','Building margin so plans can survive being wrong','Avoiding all risk','Spending every surplus'], 1],
-      ['Why can wealth be difficult to see?', ['It is always hidden by banks','Unspent assets and financial flexibility are less visible than consumption','Only businesses have wealth','Wealth cannot be measured'], 1],
-      ['What is one major benefit money can provide beyond consumption?', ['Control over time and options','Guaranteed happiness','Perfect status','No uncertainty'], 0],
-      ['What does “reasonable beats perfectly rational” suggest?', ['Ignore mathematics','Use a plan you can actually sustain emotionally and behaviorally','Never diversify','Follow other people exactly'], 1]
-    ]
+    actionNote: 'Define what enough means, what money is for, which risks could permanently damage your plans, and where you need more room for error.'
   },
   'why-we-sleep': {
     greatIdea: 'Nature',
     actionTitle: 'Run a seven-day sleep-literacy log',
     actionType: 'experiment',
-    actionNote: 'Track bedtime, wake time, caffeine timing, morning light, exercise, evening stimulation, subjective sleep quality, and next-day reading concentration. Change only one variable after observing the baseline.',
-    askPrompt: 'Help me understand the sleep concepts in this guide while separating strong evidence, plausible interpretation, and claims that deserve verification.',
-    quiz: [
-      ['What is the main difference between circadian timing and sleep pressure?', ['They are the same process','Circadian timing is a daily clock; sleep pressure tends to build with time awake','Sleep pressure controls light','Circadian rhythm is only about dreams'], 1],
-      ['Why is caffeine relevant to sleep pressure?', ['It creates sleep need','It can interfere with adenosine signaling and reduce perceived sleepiness','It permanently resets circadian rhythm','It produces REM sleep'], 1],
-      ['Why is sedation not necessarily the same as healthy sleep?', ['Any unconsciousness is identical','Some substances can change sleep architecture even if they make falling asleep easier','Healthy sleep requires no brain activity','Sedation improves every sleep stage'], 1],
-      ['How can sleep support learning?', ['By eliminating the need to study','By supporting attention before learning and memory processes afterward','By replacing practice','Only through dreams'], 1],
-      ['Why should popular-science sleep claims be read critically?', ['Sleep science is fictional','Some claims may overstate causation, effect size, or certainty','All studies are wrong','Only physicians can read research'], 1],
-      ['What is a good first step before changing many sleep variables?', ['Change everything at once','Observe a baseline and track patterns','Use more caffeine','Ignore timing'], 1]
-    ]
+    actionNote: 'Track bedtime, wake time, caffeine timing, morning light, exercise, evening stimulation, subjective sleep quality, and next-day reading concentration. Change only one variable after observing the baseline.'
   },
   'let-them-theory': {
     greatIdea: 'Freedom',
     actionTitle: 'Separate what belongs to them from what belongs to me',
     actionType: 'reflection',
-    actionNote: 'Choose one situation consuming too much mental energy. Write two columns: THEM—what belongs to the other person; ME—what you control, the boundary you can set, and your next constructive action.',
-    askPrompt: 'Help me apply the Let Them / Let Me distinction to a real situation. Help me separate acceptance, influence, boundaries, and responsibility without becoming passive.',
-    quiz: [
-      ['What is the purpose of “Let Them” in this guide?', ['To avoid all relationships','To release futile attempts to control other people’s choices or reactions','To accept harmful behavior','To stop communicating'], 1],
-      ['Why is “Let Me” necessary?', ['It restores attention to your own choices and responsibilities','It makes other people obey','It removes boundaries','It avoids consequences'], 0],
-      ['What is the difference between control and influence?', ['There is none','Influence can affect another person without guaranteeing their choice','Control is always persuasion','Influence removes uncertainty'], 1],
-      ['How is a strong boundary usually framed?', ['As a demand that another person must obey','Around what you will do if a condition occurs','As silence','As punishment'], 1],
-      ['When should “Let Them” not be used as an excuse for passivity?', ['When safety, abuse, legal duties, or serious harm require action','When someone has a different opinion','When a friend chooses another restaurant','When a colleague prefers another method'], 0],
-      ['Which classical connection fits the idea most closely?', ['Stoic attention to what is and is not up to us','Epicurean atomism only','Medieval astronomy','Formal logic only'], 0]
-    ]
+    actionNote: 'Choose one situation consuming too much mental energy. Separate what belongs to the other person from what you control, then define one boundary or constructive next action.'
   }
 };
 
@@ -2956,6 +2911,38 @@ function getBionicParts(word) {
 }
 
 function setWordContent(element, word, index = null) {
+  const guideAction = state?.source?.type === 'modern-guide' ? modernGuideActionToken(word) : '';
+  if (guideAction) {
+    const resolvedIndex = Number.isFinite(Number(index))
+      ? Number(index)
+      : Number(element?.dataset?.index ?? element?.dataset?.startIndex);
+
+    element.classList.add('modern-guide-action-word');
+    element.dataset.guideAction = guideAction;
+
+    if (guideAction === 'buy' && state.source?.buyUrl) {
+      const link = document.createElement('a');
+      link.className = 'modern-guide-inline-action modern-guide-inline-buy';
+      link.href = state.source.buyUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = modernGuideActionLabel(guideAction);
+      link.setAttribute('aria-label', `${modernGuideActionLabel(guideAction)} in a new tab`);
+      element.append(link);
+      return;
+    }
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    const actionClass = guideAction === 'action' ? 'add' : guideAction;
+    button.className = `modern-guide-inline-action modern-guide-inline-${actionClass}`;
+    button.dataset.modernGuideInlineAction = guideAction;
+    if (Number.isFinite(resolvedIndex)) button.dataset.guideWordIndex = String(resolvedIndex);
+    button.textContent = modernGuideActionLabel(guideAction);
+    element.append(button);
+    return;
+  }
+
   element.replaceChildren();
 
   if (Number.isFinite(Number(index)) && state.verseNumberIndexes?.has(Number(index))) {
@@ -4940,11 +4927,15 @@ function comprehensionPassage() {
   // On the first check, use up to the last 750 words.
   if (!previous) startIndex = Math.max(0, endIndex - 750);
 
+  const passageWords = state.words
+    .slice(startIndex, endIndex)
+    .filter((word) => !isModernGuideActionToken(word));
+
   return {
     startIndex,
     endIndex,
-    words: Math.max(0, endIndex - startIndex),
-    passage: state.words.slice(startIndex, endIndex).join(' ')
+    words: passageWords.length,
+    passage: passageWords.join(' ')
   };
 }
 
@@ -8063,127 +8054,185 @@ function modernGuideInteractionConfig(source = state?.source || {}) {
   return MODERN_GUIDE_INTERACTIONS?.[source.id] || null;
 }
 
-function openModernGuideAskMark(prompt, source = state?.source || {}) {
-  const guideTitle = source?.originalTitle || state?.title || 'this guide';
-  const index = Math.max(0, Number(state?.index) || 0);
-  const nearby = Array.isArray(state?.words)
-    ? state.words.slice(index, Math.min(state.words.length, index + 80)).join(' ')
-    : '';
+function modernGuideActionToken(word) {
+  const match = String(word || '').match(/^\[\[MSG:(DISCUSS|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
+  return match ? match[1].toLowerCase() : '';
+}
+
+function isModernGuideActionToken(word) {
+  return Boolean(modernGuideActionToken(word));
+}
+
+function modernGuideActionLabel(action) {
+  return ({
+    discuss: 'Discuss with Ask Mark',
+    quiz: 'Start comprehension quiz',
+    action: 'Add to Action Center',
+    ideas: 'Explore related Great Ideas',
+    buy: 'Buy the original book'
+  })[action] || 'Guide action';
+}
+
+function modernGuideContextRange(markerIndex, maximumWords = 260) {
+  const safeMarker = Math.max(0, Math.min(state.words.length, Number(markerIndex) || 0));
+  let start = safeMarker;
+  let counted = 0;
+
+  while (start > 0 && counted < maximumWords) {
+    start -= 1;
+    if (isModernGuideActionToken(state.words[start])) {
+      // Stop at the prior action divider once enough real reading context exists.
+      if (counted >= 90) { start += 1; break; }
+      continue;
+    }
+    counted += 1;
+  }
+
+  const cleanWords = [];
+  let firstReal = null;
+  for (let index = start; index < safeMarker; index += 1) {
+    if (isModernGuideActionToken(state.words[index])) continue;
+    if (firstReal == null) firstReal = index;
+    cleanWords.push(state.words[index]);
+  }
+
+  return {
+    startIndex: firstReal == null ? Math.max(0, safeMarker - 1) : firstReal,
+    endIndex: safeMarker,
+    text: cleanWords.join(' ').trim()
+  };
+}
+
+function openModernGuideContextInAskMark(markerIndex) {
+  const context = modernGuideContextRange(markerIndex);
+  if (!context.text) return;
+
+  if (isReaderRunning()) pauseReader();
+  state.index = Math.max(0, Number(markerIndex) || 0);
+  state.markSelection = {
+    text: context.text,
+    startIndex: context.startIndex,
+    endIndex: context.endIndex
+  };
+  state.markPersistentSelection = { ...state.markSelection };
+  state.markSelectionLocked = true;
+
   openMarkPanel('selection');
+  renderMarkSelectionCard();
   requestAnimationFrame(() => requestAnimationFrame(() => {
+    applyPersistentMarkSelectionHighlight();
     const input = document.querySelector('[data-askmark-input]');
-    if (!input) return;
-    const context = nearby ? `\n\nCurrent reading context:\n${nearby}` : '';
-    input.value = `${prompt || `Help me think more deeply about ${guideTitle}.`}${context}`;
-    input.dispatchEvent(new Event('input', { bubbles:true }));
-    input.focus();
+    input?.focus();
   }));
 }
 
-function showModernGuideQuiz(source = state?.source || {}) {
+function addModernGuideActionToCenter(source = state?.source || {}, trigger = null) {
   const config = modernGuideInteractionConfig(source);
-  if (!config?.quiz?.length) return;
-  document.querySelector('#modern-guide-quiz-dialog')?.remove();
-  const dialog = document.createElement('dialog');
-  dialog.id = 'modern-guide-quiz-dialog';
-  dialog.className = 'modern-guide-quiz-dialog';
-  dialog.innerHTML = `
-    <form method="dialog" class="modern-guide-quiz-shell">
-      <header>
-        <div><span class="source-category">Modern Guide Quiz</span><h2>${escapeHtml(source.originalTitle || state.title || 'Guide')}</h2><p>Answer from memory first. You can discuss the results with Ask Mark afterward.</p></div>
-        <button class="secondary" value="cancel" aria-label="Close quiz">Close</button>
-      </header>
-      <div class="modern-guide-quiz-questions">
-        ${config.quiz.map((q, qi) => `<fieldset data-guide-question="${qi}"><legend>${qi+1}. ${escapeHtml(q[0])}</legend>${q[1].map((choice, ci)=>`<label><input type="radio" name="guide-q-${qi}" value="${ci}"><span>${escapeHtml(choice)}</span></label>`).join('')}</fieldset>`).join('')}
-      </div>
-      <footer>
-        <button type="button" class="primary" data-grade-modern-guide-quiz>Grade quiz</button>
-        <button type="button" class="secondary" data-discuss-modern-guide-quiz hidden>Discuss results with Ask Mark</button>
-        <strong data-modern-guide-quiz-score aria-live="polite"></strong>
-      </footer>
-    </form>`;
-  document.body.appendChild(dialog);
-  dialog.querySelector('[data-grade-modern-guide-quiz]')?.addEventListener('click', () => {
-    let correct = 0;
-    const missed = [];
-    config.quiz.forEach((q, qi) => {
-      const selected = dialog.querySelector(`input[name="guide-q-${qi}"]:checked`);
-      const fieldset = dialog.querySelector(`[data-guide-question="${qi}"]`);
-      const isCorrect = selected && Number(selected.value) === Number(q[2]);
-      fieldset?.classList.toggle('is-correct', Boolean(isCorrect));
-      fieldset?.classList.toggle('is-missed', !isCorrect);
-      if (isCorrect) correct += 1;
-      else missed.push(`${qi+1}. ${q[0]}`);
+  if (!config?.actionTitle) return;
+
+  const actions = readActions();
+  const sourceTitle = `${source.originalTitle || state.title || 'Modern Guide'} — Mark, Set, Go! Guide`;
+  const existing = actions.find((item) =>
+    item.status !== 'completed'
+    && String(item.title || '') === String(config.actionTitle)
+    && String(item.sourceTitle || '') === sourceTitle
+  );
+
+  if (!existing) {
+    actions.push({
+      id: `action_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+      title: config.actionTitle,
+      type: config.actionType || 'task',
+      dueAt: '',
+      priority: 'normal',
+      repeat: 'none',
+      reminder: 'none',
+      sourceTitle,
+      note: config.actionNote || '',
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      completedAt: null
     });
-    const pct = Math.round((correct / config.quiz.length) * 100);
-    const score = dialog.querySelector('[data-modern-guide-quiz-score]');
-    if (score) score.textContent = `${correct}/${config.quiz.length} · ${pct}%`;
-    const discuss = dialog.querySelector('[data-discuss-modern-guide-quiz]');
-    if (discuss) {
-      discuss.hidden = false;
-      discuss.dataset.quizPrompt = missed.length
-        ? `I scored ${correct}/${config.quiz.length} on the ${source.originalTitle || 'guide'} quiz. Help me understand these missed ideas without simply giving me answers: ${missed.join(' | ')}`
-        : `I scored ${correct}/${config.quiz.length} on the ${source.originalTitle || 'guide'} quiz. Give me three harder application questions to test deeper understanding.`;
-    }
-  });
-  dialog.querySelector('[data-discuss-modern-guide-quiz]')?.addEventListener('click', (event) => {
-    const prompt = event.currentTarget.dataset.quizPrompt || '';
-    dialog.close();
-    openModernGuideAskMark(prompt, source);
-  });
-  dialog.addEventListener('close', () => dialog.remove(), { once:true });
-  dialog.showModal();
+    writeActions(actions);
+  }
+
+  if (trigger) {
+    trigger.textContent = existing ? 'Already in Action Center ✓' : 'Added to Action Center ✓';
+    trigger.disabled = true;
+    trigger.setAttribute('aria-disabled', 'true');
+  }
 }
 
-function bindModernGuideReaderTools(source = state?.source || {}) {
-  if (source?.type !== 'modern-guide') return;
+function openModernGuideGreatIdea(source = state?.source || {}) {
   const config = modernGuideInteractionConfig(source);
-  app.querySelectorAll('[data-modern-guide-tool]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const tool = button.dataset.modernGuideTool;
-      if (tool === 'ask') {
-        openModernGuideAskMark(`Discuss the current section of my ${source.originalTitle || 'modern guide'} with me. Start by asking what I think the main claim is, then help me test it.`, source);
-        return;
-      }
-      if (tool === 'key-ideas') {
-        openModernGuideAskMark(config?.askPrompt || `Help me identify and apply the key ideas in ${source.originalTitle || 'this guide'}.`, source);
-        return;
-      }
-      if (tool === 'quiz') {
-        showModernGuideQuiz(source);
-        return;
-      }
-      if (tool === 'action') {
-        rememberReaderForReturn();
-        renderActionCenter();
-        const titleInput = app.querySelector('#action-title');
-        const typeInput = app.querySelector('#action-type');
-        const sourceInput = app.querySelector('#action-source');
-        const noteInput = app.querySelector('#action-note');
-        if (titleInput) titleInput.value = config?.actionTitle || `Apply one idea from ${source.originalTitle || 'this guide'}`;
-        if (typeInput) typeInput.value = config?.actionType || 'experiment';
-        if (sourceInput) sourceInput.value = `${source.originalTitle || state.title || 'Modern Guide'} — Mark, Set, Go! Guide`;
-        if (noteInput) noteInput.value = config?.actionNote || 'Choose one idea from the guide and turn it into a small, specific next action.';
-        titleInput?.focus();
-        titleInput?.scrollIntoView({ behavior:'smooth', block:'center' });
-        return;
-      }
-      if (tool === 'great-ideas') {
-        rememberReaderForReturn();
-        renderSyntopicon();
-        const idea = config?.greatIdea || '';
-        const select = app.querySelector('#syntopicon-idea');
-        if (select && idea && Array.from(select.options).some((option) => option.value === idea)) {
-          select.value = idea;
-          select.dispatchEvent(new Event('change', { bubbles:true }));
-        } else {
-          const custom = app.querySelector('#syntopicon-custom-idea');
-          if (custom) custom.value = idea;
-        }
-        (select || app.querySelector('#syntopicon-custom-idea'))?.scrollIntoView({ behavior:'smooth', block:'center' });
-      }
-    });
+  const idea = config?.greatIdea || '';
+  rememberReaderForReturn();
+  renderSyntopicon();
+
+  requestAnimationFrame(() => {
+    const select = app.querySelector('#syntopicon-idea');
+    if (select && idea && Array.from(select.options).some((option) => option.value === idea)) {
+      select.value = idea;
+      select.dispatchEvent(new Event('change', { bubbles:true }));
+      select.focus();
+      return;
+    }
+    const custom = app.querySelector('#syntopicon-custom-idea');
+    if (custom) {
+      custom.value = idea;
+      custom.focus();
+    }
   });
+}
+
+function activateModernGuideInlineAction(button, source = state?.source || {}) {
+  const action = button?.dataset?.modernGuideInlineAction;
+  const index = Number(button?.dataset?.guideWordIndex);
+  if (!action || source?.type !== 'modern-guide') return;
+
+  if (Number.isFinite(index)) state.index = Math.max(0, index);
+
+  if (action === 'discuss') {
+    openModernGuideContextInAskMark(index);
+    return;
+  }
+
+  if (action === 'quiz') {
+    if (isReaderRunning()) pauseReader();
+    window.MarkSetGoStartComprehension?.();
+    return;
+  }
+
+  if (action === 'action') {
+    addModernGuideActionToCenter(source, button);
+    return;
+  }
+
+  if (action === 'ideas') {
+    openModernGuideGreatIdea(source);
+  }
+}
+
+function bindModernGuideInlineActions(source = state?.source || {}) {
+  if (source?.type !== 'modern-guide') return;
+  const reader = app.querySelector('#reader');
+  if (!reader || reader.dataset.modernGuideInlineBound === '1') return;
+  reader.dataset.modernGuideInlineBound = '1';
+
+  reader.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-modern-guide-inline-action]');
+    if (!button || !reader.contains(button)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    activateModernGuideInlineAction(button, source);
+  }, true);
+
+  reader.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('[data-modern-guide-inline-action]')) {
+      event.stopPropagation();
+    }
+  }, true);
 }
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
@@ -8276,15 +8325,6 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
           <button id="play-reading-mood" class="secondary reader-music-button" type="button">♫ Reading mood</button>
         </div>
       </div>
-      ${source?.type === 'modern-guide' ? `
-        <nav class="modern-guide-tools" aria-label="Modern guide tools">
-          <button type="button" data-modern-guide-tool="ask"><span>💬</span> Ask Mark about this section</button>
-          <button type="button" data-modern-guide-tool="key-ideas"><span>✦</span> Discuss key ideas</button>
-          <button type="button" data-modern-guide-tool="quiz"><span>✓</span> Take guide quiz</button>
-          <button type="button" data-modern-guide-tool="action"><span>◎</span> Build action plan</button>
-          <button type="button" data-modern-guide-tool="great-ideas"><span>★</span> Explore Great Ideas</button>
-          ${source?.buyUrl ? `<a href="${escapeHtml(source.buyUrl)}" target="_blank" rel="noopener noreferrer"><span>↗</span> Buy original</a>` : ''}
-        </nav>` : ''}
       <section class="reader-toolbar" aria-label="Reading settings">
         <details class="settings-panel">
           <summary><span>Reading</span><span class="settings-summary">Mode, speed, words</span></summary>
@@ -8894,7 +8934,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     control.addEventListener('change', () => persistReaderSession());
     control.addEventListener('input', () => persistReaderSession());
   });
-  bindModernGuideReaderTools(source);
+  bindModernGuideInlineActions(source);
 
   // Bible chapters/books are typically small enough to save immediately, and
   // doing so guarantees Resume Last Reading points at the passage just opened.

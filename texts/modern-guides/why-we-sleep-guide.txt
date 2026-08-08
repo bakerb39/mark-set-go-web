@@ -7,17 +7,10 @@ Sleep cycles, circadian timing, memory, health, dreams, and a critical approach 
 ABOUT THIS GUIDE
 This is an independently written educational guide. It is not the original book and is not affiliated with or endorsed by the author or publisher. It explains selected ideas in original language, adds commentary, reflection, application, and connections to other traditions, and encourages readers to obtain the original work.
 
-INTERACTIVE TOOLS
-Use the Modern Guide toolbar while reading:
-• Ask Mark about this section — discusses the passage around your current reading position.
-• Discuss key ideas — opens Ask Mark with a guide-specific coaching prompt.
-• Take guide quiz — opens a six-question comprehension check.
-• Build action plan — opens the Action Center with a suggested experiment already filled in.
-• Explore Great Ideas — opens the Syntopicon with a related Great Idea selected.
-• Buy original — opens an Amazon search for the original book.
-
 HOW TO USE IT
 Read once for the big picture. On a second pass, stop at the Ask Mark prompts and application exercises. Highlight any paragraph you want to discuss, then use Ask Mark to challenge, compare, simplify, or apply the idea.
+
+[[MSG:BUY]]
 
 1. SLEEP IS ACTIVE BIOLOGY
 
@@ -36,10 +29,6 @@ Circadian rhythm is the roughly daily timing system that helps regulate alertnes
 Sleep pressure builds during wakefulness and tends to increase the longer you have been awake. Adenosine is one chemical associated with this pressure. Caffeine temporarily interferes with adenosine signaling, which can make you feel less sleepy without erasing the underlying need for sleep.
 
 Understanding these two systems explains why a person can be tired yet temporarily alert, or why changing time zones can produce strange combinations of exhaustion and wakefulness.
-
-ASK MARK
-Ask Mark: Explain circadian rhythm versus sleep pressure with an analogy.
-Ask Mark: Why can caffeine late in the day affect nighttime sleep?
 
 3. CHRONOTYPE AND TIMING
 
@@ -91,6 +80,8 @@ Alcohol can make falling asleep feel easier while disrupting sleep architecture 
 
 Individual responses vary, but the broader lesson is that sedation and healthy sleep are not the same thing.
 
+[[MSG:DISCUSS]]
+
 9. LIGHT AND THE MODERN ENVIRONMENT
 
 Light is a major cue for circadian timing.
@@ -113,18 +104,7 @@ Why We Sleep became enormously influential, but some scientists and reviewers ha
 
 That is not a reason to ignore sleep science. It is a reason to practice scientific literacy.
 
-Ask:
-Is this association or causation?
-How large was the study?
-Was the claim replicated?
-Is the effect clinically meaningful?
-Is the language stronger than the evidence?
-
 A modern guide should help readers appreciate the central importance of sleep without turning every popular claim into settled fact.
-
-ASK MARK
-Ask Mark: Help me evaluate a health claim using association versus causation.
-Ask Mark: Which sleep claims should I verify before repeating them?
 
 12. SLEEP AND READING PERFORMANCE
 
@@ -148,13 +128,6 @@ Reading comprehension or concentration the following day.
 
 Do not try to optimize everything simultaneously. Observe first. Then change one variable.
 
-QUIZ PREVIEW
-1. What is the difference between circadian rhythm and sleep pressure?
-2. Why is sedation not identical to healthy sleep?
-3. How can sleep support learning?
-4. Why should popular science claims be evaluated critically?
-5. What variables could you track before making a sleep change?
-
 GREAT IDEAS CONNECTIONS
 Nature — sleep as a biological rhythm.
 Habit — routines and environmental cues.
@@ -164,6 +137,8 @@ Temperance — tradeoffs involving stimulation and rest.
 
 FINAL TAKEAWAY
 Treat sleep as a biological foundation for waking life, and treat claims about sleep with the same disciplined curiosity you would bring to any important science.
+
+[[MSG:IDEAS]]
 
 14. DEEP DIVE: SLEEP ARCHITECTURE
 
@@ -182,6 +157,8 @@ Circadian biology influences more than sleepiness.
 Daily rhythms affect hormone release, body temperature, metabolism, alertness, and many other systems. Light reaching the eyes is one of the strongest timing signals.
 
 This helps explain why irregular schedules and rapid travel across time zones can feel like more than simple tiredness. The body is coordinating multiple processes according to a clock that may not match the external schedule.
+
+[[MSG:DISCUSS]]
 
 16. MORNING LIGHT AND EVENING LIGHT
 
@@ -251,6 +228,8 @@ Shift workers, caregivers, emergency personnel, parents of infants, and people w
 
 Good guidance should acknowledge constraints. Small improvements in light exposure, timing consistency, recovery opportunities, and sleep environment may still help, but moralizing about perfect routines is misplaced.
 
+[[MSG:DISCUSS]]
+
 24. SLEEP AND SAFETY
 
 Sleepiness can become a safety issue.
@@ -263,62 +242,13 @@ A culture that treats severe sleep deprivation as toughness can create real risk
 
 For any strong claim, create three columns:
 
-CLAIM:
-What exactly is being asserted?
-
-EVIDENCE:
-What kind of study supports it—observational, experimental, mechanistic, meta-analysis?
-
-CONFIDENCE:
-What would make you more or less certain?
-
 This method is useful beyond sleep. It converts passive reading into scientific reasoning.
-
-ASK MARK
-Ask Mark: Take one claim from my current passage and help me classify its evidence without exaggerating certainty.
 
 26. GREAT IDEAS CONNECTIONS
 
-Nature:
-How much should human schedules conform to biological rhythms?
-
-Mind:
-What do sleep and dreaming suggest about consciousness?
-
-Education:
-How should schools and learners respond to the relationship between sleep and memory?
-
-Temperance:
-How should we balance stimulation, work, and rest?
-
-Habit:
-Which parts of a sleep-supportive routine can be designed behaviorally?
-
 27. SLEEP-LITERACY WORKBOOK
 
-BEDTIME RANGE:
-What is your normal range?
-
-WAKE RANGE:
-What is your normal range?
-
-CAFFEINE:
-When is the last intake?
-
-LIGHT:
-How much outdoor morning light do you usually receive?
-
-STIMULATION:
-What keeps the mind activated late?
-
-ENVIRONMENT:
-Darkness, temperature, noise, comfort?
-
-DAYTIME SIGNALS:
-Sleepiness, concentration, mood, reading comprehension?
-
-ONE VARIABLE:
-What single change will you test first?
+[[MSG:ACTION]]
 
 28. WHEN TO SEEK PROFESSIONAL HELP
 
@@ -330,24 +260,14 @@ A reading guide can improve literacy. It cannot diagnose.
 
 29. FINAL COMPREHENSION CHECK
 
-What are circadian timing and sleep pressure?
-How does light interact with circadian timing?
-Why can caffeine change perceived sleepiness without removing sleep need?
-How do sleep stages vary across a night?
-Why should wearable sleep stages be interpreted cautiously?
-How can sleep support reading and memory?
-Why is critical reading especially important in popular health science?
-
-Then take the interactive guide quiz.
-
 30. ACTION PLAN
-
-Choose Build Action Plan and create a seven-day observation experiment.
 
 Observe first.
 Change one variable.
 Review the pattern.
 Avoid turning sleep into another source of anxiety.
+
+[[MSG:DISCUSS]]
 
 31. CLOSING PERSPECTIVE
 
@@ -405,9 +325,6 @@ But perfection is not required. Real homes contain partners, children, pets, str
 
 Prioritize the largest source of disruption first.
 
-A useful environmental question is:
-What repeatedly wakes me or delays sleep that I can realistically change?
-
 37. SLEEP AND EXAM PREPARATION
 
 Students often sacrifice sleep because the hours before an exam feel scarce.
@@ -427,6 +344,8 @@ A minor criticism can seem larger. Patience can shrink. Problems can feel more p
 This does not invalidate emotion, but it suggests caution about making sweeping judgments while severely tired.
 
 Sometimes the appropriate first intervention is not solving the entire life problem at midnight. It is sleeping and reconsidering in the morning.
+
+[[MSG:DISCUSS]]
 
 39. SLEEP HYGIENE VERSUS INSOMNIA TREATMENT
 
@@ -450,50 +369,17 @@ The purpose of tracking is better functioning, not anxiety about achieving a per
 
 41. A MONTHLY SLEEP REVIEW
 
-Ask:
-Am I usually giving myself enough opportunity to sleep?
-Is my wake time reasonably stable?
-Is caffeine timing working for me?
-Do I experience persistent daytime sleepiness?
-Does my reading or work concentration collapse at predictable times?
-Which change produced the clearest benefit?
-Am I becoming more informed or merely more worried?
-
 42. FINAL SLEEP CHALLENGE
 
 For seven days, use the Action Center experiment already suggested.
-
-Then bring the observations to Ask Mark:
-What patterns appear?
-Which conclusions are justified?
-Which are only guesses?
-What one variable would be worth testing next?
 
 The goal is not self-diagnosis. It is better observation and better questions.
 
 43. SLEEP CLAIM CHECKLIST
 
-When you encounter a dramatic sleep claim, ask:
-Was the evidence observational or experimental?
-How many people were studied?
-Was the outcome self-reported or objectively measured?
-Does the study show association or causation?
-How large was the effect?
-Has the finding been replicated?
-Does the claim apply to everyone or to a specific group?
-Is the headline stronger than the study?
-
 This checklist helps preserve the value of popular science while resisting exaggeration.
 
 44. QUESTIONS TO DISCUSS WITH ASK MARK
-
-What is the difference between circadian rhythm and sleep pressure?
-How might caffeine timing affect me differently from someone else?
-Which sleep-tracker metrics are useful for trends and which should I treat cautiously?
-How can I improve sleep opportunity without becoming obsessive?
-What sleep claim in this guide has the strongest evidence?
-Which claims deserve independent verification?
-How might sleep quality affect my reading comprehension data?
 
 45. A READER'S SLEEP EXPERIMENT
 
@@ -509,6 +395,8 @@ Sleep duration the previous night.
 Do not treat one comparison as proof. Repeat enough times to look for a pattern.
 
 This connects sleep literacy directly to the purpose of Mark, Set, Go!: understanding how the condition of the reader affects the reading process.
+
+[[MSG:DISCUSS]]
 
 46. CLOSING WORKSHEET
 
@@ -547,12 +435,6 @@ A recent review or meta-analysis.
 One or two primary studies.
 A critique or alternative interpretation.
 
-Then ask:
-Where do the sources agree?
-Where do they differ?
-Which conclusion is strongest?
-Which conclusion is still uncertain?
-
 This is a useful template for any popular science book.
 
 49. READING PERFORMANCE CHECK
@@ -571,21 +453,11 @@ At the end, ask Mark to help you distinguish pattern from coincidence and propos
 
 50. FINAL ASK MARK PROMPT
 
-Ask Mark:
-“Help me evaluate one sleep claim scientifically. Ask me what the claim is, what evidence supports it, whether the evidence shows association or causation, and what would make the conclusion stronger or weaker.”
-
 51. DECISION JOURNAL FOR SLEEP CHANGES
 
 Sleep experiments are vulnerable to expectation. If you strongly believe a change will help, one good night can feel like proof.
 
 Record your hypothesis before changing anything.
-
-What am I changing?
-Why do I think it may help?
-What outcome will I observe?
-How many days will I observe it?
-What else could explain the result?
-What would count as no meaningful change?
 
 This creates a small barrier against confirmation bias.
 
@@ -606,3 +478,9 @@ Before accepting any sleep recommendation, ask whether it is safe, whether it fi
 Then prefer simple experiments over constant optimization. Keep the useful habits that improve daytime function and discard rituals that create anxiety without clear benefit.
 
 The goal is not to become a perfect sleeper. It is to become a better-informed observer of your own sleep while respecting what research can and cannot tell you.
+
+[[MSG:DISCUSS]]
+
+[[MSG:QUIZ]]
+
+[[MSG:BUY]]
