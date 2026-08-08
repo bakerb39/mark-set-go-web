@@ -5246,7 +5246,7 @@ const EXPERIENCE_PRESETS = Object.freeze({
     description:'Keep the interface focused on reading, your library, Mark, and notes.',
     features:{
       learn:false,
-      music:false,
+      music:true,
       goals:false,
       actionCenter:false,
       modernGuides:true,
