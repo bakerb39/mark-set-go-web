@@ -43,6 +43,8 @@
     [/Open Mark as your reading companion/g, 'Open Beth as your reading companion'],
     [/Mark output/g, 'Beth output'],
     [/Mark as your reading companion/g, 'Beth as your reading companion'],
+    [/Meet Mark\./g, 'Meet Beth.'],
+    [/Meet Mark\b/g, 'Meet Beth'],
     [/with Mark\b/g, 'with Beth'],
     [/from Mark\b/g, 'from Beth']
   ];
@@ -138,6 +140,15 @@
     if (img.matches('img.ask-mark-avatar,img[class*="ask-mark"][class*="avatar"]')) return BETH_AVATAR;
     if (img.matches('img[class*="mark"][class*="portrait"]')) return BETH_READING;
     return BETH_AVATAR;
+  }
+
+  function applyFrontpageCompanionMode(root = document) {
+    const stage = root.querySelector?.('.home-mark-icon-stage');
+    if (!stage) return;
+    stage.classList.toggle('companion-frontpage-badge-mode', state.id === 'beth');
+    stage.querySelectorAll('.home-mark-stage-caption').forEach((el) => {
+      el.hidden = state.id === 'beth';
+    });
   }
 
   function applyImages(root = document) {
@@ -242,6 +253,7 @@
     applyText(document.body, { includeProtected });
     applyKnownReaderLabels();
     applyImages(document);
+    applyFrontpageCompanionMode(document);
     updateProfileControl();
   }
 

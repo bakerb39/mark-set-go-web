@@ -12925,3 +12925,22 @@ html[data-companion="beth"] .msg-walkthrough-mark-illustration{width:100%!import
 .profile-preferences > .companion-persona-settings:first-child,
 [data-page="profile"] > .companion-persona-settings:first-child,
 .profile-page > .companion-persona-settings:first-child{margin-top:0;}
+
+
+/* v9.4.4 Beth front-page cleanup */
+html[data-companion="beth"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-portrait-wrap::before{
+  display:none !important;
+}
+html[data-companion="beth"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-avatar{
+  box-shadow:none !important;
+  border-radius:0 !important;
+  object-fit:contain !important;
+  aspect-ratio:auto !important;
+  max-width:540px !important;
+}
+html[data-companion="beth"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-stage-caption{
+  display:none !important;
+}
+html[data-companion="beth"] .home-mark-icon-stage.companion-frontpage-badge-mode{
+  background:transparent !important;
+}
