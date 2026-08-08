@@ -12833,3 +12833,50 @@ html.msg-walkthrough-active .msg-walkthrough-target,
 #msg-app-walkthrough .msg-walkthrough-mask {
   pointer-events:none !important;
 }
+
+
+/* v9.3.9 target-aware Mark pointing, built on the v9.3.8 right-click fix.
+   Mark remains ONE illustration: no duplicate/overlay arm. The walkthrough JS
+   moves and mirrors the real presenter so his existing fingertip lands on the
+   currently highlighted target. */
+#msg-app-walkthrough[data-walkthrough-build="9.3.9"] .msg-walkthrough-host {
+  position:fixed !important;
+  overflow:visible !important;
+  transition:left .20s ease, top .20s ease, width .20s ease, height .20s ease !important;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.3.9"] .msg-walkthrough-mark-figure {
+  width:100% !important;
+  height:100% !important;
+  overflow:visible !important;
+  border-radius:0 !important;
+  background:transparent !important;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.3.9"] .msg-walkthrough-mark-illustration {
+  display:block !important;
+  width:100% !important;
+  height:100% !important;
+  max-width:none !important;
+  object-fit:contain !important;
+  object-position:left bottom !important;
+  transform-origin:center center !important;
+  transition:transform .18s ease !important;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.3.9"] .msg-walkthrough-mark-figure.is-pointing-right .msg-walkthrough-mark-illustration {
+  transform:scaleX(1) !important;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.3.9"] .msg-walkthrough-mark-figure.is-pointing-left .msg-walkthrough-mark-illustration {
+  transform:scaleX(-1) !important;
+}
+#msg-app-walkthrough[data-walkthrough-build="9.3.9"] .msg-walkthrough-mark-figure::after {
+  display:none !important;
+}
+/* Keep the ASK MARK badge readable; only the portrait image is mirrored. */
+#msg-app-walkthrough[data-walkthrough-build="9.3.9"] .msg-walkthrough-mark-figure figcaption {
+  transform:none !important;
+}
+@media (prefers-reduced-motion:reduce) {
+  #msg-app-walkthrough[data-walkthrough-build="9.3.9"] .msg-walkthrough-host,
+  #msg-app-walkthrough[data-walkthrough-build="9.3.9"] .msg-walkthrough-mark-illustration {
+    transition:none !important;
+  }
+}
