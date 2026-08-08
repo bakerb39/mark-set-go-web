@@ -12664,3 +12664,45 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
 @media(max-width:650px){
   .msg-walkthrough-mode-options{grid-template-columns:1fr}
 }
+
+
+/* v9.3.2 walkthrough menu-target highlighting
+   Menu targets highlight themselves so the gold frame can never sit behind the menu. */
+.msg-walkthrough-menu-mirror .msg-walkthrough-target,
+.msg-walkthrough-menu-mirror summary.msg-walkthrough-target,
+.msg-walkthrough-menu-mirror button.msg-walkthrough-target,
+.msg-walkthrough-menu-mirror a.msg-walkthrough-target {
+  position:relative !important;
+  z-index:5 !important;
+  isolation:isolate !important;
+  background:#fff9e6 !important;
+  color:#123f68 !important;
+  outline:3px solid #f0cf62 !important;
+  outline-offset:-3px !important;
+  box-shadow:
+    inset 0 0 0 1px #a97d13,
+    0 0 0 2px rgba(255,255,255,.95),
+    0 5px 14px rgba(31,50,70,.18) !important;
+  border-radius:7px !important;
+}
+.msg-walkthrough-menu-mirror .msg-walkthrough-target .menu-copy strong,
+.msg-walkthrough-menu-mirror .msg-walkthrough-target strong {
+  color:#0b3b67 !important;
+}
+.msg-walkthrough-menu-mirror .msg-walkthrough-target .menu-copy small,
+.msg-walkthrough-menu-mirror .msg-walkthrough-target small {
+  color:#425b70 !important;
+}
+.msg-walkthrough-menu-mirror details:has(> summary.msg-walkthrough-target) {
+  position:relative !important;
+  z-index:6 !important;
+}
+
+/* Keep the visible menu above dimming masks, while the highlight remains
+   inside the menu rather than trying to surround it from another layer. */
+#msg-app-walkthrough .msg-walkthrough-menu-mirror {
+  z-index:2147483643 !important;
+}
+#msg-app-walkthrough .msg-walkthrough-outline {
+  z-index:2147483642 !important;
+}

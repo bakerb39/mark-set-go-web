@@ -2,7 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
-  const WALKTHROUGH_BUILD = '9.3.0';
+  const WALKTHROUGH_BUILD = '9.3.2';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -753,6 +753,8 @@
     activeTarget = null;
     const connector = root && $('.msg-walkthrough-connector', root);
     if (connector) connector.style.display = 'none';
+    const outline = root && $('.msg-walkthrough-outline', root);
+    if (outline) outline.style.display = 'none';
   }
 
   function schedulePosition() {
@@ -811,9 +813,17 @@
     const height = Math.max(12, bottom - top);
 
     const outline = $('.msg-walkthrough-outline', root);
-    Object.assign(outline.style, {
-      left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px`
-    });
+    const targetIsMenuItem = !!activeTarget.closest?.('.msg-walkthrough-menu-mirror');
+    if (outline) {
+      if (targetIsMenuItem) {
+        outline.style.display = 'none';
+      } else {
+        outline.style.display = 'block';
+        Object.assign(outline.style, {
+          left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px`
+        });
+      }
+    }
 
     const masks = {
       top: $('.msg-walkthrough-mask-top', root),
