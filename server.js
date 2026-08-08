@@ -939,13 +939,19 @@ app.post('/api/comprehension', async (req, res) => {
 
   const passage = String(req.body?.passage || '').replace(/\s+/g, ' ').trim();
   const title = String(req.body?.title || 'Untitled reading').trim().slice(0, 300);
+  const scope = String(req.body?.scope || 'passage').trim();
+  const wholeGuide = scope === 'whole_guide';
   const wordCount = passage ? passage.split(/\s+/).length : 0;
 
   if (wordCount < 120) {
     return res.status(400).json({ error: 'Read at least 120 words before starting a comprehension check.' });
   }
-  if (wordCount > 1200 || passage.length > 12000) {
-    return res.status(400).json({ error: 'The comprehension passage is too large.' });
+  const maxWords = wholeGuide ? 12000 : 1200;
+  const maxCharacters = wholeGuide ? 100000 : 12000;
+  if (wordCount > maxWords || passage.length > maxCharacters) {
+    return res.status(400).json({
+      error: wholeGuide ? 'The guide is too large for a whole-guide comprehension check.' : 'The comprehension passage is too large.'
+    });
   }
 
   const schema = {
@@ -978,7 +984,13 @@ app.post('/api/comprehension', async (req, res) => {
     }
   };
 
-  const prompt = `Create exactly four multiple-choice comprehension questions based ONLY on the supplied passage from "${title}".
+  const prompt = wholeGuide
+    ? `Create exactly four multiple-choice comprehension questions based ONLY on the complete reading guide "${title}".
+Treat the supplied text as the entire guide, not as a local passage. Spread the questions across different major sections and ideas so the quiz tests understanding of the guide as a whole.
+The four question types must be, in this order: factual recall, main idea, inference, and deeper understanding.
+Each question must be answerable from the supplied guide itself. Do not rely on outside knowledge or facts not present in the guide.
+Use plausible distractors. Keep explanations concise and refer to the relevant idea without long quotation.`
+    : `Create exactly four multiple-choice comprehension questions based ONLY on the supplied passage from "${title}".
 The four question types must be, in this order: factual recall, main idea, inference, and deeper understanding.
 Each question must be answerable from the passage itself. Do not rely on outside knowledge, later parts of the work, or facts not present in the passage.
 Use plausible distractors. Keep explanations concise and cite the relevant idea from the passage without long quotation.`;

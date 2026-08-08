@@ -10734,3 +10734,13 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
   .reader .modern-guide-action-word,
   .interactive-reader .modern-guide-action-word { width:100% !important; margin:.55rem 0 !important; }
 }
+
+
+/* v9.2.55 exact-section Modern Guide discussions */
+.modern-guide-section-marker { display:none !important; }
+.modern-guide-inline-discuss {
+  margin-top:.2rem;
+  background:#eef5fc;
+  border-color:rgba(24,75,129,.28);
+}
+.modern-guide-inline-discuss::before { content:"💬"; margin-right:6px; }

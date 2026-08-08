@@ -2913,6 +2913,12 @@ function getBionicParts(word) {
 function setWordContent(element, word, index = null) {
   const guideAction = state?.source?.type === 'modern-guide' ? modernGuideActionToken(word) : '';
   if (guideAction) {
+    if (guideAction === 'section') {
+      element.classList.add('modern-guide-section-marker');
+      element.setAttribute('aria-hidden', 'true');
+      return;
+    }
+
     const resolvedIndex = Number.isFinite(Number(index))
       ? Number(index)
       : Number(element?.dataset?.index ?? element?.dataset?.startIndex);
@@ -8055,7 +8061,7 @@ function modernGuideInteractionConfig(source = state?.source || {}) {
 }
 
 function modernGuideActionToken(word) {
-  const match = String(word || '').match(/^\[\[MSG:(DISCUSS|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
+  const match = String(word || '').match(/^\[\[MSG:(SECTION|DISCUSS|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
   return match ? match[1].toLowerCase() : '';
 }
 
@@ -8065,40 +8071,41 @@ function isModernGuideActionToken(word) {
 
 function modernGuideActionLabel(action) {
   return ({
+    section: '',
     discuss: 'Discuss with Ask Mark',
-    quiz: 'Start comprehension quiz',
+    quiz: 'Quiz me on the whole guide',
     action: 'Add to Action Center',
     ideas: 'Explore related Great Ideas',
     buy: 'Buy the original book'
   })[action] || 'Guide action';
 }
 
-function modernGuideContextRange(markerIndex, maximumWords = 260) {
+function modernGuideContextRange(markerIndex) {
   const safeMarker = Math.max(0, Math.min(state.words.length, Number(markerIndex) || 0));
-  let start = safeMarker;
-  let counted = 0;
+  let sectionMarker = -1;
 
-  while (start > 0 && counted < maximumWords) {
-    start -= 1;
-    if (isModernGuideActionToken(state.words[start])) {
-      // Stop at the prior action divider once enough real reading context exists.
-      if (counted >= 90) { start += 1; break; }
-      continue;
+  for (let index = safeMarker - 1; index >= 0; index -= 1) {
+    if (modernGuideActionToken(state.words[index]) === 'section') {
+      sectionMarker = index;
+      break;
     }
-    counted += 1;
   }
 
+  const startIndex = sectionMarker >= 0 ? sectionMarker + 1 : 0;
   const cleanWords = [];
   let firstReal = null;
-  for (let index = start; index < safeMarker; index += 1) {
+  let lastReal = null;
+
+  for (let index = startIndex; index < safeMarker; index += 1) {
     if (isModernGuideActionToken(state.words[index])) continue;
     if (firstReal == null) firstReal = index;
+    lastReal = index;
     cleanWords.push(state.words[index]);
   }
 
   return {
-    startIndex: firstReal == null ? Math.max(0, safeMarker - 1) : firstReal,
-    endIndex: safeMarker,
+    startIndex: firstReal == null ? startIndex : firstReal,
+    endIndex: lastReal == null ? safeMarker : lastReal + 1,
     text: cleanWords.join(' ').trim()
   };
 }
@@ -8121,6 +8128,10 @@ function openModernGuideContextInAskMark(markerIndex) {
   renderMarkSelectionCard();
   requestAnimationFrame(() => requestAnimationFrame(() => {
     applyPersistentMarkSelectionHighlight();
+    window.MarkSetGoGuideSectionWelcome?.({
+      title: source?.originalTitle || state?.title || 'this guide',
+      text: context.text
+    });
     const input = document.querySelector('[data-askmark-input]');
     input?.focus();
   }));
@@ -8186,6 +8197,44 @@ function openModernGuideGreatIdea(source = state?.source || {}) {
   });
 }
 
+async function startModernGuideWholeComprehensionCheck(source = state?.source || {}) {
+  if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
+    return window.MarkSetGoStartComprehension?.();
+  }
+
+  const passageWords = state.words.filter((word) => !isModernGuideActionToken(word));
+  const passage = passageWords.join(' ').replace(/\s+/g, ' ').trim();
+  if (passageWords.length < 120) return;
+
+  const wasRunning = isReaderRunning();
+  if (wasRunning) pauseReader();
+
+  try {
+    const response = await fetch('/api/comprehension', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `${source.originalTitle || state.title || 'Modern Guide'} — Whole Guide`,
+        passage,
+        scope: 'whole_guide'
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
+
+    renderComprehensionQuiz(payload, {
+      startIndex: 0,
+      endIndex: state.words.length,
+      words: passageWords.length,
+      passage,
+      wholeGuide: true
+    });
+  } catch (error) {
+    window.alert(`Whole-guide comprehension check unavailable: ${error.message}`);
+  }
+}
+
 function activateModernGuideInlineAction(button, source = state?.source || {}) {
   const action = button?.dataset?.modernGuideInlineAction;
   const index = Number(button?.dataset?.guideWordIndex);
@@ -8199,8 +8248,7 @@ function activateModernGuideInlineAction(button, source = state?.source || {}) {
   }
 
   if (action === 'quiz') {
-    if (isReaderRunning()) pauseReader();
-    window.MarkSetGoStartComprehension?.();
+    startModernGuideWholeComprehensionCheck(source);
     return;
   }
 

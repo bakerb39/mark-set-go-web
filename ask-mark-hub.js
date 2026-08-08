@@ -233,6 +233,25 @@
     return addMarkProgressMessage(update,{force});
   }
 
+  window.MarkSetGoGuideSectionWelcome = ({ title = '', text = '' } = {}) => {
+    if (!shell) configureShell();
+    const conversation = $('[data-askmark-conversation]', shell);
+    if (!conversation) return false;
+
+    conversation.querySelectorAll('[data-guide-section-welcome]').forEach((item) => item.remove());
+    conversation.insertAdjacentHTML('beforeend', `
+      <article class="askmark-message mark-message" data-guide-section-welcome>
+        <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+        <div>
+          <span>Mark</span>
+          <p>Happy to discuss this section with you. I’ve highlighted the entire section so we can explore any part of it together.</p>
+        </div>
+      </article>`);
+    conversation.scrollTop = conversation.scrollHeight;
+    syncSelection();
+    return true;
+  };
+
   function addThinkingMessage() {
     const conversation = $('[data-askmark-conversation]', shell);
     if (!conversation) return null;
