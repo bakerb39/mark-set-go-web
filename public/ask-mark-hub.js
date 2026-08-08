@@ -548,7 +548,21 @@
     }
   }
 
+
+  function installAskMarkScrollIsolation() {
+    if (!shell || shell.dataset.askmarkScrollIsolation === '1') return;
+    shell.dataset.askmarkScrollIsolation='1';
+
+    // Do not preventDefault: allow the browser to scroll .askmark-view normally,
+    // including native middle-button auto-scroll. Only stop the Reader/page
+    // from receiving the same wheel gesture.
+    shell.addEventListener('wheel',(event)=>{
+      event.stopPropagation();
+    },{capture:true,passive:true});
+  }
+
   function bindPremiumEvents() {
+    installAskMarkScrollIsolation();
     $('[data-askmark-close]', shell)?.addEventListener('click', () => $('#toggle-mark-panel')?.click());
     $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
     $$('[data-askmark-view]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView(button.dataset.askmarkView)));

@@ -497,3 +497,31 @@
   color:#275c39 !important;
   cursor:default;
 }
+
+
+/* v9.2.84 Ask Mark native Reader-style scrolling */
+.askmark-stage {
+  min-height:0;
+  overflow:hidden;
+}
+.askmark-view {
+  min-height:0;
+  height:100%;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+.askmark-view.is-active {
+  display:flex;
+  flex-direction:column;
+}
+.askmark-conversation {
+  flex:0 0 auto;
+  min-height:170px;
+  overflow:visible;
+  scroll-behavior:auto;
+}
+.askmark-view[data-askmark-view-panel="chat"] {
+  -webkit-overflow-scrolling:touch;
+}
