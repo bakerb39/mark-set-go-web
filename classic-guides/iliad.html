@@ -1,71 +1,28 @@
 <!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>The Iliad — Classic Guide | Mark, Set, Go!</title>
 <style>
-:root{--navy:#073b6f;--gold:#d4a72c;--ink:#13233a;--muted:#66758a;--line:#dce5ee;--bg:#f4f8fb}
-*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-header{background:#fff;border-bottom:1px solid var(--line);padding:18px 24px;position:sticky;top:0;z-index:2}
-.header-inner{max-width:1100px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:16px}
-.brand{font-weight:900;color:var(--navy)} button{border:0;border-radius:8px;padding:10px 14px;background:#eaf3fb;color:var(--navy);font-weight:800;cursor:pointer}
-main{max-width:1100px;margin:28px auto;padding:0 20px}
-.hero,.content{background:#fff;border:1px solid var(--line);border-radius:14px}
-.hero{padding:28px;margin-bottom:18px} .kicker{font-size:12px;font-weight:900;letter-spacing:.13em;color:#8a6810}
-h1{color:var(--navy);font-size:38px;margin:6px 0 8px} .subtitle{color:var(--muted);margin:0}
-.tags{display:flex;gap:7px;flex-wrap:wrap;margin-top:18px} .tag{background:#edf5fb;border:1px solid #d4e3ef;border-radius:999px;padding:6px 9px;font-size:12px}
-.content{padding:30px} section{padding:10px 0 28px;margin-bottom:22px;border-bottom:1px solid var(--line)} section:last-child{border:0}
-h2{color:var(--gold);font-size:26px;margin-bottom:12px} p{line-height:1.75;font-size:16px}
-.remember{background:#fff8df;border-left:4px solid var(--gold);padding:13px 15px;border-radius:8px;margin-top:14px}
-@media(max-width:700px){h1{font-size:30px} .header-inner{align-items:flex-start}}
-</style>
-</head>
+:root{--navy:#073b6f;--gold:#d2a52a;--ink:#10253e;--muted:#68798c;--line:#dbe4ec;--bg:#f4f8fb;--soft:#edf5fb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{background:white;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}.header-inner{max-width:1120px;margin:auto;padding:16px 22px;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.brand{font-weight:900;color:var(--navy)}.back{border:0;border-radius:8px;padding:9px 12px;background:var(--soft);color:var(--navy);font-weight:800;cursor:pointer}
+main{max-width:1120px;margin:26px auto;padding:0 20px 50px}.hero,.panel{background:#fff;border:1px solid var(--line);border-radius:14px}.hero{padding:27px;margin-bottom:16px}
+.kicker{font-size:11px;font-weight:900;letter-spacing:.14em;color:#85650f}h1{font-size:38px;margin:5px 0;color:var(--navy)}.meta{color:var(--muted)}.overview{font-size:17px;line-height:1.65;max-width:850px}
+.tabs{display:flex;gap:5px;flex-wrap:wrap;margin-top:18px}.tabs button{border:1px solid var(--line);background:#f5f9fc;border-radius:8px;padding:9px 12px;font-weight:800;color:var(--navy);cursor:pointer}.tabs button.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.panel{padding:28px}[data-panel]{display:none}[data-panel].active{display:block}.guide-section{padding:5px 0 22px;margin-bottom:20px;border-bottom:1px solid var(--line)}.guide-section:last-child{border-bottom:0}h2{color:#b28720;font-size:25px}p{line-height:1.75}
+.ideas{display:flex;gap:8px;flex-wrap:wrap}.idea-tag{background:var(--soft);border:1px solid #d4e3ef;border-radius:999px;padding:7px 10px;font-weight:700;font-size:13px}
+.quiz-card{border:1px solid var(--line);border-radius:10px;margin-bottom:14px;padding:16px}.quiz-card legend{font-weight:900;color:var(--navy);padding:0 5px}.quiz-card label{display:block;margin:9px 0}
+.primary{border:0;border-radius:8px;background:var(--navy);color:white;padding:10px 14px;font-weight:900;cursor:pointer}#score{font-weight:800}.study-list li{margin:.8rem 0;line-height:1.6}
+@media(max-width:700px){h1{font-size:30px}}
+</style></head>
 <body>
-<header><div class="header-inner"><div class="brand">Mark, Set, Go! · Classic Guides</div><button type="button" onclick="history.back()">← Back to Great Books</button></div></header>
-<main>
-  <div class="hero">
-    <div class="kicker">GREAT BOOKS · CLASSIC GUIDE</div>
-    <h1>The Iliad</h1>
-    <p class="subtitle">Homer · An independent Mark, Set, Go! reading guide</p>
-    <div class="tags"><span class="tag">War</span><span class="tag">Courage</span><span class="tag">Honor</span><span class="tag">Justice</span><span class="tag">Anger</span><span class="tag">Fate</span><span class="tag">God</span><span class="tag">Love</span><span class="tag">Death</span><span class="tag">Man</span><span class="tag">Virtue</span></div>
-  </div>
-  <div class="content"><section><h2>1. Before You Read</h2>
-    <p>The Iliad is not the story of the entire Trojan War. It concentrates on a short period near the end of the war and, more specifically, on the consequences of Achilles’ rage.</p><p>The poem announces its central concern immediately: private anger becomes a public catastrophe. Keep that conflict in view as warriors, kings, friends, families, and gods respond to Achilles’ withdrawal.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> Watch how personal honor, public duty, friendship, and mortality collide.</div></section>
-<section><h2>2. The World of Homer</h2>
-    <p>The poem emerged from a long oral tradition. Its heroes inhabit a warrior culture in which reputation, gifts, loyalty, hospitality, and public recognition carry enormous weight.</p><p>The gods intervene constantly, but human beings still make consequential choices. Homer’s world therefore resists a simple opposition between fate and free will.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> Divine action does not erase human responsibility.</div></section>
-<section><h2>3. What Starts the Conflict?</h2>
-    <p>Agamemnon takes Briseis from Achilles after being forced to return Chryseis. Achilles interprets the act as a public humiliation and withdraws from battle.</p><p>His withdrawal changes the military balance and exposes the entire Greek army to disaster. Homer turns a dispute over honor into a study of leadership and the dangers of wounded pride.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> The central war inside the poem is Achilles versus Agamemnon before it is Achilles versus Troy.</div></section>
-<section><h2>4. Achilles</h2>
-    <p>Achilles is the greatest Greek warrior, but the poem does not present greatness as simple moral perfection. His excellence is inseparable from pride, anger, grief, and an intense awareness of his own death.</p><p>He knows that choosing glory at Troy means a short life. His heroism is therefore haunted by mortality.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> Achilles is powerful because he is both nearly superhuman and painfully human.</div></section>
-<section><h2>5. Hector and Troy</h2>
-    <p>Hector provides a crucial counterweight to Achilles. He is a warrior, but also a husband, father, son, and defender of a city whose destruction he can imagine.</p><p>Scenes with Andromache and Astyanax expand the meaning of war beyond battlefield glory. The cost of heroic action is borne by families and communities.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> Hector lets us see war from inside the city that will lose.</div></section>
-<section><h2>6. The Gods and Fate</h2>
-    <p>Zeus, Hera, Athena, Apollo, Aphrodite, and other gods intervene directly. Their rivalries mirror and magnify human conflicts.</p><p>Yet even Zeus operates within limits. Certain deaths are fated, and the gods cannot simply remake the moral structure of the poem at will.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> Ask whether the gods explain events—or reveal the forces already present in human life.</div></section>
-<section><h2>7. Patroclus and the Turning Point</h2>
-    <p>Patroclus enters battle wearing Achilles’ armor and drives the Trojans back, but he exceeds Achilles’ instructions and is killed by Hector after divine and human blows combine against him.</p><p>His death transforms Achilles’ anger. The rage once aimed at Agamemnon becomes grief and a consuming desire for vengeance.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> Patroclus’ death converts wounded honor into catastrophic grief.</div></section>
-<section><h2>8. Achilles Returns</h2>
-    <p>Achilles’ return to battle is magnificent and terrifying. Homer repeatedly blurs the line between heroic excellence and destructive excess.</p><p>The killing of Hector is the climax of Achilles’ vengeance, but not the moral end of the poem.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> Victory does not cure Achilles.</div></section>
-<section><h2>9. Priam and Achilles</h2>
-    <p>The emotional culmination arrives when Priam enters Achilles’ shelter and asks for Hector’s body. He forces Achilles to imagine his own father and their shared condition as mortal human beings.</p><p>This scene interrupts the logic of revenge. Achilles and Priam grieve together, eat together, and temporarily recognize a humanity deeper than their roles as enemies.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> The poem’s deepest victory may be the recovery of pity.</div></section>
-<section><h2>10. Major Themes</h2>
-    <p>Rage and self-mastery; honor and reputation; mortality and glory; friendship and grief; fate and agency; leadership; the human cost of war; pity and reconciliation.</p><p>The Iliad rarely gives a simple answer. Its power comes from holding competing values together and forcing the reader to feel their consequences.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> Homer asks what human greatness is worth when every human life ends.</div></section>
-<section><h2>11. The Great Ideas</h2>
-    <p>The Iliad belongs naturally in the Great Conversation because its questions reappear across philosophy, history, theology, and literature: What is courage? What is justice between unequal people? Is anger ever righteous? Can glory compensate for death?</p><p>Read Homer forward into Plato on justice, Aristotle on virtue, Augustine on war and desire, and later writers on violence, glory, grief, and mortality.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> Use the poem as an entry point into the Great Conversation.</div></section>
-<section><h2>12. Why The Iliad Matters</h2>
-    <p>The poem helped shape Western ideas of heroism, tragedy, war, leadership, and poetic greatness. But its endurance comes less from cultural prestige than from its extraordinary ability to make enemies visible as human beings.</p><p>The final movement does not celebrate conquest. It ends with mourning and burial.</p>
-    <div class="remember"><strong>Key idea to remember:</strong> The Iliad begins with rage and ends with a funeral.</div></section></div>
-</main>
-</body>
-</html>
+<header><div class="header-inner"><div class="brand">Mark, Set, Go! · Classic Guides</div><button class="back" onclick="history.back()">← Back to Great Books</button></div></header>
+<main><div class="hero"><div class="kicker">GREAT BOOKS · CLASSIC GUIDE</div><h1>The Iliad</h1><div class="meta">Homer · Epic Poetry</div><p class="overview">Achilles’ rage, heroic honor, mortality, grief, war, and the movement from vengeance toward pity.</p>
+<div class="tabs"><button class="active" data-tab="guide">Guide</button><button data-tab="ideas">Key Ideas</button><button data-tab="quiz">Quiz</button><button data-tab="study">Study Plan</button></div></div>
+<div class="panel"><div data-panel="guide" class="active"><section class="guide-section"><h2>1. Before You Read</h2><p>The Iliad covers only a short period near the end of the Trojan War. Its real subject is the rage of Achilles and the human consequences that follow when the greatest Greek warrior withdraws from battle.</p></section><section class="guide-section"><h2>2. Achilles and Agamemnon</h2><p>Agamemnon humiliates Achilles by taking Briseis, and Achilles treats the insult as an attack on his public worth. The Greek army pays the price for a quarrel between two powerful men.</p></section><section class="guide-section"><h2>3. Hector and Troy</h2><p>Hector broadens the poem beyond Greek glory. He is a warrior, husband, father, and defender of a doomed city. Through him Homer forces the reader to see the enemy as fully human.</p></section><section class="guide-section"><h2>4. Patroclus</h2><p>Patroclus enters battle in Achilles’ armor and is killed. His death transforms Achilles’ anger into grief and vengeance, drawing Achilles back into the war.</p></section><section class="guide-section"><h2>5. The Gods and Fate</h2><p>The gods intervene constantly, but human choices still matter. Homer presents a world in which divine influence, fate, and responsibility overlap.</p></section><section class="guide-section"><h2>6. Priam and Achilles</h2><p>Priam’s appeal for Hector’s body brings Achilles into direct contact with another father’s grief. The poem’s emotional climax is shared mourning rather than conquest.</p></section><section class="guide-section"><h2>7. Why It Matters</h2><p>The Iliad refuses to reduce war to glory. It explores excellence, pride, leadership, love, death, rage, and the fragile possibility of recognizing humanity in an enemy.</p></section></div><div data-panel="ideas"><h2>Key Ideas</h2><div class="ideas"><span class="idea-tag">Rage</span><span class="idea-tag">Honor</span><span class="idea-tag">War</span><span class="idea-tag">Courage</span><span class="idea-tag">Fate</span><span class="idea-tag">Mortality</span><span class="idea-tag">Friendship</span><span class="idea-tag">Pity</span></div><p>Use these ideas to connect this work to later Great Books and the Great Ideas / Syntopicon workspace.</p></div>
+<div data-panel="quiz"><h2>Quick Review</h2><fieldset class="quiz-card"><legend>1. What begins the central conflict?</legend><label><input type="radio" name="q0" value="0"> Achilles’ quarrel with Agamemnon</label><label><input type="radio" name="q0" value="1"> Helen’s return to Sparta</label><label><input type="radio" name="q0" value="2"> Hector’s challenge</label><label><input type="radio" name="q0" value="3"> Odysseus’ rebellion</label></fieldset><fieldset class="quiz-card"><legend>2. Who dies wearing Achilles’ armor?</legend><label><input type="radio" name="q1" value="0"> Ajax</label><label><input type="radio" name="q1" value="1"> Patroclus</label><label><input type="radio" name="q1" value="2"> Diomedes</label><label><input type="radio" name="q1" value="3"> Nestor</label></fieldset><fieldset class="quiz-card"><legend>3. What is the emotional climax?</legend><label><input type="radio" name="q2" value="0"> The fall of Troy</label><label><input type="radio" name="q2" value="1"> Priam’s meeting with Achilles</label><label><input type="radio" name="q2" value="2"> Helen’s escape</label><label><input type="radio" name="q2" value="3"> Agamemnon’s victory</label></fieldset><button class="primary" id="check">Check Answers</button><p id="score"></p></div>
+<div data-panel="study"><h2>Study Plan</h2><ol class="study-list"><li>Read the guide before or alongside the original work.</li><li>Mark one passage that best represents a central Great Idea.</li><li>Write one question the work leaves unresolved.</li><li>Compare one character, argument, or institution with another Great Book.</li><li>After finishing the work, revise your first interpretation.</li></ol></div></div></main>
+<script>
+document.querySelectorAll('[data-tab]').forEach(btn=>btn.addEventListener('click',()=>{document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b===btn));document.querySelectorAll('[data-panel]').forEach(p=>p.classList.toggle('active',p.dataset.panel===btn.dataset.tab));}));
+const answers=[0, 1, 1];document.getElementById('check').addEventListener('click',()=>{let score=0;answers.forEach((answer,i)=>{const selected=document.querySelector(`input[name="q${i}"]:checked`);if(selected&&Number(selected.value)===answer)score++;});document.getElementById('score').textContent=`${score} of ${answers.length} correct.`;});
+</script></body></html>
