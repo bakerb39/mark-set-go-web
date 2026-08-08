@@ -12417,7 +12417,11 @@ function bindDictionaryMenu(reader) {
     return { ...context, page: context.page ? { ...context.page } : null };
   };
   const runDictionaryAction = (button, event) => {
-    if (!button || !menu.contains(button)) return false;
+    // Resolve the live menu at action time. Reader navigation can replace the
+    // menu node after bindDictionaryMenu() ran, leaving listeners attached to
+    // a detached menu even though the newly rendered menu is visible.
+    const liveMenu = app.querySelector('#word-context-menu');
+    if (!button || !liveMenu || !liveMenu.contains(button)) return false;
     event?.preventDefault?.();
     event?.stopImmediatePropagation?.();
 
@@ -12436,7 +12440,8 @@ function bindDictionaryMenu(reader) {
     closeDictionaryMenu();
 
     if (action === 'lookup') {
-      console.info('[RC-DIAG 2] lookup clicked', { word: stableContext.word, index: stableContext.index, menuConnected: menu.isConnected, readerConnected: reader.isConnected });
+      const liveReader = app.querySelector('#reader');
+      console.info('[RC-DIAG 2] lookup clicked', { word: stableContext.word, index: stableContext.index, menuConnected: liveMenu.isConnected, readerConnected: !!liveReader?.isConnected });
       performDictionaryLookup(false, 'mark', stableContext);
       return true;
     }
@@ -12466,6 +12471,32 @@ function bindDictionaryMenu(reader) {
   };
 
   let lastPointerActionAt = 0;
+
+  // Keep one delegated action bridge on a stable ancestor. The custom menu is
+  // part of the Reader render and may be replaced when navigating away and
+  // back. bindDictionaryMenu() refreshes the runner closure for the current
+  // Reader; the document listener survives those DOM replacements.
+  window.__msgDictionaryActionRunner = runDictionaryAction;
+  if (!window.__msgDictionaryDelegationInstalled) {
+    window.__msgDictionaryDelegationInstalled = true;
+    document.addEventListener('pointerup', (event) => {
+      if (event.button !== undefined && event.button !== 0) return;
+      const button = event.target instanceof Element
+        ? event.target.closest('[data-dictionary-action]')
+        : null;
+      const liveMenu = app.querySelector('#word-context-menu');
+      if (!button || !liveMenu || !liveMenu.contains(button)) return;
+      window.__msgDictionaryActionRunner?.(button, event);
+    }, true);
+    document.addEventListener('click', (event) => {
+      const button = event.target instanceof Element
+        ? event.target.closest('[data-dictionary-action]')
+        : null;
+      const liveMenu = app.querySelector('#word-context-menu');
+      if (!button || !liveMenu || !liveMenu.contains(button)) return;
+      window.__msgDictionaryActionRunner?.(button, event);
+    }, true);
+  }
 
   // Execute mouse/touch menu choices on pointerup. This occurs before the
   // synthetic click and is resistant to reader selection/click handlers that

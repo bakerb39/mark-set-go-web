@@ -1,13 +1,9 @@
-# Ask Mark Reader-return stale-reference fix
+# Right-click menu action delegation fix
 
-Fixes the case where right-click lookup works after returning to Reader but Ask Mark does not display the lookup result.
+Scope: fixes the custom word-menu action buttons after leaving Reader and returning.
 
-Cause: Ask Mark hub could retain detached `legacyHost` / `shell` references from the previous Reader DOM.
-
-Changes only:
-- `ask-mark-hub.js`
-- `public/ask-mark-hub.js`
-- cache-buster in `index.html`
-- cache-buster in `public/index.html`
-
-No Reader context-menu/right-click code, app.js, or CSS changed.
+- The existing `contextmenu` / menu-open handler is unchanged.
+- Menu actions resolve the currently connected `#word-context-menu` at click time.
+- One delegated pointer/click bridge lives on `document`, so replacing the Reader/menu DOM cannot orphan the Look up word handler.
+- Diagnostic `[RC-DIAG ...]` logging is retained for verification.
+- No CSS, Ask Mark UI, companion persona, Notebook, or Reader rendering changes.
