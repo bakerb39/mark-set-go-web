@@ -291,38 +291,7 @@
     });
   }
 
-  let companionChatObserver = null;
-  let companionChatObservedRoot = null;
-
-  function findCompanionChatRoot() {
-    const selectors = [
-      '#mark-panel', '#ask-mark-panel', '.mark-shell', '.askmark-shell',
-      '.askmark-panel', '.ask-mark-panel', '.askmark-view',
-      '[data-askmark-view-panel]', '[data-panel="mark"]', '[data-panel="ask-mark"]'
-    ];
-    for (const selector of selectors) {
-      const el = document.querySelector(selector);
-      if (el) return el;
-    }
-    return null;
-  }
-
-  function ensureCompanionChatObserver() {
-    const root = findCompanionChatRoot();
-    if (!root || root === companionChatObservedRoot) return;
-    companionChatObserver?.disconnect();
-    companionChatObservedRoot = root;
-    companionChatObserver = new MutationObserver((mutations) => {
-      // This observer is scoped ONLY to the companion/chat panel. It never
-      // observes the reader, selection surface, or right-click/context menu.
-      if (!mutations.some((m) => m.addedNodes?.length || m.type === 'characterData')) return;
-      window.queueMicrotask(() => {
-        applyCompanionChatIdentity();
-        normalizeReadingStatus(root);
-      });
-    });
-    companionChatObserver.observe(root, { childList:true, subtree:true, characterData:true });
-  }
+  /* v9.5.4 stability: no MutationObserver. Companion updates are explicit only. */
 
   function profileLikelyOpen() {
     if (document.querySelector('.companion-persona-settings')) return true;
@@ -398,7 +367,6 @@
     });
   }
 
-  let applyTimer = 0;
   function applyAll({ includeProtected = false } = {}) {
     document.documentElement.dataset.companion = state.id;
     applyText(document.body, { includeProtected });
@@ -408,21 +376,7 @@
     applyImages(document);
     applyFrontpageCompanionMode(document);
     applyCompanionChatIdentity();
-    ensureCompanionChatObserver();
     updateProfileControl();
-  }
-
-  function scheduleApply(delay = 0) {
-    window.clearTimeout(applyTimer);
-    applyTimer = window.setTimeout(() => applyAll(), delay);
-  }
-
-  function scheduleAfterUiAction() {
-    /* A few bounded passes catch normal app renders without observing every
-       DOM mutation. None run synchronously inside contextmenu handling. */
-    scheduleApply(0);
-    window.setTimeout(() => applyAll(), 90);
-    window.setTimeout(() => applyAll(), 260);
   }
 
   const api = {
@@ -442,25 +396,17 @@
   };
   window.MSGCompanion = api;
 
-  /* Bubble-phase companion/profile click listener only.
-     Reader interaction surfaces are intentionally excluded so companion refreshes
-     cannot run as a side effect of reader clicks or custom word-menu actions. */
+  /* v9.5.4 stability: only the Profile entry point gets a click listener.
+     Ordinary navigation, Reader clicks, Ask Companion clicks, context menus,
+     and resumed-reading interactions never trigger companion-wide DOM scans. */
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-    if (target?.closest?.('[data-action="profile-preferences"]')) {
-      window.setTimeout(() => ensureProfileControl(true), 80);
-      window.setTimeout(() => ensureProfileControl(true), 300);
-    }
-    if (target?.closest?.(PROTECTED_SELECTOR)) return;
-    scheduleAfterUiAction();
+    if (!target?.closest?.('[data-action="profile-preferences"]')) return;
+    window.setTimeout(() => ensureProfileControl(true), 80);
+    window.setTimeout(() => ensureProfileControl(true), 300);
   }, false);
-
-  window.addEventListener('hashchange', scheduleAfterUiAction);
-  window.addEventListener('popstate', scheduleAfterUiAction);
-  window.addEventListener('msg:companion-changed', () => scheduleAfterUiAction());
 
   document.addEventListener('DOMContentLoaded', () => {
     applyAll();
-    window.setTimeout(() => applyAll(), 120);
   });
 })();
