@@ -476,6 +476,89 @@ const sources = {
 
 const BROWSE_LAYOUT_KEY = 'markSetGoBrowseLayoutV1';
 
+const MODERN_GUIDE_LIBRARY_KEY = 'markSetGoModernGuideLibraryV1';
+const MODERN_GUIDE_ACTIONS_KEY = 'markSetGoModernGuideActionsV1';
+
+function readModernGuideLibrary() {
+  try {
+    const value = JSON.parse(localStorage.getItem(MODERN_GUIDE_LIBRARY_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeModernGuideLibrary(items) {
+  const normalized = Array.isArray(items) ? items : [];
+  localStorage.setItem(MODERN_GUIDE_LIBRARY_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+function registerModernGuideLibraryItem({
+  documentId = state?.documentId || '',
+  title = state?.title || '',
+  source = state?.source || null,
+  text = state?.currentText || ''
+} = {}) {
+  if (!documentId || !title || source?.type !== 'modern-guide') return null;
+
+  const items = readModernGuideLibrary();
+  const existingIndex = items.findIndex((item) => String(item.documentId || '') === String(documentId));
+  const now = new Date().toISOString();
+  const existing = existingIndex >= 0 ? items[existingIndex] : {};
+
+  const record = {
+    ...existing,
+    documentId,
+    title,
+    originalTitle: source?.originalTitle || existing.originalTitle || title.replace(/\s+—\s+Mark,\s*Set,\s*Go!\s+Guide$/i,''),
+    author: source?.originalAuthor || existing.author || '',
+    source,
+    wordCount: Array.isArray(state?.words) && state.words.length ? state.words.length : splitWords(text || '').length,
+    firstOpenedAt: existing.firstOpenedAt || now,
+    lastOpenedAt: now,
+    customGuide: Boolean(source?.customGuide),
+    buyUrl: source?.buyUrl || existing.buyUrl || ''
+  };
+
+  if (existingIndex >= 0) items[existingIndex] = record;
+  else items.unshift(record);
+
+  writeModernGuideLibrary(items.slice(0, 200));
+  return record;
+}
+
+function readModernGuideActions() {
+  try {
+    const value = JSON.parse(localStorage.getItem(MODERN_GUIDE_ACTIONS_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeModernGuideActions(items) {
+  const normalized = Array.isArray(items) ? items : [];
+  localStorage.setItem(MODERN_GUIDE_ACTIONS_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
+function rememberModernGuideAction(action) {
+  if (!action?.id || action?.origin !== 'modern-guide') return action || null;
+  const items = readModernGuideActions();
+  const index = items.findIndex((item) => String(item.id || '') === String(action.id));
+  if (index >= 0) items[index] = { ...action };
+  else items.unshift({ ...action });
+  writeModernGuideActions(items.slice(0, 300));
+  return action;
+}
+
+function forgetModernGuideAction(actionId) {
+  if (!actionId) return;
+  writeModernGuideActions(readModernGuideActions().filter((item) => String(item.id || '') !== String(actionId)));
+}
+
+
 const MODERN_GUIDE_SHELF = [
   {
     id: 'atomic-habits',
@@ -8866,6 +8949,12 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   // or navigation checkpoint to create the first progress record.
   if (source?.type === 'modern-guide') {
     registerCurrentDocumentInMyLibrary({ opened:true });
+    registerModernGuideLibraryItem({
+      documentId: state.documentId,
+      title: state.title,
+      source: state.source,
+      text: state.currentText
+    });
   }
 
   document.dispatchEvent(new CustomEvent('marksetgo:document-available', {
@@ -14926,6 +15015,8 @@ function renderMyLibraryHub() {
   const readingList = getReadingList();
   const progress = Object.values(readStoredObject(READING_PROGRESS_KEY))
     .sort((a, b) => new Date(b.lastReadAt || 0) - new Date(a.lastReadAt || 0));
+  const modernGuideItems = readModernGuideLibrary()
+    .sort((a, b) => new Date(b.lastOpenedAt || 0) - new Date(a.lastOpenedAt || 0));
   const activity = readStoredArray(READING_ACTIVITY_KEY);
   const comprehension = getComprehensionResults();
   const bookmarks = getBookmarks();
@@ -14986,6 +15077,7 @@ function renderMyLibraryHub() {
     delete progressRecords[documentId];
     localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progressRecords));
     localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`);
+    writeModernGuideLibrary(readModernGuideLibrary().filter((item) => String(item.documentId || '') !== String(documentId)));
 
     const readingList = getReadingList().filter((item) => String(item.documentId || '') !== String(documentId));
     saveReadingList(readingList);
@@ -15060,6 +15152,34 @@ function renderMyLibraryHub() {
     requestAnimationFrame(() => requestAnimationFrame(() => jumpToWordIndex(resumeIndex)));
   };
 
+  const modernGuideCards = modernGuideItems.map((guide) => {
+    const progressRecord = progress.find((item) => String(item.documentId || '') === String(guide.documentId || ''));
+    const percent = progressRecord?.totalWords
+      ? Math.min(100, Math.round((Number(progressRecord.furthestWord) || 0) / Number(progressRecord.totalWords) * 100))
+      : 0;
+    const lastOpened = guide.lastOpenedAt
+      ? new Date(guide.lastOpenedAt).toLocaleDateString(undefined, { month:'short', day:'numeric' })
+      : 'Recently';
+
+    return `<article class="library-modern-guide-card">
+      <div class="library-modern-guide-cover" aria-hidden="true">
+        <span>GUIDE</span>
+        <strong>${escapeHtml((guide.originalTitle || guide.title || 'G').slice(0,1).toUpperCase())}</strong>
+      </div>
+      <div class="library-modern-guide-copy">
+        <span class="source-category">${guide.customGuide ? 'My Guide' : 'Modern Guide'}</span>
+        <h3>${escapeHtml(guide.originalTitle || guide.title || 'Untitled Guide')}</h3>
+        ${guide.author ? `<p>${escapeHtml(guide.author)}</p>` : ''}
+        <small>${percent}% complete · Opened ${escapeHtml(lastOpened)}</small>
+        <div class="library-progress-track"><span style="width:${percent}%"></span></div>
+        <div class="library-book-actions">
+          <button class="primary" type="button" data-library-guide-document="${escapeHtml(guide.documentId)}">Open guide</button>
+          ${guide.buyUrl ? `<a class="secondary button-link" href="${escapeHtml(guide.buyUrl)}" target="_blank" rel="noopener noreferrer">Buy original</a>` : ''}
+        </div>
+      </div>
+    </article>`;
+  }).join('');
+
   const continueCards = progress.slice(0, 6).map((item, index) => {
     const difficulty = storedDifficultyForProgress(item);
     const percent = item.totalWords
@@ -15101,6 +15221,19 @@ function renderMyLibraryHub() {
           <button class="primary" type="button" data-action="reader">Open Reader</button>
         </div>
       </header>
+
+      ${modernGuideItems.length ? `
+        <section class="library-modern-guides-section">
+          <div class="section-heading">
+            <div>
+              <span class="source-category">Guides</span>
+              <h2>My Modern Guides</h2>
+              <p>Guides you have opened or created stay here alongside your books.</p>
+            </div>
+            <button class="secondary" type="button" data-action="browse">Find more guides</button>
+          </div>
+          <div class="library-modern-guides-grid">${modernGuideCards}</div>
+        </section>` : ''}
 
       <section class="library-focus-grid">
         <article class="library-primary-focus">
@@ -15168,6 +15301,9 @@ function renderMyLibraryHub() {
   });
   app.querySelectorAll('[data-library-delete]').forEach((button) => {
     button.addEventListener('click', () => deleteStoredDocument(button.dataset.libraryDelete, button.dataset.libraryTitle || 'this book'));
+  });
+  app.querySelectorAll('[data-library-guide-document]').forEach((button) => {
+    button.addEventListener('click', () => openStoredDocument(button.dataset.libraryGuideDocument));
   });
   document.dispatchEvent(new CustomEvent('marksetgo:library-rendered'));
 }
@@ -15474,18 +15610,28 @@ async function emailApi(path,body){const response=await fetch(path,{method:'POST
 async function syncEmailActions(){const prefs=readEmailPreferences();if(!prefs.email||!prefs.reminders)return;try{await emailApi('/api/email/sync-actions',{clientId:emailClientId(),actions:readActions()});}catch(error){console.warn('Could not sync email actions:',error.message);}}
 async function syncEmailNotes(){const prefs=readEmailPreferences();if(!prefs.email||!prefs.notes)return 0;const notes=collectEmailNotes();try{const result=await emailApi('/api/email/sync-notes',{clientId:emailClientId(),notes});return result.count||0;}catch(error){console.warn('Could not sync email notes:',error.message);return 0;}}
 function readActions() {
+  let primary = [];
   try {
     const value = JSON.parse(localStorage.getItem(ACTION_CENTER_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
+    primary = Array.isArray(value) ? value : [];
   } catch (error) {
     console.warn('Could not read saved actions:', error);
-    return [];
   }
+
+  const guideActions = readModernGuideActions();
+  const merged = [...primary];
+  guideActions.forEach((guideAction) => {
+    const index = merged.findIndex((item) => String(item.id || '') === String(guideAction.id || ''));
+    if (index >= 0) merged[index] = { ...guideAction, ...merged[index] };
+    else merged.push({ ...guideAction });
+  });
+  return merged;
 }
 
 function writeActionsBase(actions) {
   const normalized = Array.isArray(actions) ? actions : [];
   localStorage.setItem(ACTION_CENTER_KEY, JSON.stringify(normalized));
+  writeModernGuideActions(normalized.filter((item) => item?.origin === 'modern-guide'));
   return normalized;
 }
 
@@ -15520,6 +15666,8 @@ function saveActionRecord(record) {
     console.error('Action Center persistence verification failed for', normalized.id);
     return null;
   }
+
+  if (verified.origin === 'modern-guide') rememberModernGuideAction(verified);
 
   document.dispatchEvent(new CustomEvent('marksetgo:action-saved', {
     detail: { action: verified }
@@ -15729,7 +15877,11 @@ function renderActionCenter() {
     }
     if (remove) {
       const item = actions.find((entry) => entry.id === remove.dataset.actionDelete);
-      if (item && window.confirm(`Delete “${item.title}”?`)) { writeActions(actions.filter((entry) => entry.id !== item.id)); renderActionCenter(); }
+      if (item && window.confirm(`Delete “${item.title}”?`)) {
+        forgetModernGuideAction(item.id);
+        writeActions(actions.filter((entry) => entry.id !== item.id));
+        renderActionCenter();
+      }
     }
     if (edit) {
       const item = actions.find((entry) => entry.id === edit.dataset.actionEdit);

@@ -10996,3 +10996,61 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
 @media (max-width:720px) {
   .book-builder-mode-switch { grid-template-columns:1fr; }
 }
+
+
+/* v9.2.63 first-class Modern Guides in My Library */
+.library-modern-guides-section {
+  display:grid;
+  gap:14px;
+  margin:0 0 20px;
+  padding:18px;
+  border:1px solid rgba(126,82,39,.18);
+  border-radius:18px;
+  background:linear-gradient(180deg,#fffdf9,#fff);
+}
+.library-modern-guides-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:12px;
+}
+.library-modern-guide-card {
+  display:grid;
+  grid-template-columns:76px minmax(0,1fr);
+  gap:13px;
+  align-items:center;
+  padding:13px;
+  border:1px solid rgba(126,82,39,.16);
+  border-radius:14px;
+  background:#fff;
+  box-shadow:0 5px 16px rgba(73,44,24,.06);
+}
+.library-modern-guide-cover {
+  width:72px;
+  height:100px;
+  display:grid;
+  align-content:space-between;
+  justify-items:start;
+  padding:9px;
+  border-radius:5px 11px 11px 5px;
+  color:#fff7e8;
+  background:
+    linear-gradient(90deg,rgba(255,255,255,.12) 0 5px,rgba(0,0,0,.08) 5px 7px,transparent 7px),
+    linear-gradient(145deg,#9d6b3b,#6f421f 58%,#452716);
+  box-shadow:0 7px 15px rgba(73,44,24,.17);
+}
+.library-modern-guide-cover span {
+  font-size:.58rem;
+  font-weight:900;
+  letter-spacing:.08em;
+}
+.library-modern-guide-cover strong { font-size:1.75rem; }
+.library-modern-guide-copy { display:grid; gap:6px; }
+.library-modern-guide-copy h3,
+.library-modern-guide-copy p,
+.library-modern-guide-copy small { margin:0; }
+.library-modern-guide-copy p { color:#52657a; }
+.library-modern-guide-copy small { color:#748397; }
+@media (max-width:620px) {
+  .library-modern-guide-card { grid-template-columns:64px minmax(0,1fr); }
+  .library-modern-guide-cover { width:60px; height:84px; }
+}
