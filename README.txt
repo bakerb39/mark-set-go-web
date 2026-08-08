@@ -1,54 +1,29 @@
-CLASSIC GUIDE — THE ILIAD PREMIUM REFERENCE BUILD
+CLASSIC GUIDES -> READER UPDATE (patched onto your latest Beth-universal files)
 
-Upload the entire included `public/classic-guides/` folder to your repo.
+This package was built from the exact app.js and index.html you uploaded in this turn.
+It preserves your latest Beth/universal changes and only adds Classic Guide Reader integration.
 
-This intentionally DOES NOT modify:
-- public/app.js
-- public/index.html
-- reader runtime
+UPLOAD PRESERVING PATHS:
+  public/app.js
+  public/index.html
+  public/texts/classic-guides/*.txt
+
+WHAT CHANGED:
+- Great Books > Classic Guide is a button, not a standalone HTML link.
+- The guide loads directly into the existing Reader using the proven Modern Guide action system.
+- Classic Guide Reader header shows: Original Work | Great Ideas | Great Books Library | Grokipedia.
+- [[MSG:DISCUSS]], [[MSG:IDEAS]], [[MSG:ACTION]], and [[MSG:QUIZ]] use the existing guide/Ask Mark machinery.
+- Classic Guides are labeled Classic Guide in My Library/learning surfaces.
+- Bundled Classic Guide text can be reconstructed for resume if needed.
+- public/index.html cache-bust is now /app.js?v=9.6.10-classic-guides-reader.
+
+NOT TOUCHED:
+- reader engine modules
 - right-click handlers
+- highlighting
 - bookmarks
-- playback
+- pagination/book pages
+- playback cursor logic
+- Beth companion scripts/config
 
-Your existing working Great Books button already points to:
-  /classic-guides/iliad.html
-
-Files:
-public/classic-guides/iliad.html
-public/classic-guides/classic-guide.css
-public/classic-guides/classic-guide.js
-public/classic-guides/data/homer/iliad.json
-
-The renderer is reusable. Future guides can provide another JSON file and a tiny HTML shell.
-
-Reference-guide structure:
-- Guide
-- Key Ideas
-- Images
-- Notebook
-- Ask Mark Chats
-- Quiz
-- Action Plan
-
-Main Guide sections:
-1. Before You Read
-2. Historical & Mythological Background
-3. The World of Homer
-4. Major Characters
-5. Structure & Narrative Architecture
-6. Book-by-Book Reading Guide (all 24 books)
-7. Major Themes
-8. Great Ideas
-9. Important Passages to Watch
-10. Symbols & Motifs
-11. Questions to Consider
-12. Connections to Other Great Books
-13. What Scholars Debate
-14. Why This Book Matters
-15. Further Reading
-16. About This Guide
-
-Notes:
-- Notebook saves locally in the browser.
-- Ask Mark prompts are saved/copyable in this standalone version.
-- Direct integration with the app's Ask Mark runtime can be added later without changing the content model.
+The old public/classic-guides/*.html pages can remain on the server; the Great Books buttons no longer use them.
