@@ -2,7 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
-  const WALKTHROUGH_BUILD = '9.3.3';
+  const WALKTHROUGH_BUILD = '9.3.5';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -12,6 +12,8 @@
   let finishing = false;
   let menuMirror = null;
   let menuMirrorSource = null;
+  let topHighlight = null;
+  let topHighlightObserver = null;
 
   const wait = (ms = 70) => new Promise((resolve) => window.setTimeout(resolve, ms));
   const $ = (selector, scope = document) => scope.querySelector(selector);
@@ -28,6 +30,52 @@
   function visibleMatch(selector, scope = document) {
     if (!selector) return null;
     return $$(selector, scope).find(isVisibleElement) || null;
+  }
+
+  function ensureTopHighlight() {
+    if (!topHighlight?.isConnected) {
+      topHighlight = document.createElement('div');
+      topHighlight.id = 'msg-walkthrough-top-highlight';
+      topHighlight.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(topHighlight);
+    }
+    // Reassert the critical styles inline so later-loaded stylesheets cannot
+    // accidentally bury or reposition the walkthrough frame.
+    Object.assign(topHighlight.style, {
+      position: 'fixed',
+      display: 'none',
+      pointerEvents: 'none',
+      boxSizing: 'border-box',
+      zIndex: '2147483647'
+    });
+    return topHighlight;
+  }
+
+  function keepTopHighlightOnTop() {
+    const highlight = ensureTopHighlight();
+    if (highlight.parentNode === document.body && document.body.lastElementChild !== highlight) {
+      document.body.appendChild(highlight);
+    }
+    highlight.style.setProperty('z-index', '2147483647', 'important');
+    highlight.style.setProperty('position', 'fixed', 'important');
+    highlight.style.setProperty('pointer-events', 'none', 'important');
+  }
+
+  function startTopHighlightGuard() {
+    keepTopHighlightOnTop();
+    if (topHighlightObserver) return;
+    topHighlightObserver = new MutationObserver(() => {
+      if (!root || root.hidden) return;
+      keepTopHighlightOnTop();
+      schedulePosition();
+    });
+    topHighlightObserver.observe(document.body, { childList: true, subtree: true });
+  }
+
+  function stopTopHighlightGuard() {
+    if (topHighlightObserver) topHighlightObserver.disconnect();
+    topHighlightObserver = null;
+    if (topHighlight) topHighlight.style.display = 'none';
   }
 
   function clearMenuMirror() {
@@ -751,6 +799,7 @@
   function clearTarget() {
     if (activeTarget) activeTarget.classList.remove(HIGHLIGHT_CLASS);
     activeTarget = null;
+    if (topHighlight) topHighlight.style.display = 'none';
     const connector = root && $('.msg-walkthrough-connector', root);
     if (connector) connector.style.display = 'none';
     const outline = root && $('.msg-walkthrough-outline', root);
@@ -814,16 +863,24 @@
 
     const outline = $('.msg-walkthrough-outline', root);
     const targetIsMenuItem = !!activeTarget.closest?.('.msg-walkthrough-menu-mirror');
-    if (outline) {
-      if (targetIsMenuItem) {
-        outline.style.display = 'none';
-      } else {
-        outline.style.display = 'block';
-        Object.assign(outline.style, {
-          left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px`
-        });
-      }
-    }
+    const targetIsHeaderNavigation = targetIsMenuItem || !!activeTarget.closest?.('.site-header');
+
+    // The visible gold frame lives in its own body-level portal at the maximum
+    // browser z-index. This avoids being trapped inside the walkthrough root's
+    // stacking context or underneath dropdowns/modals that render later.
+    const highlight = ensureTopHighlight();
+    keepTopHighlightOnTop();
+    Object.assign(highlight.style, {
+      display: 'block',
+      left: `${left}px`,
+      top: `${top}px`,
+      width: `${width}px`,
+      height: `${height}px`
+    });
+
+    // Keep the old in-root outline disabled; its parent stacking context is the
+    // reason it could appear behind menus even with a very large child z-index.
+    if (outline) outline.style.display = 'none';
 
     const masks = {
       top: $('.msg-walkthrough-mask-top', root),
@@ -831,10 +888,9 @@
       right: $('.msg-walkthrough-mask-right', root),
       bottom: $('.msg-walkthrough-mask-bottom', root)
     };
-    if (targetIsMenuItem) {
-      // For mirrored walkthrough menus, dim the page uniformly and highlight the
-      // menu item itself. Do not cut a spotlight hole behind the menu or the
-      // gold edges will peek out from underneath the dropdown.
+    if (targetIsHeaderNavigation) {
+      // All header navigation targets use an in-place gold outline. Keep the
+      // dimmer uniform so there is no hidden spotlight rectangle behind menus.
       Object.assign(masks.top.style, { left: '0px', top: '0px', width: '100vw', height: '100vh' });
       Object.assign(masks.left.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
       Object.assign(masks.right.style, { left: '0px', top: '0px', width: '0px', height: '0px' });
@@ -983,10 +1039,12 @@
       root.hidden=false;
       document.documentElement.classList.add(ACTIVE_CLASS);
       document.body.classList.add(ACTIVE_CLASS);
+      startTopHighlightGuard();
       await beginMode(mode);
       return;
     }
     showModePicker();
+    startTopHighlightGuard();
   }
 
   async function finish() {
@@ -997,6 +1055,7 @@
     closeHeaderMenus();
     $$('.site-header nav > details').forEach((menu) => menu.classList.remove('msg-walkthrough-open-menu'));
     if (root) root.hidden = true;
+    stopTopHighlightGuard();
     document.documentElement.classList.remove(ACTIVE_CLASS);
     document.body.classList.remove(ACTIVE_CLASS);
 
