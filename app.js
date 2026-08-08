@@ -13828,7 +13828,7 @@ function renderBrowseHub() {
             <span class="source-category">Recent</span>
             <h3>${escapeHtml(item.title || 'Untitled')}</h3>
             <p>${escapeHtml(item.author || item.creator || 'Saved in your reader')}</p>
-            <small>Last read ${escapeHtml(libraryRecencyLabel(item.lastReadAt))}</small>
+            <small>${item.lastReadAt ? `Last read ${escapeHtml(libraryRecencyLabel(item.lastReadAt))}` : 'Saved in your library'}</small>
             <button class="primary" type="button" data-progress-open="${escapeHtml(item.documentId || '')}">Resume reading</button>
           </article>`).join('')}
       </div>
@@ -13991,6 +13991,37 @@ function renderBrowseHub() {
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
     requestAnimationFrame(() => jumpToWordIndex(record?.lastWord || 0));
   }));
+}
+
+
+function libraryRecencyClass(lastReadAt) {
+  if (!lastReadAt) return 'recency-undated';
+
+  const readDate = new Date(lastReadAt);
+  if (Number.isNaN(readDate.getTime())) return 'recency-undated';
+
+  const now = new Date();
+  const today = startOfDay(now);
+  const readDay = startOfDay(readDate);
+  const ageDays = Math.floor((today - readDay) / 86400000);
+
+  if (ageDays <= 0) return 'recency-today';
+  if (ageDays <= 7) return 'recency-week';
+  if (ageDays <= 30) return 'recency-month';
+  if (ageDays <= 90) return 'recency-quarter';
+  return 'recency-older';
+}
+
+function libraryRecencyLabel(lastReadAt) {
+  const recency = libraryRecencyClass(lastReadAt);
+  return ({
+    'recency-today': 'Read today',
+    'recency-week': 'Read this week',
+    'recency-month': 'Read this month',
+    'recency-quarter': 'Read in the last 3 months',
+    'recency-older': 'Read more than 3 months ago',
+    'recency-undated': 'No reading date'
+  })[recency];
 }
 
 function currentReaderFirstName() {
