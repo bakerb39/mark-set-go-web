@@ -12880,3 +12880,42 @@ html.msg-walkthrough-active .msg-walkthrough-target,
     transition:none !important;
   }
 }
+
+/* v9.4.0 selectable reading companion: Mark / Beth */
+.companion-persona-settings{
+  margin:18px auto 28px;
+  width:min(920px,calc(100% - 32px));
+  padding:20px;
+  border:1px solid rgba(23,58,86,.18);
+  border-radius:16px;
+  background:#fff;
+  box-shadow:0 12px 28px rgba(15,42,65,.08);
+}
+.companion-persona-heading{display:flex;justify-content:space-between;gap:24px;align-items:end;margin-bottom:14px}
+.companion-persona-heading h2{margin:2px 0 0;color:#123b5d;font-size:1.2rem}
+.companion-persona-heading p{margin:0;max-width:480px;color:#526879;font-size:.86rem}
+.companion-persona-kicker{font-size:.7rem;font-weight:900;letter-spacing:.12em;color:#b58a18}
+.companion-persona-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.companion-persona-options button{display:grid;grid-template-columns:58px 1fr 24px;gap:12px;align-items:center;text-align:left;padding:12px;border:1px solid #cfd9e2;border-radius:13px;background:#f9fbfd;color:#173a56;cursor:pointer}
+.companion-persona-options button.is-selected{border:2px solid #d7a928;background:#fff9e7;box-shadow:0 0 0 3px rgba(215,169,40,.12)}
+.companion-persona-options img,.companion-choice-placeholder{width:54px;height:54px;border-radius:50%;object-fit:cover;display:grid;place-items:center;background:#123b5d;color:#f4ca4f;font-weight:900;font-size:1.25rem}
+.companion-persona-options strong,.companion-persona-options small{display:block}.companion-persona-options small{margin-top:3px;opacity:.68}.companion-check{opacity:0;font-size:1.1rem;color:#123b5d}.is-selected .companion-check{opacity:1}
+html[data-companion="beth"] .msg-beth-photo{object-fit:cover!important;object-position:center!important}
+html[data-companion="beth"] .msg-walkthrough-mark-figure{border-radius:50%!important;overflow:hidden!important;border:4px solid #e2bd46!important;background:#123b5d!important;box-shadow:0 12px 28px rgba(0,0,0,.3)!important}
+html[data-companion="beth"] .msg-walkthrough-mark-figure::after{content:"ASK BETH";position:absolute;left:50%;bottom:4px;transform:translateX(-50%);background:#0d3352;color:#ffd55f;border:1px solid #d9ae35;border-radius:7px;padding:4px 9px;font-size:11px;font-weight:900;letter-spacing:.08em;white-space:nowrap;z-index:2}
+html[data-companion="beth"] .msg-walkthrough-mark-illustration{width:100%!important;height:100%!important;object-fit:cover!important;object-position:center 30%!important;transform:none!important}
+@media(max-width:700px){.companion-persona-heading{display:block}.companion-persona-heading p{margin-top:8px}.companion-persona-options{grid-template-columns:1fr}}
+
+/* v9.4.1 right-click safety hardening.
+   Companion UI is never allowed to add an invisible event-catching surface
+   over the reader. Walkthrough dimming/highlight geometry remains visual-only. */
+#msg-app-walkthrough .msg-walkthrough-mask,
+#msg-app-walkthrough .msg-walkthrough-top-highlight,
+#msg-app-walkthrough .msg-walkthrough-outline,
+#msg-app-walkthrough .msg-walkthrough-connector {
+  pointer-events:none !important;
+}
+.word-context-menu,
+.word-context-menu * {
+  pointer-events:auto !important;
+}

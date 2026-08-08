@@ -862,6 +862,28 @@
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
+    // Beth uses her profile portrait rather than Mark's pointing illustration.
+    // Keep her close to the active gold frame and on the opposite side so she
+    // never covers the control being introduced.
+    if (window.MSGCompanion?.id === 'beth') {
+      const cx = (targetRect.left + targetRect.right) / 2;
+      const cy = (targetRect.top + targetRect.bottom) / 2;
+      const size = cy < 125 ? 150 : 178;
+      const putRight = cx < viewportWidth * .5;
+      let left = putRight ? targetRect.right + 18 : targetRect.left - size - 18;
+      if (left < 8 || left + size > viewportWidth - 8) left = Math.max(8, Math.min(viewportWidth - size - 8, cx - size / 2));
+      let top = Math.max(8, Math.min(viewportHeight - size - 78, cy - size / 2));
+      figure.classList.remove('is-pointing-left','is-pointing-right');
+      host.dataset.pointDirection = putRight ? 'left' : 'right';
+      host.style.setProperty('width', `${size}px`, 'important');
+      host.style.setProperty('height', `${size}px`, 'important');
+      host.style.setProperty('left', `${Math.round(left)}px`, 'important');
+      host.style.setProperty('top', `${Math.round(top)}px`, 'important');
+      host.style.setProperty('right', 'auto', 'important');
+      host.style.setProperty('bottom', 'auto', 'important');
+      return;
+    }
+
     // Aim at the near edge of the gold frame instead of its center so Mark's
     // fingertip does not cover the control he is introducing.
     const targetCenterX = (targetRect.left + targetRect.right) / 2;
