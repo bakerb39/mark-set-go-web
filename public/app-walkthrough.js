@@ -2,7 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
-  const WALKTHROUGH_BUILD = '9.3.7';
+  const WALKTHROUGH_BUILD = '9.3.8';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -683,6 +683,7 @@
       <aside class="msg-walkthrough-host" aria-hidden="true">
         <figure class="msg-walkthrough-mark-figure">
           <img class="msg-walkthrough-mark-illustration" src="/assets/walkthrough/mark-walkthrough-guide.png" alt="">
+          <img class="msg-walkthrough-mark-arm-motion" src="/assets/walkthrough/mark-walkthrough-guide.png" alt="" aria-hidden="true">
           <figcaption>ASK MARK</figcaption>
         </figure>
       </aside>

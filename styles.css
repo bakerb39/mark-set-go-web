@@ -12825,3 +12825,38 @@ html.msg-walkthrough-active .msg-walkthrough-target,
   outline:none !important;
   box-shadow:none !important;
 }
+
+
+/* v9.3.8 walkthrough presenter: subtle independent pointing-arm motion.
+   The second image is clipped to Mark's pointing arm, so only that limb
+   receives the motion while the body/book remain visually stable. */
+#msg-app-walkthrough .msg-walkthrough-mark-figure {
+  isolation:isolate;
+}
+#msg-app-walkthrough .msg-walkthrough-mark-arm-motion {
+  position:absolute !important;
+  inset:0 !important;
+  z-index:3 !important;
+  display:block !important;
+  width:100% !important;
+  height:100% !important;
+  max-width:none !important;
+  object-fit:contain !important;
+  object-position:left bottom !important;
+  pointer-events:none !important;
+  transform-origin:58% 43% !important;
+  clip-path:polygon(49% 24%,100% 0%,100% 48%,84% 45%,72% 55%,59% 58%,51% 48%) !important;
+  animation:msgWalkthroughPointArm 1.35s cubic-bezier(.45,0,.55,1) infinite alternate !important;
+  will-change:transform;
+}
+@keyframes msgWalkthroughPointArm {
+  0%   { transform:scaleX(1.08) rotate(-1.1deg) translate3d(0,1px,0); }
+  55%  { transform:scaleX(1.08) rotate(1.1deg) translate3d(2px,-2px,0); }
+  100% { transform:scaleX(1.08) rotate(2.2deg) translate3d(4px,-4px,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #msg-app-walkthrough .msg-walkthrough-mark-arm-motion { animation:none !important; }
+}
+@media (max-width:959px) {
+  #msg-app-walkthrough .msg-walkthrough-mark-arm-motion { display:none !important; }
+}
