@@ -473,6 +473,153 @@ const sources = {
   pride: { title: 'Pride and Prejudice', path: '/texts/pp.txt' }
 };
 
+
+const BROWSE_LAYOUT_KEY = 'markSetGoBrowseLayoutV1';
+
+const MODERN_GUIDE_SHELF = [
+  {
+    id: 'atomic-habits',
+    title: 'Atomic Habits',
+    author: 'James Clear',
+    category: 'Modern guide',
+    status: 'Ready to read',
+    badge: 'Featured',
+    actionLabel: 'Read guide',
+    active: true,
+    blurb: 'A substantial independent guide to small improvements, identity-based change, and the Four Laws of Behavior Change.',
+    detail: 'Estimated reading time · 35–50 minutes',
+    palette: ['#f3d36d', '#d98324', '#6a330a']
+  },
+  {
+    id: 'deep-work',
+    title: 'Deep Work',
+    author: 'Cal Newport',
+    category: 'Modern guide',
+    status: 'Coming soon',
+    badge: 'Next',
+    active: false,
+    blurb: 'A guide to focus, distraction reduction, and protecting meaningful concentration.',
+    detail: 'Planned next in Productivity',
+    palette: ['#7ec5ff', '#2f76c1', '#123963']
+  },
+  {
+    id: 'psychology-of-money',
+    title: 'The Psychology of Money',
+    author: 'Morgan Housel',
+    category: 'Modern guide',
+    status: 'Coming soon',
+    badge: 'Planned',
+    active: false,
+    blurb: 'Money behavior, patience, risk, and decision-making through a reader-friendly study guide.',
+    detail: 'Planned next in Finance',
+    palette: ['#86ddaa', '#17875b', '#0e4f38']
+  },
+  {
+    id: 'why-we-sleep',
+    title: 'Why We Sleep',
+    author: 'Matthew Walker',
+    category: 'Modern guide',
+    status: 'Coming soon',
+    badge: 'Planned',
+    active: false,
+    blurb: 'Sleep science, circadian rhythm, memory, and health in a long-form modern guide.',
+    detail: 'Planned next in Health',
+    palette: ['#ba9cff', '#7a52cc', '#322060']
+  }
+];
+
+const BROWSE_FREE_BOOKS = [
+  {
+    id: 'gatsby',
+    title: 'The Great Gatsby',
+    author: 'F. Scott Fitzgerald',
+    category: 'Free book',
+    badge: 'Local',
+    blurb: 'An elegant American classic already staged in Mark, Set, Go! for fast reading.',
+    detail: 'Open the included reader text',
+    actionLabel: 'Open now',
+    action: { type: 'source', key: 'gatsby' },
+    palette: ['#73c3ff', '#275f9f', '#132848']
+  },
+  {
+    id: 'pride',
+    title: 'Pride and Prejudice',
+    author: 'Jane Austen',
+    category: 'Free book',
+    badge: 'Local',
+    blurb: 'Wit, courtship, and social observation from one of the most enduring novels in English.',
+    detail: 'Open the included reader text',
+    actionLabel: 'Open now',
+    action: { type: 'source', key: 'pride' },
+    palette: ['#ffb7c8', '#cb5f84', '#66243f']
+  },
+  {
+    id: 'republic',
+    title: 'The Republic',
+    author: 'Plato',
+    category: 'Great book',
+    badge: 'Discover',
+    blurb: 'Justice, education, and the ideal city—an anchor text for your Great Books shelf.',
+    detail: 'Find the best readable edition',
+    actionLabel: 'Find edition',
+    action: { type: 'search', query: 'The Republic Plato' },
+    palette: ['#99e1cf', '#1b9b83', '#0d5143']
+  },
+  {
+    id: 'brothers',
+    title: 'The Brothers Karamazov',
+    author: 'Fyodor Dostoevsky',
+    category: 'Free book',
+    badge: 'Discover',
+    blurb: 'Faith, family, doubt, and moral drama—ideal for deep reading and note-taking.',
+    detail: 'Find the best readable edition',
+    actionLabel: 'Find edition',
+    action: { type: 'search', query: 'The Brothers Karamazov Dostoevsky' },
+    palette: ['#f4a77b', '#cb6128', '#6f2613']
+  },
+  {
+    id: 'meditations',
+    title: 'Meditations',
+    author: 'Marcus Aurelius',
+    category: 'Free book',
+    badge: 'Discover',
+    blurb: 'Daily philosophical counsel for discipline, composure, and perspective.',
+    detail: 'Find the best readable edition',
+    actionLabel: 'Find edition',
+    action: { type: 'search', query: 'Meditations Marcus Aurelius' },
+    palette: ['#d4c08b', '#977a28', '#483813']
+  },
+  {
+    id: 'federalist',
+    title: 'The Federalist Papers',
+    author: 'Hamilton, Madison, Jay',
+    category: 'Free book',
+    badge: 'Discover',
+    blurb: 'American constitutional thought in a format made for study, comparison, and annotation.',
+    detail: 'Find the best readable edition',
+    actionLabel: 'Find edition',
+    action: { type: 'search', query: 'Federalist Papers' },
+    palette: ['#9bc0ff', '#3557a8', '#182850']
+  }
+];
+
+const BROWSE_LIBRARY_SOURCES = [
+  { provider: 'gutenberg', title: 'Project Gutenberg', note: 'Classic full texts', icon: 'PG' },
+  { provider: 'archive', title: 'Internet Archive', note: 'Scans, OCR, and borrowable texts', icon: 'IA' },
+  { provider: 'openlibrary', title: 'Open Library', note: 'Borrow, preview, and edition discovery', icon: 'OL' },
+  { provider: 'google', title: 'Google Books', note: 'Preview modern and public-domain titles', icon: 'GB' }
+];
+
+const BROWSE_COLLECTIONS = [
+  ['Great Books of the Western World', 'Great Books of the Western World'],
+  ['Classics for first-time readers', 'The Great Gatsby Pride and Prejudice A Tale of Two Cities'],
+  ['Philosophy foundations', 'Plato Aristotle Marcus Aurelius Augustine'],
+  ['American founding & republic', 'Federalist Papers Constitution Tocqueville'],
+  ['History and civilization', 'Gibbon Plutarch Herodotus Thucydides'],
+  ['Science for curious readers', 'Origin of Species Darwin Euclid Newton']
+];
+
+
 const languages = {
   es: 'Spanish',
   fr: 'French',
@@ -13572,126 +13719,268 @@ function renderUpload() {
   });
 }
 
+
 function renderBrowseHub() {
   stopReader();
 
   const progress = Object.values(readStoredObject(READING_PROGRESS_KEY));
-  const readingList = getReadingList();
+  const layoutMode = localStorage.getItem(BROWSE_LAYOUT_KEY) === 'list' ? 'list' : 'tiles';
+  const firstName = currentReaderFirstName();
   const recentTitles = progress
     .sort((x, y) => new Date(y.lastReadAt || 0) - new Date(x.lastReadAt || 0))
-    .slice(0, 6);
-
-  const recommended = [
-    { title:'The Republic', author:'Plato', query:'The Republic Plato', reason:'Justice and society.' },
-    { title:'Meditations', author:'Marcus Aurelius', query:'Meditations Marcus Aurelius', reason:'Character and discipline.' },
-    { title:'The Brothers Karamazov', author:'Fyodor Dostoevsky', query:'Brothers Karamazov Dostoevsky', reason:'Faith and moral choice.' },
-    { title:'The Federalist Papers', author:'Hamilton, Madison, and Jay', query:'Federalist Papers', reason:'Political philosophy.' },
-    { title:'The Confessions', author:'Augustine', query:'Confessions Augustine', reason:'Faith and memory.' },
-    { title:'On the Origin of Species', author:'Charles Darwin', query:'Origin of Species Darwin', reason:'Foundational science.' }
-  ];
-
-  const collections = [
-    ['Ancient Greece','Plato Aristotle Homer Sophocles'],
-    ['Roman Classics','Cicero Virgil Marcus Aurelius Tacitus'],
-    ['Founding & Republic','Federalist Papers Constitution Tocqueville'],
-    ['Faith & Theology','Augustine Aquinas Bunyan Bible'],
-    ['Science & Discovery','Darwin Newton Galileo Faraday'],
-    ['Adventure','Odyssey Treasure Island Robinson Crusoe'],
-    ['Mystery','Sherlock Holmes Wilkie Collins Poe'],
-    ['Biography & History','Plutarch Boswell Gibbon']
-  ];
-
-  app.innerHTML = `
-    <section class="platform-page browse-hub">
-      <header class="platform-hero">
-        <div>
-          <span class="source-category">Browse</span>
-          <h1>What would you like to discover?</h1>
-          <p>Find books, collections, and readable editions.</p>
-        </div>
-        <button class="secondary" type="button" data-action="reader">Return to Reader</button>
-      </header>
-
-      <form id="browse-global-search" class="browse-search">
-        <span aria-hidden="true">⌕</span>
-        <input id="browse-global-query" type="search" required placeholder="Search titles, authors, subjects, or ideas across all libraries">
-        <label class="browse-format-field">
-          <span>Format</span>
-          <select id="browse-global-format" aria-label="Preferred book format">
-            <option value="best">Best available</option>
-            <option value="text">Plain text</option>
-            <option value="epub">EPUB</option>
-            <option value="pdf">PDF</option>
-          </select>
-        </label>
-        <button class="primary" type="submit">Search All Libraries</button>
-      </form>
-
-      <section class="browse-section">
-        <div class="section-heading"><div><h2>Popular libraries</h2><p>Choose a source or search everything.</p></div></div>
-        <div class="platform-tile-grid library-source-tiles">
-          <button class="platform-tile featured" type="button" data-read="unified-library"><span class="browse-icon icon-search">⌕</span><strong>Search All Libraries</strong><small>Search every source</small></button>
-          <button class="platform-tile" type="button" data-read="gutenberg"><span class="browse-icon icon-gutenberg">G</span><strong>Project Gutenberg</strong><small>Public-domain classics</small></button>
-          <button class="platform-tile" type="button" data-browse-search="provider:internet-archive"><span class="browse-icon icon-archive">◎</span><strong>Internet Archive</strong><small>Digitized editions</small></button>
-          <button class="platform-tile" type="button" data-browse-search="provider:open-library"><span class="browse-icon icon-openlibrary">▤</span><strong>Open Library</strong><small>Discovery and borrowing</small></button>
-          <button class="platform-tile" type="button" data-browse-search="provider:wikisource"><span class="browse-icon icon-wikisource">W</span><strong>Wikisource</strong><small>Primary texts</small></button>
-          <button class="platform-tile" type="button" data-read="great-books"><span class="browse-icon icon-greatbooks">★</span><strong>Great Books</strong><small>Classic works and ideas</small></button>
-        </div>
-      </section>
-
-      <section class="browse-section">
-        <div class="section-heading"><div><h2>Collections</h2><p>Explore by theme.</p></div></div>
-        <div class="collection-strip">
-          ${collections.map(([title, query]) => `<button type="button" class="collection-card" data-collection-query="${escapeHtml(query)}"><strong>${escapeHtml(title)}</strong><span>Explore collection →</span></button>`).join('')}
-        </div>
-      </section>
-
-      <section class="browse-section">
-        <div class="section-heading"><div><h2>Recommended starting points</h2><p>Suggested starting points.</p></div></div>
-        <div class="platform-book-grid">
-          ${recommended.map((book) => `<article class="platform-book-card">
-            <div class="book-spine" aria-hidden="true">${escapeHtml(book.title.slice(0,1))}</div>
-            <div><h3>${escapeHtml(book.title)}</h3><p>${escapeHtml(book.author)}</p><small>${escapeHtml(book.reason)}</small></div>
-            <button class="primary" type="button" data-browse-title="${escapeHtml(book.query)}">Find full text</button>
-          </article>`).join('')}
-        </div>
-      </section>
-
-      <section class="browse-section">
-        <div class="section-heading"><div><h2>Continue exploring</h2><p>Pick up where you left off.</p></div></div>
-        <div class="continue-exploring-grid">
-          ${recentTitles.length ? recentTitles.map((item) => `<button type="button" class="continue-card" data-progress-open="${escapeHtml(item.documentId)}"><span>${Math.min(100, Math.round(((Number(item.furthestWord)||0)/Math.max(1,Number(item.totalWords)||1))*100))}%</span><strong>${escapeHtml(item.title || 'Untitled')}</strong><small>Resume recorded text</small></button>`).join('') : '<p class="navigation-empty">Your recent books will appear here after you begin reading.</p>'}
-          ${readingList.slice(0,3).map((item) => `<button type="button" class="continue-card" data-action="my-reading"><span>List</span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.status || 'Saved')}</small></button>`).join('')}
-        </div>
-      </section>
-
-      <section class="browse-section browse-daily">
-        <article><span class="source-category">Today</span><h2>Great Idea: Justice</h2><p>Compare how Plato, Aristotle, Cicero, Augustine, Aquinas, and the biblical tradition understand justice.</p><button class="secondary" type="button" data-read="syntopicon">Explore Great Ideas</button></article>
-        <article><span class="source-category">Study</span><h2>Bible reading</h2><p>Open Bible Study for parallel translations, commentary, cross references, and structured reading.</p><button class="secondary" type="button" data-read="bible">Open Bible Study</button></article>
-        <article><span class="source-category">Current</span><h2>News & interests</h2><p>Use current articles as shorter reading practice and comprehension material.</p><button class="secondary" type="button" data-read="current-reading">Browse current reading</button></article>
-      </section>
-    </section>`;
+    .slice(0, 4);
 
   const search = (query, format = app.querySelector('#browse-global-format')?.value || 'best') => {
     localStorage.setItem('markSetGoPendingLibrarySearch', query);
     renderUnifiedLibrary();
     requestAnimationFrame(() => {
-      const input = app.querySelector('#unified-library-query');
-      const formatSelect = app.querySelector('#unified-library-format');
-      const form = app.querySelector('#unified-library-search');
-      if (input) input.value = query;
-      if (formatSelect) formatSelect.value = format;
-      form?.requestSubmit();
+      const queryInput = app.querySelector('#unified-library-query');
+      const formatSelect = app.querySelector('#browse-global-format') || document.querySelector('#unified-library-format');
+      if (queryInput) {
+        queryInput.value = query;
+        queryInput.dispatchEvent(new Event('input', { bubbles:true }));
+      }
+      const unifiedFormat = document.querySelector('#unified-library-format');
+      if (unifiedFormat && format) unifiedFormat.value = format;
     });
   };
+
+  const browseTile = (item, kind = 'free') => {
+    const paletteStyle = `--cover-a:${item.palette?.[0] || '#7cb6ff'}; --cover-b:${item.palette?.[1] || '#2d6ab7'}; --cover-c:${item.palette?.[2] || '#16355a'};`;
+    const actionAttrs = kind === 'guide'
+      ? (item.active ? `data-open-guide="${escapeHtml(item.id)}"` : '')
+      : `data-open-browse-book="${escapeHtml(item.id)}"`;
+    const interactiveClass = (kind === 'guide' ? item.active : true) ? 'is-interactive' : 'is-disabled';
+    const actionText = kind === 'guide'
+      ? (item.active ? item.actionLabel : 'Coming soon')
+      : (item.actionLabel || 'Open');
+    return `
+      <article class="browse-book-card ${interactiveClass}">
+        <div class="browse-face-cover" style="${paletteStyle}">
+          <span class="browse-cover-badge">${escapeHtml(item.badge || item.category || '')}</span>
+          <div class="browse-cover-copy">
+            <strong>${escapeHtml(item.title)}</strong>
+            <span>${escapeHtml(item.author || '')}</span>
+          </div>
+          <small>${escapeHtml(item.category || '')}</small>
+        </div>
+        <div class="browse-book-body">
+          <span class="source-category">${escapeHtml(item.category || '')}</span>
+          <h3>${escapeHtml(item.title)}</h3>
+          <p>${escapeHtml(item.blurb || '')}</p>
+          <small>${escapeHtml(item.detail || '')}</small>
+          <div class="browse-book-actions">
+            ${kind === 'guide' && !item.active
+              ? `<button class="secondary" type="button" disabled>Coming soon</button>`
+              : `<button class="primary" type="button" ${actionAttrs}>${escapeHtml(actionText)}</button>`}
+          </div>
+        </div>
+      </article>`;
+  };
+
+  const browseList = (item, kind = 'free') => {
+    const paletteStyle = `--cover-a:${item.palette?.[0] || '#7cb6ff'}; --cover-b:${item.palette?.[1] || '#2d6ab7'}; --cover-c:${item.palette?.[2] || '#16355a'};`;
+    const actionAttrs = kind === 'guide'
+      ? (item.active ? `data-open-guide="${escapeHtml(item.id)}"` : '')
+      : `data-open-browse-book="${escapeHtml(item.id)}"`;
+    const actionText = kind === 'guide'
+      ? (item.active ? item.actionLabel : 'Coming soon')
+      : (item.actionLabel || 'Open');
+    return `
+      <article class="browse-list-row ${kind === 'guide' && !item.active ? 'is-disabled' : ''}">
+        <div class="browse-list-cover" style="${paletteStyle}">
+          <strong>${escapeHtml(item.title)}</strong>
+          <span>${escapeHtml(item.author || '')}</span>
+        </div>
+        <div class="browse-list-copy">
+          <div class="browse-list-title-line">
+            <span class="source-category">${escapeHtml(item.category || '')}</span>
+            <h3>${escapeHtml(item.title)}</h3>
+          </div>
+          <p>${escapeHtml(item.blurb || '')}</p>
+          <small>${escapeHtml(item.detail || '')}</small>
+        </div>
+        <div class="browse-list-actions">
+          ${kind === 'guide' && !item.active
+            ? `<button class="secondary" type="button" disabled>Coming soon</button>`
+            : `<button class="primary" type="button" ${actionAttrs}>${escapeHtml(actionText)}</button>`}
+        </div>
+      </article>`;
+  };
+
+  const renderShelf = (items, kind = 'free') => `
+    <div class="browse-shelf browse-shelf-${layoutMode}">
+      ${items.map((item) => layoutMode === 'tiles' ? browseTile(item, kind) : browseList(item, kind)).join('')}
+    </div>`;
+
+  const recentHtml = recentTitles.length ? `
+    <section class="browse-section browse-recent-section">
+      <div class="section-heading">
+        <div>
+          <span class="source-category">Continue</span>
+          <h2>Pick back up where you left off</h2>
+        </div>
+        <button class="secondary" type="button" data-view="my-library">Open My Library</button>
+      </div>
+      <div class="browse-recent-grid">
+        ${recentTitles.map((item) => `
+          <article class="browse-recent-card">
+            <span class="source-category">Recent</span>
+            <h3>${escapeHtml(item.title || 'Untitled')}</h3>
+            <p>${escapeHtml(item.author || item.creator || 'Saved in your reader')}</p>
+            <small>Last read ${escapeHtml(libraryRecencyLabel(item.lastReadAt))}</small>
+            <button class="primary" type="button" data-progress-open="${escapeHtml(item.documentId || '')}">Resume reading</button>
+          </article>`).join('')}
+      </div>
+    </section>` : '';
+
+  app.innerHTML = `
+    <section class="platform-page browse-hub browse-hub-modern">
+      <header class="platform-hero browse-hero-card">
+        <div class="browse-hero-copy">
+          <span class="source-category">Browse</span>
+          <h1>${firstName ? `Welcome back, ${escapeHtml(firstName)}.` : 'Build a richer reading shelf.'}</h1>
+          <p>Mix contemporary study guides with public-domain classics, switch between face-cover tiles and list view, and send anything you discover straight into the Reader.</p>
+          <div class="browse-hero-tags">
+            <span>Modern Guides</span>
+            <span>Free Books</span>
+            <span>Tiles + List view</span>
+          </div>
+        </div>
+        <div class="browse-hero-actions">
+          <button class="primary" type="button" data-browse-search="all">Search all libraries</button>
+          <button class="secondary" type="button" data-action="reader">Return to Reader</button>
+        </div>
+      </header>
+
+      <form id="browse-global-search" class="browse-search browse-search-modern">
+        <span aria-hidden="true">⌕</span>
+        <input id="browse-global-query" type="search" placeholder="Search title or author across libraries…" autocomplete="off">
+        <select id="browse-global-format" aria-label="Preferred reading format">
+          <option value="best">Best available format</option>
+          <option value="text">Plain text</option>
+          <option value="epub">EPUB</option>
+          <option value="pdf">PDF</option>
+        </select>
+        <button class="primary" type="submit">Search</button>
+      </form>
+
+      <section class="browse-control-bar">
+        <div class="browse-layout-toggle" role="group" aria-label="Browse layout">
+          <span class="browse-toggle-label">View</span>
+          <button class="${layoutMode === 'tiles' ? 'is-active' : ''}" type="button" data-browse-layout="tiles">Face covers</button>
+          <button class="${layoutMode === 'list' ? 'is-active' : ''}" type="button" data-browse-layout="list">List</button>
+        </div>
+        <p class="browse-helper-copy">Modern Guides are independent study guides. Full contemporary books can later be offered as <strong>Read with your copy</strong> or licensed content.</p>
+      </section>
+
+      <section class="browse-section browse-modern-guides-section">
+        <div class="section-heading">
+          <div>
+            <span class="source-category">Modern Guides</span>
+            <h2>Start your contemporary library</h2>
+            <p>Add modern, idea-driven reading guides that feel substantial inside the Reader.</p>
+          </div>
+        </div>
+        ${renderShelf(MODERN_GUIDE_SHELF, 'guide')}
+      </section>
+
+      <section class="browse-section browse-library-hub-section">
+        <div class="section-heading">
+          <div>
+            <span class="source-category">Sources</span>
+            <h2>Popular libraries</h2>
+            <p>Search the major public-domain and discoverability sources from one cleaner shelf.</p>
+          </div>
+        </div>
+        <div class="browse-library-hub">
+          ${BROWSE_LIBRARY_SOURCES.map((item) => `
+            <button class="browse-library-card" type="button" data-browse-provider="${escapeHtml(item.provider)}">
+              <span class="browse-library-icon">${escapeHtml(item.icon)}</span>
+              <strong>${escapeHtml(item.title)}</strong>
+              <small>${escapeHtml(item.note)}</small>
+            </button>`).join('')}
+        </div>
+      </section>
+
+      <section class="browse-section browse-free-books-section">
+        <div class="section-heading">
+          <div>
+            <span class="source-category">Free to read</span>
+            <h2>Classics with face covers</h2>
+            <p>Give the free library real visual pop in tile mode while preserving a Great Books-style list mode.</p>
+          </div>
+        </div>
+        ${renderShelf(BROWSE_FREE_BOOKS, 'free')}
+      </section>
+
+      <section class="browse-section browse-collections-section">
+        <div class="section-heading">
+          <div>
+            <span class="source-category">Collections</span>
+            <h2>Browse by shelf</h2>
+            <p>Jump into a curated cluster the way you would with Great Books of the Western World.</p>
+          </div>
+        </div>
+        <div class="browse-collection-list">
+          ${BROWSE_COLLECTIONS.map(([label, query]) => `
+            <button class="browse-collection-chip" type="button" data-collection-query="${escapeHtml(query)}">${escapeHtml(label)}</button>`).join('')}
+        </div>
+      </section>
+
+      ${recentHtml}
+    </section>`;
 
   app.querySelector('#browse-global-search')?.addEventListener('submit', (event) => {
     event.preventDefault();
     search(app.querySelector('#browse-global-query')?.value || '');
   });
-  app.querySelectorAll('[data-collection-query]').forEach((button) => button.addEventListener('click', () => search(button.dataset.collectionQuery)));
-  app.querySelectorAll('[data-browse-title]').forEach((button) => button.addEventListener('click', () => search(button.dataset.browseTitle)));
+
+  app.querySelectorAll('[data-browse-layout]').forEach((button) => button.addEventListener('click', () => {
+    localStorage.setItem(BROWSE_LAYOUT_KEY, button.dataset.browseLayout === 'list' ? 'list' : 'tiles');
+    renderBrowseHub();
+  }));
+
+  app.querySelectorAll('[data-collection-query]').forEach((button) => button.addEventListener('click', () => search(button.dataset.collectionQuery || '')));
   app.querySelectorAll('[data-browse-search]').forEach((button) => button.addEventListener('click', () => renderUnifiedLibrary()));
+  app.querySelectorAll('[data-browse-provider]').forEach((button) => button.addEventListener('click', () => {
+    renderUnifiedLibrary({ provider: button.dataset.browseProvider || 'all' });
+  }));
+
+  app.querySelectorAll('[data-open-guide]').forEach((button) => button.addEventListener('click', async () => {
+    const guideId = button.dataset.openGuide || '';
+    if (guideId !== 'atomic-habits') return;
+    try {
+      const response = await fetch('/texts/modern-guides/atomic-habits-guide.txt', { cache:'no-store' });
+      if (!response.ok) throw new Error('Could not load the Atomic Habits guide.');
+      const text = await response.text();
+      renderReaderWithText('Atomic Habits — Mark, Set, Go! Guide', text, {
+        type: 'modern-guide',
+        id: 'atomic-habits',
+        title: 'Atomic Habits — Mark, Set, Go! Guide',
+        subtitle: 'An independent reading guide inspired by James Clear'
+      });
+    } catch (error) {
+      window.alert(error?.message || 'The guide could not be opened.');
+    }
+  }));
+
+  app.querySelectorAll('[data-open-browse-book]').forEach((button) => button.addEventListener('click', async () => {
+    const item = BROWSE_FREE_BOOKS.find((entry) => entry.id === button.dataset.openBrowseBook);
+    if (!item?.action) return;
+    if (item.action.type === 'search') {
+      search(item.action.query || '');
+      return;
+    }
+    if (item.action.type === 'source') {
+      try {
+        const loaded = await loadLocalText(item.action.key);
+        renderReaderWithText(loaded.title, loaded.text, { type:'local-library', id:item.action.key, title:loaded.title });
+      } catch (error) {
+        window.alert(error?.message || 'That text could not be opened.');
+      }
+    }
+  }));
 
   app.querySelectorAll('[data-progress-open]').forEach((button) => button.addEventListener('click', () => {
     const documentId = button.dataset.progressOpen;
@@ -13702,37 +13991,6 @@ function renderBrowseHub() {
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
     requestAnimationFrame(() => jumpToWordIndex(record?.lastWord || 0));
   }));
-}
-
-
-function libraryRecencyClass(lastReadAt) {
-  if (!lastReadAt) return 'recency-undated';
-
-  const readDate = new Date(lastReadAt);
-  if (Number.isNaN(readDate.getTime())) return 'recency-undated';
-
-  const now = new Date();
-  const today = startOfDay(now);
-  const readDay = startOfDay(readDate);
-  const ageDays = Math.floor((today - readDay) / 86400000);
-
-  if (ageDays <= 0) return 'recency-today';
-  if (ageDays <= 7) return 'recency-week';
-  if (ageDays <= 30) return 'recency-month';
-  if (ageDays <= 90) return 'recency-quarter';
-  return 'recency-older';
-}
-
-function libraryRecencyLabel(lastReadAt) {
-  const recency = libraryRecencyClass(lastReadAt);
-  return ({
-    'recency-today': 'Read today',
-    'recency-week': 'Read this week',
-    'recency-month': 'Read this month',
-    'recency-quarter': 'Read in the last 3 months',
-    'recency-older': 'Read more than 3 months ago',
-    'recency-undated': 'No reading date'
-  })[recency];
 }
 
 function currentReaderFirstName() {
