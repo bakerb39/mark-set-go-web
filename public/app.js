@@ -3025,6 +3025,23 @@ const greatBooksCatalog = [
   }
 ];
 
+const CLASSIC_GUIDE_PATHS = Object.freeze({
+  'Iliad Homer': '/classic-guides/iliad.html',
+  'Odyssey Homer': '/classic-guides/odyssey.html',
+  'Aeschylus Agamemnon': '/classic-guides/agamemnon.html',
+  'Aeschylus plays': '/classic-guides/aeschylus-plays.html',
+  'Aeschylus Prometheus Bound': '/classic-guides/prometheus-bound.html',
+  'Aeschylus Eumenides': '/classic-guides/eumenides.html',
+  'Aeschylus Libation Bearers': '/classic-guides/libation-bearers.html',
+  'Aristophanes plays': '/classic-guides/aristophanes-plays.html',
+  'Aristophanes Birds': '/classic-guides/the-birds.html',
+  'Aristophanes Clouds': '/classic-guides/the-clouds.html'
+});
+
+function classicGuidePathForGreatBook(book) {
+  return CLASSIC_GUIDE_PATHS[String(book?.query || '')] || '';
+}
+
 // Reader state is owned by ReaderEngine (Sprint 1).
 
 function closeMenus() {
@@ -14970,6 +14987,7 @@ function renderGreatBooksLibrary() {
                 <div class="great-book-actions">
                   <button class="primary" type="button" data-load-great-book="${escapeHtml(book.query)}">Find &amp; Import Edition</button>
                   <button class="secondary" type="button" data-study-great-book="${escapeHtml(book.query)}">Study / Great Ideas</button>
+                  ${classicGuidePathForGreatBook(book) ? `<a class="secondary button-link" href="${escapeHtml(classicGuidePathForGreatBook(book))}">Classic Guide</a>` : ''}
                   <a class="secondary button-link" href="${greatBookGrokipediaUrl(book)}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
                 </div>
                 <p class="status book-load-status"></p>

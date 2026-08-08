@@ -1,0 +1,39 @@
+UPLOAD THIS PACKAGE PRESERVING PATHS
+
+Repository structure after upload:
+
+public/
+  index.html
+  app.js
+  classic-guides/
+    iliad.html
+    odyssey.html
+    agamemnon.html
+    aeschylus-plays.html
+    prometheus-bound.html
+    eumenides.html
+    libation-bearers.html
+    aristophanes-plays.html
+    the-birds.html
+    the-clouds.html
+
+IMPORTANT:
+Replace files under PUBLIC, not repository root.
+
+The included public/index.html requests:
+  /app.js?v=9.6.8-classic-guides-first-10
+
+The included public/app.js contains:
+  CLASSIC_GUIDE_PATHS
+and Classic Guide links for the first 10 non-Bible Great Books.
+
+After deployment, verify in DevTools:
+fetch('/app.js?v=' + Date.now(), {cache:'no-store'})
+  .then(r => r.text())
+  .then(t => console.log({
+    hasClassicGuidePaths: t.includes('CLASSIC_GUIDE_PATHS'),
+    hasClassicGuide: t.includes('Classic Guide'),
+    hasIliadRoute: t.includes('/classic-guides/iliad.html')
+  }));
+
+All three should be true.
