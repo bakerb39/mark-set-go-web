@@ -68,6 +68,8 @@
     '.reader',
     '.reader-frame',
     '.reader-word',
+    '.word-context-menu',
+    '#word-context-menu',
     '.reader-selection-toolbar',
     '#mark-selection-toolbar'
   ].join(',');
@@ -440,12 +442,16 @@
   };
   window.MSGCompanion = api;
 
-  /* Bubble-phase companion/profile click listener only. */
+  /* Bubble-phase companion/profile click listener only.
+     Reader interaction surfaces are intentionally excluded so companion refreshes
+     cannot run as a side effect of reader clicks or custom word-menu actions. */
   document.addEventListener('click', (event) => {
-    if (event.target.closest('[data-action="profile-preferences"]')) {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    if (target?.closest?.('[data-action="profile-preferences"]')) {
       window.setTimeout(() => ensureProfileControl(true), 80);
       window.setTimeout(() => ensureProfileControl(true), 300);
     }
+    if (target?.closest?.(PROTECTED_SELECTOR)) return;
     scheduleAfterUiAction();
   }, false);
 

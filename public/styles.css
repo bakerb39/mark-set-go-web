@@ -12944,3 +12944,30 @@ html[data-companion="beth"] .home-mark-icon-stage.companion-frontpage-badge-mode
 }
 .companion-persona-settings [data-companion-choice="mark"] .companion-option-subtitle::after{content:"Ask Mark";}
 .companion-persona-settings [data-companion-choice="beth"] .companion-option-subtitle::after{content:"Ask Beth";}
+
+/* v9.5.4 Notebook scroll repair only.
+   Keep the notebook page in normal document flow and make its entry surface
+   independently scrollable when the list is taller than the viewport. */
+.app-shell:has(.global-notebook-page) {
+  height:auto !important;
+  max-height:none !important;
+  overflow:visible !important;
+}
+.global-notebook-page {
+  height:auto !important;
+  max-height:none !important;
+  overflow:visible !important;
+}
+.global-notebook-page #global-notebook-entries {
+  max-height:calc(100vh - 250px) !important;
+  min-height:180px;
+  overflow-y:auto !important;
+  overflow-x:hidden !important;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+@media (max-width:700px) {
+  .global-notebook-page #global-notebook-entries {
+    max-height:calc(100vh - 210px) !important;
+  }
+}
