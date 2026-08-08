@@ -289,7 +289,17 @@ const ReaderContinuity = {
           furthestWord: Math.max(Number(existing.furthestWord) || 0, activeReaderSnapshot.index),
           lastWord: activeReaderSnapshot.index,
           lastReadAt: savedAt,
-          source: snapshot.source || state.source || existing.source
+          source: (snapshot.source || state.source)?.type === 'modern-guide'
+            ? {
+                type:'modern-guide',
+                id:(snapshot.source || state.source)?.id || '',
+                originalTitle:(snapshot.source || state.source)?.originalTitle || '',
+                originalAuthor:(snapshot.source || state.source)?.originalAuthor || '',
+                customGuide:Boolean((snapshot.source || state.source)?.customGuide),
+                buyUrl:(snapshot.source || state.source)?.buyUrl || '',
+                guideInteractions:(snapshot.source || state.source)?.guideInteractions || null
+              }
+            : snapshot.source || state.source || existing.source
         };
         localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progress));
       }
@@ -477,6 +487,146 @@ const sources = {
 const BROWSE_LAYOUT_KEY = 'markSetGoBrowseLayoutV1';
 
 const MODERN_GUIDE_LIBRARY_KEY = 'markSetGoModernGuideLibraryV1';
+
+function compactModernGuideLibraryItem(item = {}) {
+  const source = item?.source && typeof item.source === 'object' ? item.source : {};
+  return {
+    documentId: String(item.documentId || '').slice(0,140),
+    title: String(item.title || '').slice(0,240),
+    originalTitle: String(item.originalTitle || source.originalTitle || '').slice(0,220),
+    author: String(item.author || source.originalAuthor || '').slice(0,180),
+    firstOpenedAt: item.firstOpenedAt || '',
+    lastOpenedAt: item.lastOpenedAt || item.lastReadAt || '',
+    customGuide: Boolean(item.customGuide || source.customGuide),
+    buyUrl: String(item.buyUrl || source.buyUrl || '').slice(0,800),
+    wordCount: Math.max(0, Number(item.wordCount) || Number(item.totalWords) || 0)
+  };
+}
+
+function discoverModernGuidesFromExistingStorage() {
+  const byDocument = new Map();
+
+  // Reading progress is already the canonical My Library index.
+  const progress = readStoredObject(READING_PROGRESS_KEY);
+  Object.values(progress).forEach((item) => {
+    if (item?.source?.type !== 'modern-guide' || !item.documentId) return;
+    byDocument.set(String(item.documentId), compactModernGuideLibraryItem({
+      ...item,
+      originalTitle:item.source?.originalTitle,
+      author:item.source?.originalAuthor,
+      customGuide:item.source?.customGuide,
+      buyUrl:item.source?.buyUrl,
+      lastOpenedAt:item.lastReadAt
+    }));
+  });
+
+  // Also inspect existing saved-document metadata so a guide opened before a
+  // progress checkpoint can still appear without creating another large copy.
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (!key || !key.startsWith(DOCUMENT_STORAGE_PREFIX)) continue;
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch {}
+      if (saved?.source?.type !== 'modern-guide') continue;
+      const documentId = key.slice(DOCUMENT_STORAGE_PREFIX.length);
+      if (!documentId) continue;
+      const existing = byDocument.get(documentId) || {};
+      byDocument.set(documentId, compactModernGuideLibraryItem({
+        ...existing,
+        documentId,
+        title:saved.title || existing.title,
+        originalTitle:saved.source?.originalTitle || existing.originalTitle,
+        author:saved.source?.originalAuthor || existing.author,
+        customGuide:saved.source?.customGuide,
+        buyUrl:saved.source?.buyUrl,
+        wordCount:existing.wordCount || splitWords(saved.text || '').length,
+        lastOpenedAt:existing.lastOpenedAt || ''
+      }));
+    }
+  } catch (error) {
+    console.warn('Could not inspect saved Modern Guides.', error);
+  }
+
+  return [...byDocument.values()]
+    .filter((item) => item.documentId && item.title)
+    .sort((a,b) => new Date(b.lastOpenedAt || b.firstOpenedAt || 0) - new Date(a.lastOpenedAt || a.firstOpenedAt || 0));
+}
+
+function readModernGuideLibrary() {
+  const discovered = discoverModernGuidesFromExistingStorage();
+  const byDocument = new Map(discovered.map((item) => [String(item.documentId), item]));
+
+  // Migrate any older guide-registry metadata, but never depend on it.
+  try {
+    const legacy = JSON.parse(localStorage.getItem(MODERN_GUIDE_LIBRARY_KEY) || '[]');
+    if (Array.isArray(legacy)) {
+      legacy.map(compactModernGuideLibraryItem).forEach((item) => {
+        if (!item.documentId) return;
+        byDocument.set(item.documentId, { ...item, ...(byDocument.get(item.documentId) || {}) });
+      });
+    }
+  } catch {}
+
+  return [...byDocument.values()]
+    .filter((item) => item.documentId && item.title)
+    .sort((a,b) => new Date(b.lastOpenedAt || b.firstOpenedAt || 0) - new Date(a.lastOpenedAt || a.firstOpenedAt || 0));
+}
+
+function writeModernGuideLibrary(items) {
+  const compact = (Array.isArray(items) ? items : [])
+    .map(compactModernGuideLibraryItem)
+    .filter((item) => item.documentId && item.title)
+    .slice(0, 50);
+
+  try {
+    if (!compact.length) {
+      localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY);
+      return [];
+    }
+    localStorage.setItem(MODERN_GUIDE_LIBRARY_KEY, JSON.stringify(compact));
+    return compact;
+  } catch (error) {
+    // The registry is only a lightweight cache. Existing document/progress
+    // storage remains authoritative, so never break the Reader on quota errors.
+    try { localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY); } catch {}
+    console.warn('Modern Guide cache was skipped because browser storage is full.', error);
+    return compact;
+  }
+}
+
+function registerModernGuideLibraryItem({
+  documentId = state?.documentId || '',
+  title = state?.title || '',
+  source = state?.source || null,
+  text = state?.currentText || ''
+} = {}) {
+  if (!documentId || !title || source?.type !== 'modern-guide') return null;
+
+  const existingItems = readModernGuideLibrary();
+  const existing = existingItems.find((item) => String(item.documentId) === String(documentId)) || {};
+  const now = new Date().toISOString();
+  const record = compactModernGuideLibraryItem({
+    ...existing,
+    documentId,
+    title,
+    originalTitle:source?.originalTitle || existing.originalTitle,
+    author:source?.originalAuthor || existing.author,
+    firstOpenedAt:existing.firstOpenedAt || now,
+    lastOpenedAt:now,
+    customGuide:Boolean(source?.customGuide),
+    buyUrl:source?.buyUrl || existing.buyUrl,
+    wordCount:Array.isArray(state?.words) && state.words.length ? state.words.length : splitWords(text || '').length
+  });
+
+  // Best-effort compact cache only. My Library also discovers the guide from
+  // the existing document/progress records, so failure here is harmless.
+  const next = existingItems.filter((item) => String(item.documentId) !== String(documentId));
+  next.unshift(record);
+  writeModernGuideLibrary(next);
+  return record;
+}
+
 const MODERN_GUIDE_ACTIONS_KEY = 'markSetGoModernGuideActionsV1';
 
 function readModernGuideLibrary() {
@@ -3994,13 +4144,7 @@ function renderBookBuilder() {
           '[[MSG:DISCUSS]]',
           ''
         ]),
-        '[[MSG:IDEAS]]',
-        '',
-        '[[MSG:ACTION]]',
-        '',
-        '[[MSG:QUIZ]]',
-        '',
-        '[[MSG:BUY]]'
+        '[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]'
       ].filter((part) => part !== null && part !== undefined).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 
       const interaction = {
@@ -4761,9 +4905,23 @@ function finalizeReadingSession() {
     totalWordsRead: (Number(existing.totalWordsRead) || 0) + wordsRead,
     sessions: (Number(existing.sessions) || 0) + 1,
     lastReadAt: new Date(endedAt).toISOString(),
-    source: state.source
+    source: state.source?.type === 'modern-guide'
+      ? {
+          type:'modern-guide',
+          id:state.source?.id || '',
+          originalTitle:state.source?.originalTitle || '',
+          originalAuthor:state.source?.originalAuthor || '',
+          customGuide:Boolean(state.source?.customGuide),
+          buyUrl:state.source?.buyUrl || '',
+          guideInteractions:state.source?.guideInteractions || null
+        }
+      : state.source
   };
-  localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progress));
+  try {
+    localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progress));
+  } catch (error) {
+    console.warn('Reading progress could not be saved because browser storage is full.', error);
+  }
 }
 
 function formatDuration(seconds) {
@@ -6097,7 +6255,18 @@ function persistCurrentDocument() {
         shouldWrite = true;
       }
     }
-    if (shouldWrite) localStorage.setItem(key, JSON.stringify(next));
+    if (shouldWrite) {
+      try {
+        localStorage.setItem(key, JSON.stringify(next));
+      } catch (error) {
+        if (error?.name === 'QuotaExceededError') {
+          try { localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY); } catch {}
+          localStorage.setItem(key, JSON.stringify(next));
+        } else {
+          throw error;
+        }
+      }
+    }
     return true;
   } catch (error) {
     console.warn('Document could not be stored in this browser.', error);
@@ -6127,7 +6296,17 @@ function registerCurrentDocumentInMyLibrary({ opened = false } = {}) {
       sessions: Number(existing.sessions) || 0,
       firstOpenedAt: existing.firstOpenedAt || now,
       lastReadAt: opened || !existing.lastReadAt ? now : existing.lastReadAt,
-      source: state.source
+      source: state.source?.type === 'modern-guide'
+        ? {
+            type:'modern-guide',
+            id:state.source?.id || '',
+            originalTitle:state.source?.originalTitle || '',
+            originalAuthor:state.source?.originalAuthor || '',
+            customGuide:Boolean(state.source?.customGuide),
+            buyUrl:state.source?.buyUrl || '',
+            guideInteractions:state.source?.guideInteractions || null
+          }
+        : state.source
     };
 
     localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progress));
@@ -8593,7 +8772,7 @@ function isModernGuideActionToken(word) {
 function modernGuideActionLabel(action) {
   return ({
     section: '',
-    discuss: 'Discuss with Ask Mark',
+    discuss: 'Discuss with Mark',
     quiz: 'Quiz me on the whole guide',
     action: 'Add to Action Center',
     ideas: 'Explore related Great Ideas',
