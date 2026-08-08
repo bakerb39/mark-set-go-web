@@ -13,7 +13,7 @@
     beth: {
       id: 'beth', name: 'Beth', ask: 'Ask Beth', notebook: "Beth's Notebook",
       avatar: '/assets/companions/beth/beth-avatar.png',
-      home: '/assets/companions/beth/beth-frontpage-badge.png'
+      home: '/assets/companions/beth/beth-avatar.png'
     }
   };
 

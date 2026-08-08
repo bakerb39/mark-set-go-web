@@ -14,9 +14,9 @@
   const VALID = new Set(['mark', 'beth']);
   const MARK_AVATAR = '/assets/walkthrough/mark-walkthrough-guide.png';
   const BETH_AVATAR = '/assets/companions/beth/beth-avatar.png';
-  const BETH_FRONTPAGE = '/assets/companions/beth/beth-frontpage-badge.png';
-  const BETH_READING = '/assets/companions/beth/beth-reading.png';
-  const BETH_POINTING = '/assets/companions/beth/beth-pointing.png';
+  const BETH_FRONTPAGE = '/assets/companions/beth/beth-avatar.png';
+  const BETH_READING = '/assets/companions/beth/beth-avatar.png';
+  const BETH_POINTING = '/assets/companions/beth/beth-avatar.png';
 
   const state = {
     id: VALID.has(localStorage.getItem(STORAGE_KEY)) ? localStorage.getItem(STORAGE_KEY) : 'mark'
