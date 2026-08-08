@@ -3026,20 +3026,150 @@ const greatBooksCatalog = [
 ];
 
 const CLASSIC_GUIDE_PATHS = Object.freeze({
-  'Iliad Homer': '/classic-guides/iliad.html',
-  'Odyssey Homer': '/classic-guides/odyssey.html',
-  'Aeschylus Agamemnon': '/classic-guides/agamemnon.html',
-  'Aeschylus plays': '/classic-guides/aeschylus-plays.html',
-  'Aeschylus Prometheus Bound': '/classic-guides/prometheus-bound.html',
-  'Aeschylus Eumenides': '/classic-guides/eumenides.html',
-  'Aeschylus Libation Bearers': '/classic-guides/libation-bearers.html',
-  'Aristophanes plays': '/classic-guides/aristophanes-plays.html',
-  'Aristophanes Birds': '/classic-guides/the-birds.html',
-  'Aristophanes Clouds': '/classic-guides/the-clouds.html'
+  'Iliad Homer': { id:'iliad', dataPath:'/classic-guides/data/homer/iliad.json' },
+  'Odyssey Homer': { id:'odyssey', legacyPath:'/classic-guides/odyssey.html' },
+  'Aeschylus Agamemnon': { id:'agamemnon', legacyPath:'/classic-guides/agamemnon.html' },
+  'Aeschylus plays': { id:'aeschylus-plays', legacyPath:'/classic-guides/aeschylus-plays.html' },
+  'Aeschylus Prometheus Bound': { id:'prometheus-bound', legacyPath:'/classic-guides/prometheus-bound.html' },
+  'Aeschylus Eumenides': { id:'eumenides', legacyPath:'/classic-guides/eumenides.html' },
+  'Aeschylus Libation Bearers': { id:'libation-bearers', legacyPath:'/classic-guides/libation-bearers.html' },
+  'Aristophanes plays': { id:'aristophanes-plays', legacyPath:'/classic-guides/aristophanes-plays.html' },
+  'Aristophanes Birds': { id:'the-birds', legacyPath:'/classic-guides/the-birds.html' },
+  'Aristophanes Clouds': { id:'the-clouds', legacyPath:'/classic-guides/the-clouds.html' }
 });
 
 function classicGuidePathForGreatBook(book) {
-  return CLASSIC_GUIDE_PATHS[String(book?.query || '')] || '';
+  const guide = CLASSIC_GUIDE_PATHS[String(book?.query || '')];
+  return guide?.dataPath || guide?.legacyPath || '';
+}
+
+function classicGuideRecordForGreatBook(book) {
+  return CLASSIC_GUIDE_PATHS[String(book?.query || '')] || null;
+}
+
+function classicGuideReaderText(guide = {}) {
+  const lines = [];
+  const push = (...items) => items.forEach((item) => {
+    const value = String(item ?? '').trim();
+    if (value) lines.push(value);
+  });
+  const blank = () => { if (lines.length && lines[lines.length - 1] !== '') lines.push(''); };
+
+  push('THE ILIAD — CLASSIC GUIDE');
+  push('Homer · Mark, Set, Go!');
+  blank();
+  push(guide.dek || guide.subtitle || 'A book-by-book companion to Homer’s Iliad.');
+  blank();
+  push('HOW TO USE THIS GUIDE');
+  push('Read the guide beside Homer rather than instead of Homer. Each Book section gives you the action, the people to watch, the interpretive stakes, and questions worth carrying back into the text.');
+  blank();
+
+  if (Array.isArray(guide.greatIdeas) && guide.greatIdeas.length) {
+    push('GREAT IDEAS');
+    push(guide.greatIdeas.join(' · '));
+    blank();
+  }
+
+  push('BOOK-BY-BOOK GUIDE');
+  blank();
+  (guide.bookGuide || []).forEach((entry) => {
+    push(`BOOK ${entry.book} — ${String(entry.title || '').toUpperCase()}`);
+    blank();
+    push('Summary');
+    push(entry.summary);
+    blank();
+
+    if (Array.isArray(entry.keyEvents) && entry.keyEvents.length) {
+      push('Key Events');
+      entry.keyEvents.forEach((event) => push(`• ${event}`));
+      blank();
+    }
+
+    if (Array.isArray(entry.characters) && entry.characters.length) {
+      push('Characters in Focus');
+      push(entry.characters.join(' · '));
+      blank();
+    }
+
+    if (entry.whyItMatters) {
+      push('Why This Book Matters');
+      push(entry.whyItMatters);
+      blank();
+    }
+
+    if (entry.watch) {
+      push('Watch For');
+      push(entry.watch);
+      blank();
+    }
+
+    if (Array.isArray(entry.questions) && entry.questions.length) {
+      push('Questions to Consider');
+      entry.questions.forEach((question, index) => push(`${index + 1}. ${question}`));
+      blank();
+    }
+  });
+
+  if (Array.isArray(guide.sections) && guide.sections.length) {
+    push('DEEPER STUDY');
+    blank();
+    guide.sections.forEach((section) => {
+      push(String(section.title || '').toUpperCase());
+      (section.body || section.paragraphs || []).forEach((paragraph) => { push(paragraph); blank(); });
+      if (section.takeaway || section.remember) {
+        push('Key Takeaway');
+        push(section.takeaway || section.remember);
+        blank();
+      }
+    });
+  }
+
+  return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+async function loadClassicGuideInReader(bookOrQuery) {
+  const book = typeof bookOrQuery === 'string'
+    ? greatBooksCatalog.find((item) => item.query === bookOrQuery)
+    : bookOrQuery;
+  const guideRecord = classicGuideRecordForGreatBook(book);
+  if (!guideRecord) return;
+
+  // The Iliad is the first native Reader-format Classic Guide. Other guides
+  // keep their existing legacy path until they are converted to the same format.
+  if (!guideRecord.dataPath) {
+    if (guideRecord.legacyPath) window.location.href = guideRecord.legacyPath;
+    return;
+  }
+
+  const response = await fetch(guideRecord.dataPath, { cache:'no-store' });
+  if (!response.ok) throw new Error(`Could not load the Classic Guide for ${book?.title || 'this work'}.`);
+  const guide = await response.json();
+  const text = classicGuideReaderText(guide);
+  if (!text) throw new Error('The Classic Guide did not contain readable text.');
+
+  renderReaderWithText(`${guide.title || book?.title || 'Classic Guide'} — Classic Guide`, text, {
+    type:'classic-guide',
+    id:guide.id || guideRecord.id || '',
+    originalTitle:guide.title || book?.title || '',
+    originalAuthor:guide.author || book?.author || '',
+    subtitle:guide.subtitle || 'An independent Mark, Set, Go! Classic Guide',
+    dataPath:guideRecord.dataPath
+  });
+}
+
+async function loadBundledClassicGuideDocument(source = {}) {
+  const dataPath = String(source?.dataPath || '').trim();
+  if (!dataPath) return null;
+  const response = await fetch(dataPath, { cache:'no-store' });
+  if (!response.ok) return null;
+  const guide = await response.json();
+  const text = classicGuideReaderText(guide);
+  if (!text) return null;
+  return {
+    title:`${guide.title || source?.originalTitle || 'Classic Guide'} — Classic Guide`,
+    text,
+    source:{ ...source, type:'classic-guide', id:guide.id || source?.id || '', dataPath }
+  };
 }
 
 // Reader state is owned by ReaderEngine (Sprint 1).
@@ -4620,8 +4750,10 @@ async function readingSkillBookText(book) {
   try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${book.documentId}`) || 'null'); } catch {}
   if (data?.text) return { title:data.title || book.title, text:data.text, source:data.source || book.source || {} };
 
-  if (book.source?.type === 'modern-guide') {
-    const bundled = await loadBundledModernGuideDocument(book.source);
+  if (book.source?.type === 'modern-guide' || book.source?.type === 'classic-guide') {
+    const bundled = book.source?.type === 'classic-guide'
+      ? await loadBundledClassicGuideDocument(book.source)
+      : await loadBundledModernGuideDocument(book.source);
     if (bundled?.text) return bundled;
   }
 
@@ -4903,7 +5035,7 @@ function renderComprehensionLibrary() {
           const last = latestByBook.get(book.documentId);
           const pct = book.totalWords ? Math.min(100,Math.round((Number(book.furthestWord)||0)/Number(book.totalWords)*100)) : 0;
           return `<article class="learning-book-card">
-            <span class="source-category">${book.source?.type === 'modern-guide' ? 'Guide' : 'Book'}</span>
+            <span class="source-category">${book.source?.type === 'classic-guide' ? 'Classic Guide' : book.source?.type === 'modern-guide' ? 'Guide' : 'Book'}</span>
             <h2>${escapeHtml(book.title)}</h2>
             <p>${pct}% read${last ? ` · Last quiz ${last.scorePercent}%` : ' · No quiz yet'}</p>
             <button class="primary" type="button" data-book-quiz="${escapeHtml(book.documentId)}">Start quiz</button>
@@ -5108,7 +5240,7 @@ function renderLearningCoursesPage() {
 
       <div class="learning-course-books">
         ${books.length ? books.map((book) => `<article class="learning-course-book">
-          <div><span class="source-category">${book.source?.type === 'modern-guide' ? 'Guide' : 'Reading'}</span><h2>${escapeHtml(book.title)}</h2></div>
+          <div><span class="source-category">${book.source?.type === 'classic-guide' ? 'Classic Guide' : book.source?.type === 'modern-guide' ? 'Guide' : 'Reading'}</span><h2>${escapeHtml(book.title)}</h2></div>
           <div class="learning-provider-links">
             ${learningCourseLinks(book.source?.originalTitle || book.title).map((provider) =>
               `<a class="secondary button-link" href="${escapeHtml(provider.url)}" target="_blank" rel="noopener noreferrer" data-learning-course-provider="${escapeHtml(provider.name)}" data-learning-course-book="${escapeHtml(book.documentId)}" data-learning-course-title="${escapeHtml(book.title)}"><strong>${escapeHtml(provider.name)}</strong><small>${escapeHtml(provider.label)}</small></a>`
@@ -10229,12 +10361,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   // allowing cloud metadata to sync while the actual document remained unavailable.
   const documentPersisted = persistCurrentDocument();
   if (!documentPersisted && (source?.type === 'modern-guide' || source?.type === 'classic-guide')) {
-    console.warn(`${source?.type === 'classic-guide' ? 'Classic' : 'Modern'} Guide opened without a local text copy.`);
+    console.warn(`${source?.type === 'classic-guide' ? 'Classic' : 'Modern'} Guide opened without a local text copy; My Library will use the bundled guide fallback when available.`);
   }
 
-  // Modern Guides are first-class reading items. Register them in My Library
-  // as soon as they are opened instead of waiting for a timed reading session
-  // or navigation checkpoint to create the first progress record.
+  // Guides are first-class reading items. Register them in My Library as soon
+  // as they open instead of waiting for a timed reading session/checkpoint.
   if (source?.type === 'modern-guide' || source?.type === 'classic-guide') {
     registerCurrentDocumentInMyLibrary({ opened:true });
     if (source?.type === 'modern-guide') {
@@ -10256,7 +10387,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       <div class="reader-title-row">
         <div class="reader-title-copy">
           <h1>${escapeHtml(title)}</h1>
-          ${source?.type === 'modern-guide' ? `<div class="modern-guide-reader-note"><span>Independent educational guide</span>${source?.originalAuthor ? `<span>Original book by ${escapeHtml(source.originalAuthor)}</span>` : ''}${source?.buyUrl ? `<a href="${escapeHtml(source.buyUrl)}" target="_blank" rel="noopener noreferrer">Buy original on Amazon ↗</a>` : ''}</div>` : ''}
+          ${source?.type === 'modern-guide' || source?.type === 'classic-guide' ? `<div class="modern-guide-reader-note"><span>${source?.type === 'classic-guide' ? 'Classic Guide · Independent educational companion' : 'Independent educational guide'}</span>${source?.originalAuthor ? `<span>Original book by ${escapeHtml(source.originalAuthor)}</span>` : ''}${source?.buyUrl ? `<a href="${escapeHtml(source.buyUrl)}" target="_blank" rel="noopener noreferrer">Buy original on Amazon ↗</a>` : ''}</div>` : ''}
           <div class="reader-title-links"><a id="grokipedia-book-link" href="${grokipediaSearchUrl(source?.originalTitle || title)}" target="_blank" rel="noopener noreferrer">Read about this book on Grokipedia</a></div>
         </div>
         <div class="reader-music-actions" aria-label="Music for this reading">
@@ -14989,7 +15120,7 @@ function renderGreatBooksLibrary() {
                 <div class="great-book-actions">
                   <button class="primary" type="button" data-load-great-book="${escapeHtml(book.query)}">Find &amp; Import Edition</button>
                   <button class="secondary" type="button" data-study-great-book="${escapeHtml(book.query)}">Study / Great Ideas</button>
-                  ${classicGuidePathForGreatBook(book) ? `<a class="secondary button-link" href="${escapeHtml(classicGuidePathForGreatBook(book))}">Classic Guide</a>` : ''}
+                  ${classicGuidePathForGreatBook(book) ? `<button class="secondary" type="button" data-open-classic-guide-reader="${escapeHtml(book.query)}">Classic Guide</button>` : ''}
                   <a class="secondary button-link" href="${greatBookGrokipediaUrl(book)}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
                 </div>
                 <p class="status book-load-status"></p>
@@ -15028,6 +15159,20 @@ function renderGreatBooksLibrary() {
     button.addEventListener('click', () => {
       const item = greatBooksCatalog.find((book) => book.query === button.dataset.studyGreatBook);
       if (item) renderGreatBookStudy(item, button);
+    });
+  });
+  app.querySelectorAll('[data-open-classic-guide-reader]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      const originalLabel = button.textContent;
+      button.textContent = 'Opening…';
+      try {
+        await loadClassicGuideInReader(button.dataset.openClassicGuideReader || '');
+      } catch (error) {
+        window.alert(error?.message || 'The Classic Guide could not be opened.');
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
     });
   });
 }
@@ -17008,10 +17153,12 @@ function renderMyLibraryHub() {
 
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
 
-    if (!data?.text && record?.source?.type === 'modern-guide') {
-      // Bundled guides can always be reconstructed from their shipped text
-      // file. Older builds sometimes created only the progress record.
-      data = await loadBundledModernGuideDocument(record.source);
+    if (!data?.text && (record?.source?.type === 'modern-guide' || record?.source?.type === 'classic-guide')) {
+      // Bundled guides can always be reconstructed from their shipped source.
+      // Older builds sometimes created only the progress record.
+      data = record.source?.type === 'classic-guide'
+        ? await loadBundledClassicGuideDocument(record.source)
+        : await loadBundledModernGuideDocument(record.source);
 
       if (data?.text) {
         // Restore the exact document id expected by this library record after
@@ -17036,7 +17183,7 @@ function renderMyLibraryHub() {
 
     if (!data?.text) {
       window.alert(
-        record?.source?.type === 'modern-guide'
+        record?.source?.type === 'modern-guide' || record?.source?.type === 'classic-guide'
           ? 'This guide record was saved by an older build, but its text is no longer available in this browser. Reopen the guide from Browse once to restore it.'
           : 'This text is not currently stored in this browser.'
       );
@@ -17101,7 +17248,7 @@ function renderMyLibraryHub() {
         <span class="${libraryRecencyClass(item.lastReadAt)}" title="${escapeHtml(libraryRecencyLabel(item.lastReadAt))}">${escapeHtml((item.title || 'B').slice(0, 1).toUpperCase())}</span>
       </button>
       <div class="continue-card-copy">
-        <span class="source-category">${item.source?.type === 'modern-guide' ? (item.source?.customGuide ? 'My Guide' : 'Modern Guide') : item.source?.type === 'classic-guide' ? 'Classic Guide' : (index === 0 ? 'Continue reading' : 'Recent')}</span>
+        <span class="source-category">${item.source?.type === 'classic-guide' ? 'Classic Guide' : item.source?.type === 'modern-guide' ? (item.source?.customGuide ? 'My Guide' : 'Modern Guide') : (index === 0 ? 'Continue reading' : 'Recent')}</span>
         <h3>${escapeHtml(item.title || 'Untitled')}</h3>
         <p>${percent}% complete · Last read ${escapeHtml(lastRead)}</p>
         ${difficulty ? difficultyBadge(difficulty, {title:item.title}) : ''}
@@ -17136,7 +17283,7 @@ function renderMyLibraryHub() {
           ${primaryBook ? `
             <div class="focus-book-cover ${libraryRecencyClass(primaryBook.lastReadAt)}" aria-label="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}" title="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}">${escapeHtml((primaryBook.title || 'B').slice(0,1).toUpperCase())}</div>
             <div class="focus-book-copy">
-              <span class="source-category">${primaryBook.source?.type === 'modern-guide' ? `${primaryBook.source?.customGuide ? 'My Guide' : 'Modern Guide'} · Your next step` : primaryBook.source?.type === 'classic-guide' ? 'Classic Guide · Your next step' : 'Your next step'}</span>
+              <span class="source-category">${primaryBook.source?.type === 'classic-guide' ? 'Classic Guide · Your next step' : primaryBook.source?.type === 'modern-guide' ? `${primaryBook.source?.customGuide ? 'My Guide' : 'Modern Guide'} · Your next step` : 'Your next step'}</span>
               <h2>${escapeHtml(primaryBook.title || 'Continue reading')}</h2>
               <p>${primaryPercent}% complete. Pick up at the exact place you left off.</p>
               ${primaryDifficulty ? difficultyBadge(primaryDifficulty, {title:primaryBook.title}) : ''}
@@ -18238,74 +18385,8 @@ window.setInterval(checkActionNotifications, 30000);
 window.setTimeout(checkActionNotifications, 1500);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkActionNotifications(); });
 
-// Classic Guides can hand directly into the Reader while remaining first-class My Library documents.
-function classicGuideReaderText(guide = {}) {
-  const lines = [
-    `${String(guide.title || 'Classic Guide').toUpperCase()} — CLASSIC GUIDE`,
-    guide.author ? `By ${guide.author}` : '',
-    guide.subtitle || '',
-    '',
-    guide.dek || '',
-    ''
-  ];
-  (guide.sections || []).forEach((section, sectionIndex) => {
-    lines.push(`${sectionIndex + 1}. ${String(section.title || '').toUpperCase()}`, section.intro || '');
-    if (section.special === 'bookGuide') {
-      (guide.bookGuide || []).forEach((book) => {
-        lines.push('', `BOOK ${book.book}: ${String(book.title || '').toUpperCase()}`, book.summary || '');
-        if (book.keyEvents?.length) lines.push('Key events:', ...book.keyEvents.map((x) => `• ${x}`));
-        if (book.characters?.length) lines.push(`Characters in focus: ${book.characters.join(', ')}`);
-        if (book.whyItMatters) lines.push(`Why it matters: ${book.whyItMatters}`);
-        if (book.watch) lines.push(`Watch for: ${book.watch}`);
-        if (book.questions?.length) lines.push('Questions to carry into the text:', ...book.questions.map((x) => `• ${x}`));
-      });
-    } else if (section.special === 'characters') {
-      (guide.characters || []).forEach((c) => lines.push('', `${c.name} — ${c.role}`, c.description || ''));
-    } else if (section.special === 'greatIdeas') {
-      (guide.greatIdeas || []).forEach((idea) => lines.push('', idea.name, idea.summary || '', ...(idea.questions || []).map((q) => `• ${q}`)));
-    } else {
-      lines.push(...(section.paragraphs || []));
-      (section.bullets || []).forEach((b) => lines.push('', b.title || '', b.text || ''));
-      (section.questions || []).forEach((q) => lines.push(`• ${q}`));
-      (section.connections || []).forEach((c) => lines.push('', c.work || '', c.link || ''));
-      (section.debates || []).forEach((d) => lines.push('', d.title || '', d.sides || ''));
-    }
-    if (section.takeaway) lines.push('', `Key idea to remember: ${section.takeaway}`);
-    lines.push('');
-  });
-  return lines.filter((line) => line !== null && line !== undefined).join('\n').replace(/\n{3,}/g, '\n\n').trim();
-}
-
-async function openClassicGuideFromQuery() {
-  const params = new URLSearchParams(window.location.search || '');
-  const guideId = String(params.get('classicGuide') || '').trim().toLowerCase();
-  if (!guideId) return false;
-  const paths = { iliad:'/classic-guides/data/homer/iliad.json' };
-  const dataPath = paths[guideId];
-  if (!dataPath) return false;
-  try {
-    const response = await fetch(dataPath, { cache:'no-store' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const guide = await response.json();
-    const text = classicGuideReaderText(guide);
-    renderReaderWithText(`${guide.title} — Mark, Set, Go! Classic Guide`, text, {
-      type:'classic-guide',
-      id:guide.id || guideId,
-      originalTitle:guide.title || '',
-      originalAuthor:guide.author || '',
-      subtitle:guide.subtitle || '',
-      guidePath:`/classic-guides/${guideId}.html`
-    });
-    history.replaceState(null, '', window.location.pathname || '/');
-    return true;
-  } catch (error) {
-    console.error('Classic Guide could not open in Reader.', error);
-    return false;
-  }
-}
-
 // v5.16: startup stays lightweight. The last book is restored only after an explicit Resume action.
-openClassicGuideFromQuery().then((opened) => { if (!opened) renderHome(); });
+renderHome();
 
 // Keep top navigation popovers over the page rather than in document flow.
 (function initializeOverlayNavigation() {

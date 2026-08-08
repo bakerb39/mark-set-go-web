@@ -235,36 +235,37 @@
     {
       "book": 1,
       "title": "The Quarrel",
-      "summary": "Apollo sends plague into the Greek camp after Agamemnon insults Chryses. Forced to return Chryseis, Agamemnon takes Briseis from Achilles. Achilles withdraws from battle and asks his mother Thetis to persuade Zeus to let the Greeks suffer without him.",
-      "watch": "Honor, leadership, anger, and the difference between political authority and personal excellence.",
+      "summary": "Apollo sends a plague through the Greek camp because Agamemnon has dishonored Chryses, a priest of Apollo, by refusing to return his daughter. When Agamemnon finally yields, he protects his status by seizing Briseis from Achilles. Achilles experiences the act not as a private loss but as a public destruction of the honor owed to the army’s greatest warrior. He withdraws from battle and asks Thetis to persuade Zeus to let the Greeks suffer until they understand how much they need him.",
       "keyEvents": [
-        "Chryses appeals to Apollo after Agamemnon refuses his ransom.",
-        "Achilles forces the plague crisis into public debate and clashes with Agamemnon.",
-        "Athena restrains Achilles from killing Agamemnon; Achilles withdraws and Thetis petitions Zeus."
+        "Chryses appeals to Apollo after Agamemnon rejects his ransom.",
+        "Achilles forces the assembly to confront the cause of the plague.",
+        "Agamemnon takes Briseis, and Achilles withdraws from the war.",
+        "Thetis asks Zeus to honor Achilles by allowing Trojan success."
       ],
       "characters": [
         "Achilles",
         "Agamemnon",
         "Chryses",
         "Thetis",
-        "Athena",
-        "Zeus"
+        "Zeus",
+        "Athena"
       ],
-      "whyItMatters": "The opening establishes the poem's governing problem: a dispute about honor becomes a military catastrophe. It also shows how speech, status, divine favor, and wounded pride can redirect the fate of an entire community.",
+      "whyItMatters": "Book 1 establishes the poem’s governing problem: what happens when extraordinary personal excellence collides with political authority. Neither Achilles nor Agamemnon is simply right. Agamemnon abuses command, while Achilles makes the whole army pay for an injury to his honor. The quarrel turns the heroic code itself into a moral problem.",
+      "watch": "Honor, leadership, anger, status, and the difference between political authority and personal excellence.",
       "questions": [
-        "Why does Achilles experience the loss of Briseis as more than a private loss?",
-        "Which leader behaves more responsibly toward the army, and why?"
+        "Why does Achilles regard Agamemnon’s seizure of Briseis as an attack on his identity rather than merely a loss of property?",
+        "At what point does Achilles’ justified anger become morally dangerous?"
       ]
     },
     {
       "book": 2,
-      "title": "The Armies Gather",
-      "summary": "Zeus sends Agamemnon a deceptive dream. After a chaotic test of the troops, the Greeks prepare for battle. The Catalogue of Ships enlarges the poem from a personal quarrel into a vast coalition of peoples and places.",
-      "watch": "How individual fame sits inside collective war; memory as a way of preserving names and communities.",
+      "title": "The Great Muster",
+      "summary": "Zeus sends Agamemnon a deceptive dream encouraging him to attack Troy. Agamemnon tests the army by suggesting they sail home, only to discover that the exhausted troops eagerly accept the idea. Odysseus restores order, while Thersites publicly attacks Agamemnon and is beaten into silence. The book culminates in the Catalogue of Ships and a corresponding list of Trojan allies, expanding the poem from a personal quarrel to a vast coalition of peoples.",
       "keyEvents": [
-        "Zeus sends Agamemnon a misleading dream promising victory.",
-        "Agamemnon tests the army and nearly causes a mass return home before Odysseus restores order.",
-        "The Catalogue of Ships and Trojan catalogue name the peoples gathered around Troy."
+        "Zeus deceives Agamemnon with a dream of imminent victory.",
+        "The Greek army nearly rushes to the ships when Agamemnon tests its resolve.",
+        "Odysseus reestablishes order and humiliates Thersites.",
+        "The Catalogue of Ships names the Greek contingents and their leaders."
       ],
       "characters": [
         "Agamemnon",
@@ -273,44 +274,47 @@
         "Nestor",
         "Zeus"
       ],
-      "whyItMatters": "Book 2 deliberately widens the lens from Achilles' private grievance to the immense social world endangered by that grievance. The catalogues turn anonymous armies into remembered communities.",
+      "whyItMatters": "The book asks how armies are held together when obedience, fatigue, honor, and political hierarchy pull in different directions. The catalogue also gives weight to the human scale of the war: this is not a handful of legendary heroes but a whole social world gathered at Troy.",
+      "watch": "Authority, persuasion, class, collective memory, the fragility of political order, and the scale of war.",
       "questions": [
-        "What does the failed test of the army reveal about Agamemnon's leadership?",
-        "Why might an oral epic devote so much space to naming contingents and places?"
+        "What does the Thersites episode reveal about who is permitted to criticize authority?",
+        "Why might Homer interrupt the action with such an extensive catalogue of names and places?"
       ]
     },
     {
       "book": 3,
-      "title": "Paris and Menelaus",
-      "summary": "Paris proposes single combat with Menelaus. Helen identifies Greek leaders from Troy’s walls. Menelaus nearly wins, but Aphrodite rescues Paris and returns him to Helen.",
-      "watch": "The gap between heroic appearance and heroic duty; Helen’s self-awareness; divine interference.",
+      "title": "Paris, Menelaus, and Helen",
+      "summary": "Paris steps forward to challenge the Greeks, recoils when Menelaus accepts, and is shamed by Hector into fighting. The armies agree that a duel between Paris and Menelaus will decide the war. From the walls, Helen identifies Greek leaders for Priam and speaks with striking self-awareness about her role in the conflict. Menelaus defeats Paris, but Aphrodite rescues Paris and compels Helen to return to him, preventing the duel from ending the war.",
       "keyEvents": [
-        "Paris challenges Menelaus to single combat to settle the conflict.",
-        "Helen surveys the Greek champions with Priam from the walls.",
-        "Menelaus overpowers Paris, but Aphrodite rescues Paris and compels Helen to return to him."
+        "Hector shames Paris for shrinking from Menelaus.",
+        "Helen surveys the Greek leaders with Priam from the walls.",
+        "Menelaus defeats Paris in single combat.",
+        "Aphrodite rescues Paris and returns him to Helen."
       ],
       "characters": [
         "Paris",
         "Menelaus",
         "Helen",
+        "Hector",
         "Priam",
         "Aphrodite"
       ],
-      "whyItMatters": "The book contrasts public heroic obligation with private desire. Paris can initiate the duel but cannot bear its consequences without divine rescue, while Helen's commentary exposes the human cost and shame surrounding the war.",
+      "whyItMatters": "The book complicates any simple story about the “cause” of the Trojan War. Paris is physically beautiful but morally weak; Helen is both implicated and constrained; Priam treats her with kindness; and divine intervention prevents a seemingly rational settlement. The gap between public reputation and private character becomes central.",
+      "watch": "Shame, beauty, responsibility, desire, marriage, divine compulsion, and the contrast between appearance and character.",
       "questions": [
-        "How does Helen judge herself and Paris?",
-        "What does divine rescue do to the idea that single combat can produce a just settlement?"
+        "How much responsibility does Helen appear to assign to herself, and how much to the gods?",
+        "Why does Homer make Paris both attractive and disappointing?"
       ]
     },
     {
       "book": 4,
       "title": "The Truce Is Broken",
-      "summary": "The gods debate the war’s continuation. Athena prompts Pandarus to wound Menelaus, breaking the truce, and general battle begins.",
-      "watch": "Responsibility when gods influence human choices; how peace can be more fragile than war.",
+      "summary": "On Olympus, the gods debate whether the duel should end the war. Hera and Athena insist that Troy must still fall. Athena descends and persuades the Trojan archer Pandarus to shoot Menelaus, breaking the oath-bound truce. Agamemnon then moves through the Greek lines, praising some commanders and provoking others as he prepares the army for renewed battle.",
       "keyEvents": [
-        "The gods debate whether the war should end with Menelaus' apparent victory.",
-        "Athena persuades Pandarus to shoot Menelaus and violate the truce.",
-        "Agamemnon reviews and exhorts the Greek commanders as battle resumes."
+        "The gods decide not to let the duel end the conflict.",
+        "Athena manipulates Pandarus into breaking the truce.",
+        "Menelaus is wounded but not killed.",
+        "Agamemnon rallies and evaluates his commanders before battle."
       ],
       "characters": [
         "Zeus",
@@ -320,44 +324,47 @@
         "Menelaus",
         "Agamemnon"
       ],
-      "whyItMatters": "The broken truce makes responsibility deliberately complicated: divine prompting does not erase Pandarus' agency. The book also shifts from ritual order back into mass violence.",
+      "whyItMatters": "Book 4 makes the relationship between divine causation and human responsibility deliberately uncomfortable. Pandarus is influenced by Athena, yet he still chooses to shoot. The violation of sworn agreement also shows how easily political order collapses once trust is broken.",
+      "watch": "Oaths, justice, divine influence, responsibility, leadership, and the instability of peace.",
       "questions": [
-        "Who is responsible for the broken oath?",
-        "Why does Homer linger over commanders and formations before battle explodes?"
+        "Does divine manipulation excuse Pandarus, or does Homer still present him as responsible?",
+        "What does the broken truce suggest about the possibility of ending cycles of violence?"
       ]
     },
     {
       "book": 5,
       "title": "Diomedes’ Great Day",
-      "summary": "Diomedes dominates the battlefield with Athena’s help and even wounds Aphrodite and Ares.",
-      "watch": "The strange boundary between mortal and divine; heroic excellence temporarily approaching superhuman power.",
+      "summary": "Athena grants Diomedes extraordinary strength and the ability to distinguish gods from mortals. He tears through the Trojan ranks, wounds Aphrodite when she rescues Aeneas, and later even strikes Ares with Athena’s help. The book pushes heroic excellence toward the superhuman while simultaneously reminding us that human glory remains dependent on divine favor.",
       "keyEvents": [
-        "Athena grants Diomedes extraordinary strength and the ability to distinguish gods from mortals.",
-        "Diomedes wounds Aphrodite while rescuing Aeneas and later wounds Ares with Athena's help.",
-        "The battlefield becomes a place where mortal excellence temporarily crosses into divine conflict."
+        "Athena empowers Diomedes for an exceptional aristeia, or day of excellence.",
+        "Diomedes wounds Aphrodite while she protects Aeneas.",
+        "Apollo intervenes to keep Diomedes from exceeding mortal limits.",
+        "With Athena’s aid, Diomedes wounds Ares and drives him from battle."
       ],
       "characters": [
         "Diomedes",
         "Athena",
         "Aeneas",
         "Aphrodite",
+        "Apollo",
         "Ares"
       ],
-      "whyItMatters": "Diomedes' aristeia provides a model of heroic excellence different from Achilles: disciplined, responsive to divine instruction, and still conscious of limits even when those limits briefly expand.",
+      "whyItMatters": "Diomedes becomes a test case for the boundary between mortal greatness and divine power. His courage is real, but it is magnified and constrained by the gods. The episode invites the reader to ask how much heroic achievement belongs to the individual and how much to circumstances beyond individual control.",
+      "watch": "Heroic excellence, divine favor, human limits, courage, violence, and the porous boundary between gods and mortals.",
       "questions": [
-        "Why is Diomedes allowed to attack some gods but not others?",
-        "How does his excellence compare with Achilles' more absolute kind of greatness?"
+        "What makes Diomedes’ courage admirable rather than merely reckless?",
+        "Why does Apollo finally remind Diomedes that mortals and gods are not equals?"
       ]
     },
     {
       "book": 6,
       "title": "Hector in Troy",
-      "summary": "Battle pauses around several intimate encounters. Diomedes and Glaucus discover ancestral guest-friendship and refuse to fight. Hector returns to Troy, meets Hecuba, Paris, Helen, and finally Andromache and Astyanax.",
-      "watch": "One of the poem’s essential books: family, hospitality, civic duty, and the human world war endangers.",
+      "summary": "The battle pauses long enough for several scenes that deepen the human meaning of the war. Diomedes and Glaucus discover that their grandfathers were guest-friends and refuse to fight each other. Hector returns to Troy, speaks with Hecuba and Helen, rebukes Paris, and finally meets Andromache and their infant son Astyanax. Andromache begs him not to return to battle, but Hector believes honor and duty require him to defend Troy despite knowing the city may fall.",
       "keyEvents": [
-        "Diomedes and Glaucus discover hereditary guest-friendship and exchange armor rather than fight.",
-        "Hector returns inside Troy and encounters Hecuba, Helen, and Paris.",
-        "Hector meets Andromache and Astyanax in the poem's most intimate family scene."
+        "Diomedes and Glaucus recognize an inherited bond of guest-friendship.",
+        "Hector asks the Trojan women to pray to Athena.",
+        "Hector rebukes Paris and speaks compassionately with Helen.",
+        "Hector and Andromache discuss duty, death, and the future of their son."
       ],
       "characters": [
         "Hector",
@@ -368,89 +375,95 @@
         "Diomedes",
         "Glaucus"
       ],
-      "whyItMatters": "Book 6 shows the civilization that war threatens. Hospitality, marriage, parenthood, memory, and civic duty all create obligations that exist beside battlefield honor and sometimes conflict with it.",
+      "whyItMatters": "This is one of the poem’s essential moral centers. Hector is not merely an enemy warrior; he is husband, father, son, and citizen. His choice to return to battle is simultaneously noble and devastating. Homer forces heroic duty and domestic love into direct conflict without offering an easy resolution.",
+      "watch": "Family, civic duty, hospitality, courage, mortality, marriage, and the human cost of public honor.",
       "questions": [
-        "Why does Hector return to battle even after Andromache's appeal?",
-        "What does the Diomedes-Glaucus episode say about obligations that predate the war?"
+        "Is Hector right to return to battle after Andromache’s plea?",
+        "How does the Diomedes–Glaucus episode challenge the idea that wartime enemies must always be treated as enemies?"
       ]
     },
     {
       "book": 7,
       "title": "Hector and Ajax",
-      "summary": "Hector and Ajax duel without decisive victory, then exchange gifts. Both sides bury their dead, and the Greeks build defensive works.",
-      "watch": "Respect between enemies; ritual as a temporary restraint on violence.",
+      "summary": "Hector and Paris return to battle, and Athena and Apollo arrange a pause for single combat. Hector challenges the Greeks and Ajax is chosen by lot to face him. The duel ends without a decisive victor, but the two warriors exchange gifts as a sign of mutual respect. The armies then recover and bury their dead, while the Greeks build a defensive wall around their ships.",
       "keyEvents": [
-        "Hector challenges the Greeks and Ajax is chosen by lot to face him.",
-        "The duel ends without a victor, and the warriors exchange gifts.",
-        "Both armies pause to recover and bury their dead; the Greeks build a wall around the ships."
+        "Hector challenges a Greek champion to single combat.",
+        "Ajax and Hector fight until heralds end the duel at nightfall.",
+        "The two warriors exchange gifts despite remaining enemies.",
+        "Both armies pause to bury their dead, and the Greeks fortify their camp."
       ],
       "characters": [
         "Hector",
         "Ajax",
-        "Nestor",
-        "Priam"
+        "Apollo",
+        "Athena",
+        "Nestor"
       ],
-      "whyItMatters": "Ritual limits violence without ending hostility. The gift exchange between Hector and Ajax demonstrates that enemies can acknowledge excellence and humanity even while remaining committed to war.",
+      "whyItMatters": "The exchange between Hector and Ajax shows that respect can exist inside violent conflict. Funeral truces and gift exchange preserve fragments of shared moral order even when political reconciliation is impossible. The book also emphasizes how Achilles’ absence forces the Greeks into a defensive posture.",
+      "watch": "Respect between enemies, ritual, burial, military necessity, honor, and limits within war.",
       "questions": [
-        "What is achieved by a duel that produces no victor?",
-        "Why are burial and gift exchange important forms of order in the middle of war?"
+        "Why do Hector and Ajax exchange gifts after trying to kill one another?",
+        "What forms of moral restraint still survive inside the war?"
       ]
     },
     {
       "book": 8,
       "title": "Zeus Tips the Balance",
-      "summary": "Zeus forbids the gods to interfere and gives the Trojans battlefield superiority. The Greeks are pushed back toward their ships.",
-      "watch": "What changes when Achilles’ absence becomes strategically undeniable.",
+      "summary": "Zeus forbids the gods from intervening and weighs the fates of Greeks and Trojans on his scales. The Trojans drive the Greeks back toward their ships, and Hector appears close to burning the fleet. Hera and Athena want to intervene but are restrained. Nightfall alone prevents a complete Greek disaster.",
       "keyEvents": [
-        "Zeus forbids divine intervention and weighs the fates of Greeks and Trojans.",
-        "Hector drives the Greeks behind their defenses toward the ships.",
-        "The Trojans camp on the plain rather than retreating behind Troy's walls."
+        "Zeus commands the other gods to stay out of the fighting.",
+        "The scales of Zeus favor Trojan success.",
+        "Hector drives the Greeks behind their defensive works.",
+        "The Trojans camp on the plain rather than retreating behind Troy’s walls."
       ],
       "characters": [
         "Zeus",
         "Hector",
-        "Diomedes",
         "Hera",
-        "Athena"
+        "Athena",
+        "Agamemnon"
       ],
-      "whyItMatters": "Achilles' absence becomes a strategic fact rather than merely a personal protest. Zeus' control of the battlefield also raises the recurring tension between fate, divine will, and human courage.",
+      "whyItMatters": "Book 8 makes Achilles’ absence strategically visible. The Greek army can no longer assume superiority. It also develops the poem’s complicated idea of fate: Zeus both enforces and participates in a larger order that even divine power does not simply erase.",
+      "watch": "Fate, divine sovereignty, military reversal, dependency, and the consequences of Achilles’ withdrawal.",
       "questions": [
-        "How does the Greek army look without Achilles?",
-        "Does Zeus enforce fate, create it, or merely manage its timing here?"
+        "What does Zeus’s scale of fate suggest about the relationship between destiny and divine choice?",
+        "How is Hector changed by the sudden success of the Trojan army?"
       ]
     },
     {
       "book": 9,
       "title": "The Embassy to Achilles",
-      "summary": "Agamemnon offers restitution. Odysseus, Phoenix, and Ajax appeal to Achilles, but he refuses to return, questioning the entire heroic economy in which glory compensates for death.",
-      "watch": "A philosophical center of the poem: What is honor worth? What can recompense injury? Why risk life for reputation?",
+      "summary": "With the Greeks near defeat, Agamemnon admits his error and offers Achilles enormous gifts, including the return of Briseis. Odysseus, Phoenix, and Ajax carry the offer to Achilles. Achilles refuses. In his great speech, he questions the heroic economy itself: brave and cowardly men both die, possessions can be replaced, but life cannot. Phoenix appeals through affection and story; Ajax appeals to solidarity. Achilles remains apart.",
       "keyEvents": [
-        "Agamemnon proposes retreat before Diomedes rejects the idea.",
-        "The embassy offers Achilles gifts, apology, status, and marriage alliances.",
-        "Achilles rejects Odysseus, Phoenix, and Ajax and openly questions whether glory can compensate for death."
+        "Agamemnon offers restitution and lavish gifts to Achilles.",
+        "Odysseus presents the formal offer.",
+        "Achilles questions whether glory is worth the cost of an early death.",
+        "Phoenix and Ajax make increasingly personal appeals, but Achilles refuses to return."
       ],
       "characters": [
         "Achilles",
+        "Agamemnon",
         "Odysseus",
         "Phoenix",
         "Ajax",
-        "Agamemnon"
+        "Patroclus"
       ],
-      "whyItMatters": "This is the poem's great debate about the heroic code. Achilles exposes a contradiction: the best fighter may receive the same death as anyone else, while material compensation cannot simply erase humiliation.",
+      "whyItMatters": "This is one of the most philosophically important books in the epic. Achilles no longer argues only that he was insulted; he begins to challenge the entire system in which honor, gifts, and glory supposedly compensate a warrior for risking his life. The poem allows its greatest hero to become its greatest critic of heroic values.",
+      "watch": "Mortality, honor, compensation, friendship, persuasion, leadership, and the value of a human life.",
       "questions": [
-        "What exactly would count as adequate restitution for Achilles?",
-        "Has Achilles rejected only Agamemnon, or the entire heroic value system?"
+        "Does Agamemnon truly apologize, or does he mainly try to purchase Achilles’ return?",
+        "Is Achilles’ rejection of heroic glory a moment of wisdom, wounded pride, or both?"
       ]
     },
     {
       "book": 10,
-      "title": "Night Raid",
-      "summary": "Odysseus and Diomedes conduct a night reconnaissance mission, capture Dolon, and raid the Thracian camp.",
-      "watch": "A different mode of heroism based on stealth, intelligence, and tactical violence.",
+      "title": "The Night Raid",
+      "summary": "During a sleepless night, Greek leaders organize a reconnaissance mission. Odysseus and Diomedes capture the Trojan spy Dolon, extract information from him, kill him, and then raid the camp of the newly arrived Thracians. They kill King Rhesus and his men while they sleep and steal their horses.",
       "keyEvents": [
-        "Greek and Trojan leaders conduct nighttime councils and reconnaissance.",
-        "Odysseus and Diomedes capture Dolon and extract intelligence from him.",
-        "They kill the sleeping Thracians and steal Rhesus' horses."
+        "The Greek commanders meet in anxiety during the night.",
+        "Odysseus and Diomedes capture Dolon.",
+        "After questioning Dolon, they kill him.",
+        "They raid the Thracian camp, kill sleeping warriors, and steal horses."
       ],
       "characters": [
         "Odysseus",
@@ -458,251 +471,266 @@
         "Dolon",
         "Rhesus"
       ],
-      "whyItMatters": "The night raid emphasizes cunning, intelligence, surveillance, and morally ambiguous violence rather than formal duel or public glory. It broadens the poem's picture of what wartime excellence can look like.",
+      "whyItMatters": "Book 10 presents war without the ceremonial clarity of formal combat. Intelligence, deception, ambush, and killing sleeping enemies replace heroic duels. It broadens the poem’s picture of what successful warfare actually requires and raises difficult questions about the relationship between effectiveness and honor.",
+      "watch": "Intelligence, deception, espionage, necessity, honor, and the morally ambiguous methods of war.",
       "questions": [
-        "How does night warfare differ morally and aesthetically from daylight battle?",
-        "What kind of heroism does Odysseus represent beside Achilles or Ajax?"
+        "How does the night raid differ morally from the public duels elsewhere in the poem?",
+        "What does Book 10 suggest about the relationship between heroic courage and strategic intelligence?"
       ]
     },
     {
       "book": 11,
       "title": "Agamemnon’s Great Day",
-      "summary": "Agamemnon fights brilliantly before being wounded. Other Greek champions also fall back. Nestor encourages Patroclus to persuade Achilles or enter battle in his place.",
-      "watch": "The crisis tightening around Achilles; the cost of his continued withdrawal.",
+      "summary": "Agamemnon fights magnificently and temporarily drives the Trojans back, but one Greek leader after another is wounded. Agamemnon, Diomedes, Odysseus, and Machaon all leave the fighting. Achilles watches the collapse from his ships and sends Patroclus to learn who has been wounded. Nestor uses the opportunity to urge Patroclus to persuade Achilles—or to enter battle wearing Achilles’ armor.",
       "keyEvents": [
-        "Agamemnon enjoys his own aristeia before wounds remove him from battle.",
-        "Diomedes, Odysseus, and Machaon are also wounded as Greek resistance collapses.",
-        "Nestor directs Patroclus toward Achilles, setting up the fatal substitution of Book 16."
+        "Agamemnon has his own aristeia and drives the Trojans back.",
+        "Major Greek leaders are successively wounded.",
+        "Achilles notices the wounded Machaon and sends Patroclus to investigate.",
+        "Nestor plants the idea that Patroclus might fight in Achilles’ armor."
       ],
       "characters": [
         "Agamemnon",
-        "Odysseus",
-        "Diomedes",
+        "Achilles",
+        "Patroclus",
         "Nestor",
-        "Patroclus"
+        "Diomedes",
+        "Odysseus"
       ],
-      "whyItMatters": "The sequence of wounded champions makes the army's dependence on Achilles unavoidable. At the same time, Patroclus begins moving from observer of suffering to agent within the plot.",
+      "whyItMatters": "The book begins the chain of events that will lead to Patroclus’ death. Achilles remains physically absent but psychologically present: everyone measures the Greek crisis against the power he is withholding. Patroclus also begins to move from companion to independent moral actor.",
+      "watch": "Leadership, vulnerability, consequence, friendship, persuasion, and the cost of refusing collective responsibility.",
       "questions": [
-        "Why does Homer give Agamemnon a moment of genuine martial excellence?",
-        "How does Patroclus' compassion begin to alter Achilles' withdrawal?"
+        "How does Agamemnon’s battlefield courage complicate our judgment of his earlier failures as a leader?",
+        "At this point, what responsibility does Achilles bear for the Greek losses?"
       ]
     },
     {
       "book": 12,
-      "title": "The Wall Is Breached",
-      "summary": "The Trojans attack the Greek fortifications. Hector breaks through the gate and the Greeks’ defensive position collapses.",
-      "watch": "Images of barriers, thresholds, and the sense that disaster is now physically entering the Greek camp.",
+      "title": "The Trojans Breach the Wall",
+      "summary": "The Trojans assault the Greek fortifications. An omen warns Hector against crossing the defensive ditch, but he dismisses the interpretation offered by Polydamas. Sarpedon and Glaucus lead a powerful attack, and Hector finally smashes through the gates with a huge stone, opening the way into the Greek camp.",
       "keyEvents": [
-        "The Trojans debate how to assault the Greek wall and ignore an ominous bird sign.",
-        "Sarpedon articulates the aristocratic bargain: leaders receive honor because they must face danger first.",
-        "Hector smashes through the gate and the Trojans breach the Greek defenses."
+        "Polydamas interprets an ominous eagle-and-serpent sign.",
+        "Hector rejects caution and presses the attack.",
+        "Sarpedon explains why nobles must earn their privileges through courage.",
+        "Hector breaks the Greek gate and the Trojans pour through."
       ],
       "characters": [
         "Hector",
-        "Sarpedon",
         "Polydamas",
-        "Ajax"
+        "Sarpedon",
+        "Glaucus"
       ],
-      "whyItMatters": "The physical wall becomes an image of collapsing security. Sarpedon's speech is also one of the clearest statements of the heroic social contract in the poem.",
+      "whyItMatters": "The book contrasts prudent counsel with the momentum of success. Hector’s confidence is understandable because his strategy is working, but Homer repeatedly places warnings around him. Sarpedon’s speech also offers one of the poem’s clearest statements of the reciprocal obligations of elite status.",
+      "watch": "Leadership, counsel, privilege, courage, omens, political obligation, and overconfidence.",
       "questions": [
-        "What does Sarpedon think leaders owe in return for privilege?",
-        "Why does Hector reject prudent interpretation of the omen?"
+        "Why does Hector reject Polydamas even when the omen seems unfavorable?",
+        "According to Sarpedon, what obligations come with social privilege?"
       ]
     },
     {
       "book": 13,
-      "title": "Battle at the Ships",
-      "summary": "Poseidon secretly strengthens the Greeks while Hector presses the attack. The fighting becomes increasingly desperate.",
-      "watch": "Collective endurance in the absence of the supreme individual hero.",
+      "title": "Poseidon Helps the Greeks",
+      "summary": "While Zeus’s attention is elsewhere, Poseidon secretly encourages the Greeks. The fighting becomes brutal around the ships, and Idomeneus emerges as a major Greek warrior. Homer repeatedly pauses over individual deaths, naming fathers, homelands, and personal histories even amid the mass violence.",
       "keyEvents": [
-        "Poseidon secretly inspires the Greeks despite Zeus' prohibition.",
-        "Idomeneus leads fierce resistance near the ships.",
-        "Hector and Polydamas disagree about strategy as the battle fragments into local struggles."
+        "Poseidon intervenes despite Zeus’s prohibition.",
+        "The Greeks stabilize their defense near the ships.",
+        "Idomeneus distinguishes himself in combat.",
+        "The narrative repeatedly individualizes warriors at the moment of death."
       ],
       "characters": [
         "Poseidon",
         "Idomeneus",
-        "Hector",
-        "Polydamas",
-        "Ajax"
+        "Ajax",
+        "Hector"
       ],
-      "whyItMatters": "This book foregrounds collective resilience. Without Achilles, survival depends on many competent fighters rather than one supreme hero, complicating the poem's fascination with singular greatness.",
+      "whyItMatters": "Book 13 demonstrates one of Homer’s most important narrative habits: the poem refuses to let the dead become anonymous statistics. Brief biographies restore individuality immediately before lives are extinguished. This technique makes the cost of heroic warfare impossible to separate from its spectacle.",
+      "watch": "Individual dignity, death, divine rivalry, courage, memory, and the human cost of battle.",
       "questions": [
-        "What can a community accomplish without its greatest individual?",
-        "How does Polydamas function as a counterweight to Hector's aggressive judgment?"
+        "Why does Homer so often tell us about a minor warrior’s family or homeland just before he dies?",
+        "Does divine intervention make the battle feel more meaningful or more arbitrary?"
       ]
     },
     {
       "book": 14,
-      "title": "Zeus Deceived",
-      "summary": "Hera seduces and distracts Zeus while Poseidon aids the Greeks. Ajax wounds Hector, temporarily reversing Trojan momentum.",
-      "watch": "Comic and domestic behavior among gods set against mortal suffering below.",
+      "title": "Hera Deceives Zeus",
+      "summary": "Hera devises a plan to distract Zeus so Poseidon can continue helping the Greeks. She borrows Aphrodite’s seductive power, persuades Sleep to assist her, and draws Zeus away from the battle. With Zeus asleep, Poseidon openly rallies the Greeks, who push Hector and the Trojans back.",
       "keyEvents": [
-        "Nestor finds Agamemnon, Odysseus, and Diomedes wounded and debating retreat.",
-        "Hera borrows Aphrodite's charm and enlists Sleep to distract Zeus.",
-        "Poseidon rallies the Greeks and Ajax strikes Hector down temporarily."
+        "Hera obtains Aphrodite’s charm and enlists Sleep.",
+        "Hera seduces Zeus and causes him to fall asleep.",
+        "Poseidon openly leads the Greek counterattack.",
+        "Ajax strikes Hector with a stone, forcing the Trojans to retreat."
       ],
       "characters": [
         "Hera",
         "Zeus",
         "Poseidon",
+        "Aphrodite",
+        "Sleep",
         "Ajax",
         "Hector"
       ],
-      "whyItMatters": "The divine comedy of seduction and deception is deliberately juxtaposed with mortal suffering. The contrast can make the gods seem trivial, but it also reveals how unstable divine patronage makes human fortunes.",
+      "whyItMatters": "The comic and erotic intrigue among the gods sits beside horrifying mortal combat. The contrast is deliberate: divine beings can treat the war as rivalry and entertainment because they do not pay the mortal price. Their immortality separates them morally from the people whose lives they manipulate.",
+      "watch": "Divine politics, sexuality, deception, immortality, power, and the contrast between gods and mortals.",
       "questions": [
-        "Why might Homer place divine sexual comedy beside battlefield horror?",
-        "What does Zeus' temporary incapacitation reveal about divine power?"
+        "How does the tone of the divine plot change the way we experience the human suffering below?",
+        "What moral difference does immortality create between the gods and human beings?"
       ]
     },
     {
       "book": 15,
-      "title": "The Trojans Reach the Ships",
-      "summary": "Zeus awakens, restores Trojan momentum, and Hector leads an assault that reaches the Greek ships.",
-      "watch": "The point at which Achilles’ refusal threatens the expedition with literal destruction.",
+      "title": "Zeus Restores the Trojan Advance",
+      "summary": "Zeus awakens, discovers Hera’s deception, and reasserts control. He orders Poseidon from the battlefield and sends Apollo to revive Hector. Apollo terrifies the Greeks, destroys their defensive wall, and enables the Trojans to surge toward the ships. Hector reaches the fleet and the danger of fire becomes immediate.",
       "keyEvents": [
-        "Zeus awakens, recognizes Hera's deception, and reasserts control.",
-        "Apollo revives Hector and terrifies the Greeks.",
-        "The Trojans reach the ships and set one vessel on fire."
+        "Zeus discovers that Hera has deceived him.",
+        "Poseidon withdraws under Zeus’s command.",
+        "Apollo restores Hector’s strength.",
+        "The Trojans break through to the Greek ships."
       ],
       "characters": [
         "Zeus",
+        "Hera",
         "Apollo",
+        "Poseidon",
         "Hector",
-        "Ajax",
-        "Patroclus"
+        "Ajax"
       ],
-      "whyItMatters": "The military crisis reaches the point Achilles claimed he would wait for. His private refusal now endangers the collective project in the most literal possible way.",
+      "whyItMatters": "The book restores the trajectory Zeus promised Thetis in Book 1. The suffering Achilles requested is now reaching its climax. The narrative therefore tightens the connection between a private grievance and consequences borne by thousands of others.",
+      "watch": "Consequences, divine order, collective suffering, anger, fate, and the approach of catastrophe.",
       "questions": [
-        "At what point does Achilles' justified grievance become an unjustifiable refusal?",
-        "Why is fire at the ships such an important threshold image?"
+        "How directly should Achilles be held responsible for the danger now facing the Greek fleet?",
+        "What does Zeus’s restoration of order tell us about power among the gods?"
       ]
     },
     {
       "book": 16,
-      "title": "The Death of Patroclus",
-      "summary": "Patroclus begs to enter battle in Achilles’ armor. He drives the Trojans back and kills Sarpedon, but goes too far. Apollo weakens him; Euphorbus wounds him; Hector delivers the final blow.",
-      "watch": "Compassion, imitation, limits, and the transformation of Achilles’ story from anger to grief.",
+      "title": "Patroclus",
+      "summary": "Patroclus can no longer tolerate the Greek suffering and begs Achilles to let him enter battle wearing Achilles’ armor. Achilles agrees but tells him only to save the ships and return. The Trojans mistake Patroclus for Achilles and retreat. Patroclus kills Sarpedon, son of Zeus, and continues toward Troy despite the warning. Apollo strikes him, Euphorbus wounds him, and Hector delivers the fatal blow.",
       "keyEvents": [
-        "Patroclus weeps over Greek losses and gains permission to fight in Achilles' armor.",
-        "He saves the ships and kills Sarpedon but ignores Achilles' instruction to return after driving the Trojans back.",
-        "Apollo strikes him; Euphorbus wounds him; Hector kills him and claims the armor."
+        "Patroclus persuades Achilles to lend him the armor and the Myrmidons.",
+        "The apparent return of Achilles reverses the battle.",
+        "Patroclus kills Sarpedon despite Zeus’s grief.",
+        "Patroclus exceeds Achilles’ instructions and is killed by Hector after Apollo and Euphorbus weaken him."
       ],
       "characters": [
         "Patroclus",
         "Achilles",
+        "Hector",
         "Sarpedon",
+        "Zeus",
         "Apollo",
-        "Euphorbus",
-        "Hector"
+        "Euphorbus"
       ],
-      "whyItMatters": "Patroclus' death transforms the poem. Achilles' anger had been directed at Agamemnon and the Greeks; grief now redirects his enormous capacity for violence toward Hector and Troy.",
+      "whyItMatters": "This is the structural and emotional turning point of The Iliad. Patroclus acts from compassion, but his success carries him beyond the limits Achilles set. His death reveals the tragic interaction of character, circumstance, divine action, and battlefield momentum. It also destroys Achilles’ ability to remain outside the war.",
+      "watch": "Friendship, compassion, overreach, fate, responsibility, mortality, and the turning of anger into grief.",
       "questions": [
-        "Why does Patroclus go beyond Achilles' instructions?",
-        "How should responsibility for his death be distributed among Patroclus, Achilles, Hector, Apollo, and fate?"
+        "Why does Patroclus continue toward Troy after accomplishing the mission Achilles gave him?",
+        "Who is responsible for Patroclus’ death—Patroclus, Achilles, Hector, Apollo, fate, or some combination?"
       ]
     },
     {
       "book": 17,
-      "title": "Battle for Patroclus’ Body",
-      "summary": "Greeks and Trojans struggle over Patroclus’ corpse and Achilles’ armor. Menelaus and Ajax protect the body while Hector takes the armor.",
-      "watch": "The body of the dead as a focus of honor, identity, and obligation.",
+      "title": "The Fight for Patroclus’ Body",
+      "summary": "The Greeks and Trojans fight desperately over Patroclus’ corpse and Achilles’ armor. Menelaus kills Euphorbus; Hector strips the armor and puts it on himself. Ajax and Menelaus defend the body while Antilochus is sent to tell Achilles what has happened. The struggle transforms the corpse into a focal point for friendship, honor, and the obligation to protect the dead.",
       "keyEvents": [
-        "Menelaus kills Euphorbus and defends Patroclus' body.",
-        "Hector puts on Achilles' captured armor, while Zeus reflects on Hector's approaching death.",
-        "Ajax, Menelaus, and others struggle to recover Patroclus' corpse under intense pressure."
+        "Menelaus defends Patroclus and kills Euphorbus.",
+        "Hector takes Achilles’ armor from Patroclus’ body and wears it.",
+        "The Greeks struggle to prevent the Trojans from carrying off the corpse.",
+        "Antilochus is sent to bring the news to Achilles."
       ],
       "characters": [
+        "Patroclus",
         "Menelaus",
-        "Ajax",
         "Hector",
-        "Euphorbus",
-        "Patroclus"
+        "Ajax",
+        "Antilochus"
       ],
-      "whyItMatters": "The fight over the corpse shows that death does not end social obligation. Bodies, armor, burial, and memory remain contested because heroic identity persists through how the dead are treated.",
+      "whyItMatters": "The battle over the body shows that obligations continue after death. A corpse is not treated as disposable matter but as the remains of a person whose companions owe him protection and burial. Hector’s decision to wear Achilles’ armor also foreshadows his own death.",
+      "watch": "Burial, friendship, the body, honor, grief, possession, and obligations to the dead.",
       "questions": [
-        "Why is possession of the body so important to both sides?",
-        "What irony lies in Hector wearing Achilles' armor?"
+        "Why is recovering Patroclus’ body worth risking still more lives?",
+        "What is the symbolic significance of Hector putting on Achilles’ armor?"
       ]
     },
     {
       "book": 18,
       "title": "The Shield of Achilles",
-      "summary": "Achilles learns of Patroclus’ death and reconciles with the need to fight, knowing his own death will follow. Thetis asks Hephaestus for new armor. The shield depicts a whole human world of peace, war, work, celebration, law, nature, and cosmos.",
-      "watch": "The poem expands beyond the battlefield. The shield asks what kind of world exists outside heroic killing.",
+      "summary": "Antilochus tells Achilles that Patroclus is dead. Achilles collapses in grief, and Thetis comes to mourn with him. Because Hector now has Achilles’ old armor, Thetis asks Hephaestus to forge new equipment. The god creates the extraordinary shield depicting the cosmos, two cities, law, marriage, harvest, herding, dancing, war, and the encircling ocean.",
       "keyEvents": [
-        "Antilochus tells Achilles that Patroclus is dead; Achilles collapses in grief.",
-        "Thetis mourns with Achilles and promises new armor from Hephaestus.",
-        "The Shield of Achilles depicts cities at peace and war, agriculture, law, celebration, nature, and the cosmos."
+        "Achilles learns of Patroclus’ death and openly mourns.",
+        "Thetis promises to obtain new armor from Hephaestus.",
+        "Achilles appears unarmed at the trench and terrifies the Trojans with Athena’s aid.",
+        "Hephaestus forges the shield containing a symbolic world of human life."
       ],
       "characters": [
         "Achilles",
         "Thetis",
         "Hephaestus",
-        "Patroclus"
+        "Antilochus",
+        "Athena"
       ],
-      "whyItMatters": "The shield interrupts the logic of vengeance with a vision of the whole world Achilles is fighting inside but cannot fully inhabit. His return to battle is both heroic and a conscious movement toward his own death.",
+      "whyItMatters": "The shield enlarges the poem beyond the battlefield. War occupies only part of a complete human world that also includes law, agriculture, marriage, music, labor, and celebration. Achilles is about to return to killing while carrying an image of the very civilization war threatens.",
+      "watch": "Grief, art, civilization, war and peace, justice, work, community, and the wholeness of human life.",
       "questions": [
-        "Why does Homer place an image of ordinary human life on a weapon?",
-        "How does Achilles' knowledge of his death change the meaning of his return?"
+        "Why does Homer spend so much time describing peaceful life on a warrior’s shield?",
+        "How does the shield change the meaning of Achilles’ return to battle?"
       ]
     },
     {
       "book": 19,
-      "title": "Achilles Reenters the War",
-      "summary": "Achilles and Agamemnon publicly reconcile. Briseis mourns Patroclus. Achilles refuses food until battle and arms himself for combat.",
-      "watch": "Reconciliation that is politically necessary but emotionally incomplete; grief overriding ordinary human needs.",
+      "title": "Achilles and Agamemnon Reconcile",
+      "summary": "Achilles calls an assembly and formally ends his quarrel with Agamemnon. Agamemnon offers an explanation that shifts part of the blame toward delusion sent by Zeus, and the promised gifts are delivered. Achilles is far less interested in compensation than he was earlier; grief has transformed his priorities. He refuses food and longs only to return to battle and avenge Patroclus.",
       "keyEvents": [
         "Achilles publicly ends his quarrel with Agamemnon.",
-        "Agamemnon explains his error through delusion and returns Briseis with gifts.",
-        "Briseis mourns Patroclus, while Achilles refuses food and arms himself."
+        "Agamemnon gives the promised gifts and returns Briseis.",
+        "Briseis mourns Patroclus, revealing another dimension of his kindness.",
+        "Achilles refuses ordinary nourishment as he prepares for vengeance."
       ],
       "characters": [
         "Achilles",
         "Agamemnon",
         "Briseis",
         "Odysseus",
-        "Athena"
+        "Patroclus"
       ],
-      "whyItMatters": "Political reconciliation restores military unity but does not heal Achilles emotionally. Briseis' lament also restores her humanity after she has functioned for much of the poem as a symbol in a male honor dispute.",
+      "whyItMatters": "The original dispute is resolved only after it has become emotionally irrelevant. The gifts that could not persuade Achilles in Book 9 now arrive after Patroclus’ death, when no compensation can address the real loss. Reconciliation between leaders therefore cannot undo the consequences of their earlier choices.",
+      "watch": "Reconciliation, responsibility, grief, compensation, leadership, and the limits of restitution.",
       "questions": [
-        "Is Agamemnon's explanation an apology or an evasion of responsibility?",
-        "Why is Briseis' voice especially important at this moment?"
+        "Has Agamemnon truly taken responsibility for what he did?",
+        "Why do the gifts matter less to Achilles now than they would have earlier?"
       ]
     },
     {
       "book": 20,
-      "title": "Gods and Men in Battle",
-      "summary": "The gods receive permission to intervene openly. Achilles returns to combat and confronts Aeneas and Hector, though divine rescue prevents their deaths at this stage.",
-      "watch": "The narrowing distance between fate and fulfillment.",
+      "title": "Achilles Returns to Battle",
+      "summary": "Zeus permits the gods to return openly to the battlefield because Achilles’ fury threatens to overwhelm the Trojan fate too quickly. Achilles seeks Hector but instead fights Aeneas, whom Poseidon rescues because Aeneas is destined to survive. The book places Achilles’ near-superhuman violence against reminders that even he cannot control the larger pattern of fate.",
       "keyEvents": [
-        "Zeus allows the gods to return openly to battle so Achilles will not destroy Troy ahead of fate.",
-        "Achilles fights Aeneas, who is rescued by Poseidon because he has a future destiny.",
-        "Apollo prevents Achilles from killing Hector before the appointed moment."
+        "The gods are released to intervene openly again.",
+        "Achilles confronts Aeneas.",
+        "Poseidon rescues Aeneas because his future is fated.",
+        "Achilles continues a devastating advance while searching for Hector."
       ],
       "characters": [
         "Achilles",
         "Aeneas",
         "Poseidon",
         "Apollo",
-        "Hector",
         "Zeus"
       ],
-      "whyItMatters": "Achilles now seems powerful enough to threaten the timetable of fate itself, yet repeated divine rescues emphasize that even the greatest mortal remains bounded by a larger order.",
+      "whyItMatters": "Achilles has returned, but not as the same man who left. Grief has compressed his world into vengeance. The gods intervene partly to prevent his extraordinary power from breaking the destined shape of events, emphasizing that even the greatest warrior has limits.",
+      "watch": "Vengeance, fate, divine intervention, human limits, heroic power, and the narrowing effects of grief.",
       "questions": [
-        "Why must Aeneas survive?",
-        "Does Achilles appear more heroic or more terrifying after his return?"
+        "How has Achilles’ motivation changed since Book 1?",
+        "Why must the gods protect the larger order of fate from Achilles’ rage?"
       ]
     },
     {
       "book": 21,
       "title": "Achilles and the River",
-      "summary": "Achilles’ killing becomes so extreme that the river Scamander rises against him. The gods fight among themselves while Achilles continues toward Troy.",
-      "watch": "Nature itself resisting excessive violence; Achilles becoming almost inhuman in his rage.",
+      "summary": "Achilles drives Trojans into the river Scamander and kills so many men that the river god rises against him. Achilles nearly drowns before divine intervention saves him. The gods then fight among themselves in a scene that is at once violent and comic, while Apollo distracts Achilles long enough for many Trojans to escape into the city.",
       "keyEvents": [
-        "Achilles drives Trojans into the river and massacres captives.",
-        "The river Scamander attacks Achilles because its waters are choked with corpses.",
-        "Hephaestus' fire subdues the river while the gods quarrel and fight."
+        "Achilles fills the Scamander with Trojan bodies.",
+        "The river god attacks Achilles for polluting his waters.",
+        "Hephaestus uses fire to subdue the river.",
+        "Apollo diverts Achilles and enables Trojans to reach safety."
       ],
       "characters": [
         "Achilles",
@@ -710,23 +738,24 @@
         "Hephaestus",
         "Apollo",
         "Athena",
-        "Ares"
+        "Hera"
       ],
-      "whyItMatters": "The violence has exceeded ordinary human measure: even the landscape resists Achilles. The river episode turns moral excess into a physical image of nature overwhelmed by slaughter.",
+      "whyItMatters": "The natural world itself seems to rebel against Achilles’ excess. His violence has passed beyond ordinary warfare into something elemental and polluting. The near-drowning also punctures any illusion that Achilles has become invulnerable: the greatest warrior can still be overwhelmed by forces larger than himself.",
+      "watch": "Excess, nature, pollution, violence, mortality, divine conflict, and the limits of heroic power.",
       "questions": [
-        "What does it mean for a river to become Achilles' opponent?",
-        "At what point does heroic vengeance become something monstrous?"
+        "What does it mean that the river itself objects to Achilles’ killing?",
+        "Does Achilles’ grief excuse the extremity of his violence?"
       ]
     },
     {
       "book": 22,
       "title": "The Death of Hector",
-      "summary": "Hector remains outside Troy, flees Achilles three times around the walls, then stands to fight after Athena deceives him. Achilles kills him and desecrates his body while Hector’s family watches from the walls.",
-      "watch": "Heroic courage, fear, fate, vengeance, and the deliberate crossing of moral limits.",
+      "summary": "The Trojans retreat behind their walls, but Hector remains outside. When Achilles approaches, Hector’s courage fails and he runs three times around Troy before Athena deceives him into making a stand. Hector asks for a mutual agreement that the victor will return the loser’s body; Achilles refuses. Achilles kills Hector, pierces his ankles, and drags the corpse behind his chariot while Priam, Hecuba, and Andromache witness the catastrophe.",
       "keyEvents": [
-        "Priam and Hecuba beg Hector to return inside Troy, but he remains outside the walls.",
-        "Hector flees Achilles three times around Troy before Athena, disguised as Deiphobus, persuades him to stand.",
-        "Achilles kills Hector, refuses his dying request for burial, and drags the corpse before the grieving city."
+        "Hector chooses to remain outside Troy despite his parents’ pleas.",
+        "He flees from Achilles before finally standing to fight.",
+        "Athena deceives Hector by appearing as Deiphobus.",
+        "Achilles kills Hector and desecrates his body instead of honoring Hector’s request."
       ],
       "characters": [
         "Hector",
@@ -736,21 +765,22 @@
         "Hecuba",
         "Andromache"
       ],
-      "whyItMatters": "Hector's death is simultaneously the climax of heroic combat and the poem's clearest exposure of vengeance's moral danger. Hector experiences fear and still chooses to face death; Achilles wins but cannot yet stop hating.",
+      "whyItMatters": "Hector’s fear makes his courage more human, not less real. Achilles achieves the vengeance he wanted, but the treatment of Hector’s body reveals how far grief has carried him beyond ordinary heroic limits. The military climax therefore becomes a moral crisis rather than a simple triumph.",
+      "watch": "Courage and fear, vengeance, the body, honor, pity, family grief, and the difference between victory and justice.",
       "questions": [
-        "Does Hector's flight diminish his courage or make it more human?",
-        "Why does Achilles refuse the burial bargain that heroic custom would normally require?"
+        "Why does Homer allow us to see Hector run before he turns to fight?",
+        "At what point does Achilles’ vengeance cease to look like justice?"
       ]
     },
     {
       "book": 23,
-      "title": "Funeral Games for Patroclus",
-      "summary": "Patroclus is cremated and honored with elaborate funeral games. Competition continues, but Achilles now acts as organizer and distributor of prizes.",
-      "watch": "A controlled alternative to war: competition governed by rules, gifts, recognition, and negotiated disputes.",
+      "title": "The Funeral Games for Patroclus",
+      "summary": "Patroclus is finally cremated and buried, and Achilles organizes funeral games in his honor. The contests include chariot racing, boxing, wrestling, running, armed combat, discus, archery, and spear throwing. Achilles distributes prizes while managing disputes and recognizing rank, merit, age, and circumstance. Competition is transformed from lethal battle into regulated social ritual.",
       "keyEvents": [
-        "Patroclus' ghost asks Achilles for burial and reminds him of their closeness.",
-        "The Greeks cremate Patroclus and build his funeral mound.",
-        "Achilles presides over funeral games involving chariot racing, boxing, wrestling, running, combat, and other contests."
+        "Patroclus receives funeral rites.",
+        "Achilles organizes athletic contests for the Greek leaders.",
+        "Disputes over prizes are negotiated rather than settled by lethal violence.",
+        "Achilles increasingly acts as an arbiter within the community."
       ],
       "characters": [
         "Achilles",
@@ -758,38 +788,41 @@
         "Diomedes",
         "Antilochus",
         "Menelaus",
-        "Ajax"
+        "Ajax",
+        "Odysseus"
       ],
-      "whyItMatters": "The games transform competitive energy from killing into rule-governed rivalry. Achilles, previously unable to negotiate honor with Agamemnon, now distributes prizes and resolves disputes with greater social awareness.",
+      "whyItMatters": "The games provide a striking alternative to war. Men still compete intensely for honor, but rules, prizes, judgment, and reconciliation keep competition inside a social order. Achilles, whose anger once fractured the army, now performs the role of distributor and judge.",
+      "watch": "Ritual, competition, justice, prizes, community, grief, and the possibility of ordered rivalry.",
       "questions": [
-        "How do the games differ from warfare even though both celebrate competition?",
-        "What do Achilles' decisions as judge reveal about changes in his character?"
+        "How do the funeral games differ from the competition for honor that caused the quarrel in Book 1?",
+        "What do Achilles’ decisions as judge reveal about his development?"
       ]
     },
     {
       "book": 24,
       "title": "Priam and Achilles",
-      "summary": "The gods insist that Hector’s body be returned. Priam enters Achilles’ shelter, kisses the hands that killed his sons, and asks Achilles to remember Peleus. The two men weep together. Achilles returns Hector’s body and grants time for burial.",
-      "watch": "Pity, mortality, fathers and sons, the restoration of funeral order, and the poem’s movement beyond vengeance.",
+      "summary": "The gods preserve Hector’s corpse despite Achilles’ repeated abuse of it. Zeus commands that the body be returned, and Priam crosses the enemy camp to ransom his son. He kneels before Achilles and asks him to remember his own father, Peleus. Achilles and Priam weep together—for Hector, Patroclus, Peleus, and the common fate of mortal life. Achilles returns the body, grants time for mourning, and the poem ends with Hector’s funeral.",
       "keyEvents": [
-        "The gods condemn Achilles' continuing abuse of Hector's body and arrange its ransom.",
-        "Guided by Hermes, Priam enters Achilles' shelter and begs him to remember his own father.",
-        "Achilles and Priam weep together; Hector's body is returned, and Troy mourns and buries him."
+        "The gods insist that Hector’s body be treated with dignity.",
+        "Priam enters Achilles’ shelter and kisses the hands that killed his sons.",
+        "Priam’s appeal makes Achilles remember Peleus and recognize their shared mortality.",
+        "Achilles returns Hector’s body and grants the Trojans time for burial."
       ],
       "characters": [
         "Priam",
         "Achilles",
         "Hector",
-        "Hermes",
         "Thetis",
-        "Andromache",
+        "Hermes",
         "Hecuba",
+        "Andromache",
         "Helen"
       ],
-      "whyItMatters": "The poem ends by discovering a form of recognition stronger than vengeance: enemies see themselves in one another through shared mortality and parental grief. Burial restores Hector to the human community and temporarily suspends war.",
+      "whyItMatters": "The poem’s deepest resolution is not military. Troy has not yet fallen, Achilles has not escaped death, and the war continues. What changes is Achilles’ capacity to see an enemy’s suffering as continuous with his own. The epic begins with rage that isolates Achilles and ends with an act of pity that reconnects him to human community.",
+      "watch": "Pity, mortality, fathers and sons, burial, reconciliation, grief, hospitality, and shared humanity.",
       "questions": [
-        "Why does Priam succeed where gifts and arguments in Book 9 failed?",
-        "What has Achilles learned by the time he shares a meal with Priam?"
+        "Why is Priam able to reach Achilles when Agamemnon’s gifts and arguments could not?",
+        "Why does Homer end with Hector’s funeral rather than the fall of Troy or the death of Achilles?"
       ]
     }
   ],
