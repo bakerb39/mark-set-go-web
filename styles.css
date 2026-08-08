@@ -12748,22 +12748,32 @@ html.msg-walkthrough-active .site-header nav > details > summary.msg-walkthrough
 }
 
 
-/* v9.3.5 walkthrough topmost highlight portal
-   The visible gold frame is a body-level fixed portal so it cannot be trapped
-   below the walkthrough root, header dropdowns, dialogs, or later-rendered UI. */
+/* v9.3.5 authoritative walkthrough highlight.
+   This node is appended directly to <body>, outside the walkthrough/menu stacking
+   contexts, and is continuously positioned over the active target in JS. */
 #msg-walkthrough-top-highlight {
   position:fixed !important;
   display:none;
-  z-index:2147483647 !important;
-  pointer-events:none !important;
   box-sizing:border-box !important;
+  pointer-events:none !important;
+  z-index:2147483647 !important;
   border:3px solid #f0cf62 !important;
-  border-radius:9px !important;
-  outline:1px solid rgba(139,100,7,.78) !important;
-  outline-offset:-4px !important;
-  background:rgba(255,248,223,.12) !important;
+  border-radius:8px !important;
+  background:rgba(255,244,184,.10) !important;
   box-shadow:
-    0 0 0 2px rgba(255,255,255,.98),
-    0 0 0 5px rgba(240,207,98,.22),
-    0 7px 20px rgba(17,37,58,.28) !important;
+    0 0 0 1px rgba(132,92,0,.88),
+    0 0 0 3px rgba(255,255,255,.98),
+    0 7px 20px rgba(21,39,58,.28) !important;
+}
+
+/* There is now exactly one visual target frame. Suppress all legacy in-place
+   outlines so a hidden/offset frame cannot remain behind an opened dropdown. */
+html.msg-walkthrough-active .msg-walkthrough-target,
+html.msg-walkthrough-active .site-header .msg-walkthrough-target,
+#msg-app-walkthrough .msg-walkthrough-menu-mirror .msg-walkthrough-target {
+  outline:none !important;
+  box-shadow:none !important;
+}
+#msg-app-walkthrough .msg-walkthrough-outline {
+  display:none !important;
 }

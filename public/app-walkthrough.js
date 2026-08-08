@@ -12,7 +12,7 @@
   let finishing = false;
   let menuMirror = null;
   let menuMirrorSource = null;
-  let topHighlight = null;
+  const TOP_HIGHLIGHT_ID = 'msg-walkthrough-top-highlight';
   let topHighlightObserver = null;
 
   const wait = (ms = 70) => new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -30,52 +30,6 @@
   function visibleMatch(selector, scope = document) {
     if (!selector) return null;
     return $$(selector, scope).find(isVisibleElement) || null;
-  }
-
-  function ensureTopHighlight() {
-    if (!topHighlight?.isConnected) {
-      topHighlight = document.createElement('div');
-      topHighlight.id = 'msg-walkthrough-top-highlight';
-      topHighlight.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(topHighlight);
-    }
-    // Reassert the critical styles inline so later-loaded stylesheets cannot
-    // accidentally bury or reposition the walkthrough frame.
-    Object.assign(topHighlight.style, {
-      position: 'fixed',
-      display: 'none',
-      pointerEvents: 'none',
-      boxSizing: 'border-box',
-      zIndex: '2147483647'
-    });
-    return topHighlight;
-  }
-
-  function keepTopHighlightOnTop() {
-    const highlight = ensureTopHighlight();
-    if (highlight.parentNode === document.body && document.body.lastElementChild !== highlight) {
-      document.body.appendChild(highlight);
-    }
-    highlight.style.setProperty('z-index', '2147483647', 'important');
-    highlight.style.setProperty('position', 'fixed', 'important');
-    highlight.style.setProperty('pointer-events', 'none', 'important');
-  }
-
-  function startTopHighlightGuard() {
-    keepTopHighlightOnTop();
-    if (topHighlightObserver) return;
-    topHighlightObserver = new MutationObserver(() => {
-      if (!root || root.hidden) return;
-      keepTopHighlightOnTop();
-      schedulePosition();
-    });
-    topHighlightObserver.observe(document.body, { childList: true, subtree: true });
-  }
-
-  function stopTopHighlightGuard() {
-    if (topHighlightObserver) topHighlightObserver.disconnect();
-    topHighlightObserver = null;
-    if (topHighlight) topHighlight.style.display = 'none';
   }
 
   function clearMenuMirror() {
@@ -796,10 +750,72 @@
     }
   }
 
+  function ensureTopHighlight() {
+    let highlight = document.getElementById(TOP_HIGHLIGHT_ID);
+    if (!highlight) {
+      highlight = document.createElement('div');
+      highlight.id = TOP_HIGHLIGHT_ID;
+      highlight.setAttribute('aria-hidden', 'true');
+      Object.assign(highlight.style, {
+        position: 'fixed',
+        left: '0px',
+        top: '0px',
+        width: '0px',
+        height: '0px',
+        display: 'none',
+        boxSizing: 'border-box',
+        pointerEvents: 'none',
+        zIndex: '2147483647'
+      });
+      document.body.appendChild(highlight);
+    }
+
+    // Some app views append portals/popovers after a walkthrough step is shown.
+    // Keep this overlay outside those stacking contexts and last in <body>.
+    if (!topHighlightObserver && document.body) {
+      topHighlightObserver = new MutationObserver(() => {
+        const node = document.getElementById(TOP_HIGHLIGHT_ID);
+        if (node && node.parentNode === document.body && document.body.lastElementChild !== node) {
+          document.body.appendChild(node);
+        }
+      });
+      topHighlightObserver.observe(document.body, { childList: true });
+    }
+    return highlight;
+  }
+
+  function hideTopHighlight() {
+    const highlight = document.getElementById(TOP_HIGHLIGHT_ID);
+    if (highlight) highlight.style.display = 'none';
+  }
+
+  function positionTopHighlight(rect) {
+    const highlight = ensureTopHighlight();
+    if (!highlight || !rect) return;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const pad = 4;
+    const left = Math.max(2, Math.min(viewportWidth - 2, rect.left - pad));
+    const top = Math.max(2, Math.min(viewportHeight - 2, rect.top - pad));
+    const right = Math.max(left + 2, Math.min(viewportWidth - 2, rect.right + pad));
+    const bottom = Math.max(top + 2, Math.min(viewportHeight - 2, rect.bottom + pad));
+    Object.assign(highlight.style, {
+      display: 'block',
+      left: `${Math.round(left)}px`,
+      top: `${Math.round(top)}px`,
+      width: `${Math.max(8, Math.round(right - left))}px`,
+      height: `${Math.max(8, Math.round(bottom - top))}px`,
+      zIndex: '2147483647'
+    });
+    if (highlight.parentNode === document.body && document.body.lastElementChild !== highlight) {
+      document.body.appendChild(highlight);
+    }
+  }
+
   function clearTarget() {
     if (activeTarget) activeTarget.classList.remove(HIGHLIGHT_CLASS);
     activeTarget = null;
-    if (topHighlight) topHighlight.style.display = 'none';
+    hideTopHighlight();
     const connector = root && $('.msg-walkthrough-connector', root);
     if (connector) connector.style.display = 'none';
     const outline = root && $('.msg-walkthrough-outline', root);
@@ -850,6 +866,7 @@
     if (!root || root.hidden || !activeTarget?.isConnected || !isVisibleElement(activeTarget)) return;
 
     const rect = activeTarget.getBoundingClientRect();
+    positionTopHighlight(rect);
     positionPresenterForTarget(rect);
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
@@ -864,23 +881,12 @@
     const outline = $('.msg-walkthrough-outline', root);
     const targetIsMenuItem = !!activeTarget.closest?.('.msg-walkthrough-menu-mirror');
     const targetIsHeaderNavigation = targetIsMenuItem || !!activeTarget.closest?.('.site-header');
-
-    // The visible gold frame lives in its own body-level portal at the maximum
-    // browser z-index. This avoids being trapped inside the walkthrough root's
-    // stacking context or underneath dropdowns/modals that render later.
-    const highlight = ensureTopHighlight();
-    keepTopHighlightOnTop();
-    Object.assign(highlight.style, {
-      display: 'block',
-      left: `${left}px`,
-      top: `${top}px`,
-      width: `${width}px`,
-      height: `${height}px`
-    });
-
-    // Keep the old in-root outline disabled; its parent stacking context is the
-    // reason it could appear behind menus even with a very large child z-index.
-    if (outline) outline.style.display = 'none';
+    if (outline) {
+      // v9.3.5: the authoritative highlight is a body-level fixed overlay.
+      // Never draw the old walkthrough-root rectangle; it can be trapped under
+      // menus, portals, transformed ancestors, or later-created stacking contexts.
+      outline.style.display = 'none';
+    }
 
     const masks = {
       top: $('.msg-walkthrough-mask-top', root),
@@ -1039,12 +1045,10 @@
       root.hidden=false;
       document.documentElement.classList.add(ACTIVE_CLASS);
       document.body.classList.add(ACTIVE_CLASS);
-      startTopHighlightGuard();
       await beginMode(mode);
       return;
     }
     showModePicker();
-    startTopHighlightGuard();
   }
 
   async function finish() {
@@ -1055,7 +1059,6 @@
     closeHeaderMenus();
     $$('.site-header nav > details').forEach((menu) => menu.classList.remove('msg-walkthrough-open-menu'));
     if (root) root.hidden = true;
-    stopTopHighlightGuard();
     document.documentElement.classList.remove(ACTIVE_CLASS);
     document.body.classList.remove(ACTIVE_CLASS);
 
