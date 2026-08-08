@@ -12936,11 +12936,3 @@ html[data-companion="beth"] .home-mark-icon-stage.companion-frontpage-badge-mode
 
 
 /* v9.4.6: right-click surface restored exactly from v9.3.8; companion CSS does not override context-menu behavior. */
-
-
-/* v9.5.2 profile companion option labels — immutable by persona text swapping. */
-.companion-persona-settings [data-companion-choice] .companion-option-subtitle::after{
-  display:inline;
-}
-.companion-persona-settings [data-companion-choice="mark"] .companion-option-subtitle::after{content:"Ask Mark";}
-.companion-persona-settings [data-companion-choice="beth"] .companion-option-subtitle::after{content:"Ask Beth";}

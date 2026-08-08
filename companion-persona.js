@@ -68,8 +68,6 @@
     '.reader',
     '.reader-frame',
     '.reader-word',
-    '.word-context-menu',
-    '#word-context-menu',
     '.reader-selection-toolbar',
     '#mark-selection-toolbar'
   ].join(',');
@@ -204,19 +202,6 @@
     });
   }
 
-  function normalizeReadingStatus(root = document.body) {
-    if (!root) return;
-    const desired = `${current().name} is reading`;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    const nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
-    for (const node of nodes) {
-      const value = node.nodeValue || '';
-      if (!/Ask (?:Mark|Beth) is reading/.test(value)) continue;
-      node.nodeValue = value.replace(/Ask (?:Mark|Beth) is reading/g, desired);
-    }
-  }
-
   function applyKnownReaderLabels() {
     /* Target only visible companion labels inside protected reader UI. This
        avoids walking/mutating the reader or word context-menu DOM. */
@@ -239,60 +224,6 @@
     });
   }
 
-
-  function applyCompanionChatIdentity() {
-    const roots = new Set();
-    const selectors = [
-      '#mark-panel', '#ask-mark-panel', '.mark-shell', '.askmark-shell',
-      '.askmark-panel', '.ask-mark-panel', '.askmark-view',
-      '[data-askmark-view-panel]', '[data-panel="mark"]', '[data-panel="ask-mark"]'
-    ];
-    document.querySelectorAll(selectors.join(',')).forEach((el) => roots.add(el));
-
-    /* Fallback for builds whose companion panel has no stable class/id: find the
-       visible companion heading, then limit all work to its nearest panel-like box. */
-    document.querySelectorAll('aside,section,div').forEach((el) => {
-      const text = (el.textContent || '').trim();
-      if (!/\bAsk (Mark|Beth)\b/.test(text) || !/READING COMPANION/i.test(text)) return;
-      if (el.querySelector('input,textarea,button') || el.querySelector('.mark-shell,.askmark-view')) roots.add(el);
-    });
-
-    roots.forEach((root) => {
-      /* Only swap standalone author badges/labels such as the MARK shown above
-         companion messages. Do not rewrite arbitrary message/book text. */
-      root.querySelectorAll('*').forEach((el) => {
-        if (!(el instanceof HTMLElement) || el.children.length) return;
-        const value = (el.textContent || '').trim();
-        if (value !== 'MARK' && value !== 'Mark') return;
-        if (!el.dataset.msgOriginalCompanionAuthor) el.dataset.msgOriginalCompanionAuthor = value;
-        el.textContent = state.id === 'beth'
-          ? (value === 'MARK' ? 'BETH' : 'Beth')
-          : el.dataset.msgOriginalCompanionAuthor;
-      });
-
-      root.querySelectorAll('img').forEach((img) => {
-        if (!(img instanceof HTMLImageElement)) return;
-        const src = img.getAttribute('src') || '';
-        const alt = img.getAttribute('alt') || '';
-        const title = img.getAttribute('title') || '';
-        const identityHint = /mark/i.test(`${src} ${alt} ${title}`);
-        const smallAvatar = (img.width && img.width <= 96) || img.className.toString().toLowerCase().includes('avatar');
-        if (!identityHint && !smallAvatar) return;
-        if (!img.dataset.msgOriginalCompanionChatSrc) img.dataset.msgOriginalCompanionChatSrc = src;
-        if (!img.dataset.msgOriginalCompanionChatAlt) img.dataset.msgOriginalCompanionChatAlt = alt;
-        if (state.id === 'beth') {
-          img.src = BETH_AVATAR;
-          img.alt = 'Beth';
-        } else {
-          img.src = img.dataset.msgOriginalCompanionChatSrc || MARK_AVATAR;
-          img.alt = img.dataset.msgOriginalCompanionChatAlt || 'Mark';
-        }
-      });
-    });
-  }
-
-  /* v9.5.4 stability: no MutationObserver. Companion updates are explicit only. */
-
   function profileLikelyOpen() {
     if (document.querySelector('.companion-persona-settings')) return true;
     return !!document.querySelector('[data-page="profile"],.profile-page,.profile-preferences,.experience-profile');
@@ -311,9 +242,9 @@
         <div><span class="companion-persona-kicker">READING COMPANION</span><h2 id="companion-persona-title">Choose your companion</h2></div>
         <p>Use the same reading, study, notebook, and walkthrough features with Mark or Beth.</p>
       </div>
-      <div class="companion-persona-options" role="radiogroup" aria-label="Reading companion" data-companion-no-swap>
-        <button type="button" data-companion-choice="mark" role="radio" data-companion-no-swap><img src="${MARK_AVATAR}" alt="Mark"><span><strong>Mark</strong><small class="companion-option-subtitle companion-option-subtitle-mark"></small></span><span class="companion-check">✓</span></button>
-        <button type="button" data-companion-choice="beth" role="radio" data-companion-no-swap><img src="${BETH_AVATAR}" alt="Beth"><span><strong>Beth</strong><small class="companion-option-subtitle companion-option-subtitle-beth"></small></span><span class="companion-check">✓</span></button>
+      <div class="companion-persona-options" role="radiogroup" aria-label="Reading companion">
+        <button type="button" data-companion-choice="mark" role="radio"><img src="${MARK_AVATAR}" alt="Mark"><span><strong>Mark</strong><small>Ask Mark</small></span><span class="companion-check">✓</span></button>
+        <button type="button" data-companion-choice="beth" role="radio"><img src="${BETH_AVATAR}" alt="Beth"><span><strong>Beth</strong><small>Ask Beth</small></span><span class="companion-check">✓</span></button>
       </div>`;
     // Put the companion choice at the TOP of Customize My Experience / Profile.
     // Prefer the existing experience/profile content container instead of appending
@@ -345,38 +276,34 @@
 
   function updateProfileControl() {
     document.querySelectorAll('[data-companion-choice]').forEach((btn) => {
-      const id = btn.dataset.companionChoice;
-      const selected = id === state.id;
+      const selected = btn.dataset.companionChoice === state.id;
       btn.classList.toggle('is-selected', selected);
       btn.setAttribute('aria-checked', selected ? 'true' : 'false');
-
-      // These option labels describe the two available personas and must never
-      // be rewritten to match the currently selected persona.
-      const option = config[id];
-      if (option) {
-        const strong = btn.querySelector('strong');
-        const small = btn.querySelector('small');
-        const img = btn.querySelector('img');
-        if (strong) strong.textContent = option.name;
-        if (small) small.textContent = '';
-        if (img) {
-          img.src = option.avatar;
-          img.alt = option.name;
-        }
-      }
     });
   }
 
+  let applyTimer = 0;
   function applyAll({ includeProtected = false } = {}) {
     document.documentElement.dataset.companion = state.id;
     applyText(document.body, { includeProtected });
-    normalizeReadingStatus(document.body);
     applyKnownReaderLabels();
     applyAskCompanionButtonAvatar();
     applyImages(document);
     applyFrontpageCompanionMode(document);
-    applyCompanionChatIdentity();
     updateProfileControl();
+  }
+
+  function scheduleApply(delay = 0) {
+    window.clearTimeout(applyTimer);
+    applyTimer = window.setTimeout(() => applyAll(), delay);
+  }
+
+  function scheduleAfterUiAction() {
+    /* A few bounded passes catch normal app renders without observing every
+       DOM mutation. None run synchronously inside contextmenu handling. */
+    scheduleApply(0);
+    window.setTimeout(() => applyAll(), 90);
+    window.setTimeout(() => applyAll(), 260);
   }
 
   const api = {
@@ -396,17 +323,21 @@
   };
   window.MSGCompanion = api;
 
-  /* v9.5.4 stability: only the Profile entry point gets a click listener.
-     Ordinary navigation, Reader clicks, Ask Companion clicks, context menus,
-     and resumed-reading interactions never trigger companion-wide DOM scans. */
+  /* Bubble-phase companion/profile click listener only. */
   document.addEventListener('click', (event) => {
-    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-    if (!target?.closest?.('[data-action="profile-preferences"]')) return;
-    window.setTimeout(() => ensureProfileControl(true), 80);
-    window.setTimeout(() => ensureProfileControl(true), 300);
+    if (event.target.closest('[data-action="profile-preferences"]')) {
+      window.setTimeout(() => ensureProfileControl(true), 80);
+      window.setTimeout(() => ensureProfileControl(true), 300);
+    }
+    scheduleAfterUiAction();
   }, false);
+
+  window.addEventListener('hashchange', scheduleAfterUiAction);
+  window.addEventListener('popstate', scheduleAfterUiAction);
+  window.addEventListener('msg:companion-changed', () => scheduleAfterUiAction());
 
   document.addEventListener('DOMContentLoaded', () => {
     applyAll();
+    window.setTimeout(() => applyAll(), 120);
   });
 })();
