@@ -12936,3 +12936,16 @@ html[data-companion="beth"] .home-mark-icon-stage.companion-frontpage-badge-mode
 
 
 /* v9.4.6: right-click surface restored exactly from v9.3.8; companion CSS does not override context-menu behavior. */
+
+/* Notebook scroll repair: keep the app shell unchanged and make only the
+   standalone Notebook page own vertical overflow when its content exceeds
+   the visible viewport. */
+.global-notebook-page {
+  max-height: calc(100dvh - 7.5rem);
+  min-height: 0;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
