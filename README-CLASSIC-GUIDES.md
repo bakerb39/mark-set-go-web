@@ -1,4 +1,4 @@
-# Mark, Set, Go! — Classic Guides v1.3
+# Mark, Set, Go! — Classic Guides v1.4
 
 This patch adds Classic Guides as a self-contained feature and deliberately does NOT edit:
 - app.js
@@ -73,3 +73,30 @@ When the page headed `Great Books of the Western World` is rendered:
 
 The module observes only the page DOM. It does not modify `app.js`, the reader
 runtime, playback, highlighting, bookmarks, or right-click handlers.
+
+
+## v1.4 — robust Great Books integration
+v1.3 was too dependent on exact navigation/action markup.
+
+v1.4:
+- detects the page from the visible `Great Books of the Western World` heading;
+- recognizes buttons, links, and `[role=button]` action controls;
+- finds each work row from its visible `Find & Import Edition`, `Study / Great Ideas`,
+  and `Grokipedia` controls;
+- inserts the Iliad's `Classic Guide` immediately before `Grokipedia`;
+- inserts a top `Classic Guides` action near `Search Gutenberg`;
+- retries after initial render and watches later DOM re-renders.
+
+### Diagnostic
+After deploying, open DevTools Console on the Great Books page and run:
+
+`MarkSetGoClassicGuidesDebug()`
+
+Expected:
+- `loaded: true`
+- `version: "1.4.0"`
+- `greatBooksPage: true`
+- `libraryButton: true`
+- `guideButtons` contains `{ id: "iliad", ... }`
+
+If `MarkSetGoClassicGuidesDebug` itself is undefined, the module script is not loading.
