@@ -7138,23 +7138,124 @@ function unifiedBookCard(book, selectedFormat = 'best') {
     </article>`;
 }
 
-async function renderUnifiedLibrary(initial = {}) {
+async 
+function browseCatalogText(item = {}) {
+  return [
+    item.title,
+    item.author,
+    item.category,
+    item.badge,
+    item.blurb,
+    item.detail
+  ].filter(Boolean).join(' ').toLocaleLowerCase();
+}
+
+function browseCatalogMatches(items = [], query = '') {
+  const q = String(query || '').trim().toLocaleLowerCase();
+  if (!q) return items.slice();
+  return items.filter((item) => browseCatalogText(item).includes(q));
+}
+
+function browseSearchLocalCard(item, kind = 'free') {
+  const paletteStyle = `--cover-a:${item.palette?.[0] || '#7cb6ff'}; --cover-b:${item.palette?.[1] || '#2d6ab7'}; --cover-c:${item.palette?.[2] || '#16355a'};`;
+  const isGuide = kind === 'guide';
+  return `
+    <article class="unified-book-card browse-search-local-card">
+      <div class="browse-search-mini-cover" style="${paletteStyle}">
+        <span>${escapeHtml(isGuide ? 'Modern Guide' : (item.category || 'Free Book'))}</span>
+        <strong>${escapeHtml(item.title || '')}</strong>
+        <small>${escapeHtml(item.author || '')}</small>
+      </div>
+      <div class="unified-book-copy">
+        <span class="source-category">${escapeHtml(isGuide ? 'In Mark, Set, Go!' : (item.badge || item.category || 'Browse'))}</span>
+        <h2>${escapeHtml(item.title || '')}</h2>
+        <p>${escapeHtml(item.blurb || '')}</p>
+        <small>${escapeHtml(item.detail || '')}</small>
+        <div class="unified-book-actions">
+          ${isGuide
+            ? `<button class="primary" type="button" data-search-open-guide="${escapeHtml(item.id)}">Read guide</button>${item.buyUrl ? `<a class="secondary button-link" href="${escapeHtml(item.buyUrl)}" target="_blank" rel="noopener noreferrer">Buy original</a>` : ''}`
+            : `<button class="primary" type="button" data-search-open-free-book="${escapeHtml(item.id)}">${escapeHtml(item.actionLabel || 'Open')}</button>`}
+        </div>
+      </div>
+    </article>`;
+}
+
+function bindBrowseSearchLocalActions(container) {
+  container?.querySelectorAll('[data-search-open-guide]').forEach((button) => button.addEventListener('click', async () => {
+    const guide = MODERN_GUIDE_SHELF.find((item) => item.id === button.dataset.searchOpenGuide && item.active);
+    if (!guide) return;
+    try {
+      const response = await fetch(`/texts/modern-guides/${encodeURIComponent(guide.id)}-guide.txt`, { cache:'no-store' });
+      if (!response.ok) throw new Error(`Could not load the ${guide.title} guide.`);
+      const text = await response.text();
+      renderReaderWithText(`${guide.title} — Mark, Set, Go! Guide`, text, {
+        type:'modern-guide',
+        id:guide.id,
+        title:`${guide.title} — Mark, Set, Go! Guide`,
+        originalTitle:guide.title,
+        originalAuthor:guide.author,
+        buyUrl:guide.buyUrl,
+        subtitle:`An independent reading guide to ${guide.title}`
+      });
+    } catch (error) {
+      window.alert(error?.message || 'The guide could not be opened.');
+    }
+  }));
+
+  container?.querySelectorAll('[data-search-open-free-book]').forEach((button) => button.addEventListener('click', async () => {
+    const item = BROWSE_FREE_BOOKS.find((entry) => entry.id === button.dataset.searchOpenFreeBook);
+    if (!item?.action) return;
+    if (item.action.type === 'search') {
+      renderUnifiedLibrary({ query:item.action.query || item.title || '', scope:'online' });
+      return;
+    }
+    if (item.action.type === 'source') {
+      try {
+        const loaded = await loadLocalText(item.action.key);
+        renderReaderWithText(loaded.title, loaded.text, { type:'local-library', id:item.action.key, title:loaded.title });
+      } catch (error) {
+        window.alert(error?.message || 'That text could not be opened.');
+      }
+    }
+  }));
+}
+
+function renderUnifiedLibrary(initial = {}) {
   stopReader();
-  const query = initial.query || '';
+  const query = initial.query || localStorage.getItem('markSetGoPendingLibrarySearch') || '';
   const provider = initial.provider || 'all';
+  const scope = initial.scope || localStorage.getItem('markSetGoPendingBrowseScope') || 'all';
+
+  const scopeLabels = {
+    all: 'Everything',
+    modern: 'Modern Guides',
+    free: 'Free Books & Classics',
+    online: 'Online Libraries',
+    collections: 'Curated Collections'
+  };
+
   app.innerHTML = `
     <section class="panel unified-library">
       <div class="library-heading unified-library-heading">
-        <div><h1><span class="title-icon">⌕</span> Library</h1><p>Search several public book collections from one place, then open readable editions directly in Mark, Set, Go!</p></div>
+        <div>
+          <button class="text-link browse-search-back" type="button" data-action="browse">← Back to Browse</button>
+          <h1><span class="title-icon">⌕</span> Browse Search</h1>
+          <p>Search Mark, Set, Go! guides and books together with trusted online library sources.</p>
+        </div>
         <button class="secondary" type="button" data-read="upload">⇧ Import my own text</button>
       </div>
-      <div class="provider-strip" aria-label="Library sources">
-        ${Object.entries(LIBRARY_PROVIDERS).map(([key, item]) => `<button class="provider-tile ${provider === key ? 'active' : ''}" type="button" data-provider-filter="${key}"><span>${escapeHtml(item.icon)}</span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.note)}</small></button>`).join('')}
-      </div>
-      <form id="unified-library-search" class="unified-search-form">
-        <label class="unified-search-box"><span aria-hidden="true">⌕</span><input id="unified-library-query" type="search" value="${escapeHtml(query)}" placeholder="Search title or author…" autocomplete="off"></label>
-        <select id="unified-library-provider" aria-label="Library source">
-          <option value="all" ${provider === 'all' ? 'selected' : ''}>All libraries</option>
+
+      <form id="unified-library-search" class="unified-search-form browse-results-search">
+        <label class="unified-search-box"><span aria-hidden="true">⌕</span><input id="unified-library-query" type="search" value="${escapeHtml(query)}" placeholder="Search title, author, subject, or idea…" autocomplete="off"></label>
+        <select id="unified-browse-scope" aria-label="What to search">
+          <option value="all" ${scope === 'all' ? 'selected' : ''}>Everything</option>
+          <option value="modern" ${scope === 'modern' ? 'selected' : ''}>Modern Guides</option>
+          <option value="free" ${scope === 'free' ? 'selected' : ''}>Free Books & Classics</option>
+          <option value="online" ${scope === 'online' ? 'selected' : ''}>Online Libraries</option>
+          <option value="collections" ${scope === 'collections' ? 'selected' : ''}>Curated Collections</option>
+        </select>
+        <select id="unified-library-provider" aria-label="Online library source">
+          <option value="all" ${provider === 'all' ? 'selected' : ''}>All online libraries</option>
           ${Object.entries(LIBRARY_PROVIDERS).map(([key, item]) => `<option value="${key}" ${provider === key ? 'selected' : ''}>${escapeHtml(item.label)}</option>`).join('')}
         </select>
         <select id="unified-library-format" aria-label="Book format">
@@ -7165,12 +7266,27 @@ async function renderUnifiedLibrary(initial = {}) {
         </select>
         <button class="primary" type="submit">Search</button>
       </form>
-      <div class="list-toolbar-row">
-        <p id="unified-library-status" class="status">Enter a title or author to search all libraries.</p>
-        ${listPresentationControls('all-libraries', { collapsible:false, defaultView:'tiles' })}
-      </div>
-      <div id="unified-library-results" class="unified-results presentation-tiles" aria-live="polite"></div>
-      <p class="library-note">Availability differs by source and country. Open Library may link to borrowing or preview pages rather than provide downloadable text.</p>
+
+      <div id="browse-local-search-results"></div>
+
+      <section id="browse-online-search-section" class="browse-search-online-section">
+        <div class="section-heading browse-online-heading">
+          <div>
+            <span class="source-category">Online</span>
+            <h2>Online library results</h2>
+            <p>Search Project Gutenberg, Internet Archive, Open Library, and Google Books.</p>
+          </div>
+        </div>
+        <div class="provider-strip" aria-label="Library sources">
+          ${Object.entries(LIBRARY_PROVIDERS).map(([key, item]) => `<button class="provider-tile ${provider === key ? 'active' : ''}" type="button" data-provider-filter="${key}"><span>${escapeHtml(item.icon)}</span><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.note)}</small></button>`).join('')}
+        </div>
+        <div class="list-toolbar-row">
+          <p id="unified-library-status" class="status">Enter a title or author to search online libraries.</p>
+          ${listPresentationControls('all-libraries', { collapsible:false, defaultView:'tiles' })}
+        </div>
+        <div id="unified-library-results" class="unified-results presentation-tiles" aria-live="polite"></div>
+        <p class="library-note">Availability differs by source and country. Open Library may link to borrowing or preview pages rather than provide downloadable text.</p>
+      </section>
     </section>`;
 
   bindListPresentationControls({
@@ -7179,22 +7295,57 @@ async function renderUnifiedLibrary(initial = {}) {
     itemSelector:'.unified-book-card',
     defaultView:'tiles'
   });
+
   const form = app.querySelector('#unified-library-search');
   const status = app.querySelector('#unified-library-status');
   const results = app.querySelector('#unified-library-results');
-  const search = async () => {
-    const q = app.querySelector('#unified-library-query').value.trim();
-    const source = app.querySelector('#unified-library-provider').value;
-    const format = app.querySelector('#unified-library-format').value;
-    if (!q) { status.textContent = 'Enter a title or author.'; results.innerHTML = ''; return; }
+  const localResults = app.querySelector('#browse-local-search-results');
+  const onlineSection = app.querySelector('#browse-online-search-section');
+
+  const renderLocal = (q, selectedScope) => {
+    const guideMatches = ['all','modern'].includes(selectedScope) ? browseCatalogMatches(MODERN_GUIDE_SHELF, q) : [];
+    const freeMatches = ['all','free'].includes(selectedScope) ? browseCatalogMatches(BROWSE_FREE_BOOKS, q) : [];
+    const collectionMatches = ['all','collections'].includes(selectedScope)
+      ? BROWSE_COLLECTIONS.filter(([label, collectionQuery]) => `${label} ${collectionQuery}`.toLocaleLowerCase().includes(String(q || '').toLocaleLowerCase()))
+      : [];
+
+    const count = guideMatches.length + freeMatches.length + collectionMatches.length;
+    if (!['all','modern','free','collections'].includes(selectedScope)) {
+      localResults.innerHTML = '';
+      return;
+    }
+
+    localResults.innerHTML = `
+      <section class="browse-search-local-section">
+        <div class="section-heading">
+          <div>
+            <span class="source-category">${escapeHtml(scopeLabels[selectedScope] || 'Browse')}</span>
+            <h2>${count ? `Matches in Mark, Set, Go!` : 'No matching titles in this collection'}</h2>
+            <p>${count ? `${count} result${count === 1 ? '' : 's'} from Modern Guides, included classics, and curated shelves.` : 'Try a broader term or search the online libraries.'}</p>
+          </div>
+        </div>
+        ${guideMatches.length ? `<div class="browse-search-result-group"><h3>Modern Guides</h3><div class="unified-results presentation-tiles">${guideMatches.map((item) => browseSearchLocalCard(item,'guide')).join('')}</div></div>` : ''}
+        ${freeMatches.length ? `<div class="browse-search-result-group"><h3>Free Books & Classics</h3><div class="unified-results presentation-tiles">${freeMatches.map((item) => browseSearchLocalCard(item,'free')).join('')}</div></div>` : ''}
+        ${collectionMatches.length ? `<div class="browse-search-result-group"><h3>Curated Collections</h3><div class="browse-collection-list">${collectionMatches.map(([label, collectionQuery]) => `<button class="browse-collection-chip" type="button" data-search-collection-query="${escapeHtml(collectionQuery)}">${escapeHtml(label)}</button>`).join('')}</div></div>` : ''}
+      </section>`;
+
+    bindBrowseSearchLocalActions(localResults);
+    localResults.querySelectorAll('[data-search-collection-query]').forEach((button) => button.addEventListener('click', () => {
+      app.querySelector('#unified-library-query').value = button.dataset.searchCollectionQuery || '';
+      app.querySelector('#unified-browse-scope').value = 'all';
+      search();
+    }));
+  };
+
+  const searchOnline = async (q, source, format) => {
     status.className = 'status';
-    status.textContent = `Searching ${source === 'all' ? 'all libraries' : LIBRARY_PROVIDERS[source]?.label || source}…`;
+    status.textContent = `Searching ${source === 'all' ? 'all online libraries' : LIBRARY_PROVIDERS[source]?.label || source}…`;
     results.innerHTML = '<div class="library-loading"><span class="loading-book">◫</span><p>Gathering editions…</p></div>';
     try {
       const payload = await loadApiPayload(`/api/library/search?q=${encodeURIComponent(q)}&provider=${encodeURIComponent(source)}&format=${encodeURIComponent(format)}`);
       const books = Array.isArray(payload.books) ? payload.books : [];
-      status.textContent = books.length ? `${books.length} result${books.length === 1 ? '' : 's'} found.` : 'No books found. Try a broader search.';
-      results.innerHTML = books.length ? books.map((book) => unifiedBookCard(book, format)).join('') : `<div class="empty-library"><h2>No results</h2><p>${format === 'best' ? 'Try another title, author, or source.' : `No matching ${format === 'text' ? 'plain-text' : format.toUpperCase()} edition was found. Try Best available or another source.`}</p></div>`;
+      status.textContent = books.length ? `${books.length} online result${books.length === 1 ? '' : 's'} found.` : 'No online books found. Try a broader search.';
+      results.innerHTML = books.length ? books.map((book) => unifiedBookCard(book, format)).join('') : `<div class="empty-library"><h2>No online results</h2><p>${format === 'best' ? 'Try another title, author, or source.' : `No matching ${format === 'text' ? 'plain-text' : format.toUpperCase()} edition was found. Try Best available or another source.`}</p></div>`;
       bindUnifiedLibraryActions(results);
       bindListPresentationControls({
         key:'all-libraries',
@@ -7208,12 +7359,48 @@ async function renderUnifiedLibrary(initial = {}) {
       results.innerHTML = '<div class="empty-library"><h2>Search unavailable</h2><p>One or more libraries may be temporarily unavailable.</p></div>';
     }
   };
-  form?.addEventListener('submit', (event) => { event.preventDefault(); search(); });
+
+  const search = async () => {
+    const q = app.querySelector('#unified-library-query').value.trim();
+    const selectedScope = app.querySelector('#unified-browse-scope').value;
+    const source = app.querySelector('#unified-library-provider').value;
+    const format = app.querySelector('#unified-library-format').value;
+
+    localStorage.setItem('markSetGoPendingLibrarySearch', q);
+    localStorage.setItem('markSetGoPendingBrowseScope', selectedScope);
+
+    if (!q) {
+      localResults.innerHTML = '';
+      status.textContent = 'Enter a title, author, subject, or idea.';
+      results.innerHTML = '';
+      return;
+    }
+
+    renderLocal(q, selectedScope);
+
+    const shouldSearchOnline = ['all','free','online'].includes(selectedScope);
+    onlineSection.hidden = !shouldSearchOnline;
+    app.querySelector('#unified-library-provider').disabled = !shouldSearchOnline;
+    app.querySelector('#unified-library-format').disabled = !shouldSearchOnline;
+
+    if (shouldSearchOnline) await searchOnline(q, source, format);
+  };
+
+  form?.addEventListener('submit', (event) => {
+    event.preventDefault();
+    search();
+  });
+
+  app.querySelector('#unified-browse-scope')?.addEventListener('change', () => {
+    if (app.querySelector('#unified-library-query').value.trim()) search();
+  });
+
   app.querySelectorAll('[data-provider-filter]').forEach((button) => button.addEventListener('click', () => {
     app.querySelector('#unified-library-provider').value = button.dataset.providerFilter;
     app.querySelectorAll('[data-provider-filter]').forEach((item) => item.classList.toggle('active', item === button));
     if (app.querySelector('#unified-library-query').value.trim()) search();
   }));
+
   if (query) search();
 }
 
@@ -8139,40 +8326,59 @@ function openModernGuideContextInAskMark(markerIndex) {
 
 function addModernGuideActionToCenter(source = state?.source || {}, trigger = null) {
   const config = modernGuideInteractionConfig(source);
-  if (!config?.actionTitle) return;
+  if (!config?.actionTitle) return null;
 
-  const actions = readActions();
   const sourceTitle = `${source.originalTitle || state.title || 'Modern Guide'} — Mark, Set, Go! Guide`;
-  const existing = actions.find((item) =>
+  const currentActions = readActions();
+  const existing = currentActions.find((item) =>
     item.status !== 'completed'
     && String(item.title || '') === String(config.actionTitle)
     && String(item.sourceTitle || '') === sourceTitle
   );
 
-  if (!existing) {
-    actions.push({
-      id: `action_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
-      title: config.actionTitle,
-      type: config.actionType || 'task',
-      dueAt: '',
-      priority: 'normal',
-      repeat: 'none',
-      reminder: 'none',
-      sourceTitle,
-      note: config.actionNote || '',
-      status: 'active',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      completedAt: null
-    });
-    writeActions(actions);
+  if (existing) {
+    if (trigger) {
+      trigger.textContent = 'Already in Action Center ✓';
+      trigger.disabled = true;
+      trigger.setAttribute('aria-disabled', 'true');
+    }
+    return existing;
   }
 
+  const now = new Date().toISOString();
+  const record = {
+    id: `action_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+    title: config.actionTitle,
+    type: config.actionType || 'task',
+    dueAt: '',
+    priority: 'normal',
+    repeat: 'none',
+    reminder: 'none',
+    sourceTitle,
+    note: config.actionNote || '',
+    status: 'active',
+    createdAt: now,
+    updatedAt: now,
+    completedAt: null,
+    origin: 'modern-guide',
+    sourceId: source.id || ''
+  };
+
+  const saved = saveActionRecord(record);
+
   if (trigger) {
-    trigger.textContent = existing ? 'Already in Action Center ✓' : 'Added to Action Center ✓';
-    trigger.disabled = true;
-    trigger.setAttribute('aria-disabled', 'true');
+    if (saved) {
+      trigger.textContent = 'Added to Action Center ✓';
+      trigger.disabled = true;
+      trigger.setAttribute('aria-disabled', 'true');
+    } else {
+      trigger.textContent = 'Could not save — try again';
+      trigger.disabled = false;
+      trigger.removeAttribute('aria-disabled');
+    }
   }
+
+  return saved;
 }
 
 function openModernGuideGreatIdea(source = state?.source || {}) {
@@ -14059,18 +14265,14 @@ function renderBrowseHub() {
     .sort((x, y) => new Date(y.lastReadAt || 0) - new Date(x.lastReadAt || 0))
     .slice(0, 4);
 
-  const search = (query, format = app.querySelector('#browse-global-format')?.value || 'best') => {
-    localStorage.setItem('markSetGoPendingLibrarySearch', query);
-    renderUnifiedLibrary();
+  const search = (query, scope = app.querySelector('#browse-global-scope')?.value || 'all', format = app.querySelector('#browse-global-format')?.value || 'best') => {
+    const trimmed = String(query || '').trim();
+    localStorage.setItem('markSetGoPendingLibrarySearch', trimmed);
+    localStorage.setItem('markSetGoPendingBrowseScope', scope);
+    renderUnifiedLibrary({ query:trimmed, scope, provider:'all' });
     requestAnimationFrame(() => {
-      const queryInput = app.querySelector('#unified-library-query');
-      const formatSelect = app.querySelector('#browse-global-format') || document.querySelector('#unified-library-format');
-      if (queryInput) {
-        queryInput.value = query;
-        queryInput.dispatchEvent(new Event('input', { bubbles:true }));
-      }
-      const unifiedFormat = document.querySelector('#unified-library-format');
-      if (unifiedFormat && format) unifiedFormat.value = format;
+      const formatSelect = app.querySelector('#unified-library-format');
+      if (formatSelect && format) formatSelect.value = format;
     });
   };
 
@@ -14172,11 +14374,11 @@ function renderBrowseHub() {
           <span class="source-category">Browse</span>
           <h1>${firstName ? `Welcome back, ${escapeHtml(firstName)}.` : 'Find your next great read.'}</h1>
           <p>Explore modern reading guides, timeless classics, and trusted online libraries—all in one place.</p>
-          <div class="browse-hero-tags">
-            <span>Modern Guides</span>
-            <span>Free Books</span>
-            <span>Cover + List views</span>
-          </div>
+          <nav class="browse-hero-tags browse-hero-links" aria-label="Jump to Browse section">
+            <a href="#browse-modern-guides">Modern Guides</a>
+            <a href="#browse-free-books">Free Books</a>
+            <a href="#browse-collections">Collections</a>
+          </nav>
         </div>
         <div class="browse-hero-actions">
           <button class="primary" type="button" data-browse-search="all">Search all libraries</button>
@@ -14186,7 +14388,14 @@ function renderBrowseHub() {
 
       <form id="browse-global-search" class="browse-search browse-search-modern">
         <span aria-hidden="true">⌕</span>
-        <input id="browse-global-query" type="search" placeholder="Search title or author across libraries…" autocomplete="off">
+        <input id="browse-global-query" type="search" placeholder="Search title, author, subject, or idea…" autocomplete="off">
+        <select id="browse-global-scope" aria-label="What to search">
+          <option value="all">Everything</option>
+          <option value="modern">Modern Guides</option>
+          <option value="free">Free Books & Classics</option>
+          <option value="online">Online Libraries</option>
+          <option value="collections">Curated Collections</option>
+        </select>
         <select id="browse-global-format" aria-label="Preferred reading format">
           <option value="best">Best available format</option>
           <option value="text">Plain text</option>
@@ -14205,18 +14414,7 @@ function renderBrowseHub() {
         <p class="browse-helper-copy">Choose cover view for browsing or switch to a compact list when you want to scan titles quickly.</p>
       </section>
 
-      <section class="browse-section browse-modern-guides-section">
-        <div class="section-heading">
-          <div>
-            <span class="source-category">Modern Guides</span>
-            <h2>Modern Guides</h2>
-            <p>Explore original, in-depth guides to popular contemporary books, with built-in ways to discuss, review, and apply what you read.</p>
-          </div>
-        </div>
-        ${renderShelf(MODERN_GUIDE_SHELF, 'guide')}
-      </section>
-
-      <section class="browse-section browse-library-hub-section">
+      <section id="browse-popular-libraries" class="browse-section browse-library-hub-section">
         <div class="section-heading">
           <div>
             <span class="source-category">Sources</span>
@@ -14234,7 +14432,18 @@ function renderBrowseHub() {
         </div>
       </section>
 
-      <section class="browse-section browse-free-books-section">
+      <section id="browse-modern-guides" class="browse-section browse-modern-guides-section">
+        <div class="section-heading">
+          <div>
+            <span class="source-category">Modern Guides</span>
+            <h2>Modern Guides</h2>
+            <p>Explore original, in-depth guides to popular contemporary books, with built-in ways to discuss, review, and apply what you read.</p>
+          </div>
+        </div>
+        ${renderShelf(MODERN_GUIDE_SHELF, 'guide')}
+      </section>
+
+      <section id="browse-free-books" class="browse-section browse-free-books-section">
         <div class="section-heading">
           <div>
             <span class="source-category">Free to read</span>
@@ -14245,7 +14454,7 @@ function renderBrowseHub() {
         ${renderShelf(BROWSE_FREE_BOOKS, 'free')}
       </section>
 
-      <section class="browse-section browse-collections-section">
+      <section id="browse-collections" class="browse-section browse-collections-section">
         <div class="section-heading">
           <div>
             <span class="source-category">Collections</span>
@@ -14264,7 +14473,10 @@ function renderBrowseHub() {
 
   app.querySelector('#browse-global-search')?.addEventListener('submit', (event) => {
     event.preventDefault();
-    search(app.querySelector('#browse-global-query')?.value || '');
+    search(
+      app.querySelector('#browse-global-query')?.value || '',
+      app.querySelector('#browse-global-scope')?.value || 'all'
+    );
   });
 
   app.querySelectorAll('[data-browse-layout]').forEach((button) => button.addEventListener('click', () => {
@@ -14272,8 +14484,12 @@ function renderBrowseHub() {
     renderBrowseHub();
   }));
 
-  app.querySelectorAll('[data-collection-query]').forEach((button) => button.addEventListener('click', () => search(button.dataset.collectionQuery || '')));
-  app.querySelectorAll('[data-browse-search]').forEach((button) => button.addEventListener('click', () => renderUnifiedLibrary()));
+  app.querySelectorAll('[data-collection-query]').forEach((button) => button.addEventListener('click', () => search(button.dataset.collectionQuery || '', 'all')));
+  app.querySelectorAll('[data-browse-search]').forEach((button) => button.addEventListener('click', () => {
+    const input = app.querySelector('#browse-global-query');
+    input?.scrollIntoView({ behavior:'smooth', block:'center' });
+    input?.focus();
+  }));
   app.querySelectorAll('[data-browse-provider]').forEach((button) => button.addEventListener('click', () => {
     renderUnifiedLibrary({ provider: button.dataset.browseProvider || 'all' });
   }));
@@ -14950,9 +15166,6 @@ function writeEmailPreferences(value){localStorage.setItem(EMAIL_PREFS_KEY,JSON.
 async function emailApi(path,body){const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||`Request failed (${response.status}).`);return payload;}
 async function syncEmailActions(){const prefs=readEmailPreferences();if(!prefs.email||!prefs.reminders)return;try{await emailApi('/api/email/sync-actions',{clientId:emailClientId(),actions:readActions()});}catch(error){console.warn('Could not sync email actions:',error.message);}}
 async function syncEmailNotes(){const prefs=readEmailPreferences();if(!prefs.email||!prefs.notes)return 0;const notes=collectEmailNotes();try{const result=await emailApi('/api/email/sync-notes',{clientId:emailClientId(),notes});return result.count||0;}catch(error){console.warn('Could not sync email notes:',error.message);return 0;}}
-const originalWriteActions=writeActions;
-writeActions=function(actions){originalWriteActions(actions);window.clearTimeout(window.__msgEmailSyncTimer);window.__msgEmailSyncTimer=window.setTimeout(syncEmailActions,500);};
-
 function readActions() {
   try {
     const value = JSON.parse(localStorage.getItem(ACTION_CENTER_KEY) || '[]');
@@ -14963,8 +15176,48 @@ function readActions() {
   }
 }
 
+function writeActionsBase(actions) {
+  const normalized = Array.isArray(actions) ? actions : [];
+  localStorage.setItem(ACTION_CENTER_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
 function writeActions(actions) {
-  localStorage.setItem(ACTION_CENTER_KEY, JSON.stringify(actions));
+  const saved = writeActionsBase(actions);
+  window.clearTimeout(window.__msgEmailSyncTimer);
+  window.__msgEmailSyncTimer = window.setTimeout(syncEmailActions, 500);
+  return saved;
+}
+
+function saveActionRecord(record) {
+  if (!record?.id || !record?.title) return null;
+
+  const actions = readActions();
+  const existingIndex = actions.findIndex((item) => String(item.id || '') === String(record.id));
+  const normalized = {
+    ...record,
+    status: record.status || 'active',
+    updatedAt: record.updatedAt || new Date().toISOString(),
+    createdAt: record.createdAt || new Date().toISOString()
+  };
+
+  if (existingIndex >= 0) actions[existingIndex] = normalized;
+  else actions.push(normalized);
+
+  writeActions(actions);
+
+  // Verify persistence immediately. This keeps programmatic guide actions on
+  // exactly the same storage contract as actions created in Action Center.
+  const verified = readActions().find((item) => String(item.id || '') === String(normalized.id));
+  if (!verified) {
+    console.error('Action Center persistence verification failed for', normalized.id);
+    return null;
+  }
+
+  document.dispatchEvent(new CustomEvent('marksetgo:action-saved', {
+    detail: { action: verified }
+  }));
+  return verified;
 }
 
 function actionLocalDate(value) {
@@ -14988,7 +15241,7 @@ function renderActionCenter() {
 
   app.innerHTML = `<section class="panel action-center-page">
     <header class="action-center-hero">
-      <div><span class="source-category">Understanding into action</span><h1>Action Center</h1><p>Turn ideas from your reading into specific commitments, reviews, habits, and reflections.</p></div>
+      <div><span class="source-category">Understanding into action</span><h1>Action Center</h1><p>Turn ideas from your reading into specific commitments, reviews, habits, and reflections.</p>${actions.some((item) => item.origin === 'modern-guide') ? `<small class="action-center-guide-note">${actions.filter((item) => item.origin === 'modern-guide' && item.status !== 'completed').length} active action${actions.filter((item) => item.origin === 'modern-guide' && item.status !== 'completed').length === 1 ? '' : 's'} added from Modern Guides.</small>` : ''}</div>
       <button class="secondary" type="button" data-action="reader">Return to Reader</button>
     </header>
 
@@ -15104,8 +15357,15 @@ function renderActionCenter() {
       updatedAt: new Date().toISOString(),
       completedAt: existing?.completedAt || null
     };
-    if (existing) actions[actions.indexOf(existing)] = record; else actions.push(record);
-    writeActions(actions);
+    const saved = saveActionRecord(record);
+    if (!saved) {
+      const status = app.querySelector('#action-status');
+      if (status) {
+        status.textContent = 'This action could not be saved. Please try again.';
+        status.classList.add('error');
+      }
+      return;
+    }
     resetForm();
     renderActionCenter();
   });

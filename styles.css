@@ -10744,3 +10744,89 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
   border-color:rgba(24,75,129,.28);
 }
 .modern-guide-inline-discuss::before { content:"💬"; margin-right:6px; }
+
+
+/* v9.2.56 Action Center guide persistence */
+.action-center-guide-note {
+  display:inline-block;
+  margin-top:8px;
+  color:#385f87;
+  font-weight:700;
+}
+
+
+/* v9.2.57 unified Browse search and section navigation */
+.browse-hero-links a {
+  display:inline-flex;
+  align-items:center;
+  padding:6px 12px;
+  border-radius:999px;
+  background:rgba(37,93,163,.08);
+  color:#143861;
+  font-weight:700;
+  font-size:.83rem;
+  text-decoration:none;
+}
+.browse-hero-links a:hover,
+.browse-hero-links a:focus-visible {
+  background:rgba(37,93,163,.14);
+  text-decoration:none;
+  outline:2px solid rgba(213,164,37,.45);
+  outline-offset:2px;
+}
+.browse-hub-modern [id^="browse-"] { scroll-margin-top:90px; }
+.browse-search-modern {
+  grid-template-columns:30px minmax(0,1.45fr) minmax(165px,.48fr) minmax(165px,.46fr) auto;
+}
+.browse-results-search {
+  grid-template-columns:minmax(240px,1.4fr) minmax(160px,.5fr) minmax(170px,.52fr) minmax(145px,.42fr) auto;
+}
+.browse-search-local-section,
+.browse-search-online-section {
+  display:grid;
+  gap:16px;
+  margin-top:20px;
+}
+.browse-search-result-group {
+  display:grid;
+  gap:12px;
+  padding-top:4px;
+}
+.browse-search-result-group > h3 {
+  margin:0;
+  color:#173f6d;
+  font-size:1rem;
+}
+.browse-search-local-card { overflow:hidden; }
+.browse-search-mini-cover {
+  min-height:150px;
+  display:grid;
+  align-content:end;
+  gap:6px;
+  padding:16px;
+  color:#fff;
+  background:
+    radial-gradient(circle at top right, rgba(255,255,255,.22), transparent 35%),
+    linear-gradient(155deg, var(--cover-a,#7cb6ff), var(--cover-b,#2d6ab7) 55%, var(--cover-c,#16355a));
+}
+.browse-search-mini-cover span { font-size:.72rem; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.browse-search-mini-cover strong { font-size:1.25rem; line-height:1.08; }
+.browse-search-mini-cover small { font-weight:700; opacity:.92; }
+.browse-search-back {
+  margin:0 0 8px;
+  padding:0;
+  border:0;
+  background:transparent;
+  color:#285b92;
+  font-weight:800;
+  cursor:pointer;
+}
+#browse-online-search-section[hidden] { display:none !important; }
+@media (max-width:1050px) {
+  .browse-search-modern,
+  .browse-results-search { grid-template-columns:30px minmax(0,1fr); }
+  .browse-search-modern select,
+  .browse-search-modern button,
+  .browse-results-search select,
+  .browse-results-search button { grid-column:1 / -1; }
+}
