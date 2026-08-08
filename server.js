@@ -1470,6 +1470,88 @@ Keep each section compact and useful before or during reading.`;
 });
 
 
+
+app.post('/api/mnemonics', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error:'Mnemonic generation is not configured.' });
+
+  const title = String(req.body?.title || 'Untitled').trim().slice(0,300);
+  const focus = String(req.body?.focus || '').trim().slice(0,500);
+  const style = String(req.body?.style || 'mixed').trim().slice(0,40);
+  const sample = String(req.body?.sample || '').replace(/\s+/g,' ').trim().slice(0,40000);
+  if (!sample) return res.status(400).json({ error:'No readable book text was supplied.' });
+
+  const schema={type:'object',additionalProperties:false,required:['mnemonics'],properties:{
+    mnemonics:{type:'array',minItems:4,maxItems:8,items:{type:'object',additionalProperties:false,required:['type','name','device','use'],properties:{
+      type:{type:'string'},name:{type:'string'},device:{type:'string'},use:{type:'string'}
+    }}}
+  }};
+
+  const instructions=`Create practical memory aids for a reader studying "${title}".
+Ground every mnemonic in the supplied reading sample. Do not invent facts not supported by the sample.
+Focus requested by the reader: ${focus || 'the most important ideas, names, sequence, arguments, or themes'}.
+Preferred style: ${style}.
+Make the devices memorable but academically useful. Explain exactly what each mnemonic helps the reader retain.`;
+
+  try {
+    const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({
+      model:COMPREHENSION_MODEL,reasoning:{effort:'low'},store:false,
+      input:[{role:'developer',content:[{type:'input_text',text:instructions}]},{role:'user',content:[{type:'input_text',text:sample}]}],
+      text:{format:{type:'json_schema',name:'book_mnemonics',strict:true,schema}}
+    })});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok) return res.status(502).json({error:'Unable to create mnemonics.',detail:payload?.error?.message||`HTTP ${response.status}`});
+    const outputText=extractOpenAIOutputText(payload);
+    if(!outputText) throw new Error('No structured mnemonic response.');
+    res.json(JSON.parse(outputText));
+  } catch(error) {
+    console.error('Mnemonic generation failed:',error);
+    res.status(502).json({error:'Unable to create mnemonics.'});
+  }
+});
+
+app.post('/api/language-lesson', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error:'Language lessons are not configured.' });
+
+  const title=String(req.body?.title||'Untitled').trim().slice(0,300);
+  const language=String(req.body?.language||'Spanish').trim().slice(0,80);
+  const level=['beginner','intermediate','advanced'].includes(req.body?.level)?req.body.level:'beginner';
+  const sample=String(req.body?.sample||'').replace(/\s+/g,' ').trim().slice(0,18000);
+  if(!sample) return res.status(400).json({error:'No readable book text was supplied.'});
+
+  const schema={type:'object',additionalProperties:false,required:['passage','vocabulary','notes','exercises'],properties:{
+    passage:{type:'string'},
+    vocabulary:{type:'array',minItems:6,maxItems:12,items:{type:'object',additionalProperties:false,required:['term','meaning'],properties:{term:{type:'string'},meaning:{type:'string'}}}},
+    notes:{type:'array',minItems:3,maxItems:8,items:{type:'string'}},
+    exercises:{type:'array',minItems:4,maxItems:8,items:{type:'string'}}
+  }};
+
+  const instructions=`Create a ${level} ${language} language-learning lesson based on the meaning and subject matter of the supplied passage from "${title}".
+Write an original short adapted passage in ${language}; do not translate or reproduce a long copyrighted passage.
+Use the reader's familiarity with the book to teach vocabulary and comprehension.
+Vocabulary meanings and instructional notes may be explained in English.
+Exercises should include comprehension, vocabulary, and short translation or production practice.
+Do not provide answer keys in the exercise text.`;
+
+  try {
+    const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({
+      model:COMPREHENSION_MODEL,reasoning:{effort:'low'},store:false,
+      input:[{role:'developer',content:[{type:'input_text',text:instructions}]},{role:'user',content:[{type:'input_text',text:sample}]}],
+      text:{format:{type:'json_schema',name:'language_reading_lesson',strict:true,schema}}
+    })});
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok) return res.status(502).json({error:'Unable to create the language lesson.',detail:payload?.error?.message||`HTTP ${response.status}`});
+    const outputText=extractOpenAIOutputText(payload);
+    if(!outputText) throw new Error('No structured language lesson.');
+    res.json({lesson:JSON.parse(outputText)});
+  } catch(error) {
+    console.error('Language lesson generation failed:',error);
+    res.status(502).json({error:'Unable to create the language lesson.'});
+  }
+});
+
+
 app.post('/api/mark-selection', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) return res.status(503).json({ error: 'Mark is not configured. Add OPENAI_API_KEY to the server environment.' });
