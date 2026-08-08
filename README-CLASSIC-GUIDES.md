@@ -1,4 +1,4 @@
-# Mark, Set, Go! — Classic Guides v1.2
+# Mark, Set, Go! — Classic Guides v1.3
 
 This patch adds Classic Guides as a self-contained feature and deliberately does NOT edit:
 - app.js
@@ -59,3 +59,17 @@ The module looks first for `[data-action="great-books"]`, then
 navigation label. It also watches for navigation re-renders.
 
 No reader, playback, bookmark, highlight, or right-click code is modified.
+
+
+## v1.3 — Great Books page integration
+Classic Guides is now integrated into the actual Great Books screen.
+
+When the page headed `Great Books of the Western World` is rendered:
+- a `Classic Guides` button is inserted in the page-header actions;
+- every work whose catalog status is `ready` receives a `Classic Guide` button
+  beside its existing `Study / Great Ideas` and `Grokipedia` actions;
+- currently `The Iliad` is the first ready guide;
+- future guides appear automatically when their catalog status changes to `ready`.
+
+The module observes only the page DOM. It does not modify `app.js`, the reader
+runtime, playback, highlighting, bookmarks, or right-click handlers.

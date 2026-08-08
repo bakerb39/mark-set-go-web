@@ -25,3 +25,19 @@
 .cg-facts{list-style:none;padding:0;margin:0}.cg-facts li{padding:7px 0;border-bottom:1px solid #edf0f3;font-size:13px}.cg-idea-tags{display:flex;flex-wrap:wrap;gap:7px}.cg-idea-tags span{background:#edf4fb;border:1px solid #d0e0ef;border-radius:99px;padding:6px 8px;font-size:12px}
 .cg-panel-title{color:var(--cg-navy);font-size:28px;margin-top:0}.cg-quiz-q{margin:18px 0;padding:16px;border:1px solid var(--cg-line);border-radius:11px}.cg-quiz-q label{display:block;margin:7px 0}.cg-check{margin-top:12px}
 @media(max-width:1000px){.classic-guides-shell{grid-template-columns:1fr}.cg-sidebar{display:none}.cg-guide-body{grid-template-columns:1fr}.cg-toc,.cg-aside{position:static}.cg-titlebar{flex-direction:column}}
+
+.cg-great-books-btn{
+  border:0;
+  border-radius:6px;
+  padding:7px 10px;
+  background:#0b4b7d;
+  color:#f3c85b;
+  font-weight:800;
+  font-size:12px;
+  cursor:pointer;
+  margin:0 4px;
+}
+.cg-great-books-btn:hover{
+  background:#123f66;
+  color:#ffe48d;
+}
