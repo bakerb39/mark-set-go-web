@@ -200,7 +200,26 @@
         <button type="button" data-companion-choice="mark" role="radio"><img src="${MARK_AVATAR}" alt="Mark"><span><strong>Mark</strong><small>Ask Mark</small></span><span class="companion-check">✓</span></button>
         <button type="button" data-companion-choice="beth" role="radio"><img src="${BETH_AVATAR}" alt="Beth"><span><strong>Beth</strong><small>Ask Beth</small></span><span class="companion-check">✓</span></button>
       </div>`;
-    app.appendChild(card);
+    // Put the companion choice at the TOP of Customize My Experience / Profile.
+    // Prefer the existing experience/profile content container instead of appending
+    // to the end of #app. If a visible heading named "Customize My Experience"
+    // exists, insert the selector immediately after that heading block.
+    const experienceHost =
+      document.querySelector('.experience-profile,.profile-preferences,[data-page="profile"],.profile-page') || app;
+
+    const headings = Array.from(experienceHost.querySelectorAll('h1,h2,h3,.page-title,.section-title'));
+    const customizeHeading = headings.find((el) =>
+      /customize\s+my\s+experience/i.test((el.textContent || '').trim())
+    );
+
+    if (customizeHeading) {
+      const headingBlock = customizeHeading.closest('header,.page-header,.section-header') || customizeHeading;
+      headingBlock.insertAdjacentElement('afterend', card);
+    } else {
+      // No named heading found: make it the first setting in the profile/experience area.
+      experienceHost.insertBefore(card, experienceHost.firstElementChild || null);
+    }
+
     card.addEventListener('click', (event) => {
       const btn = event.target.closest('[data-companion-choice]');
       if (!btn) return;

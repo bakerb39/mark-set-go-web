@@ -12919,3 +12919,9 @@ html[data-companion="beth"] .msg-walkthrough-mark-illustration{width:100%!import
 .word-context-menu * {
   pointer-events:auto !important;
 }
+
+/* v9.4.3: reading companion choice is the first Customize My Experience setting */
+.experience-profile > .companion-persona-settings:first-child,
+.profile-preferences > .companion-persona-settings:first-child,
+[data-page="profile"] > .companion-persona-settings:first-child,
+.profile-page > .companion-persona-settings:first-child{margin-top:0;}
