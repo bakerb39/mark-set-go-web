@@ -12290,16 +12290,7 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
 }
 
 
-/* v9.2.88 Focus Anchor true-overlay behavior
-   Dragging the anchor in the normal Reader must never reflow book text. */
-.reader-frame:not(:fullscreen):not(.fullscreen-fallback) > .interactive-reader.focus-anchor-clearance {
-  padding-top:0 !important;
-}
-.reader-frame:not(:fullscreen):not(.fullscreen-fallback) > .interactive-reader {
-  --focus-anchor-clearance:0px !important;
-}
-
-
+/* v9.2.88 superseded by v9.2.91: zero-clearance override removed. */
 /* v9.2.89 walkthrough refresh with Mark guide */
 .msg-walkthrough-menu-mirror summary,
 .msg-walkthrough-menu-mirror .library-submenu-items > button,
@@ -12435,12 +12426,7 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
 }
 
 
-/* v9.2.90 Focus Anchor: fixed top reading band + freely movable overlay
-   The initial text stays below the anchor, but dragging the anchor never
-   recalculates or changes the text position. */
+/* v9.2.91 Focus Anchor: preserve original top band, freeze it while dragging. */
 .reader-frame:not(:fullscreen):not(.fullscreen-fallback) > .interactive-reader.focus-anchor-clearance {
-  padding-top:var(--focus-anchor-clearance, 5rem) !important;
-}
-.reader-frame:not(:fullscreen):not(.fullscreen-fallback) > .interactive-reader {
-  --focus-anchor-clearance:5rem;
+  padding-top:var(--focus-anchor-clearance, 7rem) !important;
 }

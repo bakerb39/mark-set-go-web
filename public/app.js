@@ -3321,7 +3321,7 @@ function applyFocusAnchorReaderClearance() {
     const frameRect = frame.getBoundingClientRect();
     const clearance = Math.max(72, Math.ceil(overlayRect.bottom - frameRect.top + 14));
     reader.classList.add('focus-anchor-clearance');
-    reader.style.setProperty('--focus-anchor-clearance', `${clearance}px`);
+    reader.style.setProperty('--focus-anchor-clearance', `${clearance}px`, 'important');
     return;
   }
 
@@ -3332,14 +3332,16 @@ function applyFocusAnchorReaderClearance() {
   //
   // The reserved amount is based on the anchor's default top placement,
   // not its current dragged position.
-  const frameStyles = window.getComputedStyle(frame);
   const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
   const defaultTop = 3.2 * rootFontSize;
   const overlayHeight = Math.max(42, overlay.getBoundingClientRect().height || 0);
-  const clearance = Math.max(72, Math.ceil(defaultTop + overlayHeight + 14));
+
+  // Match the original dynamic top-band result at the default top position:
+  // default top + overlay height + the original 14px breathing room.
+  const clearance = Math.max(96, Math.ceil(defaultTop + overlayHeight + 14));
 
   reader.classList.add('focus-anchor-clearance');
-  reader.style.setProperty('--focus-anchor-clearance', `${clearance}px`);
+  reader.style.setProperty('--focus-anchor-clearance', `${clearance}px`, 'important');
 }
 
 function focusAnchorIsFullscreen(overlay) {
