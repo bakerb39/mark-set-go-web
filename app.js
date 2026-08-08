@@ -9167,7 +9167,7 @@ function renderMarkResult(result, action){
 
   panels.forEach(panel=>{
     panel.hidden=false;
-    panel.innerHTML=`<div class="mark-response-heading"><span>Ask Mark</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<button type="button" class="secondary" data-save-mark-response data-mark-save-id="${escapeHtml(saveId)}">Save to notebook</button>`;
+    panel.innerHTML=`<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<button type="button" class="secondary" data-save-mark-response data-mark-save-id="${escapeHtml(saveId)}">Save to notebook</button>`;
 
     panel.querySelector('[data-save-mark-response]')?.addEventListener('click',(event)=>{
       const button=event.currentTarget;
@@ -11967,9 +11967,20 @@ function renderTwoColumnDocument(reader) {
 }
 
 
+
+function currentCompanionIdentity() {
+  const live = window.MSGCompanion?.config;
+  if (live?.id) return live;
+  let selected = 'mark';
+  try { selected = localStorage.getItem('msg_companion_persona_v2') || localStorage.getItem('msg_companion_persona_v1') || 'mark'; } catch {}
+  return selected === 'beth'
+    ? { id:'beth', name:'Beth', ask:'Ask Beth', avatar:'/assets/companions/beth/beth-avatar.png' }
+    : { id:'mark', name:'Mark', ask:'Ask Mark', avatar:'/assets/ask-mark/ask-mark-avatar.png' };
+}
+
 function dictionaryResultMarkup(word, definition, partOfSpeech = '', example = '', saved = false) {
   return `
-    <div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div>
+    <div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>Word lookup</strong></div>
     <h2>${escapeHtml(word)}</h2>
     ${partOfSpeech ? `<p class="dictionary-part">${escapeHtml(partOfSpeech)}</p>` : ''}
     <p class="word-meaning">${escapeHtml(definition)}</p>
@@ -12026,7 +12037,7 @@ async function performDictionaryLookup(saveAfter = false, target = 'tools', cont
     const markPanel = app.querySelector('#mark-response');
     if (markPanel) {
       markPanel.hidden = false;
-      markPanel.innerHTML = `<div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
+      markPanel.innerHTML = `<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status">Looking up definition…</p>`;
     }
   } else {
     openWordPanelForDictionary();
@@ -12046,7 +12057,7 @@ async function performDictionaryLookup(saveAfter = false, target = 'tools', cont
     const panel = target === 'mark' ? app.querySelector('#mark-response') : app.querySelector('#word-result');
     if (panel) {
       panel.hidden = false;
-      panel.innerHTML = `<div class="mark-response-heading"><span>Ask Mark</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status error">${escapeHtml(error.message)}</p>`;
+      panel.innerHTML = `<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>Word lookup</strong></div><h2>${escapeHtml(context.word)}</h2><p class="status error">${escapeHtml(error.message)}</p>`;
     }
   }
 }

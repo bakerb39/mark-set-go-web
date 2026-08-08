@@ -8,6 +8,20 @@
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const transformApi = () => window.MarkSetGoReadAnything;
 
+  const COMPANION_STORAGE_KEY = 'msg_companion_persona_v2';
+  const companionConfig = () => {
+    const live = window.MSGCompanion?.config;
+    if (live?.id) return live;
+    const selected = localStorage.getItem(COMPANION_STORAGE_KEY) || localStorage.getItem('msg_companion_persona_v1') || 'mark';
+    return selected === 'beth'
+      ? { id:'beth', name:'Beth', ask:'Ask Beth', notebook:"Beth's Notebook", avatar:'/assets/companions/beth/beth-avatar.png' }
+      : { id:'mark', name:'Mark', ask:'Ask Mark', notebook:"Mark's Notebook", avatar:'/assets/ask-mark/ask-mark-avatar.png' };
+  };
+  const companionName = () => companionConfig().name;
+  const companionAsk = () => companionConfig().ask;
+  const companionAvatar = () => companionConfig().avatar;
+  const companionNotebook = () => companionConfig().id === 'beth' ? 'Beth’s Notebook' : 'Mark’s Notebook';
+
   let shell = null;
   let legacyHost = null;
   let selectionObserver = null;
@@ -50,14 +64,8 @@
     return { title, chapter, progress };
   }
 
-  function liveLegacyRoot() {
-    if (legacyHost?.isConnected) return legacyHost;
-    if (shell?.isConnected) return shell;
-    return document;
-  }
-
   function getLegacySelectionPanel() {
-    return $('#mark-selection-panel', liveLegacyRoot());
+    return $('#mark-selection-panel', legacyHost || shell || document);
   }
 
   function getSelectionText() {
@@ -88,15 +96,15 @@
     return `
       <div class="askmark-premium" data-askmark-premium>
         <header class="askmark-hero">
-          <button class="askmark-close" type="button" data-askmark-close aria-label="Close Ask Mark">×</button>
+          <button class="askmark-close" type="button" data-askmark-close aria-label="Close ${companionAsk()}">×</button>
           <div class="askmark-avatar-wrap" aria-hidden="true">
             <span class="askmark-avatar-glow"></span>
-            <img class="askmark-avatar" src="/assets/ask-mark/ask-mark-avatar.png" alt="">
+            <img class="askmark-avatar" src="${companionAvatar()}" alt="${companionName()}">
             <span class="askmark-presence"></span>
           </div>
           <div class="askmark-brand-copy">
             <span class="askmark-eyebrow">Your reading companion</span>
-            <h2>Ask Mark</h2>
+            <h2>${companionAsk()}</h2>
           </div>
           <div class="askmark-header-actions">
             <button type="button" data-askmark-view="notebook" aria-label="Open notebook" title="Notebook">✎</button>
@@ -109,9 +117,9 @@
           <section class="askmark-view is-active" data-askmark-view-panel="chat">
             <div class="askmark-conversation" data-askmark-conversation aria-live="polite">
               <article class="askmark-message mark-message">
-                <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+                <img src="${companionAvatar()}" alt="${companionName()}">
                 <div>
-                  <span>Mark</span>
+                  <span>${companionName()}</span>
                   <p><strong data-askmark-personal-greeting>${greeting()}</strong> Highlight a passage or ask me about the book. I can explain ideas, summarize, compare viewpoints, quiz you, or save an insight.</p>
                 </div>
               </article>
@@ -121,7 +129,7 @@
           </section>
 
           <section class="askmark-view" data-askmark-view-panel="notebook">
-            <div class="askmark-subhead"><button type="button" data-askmark-back>←</button><div><span>Your saved thinking</span><h3>Mark’s Notebook</h3></div></div>
+            <div class="askmark-subhead"><button type="button" data-askmark-back>←</button><div><span>Your saved thinking</span><h3>${companionNotebook()}</h3></div></div>
             <div class="askmark-legacy-slot" data-notebook-slot></div>
           </section>
 
@@ -219,9 +227,9 @@
 
     conversation.insertAdjacentHTML('beforeend',`
       <article class="askmark-message mark-message askmark-progress-message" data-mark-progress-message>
-        <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+        <img src="${companionAvatar()}" alt="${companionName()}">
         <div>
-          <span>Mark · Your progress</span>
+          <span>${companionName()} · Your progress</span>
           <p>${escapeHtml(update.message)}</p>
         </div>
       </article>`);
@@ -247,9 +255,9 @@
     conversation.querySelectorAll('[data-guide-section-welcome]').forEach((item) => item.remove());
     conversation.insertAdjacentHTML('beforeend', `
       <article class="askmark-message mark-message" data-guide-section-welcome>
-        <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+        <img src="${companionAvatar()}" alt="${companionName()}">
         <div>
-          <span>Mark</span>
+          <span>${companionName()}</span>
           <p>Happy to discuss this section with you. I’ve highlighted the entire section so we can explore any part of it together.</p>
         </div>
       </article>`);
@@ -264,31 +272,26 @@
     const id = `askmark-thinking-${Date.now()}`;
     conversation.insertAdjacentHTML('beforeend', `
       <article class="askmark-message mark-message is-thinking" id="${id}">
-        <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
-        <div><span>Mark</span><p><i></i><i></i><i></i></p></div>
+        <img src="${companionAvatar()}" alt="${companionName()}">
+        <div><span>${companionName()}</span><p><i></i><i></i><i></i></p></div>
       </article>`);
     conversation.scrollTop = conversation.scrollHeight;
     return document.getElementById(id);
   }
 
   function syncLegacyResponse() {
-    if (!shell?.isConnected || !legacyHost?.isConnected) configureShell();
-    const livePanel = getLegacySelectionPanel();
-    const response = livePanel?.querySelector('#mark-response');
-    if (response && !response.hidden && response.textContent.trim()) {
-      console.info('[RC-DIAG hub] live response detected', { panelConnected: !!livePanel?.isConnected, responseConnected: !!response.isConnected, responseLength: response.textContent.trim().length, shellConnected: !!shell?.isConnected });
-    }
+    const response = getLegacySelectionPanel()?.querySelector('#mark-response');
     if (!response || response.hidden || !response.textContent.trim()) return;
     const thinking = $('.askmark-message.is-thinking', shell);
     const body = response.cloneNode(true);
     body.querySelectorAll('button').forEach((button) => button.classList.add('askmark-inline-action'));
+    body.querySelectorAll('.mark-response-heading span').forEach((node) => { node.textContent = companionAsk(); });
     const markup = `<article class="askmark-message mark-message">
-      <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
-      <div><span>Mark</span><div class="askmark-rich-response">${body.innerHTML}</div></div>
+      <img src="${companionAvatar()}" alt="${companionName()}">
+      <div><span>${companionName()}</span><div class="askmark-rich-response">${body.innerHTML}</div></div>
     </article>`;
     if (thinking) thinking.outerHTML = markup;
     else $('[data-askmark-conversation]', shell)?.insertAdjacentHTML('beforeend', markup);
-    console.info('[RC-DIAG 4] response rendered in Ask Mark', { shellConnected: !!shell?.isConnected, usedThinkingSlot: !!thinking });
 
     const messages = $$('[data-askmark-conversation] .askmark-message', shell);
     const latestMessage = messages[messages.length - 1];
@@ -325,8 +328,7 @@
   });
 
   function syncSelection() {
-    if (!shell?.isConnected || !legacyHost?.isConnected) configureShell();
-    if (!shell?.isConnected) return;
+    if (!shell) return;
     const text = getSelectionText();
     const card = $('[data-askmark-selection]', shell);
     const output = $('[data-askmark-selection-text]', shell);
@@ -434,7 +436,7 @@
     const id = `askmark-structured-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
     conversation.insertAdjacentHTML('beforeend', `
       <article class="askmark-message mark-message ${className}" id="${id}">
-        <img src="/assets/ask-mark/ask-mark-avatar.png" alt="Mark">
+        <img src="${companionAvatar()}" alt="${companionName()}">
         <div>
           <span>Mark · ${escapeHtml(title)}</span>
           <div class="askmark-rich-response askmark-study-output">${bodyHtml}</div>
@@ -792,5 +794,24 @@
   [400, 900, 1800, 3200].forEach((delay) => setTimeout(install, delay));
 
   document.addEventListener('marksetgo:auth-changed', refreshPersonalGreeting);
+  window.addEventListener('msg:companion-changed', () => {
+    if (!shell?.isConnected) return;
+    const c = companionConfig();
+    const avatar = shell.querySelector('.askmark-avatar');
+    if (avatar) { avatar.src = c.avatar; avatar.alt = c.name; }
+    const heading = shell.querySelector('.askmark-brand-copy h2');
+    if (heading) heading.textContent = c.ask;
+    shell.querySelectorAll('.askmark-message.mark-message').forEach((message) => {
+      const img = message.querySelector(':scope > img');
+      if (img) { img.src = c.avatar; img.alt = c.name; }
+      const name = message.querySelector(':scope > div > span');
+      if (name && /^(Mark|Beth)(\s*·.*)?$/.test(name.textContent.trim())) {
+        name.textContent = name.textContent.includes('·') ? `${c.name} · ${name.textContent.split('·').slice(1).join('·').trim()}` : c.name;
+      }
+      message.querySelectorAll('.mark-response-heading span').forEach((node) => { node.textContent = c.ask; });
+    });
+    const notebook = shell.querySelector('.askmark-subhead h3');
+    if (notebook && /Notebook/.test(notebook.textContent)) notebook.textContent = companionNotebook();
+  });
 
 })();

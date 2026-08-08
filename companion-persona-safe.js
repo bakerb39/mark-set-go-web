@@ -37,12 +37,12 @@
       Array.from(el.childNodes).forEach((node) => {
         if (node.nodeType === Node.TEXT_NODE) node.nodeValue = '';
       });
-      let span = el.querySelector('[data-companion-label]');
+      let span = el.querySelector('[data-companion-label]') || el.querySelector(':scope > span');
       if (!span) {
         span = document.createElement('span');
-        span.dataset.companionLabel = '1';
         el.appendChild(span);
       }
+      span.dataset.companionLabel = '1';
       span.textContent = desired;
     } else {
       const icon = el.querySelector('[aria-hidden="true"]');
@@ -65,7 +65,7 @@
 
   function applyAvatar(img) {
     if (!(img instanceof HTMLImageElement)) return;
-    if (!img.dataset.msgMarkSrc) img.dataset.msgMarkSrc = img.getAttribute('src') || CONFIG.mark.avatar;
+    if (!img.dataset.msgMarkSrc) img.dataset.msgMarkSrc = CONFIG.mark.avatar;
     img.src = id === 'beth' ? CONFIG.beth.avatar : img.dataset.msgMarkSrc;
     img.alt = cfg().name;
   }
@@ -91,7 +91,8 @@
     });
 
     qsa('[data-mark-toolbar-action="ask"]', root).forEach((el) => setText(el, '✦ Ask Mark', '✦ Ask Beth'));
-    qsa('.askmark-message.mark-message img,.askmark-brand-avatar img', root).forEach(applyAvatar);
+    qsa('.mark-response-heading span', root).forEach((el) => setText(el, 'Ask Mark', 'Ask Beth'));
+    qsa('.askmark-message.mark-message img,.askmark-brand-avatar img,.askmark-avatar', root).forEach(applyAvatar);
     qsa('.askmark-message.mark-message span', root).forEach((el) => {
       if (/^(Mark|Beth)$/.test((el.textContent || '').trim())) setText(el, 'Mark', 'Beth');
     });
@@ -106,8 +107,9 @@
       if (!(img instanceof HTMLImageElement)) return;
       if (!img.dataset.msgMarkSrc) img.dataset.msgMarkSrc = img.src;
       img.src = id === 'beth' ? CONFIG.beth.home : img.dataset.msgMarkSrc;
-      img.alt = cfg().name;
+      img.alt = `${cfg().name}, your reading companion.`;
     });
+    qsa('.home-mark-card figcaption strong', root).forEach((el) => setText(el, 'Meet Mark.', 'Meet Beth.'));
   }
 
   function ensureProfileControl() {

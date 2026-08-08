@@ -1,9 +1,15 @@
 {
-  "currentBuild": "v9.6.2-debug-and-roadmap-foundation",
+  "currentBuild": "v9.6.3-companion-identity-render-fix",
   "channel": "development",
   "date": "2026-08-08",
   "latestStableBuild": "2026-08-08-right-click-stable",
-  "stableBasis": ["reader-stable-2026-08-07", "confirmed stale-outside-listener right-click fix"],
-  "routes": {"debug": "/?debug", "features": "/?features"},
-  "notes": "Debug Center and Features Roadmap are source-controlled. Promote this build to stable only after automated regression checks and manual verification of restored UI/companion behaviors."
+  "stableBasis": [
+    "reader-stable-2026-08-07",
+    "confirmed stale-outside-listener right-click fix"
+  ],
+  "routes": {
+    "debug": "/?debug",
+    "features": "/?features"
+  },
+  "notes": "Chromium-verified companion identity rendering: single Ask Mark/Ask Beth help label, matching Reader avatar/name/badges, corrected home Meet Mark/Meet Beth text, and Features workflow ordered Ideas \u2192 Planned \u2192 Testing \u2192 In Progress \u2192 Completed. Right-click baseline preserved."
 }
