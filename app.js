@@ -14122,12 +14122,12 @@ function renderBrowseHub() {
       <header class="platform-hero browse-hero-card">
         <div class="browse-hero-copy">
           <span class="source-category">Browse</span>
-          <h1>${firstName ? `Welcome back, ${escapeHtml(firstName)}.` : 'Build a richer reading shelf.'}</h1>
-          <p>Mix contemporary study guides with public-domain classics, switch between face-cover tiles and list view, and send anything you discover straight into the Reader.</p>
+          <h1>${firstName ? `Welcome back, ${escapeHtml(firstName)}.` : 'Find your next great read.'}</h1>
+          <p>Explore modern reading guides, timeless classics, and trusted online libraries—all in one place.</p>
           <div class="browse-hero-tags">
             <span>Modern Guides</span>
             <span>Free Books</span>
-            <span>Tiles + List view</span>
+            <span>Cover + List views</span>
           </div>
         </div>
         <div class="browse-hero-actions">
@@ -14154,15 +14154,15 @@ function renderBrowseHub() {
           <button class="${layoutMode === 'tiles' ? 'is-active' : ''}" type="button" data-browse-layout="tiles">Face covers</button>
           <button class="${layoutMode === 'list' ? 'is-active' : ''}" type="button" data-browse-layout="list">List</button>
         </div>
-        <p class="browse-helper-copy">Modern Guides are independent study guides. Full contemporary books can later be offered as <strong>Read with your copy</strong> or licensed content.</p>
+        <p class="browse-helper-copy">Choose cover view for browsing or switch to a compact list when you want to scan titles quickly.</p>
       </section>
 
       <section class="browse-section browse-modern-guides-section">
         <div class="section-heading">
           <div>
             <span class="source-category">Modern Guides</span>
-            <h2>Start your contemporary library</h2>
-            <p>Add modern, idea-driven reading guides that feel substantial inside the Reader.</p>
+            <h2>Modern Guides</h2>
+            <p>Explore original, in-depth guides to popular contemporary books, with built-in ways to discuss, review, and apply what you read.</p>
           </div>
         </div>
         ${renderShelf(MODERN_GUIDE_SHELF, 'guide')}
@@ -14173,7 +14173,7 @@ function renderBrowseHub() {
           <div>
             <span class="source-category">Sources</span>
             <h2>Popular libraries</h2>
-            <p>Search the major public-domain and discoverability sources from one cleaner shelf.</p>
+            <p>Search trusted sources for full texts, editions, previews, and books you can borrow or read online.</p>
           </div>
         </div>
         <div class="browse-library-hub">
@@ -14190,8 +14190,8 @@ function renderBrowseHub() {
         <div class="section-heading">
           <div>
             <span class="source-category">Free to read</span>
-            <h2>Classics with face covers</h2>
-            <p>Give the free library real visual pop in tile mode while preserving a Great Books-style list mode.</p>
+            <h2>Free Books & Classics</h2>
+            <p>Discover enduring works you can read now, from novels and philosophy to history and political thought.</p>
           </div>
         </div>
         ${renderShelf(BROWSE_FREE_BOOKS, 'free')}
@@ -14202,7 +14202,7 @@ function renderBrowseHub() {
           <div>
             <span class="source-category">Collections</span>
             <h2>Browse by shelf</h2>
-            <p>Jump into a curated cluster the way you would with Great Books of the Western World.</p>
+            <p>Browse curated reading paths by tradition, subject, and major ideas.</p>
           </div>
         </div>
         <div class="browse-collection-list">
