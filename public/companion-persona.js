@@ -12,15 +12,19 @@
 
   const STORAGE_KEY = 'msg_companion_persona_v1';
   const VALID = new Set(['mark', 'beth']);
+  const MARK_AVATAR = '/assets/walkthrough/mark-walkthrough-guide.png';
   const BETH_AVATAR = '/assets/companions/beth/beth-avatar.png';
+  const BETH_FRONTPAGE = '/assets/companions/beth/beth-frontpage-badge.png';
+  const BETH_READING = '/assets/companions/beth/beth-reading.png';
+  const BETH_POINTING = '/assets/companions/beth/beth-pointing.png';
 
   const state = {
     id: VALID.has(localStorage.getItem(STORAGE_KEY)) ? localStorage.getItem(STORAGE_KEY) : 'mark'
   };
 
   const config = {
-    mark: { id:'mark', name:'Mark', ask:'Ask Mark', notebook:"Mark's Notebook", subject:'he', object:'him', possessive:'his' },
-    beth: { id:'beth', name:'Beth', ask:'Ask Beth', notebook:"Beth's Notebook", subject:'she', object:'her', possessive:'her', avatar:BETH_AVATAR }
+    mark: { id:'mark', name:'Mark', ask:'Ask Mark', notebook:"Mark's Notebook", subject:'he', object:'him', possessive:'his', avatar:MARK_AVATAR },
+    beth: { id:'beth', name:'Beth', ask:'Ask Beth', notebook:"Beth's Notebook", subject:'she', object:'her', possessive:'her', avatar:BETH_AVATAR, frontpage:BETH_FRONTPAGE, reading:BETH_READING, pointing:BETH_POINTING }
   };
 
   const textRules = [
@@ -128,12 +132,20 @@
     });
   }
 
+  function bethAssetForImage(img) {
+    if (img.matches('.home-mark-avatar')) return BETH_FRONTPAGE;
+    if (img.matches('.mark-photo-pointer-image,.msg-walkthrough-mark-illustration')) return BETH_POINTING;
+    if (img.matches('img.ask-mark-avatar,img[class*="ask-mark"][class*="avatar"]')) return BETH_AVATAR;
+    if (img.matches('img[class*="mark"][class*="portrait"]')) return BETH_READING;
+    return BETH_AVATAR;
+  }
+
   function applyImages(root = document) {
     root.querySelectorAll?.(bethImageSelectors).forEach((img) => {
       if (!(img instanceof HTMLImageElement)) return;
       if (!img.dataset.msgOriginalSrc) img.dataset.msgOriginalSrc = img.getAttribute('src') || '';
       if (state.id === 'beth') {
-        img.src = BETH_AVATAR;
+        img.src = bethAssetForImage(img);
         img.alt = img.alt?.replace(/Mark/g, 'Beth') || 'Beth';
         img.classList.add('msg-beth-photo');
       } else {
@@ -185,7 +197,7 @@
         <p>Use the same reading, study, notebook, and walkthrough features with Mark or Beth.</p>
       </div>
       <div class="companion-persona-options" role="radiogroup" aria-label="Reading companion">
-        <button type="button" data-companion-choice="mark" role="radio"><span class="companion-choice-placeholder">M</span><span><strong>Mark</strong><small>Ask Mark</small></span><span class="companion-check">✓</span></button>
+        <button type="button" data-companion-choice="mark" role="radio"><img src="${MARK_AVATAR}" alt="Mark"><span><strong>Mark</strong><small>Ask Mark</small></span><span class="companion-check">✓</span></button>
         <button type="button" data-companion-choice="beth" role="radio"><img src="${BETH_AVATAR}" alt="Beth"><span><strong>Beth</strong><small>Ask Beth</small></span><span class="companion-check">✓</span></button>
       </div>`;
     app.appendChild(card);
