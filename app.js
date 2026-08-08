@@ -554,30 +554,55 @@ const MODERN_GUIDE_INTERACTIONS = {
     greatIdea: 'Habit',
     actionTitle: 'Run a seven-day tiny-habit experiment',
     actionType: 'experiment',
+    dueDays: 7,
+    dueHour: 19,
+    priority: 'normal',
+    repeat: 'none',
+    reminder: 'day1',
     actionNote: 'Choose one identity-based habit. Make the cue obvious, the first step easy, and the completion satisfying. Track it for seven days, then review what helped or created friction.'
   },
   'deep-work': {
     greatIdea: 'Education',
     actionTitle: 'Protect one recurring deep-work block',
     actionType: 'habit',
+    dueDays: 1,
+    dueHour: 9,
+    priority: 'high',
+    repeat: 'weekly',
+    reminder: 'min30',
     actionNote: 'Schedule one distraction-free block for your highest-value cognitive task. Define the output before you begin, silence communication, and review the quality of attention afterward.'
   },
   'psychology-of-money': {
     greatIdea: 'Prudence',
     actionTitle: 'Write a personal money philosophy',
     actionType: 'reflection',
+    dueDays: 3,
+    dueHour: 19,
+    priority: 'normal',
+    repeat: 'none',
+    reminder: 'day1',
     actionNote: 'Define what enough means, what money is for, which risks could permanently damage your plans, and where you need more room for error.'
   },
   'why-we-sleep': {
     greatIdea: 'Nature',
     actionTitle: 'Run a seven-day sleep-literacy log',
     actionType: 'experiment',
+    dueDays: 7,
+    dueHour: 19,
+    priority: 'normal',
+    repeat: 'none',
+    reminder: 'day1',
     actionNote: 'Track bedtime, wake time, caffeine timing, morning light, exercise, evening stimulation, subjective sleep quality, and next-day reading concentration. Change only one variable after observing the baseline.'
   },
   'let-them-theory': {
     greatIdea: 'Freedom',
     actionTitle: 'Separate what belongs to them from what belongs to me',
     actionType: 'reflection',
+    dueDays: 2,
+    dueHour: 19,
+    priority: 'normal',
+    repeat: 'none',
+    reminder: 'day1',
     actionNote: 'Choose one situation consuming too much mental energy. Separate what belongs to the other person from what you control, then define one boundary or constructive next action.'
   }
 };
@@ -5803,6 +5828,39 @@ function persistCurrentDocument() {
   }
 }
 
+
+function registerCurrentDocumentInMyLibrary({ opened = false } = {}) {
+  if (!state.documentId || !state.title || !Array.isArray(state.words) || !state.words.length) return false;
+
+  try {
+    const progress = readStoredObject(READING_PROGRESS_KEY);
+    const existing = progress[state.documentId] || {};
+    const now = new Date().toISOString();
+    const currentIndex = Math.max(0, Math.min(state.words.length, Number(state.index) || 0));
+
+    progress[state.documentId] = {
+      ...existing,
+      documentId: state.documentId,
+      title: state.title,
+      totalWords: state.words.length,
+      furthestWord: Math.max(Number(existing.furthestWord) || 0, currentIndex),
+      lastWord: Number.isFinite(Number(existing.lastWord)) ? Number(existing.lastWord) : currentIndex,
+      totalSeconds: Number(existing.totalSeconds) || 0,
+      totalWordsRead: Number(existing.totalWordsRead) || 0,
+      sessions: Number(existing.sessions) || 0,
+      firstOpenedAt: existing.firstOpenedAt || now,
+      lastReadAt: opened || !existing.lastReadAt ? now : existing.lastReadAt,
+      source: state.source
+    };
+
+    localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progress));
+    return true;
+  } catch (error) {
+    console.warn('Could not register this reading in My Library.', error);
+    return false;
+  }
+}
+
 function classifyStructureLine(line, wordCount) {
   const clean = line.replace(/\s+/g, ' ').trim();
   if (!clean || clean.length > 150 || wordCount > 22) return null;
@@ -8323,6 +8381,22 @@ function openModernGuideContextInAskMark(markerIndex) {
   }));
 }
 
+function modernGuideActionDueAt(config = {}) {
+  const days = Math.max(0, Number(config.dueDays) || 0);
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  date.setHours(
+    Number.isFinite(Number(config.dueHour)) ? Number(config.dueHour) : 19,
+    Number.isFinite(Number(config.dueMinute)) ? Number(config.dueMinute) : 0,
+    0,
+    0
+  );
+
+  // datetime-local inputs require local calendar values, not a UTC ISO string.
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
 function addModernGuideActionToCenter(source = state?.source || {}, trigger = null) {
   const config = modernGuideInteractionConfig(source);
   if (!config?.actionTitle) return null;
@@ -8336,8 +8410,40 @@ function addModernGuideActionToCenter(source = state?.source || {}, trigger = nu
   );
 
   if (existing) {
+    // Earlier guide builds created skeletal actions without a date. Upgrade only
+    // missing scheduling fields and preserve anything the reader already edited.
+    let changed = false;
+    if (!existing.dueAt) {
+      existing.dueAt = modernGuideActionDueAt(config);
+      changed = true;
+    }
+    if (!existing.type) {
+      existing.type = config.actionType || 'task';
+      changed = true;
+    }
+    if (!existing.priority) {
+      existing.priority = config.priority || 'normal';
+      changed = true;
+    }
+    if (!existing.repeat) {
+      existing.repeat = config.repeat || 'none';
+      changed = true;
+    }
+    if (!existing.reminder) {
+      existing.reminder = config.reminder || 'none';
+      changed = true;
+    }
+    if (!existing.note && config.actionNote) {
+      existing.note = config.actionNote;
+      changed = true;
+    }
+    if (changed) {
+      existing.updatedAt = new Date().toISOString();
+      saveActionRecord(existing);
+    }
+
     if (trigger) {
-      trigger.textContent = 'Already in Action Center ✓';
+      trigger.textContent = changed ? 'Action updated in Action Center ✓' : 'Already in Action Center ✓';
       trigger.disabled = true;
       trigger.setAttribute('aria-disabled', 'true');
     }
@@ -8349,10 +8455,10 @@ function addModernGuideActionToCenter(source = state?.source || {}, trigger = nu
     id: `action_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
     title: config.actionTitle,
     type: config.actionType || 'task',
-    dueAt: '',
-    priority: 'normal',
-    repeat: 'none',
-    reminder: 'none',
+    dueAt: modernGuideActionDueAt(config),
+    priority: config.priority || 'normal',
+    repeat: config.repeat || 'none',
+    reminder: config.reminder || 'none',
     sourceTitle,
     note: config.actionNote || '',
     status: 'active',
@@ -8560,6 +8666,14 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   // Previously the text was only persisted after actions such as adding a bookmark,
   // allowing cloud metadata to sync while the actual document remained unavailable.
   persistCurrentDocument();
+
+  // Modern Guides are first-class reading items. Register them in My Library
+  // as soon as they are opened instead of waiting for a timed reading session
+  // or navigation checkpoint to create the first progress record.
+  if (source?.type === 'modern-guide') {
+    registerCurrentDocumentInMyLibrary({ opened:true });
+  }
+
   document.dispatchEvent(new CustomEvent('marksetgo:document-available', {
     detail: { documentId: state.documentId, title: state.title }
   }));
@@ -14765,7 +14879,7 @@ function renderMyLibraryHub() {
         <span class="${libraryRecencyClass(item.lastReadAt)}" title="${escapeHtml(libraryRecencyLabel(item.lastReadAt))}">${escapeHtml((item.title || 'B').slice(0, 1).toUpperCase())}</span>
       </button>
       <div class="continue-card-copy">
-        <span class="source-category">${index === 0 ? 'Continue reading' : 'Recent'}</span>
+        <span class="source-category">${item.source?.type === 'modern-guide' ? 'Modern Guide' : (index === 0 ? 'Continue reading' : 'Recent')}</span>
         <h3>${escapeHtml(item.title || 'Untitled')}</h3>
         <p>${percent}% complete · Last read ${escapeHtml(lastRead)}</p>
         ${difficulty ? difficultyBadge(difficulty, {title:item.title}) : ''}
@@ -14799,7 +14913,7 @@ function renderMyLibraryHub() {
           ${primaryBook ? `
             <div class="focus-book-cover ${libraryRecencyClass(primaryBook.lastReadAt)}" aria-label="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}" title="${escapeHtml(libraryRecencyLabel(primaryBook.lastReadAt))}">${escapeHtml((primaryBook.title || 'B').slice(0,1).toUpperCase())}</div>
             <div class="focus-book-copy">
-              <span class="source-category">Your next step</span>
+              <span class="source-category">${primaryBook.source?.type === 'modern-guide' ? 'Modern Guide · Your next step' : 'Your next step'}</span>
               <h2>${escapeHtml(primaryBook.title || 'Continue reading')}</h2>
               <p>${primaryPercent}% complete. Pick up at the exact place you left off.</p>
               ${primaryDifficulty ? difficultyBadge(primaryDifficulty, {title:primaryBook.title}) : ''}
