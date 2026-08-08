@@ -2,7 +2,7 @@
   'use strict';
   window.MSGDeveloperData = {
     build: {
-      current: 'v9.6.3-ui-and-companion-corrections',
+      current: 'v9.6.2-debug-and-roadmap-foundation',
       channel: 'development',
       builtAt: '2026-08-08',
       latestStable: '2026-08-08-right-click-stable',
@@ -19,9 +19,7 @@
       { id:'BUG-002', title:'Right-click actions fail after Reader navigation', area:'Reader', severity:'high', status:'fixed-verified', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:true, notes:'Root cause: stale document pointerdown listener closed over an old context menu. Fixed by resolving the live menu at event time. User verified.' },
       { id:'BUG-003', title:'Read Anything Format control crowds heading and controls', area:'Formatter', severity:'low', status:'fixed-pending-verification', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Added explicit smart-format layout, spacing, button sizing, and mobile wrapping.' },
       { id:'BUG-004', title:'Companion profile state can fail to reflect Mark/Beth consistently', area:'Profile / Companion', severity:'medium', status:'fixed-pending-verification', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Replaced broad DOM rewriting with targeted, event-driven companion updates. No MutationObserver.' },
-      { id:'BUG-005', title:'Global Ask Mark help restoration', area:'App Help', severity:'medium', status:'fixed-pending-verification', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Restored detailed page-aware help and companion avatar; button moved slightly higher.' },
-      { id:'BUG-006', title:'Floating companion button renders duplicate label', area:'App Help', severity:'medium', status:'fixed-pending-verification', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Persona label updater now reuses the existing label span instead of appending a second Ask Mark/Ask Beth label.' },
-      { id:'BUG-007', title:'Global companion help returns duplicate answer', area:'App Help', severity:'high', status:'fixed-pending-verification', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Added singleton initialization and in-flight submit guard so one question produces one request and one response.' },
+      { id:'BUG-005', title:'Global Ask Mark help restoration', area:'App Help', severity:'medium', status:'fixed-pending-verification', discovered:'2026-08-08', fixed:'2026-08-08', stableImpact:false, notes:'Restored detailed page-aware help and companion avatar; button moved slightly higher.' }
     ],
     features: [
       { id:'FEAT-001', title:'Debug Center', status:'testing', priority:'highest', area:'Platform', summary:'Permanent diagnostics, bug catalog, stable-build manifest, runtime snapshots, event probes, and exportable debug reports.', route:'/?debug' },

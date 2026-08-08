@@ -147,8 +147,6 @@
       add('Global page-help module loads', helpSrc.includes('MarkSetGoPageHelpKnowledge') ? 'pass':'fail', 'Page-aware non-Reader help restored.');
       add('Formatter layout CSS exists', formatCss.includes('.smart-format-heading') && formatCss.includes('.smart-format-actions') ? 'pass':'fail', 'Professional Format control styling present.');
       add('Debug and features routes supported', devSrc.includes("params.has('debug')") && devSrc.includes("params.has('features')") ? 'pass':'fail', 'Developer routes detected in source.');
-      add('Feature workflow is canonical', devSrc.includes("['idea','Ideas'],['planned','Planned'],['testing','Testing'],['in-progress','In Progress'],['completed','Completed']") ? 'pass':'fail', 'Ideas → Planned → Testing → In Progress → Completed.');
-      add('App-help singleton guard', helpSrc.includes('__MSG_APP_HELP_MARK_ACTIVE__') && helpSrc.includes('requestInFlight') ? 'pass':'fail', 'Prevents duplicate help hosts/submits/responses.');
     } catch (error) { add('Static asset/source checks','fail',error.message); }
     let storageOk=true; try { localStorage.setItem('__msg_reg','1'); localStorage.removeItem('__msg_reg'); } catch { storageOk=false; }
     add('localStorage writable',storageOk?'pass':'warn',storageOk?'Storage write/read path available.':'Storage is blocked or full.');
@@ -183,7 +181,7 @@
 
   function renderFeatures() {
     const statuses = [
-      ['idea','Ideas'],['planned','Planned'],['testing','Testing'],['in-progress','In Progress'],['completed','Completed']
+      ['in-progress','In Progress'],['testing','Testing'],['planned','Planned'],['idea','Ideas'],['complete','Complete']
     ];
     app.innerHTML = `<section class="dev-center"><div class="dev-shell">${chrome('features')}<div class="dev-card" style="margin-top:16px"><div class="feature-board">${statuses.map(([status,label])=>`<section class="feature-column"><h2>${label}<span class="dev-badge">${(D.features||[]).filter(f=>f.status===status).length}</span></h2><div>${(D.features||[]).filter(f=>f.status===status).map(featureCard).join('') || '<div class="dev-empty">No items</div>'}</div></section>`).join('')}</div></div><section class="dev-card" style="margin-top:16px"><h2>Product Development Rules</h2><div class="dev-build-row"><span class="dev-label">Protected baseline</span><span class="dev-value">Changes to Reader core or verified interactions should be isolated and regression-tested before promotion.</span></div><div class="dev-build-row"><span class="dev-label">Bugs vs. features</span><span class="dev-value">Bugs live in /?debug. New product work lives here.</span></div><div class="dev-build-row"><span class="dev-label">Stable promotion</span><span class="dev-value">A development build becomes stable only after the regression suite passes and the changed behaviors are manually verified.</span></div></section><div class="dev-footer">Roadmap data is source-controlled in developer-data.js.</div></div></section>`;
   }
