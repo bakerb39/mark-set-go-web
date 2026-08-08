@@ -7,7 +7,7 @@
    * IMPORTANT: this module intentionally does NOT observe the whole reader DOM.
    * The v9.4.0 global MutationObservers could run while the reader was creating
    * its custom word context menu. Companion updates are now event-driven and
-   * never intercept contextmenu/pointer events.
+   * stays isolated from reader interaction handlers.
    */
 
   const STORAGE_KEY = 'msg_companion_persona_v1';
@@ -61,14 +61,13 @@
 
   /* Reader surfaces are deliberately excluded from broad companion rewriting.
      The word context menu is especially protected because its lifetime is tied
-     to the contextmenu event. */
+     to reader interaction state. */
   const PROTECTED_SELECTOR = [
     '#reader-frame',
     '#reader',
     '.reader',
     '.reader-frame',
     '.reader-word',
-    '.word-context-menu',
     '.reader-selection-toolbar',
     '#mark-selection-toolbar'
   ].join(',');
@@ -216,7 +215,6 @@
       '#mark-selection-toolbar [data-action*="mark"]'
     ];
     document.querySelectorAll(selectors.join(',')).forEach((el) => {
-      if (el.matches('.word-context-menu,.word-context-menu *')) return;
       const text = el.textContent;
       if (!text) return;
       if (!el.dataset.msgOriginalCompanionText) el.dataset.msgOriginalCompanionText = text;
@@ -325,8 +323,7 @@
   };
   window.MSGCompanion = api;
 
-  /* Bubble-phase click listener only. It never receives right-click/contextmenu
-     events and never calls preventDefault/stopPropagation. */
+  /* Bubble-phase companion/profile click listener only. */
   document.addEventListener('click', (event) => {
     if (event.target.closest('[data-action="profile-preferences"]')) {
       window.setTimeout(() => ensureProfileControl(true), 80);

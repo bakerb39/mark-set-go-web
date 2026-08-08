@@ -2,7 +2,7 @@
   'use strict';
 
   const ROOT_ID = 'msg-app-walkthrough';
-  const WALKTHROUGH_BUILD = '9.3.9';
+  const WALKTHROUGH_BUILD = '9.3.7';
   const ACTIVE_CLASS = 'msg-walkthrough-active';
   const HIGHLIGHT_CLASS = 'msg-walkthrough-target';
   let root = null;
@@ -856,98 +856,34 @@
 
   function positionPresenterForTarget(targetRect) {
     const host = $('.msg-walkthrough-host', root);
-    const figure = $('.msg-walkthrough-mark-figure', root);
-    if (!host || !figure || window.innerWidth < 960) return;
+    if (!host || window.innerWidth < 960) return;
 
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
+    const targetX = (targetRect.left + targetRect.right) / 2;
+    const targetY = (targetRect.top + targetRect.bottom) / 2;
 
-    // Beth uses her profile portrait rather than Mark's pointing illustration.
-    // Keep her close to the active gold frame and on the opposite side so she
-    // never covers the control being introduced.
-    if (window.MSGCompanion?.id === 'beth') {
-      const cx = (targetRect.left + targetRect.right) / 2;
-      const cy = (targetRect.top + targetRect.bottom) / 2;
-      const size = cy < 125 ? 150 : 178;
-      const putRight = cx < viewportWidth * .5;
-      let left = putRight ? targetRect.right + 18 : targetRect.left - size - 18;
-      if (left < 8 || left + size > viewportWidth - 8) left = Math.max(8, Math.min(viewportWidth - size - 8, cx - size / 2));
-      let top = Math.max(8, Math.min(viewportHeight - size - 78, cy - size / 2));
-      figure.classList.remove('is-pointing-left','is-pointing-right');
-      host.dataset.pointDirection = putRight ? 'left' : 'right';
-      host.style.setProperty('width', `${size}px`, 'important');
-      host.style.setProperty('height', `${size}px`, 'important');
-      host.style.setProperty('left', `${Math.round(left)}px`, 'important');
-      host.style.setProperty('top', `${Math.round(top)}px`, 'important');
-      host.style.setProperty('right', 'auto', 'important');
-      host.style.setProperty('bottom', 'auto', 'important');
-      return;
-    }
+    // Mark's pointing arm is baked into the presenter artwork and points
+    // diagonally up/right. Move Mark horizontally so that natural pointing
+    // direction aims toward the highlighted control instead of drawing a line.
+    const hostWidth = Math.min(300, Math.max(248, viewportWidth * .205));
+    const hostHeight = Math.min(330, Math.max(275, viewportHeight * .36));
+    const anchorX = hostWidth * .74;   // approximate fingertip direction origin
+    const anchorY = hostHeight * .16;
 
-    // Aim at the near edge of the gold frame instead of its center so Mark's
-    // fingertip does not cover the control he is introducing.
-    const targetCenterX = (targetRect.left + targetRect.right) / 2;
-    const targetCenterY = (targetRect.top + targetRect.bottom) / 2;
-    const edgeInset = Math.min(18, Math.max(4, targetRect.width * .14));
+    let left = targetX - anchorX;
+    left = Math.max(8, Math.min(viewportWidth - hostWidth - 8, left));
 
-    // The current Mark artwork is a single, flat image. Rather than drawing a
-    // second arm over it, place (and, when useful, mirror) the real artwork so
-    // the EXISTING fingertip lands on the active walkthrough target.
-    //
-    // The source art is square. With object-fit:contain and object-position:
-    // left bottom, these normalized coordinates closely match the fingertip.
-    const FINGER_X = .948;
-    const FINGER_Y = .132;
+    // Keep Mark in the lower half for ordinary controls, but let him rise
+    // slightly for low targets so his raised arm still clearly points at them.
+    let bottom = 82;
+    if (targetY > viewportHeight * .58) bottom = 22;
 
-    // Use a smaller Mark for the top navigation and a fuller presentation in
-    // the reader. This gives us room to hit top-row controls accurately.
-    let hostWidth = targetCenterY < 120
-      ? Math.min(205, Math.max(178, viewportWidth * .14))
-      : Math.min(285, Math.max(225, viewportWidth * .19));
-    const hostHeight = Math.round(hostWidth * 1.10);
-    const imageTopInset = Math.max(0, hostHeight - hostWidth); // square art sits at bottom
-    const fingerY = imageTopInset + hostWidth * FINGER_Y;
-
-    // Prefer Mark on the opposite side of the target. For left-side controls
-    // mirror the entire illustration so his actual pointing hand aims up-left.
-    const normalLeft = targetCenterX - hostWidth * FINGER_X;
-    const mirroredLeft = targetCenterX - hostWidth * (1 - FINGER_X);
-    const normalFits = normalLeft >= -hostWidth * .08;
-    const mirroredFits = mirroredLeft + hostWidth <= viewportWidth + hostWidth * .08;
-    let pointLeft;
-    if (targetCenterX < viewportWidth * .44 && mirroredFits) pointLeft = true;
-    else if (targetCenterX > viewportWidth * .56 && normalFits) pointLeft = false;
-    else pointLeft = !normalFits && mirroredFits;
-
-    const aimX = pointLeft
-      ? Math.max(targetRect.left + edgeInset, Math.min(targetRect.right - edgeInset, targetCenterX))
-      : Math.min(targetRect.right - edgeInset, Math.max(targetRect.left + edgeInset, targetCenterX));
-    const fingertipLocalX = hostWidth * (pointLeft ? (1 - FINGER_X) : FINGER_X);
-
-    // Put the fingertip on the vertical center of the highlighted item. Mark is
-    // allowed to extend slightly beyond the bottom edge for low Reader targets;
-    // keeping the finger accurate is more useful than forcing his shoes onscreen.
-    let left = aimX - fingertipLocalX;
-    let top = targetCenterY - fingerY;
-
-    // Preserve the fingertip alignment whenever possible. Only clamp enough to
-    // keep Mark's pointing hand/head visible at the extreme viewport edges.
-    left = Math.max(-hostWidth * .22, Math.min(viewportWidth - hostWidth * .78, left));
-    top = Math.max(-hostWidth * .12, Math.min(viewportHeight - hostHeight * .24, top));
-
-    figure.classList.toggle('is-pointing-left', pointLeft);
-    figure.classList.toggle('is-pointing-right', !pointLeft);
-    host.dataset.pointDirection = pointLeft ? 'left' : 'right';
-
-    // v9.2.96 has !important left/bottom defaults, so use important inline
-    // positioning here. Without this, the presenter appears fixed in one place
-    // even though JavaScript calculates a new target position.
-    host.style.setProperty('width', `${Math.round(hostWidth)}px`, 'important');
-    host.style.setProperty('height', `${Math.round(hostHeight)}px`, 'important');
-    host.style.setProperty('left', `${Math.round(left)}px`, 'important');
-    host.style.setProperty('top', `${Math.round(top)}px`, 'important');
-    host.style.setProperty('right', 'auto', 'important');
-    host.style.setProperty('bottom', 'auto', 'important');
+    host.style.width = `${Math.round(hostWidth)}px`;
+    host.style.height = `${Math.round(hostHeight)}px`;
+    host.style.left = `${Math.round(left)}px`;
+    host.style.right = 'auto';
+    host.style.bottom = `${bottom}px`;
   }
 
   let walkthroughToolbarOriginalStyle = null;
