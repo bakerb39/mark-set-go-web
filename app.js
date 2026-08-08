@@ -3599,12 +3599,17 @@ function renderBookBuilder() {
     <section class="platform-page book-builder-page">
       <header class="book-builder-header">
         <div>
-          <span class="source-category">Create a Book</span>
-          <h1>Build an app-ready book</h1>
-          <p>Upload or paste raw text, clean OCR and page artifacts, review the detected chapters, and create a private reading edition.</p>
+          <span class="source-category">Create</span>
+          <h1 id="builder-page-title">Build an app-ready book</h1>
+          <p id="builder-page-description">Upload or paste raw text, clean OCR and page artifacts, review the detected chapters, and create a private reading edition.</p>
         </div>
         <button class="secondary" type="button" data-action="my-library">My Library</button>
       </header>
+
+      <div class="book-builder-mode-switch" role="group" aria-label="What would you like to create?">
+        <label class="${draft.mode === 'guide' ? '' : 'is-active'}"><input type="radio" name="builder-mode" value="book" ${draft.mode === 'guide' ? '' : 'checked'}> <span><strong>Create Book</strong><small>Prepare text you own or may legally use</small></span></label>
+        <label class="${draft.mode === 'guide' ? 'is-active' : ''}"><input type="radio" name="builder-mode" value="guide" ${draft.mode === 'guide' ? 'checked' : ''}> <span><strong>Create Guide</strong><small>Build an independent interactive guide to any book</small></span></label>
+      </div>
 
       <div class="book-builder-grid">
         <form id="book-builder-form" class="book-builder-editor">
@@ -3612,21 +3617,39 @@ function renderBookBuilder() {
             <label><span>Title</span><input id="builder-title" maxlength="180" value="${escapeHtml(draft.title || '')}" placeholder="The Republic" required></label>
             <label><span>Author</span><input id="builder-author" maxlength="180" value="${escapeHtml(draft.author || '')}" placeholder="Plato"></label>
           </div>
-          <section class="book-builder-import">
+
+          <section id="builder-guide-options" class="book-builder-guide-options" ${draft.mode === 'guide' ? '' : 'hidden'}>
+            <div class="section-heading">
+              <div><span class="source-category">Guide options</span><h2>Create an interactive reading guide</h2><p>Mark will create original explanatory sections, not reproduce the original book.</p></div>
+            </div>
+            <div class="book-builder-fields">
+              <label><span>Guide depth</span>
+                <select id="builder-guide-depth">
+                  <option value="standard" ${draft.guideDepth === 'standard' ? 'selected' : ''}>Standard · about 12 sections</option>
+                  <option value="extended" ${(!draft.guideDepth || draft.guideDepth === 'extended') ? 'selected' : ''}>Extended · about 18 sections</option>
+                </select>
+              </label>
+              <label><span>Great Idea connection</span>
+                <input id="builder-guide-idea" maxlength="80" value="${escapeHtml(draft.guideIdea || '')}" placeholder="Optional — e.g. Freedom, Habit, Justice">
+              </label>
+            </div>
+            <p class="book-builder-guide-note">You can create a guide from the title alone. Adding notes or legally available source material below can make it more specific.</p>
+          </section>
+          <section id="builder-import-section" class="book-builder-import">
             <div><strong>Add your text</strong><small>Upload a book/document or paste into the editor below.</small></div>
             <label class="secondary button-link book-builder-file-button">Upload File<input id="builder-file" type="file" accept=".epub,.pdf,.docx,.txt,.md,.markdown" hidden></label>
             <span id="builder-file-name" class="book-builder-file-name"></span>
           </section>
-          <label class="book-builder-text-label"><span>Book text</span>
+          <label class="book-builder-text-label"><span id="builder-text-label">Book text</span>
             <textarea id="builder-text" spellcheck="false" placeholder="Paste the complete text here, or upload EPUB, PDF, Word, Markdown, or TXT. Chapter headings such as CHAPTER I, BOOK II, PART THREE, Preface, and Epilogue will be detected automatically." required>${escapeHtml(draft.text || '')}</textarea>
           </label>
-          <fieldset class="book-builder-cleanup">
+          <fieldset id="builder-cleanup-section" class="book-builder-cleanup">
             <legend>Cleanup level</legend>
             <label><input type="radio" name="builder-cleanup-level" value="light" ${draft.cleanupLevel === 'light' ? 'checked' : ''}><strong>Light</strong><small>Characters, spacing, punctuation</small></label>
             <label><input type="radio" name="builder-cleanup-level" value="standard" ${draft.cleanupLevel === 'standard' ? 'checked' : ''}><strong>Standard</strong><small>OCR cleanup, paragraphs, page artifacts</small></label>
             <label><input type="radio" name="builder-cleanup-level" value="deep" ${(!draft.cleanupLevel || draft.cleanupLevel === 'deep') ? 'checked' : ''}><strong>AI Deep Clean</strong><small>Context-aware OCR repair and document structure</small></label>
           </fieldset>
-          <div class="book-builder-options">
+          <div id="builder-book-options" class="book-builder-options">
             <label><input id="builder-clean-toc" type="checkbox" ${draft.cleanToc === false ? '' : 'checked'}> Remove a printed table of contents from the reading text and keep it in the Contents pane.</label>
             <label><input id="builder-clean-headers" type="checkbox" ${draft.cleanHeaders === false ? '' : 'checked'}> Remove repeated page headers, page numbers, and repeated book-title lines.</label>
             <label><input id="builder-rights" type="checkbox" ${draft.rights ? 'checked' : ''}> I own this text, have permission to use it, or it is in the public domain.</label>
@@ -3634,7 +3657,7 @@ function renderBookBuilder() {
           <div class="book-builder-actions">
             <button id="builder-clean" class="secondary" type="button">Clean &amp; Preview</button>
             <button id="builder-analyze" class="secondary" type="button">Analyze structure</button>
-            <button class="primary" type="submit">Create book</button>
+            <button id="builder-submit" class="primary" type="submit">Create book</button>
             <button id="builder-clear" class="subtle-link" type="button">Clear draft</button>
           </div>
           <p id="builder-status" class="status" aria-live="polite"></p>
@@ -3642,7 +3665,7 @@ function renderBookBuilder() {
 
         <aside class="book-builder-preview">
           <div class="book-builder-preview-heading">
-            <div><span class="source-category">Preview</span><h2>Table of contents</h2></div>
+            <div><span class="source-category">Preview</span><h2 id="builder-preview-title">Table of contents</h2></div>
             <span id="builder-count" class="book-builder-count">0 words</span>
           </div>
           <ol id="builder-toc" class="book-builder-toc"><li class="empty">Paste text to generate a table of contents.</li></ol>
@@ -3654,6 +3677,18 @@ function renderBookBuilder() {
   const titleInput = app.querySelector('#builder-title');
   const authorInput = app.querySelector('#builder-author');
   const textInput = app.querySelector('#builder-text');
+  const modeInputs = [...app.querySelectorAll('input[name="builder-mode"]')];
+  const guideOptions = app.querySelector('#builder-guide-options');
+  const guideDepthInput = app.querySelector('#builder-guide-depth');
+  const guideIdeaInput = app.querySelector('#builder-guide-idea');
+  const cleanupSection = app.querySelector('#builder-cleanup-section');
+  const bookOptions = app.querySelector('#builder-book-options');
+  const importSection = app.querySelector('#builder-import-section');
+  const submitButton = app.querySelector('#builder-submit');
+  const textLabel = app.querySelector('#builder-text-label');
+  const previewTitle = app.querySelector('#builder-preview-title');
+  const pageTitle = app.querySelector('#builder-page-title');
+  const pageDescription = app.querySelector('#builder-page-description');
   const fileInput = app.querySelector('#builder-file');
   const fileName = app.querySelector('#builder-file-name');
   const cleanupLevelInputs = [...app.querySelectorAll('input[name="builder-cleanup-level"]')];
@@ -3666,7 +3701,43 @@ function renderBookBuilder() {
 
   let cleanedPreview = null;
   let importedSource = draft.importedSource || null;
+  const selectedMode = () => modeInputs.find((input) => input.checked)?.value || 'book';
   const selectedCleanupLevel = () => cleanupLevelInputs.find((input) => input.checked)?.value || 'deep';
+
+  const applyBuilderMode = () => {
+    const guideMode = selectedMode() === 'guide';
+    modeInputs.forEach((input) => input.closest('label')?.classList.toggle('is-active', input.checked));
+    if (guideOptions) guideOptions.hidden = !guideMode;
+    if (cleanupSection) cleanupSection.hidden = guideMode;
+    if (bookOptions) bookOptions.hidden = guideMode;
+    if (importSection) {
+      const strong = importSection.querySelector('strong');
+      const small = importSection.querySelector('small');
+      if (strong) strong.textContent = guideMode ? 'Optional notes or source material' : 'Add your text';
+      if (small) small.textContent = guideMode ? 'Upload or paste material you may legally use to help make the guide more specific.' : 'Upload a book/document or paste into the editor below.';
+    }
+    if (textLabel) textLabel.textContent = guideMode ? 'Notes or source material (optional)' : 'Book text';
+    textInput.required = !guideMode;
+    textInput.placeholder = guideMode
+      ? 'Optional: add your own notes, public-domain text, or other material you may legally use. You can also leave this blank and create a guide from the title and author.'
+      : 'Paste the complete text here, or upload EPUB, PDF, Word, Markdown, or TXT. Chapter headings such as CHAPTER I, BOOK II, PART THREE, Preface, and Epilogue will be detected automatically.';
+    if (submitButton) submitButton.textContent = guideMode ? 'Create guide' : 'Create book';
+    if (previewTitle) previewTitle.textContent = guideMode ? 'Guide plan' : 'Table of contents';
+    if (pageTitle) pageTitle.textContent = guideMode ? 'Create a Modern Guide' : 'Build an app-ready book';
+    if (pageDescription) pageDescription.textContent = guideMode
+      ? 'Create an independent, interactive reading guide for any book and open it directly in the Reader.'
+      : 'Upload or paste raw text, clean OCR and page artifacts, review the detected chapters, and create a private reading edition.';
+    if (guideMode) {
+      toc.innerHTML = '<li class="empty">Enter a title and create the guide. Mark will build the section structure.</li>';
+      count.textContent = 'Interactive guide';
+      app.querySelector('#builder-cleanup-report').textContent = 'The generated guide will include section-by-section Ask Mark discussion links, a whole-guide quiz, an Action Center activity, and a Great Ideas connection.';
+      status.textContent = '';
+    } else if (textInput.value.trim()) {
+      analyze();
+    }
+    saveDraft();
+  };
+
   const formatter = () => window.MarkSetGoReadAnything?.cleanupTextContent;
   const aiFormatter = () => window.MarkSetGoReadAnything?.requestAiCleanupText;
 
@@ -3697,7 +3768,21 @@ function renderBookBuilder() {
   };
 
   const saveDraft = () => {
-    try { localStorage.setItem(BOOK_BUILDER_DRAFT_KEY, JSON.stringify({ title:titleInput.value, author:authorInput.value, text:textInput.value, cleanupLevel:selectedCleanupLevel(), importedSource, cleanToc:cleanTocInput.checked, cleanHeaders:cleanHeadersInput.checked, rights:rightsInput.checked })); } catch {}
+    try {
+      localStorage.setItem(BOOK_BUILDER_DRAFT_KEY, JSON.stringify({
+        mode:selectedMode(),
+        title:titleInput.value,
+        author:authorInput.value,
+        text:textInput.value,
+        cleanupLevel:selectedCleanupLevel(),
+        importedSource,
+        cleanToc:cleanTocInput.checked,
+        cleanHeaders:cleanHeadersInput.checked,
+        rights:rightsInput.checked,
+        guideDepth:guideDepthInput?.value || 'extended',
+        guideIdea:guideIdeaInput?.value || ''
+      }));
+    } catch {}
   };
   const analyze = () => {
     const analysisSource = cleanedPreview?.text || textInput.value;
@@ -3723,14 +3808,15 @@ function renderBookBuilder() {
   };
 
   let analyzeTimer = null;
-  [titleInput, authorInput, textInput, ...cleanupLevelInputs, cleanTocInput, cleanHeadersInput, rightsInput].forEach((input) => input.addEventListener('input', () => {
+  [titleInput, authorInput, textInput, guideDepthInput, guideIdeaInput, ...cleanupLevelInputs, cleanTocInput, cleanHeadersInput, rightsInput].filter(Boolean).forEach((input) => input.addEventListener('input', () => {
     saveDraft();
-    if (input === textInput) {
+    if (input === textInput && selectedMode() === 'book') {
       cleanedPreview = null;
       clearTimeout(analyzeTimer);
       analyzeTimer = setTimeout(analyze, 350);
     }
   }));
+  modeInputs.forEach((input) => input.addEventListener('change', applyBuilderMode));
   fileInput?.addEventListener('change', async (event) => {
     try { await loadBuilderFile(event.target.files?.[0]); }
     catch (error) { status.textContent = error?.message || 'The file could not be opened.'; }
@@ -3768,8 +3854,115 @@ function renderBookBuilder() {
     localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
     renderBookBuilder();
   });
+  const createInteractiveGuide = async () => {
+    const title = titleInput.value.trim();
+    const author = authorInput.value.trim();
+    if (!title) {
+      titleInput.focus();
+      return;
+    }
+
+    const button = submitButton;
+    const originalLabel = button?.textContent || 'Create guide';
+    try {
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Creating guide…';
+      }
+      status.className = 'status';
+      status.textContent = 'Mark is building the guide structure, explanations, application activity, and Great Ideas connection…';
+
+      const response = await fetch('/api/create-modern-guide', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          title,
+          author,
+          depth:guideDepthInput?.value || 'extended',
+          requestedGreatIdea:guideIdeaInput?.value.trim() || '',
+          sourceMaterial:textInput.value.trim().slice(0, 60000)
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+      const guide = payload.guide;
+      if (!guide?.sections?.length) throw new Error('The generated guide did not contain readable sections.');
+
+      const guideId = `custom-guide-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+      const buyUrl = `https://www.amazon.com/s?k=${encodeURIComponent([title, author].filter(Boolean).join(' '))}`;
+
+      const guideText = [
+        String(title).toUpperCase(),
+        'An Independent Mark, Set, Go! Reading Guide',
+        author ? `Original book by ${author}` : '',
+        '',
+        'ABOUT THIS GUIDE',
+        guide.overview || `An independent educational guide to ${title}.`,
+        '',
+        '[[MSG:BUY]]',
+        '',
+        ...guide.sections.flatMap((section, index) => [
+          '[[MSG:SECTION]]',
+          '',
+          `${index + 1}. ${String(section.title || `Section ${index + 1}`).toUpperCase()}`,
+          '',
+          String(section.content || '').trim(),
+          '',
+          '[[MSG:DISCUSS]]',
+          ''
+        ]),
+        '[[MSG:IDEAS]]',
+        '',
+        '[[MSG:ACTION]]',
+        '',
+        '[[MSG:QUIZ]]',
+        '',
+        '[[MSG:BUY]]'
+      ].filter((part) => part !== null && part !== undefined).join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+      const interaction = {
+        greatIdea: guide.greatIdea || guideIdeaInput?.value.trim() || 'Education',
+        actionTitle: guide.actionTitle || `Apply one idea from ${title}`,
+        actionType: ['task','habit','review','reflection','experiment','discussion'].includes(guide.actionType) ? guide.actionType : 'reflection',
+        dueDays: Math.max(1, Number(guide.dueDays) || 3),
+        dueHour: 19,
+        priority: ['low','normal','high'].includes(guide.priority) ? guide.priority : 'normal',
+        repeat: ['none','daily','weekly','monthly'].includes(guide.repeat) ? guide.repeat : 'none',
+        reminder: ['none','at_time','min10','min30','hour1','day1'].includes(guide.reminder) ? guide.reminder : 'day1',
+        actionNote: guide.actionNote || `Choose one useful idea from ${title} and turn it into a concrete next step.`
+      };
+
+      localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+      renderReaderWithText(`${title} — Mark, Set, Go! Guide`, guideText, {
+        type:'modern-guide',
+        id:guideId,
+        customGuide:true,
+        originalTitle:title,
+        originalAuthor:author,
+        buyUrl,
+        guideInteractions:interaction,
+        createdAt:new Date().toISOString(),
+        private:true,
+        subtitle:`An independent reading guide to ${title}`
+      });
+    } catch (error) {
+      status.className = 'status error';
+      status.textContent = error?.message || 'The guide could not be created.';
+      if (button) {
+        button.disabled = false;
+        button.textContent = originalLabel;
+      }
+    }
+  };
+
   app.querySelector('#book-builder-form').addEventListener('submit', async (event) => {
     event.preventDefault();
+
+    if (selectedMode() === 'guide') {
+      await createInteractiveGuide();
+      return;
+    }
+
     if (selectedCleanupLevel() === 'deep' && !cleanedPreview) {
       status.textContent = 'Run Clean & Preview first so AI Deep Clean can review the source before the book is created.';
       app.querySelector('#builder-clean')?.focus();
@@ -3801,7 +3994,8 @@ function renderBookBuilder() {
     renderReaderWithText(displayTitle, text, source);
   });
 
-  if (textInput.value.trim()) analyze();
+  applyBuilderMode();
+  if (selectedMode() === 'book' && textInput.value.trim()) analyze();
 }
 
 function renderEmptyReader() {
@@ -8301,7 +8495,7 @@ function bindMarkCompanion(reader){
 
 function modernGuideInteractionConfig(source = state?.source || {}) {
   if (source?.type !== 'modern-guide') return null;
-  return MODERN_GUIDE_INTERACTIONS?.[source.id] || null;
+  return MODERN_GUIDE_INTERACTIONS?.[source.id] || source?.guideInteractions || null;
 }
 
 function modernGuideActionToken(word) {

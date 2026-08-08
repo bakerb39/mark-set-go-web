@@ -1217,6 +1217,116 @@ Critical calibration rules:
 });
 
 
+
+app.post('/api/create-modern-guide', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) {
+    return res.status(503).json({
+      error: 'Guide creation is not configured. Add OPENAI_API_KEY to the server environment.'
+    });
+  }
+
+  const title = String(req.body?.title || '').trim().slice(0, 300);
+  const author = String(req.body?.author || '').trim().slice(0, 300);
+  const depth = req.body?.depth === 'standard' ? 'standard' : 'extended';
+  const requestedGreatIdea = String(req.body?.requestedGreatIdea || '').trim().slice(0, 100);
+  const sourceMaterial = String(req.body?.sourceMaterial || '').trim().slice(0, 60000);
+
+  if (!title) return res.status(400).json({ error: 'Enter a book title.' });
+
+  const sectionCount = depth === 'standard' ? 12 : 18;
+  const schema = {
+    type:'object',
+    additionalProperties:false,
+    required:['overview','greatIdea','sections','actionTitle','actionType','actionNote','dueDays','priority','repeat','reminder'],
+    properties:{
+      overview:{type:'string'},
+      greatIdea:{type:'string'},
+      sections:{
+        type:'array',
+        minItems:sectionCount,
+        maxItems:sectionCount,
+        items:{
+          type:'object',
+          additionalProperties:false,
+          required:['title','content'],
+          properties:{
+            title:{type:'string'},
+            content:{type:'string'}
+          }
+        }
+      },
+      actionTitle:{type:'string'},
+      actionType:{type:'string',enum:['task','habit','review','reflection','experiment','discussion']},
+      actionNote:{type:'string'},
+      dueDays:{type:'integer',minimum:1,maximum:30},
+      priority:{type:'string',enum:['low','normal','high']},
+      repeat:{type:'string',enum:['none','daily','weekly','monthly']},
+      reminder:{type:'string',enum:['none','at_time','min10','min30','hour1','day1']}
+    }
+  };
+
+  const instructions = `Create an original, independent educational reading guide to the identified book for use inside Mark, Set, Go!.
+This is NOT the original book and must not substitute for it by reproducing copyrighted expression.
+Do not quote passages from the book. Do not imitate the author's prose.
+Explain ideas, themes, arguments, context, structure, application, and useful comparisons in your own words.
+Do not invent plot events, claims, characters, or facts. If the title is ambiguous or your knowledge is uncertain, state uncertainty inside the relevant section rather than fabricating detail.
+The result should be substantial and useful for serious adult readers.
+Create exactly ${sectionCount} sections.
+Each section should contain multiple developed paragraphs, normally 250-450 words, with no questions addressed directly to the reader.
+Do not put quizzes, "Ask Mark" prompts, action links, or UI directions into the prose; the app adds those interactions separately.
+Prefer conceptual organization over a chapter-by-chapter substitute for the original.
+Include one appropriate Great Idea connection such as Freedom, Justice, Habit, Education, Nature, Prudence, Happiness, Love, Duty, Work, Mind, or another concise concept.
+Also design one concrete Action Center activity with a sensible action type, priority, due window, repeat setting, and reminder.
+${requestedGreatIdea ? `Use "${requestedGreatIdea}" as the Great Idea connection if it is genuinely relevant.` : ''}
+${sourceMaterial ? 'The user supplied notes or source material. Use it only as supporting context and do not reproduce long passages from it.' : 'No source material was supplied. Be conservative about uncertain details.'}`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method:'POST',
+      headers:{
+        Authorization:`Bearer ${apiKey}`,
+        'Content-Type':'application/json'
+      },
+      body:JSON.stringify({
+        model:COMPREHENSION_MODEL,
+        reasoning:{effort:'medium'},
+        store:false,
+        input:[
+          {role:'developer',content:[{type:'input_text',text:instructions}]},
+          {role:'user',content:[{type:'input_text',text:JSON.stringify({
+            book:{title,author},
+            sourceMaterial:sourceMaterial || null
+          })}]}
+        ],
+        text:{
+          format:{
+            type:'json_schema',
+            name:'custom_modern_guide',
+            strict:true,
+            schema
+          }
+        }
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const detail = payload?.error?.message || `OpenAI returned HTTP ${response.status}.`;
+      return res.status(502).json({ error:'Unable to create the guide.', detail });
+    }
+
+    const outputText = extractOpenAIOutputText(payload);
+    if (!outputText) throw new Error('OpenAI returned no structured guide.');
+    const guide = JSON.parse(outputText);
+    res.json({ model:COMPREHENSION_MODEL, guide });
+  } catch (error) {
+    console.error('Custom Modern Guide generation failed:', error);
+    res.status(502).json({ error:'Unable to create the guide.' });
+  }
+});
+
+
 app.post('/api/book-guide', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) {

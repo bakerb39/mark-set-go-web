@@ -10947,3 +10947,52 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
     linear-gradient(145deg, #b0906a 0%, #886844 55%, #5e442b 100%) !important;
   color:#fff8e8 !important;
 }
+
+
+/* v9.2.62 Create Book / Create Guide */
+.book-builder-mode-switch {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin:0 0 18px;
+}
+.book-builder-mode-switch label {
+  display:flex;
+  align-items:center;
+  gap:12px;
+  min-height:74px;
+  padding:14px 16px;
+  border:1px solid rgba(64,107,157,.20);
+  border-radius:16px;
+  background:#fff;
+  cursor:pointer;
+  box-shadow:0 5px 16px rgba(18,61,112,.05);
+}
+.book-builder-mode-switch label.is-active {
+  border-color:rgba(30,91,162,.55);
+  background:#eef5fd;
+  box-shadow:0 8px 22px rgba(18,61,112,.10);
+}
+.book-builder-mode-switch input { accent-color:#123d70; }
+.book-builder-mode-switch span { display:grid; gap:3px; }
+.book-builder-mode-switch strong { color:#173f6d; }
+.book-builder-mode-switch small { color:#63778d; }
+.book-builder-guide-options {
+  display:grid;
+  gap:14px;
+  padding:16px;
+  border:1px solid rgba(174,126,47,.24);
+  border-radius:16px;
+  background:linear-gradient(180deg,#fffaf0,#fff);
+}
+.book-builder-guide-options[hidden],
+#builder-cleanup-section[hidden],
+#builder-book-options[hidden] { display:none !important; }
+.book-builder-guide-note {
+  margin:0;
+  color:#617083;
+  line-height:1.5;
+}
+@media (max-width:720px) {
+  .book-builder-mode-switch { grid-template-columns:1fr; }
+}
