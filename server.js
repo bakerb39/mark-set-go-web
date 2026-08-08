@@ -1680,6 +1680,58 @@ Use the surrounding text only to disambiguate the selection. Never summarize or 
   } catch(error){ console.error('Mark selection failed:',error); res.status(502).json({error:'Mark could not complete the request.'}); }
 });
 
+
+app.post('/api/app-help', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error: 'Mark help is not configured. Add OPENAI_API_KEY to the server environment.' });
+
+  const pageKey = String(req.body?.pageKey || 'unknown').trim().slice(0, 120);
+  const pageTitle = String(req.body?.pageTitle || 'Current page').trim().slice(0, 200);
+  const question = String(req.body?.question || '').trim().slice(0, 800);
+  const helpTopics = Array.isArray(req.body?.helpTopics)
+    ? req.body.helpTopics.map(item => String(item || '').trim()).filter(Boolean).slice(0, 12)
+    : [];
+  if (!question) return res.status(400).json({ error: 'Enter a help question.' });
+
+  const schema = {
+    type: 'object', additionalProperties: false, required: ['inScope','answer'],
+    properties: { inScope: { type: 'boolean' }, answer: { type: 'string' } }
+  };
+  const prompt = `You are Mark, the in-app help companion for Mark, Set, Go!.
+Your ONLY job in this mode is to answer questions about how to use the CURRENT APP PAGE or how the controls/features on that page work.
+Do not answer general knowledge, book-content, personal advice, current events, coding, or unrelated questions.
+Do not pretend a feature exists unless it is supported by the supplied page-help topics.
+If the question is outside this narrow app-help scope, set inScope=false and answer briefly: "I can help with how to use this page. Ask me about its controls, options, or where to go next."
+If it is in scope, set inScope=true and give concise step-by-step guidance grounded only in the supplied current-page context.
+Do not discuss highlighted reading text in this mode.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: COMPREHENSION_MODEL,
+        reasoning: { effort: 'low' },
+        store: false,
+        input: [
+          { role: 'developer', content: [{ type: 'input_text', text: prompt }] },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ pageKey, pageTitle, helpTopics, question }) }] }
+        ],
+        text: { format: { type: 'json_schema', name: 'app_help_response', strict: true, schema } }
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) return res.status(502).json({ error: 'Mark could not answer that help question.', detail: payload?.error?.message || `HTTP ${response.status}` });
+    const outputText = extractOpenAIOutputText(payload);
+    if (!outputText) throw new Error('No response text.');
+    const result = JSON.parse(outputText);
+    res.json({ inScope: !!result.inScope, answer: String(result.answer || '').trim() });
+  } catch (error) {
+    console.error('App help failed:', error);
+    res.status(502).json({ error: 'Mark could not answer that help question.' });
+  }
+});
+
 app.post('/api/progress-recommendations', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) {
