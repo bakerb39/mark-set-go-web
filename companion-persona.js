@@ -341,8 +341,8 @@
         <p>Use the same reading, study, notebook, and walkthrough features with Mark or Beth.</p>
       </div>
       <div class="companion-persona-options" role="radiogroup" aria-label="Reading companion" data-companion-no-swap>
-        <button type="button" data-companion-choice="mark" role="radio"><img src="${MARK_AVATAR}" alt="Mark"><span><strong>Mark</strong><small>Ask Mark</small></span><span class="companion-check">✓</span></button>
-        <button type="button" data-companion-choice="beth" role="radio"><img src="${BETH_AVATAR}" alt="Beth"><span><strong>Beth</strong><small>Ask Beth</small></span><span class="companion-check">✓</span></button>
+        <button type="button" data-companion-choice="mark" role="radio" data-companion-no-swap><img src="${MARK_AVATAR}" alt="Mark"><span><strong>Mark</strong><small class="companion-option-subtitle companion-option-subtitle-mark"></small></span><span class="companion-check">✓</span></button>
+        <button type="button" data-companion-choice="beth" role="radio" data-companion-no-swap><img src="${BETH_AVATAR}" alt="Beth"><span><strong>Beth</strong><small class="companion-option-subtitle companion-option-subtitle-beth"></small></span><span class="companion-check">✓</span></button>
       </div>`;
     // Put the companion choice at the TOP of Customize My Experience / Profile.
     // Prefer the existing experience/profile content container instead of appending
@@ -387,7 +387,7 @@
         const small = btn.querySelector('small');
         const img = btn.querySelector('img');
         if (strong) strong.textContent = option.name;
-        if (small) small.textContent = option.ask;
+        if (small) small.textContent = '';
         if (img) {
           img.src = option.avatar;
           img.alt = option.name;
