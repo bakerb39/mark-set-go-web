@@ -3310,19 +3310,34 @@ function applyFocusAnchorReaderClearance() {
 
   if (!reader) return;
 
-  // Normal Reader: the Focus Anchor is a true overlay. Moving it must never
-  // change the Reader's padding or push book text down.
-  //
-  // Fullscreen still uses its dedicated stable top band behavior.
-  if (!overlay || overlay.hidden || !focusAnchorIsFullscreen(overlay)) {
+  if (!overlay || overlay.hidden) {
     reader.classList.remove('focus-anchor-clearance');
     reader.style.removeProperty('--focus-anchor-clearance');
     return;
   }
 
-  const overlayRect = overlay.getBoundingClientRect();
-  const frameRect = frame.getBoundingClientRect();
-  const clearance = Math.max(72, Math.ceil(overlayRect.bottom - frameRect.top + 14));
+  if (focusAnchorIsFullscreen(overlay)) {
+    const overlayRect = overlay.getBoundingClientRect();
+    const frameRect = frame.getBoundingClientRect();
+    const clearance = Math.max(72, Math.ceil(overlayRect.bottom - frameRect.top + 14));
+    reader.classList.add('focus-anchor-clearance');
+    reader.style.setProperty('--focus-anchor-clearance', `${clearance}px`);
+    return;
+  }
+
+  // Normal Reader:
+  // Keep the original top reading band reserved at all times. The Focus Anchor
+  // may then be dragged anywhere over the text without changing this padding,
+  // so moving the anchor never pushes/reflows the book.
+  //
+  // The reserved amount is based on the anchor's default top placement,
+  // not its current dragged position.
+  const frameStyles = window.getComputedStyle(frame);
+  const rootFontSize = Number.parseFloat(window.getComputedStyle(document.documentElement).fontSize) || 16;
+  const defaultTop = 3.2 * rootFontSize;
+  const overlayHeight = Math.max(42, overlay.getBoundingClientRect().height || 0);
+  const clearance = Math.max(72, Math.ceil(defaultTop + overlayHeight + 14));
+
   reader.classList.add('focus-anchor-clearance');
   reader.style.setProperty('--focus-anchor-clearance', `${clearance}px`);
 }

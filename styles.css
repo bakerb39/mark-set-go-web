@@ -12433,3 +12433,14 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
 @media (max-width: 960px) {
   .msg-walkthrough-host { display:none; }
 }
+
+
+/* v9.2.90 Focus Anchor: fixed top reading band + freely movable overlay
+   The initial text stays below the anchor, but dragging the anchor never
+   recalculates or changes the text position. */
+.reader-frame:not(:fullscreen):not(.fullscreen-fallback) > .interactive-reader.focus-anchor-clearance {
+  padding-top:var(--focus-anchor-clearance, 5rem) !important;
+}
+.reader-frame:not(:fullscreen):not(.fullscreen-fallback) > .interactive-reader {
+  --focus-anchor-clearance:5rem;
+}
