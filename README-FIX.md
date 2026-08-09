@@ -1,9 +1,10 @@
-# Right-click navigation fix
+# Classic Guide toolbar + Action Center fix
 
-Fixes a stale document-level pointerdown listener left behind after navigating away from Reader and returning.
+Changes only:
+- Keeps Classic/Modern Guide action buttons horizontal and wrapping at all viewport sizes via the final winning CSS rule.
+- Adds a Classic Guide fallback interaction config so `Add to Action Center` saves a real action instead of silently returning when no Modern Guide-specific config exists.
+- Makes Action Center source labels say `Classic Guide` for Classic Guides.
+- Bumps CSS/JS cache keys in both root and public `index.html` so browsers do not keep the previous cached stylesheet/script.
+- Root and public copies are synchronized.
 
-The old listener captured the previous `#word-context-menu` element. A click on the newly rendered menu was therefore misclassified as an outside click, which hid the live menu before its Lookup action could receive pointerup/click.
-
-The outside-click closer is now installed once and resolves the currently connected context menu at event time.
-
-The `contextmenu` / right-click-open handler itself was not changed.
+No MutationObserver code was added or changed.

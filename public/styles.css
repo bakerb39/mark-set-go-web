@@ -12973,3 +12973,40 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
   object-fit:cover !important;
   object-position:center !important;
 }
+
+/* Classic + Modern Guide action toolbar final cascade guard.
+   These are the same Reader actions and must remain a horizontal, wrapping
+   toolbar at every viewport size. Keep this block at the end of the file so
+   older responsive/full-width rules cannot win later in the cascade. */
+.reader .modern-guide-action-word,
+.interactive-reader .modern-guide-action-word {
+  display:inline-flex !important;
+  width:auto !important;
+  min-width:0 !important;
+  max-width:max-content !important;
+  margin:.42rem .42rem .42rem 0 !important;
+  vertical-align:middle !important;
+}
+.reader .modern-guide-action-word > .modern-guide-inline-action,
+.interactive-reader .modern-guide-action-word > .modern-guide-inline-action,
+.reader .modern-guide-action-word > a.modern-guide-inline-action,
+.interactive-reader .modern-guide-action-word > a.modern-guide-inline-action {
+  display:inline-flex !important;
+  width:auto !important;
+  min-width:0 !important;
+  max-width:max-content !important;
+  flex:0 0 auto !important;
+  margin:0 !important;
+  border-radius:999px !important;
+}
+@media (max-width:720px) {
+  .reader .modern-guide-action-word,
+  .interactive-reader .modern-guide-action-word,
+  .reader .modern-guide-action-word > .modern-guide-inline-action,
+  .interactive-reader .modern-guide-action-word > .modern-guide-inline-action {
+    width:auto !important;
+    min-width:0 !important;
+    max-width:max-content !important;
+  }
+}
+

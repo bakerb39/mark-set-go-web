@@ -3035,7 +3035,17 @@ const CLASSIC_GUIDES = Object.freeze({
   'Aeschylus Libation Bearers': { id:'classic-libation-bearers', slug:'libation-bearers', title:'The Libation Bearers', author:'Aeschylus' },
   'Aristophanes plays': { id:'classic-aristophanes-plays', slug:'aristophanes-plays', title:'Aristophanes — Plays', author:'Aristophanes' },
   'Aristophanes Birds': { id:'classic-birds', slug:'birds', title:'The Birds', author:'Aristophanes' },
-  'Aristophanes Clouds': { id:'classic-clouds', slug:'clouds', title:'The Clouds', author:'Aristophanes' }
+  'Aristophanes Clouds': { id:'classic-clouds', slug:'clouds', title:'The Clouds', author:'Aristophanes' },
+  'Aristophanes Frogs': { id:'classic-frogs', slug:'frogs', title:"The Frogs", author:"Aristophanes" },
+  'Euripides Hippolytus': { id:'classic-hippolytus', slug:'hippolytus', title:"Hippolytus", author:"Euripides" },
+  'Euripides Medea': { id:'classic-medea', slug:'medea', title:"Medea", author:"Euripides" },
+  'Euripides plays': { id:'classic-euripides-plays', slug:'euripides-plays', title:"Euripides \u2014 Plays", author:"Euripides" },
+  'Euripides Bacchae': { id:'classic-bacchae', slug:'bacchae', title:"The Bacchae", author:"Euripides" },
+  'Sophocles Antigone': { id:'classic-antigone', slug:'antigone', title:"Antigone", author:"Sophocles" },
+  'Sophocles Oedipus Colonus': { id:'classic-oedipus-colonus', slug:'oedipus-at-colonus', title:"Oedipus at Colonus", author:"Sophocles" },
+  'Sophocles Oedipus Rex': { id:'classic-oedipus-king', slug:'oedipus-the-king', title:"Oedipus the King", author:"Sophocles" },
+  'Sophocles plays': { id:'classic-sophocles-plays', slug:'sophocles-plays', title:"Sophocles \u2014 Plays", author:"Sophocles" },
+  'Herodotus Persian Wars': { id:'classic-herodotus-persian-wars', slug:'herodotus-persian-wars', title:"The History of the Persian Wars", author:"Herodotus" }
 });
 
 function classicGuideForGreatBook(book) {
@@ -9848,7 +9858,32 @@ function bindMarkCompanion(reader){
 
 function modernGuideInteractionConfig(source = state?.source || {}) {
   if (source?.type !== 'modern-guide') return null;
-  return MODERN_GUIDE_INTERACTIONS?.[source.id] || source?.guideInteractions || null;
+
+  const configured = MODERN_GUIDE_INTERACTIONS?.[source.id] || source?.guideInteractions || null;
+  if (configured) return configured;
+
+  // Classic Guides deliberately reuse the proven Modern Guide Reader/action
+  // pipeline. Older/resumed Classic Guide source records may not contain a
+  // guideInteractions object, so provide the same Action Center contract here
+  // instead of allowing the action button to render and then silently do nothing.
+  if (source?.classicGuide) {
+    const title = String(source.originalTitle || state?.title || 'this Classic Guide')
+      .replace(/\s+—\s+Mark, Set, Go!.*$/i, '')
+      .trim() || 'this Classic Guide';
+    return {
+      greatIdea: 'Education',
+      actionTitle: `Apply one insight from ${title}`,
+      actionType: 'reflection',
+      dueDays: 3,
+      dueHour: 19,
+      priority: 'normal',
+      repeat: 'none',
+      reminder: 'day1',
+      actionNote: `Choose one important idea from ${title}. Write what it means, where it applies in your life or study, and one concrete action or question you will carry forward.`
+    };
+  }
+
+  return null;
 }
 
 function modernGuideActionToken(word) {
@@ -9990,7 +10025,7 @@ function addModernGuideActionToCenter(source = state?.source || {}, trigger = nu
   const config = modernGuideInteractionConfig(source);
   if (!config?.actionTitle) return null;
 
-  const sourceTitle = `${source.originalTitle || state.title || 'Modern Guide'} — Mark, Set, Go! Guide`;
+  const sourceTitle = `${source.originalTitle || state.title || (source.classicGuide ? 'Classic Guide' : 'Modern Guide')} — Mark, Set, Go! ${source.classicGuide ? 'Classic Guide' : 'Guide'}`;
   const currentActions = readActions();
   const existing = currentActions.find((item) =>
     item.status !== 'completed'
