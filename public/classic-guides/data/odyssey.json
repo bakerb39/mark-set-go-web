@@ -1,0 +1,15 @@
+{
+  "id": "classic-odyssey",
+  "slug": "odyssey",
+  "title": "The Odyssey",
+  "author": "Homer",
+  "tagline": "Homecoming, identity, loyalty, temptation, intelligence, storytelling, and the restoration of order after war.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

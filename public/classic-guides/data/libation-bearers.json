@@ -1,0 +1,15 @@
+{
+  "id": "classic-libation-bearers",
+  "slug": "libation-bearers",
+  "title": "The Libation Bearers",
+  "author": "Aeschylus",
+  "tagline": "Return, recognition, revenge, divine command, kinship, and the guilt that follows successful vengeance.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

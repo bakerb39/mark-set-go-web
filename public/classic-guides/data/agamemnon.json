@@ -1,0 +1,15 @@
+{
+  "id": "classic-agamemnon",
+  "slug": "agamemnon",
+  "title": "Agamemnon",
+  "author": "Aeschylus",
+  "tagline": "Victory, sacrifice, revenge, gender, political power, inherited guilt, and the deadly return from Troy.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

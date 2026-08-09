@@ -1,0 +1,15 @@
+{
+  "id": "classic-eumenides",
+  "slug": "eumenides",
+  "title": "The Eumenides",
+  "author": "Aeschylus",
+  "tagline": "Law, trial, reconciliation, old and new forms of justice, and the political transformation of vengeance.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

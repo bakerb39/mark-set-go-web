@@ -1,0 +1,15 @@
+{
+  "id": "classic-aeschylus-plays",
+  "slug": "aeschylus-plays",
+  "title": "Aeschylus — Plays",
+  "author": "Aeschylus",
+  "tagline": "Justice, divine order, war, political authority, inherited violence, and the invention of civic settlement.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

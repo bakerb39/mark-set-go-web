@@ -1,0 +1,15 @@
+{
+  "id": "classic-clouds",
+  "slug": "clouds",
+  "title": "The Clouds",
+  "author": "Aristophanes",
+  "tagline": "Education, rhetoric, debt, intellectual fashion, family conflict, and the difference between cleverness and wisdom.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

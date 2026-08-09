@@ -1,0 +1,15 @@
+{
+  "id": "classic-birds",
+  "slug": "birds",
+  "title": "The Birds",
+  "author": "Aristophanes",
+  "tagline": "Utopia, political founding, rhetoric, empire, sovereignty, and the comic impossibility of escaping politics.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "classic-prometheus-bound",
+  "slug": "prometheus-bound",
+  "title": "Prometheus Bound",
+  "author": "Aeschylus",
+  "tagline": "Authority, rebellion, technology, knowledge, suffering, and the moral limits of obedience.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

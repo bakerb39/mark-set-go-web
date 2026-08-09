@@ -3025,21 +3025,48 @@ const greatBooksCatalog = [
   }
 ];
 
-const CLASSIC_GUIDE_PATHS = Object.freeze({
-  'Iliad Homer': '/classic-guides/iliad.html',
-  'Odyssey Homer': '/classic-guides/odyssey.html',
-  'Aeschylus Agamemnon': '/classic-guides/agamemnon.html',
-  'Aeschylus plays': '/classic-guides/aeschylus-plays.html',
-  'Aeschylus Prometheus Bound': '/classic-guides/prometheus-bound.html',
-  'Aeschylus Eumenides': '/classic-guides/eumenides.html',
-  'Aeschylus Libation Bearers': '/classic-guides/libation-bearers.html',
-  'Aristophanes plays': '/classic-guides/aristophanes-plays.html',
-  'Aristophanes Birds': '/classic-guides/the-birds.html',
-  'Aristophanes Clouds': '/classic-guides/the-clouds.html'
+const CLASSIC_GUIDES = Object.freeze({
+  'Iliad Homer': { id:'classic-iliad', slug:'iliad', title:'The Iliad', author:'Homer' },
+  'Odyssey Homer': { id:'classic-odyssey', slug:'odyssey', title:'The Odyssey', author:'Homer' },
+  'Aeschylus Agamemnon': { id:'classic-agamemnon', slug:'agamemnon', title:'Agamemnon', author:'Aeschylus' },
+  'Aeschylus plays': { id:'classic-aeschylus-plays', slug:'aeschylus-plays', title:'Aeschylus — Plays', author:'Aeschylus' },
+  'Aeschylus Prometheus Bound': { id:'classic-prometheus-bound', slug:'prometheus-bound', title:'Prometheus Bound', author:'Aeschylus' },
+  'Aeschylus Eumenides': { id:'classic-eumenides', slug:'eumenides', title:'The Eumenides', author:'Aeschylus' },
+  'Aeschylus Libation Bearers': { id:'classic-libation-bearers', slug:'libation-bearers', title:'The Libation Bearers', author:'Aeschylus' },
+  'Aristophanes plays': { id:'classic-aristophanes-plays', slug:'aristophanes-plays', title:'Aristophanes — Plays', author:'Aristophanes' },
+  'Aristophanes Birds': { id:'classic-birds', slug:'birds', title:'The Birds', author:'Aristophanes' },
+  'Aristophanes Clouds': { id:'classic-clouds', slug:'clouds', title:'The Clouds', author:'Aristophanes' }
 });
 
+function classicGuideForGreatBook(book) {
+  return CLASSIC_GUIDES[String(book?.query || '')] || null;
+}
+
 function classicGuidePathForGreatBook(book) {
-  return CLASSIC_GUIDE_PATHS[String(book?.query || '')] || '';
+  return classicGuideForGreatBook(book) ? '#reader' : '';
+}
+
+function classicGuideSource(meta = {}) {
+  return {
+    type:'modern-guide',
+    classicGuide:true,
+    id:meta.id,
+    classicGuideSlug:meta.slug,
+    originalTitle:meta.title,
+    originalAuthor:meta.author,
+    buyUrl:`https://www.amazon.com/s?k=${encodeURIComponent(`${meta.author} ${meta.title}`)}`,
+    subtitle:'An Independent Mark, Set, Go! Classic Guide'
+  };
+}
+
+async function openClassicGuideInReader(book) {
+  const meta = classicGuideForGreatBook(book);
+  if (!meta) throw new Error('This Classic Guide is not available yet.');
+  const response = await fetch(`/texts/classic-guides/${encodeURIComponent(meta.slug)}-guide.txt`, { cache:'no-store' });
+  if (!response.ok) throw new Error(`Could not load ${meta.title} Classic Guide.`);
+  const text = await response.text();
+  if (!text.trim()) throw new Error(`${meta.title} Classic Guide is empty.`);
+  renderReaderWithText(`${meta.title} — Mark, Set, Go! Classic Guide`, text, classicGuideSource(meta));
 }
 
 // Reader state is owned by ReaderEngine (Sprint 1).
@@ -15032,24 +15059,8 @@ function renderGreatBooksLibrary() {
     button.addEventListener('click', async () => {
       const item = greatBooksCatalog.find((book) => book.query === button.dataset.openClassicGuide);
       if (!item) return;
-      if (String(item.title || '').toLowerCase() !== 'the iliad' && String(item.title || '').toLowerCase() !== 'iliad') {
-        window.location.href = classicGuidePathForGreatBook(item);
-        return;
-      }
       try {
-        const response = await fetch('/texts/classic-guides/iliad-guide.txt', { cache:'no-store' });
-        if (!response.ok) throw new Error('Could not load The Iliad Classic Guide.');
-        const text = await response.text();
-        renderReaderWithText('The Iliad — Mark, Set, Go! Classic Guide', text, {
-          type:'modern-guide',
-          classicGuide:true,
-          id:'classic-iliad',
-          title:'The Iliad — Mark, Set, Go! Classic Guide',
-          originalTitle:'The Iliad',
-          originalAuthor:'Homer',
-          buyUrl:'https://www.amazon.com/s?k=Homer+Iliad',
-          subtitle:'An Independent Mark, Set, Go! Classic Guide'
-        });
+        await openClassicGuideInReader(item);
       } catch (error) {
         window.alert(error?.message || 'The Classic Guide could not be opened.');
       }
@@ -16917,20 +16928,23 @@ window.addEventListener('marksetgo:auth-ready', scheduleLibraryPersonalization);
 async function loadBundledModernGuideDocument(source = {}) {
   const id = String(source?.id || '').trim();
   if (!id) return null;
-  if (source?.classicGuide && id === 'classic-iliad') {
-    const response = await fetch('/texts/classic-guides/iliad-guide.txt', { cache:'no-store' });
+  if (source?.classicGuide) {
+    const meta = Object.values(CLASSIC_GUIDES).find((item) => item.id === id) ||
+      (source?.classicGuideSlug ? {
+        id,
+        slug:String(source.classicGuideSlug),
+        title:String(source.originalTitle || source.title || 'Classic Guide'),
+        author:String(source.originalAuthor || '')
+      } : null);
+    if (!meta?.slug) return null;
+    const response = await fetch(`/texts/classic-guides/${encodeURIComponent(meta.slug)}-guide.txt`, { cache:'no-store' });
     if (!response.ok) return null;
     const text = await response.text();
     if (!text.trim()) return null;
     return {
-      title:'The Iliad — Mark, Set, Go! Classic Guide',
+      title:`${meta.title} — Mark, Set, Go! Classic Guide`,
       text,
-      source:{
-        type:'modern-guide', classicGuide:true, id:'classic-iliad',
-        originalTitle:'The Iliad', originalAuthor:'Homer',
-        buyUrl:'https://www.amazon.com/s?k=Homer+Iliad',
-        subtitle:'An Independent Mark, Set, Go! Classic Guide'
-      }
+      source:classicGuideSource(meta)
     };
   }
 
