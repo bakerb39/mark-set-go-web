@@ -10730,9 +10730,21 @@ html.msg-walkthrough-active .site-header .menu-popover.msg-walkthrough-pinned-me
   color:#123d70 !important;
 }
 @media (max-width:720px) {
-  .modern-guide-inline-action { width:100%; border-radius:10px; padding:9px 11px; }
+  /* Keep Modern and Classic Guide actions as one shared wrapping toolbar.
+     Do not force one full-width action per row. */
+  .modern-guide-inline-action {
+    width:auto !important;
+    max-width:100%;
+    border-radius:999px;
+    padding:7px 12px;
+  }
   .reader .modern-guide-action-word,
-  .interactive-reader .modern-guide-action-word { width:100% !important; margin:.55rem 0 !important; }
+  .interactive-reader .modern-guide-action-word {
+    display:inline-flex !important;
+    width:auto !important;
+    min-width:0 !important;
+    margin:.35rem .3rem .35rem 0 !important;
+  }
 }
 
 
