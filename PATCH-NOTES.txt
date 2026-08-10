@@ -1,15 +1,11 @@
-Mark, Set, Go! — corrected reader click behavior
+Mark, Set, Go! — Reader instruction text update
 
-Built from the user's latest:
-- app(5).js
-- index(6).html
+Built on top of the latest corrected click-behavior patch.
 
-Behavior:
-- Spacebar behavior is LEFT ALONE and continues to toggle Start/Pause.
-- Single click on BLANK reader space does nothing to playback.
-- Scrollbar clicks/drags do nothing to playback.
-- Single click on visible text keeps the existing seek-to-position behavior.
-- Double-click directly in the Reader toggles Start/Pause.
-- Alt+double-click keeps the existing Ask Mark paragraph-selection behavior.
-- Start/Pause buttons are unchanged.
-- No files under public/reader/ were modified.
+Changed Reader tooltip/instructions from:
+"Click a word to move the reading position; click empty space to pause or resume"
+
+to:
+"Click a word to move the reading position; double-click to pause or resume"
+
+No reader behavior or reader-engine files were changed.

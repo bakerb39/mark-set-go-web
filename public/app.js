@@ -10861,7 +10861,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
               <div id="fullscreen-mark-notebook" data-fs-mark-panel="notebook" hidden></div>
               <div id="fullscreen-mark-format" data-fs-mark-panel="format" hidden></div>
             </aside>
-          <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text" title="Click a word to move the reading position; click empty space to pause or resume"></article>
+          <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text" title="Click a word to move the reading position; double-click to pause or resume"></article>
           </div>
           <div class="reader-viewer-footer" aria-label="Reader pace and page navigation">
             <div id="book-page-controls-home" class="book-page-controls-home">
