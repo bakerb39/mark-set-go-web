@@ -1,25 +1,14 @@
-Mark, Set, Go! — Reader Workspace merge onto latest user files
-2026-08-10
+Mark, Set, Go! — Reader Workspace integration v9.7.3
+Built from the exact full project ZIP supplied in this turn.
 
-BASE FILES USED
-- app.js: exact latest uploaded app(4).js, with Reader Workspace changes merged into it.
-- index.html: exact latest uploaded index(5).html, preserving the user's Classic Guides cache tokens and other changes except for the app.js cache bust and one additive workspace stylesheet link.
+Fix:
+- Preserves the existing Reader Workspace shell and six tabs:
+  Read | Companion | Notes | Progress | Study | Contents
+- Fixes ask-mark-hub.js so the premium Ask Mark/Beth interface mounts only inside
+  the Companion panel instead of replacing the entire workspace shell.
+- Companion retains the full premium chat/writing composer.
+- Progress, Study, Contents, Notes and Read panels remain available in the same right rail.
+- Desktop persistent workspace behavior already present in the supplied app.js is preserved.
+- Reader engine files were not modified.
 
-FILES TO COPY TO REPO PUBLIC FOLDER
-- public/app.js
-- public/index.html
-- public/reader-workspace-shell.css
-
-WHAT CHANGED
-- Restores persistent desktop Reader Workspace beside the reader.
-- Tabs: Read | Companion | Notes | Progress | Study | Contents.
-- Companion remains the full existing Ask Mark/Beth writing panel.
-- Progress renders current-text KPIs plus annual WPM/comprehension charts and goal lines.
-- Study and Contents render inside the same right workspace.
-- Desktop opens the workspace automatically; mobile remains collapsed.
-- Uses an additive reader-workspace-shell.css so the user's existing styles.css is NOT replaced.
-
-PROTECTED
-- No files under public/reader/ modified.
-- No right-click handler changes.
-- No VirtualRenderer / ReaderEngine / pagination module changes.
+Files are intentionally under public/.
