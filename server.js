@@ -941,6 +941,16 @@ app.post('/api/comprehension', async (req, res) => {
   const title = String(req.body?.title || 'Untitled reading').trim().slice(0, 300);
   const scope = String(req.body?.scope || 'passage').trim();
   const wholeGuide = scope === 'whole_guide';
+  const requestedQuestionCount = Number(req.body?.questionCount);
+  const questionCount = wholeGuide
+    ? (Number.isInteger(requestedQuestionCount) ? Math.max(1, Math.min(25, requestedQuestionCount)) : 10)
+    : 4;
+  const questionMode = wholeGuide && ['new', 'mixed'].includes(String(req.body?.questionMode || '').trim())
+    ? String(req.body.questionMode).trim()
+    : 'new';
+  const avoidQuestions = wholeGuide && Array.isArray(req.body?.avoidQuestions)
+    ? req.body.avoidQuestions.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 100)
+    : [];
   const wordCount = passage ? passage.split(/\s+/).length : 0;
 
   if (wordCount < 120) {
@@ -961,8 +971,8 @@ app.post('/api/comprehension', async (req, res) => {
     properties: {
       questions: {
         type: 'array',
-        minItems: 4,
-        maxItems: 4,
+        minItems: questionCount,
+        maxItems: questionCount,
         items: {
           type: 'object',
           additionalProperties: false,
@@ -984,12 +994,15 @@ app.post('/api/comprehension', async (req, res) => {
     }
   };
 
+  const avoidPrompt = avoidQuestions.length
+    ? `\nDo not repeat or lightly paraphrase any of these previously used questions:\n${avoidQuestions.map((question, index) => `${index + 1}. ${question}`).join('\n')}`
+    : '';
   const prompt = wholeGuide
-    ? `Create exactly four multiple-choice comprehension questions based ONLY on the complete reading guide "${title}".
+    ? `Create exactly ${questionCount} multiple-choice comprehension questions based ONLY on the complete reading guide "${title}".
 Treat the supplied text as the entire guide, not as a local passage. Spread the questions across different major sections and ideas so the quiz tests understanding of the guide as a whole.
-The four question types must be, in this order: factual recall, main idea, inference, and deeper understanding.
+Use a balanced mix of factual recall, main idea, inference, and deeper-understanding questions.
 Each question must be answerable from the supplied guide itself. Do not rely on outside knowledge or facts not present in the guide.
-Use plausible distractors. Keep explanations concise and refer to the relevant idea without long quotation.`
+Use plausible distractors. Keep explanations concise and refer to the relevant idea without long quotation.${avoidPrompt}`
     : `Create exactly four multiple-choice comprehension questions based ONLY on the supplied passage from "${title}".
 The four question types must be, in this order: factual recall, main idea, inference, and deeper understanding.
 Each question must be answerable from the passage itself. Do not rely on outside knowledge, later parts of the work, or facts not present in the passage.
@@ -1031,7 +1044,7 @@ Use plausible distractors. Keep explanations concise and cite the relevant idea 
     const outputText = extractOpenAIOutputText(payload);
     if (!outputText) throw new Error('OpenAI returned no structured text output.');
     const quiz = JSON.parse(outputText);
-    if (!Array.isArray(quiz.questions) || quiz.questions.length !== 4) throw new Error('Unexpected quiz structure.');
+    if (!Array.isArray(quiz.questions) || quiz.questions.length !== questionCount) throw new Error('Unexpected quiz structure.');
 
     res.json({
       title,

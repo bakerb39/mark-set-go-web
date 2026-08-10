@@ -1,34 +1,36 @@
-# Classic Guides 40 — horizontal section quizzes / toolbar verification
+# Whole-guide quiz configuration patch verification
 
-Built from the user-supplied full ZIP `mark-set-go-web-feature-ask-mark-premium-phase-1 (7).zip`, with the prior 40-guide content overlaid, then corrected in the executing `public/` runtime only.
+Runtime files changed:
+- `server.js`
+- `public/app.js`
+- `public/index.html` (app cache key only)
 
-## Required implementation
+Behavior contract:
+- Whole-guide quiz defaults to 10 questions.
+- User may choose any integer from 5 through 25.
+- Mixed mode randomly combines prior questions with newly generated questions when prior history exists.
+- New-only mode requests fresh questions and sends prior question stems as an avoidance list.
+- Review-previous mode randomly samples stored whole-guide questions for that book and does not call the API.
+- Section-level guide quizzes remain exactly 4 questions.
+- Whole-guide question history is stored per document in browser localStorage, capped at 200 unique questions per document.
+- `Randomize another quiz` returns the user to the whole-guide setup screen.
 
-- Classic Guide action renderer uses the same Modern Guide JavaScript structure; only the CSS class prefix changes from `modern-guide-*` to `classic-guide-*` when `source.classicGuide` is true.
-- Classic Guide CSS is a direct copy of the final Modern Guide horizontal action contract with only the class prefix changed.
-- Both Modern and Classic visible discussion labels read `Discuss with reading companion`.
-- Section source markers are on one source line: `[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]`.
-- Bottom source markers exactly replicate the Modern Guide generator pattern: `[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]`.
+Checks run:
+- `node --check server.js`: PASS
+- `node --check public/app.js`: PASS
+- Static count/limit contract: PASS
+- Section quiz 4-question contract present: PASS
+- Chromium 144 functional test using the actual modified whole-guide functions: PASS
+  - default: 10 / Mixed
+  - New only 25: request 25, render 25
+  - Mixed 10 with history: request 5 new + sample 5 old, render 10
+  - Review previous 5: zero network request, render 5 prior questions
+- Chromium visual rendering with the production app stylesheet: PASS
+- No guide text files changed.
+- No CSS files changed.
+- No Reader module files changed.
+- No new MutationObserver introduced by this patch.
+- ZIP integrity: PASS
 
-## Checks performed
-
-- 40 canonical Classic Guide text files: PASS
-- Section quiz checkpoints across 40 guides: 1027 total; 14–33 per guide: PASS
-- Exactly one whole-guide quiz marker per guide: PASS
-- Bottom action marker row on one source line for all 40: PASS
-- Public app.js Node syntax check: PASS
-- Classic Guide renderer class-prefix logic: PASS
-- Visible `Discuss with reading companion` label: PASS
-- Classic CSS primary layout properties exact-copy Modern Guide: PASS
-- Root app.js/styles.css/index.html left unchanged: PASS
-- Protected `public/reader` and `modules/reading` directories unchanged from supplied baseline: PASS
-- MutationObserver occurrence count in public/app.js unchanged from supplied baseline: PASS (none added)
-- Chromium computed geometry: PASS
-  - Section Discuss + Quiz me: same Y coordinate
-  - Bottom first three actions: same Y coordinate
-  - Buy wraps to next row at the tested width because the four-button total does not fit
-  - Modern Guide reference produces the same horizontal/wrapping pattern
-- Chromium screenshot visually inspected: PASS
-- ZIP integrity: performed after packaging
-
-Chromium navigation to localhost/file URLs is blocked by the environment's administrator policy. To still execute the real Chromium layout engine, the executing `public/styles.css` and exact runtime action markup were injected into a Chromium page through DevTools `Page.setDocumentContent`; computed bounding boxes and a screenshot were then captured from Chromium itself.
+Chromium environment note:
+Direct navigation to localhost is blocked by the execution environment's organization policy. Chromium verification therefore loaded the production stylesheet and the exact modified quiz functions through the Chrome DevTools Protocol into a browser document and exercised the actual controls and generation logic there. This is a real Chromium execution, but not a localhost end-to-end server navigation.
