@@ -1,0 +1,12 @@
+Mark, Set, Go! — Reader Workspace Tabs patch
+2026-08-10
+
+IMPORTANT BASE FILES
+- app.js in this ZIP is the exact app(3).js file supplied by the user.
+- index.html in this ZIP is the exact index(4).html file supplied by the user.
+- styles.css contains the reader-workspace tab styling from the v9.7.1 workspace patch.
+
+Reader workspace tabs implemented in app.js:
+Read | Companion | Notes | Progress | Study | Contents
+
+No reader-engine module files are included in this patch.
