@@ -1,21 +1,11 @@
-MARK, SET, GO! — BROWSE DISCOVERY FACELIFT PATCH
+SECTIONQUIZ RUNTIME FIX
 
-Files changed:
-  public/app.js
-  public/styles.css
-  public/index.html
+This patch targets the ACTUAL files served by server.js: public/app.js and public/index.html.
 
-Purpose:
-  - Make Popular Libraries read as a distinct discovery section.
-  - Make the DRM-free finder visually prominent and easier to scan.
-  - Fix the run-together DRM-free feature text by converting it to proper feature cards.
-  - Preserve all existing data attributes and click behavior.
+Fix:
+- [[MSG:SECTIONQUIZ]] is recognized as a guide action token.
+- It renders as a "Quiz me" button instead of literal text.
+- The button launches a section-level comprehension check.
+- public/index.html cache-busts app.js so the browser loads the corrected runtime.
 
-Safety:
-  - No reader modules are changed.
-  - No reader event handlers are changed.
-  - No DRM search logic is changed.
-  - No library provider logic is changed.
-
-Install:
-  Copy these files over the matching files in the deployed project.
+Install: copy the public folder over the app's public folder, preserving paths.

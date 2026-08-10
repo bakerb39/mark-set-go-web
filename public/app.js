@@ -10160,7 +10160,7 @@ function modernGuideInteractionConfig(source = state?.source || {}) {
 }
 
 function modernGuideActionToken(word) {
-  const match = String(word || '').match(/^\[\[MSG:(SECTION|DISCUSS|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
+  const match = String(word || '').match(/^\[\[MSG:(SECTION|DISCUSS|SECTIONQUIZ|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
   return match ? match[1].toLowerCase() : '';
 }
 
@@ -10172,6 +10172,7 @@ function modernGuideActionLabel(action) {
   return ({
     section: '',
     discuss: 'Discuss with Mark',
+    sectionquiz: 'Quiz me',
     quiz: 'Quiz me on the whole guide',
     action: 'Add to Action Center',
     ideas: 'Explore related Great Ideas',
@@ -10191,6 +10192,37 @@ function modernGuideContextRange(markerIndex) {
   }
 
   const startIndex = sectionMarker >= 0 ? sectionMarker + 1 : 0;
+  const cleanWords = [];
+  let firstReal = null;
+  let lastReal = null;
+
+  for (let index = startIndex; index < safeMarker; index += 1) {
+    if (isModernGuideActionToken(state.words[index])) continue;
+    if (firstReal == null) firstReal = index;
+    lastReal = index;
+    cleanWords.push(state.words[index]);
+  }
+
+  return {
+    startIndex: firstReal == null ? startIndex : firstReal,
+    endIndex: lastReal == null ? safeMarker : lastReal + 1,
+    text: cleanWords.join(' ').trim()
+  };
+}
+
+function modernGuideSectionQuizContextRange(markerIndex) {
+  const safeMarker = Math.max(0, Math.min(state.words.length, Number(markerIndex) || 0));
+  let boundary = -1;
+
+  for (let index = safeMarker - 1; index >= 0; index -= 1) {
+    const action = modernGuideActionToken(state.words[index]);
+    if (action === 'sectionquiz' || action === 'section') {
+      boundary = index;
+      break;
+    }
+  }
+
+  const startIndex = boundary >= 0 ? boundary + 1 : 0;
   const cleanWords = [];
   let firstReal = null;
   let lastReal = null;
@@ -10405,6 +10437,47 @@ function openModernGuideGreatIdea(source = state?.source || {}) {
   });
 }
 
+async function startModernGuideSectionComprehensionCheck(markerIndex, source = state?.source || {}) {
+  if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) return;
+
+  const context = modernGuideSectionQuizContextRange(markerIndex);
+  const passageWords = context.text.split(/\s+/).filter(Boolean);
+  if (passageWords.length < 120) {
+    window.alert(`This guide section has ${passageWords.length} readable words; a comprehension check needs at least 120.`);
+    return;
+  }
+
+  const wasRunning = isReaderRunning();
+  if (wasRunning) pauseReader();
+
+  const sectionTitle = tocTitleForWordIndex(context.startIndex) || 'Guide section';
+  try {
+    const response = await fetch('/api/comprehension', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `${source.originalTitle || state.title || 'Modern Guide'} — ${sectionTitle}`,
+        passage: context.text,
+        scope: 'guide_section'
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
+
+    renderComprehensionQuiz(payload, {
+      startIndex: context.startIndex,
+      endIndex: context.endIndex,
+      words: passageWords.length,
+      passage: context.text,
+      guideSection: true,
+      sectionTitle
+    });
+  } catch (error) {
+    window.alert(`Section comprehension check unavailable: ${error.message}`);
+  }
+}
+
 async function startModernGuideWholeComprehensionCheck(source = state?.source || {}) {
   if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
     return window.MarkSetGoStartComprehension?.();
@@ -10452,6 +10525,11 @@ function activateModernGuideInlineAction(button, source = state?.source || {}) {
 
   if (action === 'discuss') {
     openModernGuideContextInAskMark(index);
+    return;
+  }
+
+  if (action === 'sectionquiz') {
+    startModernGuideSectionComprehensionCheck(index, source);
     return;
   }
 
