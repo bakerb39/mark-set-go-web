@@ -1,0 +1,15 @@
+{
+  "id": "classic-shakespeare-midsummer-nights-dream",
+  "slug": "shakespeare-midsummer-nights-dream",
+  "title": "A Midsummer Night's Dream",
+  "author": "William Shakespeare",
+  "tagline": "A focused guide to love, imagination, nature, art, law, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "classic-bacon-novum-organum",
+  "slug": "bacon-novum-organum",
+  "title": "Novum Organum",
+  "author": "Francis Bacon",
+  "tagline": "A focused guide to knowledge, method, nature, experiment, cause, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

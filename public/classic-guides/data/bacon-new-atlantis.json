@@ -1,0 +1,15 @@
+{
+  "id": "classic-bacon-new-atlantis",
+  "slug": "bacon-new-atlantis",
+  "title": "New Atlantis",
+  "author": "Francis Bacon",
+  "tagline": "A focused guide to science, education, government, knowledge, progress, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

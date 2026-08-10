@@ -1,0 +1,15 @@
+{
+  "id": "classic-shakespeare-romeo-and-juliet",
+  "slug": "shakespeare-romeo-and-juliet",
+  "title": "Romeo and Juliet",
+  "author": "William Shakespeare",
+  "tagline": "A focused guide to love, fate, family, youth, death, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

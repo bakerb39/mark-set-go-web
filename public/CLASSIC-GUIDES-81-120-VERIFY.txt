@@ -1,0 +1,15 @@
+Classic Guides 81–120 — verification
+
+Runtime-only patch: every changed file is under public/.
+New guides: 40
+CLASSIC_GUIDES registry total after patch: 120
+Section quiz checkpoints across new guides: 960
+Per-guide section quiz range: 24–24
+Whole-guide quiz markers: exactly 1 per new guide
+Section marker row: [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+Footer marker row: [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]
+SECTIONQUIZ token parser: present
+SECTIONQUIZ action handler: present
+No root-level app.js/index.html/styles.css included
+No reader engine/module files included
+No styles.css change required

@@ -1,0 +1,15 @@
+{
+  "id": "classic-descartes-meditations",
+  "slug": "descartes-meditations",
+  "title": "Meditations on First Philosophy",
+  "author": "René Descartes",
+  "tagline": "A focused guide to knowledge, doubt, self, god, mind, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

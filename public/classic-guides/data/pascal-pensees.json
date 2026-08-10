@@ -1,0 +1,15 @@
+{
+  "id": "classic-pascal-pensees",
+  "slug": "pascal-pensees",
+  "title": "Pensées",
+  "author": "Blaise Pascal",
+  "tagline": "A focused guide to god, faith, reason, happiness, human nature, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

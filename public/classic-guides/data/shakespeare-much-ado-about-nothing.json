@@ -1,0 +1,15 @@
+{
+  "id": "classic-shakespeare-much-ado-about-nothing",
+  "slug": "shakespeare-much-ado-about-nothing",
+  "title": "Much Ado About Nothing",
+  "author": "William Shakespeare",
+  "tagline": "A focused guide to love, honor, language, deception, friendship, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

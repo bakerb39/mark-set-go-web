@@ -1,0 +1,15 @@
+{
+  "id": "classic-voltaire-candide",
+  "slug": "voltaire-candide",
+  "title": "Candide",
+  "author": "Voltaire",
+  "tagline": "A focused guide to happiness, good and evil, providence, war, religion, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

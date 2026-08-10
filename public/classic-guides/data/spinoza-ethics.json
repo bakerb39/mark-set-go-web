@@ -1,0 +1,15 @@
+{
+  "id": "classic-spinoza-ethics",
+  "slug": "spinoza-ethics",
+  "title": "Ethics",
+  "author": "Benedict de Spinoza",
+  "tagline": "A focused guide to god, nature, cause, freedom, emotion, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

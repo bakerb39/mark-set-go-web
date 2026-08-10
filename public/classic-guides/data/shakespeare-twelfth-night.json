@@ -1,0 +1,15 @@
+{
+  "id": "classic-shakespeare-twelfth-night",
+  "slug": "shakespeare-twelfth-night",
+  "title": "Twelfth Night",
+  "author": "William Shakespeare",
+  "tagline": "A focused guide to identity, love, gender, desire, appearance and reality, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

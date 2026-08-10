@@ -1,0 +1,15 @@
+{
+  "id": "classic-swift-gullivers-travels",
+  "slug": "swift-gullivers-travels",
+  "title": "Gulliver’s Travels",
+  "author": "Jonathan Swift",
+  "tagline": "A focused guide to human nature, politics, reason, pride, society, and the structure that makes those questions difficult.",
+  "format": "reader-guide-v2",
+  "actions": [
+    "buy",
+    "discuss",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}
