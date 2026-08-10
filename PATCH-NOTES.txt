@@ -1,8 +1,16 @@
-Reader Workspace layout repair
-- Built from the public/ files in the latest uploaded full project ZIP.
-- Fixes the workspace shell grid so Header, Tabs, and Active Panel have three explicit rows.
-- Prevents the tab bar from stretching vertically.
-- Forces tabs to stay horizontal and scroll horizontally if space becomes too narrow.
-- Enforces a 520px minimum desktop workspace width, including restored splitter widths.
-- Updates app.js and reader-workspace-shell.css cache tokens.
-- Reader engine modules were not changed.
+Mark, Set, Go! — Reader double-click-only playback patch
+
+Built from the exact latest files supplied by the user:
+- app(5).js -> public/app.js
+- index(6).html -> public/index.html
+
+Changes:
+- Spacebar no longer controls Reader playback.
+- Single clicks no longer start/pause Reader playback.
+- Existing single-click text seek behavior is preserved.
+- Double-click inside the Reader toggles start/pause.
+- Alt+double-click remains reserved for Ask Mark paragraph selection.
+- Scrollbar/splitter double-clicks are excluded from playback.
+- Existing Start/Pause buttons remain unchanged.
+- Reader engine modules were not modified.
+- app.js cache token updated.
