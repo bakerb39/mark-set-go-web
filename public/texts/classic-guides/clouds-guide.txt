@@ -282,8 +282,7 @@ For close reading, mark the passages where education changes vocabulary or speak
 READING CHECK
 Find one early and one late passage involving education. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 2: RHETORIC
@@ -299,8 +298,7 @@ For close reading, mark the passages where rhetoric changes vocabulary or speake
 READING CHECK
 Find one early and one late passage involving rhetoric. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 3: DEBT
@@ -316,8 +314,7 @@ For close reading, mark the passages where debt changes vocabulary or speaker. N
 READING CHECK
 Find one early and one late passage involving debt. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 4: GENERATIONAL CONFLICT
@@ -333,8 +330,7 @@ For close reading, mark the passages where generational conflict changes vocabul
 READING CHECK
 Find one early and one late passage involving generational conflict. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 5: PHILOSOPHY AND CARICATURE
@@ -350,8 +346,7 @@ For close reading, mark the passages where philosophy and caricature changes voc
 READING CHECK
 Find one early and one late passage involving philosophy and caricature. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 6: MORAL RESPONSIBILITY
@@ -367,8 +362,7 @@ For close reading, mark the passages where moral responsibility changes vocabula
 READING CHECK
 Find one early and one late passage involving moral responsibility. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 CHARACTERS AS ARGUMENTS
@@ -405,8 +399,7 @@ Chorus of Clouds should be read as more than a plot function. In The Clouds, the
 
 Also watch how other speakers describe Chorus of Clouds. Reputation in classical literature is rarely neutral. Praise, accusation, genealogy, rumor, prophecy, lament, and public speech create competing versions of the same person. Compare self-description with description by enemies, allies, family, chorus, narrator, or gods. The distance between these portraits often reveals the work’s deepest uncertainty about motive and responsibility. A good seminar question is: what does the audience know about Chorus of Clouds that no single character in the work can fully know?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 LANGUAGE, FORM, AND CLOSE READING
@@ -419,8 +412,7 @@ For oral works, drama, and epic, sound matters as well. Repetition, formal addre
 
 Finally, distinguish dramatic or narrative irony from simple contradiction. The audience may possess information a character lacks, or may see that two characters speak partial truths that cannot be reconciled within the available institutions. That gap creates much of the intellectual pleasure of classical reading. It lets The Clouds ask the reader to judge without giving the reader the comfort of perfect innocence.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 HISTORICAL AND CULTURAL LENSES
@@ -431,8 +423,7 @@ At the same time, avoid the opposite mistake of treating the work as a museum pi
 
 Translation is another part of context. Different English versions can make a speaker sound archaic, conversational, formal, brutal, lyrical, or psychologically modern. If a sentence seems especially important, compare two translations or consult a note on the underlying Greek term. You do not need Greek to benefit from this practice. The purpose is to remember that interpretive confidence should remain proportional to what the translation can securely carry.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 THE GREAT CONVERSATION — COMPARATIVE PATHS
@@ -449,8 +440,7 @@ Reading The Clouds beside Aristophanes — The Frogs sharpens the Great Books co
 The Clouds AND Xenophon — Memorabilia
 Reading The Clouds beside Xenophon — Memorabilia sharpens the Great Books conversation around generational conflict. The point of comparison is not to force the works into agreement, but to notice that each assigns different weight to authority, character, institutions, divine order, historical circumstance, and consequences. Begin with one concrete scene or claim from The Clouds, then ask what the other work would recognize, reject, or redescribe. This produces a more useful comparison than simply listing shared themes. It also makes visible a long-running Western argument: whether moral order is discovered, inherited, negotiated, legislated, narrated, or painfully built after older forms of order fail.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 INTERPRETIVE POSITIONS TO TEST
@@ -465,8 +455,7 @@ POSITION 4 — The work ultimately endorses the victorious or surviving position
 
 POSITION 5 — Modern moral categories are enough to settle the work. Test this by identifying at least one ancient institution or obligation that changes the terms of judgment. Then reverse the exercise: identify one feature of the work that invites criticism of its own inherited world. The best reading is historically informed without surrendering moral intelligence.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 SEMINAR PREPARATION — TWELVE QUESTIONS
@@ -484,8 +473,7 @@ SEMINAR PREPARATION — TWELVE QUESTIONS
 11. Does the ending resolve the central conflict, transform it, or merely contain it?
 12. What would a reader of Plato — Apology notice in The Clouds that a first-time reader might miss?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 REREADING PLAN
@@ -510,8 +498,7 @@ Next place the passage within the whole of The Clouds. What happened immediately
 
 Finally connect the passage to the moral problem of the work: whether clever argument improves judgment or merely equips desire with better excuses. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -523,8 +510,7 @@ Next place the passage within the whole of The Clouds. What happened immediately
 
 Finally connect the passage to the moral problem of the work: whether clever argument improves judgment or merely equips desire with better excuses. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -536,8 +522,7 @@ Next place the passage within the whole of The Clouds. What happened immediately
 
 Finally connect the passage to the moral problem of the work: whether clever argument improves judgment or merely equips desire with better excuses. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -549,8 +534,7 @@ Next place the passage within the whole of The Clouds. What happened immediately
 
 Finally connect the passage to the moral problem of the work: whether clever argument improves judgment or merely equips desire with better excuses. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -562,8 +546,7 @@ Next place the passage within the whole of The Clouds. What happened immediately
 
 Finally connect the passage to the moral problem of the work: whether clever argument improves judgment or merely equips desire with better excuses. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -575,8 +558,7 @@ Next place the passage within the whole of The Clouds. What happened immediately
 
 Finally connect the passage to the moral problem of the work: whether clever argument improves judgment or merely equips desire with better excuses. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -588,8 +570,7 @@ Next place the passage within the whole of The Clouds. What happened immediately
 
 Finally connect the passage to the moral problem of the work: whether clever argument improves judgment or merely equips desire with better excuses. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -601,8 +582,7 @@ Next place the passage within the whole of The Clouds. What happened immediately
 
 Finally connect the passage to the moral problem of the work: whether clever argument improves judgment or merely equips desire with better excuses. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 ABOUT THIS GUIDE
@@ -641,7 +621,4 @@ Answer: Strepsiades attacks and burns the Thinkery.
 8. Why should the play not be treated as a biography of Socrates?
 Answer: Its Socrates is a deliberate comic composite and caricature serving satirical purposes.
 
-[[MSG:IDEAS]]
-[[MSG:ACTION]]
-[[MSG:QUIZ]]
-[[MSG:BUY]]
+[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]

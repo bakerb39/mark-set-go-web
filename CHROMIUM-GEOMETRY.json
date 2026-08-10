@@ -1,0 +1,98 @@
+{
+  "classic-section": [
+    {
+      "text": "Discuss with reading companion",
+      "x": 141,
+      "y": 123.3125,
+      "w": 261.75,
+      "h": 30.796875,
+      "display": "inline-flex",
+      "verticalAlign": "middle"
+    },
+    {
+      "text": "Quiz me",
+      "x": 413.96875,
+      "y": 123.3125,
+      "w": 78.25,
+      "h": 30.796875,
+      "display": "inline-flex",
+      "verticalAlign": "middle"
+    }
+  ],
+  "classic-bottom": [
+    {
+      "text": "Explore related Great Ideas",
+      "x": 141,
+      "y": 249.140625,
+      "w": 220.765625,
+      "h": 30.796875,
+      "display": "inline-flex",
+      "verticalAlign": "middle"
+    },
+    {
+      "text": "Add to Action Center",
+      "x": 372.984375,
+      "y": 249.140625,
+      "w": 174.046875,
+      "h": 30.796875,
+      "display": "inline-flex",
+      "verticalAlign": "middle"
+    },
+    {
+      "text": "Quiz me on the whole guide",
+      "x": 558.25,
+      "y": 249.140625,
+      "w": 226.953125,
+      "h": 30.796875,
+      "display": "inline-flex",
+      "verticalAlign": "middle"
+    },
+    {
+      "text": "Buy the original book",
+      "x": 141,
+      "y": 293.375,
+      "w": 159.859375,
+      "h": 24.796875,
+      "display": "inline-flex",
+      "verticalAlign": "middle"
+    }
+  ],
+  "modern-bottom": [
+    {
+      "text": "Explore related Great Ideas",
+      "x": 141,
+      "y": 413.203125,
+      "w": 208.15625,
+      "h": 34,
+      "display": "inline-flex",
+      "verticalAlign": "middle"
+    },
+    {
+      "text": "Add to Action Center",
+      "x": 360.375,
+      "y": 413.203125,
+      "w": 170.25,
+      "h": 34,
+      "display": "inline-flex",
+      "verticalAlign": "middle"
+    },
+    {
+      "text": "Quiz me on the whole guide",
+      "x": 541.84375,
+      "y": 413.203125,
+      "w": 211.453125,
+      "h": 34,
+      "display": "inline-flex",
+      "verticalAlign": "middle"
+    },
+    {
+      "text": "Buy the original book",
+      "x": 141,
+      "y": 460.640625,
+      "w": 172.671875,
+      "h": 34,
+      "display": "inline-flex",
+      "verticalAlign": "middle"
+    }
+  ]
+}

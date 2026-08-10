@@ -13010,3 +13010,37 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
   }
 }
 
+/* Classic Guide action layout: exact Modern Guide action contract with only
+   the class prefix changed from modern-guide-* to classic-guide-*. */
+.reader .classic-guide-action-word,
+.interactive-reader .classic-guide-action-word {
+  display:inline-flex !important;
+  width:auto !important;
+  min-width:0 !important;
+  max-width:max-content !important;
+  margin:.42rem .42rem .42rem 0 !important;
+  vertical-align:middle !important;
+}
+.reader .classic-guide-action-word > .classic-guide-inline-action,
+.interactive-reader .classic-guide-action-word > .classic-guide-inline-action,
+.reader .classic-guide-action-word > a.classic-guide-inline-action,
+.interactive-reader .classic-guide-action-word > a.classic-guide-inline-action {
+  display:inline-flex !important;
+  width:auto !important;
+  min-width:0 !important;
+  max-width:max-content !important;
+  flex:0 0 auto !important;
+  margin:0 !important;
+  border-radius:999px !important;
+}
+@media (max-width:720px) {
+  .reader .classic-guide-action-word,
+  .interactive-reader .classic-guide-action-word,
+  .reader .classic-guide-action-word > .classic-guide-inline-action,
+  .interactive-reader .classic-guide-action-word > .classic-guide-inline-action {
+    width:auto !important;
+    min-width:0 !important;
+    max-width:max-content !important;
+  }
+}
+

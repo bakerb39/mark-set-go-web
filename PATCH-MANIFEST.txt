@@ -1,18 +1,13 @@
-Changed/added by this patch:
-- app.js
+Executing runtime files changed:
 - public/app.js
-- index.html
+- public/styles.css
 - public/index.html
-- texts/classic-guides/*.txt (40 canonical guides)
-- public/texts/classic-guides/*.txt (40 canonical guides)
-- classic-guides/data/*.json (20 new guides)
-- public/classic-guides/data/*.json (20 new guides)
-- CLASSIC-GUIDES-21-40-AND-SECTION-QUIZZES.md
-- VERIFICATION.md
+- public/texts/classic-guides/*.txt (40 canonical Classic Guides)
+- public/classic-guides/data/*.json (currently available Classic Guide metadata)
 
-Intentionally NOT changed:
-- styles.css / public/styles.css
-- public/reader/*
-- modules/reading/*
-- right-click/context-menu implementation
-- protected reader check files
+Verification artifacts:
+- VERIFICATION.md
+- CHROMIUM-HORIZONTAL-VERIFICATION.png
+- CHROMIUM-GEOMETRY.json
+
+Root runtime duplicates are intentionally NOT included or modified.

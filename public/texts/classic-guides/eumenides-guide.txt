@@ -281,8 +281,7 @@ For close reading, mark the passages where law and vengeance changes vocabulary 
 READING CHECK
 Find one early and one late passage involving law and vengeance. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 2: INSTITUTION BUILDING
@@ -298,8 +297,7 @@ For close reading, mark the passages where institution building changes vocabula
 READING CHECK
 Find one early and one late passage involving institution building. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 3: GENDERED CLAIMS OF KINSHIP
@@ -315,8 +313,7 @@ For close reading, mark the passages where gendered claims of kinship changes vo
 READING CHECK
 Find one early and one late passage involving gendered claims of kinship. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 4: DIVINE CONFLICT
@@ -332,8 +329,7 @@ For close reading, mark the passages where divine conflict changes vocabulary or
 READING CHECK
 Find one early and one late passage involving divine conflict. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 5: PERSUASION
@@ -349,8 +345,7 @@ For close reading, mark the passages where persuasion changes vocabulary or spea
 READING CHECK
 Find one early and one late passage involving persuasion. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 6: CIVIC RECONCILIATION
@@ -366,8 +361,7 @@ For close reading, mark the passages where civic reconciliation changes vocabula
 READING CHECK
 Find one early and one late passage involving civic reconciliation. What changed in the meaning of the idea, and what caused the change?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 CHARACTERS AS ARGUMENTS
@@ -404,8 +398,7 @@ Athenian jurors should be read as more than a plot function. In The Eumenides, t
 
 Also watch how other speakers describe Athenian jurors. Reputation in classical literature is rarely neutral. Praise, accusation, genealogy, rumor, prophecy, lament, and public speech create competing versions of the same person. Compare self-description with description by enemies, allies, family, chorus, narrator, or gods. The distance between these portraits often reveals the work’s deepest uncertainty about motive and responsibility. A good seminar question is: what does the audience know about Athenian jurors that no single character in the work can fully know?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 LANGUAGE, FORM, AND CLOSE READING
@@ -418,8 +411,7 @@ For oral works, drama, and epic, sound matters as well. Repetition, formal addre
 
 Finally, distinguish dramatic or narrative irony from simple contradiction. The audience may possess information a character lacks, or may see that two characters speak partial truths that cannot be reconciled within the available institutions. That gap creates much of the intellectual pleasure of classical reading. It lets The Eumenides ask the reader to judge without giving the reader the comfort of perfect innocence.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 HISTORICAL AND CULTURAL LENSES
@@ -430,8 +422,7 @@ At the same time, avoid the opposite mistake of treating the work as a museum pi
 
 Translation is another part of context. Different English versions can make a speaker sound archaic, conversational, formal, brutal, lyrical, or psychologically modern. If a sentence seems especially important, compare two translations or consult a note on the underlying Greek term. You do not need Greek to benefit from this practice. The purpose is to remember that interpretive confidence should remain proportional to what the translation can securely carry.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 THE GREAT CONVERSATION — COMPARATIVE PATHS
@@ -448,8 +439,7 @@ Reading The Eumenides beside Sophocles — Antigone sharpens the Great Books con
 The Eumenides AND Plato — Laws
 Reading The Eumenides beside Plato — Laws sharpens the Great Books conversation around divine conflict. The point of comparison is not to force the works into agreement, but to notice that each assigns different weight to authority, character, institutions, divine order, historical circumstance, and consequences. Begin with one concrete scene or claim from The Eumenides, then ask what the other work would recognize, reject, or redescribe. This produces a more useful comparison than simply listing shared themes. It also makes visible a long-running Western argument: whether moral order is discovered, inherited, negotiated, legislated, narrated, or painfully built after older forms of order fail.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 INTERPRETIVE POSITIONS TO TEST
@@ -464,8 +454,7 @@ POSITION 4 — The work ultimately endorses the victorious or surviving position
 
 POSITION 5 — Modern moral categories are enough to settle the work. Test this by identifying at least one ancient institution or obligation that changes the terms of judgment. Then reverse the exercise: identify one feature of the work that invites criticism of its own inherited world. The best reading is historically informed without surrendering moral intelligence.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 SEMINAR PREPARATION — TWELVE QUESTIONS
@@ -483,8 +472,7 @@ SEMINAR PREPARATION — TWELVE QUESTIONS
 11. Does the ending resolve the central conflict, transform it, or merely contain it?
 12. What would a reader of Agamemnon notice in The Eumenides that a first-time reader might miss?
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 REREADING PLAN
@@ -509,8 +497,7 @@ Next place the passage within the whole of The Eumenides. What happened immediat
 
 Finally connect the passage to the moral problem of the work: whether institutions can transform inherited violence into public justice without simply erasing older claims. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -522,8 +509,7 @@ Next place the passage within the whole of The Eumenides. What happened immediat
 
 Finally connect the passage to the moral problem of the work: whether institutions can transform inherited violence into public justice without simply erasing older claims. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -535,8 +521,7 @@ Next place the passage within the whole of The Eumenides. What happened immediat
 
 Finally connect the passage to the moral problem of the work: whether institutions can transform inherited violence into public justice without simply erasing older claims. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -548,8 +533,7 @@ Next place the passage within the whole of The Eumenides. What happened immediat
 
 Finally connect the passage to the moral problem of the work: whether institutions can transform inherited violence into public justice without simply erasing older claims. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -561,8 +545,7 @@ Next place the passage within the whole of The Eumenides. What happened immediat
 
 Finally connect the passage to the moral problem of the work: whether institutions can transform inherited violence into public justice without simply erasing older claims. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -574,8 +557,7 @@ Next place the passage within the whole of The Eumenides. What happened immediat
 
 Finally connect the passage to the moral problem of the work: whether institutions can transform inherited violence into public justice without simply erasing older claims. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -587,8 +569,7 @@ Next place the passage within the whole of The Eumenides. What happened immediat
 
 Finally connect the passage to the moral problem of the work: whether institutions can transform inherited violence into public justice without simply erasing older claims. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -600,8 +581,7 @@ Next place the passage within the whole of The Eumenides. What happened immediat
 
 Finally connect the passage to the moral problem of the work: whether institutions can transform inherited violence into public justice without simply erasing older claims. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
-[[MSG:DISCUSS]]
-[[MSG:SECTIONQUIZ]]
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 ABOUT THIS GUIDE
@@ -640,7 +620,4 @@ Answer: They threaten the city because they believe their ancient honor and func
 8. How does Athena resolve the final conflict?
 Answer: She persuades the Furies to accept an honored civic role, transforming them into the Eumenides.
 
-[[MSG:IDEAS]]
-[[MSG:ACTION]]
-[[MSG:QUIZ]]
-[[MSG:BUY]]
+[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]

@@ -3257,12 +3257,13 @@ function setWordContent(element, word, index = null) {
       ? Number(index)
       : Number(element?.dataset?.index ?? element?.dataset?.startIndex);
 
-    element.classList.add('modern-guide-action-word');
+    const guideClassPrefix = state.source?.classicGuide ? 'classic-guide' : 'modern-guide';
+    element.classList.add(`${guideClassPrefix}-action-word`);
     element.dataset.guideAction = guideAction;
 
     if (guideAction === 'buy' && state.source?.buyUrl) {
       const link = document.createElement('a');
-      link.className = 'modern-guide-inline-action modern-guide-inline-buy';
+      link.className = `${guideClassPrefix}-inline-action ${guideClassPrefix}-inline-buy`;
       link.href = state.source.buyUrl;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
@@ -3275,7 +3276,7 @@ function setWordContent(element, word, index = null) {
     const button = document.createElement('button');
     button.type = 'button';
     const actionClass = guideAction === 'action' ? 'add' : guideAction;
-    button.className = `modern-guide-inline-action modern-guide-inline-${actionClass}`;
+    button.className = `${guideClassPrefix}-inline-action ${guideClassPrefix}-inline-${actionClass}`;
     button.dataset.modernGuideInlineAction = guideAction;
     if (Number.isFinite(resolvedIndex)) button.dataset.guideWordIndex = String(resolvedIndex);
     button.textContent = modernGuideActionLabel(guideAction);
@@ -9920,7 +9921,7 @@ function isModernGuideActionToken(word) {
 function modernGuideActionLabel(action) {
   return ({
     section: '',
-    discuss: 'Discuss with Mark',
+    discuss: 'Discuss with reading companion',
     sectionquiz: 'Quiz me',
     quiz: 'Quiz me on the whole guide',
     action: 'Add to Action Center',

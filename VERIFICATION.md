@@ -1,40 +1,34 @@
-# Verification — Classic Guides 21–40 + section quizzes
+# Classic Guides 40 — horizontal section quizzes / toolbar verification
 
-Baseline: exact user-uploaded `mark-set-go-web-feature-ask-mark-premium-phase-1 (7).zip`.
+Built from the user-supplied full ZIP `mark-set-go-web-feature-ask-mark-premium-phase-1 (7).zip`, with the prior 40-guide content overlaid, then corrected in the executing `public/` runtime only.
 
-## Requested behavior
+## Required implementation
 
-- Classic Guides 21–40 added in Great Books order after Herodotus.
-- All 40 Classic Guides now contain one or more `Quiz me` checkpoints.
-- A section-level `Quiz me` submits only the preceding substantive guide section to the existing `/api/comprehension` flow.
-- The existing `Quiz me on the whole guide` action remains unchanged in purpose.
-- Existing approved bottom action-toolbar CSS was not modified; horizontal/wrapping behavior is preserved from the current baseline.
-- Root and `public/` copies are both included and matched.
+- Classic Guide action renderer uses the same Modern Guide JavaScript structure; only the CSS class prefix changes from `modern-guide-*` to `classic-guide-*` when `source.classicGuide` is true.
+- Classic Guide CSS is a direct copy of the final Modern Guide horizontal action contract with only the class prefix changed.
+- Both Modern and Classic visible discussion labels read `Discuss with reading companion`.
+- Section source markers are on one source line: `[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]`.
+- Bottom source markers exactly replicate the Modern Guide generator pattern: `[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]`.
 
-## Checks actually run
+## Checks performed
 
-- `node --check app.js`: PASS
-- `node --check public/app.js`: PASS
-- `app.js` / `public/app.js` parity: PASS
-- `index.html` / `public/index.html` parity: PASS
-- `styles.css` / `public/styles.css` parity: PASS
-- Canonical Classic Guide count in root: 40
-- All 40 canonical Classic Guide text files mirrored byte-for-byte to `public/`: PASS
-- Guide word-count range: 8,836–9,398 words
-- New 20 all within Modern Guide target range: PASS
-- All 40 have section-level quiz checkpoints: PASS
-- Total section quiz checkpoints: 1,027
-- Every section quiz passage is 120–1,200 words, matching the existing comprehension endpoint limits: PASS
-- First 20 existing guide texts preserved exactly after removing only newly inserted section-quiz markers: PASS
-- Next 20 registry entries present: PASS
-- New 20 metadata root/public parity + JSON validation: PASS
-- Existing approved horizontal toolbar CSS byte-for-byte unchanged from uploaded baseline: PASS
-- No new `MutationObserver` in app diff: PASS
-- No right-click/context-menu code changed in app diff: PASS
-- `public/reader/` directory unchanged from uploaded baseline: PASS
-- `modules/reading/` directory unchanged from uploaded baseline: PASS
-- `PROTECTED-READER-SHA256.txt` unchanged: PASS
-- `READER-CORE-SHA256SUMS.txt` unchanged: PASS
-- Runtime unit test of section boundaries, API payload, `guide_section` scope, render handoff, and button dispatch: PASS
-- Root and public app cache-bust key updated: PASS
-- Chromium regression: **SKIPPED BY USER FOR THIS REQUEST**
+- 40 canonical Classic Guide text files: PASS
+- Section quiz checkpoints across 40 guides: 1027 total; 14–33 per guide: PASS
+- Exactly one whole-guide quiz marker per guide: PASS
+- Bottom action marker row on one source line for all 40: PASS
+- Public app.js Node syntax check: PASS
+- Classic Guide renderer class-prefix logic: PASS
+- Visible `Discuss with reading companion` label: PASS
+- Classic CSS primary layout properties exact-copy Modern Guide: PASS
+- Root app.js/styles.css/index.html left unchanged: PASS
+- Protected `public/reader` and `modules/reading` directories unchanged from supplied baseline: PASS
+- MutationObserver occurrence count in public/app.js unchanged from supplied baseline: PASS (none added)
+- Chromium computed geometry: PASS
+  - Section Discuss + Quiz me: same Y coordinate
+  - Bottom first three actions: same Y coordinate
+  - Buy wraps to next row at the tested width because the four-button total does not fit
+  - Modern Guide reference produces the same horizontal/wrapping pattern
+- Chromium screenshot visually inspected: PASS
+- ZIP integrity: performed after packaging
+
+Chromium navigation to localhost/file URLs is blocked by the environment's administrator policy. To still execute the real Chromium layout engine, the executing `public/styles.css` and exact runtime action markup were injected into a Chromium page through DevTools `Page.setDocumentContent`; computed bounding boxes and a screenshot were then captured from Chromium itself.
