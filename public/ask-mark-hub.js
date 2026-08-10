@@ -740,14 +740,6 @@
     const candidate = $('.reader-control-shell.mark-shell');
     if (!candidate) return false;
 
-    /*
-      v9.7.3 Reader Workspace integration.
-      The app now owns the persistent Read / Companion / Notes / Progress / Study /
-      Contents shell. Ask Mark/Beth must mount INSIDE the Companion panel instead of
-      replacing the whole reader-control shell. Replacing candidate's children was
-      the reason the new workspace tabs disappeared and only the old companion UI
-      remained visible.
-    */
     const workspaceCompanion = candidate.querySelector('#mark-selection-panel[data-mark-panel="selection"]');
     const mount = workspaceCompanion || candidate;
 
@@ -762,15 +754,10 @@
     shell.dataset.premiumConfigured = '1';
 
     if (workspaceCompanion) {
-      // Preserve the workspace header, six tabs, and every non-Companion panel.
-      // Only replace the legacy contents of the Companion panel with the premium
-      // writing/chat experience.
       workspaceCompanion.replaceChildren();
       workspaceCompanion.insertAdjacentHTML('beforeend', premiumMarkup());
       legacyHost = null;
     } else {
-      // Backward-compatible fallback for older reader shells that do not yet have
-      // the workspace panel structure.
       legacyHost = document.createElement('div');
       legacyHost.className = 'askmark-legacy-host';
       legacyHost.hidden = true;

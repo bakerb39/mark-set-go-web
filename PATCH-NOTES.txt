@@ -1,14 +1,20 @@
-Mark, Set, Go! — Reader Workspace integration v9.7.3
-Built from the exact full project ZIP supplied in this turn.
+Mark, Set, Go! Reader Workspace UI Repair v9.7.4
 
-Fix:
-- Preserves the existing Reader Workspace shell and six tabs:
-  Read | Companion | Notes | Progress | Study | Contents
-- Fixes ask-mark-hub.js so the premium Ask Mark/Beth interface mounts only inside
-  the Companion panel instead of replacing the entire workspace shell.
-- Companion retains the full premium chat/writing composer.
-- Progress, Study, Contents, Notes and Read panels remain available in the same right rail.
-- Desktop persistent workspace behavior already present in the supplied app.js is preserved.
-- Reader engine files were not modified.
+Built from the exact public/ files in the user's latest full source ZIP (10).
 
-Files are intentionally under public/.
+Fixes:
+- Keeps Ask Mark/Beth inside the Companion tab instead of replacing the workspace shell.
+- Forces the six workspace tabs into a fixed horizontal navigation row.
+- Prevents old .mark-tabs CSS from stretching the tabs vertically.
+- Prevents saved 320px panel widths from crushing the workspace on desktop.
+- Gives Progress KPIs a clean second row and keeps the two charts side by side on desktop.
+- Preserves the full Companion writing/chat panel.
+- Cache-busts reader-workspace-shell.css and ask-mark-hub.js.
+
+Files changed under public/ only:
+- app.js
+- ask-mark-hub.js
+- reader-workspace-shell.css
+- index.html
+
+Protected reader engine files were not changed.
