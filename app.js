@@ -3045,11 +3045,113 @@ const CLASSIC_GUIDES = Object.freeze({
   'Sophocles Oedipus Colonus': { id:'classic-oedipus-colonus', slug:'oedipus-at-colonus', title:"Oedipus at Colonus", author:"Sophocles" },
   'Sophocles Oedipus Rex': { id:'classic-oedipus-king', slug:'oedipus-the-king', title:"Oedipus the King", author:"Sophocles" },
   'Sophocles plays': { id:'classic-sophocles-plays', slug:'sophocles-plays', title:"Sophocles \u2014 Plays", author:"Sophocles" },
-  'Herodotus Persian Wars': { id:'classic-herodotus-persian-wars', slug:'herodotus-persian-wars', title:"The History of the Persian Wars", author:"Herodotus" }
+  'Herodotus Persian Wars': { id:'classic-herodotus-persian-wars', slug:'herodotus-persian-wars', title:"The History of the Persian Wars", author:"Herodotus" },
+  "Thucydides Peloponnesian War": { id:"classic-thucydides-peloponnesian-war", slug:"thucydides-peloponnesian-war", title:"The History of the Peloponnesian War", author:"Thucydides" },
+  "Plato Apology": { id:"classic-plato-apology", slug:"plato-apology", title:"Apology", author:"Plato" },
+  "Plato Crito": { id:"classic-plato-crito", slug:"plato-crito", title:"Crito", author:"Plato" },
+  "Plato Dialogues": { id:"classic-plato-dialogues", slug:"plato-dialogues", title:"Dialogues and The Seventh Letter", author:"Plato" },
+  "Plato Laws": { id:"classic-plato-laws", slug:"plato-laws", title:"Laws", author:"Plato" },
+  "Plato Phaedo": { id:"classic-plato-phaedo", slug:"plato-phaedo", title:"Phaedo", author:"Plato" },
+  "Plato Phaedrus": { id:"classic-plato-phaedrus", slug:"plato-phaedrus", title:"Phaedrus", author:"Plato" },
+  "Plato Republic": { id:"classic-plato-republic", slug:"plato-republic", title:"Republic", author:"Plato" },
+  "Plato Symposium": { id:"classic-plato-symposium", slug:"plato-symposium", title:"Symposium", author:"Plato" },
+  "Plato Theaetetus": { id:"classic-plato-theaetetus", slug:"plato-theaetetus", title:"Theaetetus", author:"Plato" },
+  "Plato Timaeus": { id:"classic-plato-timaeus", slug:"plato-timaeus", title:"Timaeus", author:"Plato" },
+  "Aristotle Categories": { id:"classic-aristotle-categories", slug:"aristotle-categories", title:"Categories", author:"Aristotle" },
+  "Aristotle Metaphysics": { id:"classic-aristotle-metaphysics", slug:"aristotle-metaphysics", title:"Metaphysics", author:"Aristotle" },
+  "Aristotle On Interpretation": { id:"classic-aristotle-on-interpretation", slug:"aristotle-on-interpretation", title:"On Interpretation", author:"Aristotle" },
+  "Aristotle Physics": { id:"classic-aristotle-physics", slug:"aristotle-physics", title:"Physics", author:"Aristotle" },
+  "Aristotle Posterior Analytics": { id:"classic-aristotle-posterior-analytics", slug:"aristotle-posterior-analytics", title:"Posterior Analytics", author:"Aristotle" },
+  "Aristotle Prior Analytics": { id:"classic-aristotle-prior-analytics", slug:"aristotle-prior-analytics", title:"Prior Analytics", author:"Aristotle" },
+  "Aristotle works::Works, Volume I": { id:"classic-aristotle-works-volume-i", slug:"aristotle-works-volume-i", title:"Works, Volume I", author:"Aristotle" },
+  "Aristotle Nicomachean Ethics": { id:"classic-aristotle-nicomachean-ethics", slug:"aristotle-nicomachean-ethics", title:"Nicomachean Ethics", author:"Aristotle" },
+  "Aristotle On the Soul": { id:"classic-aristotle-on-the-soul", slug:"aristotle-on-the-soul", title:"On the Soul", author:"Aristotle" },
+  "Aristotle Poetics": { id:"classic-aristotle-poetics", slug:"aristotle-poetics", title:"Poetics", author:"Aristotle" },
+  "Aristotle Politics": { id:"classic-aristotle-politics", slug:"aristotle-politics", title:"Politics", author:"Aristotle" },
+  "Aristotle Rhetoric": { id:"classic-aristotle-rhetoric", slug:"aristotle-rhetoric", title:"Rhetoric", author:"Aristotle" },
+  "Aristotle works::Works, Volume II": { id:"classic-aristotle-works-volume-ii", slug:"aristotle-works-volume-ii", title:"Works, Volume II", author:"Aristotle" },
+  "Galen Natural Faculties": { id:"classic-galen-natural-faculties", slug:"galen-natural-faculties", title:"On the Natural Faculties", author:"Galen" },
+  "Hippocrates works": { id:"classic-hippocrates-works", slug:"hippocrates-works", title:"Works", author:"Hippocrates" },
+  "Archimedes works": { id:"classic-archimedes-works", slug:"archimedes-works", title:"Works", author:"Archimedes" },
+  "Euclid Elements": { id:"classic-euclid-elements", slug:"euclid-elements", title:"Elements", author:"Euclid" },
+  "Nicomachus Introduction Arithmetic": { id:"classic-nicomachus-introduction-arithmetic", slug:"nicomachus-introduction-arithmetic", title:"Introduction to Arithmetic", author:"Nicomachus" },
+  "Epictetus Discourses": { id:"classic-epictetus-discourses", slug:"epictetus-discourses", title:"Discourses", author:"Epictetus" },
+  "Lucretius Nature Things": { id:"classic-lucretius-way-things-are", slug:"lucretius-way-things-are", title:"The Way Things Are", author:"Lucretius" },
+  "Marcus Aurelius Meditations": { id:"classic-marcus-aurelius-meditations", slug:"marcus-aurelius-meditations", title:"Meditations", author:"Marcus Aurelius" },
+  "Plotinus Enneads": { id:"classic-plotinus-six-enneads", slug:"plotinus-six-enneads", title:"The Six Enneads", author:"Plotinus" },
+  "Virgil Aeneid": { id:"classic-virgil-eclogues-georgics-aeneid", slug:"virgil-eclogues-georgics-aeneid", title:"Eclogues, Georgics, and The Aeneid", author:"Virgil" },
+  "Plutarch Lives": { id:"classic-plutarch-lives", slug:"plutarch-lives", title:"The Lives of the Noble Grecians and Romans", author:"Plutarch" },
+  "Tacitus Annals Histories": { id:"classic-tacitus-annals-histories", slug:"tacitus-annals-histories", title:"The Annals and The Histories", author:"Tacitus" },
+  "Kepler Copernican Astronomy Harmonies World": { id:"classic-kepler-copernican-astronomy-harmonies", slug:"kepler-copernican-astronomy-harmonies", title:"Epitome of Copernican Astronomy and Harmonies of the World", author:"Johannes Kepler" },
+  "Copernicus Revolutions Heavenly Spheres": { id:"classic-copernicus-revolutions-heavenly-spheres", slug:"copernicus-revolutions-heavenly-spheres", title:"On the Revolutions of the Heavenly Spheres", author:"Nicolaus Copernicus" },
+  "Ptolemy Almagest": { id:"classic-ptolemy-almagest", slug:"ptolemy-almagest", title:"The Almagest", author:"Ptolemy" },
+  "Augustine Christian Doctrine": { id:"classic-augustine-on-christian-doctrine", slug:"augustine-on-christian-doctrine", title:"On Christian Doctrine", author:"Saint Augustine" },
+  "Augustine City of God": { id:"classic-augustine-city-of-god", slug:"augustine-city-of-god", title:"The City of God", author:"Saint Augustine" },
+  "Augustine Confessions": { id:"classic-augustine-confessions", slug:"augustine-confessions", title:"The Confessions", author:"Saint Augustine" },
+  "Aquinas Summa Theologica::Summa Theologica, Part I": { id:"classic-aquinas-summa-part-i", slug:"aquinas-summa-part-i", title:"Summa Theologica, Part I", author:"Thomas Aquinas" },
+  "Aquinas Summa Theologica::Summa Theologica, Part II": { id:"classic-aquinas-summa-part-ii", slug:"aquinas-summa-part-ii", title:"Summa Theologica, Part II", author:"Thomas Aquinas" },
+  "Dante Divine Comedy": { id:"classic-dante-divine-comedy", slug:"dante-divine-comedy", title:"The Divine Comedy", author:"Dante Alighieri" },
+  "Chaucer Canterbury Tales": { id:"classic-chaucer-canterbury-tales", slug:"chaucer-canterbury-tales", title:"The Canterbury Tales", author:"Geoffrey Chaucer" },
+  "Chaucer Troilus Criseyde": { id:"classic-chaucer-troilus-and-criseyde", slug:"chaucer-troilus-and-criseyde", title:"Troilus and Criseyde", author:"Geoffrey Chaucer" },
+  "Calvin Institutes Christian Religion": { id:"classic-calvin-institutes", slug:"calvin-institutes", title:"Institutes of the Christian Religion", author:"John Calvin" },
+  "Machiavelli Prince": { id:"classic-machiavelli-prince", slug:"machiavelli-prince", title:"The Prince", author:"Niccolò Machiavelli" },
+  "Hobbes Leviathan": { id:"classic-hobbes-leviathan", slug:"hobbes-leviathan", title:"Leviathan", author:"Thomas Hobbes" },
+  "Rabelais Gargantua Pantagruel": { id:"classic-rabelais-gargantua-pantagruel", slug:"rabelais-gargantua-pantagruel", title:"Gargantua and Pantagruel", author:"François Rabelais" },
+  "Erasmus Praise Folly": { id:"classic-erasmus-praise-of-folly", slug:"erasmus-praise-of-folly", title:"Praise of Folly", author:"Desiderius Erasmus" },
+  "Montaigne Essays": { id:"classic-montaigne-essays", slug:"montaigne-essays", title:"Essays", author:"Michel de Montaigne" },
+  "Montaigne Of Cannibals": { id:"classic-montaigne-of-cannibals", slug:"montaigne-of-cannibals", title:"Of Cannibals", author:"Michel de Montaigne" },
+  "Montaigne Of Experience": { id:"classic-montaigne-of-experience", slug:"montaigne-of-experience", title:"Of Experience", author:"Michel de Montaigne" },
+  "Shakespeare Hamlet": { id:"classic-shakespeare-hamlet", slug:"shakespeare-hamlet", title:"Hamlet", author:"William Shakespeare" },
+  "Shakespeare Julius Caesar": { id:"classic-shakespeare-julius-caesar", slug:"shakespeare-julius-caesar", title:"Julius Caesar", author:"William Shakespeare" },
+  "Shakespeare King Lear": { id:"classic-shakespeare-king-lear", slug:"shakespeare-king-lear", title:"King Lear", author:"William Shakespeare" },
+  "Shakespeare Macbeth": { id:"classic-shakespeare-macbeth", slug:"shakespeare-macbeth", title:"Macbeth", author:"William Shakespeare" },
+  "Shakespeare Othello": { id:"classic-shakespeare-othello", slug:"shakespeare-othello", title:"Othello", author:"William Shakespeare" },
+  "Shakespeare plays": { id:"classic-shakespeare-plays-volume-i", slug:"shakespeare-plays-volume-i", title:"Plays, Volume I", author:"William Shakespeare" },
+  "Shakespeare Romeo Juliet": { id:"classic-shakespeare-romeo-and-juliet", slug:"shakespeare-romeo-and-juliet", title:"Romeo and Juliet", author:"William Shakespeare" },
+  "Shakespeare Tempest": { id:"classic-shakespeare-tempest", slug:"shakespeare-tempest", title:"The Tempest", author:"William Shakespeare" },
+  "Shakespeare Midsummer Night Dream": { id:"classic-shakespeare-midsummer-nights-dream", slug:"shakespeare-midsummer-nights-dream", title:"A Midsummer Night's Dream", author:"William Shakespeare" },
+  "Shakespeare Much Ado": { id:"classic-shakespeare-much-ado-about-nothing", slug:"shakespeare-much-ado-about-nothing", title:"Much Ado About Nothing", author:"William Shakespeare" },
+  "Shakespeare Sonnets plays": { id:"classic-shakespeare-plays-volume-ii-and-sonnets", slug:"shakespeare-plays-volume-ii-and-sonnets", title:"Plays, Volume II and Sonnets", author:"William Shakespeare" },
+  "Shakespeare Sonnets": { id:"classic-shakespeare-sonnets", slug:"shakespeare-sonnets", title:"Sonnets", author:"William Shakespeare" },
+  "Shakespeare Merchant Venice": { id:"classic-shakespeare-merchant-of-venice", slug:"shakespeare-merchant-of-venice", title:"The Merchant of Venice", author:"William Shakespeare" },
+  "Shakespeare Twelfth Night": { id:"classic-shakespeare-twelfth-night", slug:"shakespeare-twelfth-night", title:"Twelfth Night", author:"William Shakespeare" },
+  "Galileo Two New Sciences": { id:"classic-galileo-two-new-sciences", slug:"galileo-two-new-sciences", title:"Dialogues Concerning the Two New Sciences", author:"Galileo Galilei" },
+  "William Gilbert Loadstone": { id:"classic-william-gilbert-loadstone", slug:"william-gilbert-loadstone", title:"On the Loadstone and Magnetic Bodies", author:"William Gilbert" },
+  "William Harvey heart blood animals": { id:"classic-william-harvey-heart-blood-generation", slug:"william-harvey-heart-blood-generation", title:"Works on the Heart, Blood, and Generation", author:"William Harvey" },
+  "Cervantes Don Quixote": { id:"classic-cervantes-don-quixote", slug:"cervantes-don-quixote", title:"Don Quixote", author:"Miguel de Cervantes" },
+  "Spinoza Ethics": { id:"classic-spinoza-ethics", slug:"spinoza-ethics", title:"Ethics", author:"Benedict de Spinoza" },
+  "Francis Bacon Novum Organum": { id:"classic-francis-bacon-advancement-novum-new-atlantis", slug:"francis-bacon-advancement-novum-new-atlantis", title:"Advancement of Learning, Novum Organum, and New Atlantis", author:"Francis Bacon" },
+  "Bacon New Atlantis": { id:"classic-bacon-new-atlantis", slug:"bacon-new-atlantis", title:"New Atlantis", author:"Francis Bacon" },
+  "Bacon Novum Organum": { id:"classic-bacon-novum-organum", slug:"bacon-novum-organum", title:"Novum Organum", author:"Francis Bacon" },
+  "Bacon Advancement Learning": { id:"classic-bacon-advancement-of-learning", slug:"bacon-advancement-of-learning", title:"The Advancement of Learning", author:"Francis Bacon" },
+  "Descartes Discourse Method": { id:"classic-descartes-discourse-on-method", slug:"descartes-discourse-on-method", title:"Discourse on the Method", author:"René Descartes" },
+  "Descartes Discourse Method Meditations": { id:"classic-descartes-major-philosophical-works", slug:"descartes-major-philosophical-works", title:"Major Philosophical Works", author:"René Descartes" },
+  "Descartes Meditations": { id:"classic-descartes-meditations", slug:"descartes-meditations", title:"Meditations on First Philosophy", author:"René Descartes" },
+  "Milton Paradise Lost": { id:"classic-milton-paradise-lost", slug:"milton-paradise-lost", title:"Paradise Lost and Other Works", author:"John Milton" },
+  "Pascal Pensees": { id:"classic-pascal-pensees", slug:"pascal-pensees", title:"Pensées", author:"Blaise Pascal" },
+  "Pascal Pensees": { id:"classic-pascal-provincial-pensees-science", slug:"pascal-provincial-pensees-science", title:"Provincial Letters, Pensées, and Scientific Treatises", author:"Blaise Pascal" },
+  "Racine Phaedra Berenice": { id:"classic-racine-berenice-phaedra", slug:"racine-berenice-phaedra", title:"Berenice and Phaedra", author:"Jean Racine" },
+  "Moliere plays": { id:"classic-moliere-major-plays", slug:"moliere-major-plays", title:"Major Plays", author:"Molière" },
+  "Huygens Treatise Light": { id:"classic-huygens-treatise-on-light", slug:"huygens-treatise-on-light", title:"Treatise on Light", author:"Christiaan Huygens" },
+  "Newton Principia Opticks": { id:"classic-newton-principia-opticks", slug:"newton-principia-opticks", title:"Mathematical Principles of Natural Philosophy and Optics", author:"Isaac Newton" },
+  "Hume Enquiry Human Understanding": { id:"classic-hume-enquiry-human-understanding", slug:"hume-enquiry-human-understanding", title:"An Enquiry Concerning Human Understanding", author:"David Hume" },
+  "Berkeley Human Knowledge": { id:"classic-berkeley-principles-human-knowledge", slug:"berkeley-principles-human-knowledge", title:"The Principles of Human Knowledge", author:"George Berkeley" },
+  "Locke Letter Toleration": { id:"classic-locke-letter-concerning-toleration", slug:"locke-letter-concerning-toleration", title:"A Letter Concerning Toleration", author:"John Locke" },
+  "Locke Human Understanding Government": { id:"classic-locke-human-understanding-government-toleration", slug:"locke-human-understanding-government-toleration", title:"A Letter Concerning Toleration, Civil Government, and Human Understanding", author:"John Locke" },
+  "Locke Human Understanding": { id:"classic-locke-essay-human-understanding", slug:"locke-essay-human-understanding", title:"An Essay Concerning Human Understanding", author:"John Locke" },
+  "Locke Second Treatise Government": { id:"classic-locke-second-treatise-government", slug:"locke-second-treatise-government", title:"Second Treatise of Government", author:"John Locke" },
+  "Diderot Rameau Nephew": { id:"classic-diderot-rameaus-nephew", slug:"diderot-rameaus-nephew", title:"Rameau’s Nephew", author:"Denis Diderot" },
+  "Swift Gulliver Travels": { id:"classic-swift-gullivers-travels", slug:"swift-gullivers-travels", title:"Gulliver’s Travels", author:"Jonathan Swift" },
+  "Voltaire Candide": { id:"classic-voltaire-candide", slug:"voltaire-candide", title:"Candide", author:"Voltaire" },
+  "Rousseau Discourse Inequality": { id:"classic-rousseau-discourse-on-inequality", slug:"rousseau-discourse-on-inequality", title:"Discourse on Inequality", author:"Jean-Jacques Rousseau" },
+  "Rousseau Social Contract": { id:"classic-rousseau-political-writings-social-contract", slug:"rousseau-political-writings-social-contract", title:"Political Writings including The Social Contract", author:"Jean-Jacques Rousseau" },
+  "Rousseau Social Contract": { id:"classic-rousseau-social-contract", slug:"rousseau-social-contract", title:"The Social Contract", author:"Jean-Jacques Rousseau" }
 });
 
 function classicGuideForGreatBook(book) {
-  return CLASSIC_GUIDES[String(book?.query || '')] || null;
+  const query = String(book?.query || '');
+  const titleKey = `${query}::${String(book?.title || '')}`;
+  return CLASSIC_GUIDES[titleKey] || CLASSIC_GUIDES[query] || null;
 }
 
 function classicGuidePathForGreatBook(book) {
@@ -3235,12 +3337,13 @@ function setWordContent(element, word, index = null) {
       ? Number(index)
       : Number(element?.dataset?.index ?? element?.dataset?.startIndex);
 
-    element.classList.add('modern-guide-action-word');
+    const guideClassPrefix = state.source?.classicGuide ? 'classic-guide' : 'modern-guide';
+    element.classList.add(`${guideClassPrefix}-action-word`);
     element.dataset.guideAction = guideAction;
 
     if (guideAction === 'buy' && state.source?.buyUrl) {
       const link = document.createElement('a');
-      link.className = 'modern-guide-inline-action modern-guide-inline-buy';
+      link.className = `${guideClassPrefix}-inline-action ${guideClassPrefix}-inline-buy`;
       link.href = state.source.buyUrl;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
@@ -3253,7 +3356,7 @@ function setWordContent(element, word, index = null) {
     const button = document.createElement('button');
     button.type = 'button';
     const actionClass = guideAction === 'action' ? 'add' : guideAction;
-    button.className = `modern-guide-inline-action modern-guide-inline-${actionClass}`;
+    button.className = `${guideClassPrefix}-inline-action ${guideClassPrefix}-inline-${actionClass}`;
     button.dataset.modernGuideInlineAction = guideAction;
     if (Number.isFinite(resolvedIndex)) button.dataset.guideWordIndex = String(resolvedIndex);
     button.textContent = modernGuideActionLabel(guideAction);
@@ -5378,8 +5481,6 @@ const READING_ACTIVITY_KEY = 'markSetGoReadingActivityV1';
 const COMPREHENSION_RESULTS_KEY = 'markSetGoComprehensionV1';
 const COMPREHENSION_POSITION_KEY = 'markSetGoComprehensionPositionV1';
 const READING_GOAL_KEY = 'markSetGoAnnualReadingGoalV1';
-const READING_SPEED_GOAL_KEY = 'markSetGoReadingSpeedGoalV1';
-const READING_COMPREHENSION_GOAL_KEY = 'markSetGoReadingComprehensionGoalV1';
 const READING_AWARDS_KEY = 'markSetGoReadingAwardsV1';
 
 const LEARNING_ACTIVITY_KEY = 'markSetGoLearningActivityV1';
@@ -5885,28 +5986,6 @@ function setAnnualReadingGoal(value) {
   return goal;
 }
 
-function getReadingSpeedGoal() {
-  const stored = Number(localStorage.getItem(READING_SPEED_GOAL_KEY));
-  return Number.isFinite(stored) && stored >= 50 ? Math.min(1200, Math.round(stored)) : 350;
-}
-
-function setReadingSpeedGoal(value) {
-  const goal = Math.max(50, Math.min(1200, Math.round(Number(value) || 350)));
-  localStorage.setItem(READING_SPEED_GOAL_KEY, String(goal));
-  return goal;
-}
-
-function getReadingComprehensionGoal() {
-  const stored = Number(localStorage.getItem(READING_COMPREHENSION_GOAL_KEY));
-  return Number.isFinite(stored) && stored >= 50 ? Math.min(100, Math.round(stored)) : 85;
-}
-
-function setReadingComprehensionGoal(value) {
-  const goal = Math.max(50, Math.min(100, Math.round(Number(value) || 85)));
-  localStorage.setItem(READING_COMPREHENSION_GOAL_KEY, String(goal));
-  return goal;
-}
-
 function completedBooksThisYear(progress, readingList) {
   const year = new Date().getFullYear();
   const ids = new Set();
@@ -5995,43 +6074,6 @@ function lineChartSvg(data, valueKey, { label = '', suffix = '', empty = 'No tre
     }).join('')}
     ${nonzero ? `<polyline points="${polyline}" class="chart-line"/>${points.map((p) => `<circle cx="${p.x}" cy="${p.y}" r="3.5"><title>${escapeSvg(p.row.label)}: ${(Number(p.row[valueKey])||0).toLocaleString()}${escapeSvg(suffix)}</title></circle>`).join('')}` : `<text x="${width/2}" y="${height/2}" text-anchor="middle" class="chart-empty">${escapeSvg(empty)}</text>`}
     ${points.filter((_,i)=>i===0 || i===points.length-1 || i%7===0).map((p) => `<text x="${p.x}" y="${height-12}" text-anchor="middle">${escapeSvg(p.row.label)}</text>`).join('')}
-  </svg>`;
-}
-
-function yearlyPerformanceChartSvg(data, valueKey, { label = '', suffix = '', goal = 0, kind = 'speed' } = {}) {
-  const width=920,height=270,left=54,right=24,top=20,bottom=42;
-  const values=data.map((row)=>Number(row[valueKey])||0);
-  const hasData=values.some((value)=>value>0);
-  const baseMax=kind==='comprehension' ? 100 : Math.max(400, goal, ...values);
-  const max=kind==='comprehension' ? 100 : Math.ceil(baseMax/50)*50;
-  const min=0;
-  const usableW=width-left-right, usableH=height-top-bottom;
-  const x=(index)=>left+(data.length===1?usableW/2:index*usableW/Math.max(1,data.length-1));
-  const y=(value)=>top+usableH-((Math.max(min,Math.min(max,Number(value)||0))-min)/Math.max(1,max-min))*usableH;
-  const points=data.map((row,index)=>({x:x(index),y:y(row[valueKey]),row,value:Number(row[valueKey])||0}));
-  const valid=points.filter((point)=>point.value>0);
-  const linePoints=valid.map((point)=>`${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
-  const areaPath=valid.length>1
-    ? `M ${valid[0].x.toFixed(1)} ${top+usableH} L ${valid.map((point)=>`${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' L ')} L ${valid[valid.length-1].x.toFixed(1)} ${top+usableH} Z`
-    : '';
-  const goalY=y(goal);
-  const gradientId=`performance-${kind}-gradient`;
-  const lineClass=kind==='comprehension'?'performance-line-comprehension':'performance-line-speed';
-  const areaClass=kind==='comprehension'?'performance-area-comprehension':'performance-area-speed';
-  return `<svg class="progress-chart yearly-performance-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeSvg(label)}">
-    <defs>
-      <linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%" class="${areaClass}-start"/><stop offset="100%" class="${areaClass}-end"/>
-      </linearGradient>
-    </defs>
-    ${[0,.25,.5,.75,1].map((ratio)=>{const value=Math.round(min+(max-min)*ratio);const gy=y(value);return `<line x1="${left}" y1="${gy}" x2="${width-right}" y2="${gy}" class="performance-grid"/><text x="${left-10}" y="${gy+4}" text-anchor="end" class="performance-axis-label">${value}${kind==='comprehension'?'%':''}</text>`;}).join('')}
-    <line x1="${left}" y1="${goalY}" x2="${width-right}" y2="${goalY}" class="performance-goal-line"/>
-    <g class="performance-goal-label"><rect x="${width-right-102}" y="${Math.max(2,goalY-23)}" width="100" height="20" rx="10"/><text x="${width-right-52}" y="${Math.max(16,goalY-9)}" text-anchor="middle">Goal ${goal}${escapeSvg(suffix)}</text></g>
-    ${areaPath?`<path d="${areaPath}" fill="url(#${gradientId})" class="performance-area"/>`:''}
-    ${valid.length>1?`<polyline points="${linePoints}" class="performance-line ${lineClass}"/>`:''}
-    ${valid.map((point)=>`<circle cx="${point.x}" cy="${point.y}" r="5" class="performance-point ${lineClass}"><title>${escapeSvg(point.row.label)}: ${point.value.toLocaleString()}${escapeSvg(suffix)}</title></circle>`).join('')}
-    ${!hasData?`<text x="${width/2}" y="${height/2}" text-anchor="middle" class="chart-empty">Your ${kind==='comprehension'?'comprehension':'reading speed'} trend will appear here as you build a reading record.</text>`:''}
-    ${points.map((point)=>`<text x="${point.x}" y="${height-14}" text-anchor="middle" class="performance-month-label">${escapeSvg(point.row.label)}</text>`).join('')}
   </svg>`;
 }
 
@@ -6145,257 +6187,210 @@ function renderProgressDashboard() {
   const earned=awards.definitions.filter((item)=>item.earned).length;
   const goalPercent=Math.min(100,Math.round(awards.completed/Math.max(1,goal)*100));
   const learning=learningMetricsSummary();
-  const speedGoal=getReadingSpeedGoal();
-  const comprehensionGoal=getReadingComprehensionGoal();
-  const latestSession=activity[0] || null;
-  const goalBooksRemaining=Math.max(0,goal-awards.completed);
-  const currentYear=new Date().getFullYear();
-  const monthFormatter=new Intl.DateTimeFormat(undefined,{month:'short'});
-  const yearMonths=Array.from({length:12},(_,month)=>({
-    month,
-    label:monthFormatter.format(new Date(currentYear,month,1)),
-    wpm:0,
-    comprehension:0,
-    words:0,
-    seconds:0,
-    comprehensionTotal:0,
-    comprehensionCount:0
-  }));
 
-  activity.forEach((item)=>{
-    const date=new Date(item.endedAt || item.startedAt || 0);
-    if (!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
-    const bucket=yearMonths[date.getMonth()];
-    bucket.words += Number(item.wordsRead)||0;
-    bucket.seconds += Number(item.seconds)||0;
-  });
-  comprehension.forEach((item)=>{
-    const date=new Date(item.createdAt || 0);
-    if (!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
-    const score=Number(item.scorePercent);
-    if (!Number.isFinite(score)) return;
-    const bucket=yearMonths[date.getMonth()];
-    bucket.comprehensionTotal += score;
-    bucket.comprehensionCount += 1;
-  });
-  yearMonths.forEach((bucket)=>{
-    bucket.wpm=bucket.seconds ? Math.round(bucket.words/(bucket.seconds/60)) : 0;
-    bucket.comprehension=bucket.comprehensionCount ? Math.round(bucket.comprehensionTotal/bucket.comprehensionCount) : 0;
-  });
+  const modeCounts = activity.reduce((map,item)=>{
+    const label=({
+      highlight:'Highlight',
+      'pointing-guide':'Pointing Guide',
+      'bold-focus':'Bold Focus',
+      flash:'Flash',
+      'smooth-glide':'Smooth Glide',
+      marquee:'Marquee',
+      'digital-sign':'Digital Sign',
+      'auto-scroll':'Auto Scroll'
+    })[item.mode] || 'Other';
+    map[label]=(map[label]||0)+1;
+    return map;
+  },{});
+  const modeEntries=Object.entries(modeCounts).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,6);
 
-  const thisYearSpeeds=yearMonths.map((item)=>item.wpm).filter(Boolean);
-  const latestYearSpeed=[...yearMonths].reverse().find((item)=>item.wpm)?.wpm || averageWpm;
-  const firstYearSpeed=yearMonths.find((item)=>item.wpm)?.wpm || latestYearSpeed;
-  const yearlySpeedChange=firstYearSpeed && latestYearSpeed ? latestYearSpeed-firstYearSpeed : 0;
-
-  const progressByDocument=new Map(progress.map((item)=>[String(item.documentId||''),item]));
-  const compByDocument=new Map();
-  comprehension.forEach((item)=>{
-    const key=String(item.documentId||'');
-    if (!key) return;
-    const list=compByDocument.get(key)||[];
-    list.push(item);
-    compByDocument.set(key,list);
-  });
-  const activityByDocument=new Map();
-  activity.forEach((item)=>{
-    const key=String(item.documentId||'');
-    if (!key) return;
-    const list=activityByDocument.get(key)||[];
-    list.push(item);
-    activityByDocument.set(key,list);
-  });
-  const textIds=[...new Set([...activityByDocument.keys(),...progressByDocument.keys(),...compByDocument.keys()])];
-  const textKpis=textIds.map((documentId)=>{
-    const sessions=activityByDocument.get(documentId)||[];
-    const checks=compByDocument.get(documentId)||[];
-    const record=progressByDocument.get(documentId)||{};
-    const words=sessions.reduce((sum,item)=>sum+(Number(item.wordsRead)||0),0);
-    const seconds=sessions.reduce((sum,item)=>sum+(Number(item.seconds)||0),0);
-    const wpm=seconds?Math.round(words/(seconds/60)):0;
-    const comp=checks.length?Math.round(checks.reduce((sum,item)=>sum+(Number(item.scorePercent)||0),0)/checks.length):0;
-    const eff=checks.length?Math.round(checks.reduce((sum,item)=>sum+(Number(item.effectiveWpm)||0),0)/checks.length):0;
-    const totalWords=Number(record.totalWords)||Number(sessions[0]?.totalWords)||0;
-    const furthest=Math.max(Number(record.furthestWord)||0,...sessions.map((item)=>Number(item.endIndex)||0),0);
-    const percent=totalWords?Math.min(100,Math.round(furthest/totalWords*100)):0;
-    const latestAt=[record.lastReadAt,...sessions.map((item)=>item.endedAt),...checks.map((item)=>item.createdAt)].filter(Boolean).sort().pop()||'';
-    const title=record.title || sessions[0]?.title || checks[0]?.title || 'Untitled';
-    return {documentId,title,sessions:sessions.length,checks:checks.length,words,seconds,wpm,comp,eff,percent,latestAt};
-  }).sort((a,b)=>{
-    const currentId=String(latestSession?.documentId||'');
-    if (a.documentId===currentId && b.documentId!==currentId) return -1;
-    if (b.documentId===currentId && a.documentId!==currentId) return 1;
-    return new Date(b.latestAt||0)-new Date(a.latestAt||0);
-  });
-  const currentText=textKpis[0] || null;
-
-  const currentComp=Number(comprehension[0]?.scorePercent)||awards.compAverage||0;
-  const speedGoalGap=latestYearSpeed ? speedGoal-latestYearSpeed : speedGoal;
-  const compGoalGap=currentComp ? comprehensionGoal-currentComp : comprehensionGoal;
-
-  app.innerHTML = `<section class="panel progress-analytics-page progress-dashboard-performance">
-    <header class="performance-dashboard-header">
+  app.innerHTML = `<section class="panel progress-analytics-page compact-progress-dashboard">
+    <div class="progress-hero">
       <div>
-        <span class="source-category">Reading performance</span>
+        <span class="source-category">Recorded analysis</span>
         <h1>Progress &amp; Awards</h1>
-        <p>The two numbers that matter most: read faster, understand more, and see whether both are improving together.</p>
+        <p>A visual record of reading consistency, speed, comprehension, completed books, and long-term growth.</p>
       </div>
       <div class="progress-hero-actions">
         <button class="secondary" type="button" data-action="my-reading">My Reading List</button>
         <button id="clear-reading-progress" class="secondary" type="button">Clear recorded history</button>
       </div>
-    </header>
+    </div>
 
-    <section class="performance-kpi-grid" aria-label="Primary reading KPIs">
-      <article class="performance-kpi-card speed-kpi">
-        <span>Reading speed</span>
-        <strong>${latestYearSpeed||'—'} <small>WPM</small></strong>
-        <p>Goal <b>${speedGoal} WPM</b>${latestYearSpeed?` · ${speedGoalGap<=0?'Goal reached':`${speedGoalGap} to go`}`:''}</p>
-      </article>
-      <article class="performance-kpi-card comprehension-kpi">
-        <span>Comprehension</span>
-        <strong>${currentComp||'—'}${currentComp?'%':''}</strong>
-        <p>Goal <b>${comprehensionGoal}%</b>${currentComp?` · ${compGoalGap<=0?'Goal reached':`${compGoalGap} points to go`}`:''}</p>
-      </article>
-      <article class="performance-kpi-card effective-kpi">
-        <span>Effective reading speed</span>
-        <strong>${effectiveWpm||'—'} <small>WPM</small></strong>
-        <p>Speed adjusted for measured comprehension</p>
-      </article>
-      <article class="performance-kpi-card improvement-kpi">
-        <span>Speed change this year</span>
-        <strong>${yearlySpeedChange>0?'+':''}${yearlySpeedChange||0} <small>WPM</small></strong>
-        <p>${thisYearSpeeds.length>1?'First recorded month vs latest':'Build more monthly history to see change'}</p>
-      </article>
+    <div class="progress-stat-grid">
+      <article class="progress-stat"><span>Recorded words</span><strong>${totalWords.toLocaleString()}</strong><small>${activity.length.toLocaleString()} sessions</small></article>
+      <article class="progress-stat"><span>Reading time</span><strong>${formatDuration(totalSeconds)}</strong><small>${awards.activeDays} active days</small></article>
+      <article class="progress-stat"><span>Average pace</span><strong>${averageWpm||'—'}</strong><small>WPM</small></article>
+      <article class="progress-stat"><span>Comprehension</span><strong>${awards.compAverage||'—'}${awards.compAverage?'%':''}</strong><small>${comprehension.length} checks</small></article>
+      <article class="progress-stat"><span>Learning activity</span><strong>${learning.totalActivities.toLocaleString()}</strong><small>quizzes, skills &amp; study</small></article>
+      <article class="progress-stat"><span>Current streak</span><strong>${awards.streak}</strong><small>${awards.streak===1?'day':'days'}</small></article>
+    </div>
+
+    <section class="annual-goal-card">
+      <div>
+        <span class="source-category">Annual reading goal</span>
+        <h2>${awards.completed} of ${goal} books completed</h2>
+        <p>Set a yearly target and the dashboard will calculate pace, progress, and goal-based awards.</p>
+      </div>
+      <div class="annual-goal-control">
+        <label for="annual-reading-goal">Books per year
+          <input id="annual-reading-goal" type="number" min="1" max="500" value="${goal}">
+        </label>
+        <button id="save-annual-reading-goal" class="secondary" type="button">Save goal</button>
+      </div>
+      <div class="annual-goal-meter"><span style="width:${goalPercent}%"></span></div>
+      <strong class="annual-goal-percent">${goalPercent}%</strong>
     </section>
 
-    <section class="performance-year-grid">
-      <article class="performance-year-card speed-year-card">
-        <div class="performance-chart-heading">
-          <div>
-            <span class="source-category">${currentYear} progress</span>
-            <h2>Reading speed</h2>
-            <p>Monthly average WPM across your recorded reading sessions.</p>
+    <section class="learning-progress-overview">
+      <div class="section-heading">
+        <div><span class="source-category">Learning</span><h2>Learning progress</h2><p>Your core reading KPIs stay visible above. Open a category when you want the details.</p></div>
+        <button class="secondary" type="button" data-action="reading-skills">Open Reading Skills</button>
+      </div>
+
+      <div class="learning-progress-details">
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Reading Speed</strong><small>WPM tests and effective pace</small></span><span>${learning.latestWpm || averageWpm || '—'} WPM</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>WPM tests</span><strong>${learning.wpmTests}</strong><small>completed</small></article>
+              <article><span>Latest test</span><strong>${learning.latestWpm || '—'}</strong><small>WPM</small></article>
+              <article><span>Best test</span><strong>${learning.bestWpm || '—'}</strong><small>WPM</small></article>
+              <article><span>Recorded pace</span><strong>${averageWpm || '—'}</strong><small>session average</small></article>
+              <article><span>Effective pace</span><strong>${effectiveWpm || '—'}</strong><small>WPM × comprehension</small></article>
+            </div>
+            <button class="secondary" type="button" data-test="wpm">Take WPM Test</button>
           </div>
-          <div class="performance-chart-stat"><strong>${latestYearSpeed||'—'}</strong><span>current WPM</span></div>
-        </div>
-        ${yearlyPerformanceChartSvg(yearMonths,'wpm',{label:`${currentYear} monthly reading speed`,suffix:' WPM',goal:speedGoal,kind:'speed'})}
-      </article>
+        </details>
 
-      <article class="performance-year-card comprehension-year-card">
-        <div class="performance-chart-heading">
-          <div>
-            <span class="source-category">${currentYear} progress</span>
-            <h2>Comprehension</h2>
-            <p>Monthly average quiz score. The gold line is your personal target.</p>
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Comprehension Quizzes</strong><small>Understanding across current and past books</small></span><span>${learning.comprehensionAverage || '—'}${learning.comprehensionAverage ? '%' : ''}</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Checks</span><strong>${learning.comprehensionChecks}</strong><small>completed</small></article>
+              <article><span>Average</span><strong>${learning.comprehensionAverage || '—'}${learning.comprehensionAverage ? '%' : ''}</strong><small>all checks</small></article>
+              <article><span>Best</span><strong>${learning.bestComprehension || '—'}${learning.bestComprehension ? '%' : ''}</strong><small>highest score</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="comprehension-library">Open quizzes</button>
           </div>
-          <div class="performance-chart-stat"><strong>${currentComp||'—'}${currentComp?'%':''}</strong><span>latest score</span></div>
-        </div>
-        ${yearlyPerformanceChartSvg(yearMonths,'comprehension',{label:`${currentYear} monthly comprehension`,suffix:'%',goal:comprehensionGoal,kind:'comprehension'})}
-      </article>
-    </section>
+        </details>
 
-    <section class="performance-goals-strip">
-      <div class="performance-goals-copy">
-        <span class="source-category">Your targets</span>
-        <strong>Adjust the finish lines on the graphs</strong>
-        <p>Choose a speed goal you can grow into while protecting comprehension.</p>
-      </div>
-      <div class="performance-goal-controls">
-        <label>Target WPM<input id="reading-speed-goal" type="number" min="50" max="1200" step="10" value="${speedGoal}"></label>
-        <label>Target comprehension<input id="reading-comprehension-goal" type="number" min="50" max="100" step="1" value="${comprehensionGoal}"></label>
-        <label>Books / year<input id="annual-reading-goal" type="number" min="1" max="500" value="${goal}"></label>
-        <button id="save-reading-goals" class="primary" type="button">Save goals</button>
-      </div>
-    </section>
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Great Ideas / Syntopicon</strong><small>Cross-book conceptual study</small></span><span>${learning.greatIdeasSessions} sessions</span></summary>
+          <div class="progress-collapsible-body">
+            <p>You have opened Great Ideas / Syntopicon ${learning.greatIdeasSessions} time${learning.greatIdeasSessions===1?'':'s'} since learning tracking began.</p>
+            <button class="secondary" type="button" data-read="syntopicon">Explore Great Ideas</button>
+          </div>
+        </details>
 
-    <section class="current-text-performance">
-      <div class="performance-section-heading">
-        <div>
-          <span class="source-category">Current text</span>
-          <h2>${escapeHtml(currentText?.title || 'No current text yet')}</h2>
-          <p>${currentText?'See how your performance changes with the difficulty and style of this particular text.':'Your most recently read text will appear here after a reading session.'}</p>
-        </div>
-        ${currentText?`<span class="current-text-badge">${currentText.percent}% read</span>`:''}
-      </div>
-      ${currentText?`<div class="current-text-kpis">
-        <article><span>Text WPM</span><strong>${currentText.wpm||'—'}</strong><small>${currentText.sessions} session${currentText.sessions===1?'':'s'}</small></article>
-        <article><span>Comprehension</span><strong>${currentText.comp?`${currentText.comp}%`:'—'}</strong><small>${currentText.checks} check${currentText.checks===1?'':'s'}</small></article>
-        <article><span>Effective WPM</span><strong>${currentText.eff||'—'}</strong><small>speed × understanding</small></article>
-        <article><span>Time invested</span><strong>${formatDuration(currentText.seconds)}</strong><small>${currentText.words.toLocaleString()} words</small></article>
-        <article><span>Progress</span><strong>${currentText.percent}%</strong><small>through this text</small></article>
-      </div>`:''}
-    </section>
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Mnemonics</strong><small>Memory aids tied to your books</small></span><span>${learning.mnemonicsCreated} created</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Mnemonics</span><strong>${learning.mnemonicsCreated}</strong><small>created</small></article>
+              <article><span>Books covered</span><strong>${learning.mnemonicBooks}</strong><small>books / guides</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="mnemonics">Create mnemonics</button>
+          </div>
+        </details>
 
-    <section class="text-performance-section">
-      <div class="performance-section-heading">
-        <div>
-          <span class="source-category">Performance by text</span>
-          <h2>How different books affect your reading</h2>
-          <p>Compare speed and comprehension by text so a difficult classic is not judged by the same standard as lighter reading.</p>
-        </div>
-      </div>
-      <div class="text-performance-table-wrap">
-        <table class="text-performance-table">
-          <thead><tr><th>Text</th><th>Progress</th><th>WPM</th><th>Comprehension</th><th>Effective WPM</th><th>Time</th><th>Sessions</th></tr></thead>
-          <tbody>${textKpis.slice(0,10).map((item,index)=>`<tr class="${index===0?'is-current-text':''}"><td><strong>${escapeHtml(item.title)}</strong>${index===0?'<small>Current</small>':''}</td><td>${item.percent}%</td><td>${item.wpm||'—'}</td><td>${item.comp?`${item.comp}%`:'—'}</td><td>${item.eff||'—'}</td><td>${formatDuration(item.seconds)}</td><td>${item.sessions}</td></tr>`).join('') || '<tr><td colspan="7" class="navigation-empty">Complete a reading session to begin comparing texts.</td></tr>'}</tbody>
-        </table>
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Language Learning</strong><small>Lessons generated from your reading</small></span><span>${learning.languageLessons} lessons</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Lessons</span><strong>${learning.languageLessons}</strong><small>completed</small></article>
+              <article><span>Languages</span><strong>${learning.languagesPracticed.length}</strong><small>${escapeHtml(learning.languagesPracticed.slice(0,3).join(', ') || 'none yet')}</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="language-learning">Practice a language</button>
+          </div>
+        </details>
+
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Courses &amp; Learning Modules</strong><small>Outside learning connected to your books</small></span><span>${learning.courseOpens} opened</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Course links opened</span><strong>${learning.courseOpens}</strong><small>tracked</small></article>
+              <article><span>Providers explored</span><strong>${learning.courseProviders.length}</strong><small>${escapeHtml(learning.courseProviders.slice(0,4).join(', ') || 'none yet')}</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="learning-courses">Find courses</button>
+          </div>
+        </details>
       </div>
     </section>
 
-    <details class="analytics-card recommendation-card progress-collapsible performance-coach" open>
-      <summary><span><span class="source-category">Reading coach</span><strong>What should I work on next?</strong></span><small>Open</small></summary>
+    <div class="progress-chart-grid">
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Daily reading volume</h2><p>Words recorded over the last 30 days.</p></div></div>
+        ${lineChartSvg(daily,'words',{label:'Daily words read during the last 30 days'})}
+      </section>
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Weekly reading time</h2><p>Minutes across the last eight weeks.</p></div></div>
+        ${barChartSvg(weekly,'minutes',{label:'Weekly reading minutes',suffix:' min'})}
+      </section>
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Reading modes</h2><p>Share of recorded sessions by mode.</p></div></div>
+        ${pieChartSvg(modeEntries,{label:'Reading sessions by mode'})}
+      </section>
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Pace trend</h2><p>Daily average WPM. Empty days remain visible so consistency is not hidden.</p></div></div>
+        ${lineChartSvg(daily,'wpm',{label:'Daily average reading speed',suffix:' WPM'})}
+      </section>
+    </div>
+
+    <details class="analytics-card progress-collapsible">
+      <summary><span><span class="source-category">Statistical analysis</span><strong>What the record shows</strong></span><small>Open</small></summary>
       <div class="progress-collapsible-body">
-        <div class="analytics-heading">
-          <div><h2>Recommendations</h2><p>Guidance is based on your reading record, with special attention to speed and comprehension.</p></div>
-          <button id="generate-ai-progress" class="primary" type="button">Generate AI analysis</button>
-        </div>
-        <div id="progress-recommendations" class="recommendation-grid">
-          ${recommendations.map((item)=>`<article><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.text)}</p></article>`).join('')}
-        </div>
-        <p id="progress-ai-status" class="status"></p>
+      <div class="analysis-grid">
+        <article><span>Average session</span><strong>${activity.length?Math.round(totalWords/activity.length).toLocaleString():'—'}</strong><small>words</small></article>
+        <article><span>Average duration</span><strong>${activity.length?formatDuration(totalSeconds/activity.length):'—'}</strong><small>per session</small></article>
+        <article><span>30-day consistency</span><strong>${awards.monthlyDays}/30</strong><small>active days</small></article>
+        <article><span>Recent improvement</span><strong>${awards.improvement>0?'+':''}${awards.improvement||0}</strong><small>WPM vs prior sessions</small></article>
+        <article><span>Books completed</span><strong>${awards.completed}</strong><small>this year</small></article>
+        <article><span>Awards earned</span><strong>${earned}/${awards.definitions.length}</strong><small>trophies</small></article>
+      </div>
       </div>
     </details>
 
-    <details class="analytics-card progress-collapsible secondary-progress-section">
-      <summary><span><span class="source-category">Overall reading KPIs</span><strong>Volume, consistency &amp; annual goal</strong></span><small>Open details</small></summary>
+    <details class="analytics-card recommendation-card progress-collapsible">
+      <summary><span><span class="source-category">Coach</span><strong>Recommendations</strong></span><small>Open</small></summary>
       <div class="progress-collapsible-body">
-        <div class="progress-stat-grid secondary-kpi-grid">
-          <article class="progress-stat"><span>Recorded words</span><strong>${totalWords.toLocaleString()}</strong><small>${activity.length.toLocaleString()} sessions</small></article>
-          <article class="progress-stat"><span>Total reading time</span><strong>${formatDuration(totalSeconds)}</strong><small>${awards.activeDays} active days</small></article>
-          <article class="progress-stat"><span>Current streak</span><strong>${awards.streak}</strong><small>${awards.streak===1?'day':'days'}</small></article>
-          <article class="progress-stat"><span>Annual book goal</span><strong>${goalPercent}%</strong><small>${goalBooksRemaining} book${goalBooksRemaining===1?'':'s'} remaining</small></article>
-        </div>
-        <div class="progress-chart-grid secondary-chart-grid">
-          <section class="analytics-card"><div class="analytics-heading"><div><h2>Daily reading volume</h2><p>Words recorded over the last 30 days.</p></div></div>${lineChartSvg(daily,'words',{label:'Daily words read during the last 30 days'})}</section>
-          <section class="analytics-card"><div class="analytics-heading"><div><h2>Weekly reading time</h2><p>Minutes across the last eight weeks.</p></div></div>${barChartSvg(weekly,'minutes',{label:'Weekly reading minutes',suffix:' min'})}</section>
-        </div>
+      <div class="analytics-heading">
+        <div><span class="source-category">Coach</span><h2>Recommendations</h2><p>Immediate guidance is calculated privately from the reading record. An optional AI analysis can add a more nuanced interpretation.</p></div>
+        <button id="generate-ai-progress" class="primary" type="button">Generate AI analysis</button>
       </div>
-    </details>
-
-    <details class="analytics-card progress-collapsible secondary-progress-section">
-      <summary><span><span class="source-category">Practice tools</span><strong>Reading skills &amp; learning</strong></span><small>${learning.totalActivities} activities</small></summary>
-      <div class="progress-collapsible-body">
-        <div class="learning-tool-grid-focused">
-          <article><div><strong>Reading Speed</strong><small>Latest ${learning.latestWpm || averageWpm || '—'} WPM · Best ${learning.bestWpm || '—'} WPM</small></div><button class="secondary" type="button" data-test="wpm">Take WPM Test</button></article>
-          <article><div><strong>Comprehension</strong><small>${learning.comprehensionAverage || '—'}${learning.comprehensionAverage?'%':''} average · ${learning.comprehensionChecks} checks</small></div><button class="secondary" type="button" data-action="comprehension-library">Open quizzes</button></article>
-          <article><div><strong>Great Ideas / Syntopicon</strong><small>${learning.greatIdeasSessions} study sessions</small></div><button class="secondary" type="button" data-read="syntopicon">Explore Great Ideas</button></article>
-          <article><div><strong>Mnemonics</strong><small>${learning.mnemonicsCreated} created</small></div><button class="secondary" type="button" data-action="mnemonics">Create mnemonics</button></article>
-        </div>
+      <div id="progress-recommendations" class="recommendation-grid">
+        ${recommendations.map((item)=>`<article><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.text)}</p></article>`).join('')}
+      </div>
+      <p id="progress-ai-status" class="status"></p>
       </div>
     </details>
 
     <details class="analytics-card progress-collapsible">
       <summary><span><span class="source-category">Achievement cabinet</span><strong>Trophies &amp; milestones</strong></span><small>${earned} earned</small></summary>
-      <div class="progress-collapsible-body"><div class="trophy-grid">
-        ${awards.definitions.map((award)=>`<article class="trophy-card ${award.earned?'earned':'locked'}"><div class="trophy-icon" aria-hidden="true">${award.icon}</div><div><h3>${escapeHtml(award.title)}</h3><p>${escapeHtml(award.description)}</p></div><div class="trophy-progress"><span style="width:${Math.round(award.progress*100)}%"></span></div><small>${award.earned?'Earned':'In progress · '+Math.round(award.progress*100)+'%'}</small></article>`).join('')}
-      </div></div>
+      <div class="progress-collapsible-body">
+      <div class="trophy-grid">
+        ${awards.definitions.map((award)=>`<article class="trophy-card ${award.earned?'earned':'locked'}">
+          <div class="trophy-icon" aria-hidden="true">${award.icon}</div>
+          <div><h3>${escapeHtml(award.title)}</h3><p>${escapeHtml(award.description)}</p></div>
+          <div class="trophy-progress"><span style="width:${Math.round(award.progress*100)}%"></span></div>
+          <small>${award.earned?'Earned':'In progress · '+Math.round(award.progress*100)+'%'}</small>
+        </article>`).join('')}
+      </div>
+      </div>
+    </details>
+
+    <details class="analytics-card progress-collapsible">
+      <summary><span><strong>Recent books &amp; documents</strong></span><small>Open</small></summary>
+      <div class="progress-collapsible-body">
+      <div class="progress-book-list">${progress.sort((x,y)=>new Date(y.lastReadAt||0)-new Date(x.lastReadAt||0)).slice(0,10).map((item)=>{
+        const percent=item.totalWords?Math.min(100,Math.round((Number(item.furthestWord)||0)/item.totalWords*100)):0;
+        return `<article class="progress-book-card"><div><h3>${escapeHtml(item.title||'Untitled')}</h3><p>${percent}% complete · ${formatDuration(item.totalSeconds)} · ${Number(item.sessions)||0} sessions</p></div><div class="progress-meter"><span style="width:${percent}%"></span></div><button class="secondary" type="button" data-progress-open="${escapeHtml(item.documentId)}">Resume saved text</button></article>`;
+      }).join('')||'<p class="navigation-empty">Complete a reading session to begin the analysis.</p>'}</div>
+      </div>
     </details>
   </section>`;
 
-  app.querySelector('#save-reading-goals')?.addEventListener('click',()=>{
-    setReadingSpeedGoal(app.querySelector('#reading-speed-goal')?.value);
-    setReadingComprehensionGoal(app.querySelector('#reading-comprehension-goal')?.value);
+  app.querySelector('#save-annual-reading-goal')?.addEventListener('click',()=>{
     setAnnualReadingGoal(app.querySelector('#annual-reading-goal')?.value);
     renderProgressDashboard();
   });
@@ -6409,6 +6404,16 @@ function renderProgressDashboard() {
     localStorage.removeItem(LEARNING_ACTIVITY_KEY);
     renderProgressDashboard();
   });
+
+  app.querySelectorAll('[data-progress-open]').forEach((button)=>button.addEventListener('click',()=>{
+    const documentId=button.dataset.progressOpen;
+    let data=null;
+    try{data=JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`)||'null');}catch{}
+    if(!data?.text) return window.alert('That text is not stored in this browser. Open it again from My Reading or its original library.');
+    renderReaderWithText(data.title,data.text,data.source||{type:'saved'});
+    const record=readStoredObject(READING_PROGRESS_KEY)[documentId];
+    requestAnimationFrame(()=>jumpToWordIndex(record?.lastWord||0));
+  }));
 
   app.querySelector('#generate-ai-progress')?.addEventListener('click',async()=>{
     const button=app.querySelector('#generate-ai-progress');
@@ -6430,8 +6435,6 @@ function renderProgressDashboard() {
             activeDays:awards.activeDays,
             completedBooks:awards.completed,
             annualGoal:goal,
-            speedGoal,
-            comprehensionGoal,
             recentImprovementWpm:awards.improvement,
             learning
           },
@@ -6439,13 +6442,14 @@ function renderProgressDashboard() {
           weekly
         })
       });
-      const items=Array.isArray(payload?.recommendations)?payload.recommendations:[];
-      if(!items.length) throw new Error('No AI recommendations were returned.');
-      container.innerHTML=items.slice(0,4).map((item)=>`<article><h3>${escapeHtml(item.title||'Recommendation')}</h3><p>${escapeHtml(item.text||item.recommendation||'')}</p></article>`).join('');
-      status.textContent='AI analysis added.';
+      const items=Array.isArray(payload.recommendations)?payload.recommendations:[];
+      if(!items.length) throw new Error('No recommendations were returned.');
+      container.innerHTML=items.map((item)=>`<article><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.recommendation)}</p><small>${escapeHtml(item.reason||'')}</small></article>`).join('');
+      status.className='status success';
+      status.textContent='AI analysis complete.';
     }catch(error){
       status.className='status error';
-      status.textContent=error?.message||'AI analysis could not be generated.';
+      status.textContent=error.message||'AI analysis is unavailable.';
     }finally{button.disabled=false;}
   });
 }
@@ -6521,15 +6525,20 @@ function renderComprehensionQuiz(quiz, context) {
     <div class="comprehension-actions">
       <span id="comprehension-status" class="status"></span>
       <button id="score-comprehension" class="primary" type="button">Score Check</button>
+      ${context.wholeGuide ? '<button id="randomize-whole-guide" class="secondary" type="button">Randomize another quiz</button>' : ''}
       <button class="secondary" value="cancel" type="submit">Close</button>
     </div>
   </form>`;
   dialog.showModal();
 
+  dialog.querySelector('#randomize-whole-guide')?.addEventListener('click', () => {
+    showModernGuideWholeQuizSetup(context.guideSource || state?.source || {});
+  });
+
   dialog.querySelector('#score-comprehension')?.addEventListener('click', () => {
     const unanswered = quiz.questions.some((_, index) => !dialog.querySelector(`input[name="question-${index}"]:checked`));
     if (unanswered) {
-      dialog.querySelector('#comprehension-status').textContent = 'Answer all four questions first.';
+      dialog.querySelector('#comprehension-status').textContent = `Answer all ${quiz.questions.length} questions first.`;
       return;
     }
 
@@ -9287,187 +9296,13 @@ function openMarkPanel(tab='selection'){
   }
 }
 function activateMarkTab(tab){
-  app.querySelectorAll('[data-mark-tab]').forEach((button)=>{
-    const active=button.dataset.markTab===tab;
-    button.classList.toggle('active',active);
-    button.setAttribute('aria-selected',String(active));
-  });
+  app.querySelectorAll('[data-mark-tab]').forEach(b=>b.classList.toggle('active',b.dataset.markTab===tab));
   app.querySelectorAll('[data-mark-panel]').forEach(p=>p.hidden=p.dataset.markPanel!==tab);
   if(tab==='history') renderMarkHistory();
   if(tab==='notebook') renderMarkNotebook();
-  if(tab==='progress') renderReaderWorkspaceProgress();
-  if(tab==='study') renderReaderWorkspaceStudy();
-  if(tab==='contents') renderReaderWorkspaceContents();
 }
 function notifyAskMarkLegacyUpdated(kind='selection'){
   document.dispatchEvent(new CustomEvent('marksetgo:askmark-legacy-updated',{detail:{kind}}));
-}
-
-function readerWorkspaceYearData() {
-  const currentYear=new Date().getFullYear();
-  const formatter=new Intl.DateTimeFormat(undefined,{month:'short'});
-  const rows=Array.from({length:12},(_,month)=>({
-    month,
-    label:formatter.format(new Date(currentYear,month,1)),
-    words:0,
-    seconds:0,
-    wpm:0,
-    comprehensionTotal:0,
-    comprehensionCount:0,
-    comprehension:0
-  }));
-  readStoredArray(READING_ACTIVITY_KEY).forEach((item)=>{
-    const date=new Date(item.endedAt || item.startedAt || 0);
-    if(!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
-    const row=rows[date.getMonth()];
-    row.words += Number(item.wordsRead)||0;
-    row.seconds += Number(item.seconds)||0;
-  });
-  getComprehensionResults().forEach((item)=>{
-    const date=new Date(item.createdAt || 0);
-    if(!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
-    const score=Number(item.scorePercent);
-    if(!Number.isFinite(score)) return;
-    const row=rows[date.getMonth()];
-    row.comprehensionTotal += score;
-    row.comprehensionCount += 1;
-  });
-  rows.forEach((row)=>{
-    row.wpm=row.seconds?Math.round(row.words/(row.seconds/60)):0;
-    row.comprehension=row.comprehensionCount?Math.round(row.comprehensionTotal/row.comprehensionCount):0;
-  });
-  return rows;
-}
-
-function readerWorkspaceCurrentTextStats() {
-  const documentId=String(state.documentId || '');
-  const activity=readStoredArray(READING_ACTIVITY_KEY).filter((item)=>String(item.documentId||'')===documentId);
-  const comprehension=getComprehensionResults().filter((item)=>String(item.documentId||'')===documentId);
-  const progress=readStoredObject(READING_PROGRESS_KEY)[documentId] || {};
-  const totalWords=Math.max(0,Number(progress.totalWords)||Number(state.words?.length)||0);
-  const currentIndex=Math.max(Number(progress.lastWord)||0,Number(progress.furthestWord)||0,Number(state.index)||0);
-  const percent=totalWords?Math.min(100,Math.round(currentIndex/totalWords*100)):0;
-  const latestComp=Number(comprehension[0]?.scorePercent)||0;
-  const selectedPace=Math.max(0,Math.round(Number(state.wpm)||Number(app.querySelector('#speed')?.value)||0));
-  const completedSeconds=activity.reduce((sum,item)=>sum+(Number(item.seconds)||0),0);
-  let liveSeconds=0;
-  if(state.sessionActive && Number(state.sessionStartedAt)) liveSeconds=Math.max(0,(Date.now()-Number(state.sessionStartedAt))/1000);
-  const sessionSeconds=liveSeconds || Number(activity[0]?.seconds)||0;
-  const effective=latestComp && selectedPace ? Math.round(selectedPace*(latestComp/100)) : 0;
-  return {
-    documentId,
-    title:state.title || progress.title || activity[0]?.title || 'Current text',
-    percent,
-    pace:selectedPace,
-    comprehension:latestComp,
-    effective,
-    sessionSeconds,
-    totalSeconds:completedSeconds+liveSeconds,
-    sessions:activity.length + (state.sessionActive?1:0)
-  };
-}
-
-function renderReaderWorkspaceProgress() {
-  const panel=app.querySelector('#mark-progress-panel');
-  if(!panel) return;
-  const rows=readerWorkspaceYearData();
-  const stats=readerWorkspaceCurrentTextStats();
-  const speedGoal=getReadingSpeedGoal();
-  const comprehensionGoal=getReadingComprehensionGoal();
-  const latestWpm=[...rows].reverse().find((row)=>row.wpm)?.wpm || stats.pace || 0;
-  const latestComp=[...rows].reverse().find((row)=>row.comprehension)?.comprehension || stats.comprehension || 0;
-  const identity=currentCompanionIdentity();
-  const avatar=identity?.avatar || '/assets/ask-mark/ask-mark-avatar.png';
-  const name=identity?.name || 'Mark';
-  const speedStatus=latestWpm ? (latestWpm>=speedGoal?'Goal reached':'Keep building toward your goal') : 'Your trend will appear as you read';
-  const compStatus=latestComp ? (latestComp>=comprehensionGoal?'Goal reached':'Protect understanding as speed rises') : 'Take a comprehension check to start the trend';
-
-  panel.innerHTML=`
-    <section class="reader-progress-companion-card">
-      <img src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" class="reader-progress-avatar">
-      <div><span>${escapeHtml(name)} says</span><strong>${escapeHtml(speedStatus)}.</strong><p>${escapeHtml(compStatus)}.</p></div>
-      <div class="reader-progress-path" aria-hidden="true"><span>●</span><i></i><b>⚑</b></div>
-    </section>
-
-    <section class="reader-progress-current-card">
-      <div class="reader-progress-book-mark" aria-hidden="true">▤</div>
-      <div class="reader-progress-current-copy"><span>Current text</span><strong>${escapeHtml(stats.title)}</strong><small>${stats.percent}% complete</small></div>
-      <div class="reader-progress-current-kpis">
-        <article><strong>${stats.percent}%</strong><span>Complete</span></article>
-        <article><strong>${formatDuration(stats.sessionSeconds)}</strong><span>Session</span></article>
-        <article><strong>${stats.pace||'—'}</strong><span>WPM</span></article>
-        <article><strong>${stats.comprehension?`${stats.comprehension}%`:'—'}</strong><span>Comprehension</span></article>
-        <article><strong>${stats.effective||'—'}</strong><span>Effective WPM</span></article>
-      </div>
-    </section>
-
-    <div class="reader-progress-chart-grid">
-      <article class="reader-progress-chart-card">
-        <div class="reader-progress-chart-heading"><div><strong>WPM Progress</strong><span>${new Date().getFullYear()} · monthly average</span></div><b>Goal: ${speedGoal} WPM</b></div>
-        ${yearlyPerformanceChartSvg(rows,'wpm',{label:'Reading speed progress this year',suffix:' WPM',goal:speedGoal,kind:'speed'})}
-      </article>
-      <article class="reader-progress-chart-card comprehension-card">
-        <div class="reader-progress-chart-heading"><div><strong>Comprehension</strong><span>${new Date().getFullYear()} · monthly average</span></div><b>Goal: ${comprehensionGoal}%</b></div>
-        ${yearlyPerformanceChartSvg(rows,'comprehension',{label:'Comprehension progress this year',suffix:'%',goal:comprehensionGoal,kind:'comprehension'})}
-      </article>
-    </div>
-
-    <div class="reader-progress-actions">
-      <button type="button" data-reader-progress-action="explain"><span>▣</span><strong>Explain passage</strong></button>
-      <button type="button" data-reader-progress-action="quiz"><span>◎</span><strong>Take quiz</strong></button>
-      <button type="button" data-reader-progress-action="note"><span>◆</span><strong>Save note</strong></button>
-      <button type="button" data-reader-progress-action="full"><span>▥</span><strong>View full progress</strong></button>
-    </div>
-
-    <section class="reader-progress-mini-summary">
-      <div><span>Current goals</span><strong>${speedGoal} WPM · ${comprehensionGoal}% comprehension</strong></div>
-      <button type="button" data-reader-progress-action="goals">Edit goals</button>
-    </section>`;
-
-  panel.querySelector('[data-reader-progress-action="explain"]')?.addEventListener('click',()=>{
-    activateMarkTab('selection');
-    renderMarkSelectionCard();
-    requestAnimationFrame(()=>app.querySelector('#mark-question')?.focus());
-  });
-  panel.querySelector('[data-reader-progress-action="quiz"]')?.addEventListener('click',()=>startComprehensionCheck());
-  panel.querySelector('[data-reader-progress-action="note"]')?.addEventListener('click',()=>{
-    activateMarkTab('notebook');
-    renderMarkNotebook();
-  });
-  panel.querySelector('[data-reader-progress-action="full"]')?.addEventListener('click',()=>renderProgressDashboard());
-  panel.querySelector('[data-reader-progress-action="goals"]')?.addEventListener('click',()=>renderProgressDashboard());
-}
-
-function renderReaderWorkspaceStudy() {
-  const panel=app.querySelector('#mark-study-panel');
-  if(!panel) return;
-  panel.innerHTML=`
-    <div class="reader-workspace-section-heading"><span>Study this text</span><strong>Turn reading into learning</strong><p>Use the current book without leaving the Reader.</p></div>
-    <div class="reader-study-grid">
-      <button type="button" data-study-action="quiz"><span>◎</span><div><strong>Comprehension</strong><small>Check what you understood</small></div></button>
-      <button type="button" data-study-action="mnemonics"><span>M</span><div><strong>Mnemonics</strong><small>Create a memory aid</small></div></button>
-      <button type="button" data-study-action="ideas"><span>★</span><div><strong>Great Ideas</strong><small>Connect themes across books</small></div></button>
-      <button type="button" data-study-action="language"><span>文</span><div><strong>Language</strong><small>Practice with this text</small></div></button>
-    </div>`;
-  panel.querySelector('[data-study-action="quiz"]')?.addEventListener('click',()=>startComprehensionCheck());
-  panel.querySelector('[data-study-action="mnemonics"]')?.addEventListener('click',()=>renderMnemonics?.());
-  panel.querySelector('[data-study-action="ideas"]')?.addEventListener('click',()=>renderSyntopicon?.());
-  panel.querySelector('[data-study-action="language"]')?.addEventListener('click',()=>renderLanguageLearning?.());
-}
-
-function renderReaderWorkspaceContents() {
-  const panel=app.querySelector('#mark-contents-panel');
-  if(!panel) return;
-  const bookmarks=getReaderBookmarks().filter((item)=>item.documentId===state.documentId);
-  const toc=Array.isArray(state.toc)?state.toc:[];
-  panel.innerHTML=`
-    <div class="reader-workspace-section-heading"><span>Navigate</span><strong>Contents &amp; bookmarks</strong><p>Jump around without leaving the Reader.</p></div>
-    <div class="reader-workspace-contents-actions"><button type="button" data-workspace-bookmark>＋ Add bookmark</button><span>${bookmarks.length} saved</span></div>
-    <div class="reader-workspace-toc">
-      ${toc.length?toc.map((entry,index)=>`<button type="button" data-workspace-toc="${Number(entry.index)||0}"><span>${index+1}</span><strong>${escapeHtml(entry.title)}</strong></button>`).join(''):'<p class="navigation-empty">No chapter headings were detected for this text.</p>'}
-    </div>`;
-  panel.querySelector('[data-workspace-bookmark]')?.addEventListener('click',()=>addBookmark());
-  panel.querySelectorAll('[data-workspace-toc]').forEach((button)=>button.addEventListener('click',()=>jumpToWordIndex(button.dataset.workspaceToc)));
 }
 function renderMarkSelectionCard(){
   const panel=app.querySelector('#mark-selection-panel'); if(!panel) return;
@@ -10171,7 +10006,7 @@ function isModernGuideActionToken(word) {
 function modernGuideActionLabel(action) {
   return ({
     section: '',
-    discuss: 'Discuss with Mark',
+    discuss: 'Discuss with reading companion',
     sectionquiz: 'Quiz me',
     quiz: 'Quiz me on the whole guide',
     action: 'Add to Action Center',
@@ -10214,6 +10049,9 @@ function modernGuideSectionQuizContextRange(markerIndex) {
   const safeMarker = Math.max(0, Math.min(state.words.length, Number(markerIndex) || 0));
   let boundary = -1;
 
+  // A guide can contain several quiz checkpoints under one umbrella SECTION
+  // marker (for example a book-by-book roadmap). The preceding quiz checkpoint
+  // is therefore a stronger boundary than the umbrella section heading.
   for (let index = safeMarker - 1; index >= 0; index -= 1) {
     const action = modernGuideActionToken(state.words[index]);
     if (action === 'sectionquiz' || action === 'section') {
@@ -10478,7 +10316,88 @@ async function startModernGuideSectionComprehensionCheck(markerIndex, source = s
   }
 }
 
-async function startModernGuideWholeComprehensionCheck(source = state?.source || {}) {
+const WHOLE_GUIDE_QUESTION_HISTORY_KEY = 'marksetgo_whole_guide_question_history_v1';
+
+function wholeGuideQuestionHistory(documentId = state?.documentId) {
+  if (!documentId) return [];
+  try {
+    const store = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
+    return Array.isArray(store[documentId]) ? store[documentId] : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberWholeGuideQuestions(documentId, questions = []) {
+  if (!documentId || !Array.isArray(questions) || !questions.length) return;
+  try {
+    const store = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
+    const previous = Array.isArray(store[documentId]) ? store[documentId] : [];
+    const merged = [...questions, ...previous];
+    const seen = new Set();
+    store[documentId] = merged.filter((item) => {
+      const key = String(item?.question || '').trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 200);
+    localStorage.setItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY, JSON.stringify(store));
+  } catch {}
+}
+
+function shuffledWholeGuideQuestions(items = []) {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+  return copy;
+}
+
+function showModernGuideWholeQuizSetup(source = state?.source || {}) {
+  const dialog = app.querySelector('#comprehension-dialog');
+  if (!dialog) return;
+  const historyCount = wholeGuideQuestionHistory().length;
+  dialog.innerHTML = `<form method="dialog" class="comprehension-card" id="whole-guide-quiz-setup">
+    <div class="comprehension-heading">
+      <div><span class="comprehension-kicker">Whole-guide quiz</span><h2>Build your quiz</h2><p>${escapeHtml(source.originalTitle || state.title || 'Reading guide')}</p></div>
+      <button class="comprehension-close" value="cancel" type="submit" aria-label="Close">×</button>
+    </div>
+    <div class="comprehension-questions">
+      <fieldset class="comprehension-question">
+        <legend><span>1</span><div><small>Length</small>How many questions?</div></legend>
+        <label>Questions
+          <input id="whole-guide-question-count" type="number" min="5" max="25" step="1" value="10" inputmode="numeric">
+        </label>
+      </fieldset>
+      <fieldset class="comprehension-question">
+        <legend><span>2</span><div><small>Question mix</small>Choose new and review questions</div></legend>
+        <label>Mix
+          <select id="whole-guide-question-mode">
+            <option value="mixed" selected>Mixed — new + previous</option>
+            <option value="new">New only</option>
+            <option value="review">Review previous</option>
+          </select>
+        </label>
+        <p class="status">${historyCount ? `${historyCount} previous whole-guide question${historyCount === 1 ? '' : 's'} available for this book.` : 'No previous whole-guide questions yet. Mixed will generate new questions until history exists.'}</p>
+      </fieldset>
+    </div>
+    <div class="comprehension-actions">
+      <span id="comprehension-status" class="status"></span>
+      <button id="generate-whole-guide-quiz" class="primary" type="button">Generate randomized quiz</button>
+      <button class="secondary" value="cancel" type="submit">Close</button>
+    </div>
+  </form>`;
+  if (!dialog.open) dialog.showModal();
+  dialog.querySelector('#generate-whole-guide-quiz')?.addEventListener('click', () => {
+    const requestedCount = Number(dialog.querySelector('#whole-guide-question-count')?.value);
+    const questionCount = Number.isInteger(requestedCount) ? Math.max(5, Math.min(25, requestedCount)) : 10;
+    const questionMode = String(dialog.querySelector('#whole-guide-question-mode')?.value || 'mixed');
+    generateModernGuideWholeComprehensionCheck(source, { questionCount, questionMode });
+  });
+}
+
+async function generateModernGuideWholeComprehensionCheck(source = state?.source || {}, options = {}) {
   if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
     return window.MarkSetGoStartComprehension?.();
   }
@@ -10486,6 +10405,40 @@ async function startModernGuideWholeComprehensionCheck(source = state?.source ||
   const passageWords = state.words.filter((word) => !isModernGuideActionToken(word));
   const passage = passageWords.join(' ').replace(/\s+/g, ' ').trim();
   if (passageWords.length < 120) return;
+
+  const requestedCount = Number(options.questionCount);
+  const questionCount = Number.isInteger(requestedCount) ? Math.max(5, Math.min(25, requestedCount)) : 10;
+  const questionMode = ['mixed', 'new', 'review'].includes(options.questionMode) ? options.questionMode : 'mixed';
+  const history = wholeGuideQuestionHistory();
+
+  if (questionMode === 'review') {
+    if (history.length < questionCount) {
+      const dialog = app.querySelector('#comprehension-dialog');
+      const status = dialog?.querySelector('#comprehension-status');
+      if (status) status.textContent = `Only ${history.length} previous question${history.length === 1 ? '' : 's'} are available. Choose a smaller quiz or use Mixed/New only.`;
+      return;
+    }
+    const reviewed = shuffledWholeGuideQuestions(history).slice(0, questionCount);
+    renderComprehensionQuiz({ questions: reviewed }, {
+      startIndex: 0,
+      endIndex: state.words.length,
+      words: passageWords.length,
+      passage,
+      wholeGuide: true,
+      wholeGuideOptions: { questionCount, questionMode },
+      guideSource: source
+    });
+    return;
+  }
+
+  const oldTarget = questionMode === 'mixed' && history.length ? Math.min(history.length, Math.floor(questionCount / 2)) : 0;
+  const oldQuestions = oldTarget ? shuffledWholeGuideQuestions(history).slice(0, oldTarget) : [];
+  const newTarget = questionCount - oldQuestions.length;
+  const dialog = app.querySelector('#comprehension-dialog');
+  const generateButton = dialog?.querySelector('#generate-whole-guide-quiz');
+  const status = dialog?.querySelector('#comprehension-status');
+  if (generateButton) { generateButton.disabled = true; generateButton.textContent = 'Generating…'; }
+  if (status) status.textContent = '';
 
   const wasRunning = isReaderRunning();
   if (wasRunning) pauseReader();
@@ -10497,23 +10450,39 @@ async function startModernGuideWholeComprehensionCheck(source = state?.source ||
       body: JSON.stringify({
         title: `${source.originalTitle || state.title || 'Modern Guide'} — Whole Guide`,
         passage,
-        scope: 'whole_guide'
+        scope: 'whole_guide',
+        questionCount: newTarget,
+        questionMode: 'new',
+        avoidQuestions: history.map((item) => item?.question).filter(Boolean).slice(0, 100)
       })
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
-    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
+    if (!Array.isArray(payload.questions) || payload.questions.length !== newTarget) throw new Error('The whole-guide quiz response was incomplete.');
 
-    renderComprehensionQuiz(payload, {
+    rememberWholeGuideQuestions(state.documentId, payload.questions);
+    const questions = shuffledWholeGuideQuestions([...oldQuestions, ...payload.questions]);
+    renderComprehensionQuiz({ ...payload, questions }, {
       startIndex: 0,
       endIndex: state.words.length,
       words: passageWords.length,
       passage,
-      wholeGuide: true
+      wholeGuide: true,
+      wholeGuideOptions: { questionCount, questionMode },
+      guideSource: source
     });
   } catch (error) {
-    window.alert(`Whole-guide comprehension check unavailable: ${error.message}`);
+    if (status) status.textContent = `Whole-guide comprehension check unavailable: ${error.message}`;
+    else window.alert(`Whole-guide comprehension check unavailable: ${error.message}`);
+    if (generateButton) { generateButton.disabled = false; generateButton.textContent = 'Generate randomized quiz'; }
   }
+}
+
+async function startModernGuideWholeComprehensionCheck(source = state?.source || {}) {
+  if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
+    return window.MarkSetGoStartComprehension?.();
+  }
+  showModernGuideWholeQuizSetup(source);
 }
 
 function activateModernGuideInlineAction(button, source = state?.source || {}) {
@@ -11674,16 +11643,9 @@ function arrangeReaderSidePanels() {
   const wordPanel=app.querySelector('#word-panel'), toolbar=app.querySelector('.reader-toolbar'), media=app.querySelector('.reader-music-actions'), translation=app.querySelector('.translation-tools'), wordResult=app.querySelector('#word-result');
   if(!wordPanel||!toolbar)return;
   wordPanel.classList.add('reader-control-panel','mark-companion-panel');wordPanel.setAttribute('aria-label','Mark and reader tools');
-  const shell=document.createElement('div');shell.className='reader-control-shell mark-shell reader-workspace-shell';shell.innerHTML=`
-    <div class="reader-control-header reader-workspace-header"><div><span>Reading workspace</span><strong>${escapeHtml(state.title || 'Current text')}</strong></div><button id="close-reader-controls" class="reader-panel-close" type="button" aria-label="Close right pane">×</button></div>
-    <nav class="mark-tabs reader-workspace-tabs" role="tablist" aria-label="Reader workspace">
-      <button type="button" role="tab" aria-selected="true" data-mark-tab="tools" class="active"><span class="workspace-tab-icon" aria-hidden="true">▤</span><span>Read</span></button>
-      <button type="button" role="tab" aria-selected="false" data-mark-tab="selection"><span class="workspace-tab-icon" aria-hidden="true">✦</span><span>Companion</span></button>
-      <button type="button" role="tab" aria-selected="false" data-mark-tab="notebook"><span class="workspace-tab-icon" aria-hidden="true">✎</span><span>Notes</span></button>
-      <button type="button" role="tab" aria-selected="false" data-mark-tab="progress"><span class="workspace-tab-icon workspace-bars" aria-hidden="true">▥</span><span>Progress</span></button>
-      <button type="button" role="tab" aria-selected="false" data-mark-tab="study"><span class="workspace-tab-icon" aria-hidden="true">◇</span><span>Study</span></button>
-      <button type="button" role="tab" aria-selected="false" data-mark-tab="contents"><span class="workspace-tab-icon" aria-hidden="true">☷</span><span>Contents</span></button>
-    </nav>
+  const shell=document.createElement('div');shell.className='reader-control-shell mark-shell';shell.innerHTML=`
+    <div class="reader-control-header"><div><span>Reading companion</span><strong>Ask Mark</strong></div><button id="close-reader-controls" class="reader-panel-close" type="button" aria-label="Close right pane">×</button></div>
+    <nav class="mark-tabs" aria-label="Reader tools and Mark tabs"><button type="button" data-mark-tab="tools" class="active">Reader Tools</button><button type="button" data-mark-tab="selection">Mark</button><button type="button" data-mark-tab="notebook">Notebook</button><button type="button" data-mark-tab="history">History</button></nav>
     <div id="mark-tools-panel" data-mark-panel="tools" class="mark-panel-view">
       <div id="reader-control-core" class="reader-control-section"></div>
       <details class="settings-panel reader-tool-settings-panel"><summary><span>Media</span><span class="settings-summary">Music &amp; focus</span></summary><div id="reader-control-media" class="settings-content reader-control-group-body"></div></details>
@@ -11691,9 +11653,7 @@ function arrangeReaderSidePanels() {
     </div>
     <div id="mark-selection-panel" data-mark-panel="selection" class="mark-panel-view" hidden></div>
     <div id="mark-notebook-panel" data-mark-panel="notebook" class="mark-panel-view" hidden></div>
-    <div id="mark-progress-panel" data-mark-panel="progress" class="mark-panel-view reader-workspace-progress" hidden></div>
-    <div id="mark-study-panel" data-mark-panel="study" class="mark-panel-view reader-workspace-study" hidden></div>
-    <div id="mark-contents-panel" data-mark-panel="contents" class="mark-panel-view reader-workspace-contents" hidden></div>`;
+    <div id="mark-history-panel" data-mark-panel="history" class="mark-panel-view" hidden></div>`;
   wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
   shell.querySelector('#close-reader-controls')?.addEventListener('click',()=>app.querySelector('#toggle-word-panel')?.click());
 }
@@ -17143,46 +17103,40 @@ function renderBrowseHub() {
         <p class="browse-helper-copy">Choose cover view for browsing or switch to a compact list when you want to scan titles quickly.</p>
       </section>
 
-      <section id="browse-popular-libraries" class="browse-section browse-library-hub-section browse-feature-panel">
-        <div class="section-heading browse-feature-heading">
+      <section id="browse-popular-libraries" class="browse-section browse-library-hub-section">
+        <div class="section-heading">
           <div>
-            <span class="source-category">Libraries</span>
-            <h2>Popular Libraries</h2>
+            <span class="source-category">Sources</span>
+            <h2>Popular libraries</h2>
             <p>Search trusted sources for full texts, editions, previews, and books you can borrow or read online.</p>
           </div>
-          <span class="browse-feature-kicker" aria-hidden="true">Trusted book sources</span>
         </div>
         <div class="browse-library-hub">
           ${BROWSE_LIBRARY_SOURCES.map((item) => `
-            <button class="browse-library-card browse-library-card-featured" type="button" data-browse-provider="${escapeHtml(item.provider)}">
+            <button class="browse-library-card" type="button" data-browse-provider="${escapeHtml(item.provider)}">
               <span class="browse-library-icon">${escapeHtml(item.icon)}</span>
-              <span class="browse-library-card-copy">
-                <strong>${escapeHtml(item.title)}</strong>
-                <small>${escapeHtml(item.note)}</small>
-              </span>
-              <span class="browse-library-card-action" aria-hidden="true">Browse source →</span>
+              <strong>${escapeHtml(item.title)}</strong>
+              <small>${escapeHtml(item.note)}</small>
             </button>`).join('')}
         </div>
       </section>
 
-      <section id="browse-drm-free" class="browse-section drm-free-browse-promo browse-feature-panel">
+      <section id="browse-drm-free" class="browse-section drm-free-browse-promo">
         <div class="drm-free-promo-copy">
-          <span class="source-category">DRM-free books</span>
-          <h2>Find DRM-Free Books</h2>
-          <p>Search free public-domain books by category, author, subject, language, format, and popularity—then browse stores and publishers that sell modern DRM-free ebooks.</p>
+          <span class="source-category">Open & portable ebooks</span>
+          <h2>DRM-Free Book Finder</h2>
+          <p>Search free public-domain books by category, author, subject, language, format, and popularity—then browse a curated directory of stores and publishers that sell modern DRM-free ebooks.</p>
           <div class="drm-free-promo-actions">
             <button class="primary" type="button" data-action="drm-free-books">Search DRM-free books</button>
-            <span class="drm-free-browse-label">Browse:</span>
-            <button class="secondary" type="button" data-drm-quick-category="philosophy">Philosophy</button>
-            <button class="secondary" type="button" data-drm-quick-category="history">History</button>
-            <button class="secondary" type="button" data-drm-quick-category="science-fiction">Science Fiction</button>
+            <button class="secondary" type="button" data-drm-quick-category="philosophy">Browse Philosophy</button>
+            <button class="secondary" type="button" data-drm-quick-category="history">Browse History</button>
+            <button class="secondary" type="button" data-drm-quick-category="science-fiction">Browse Science Fiction</button>
           </div>
         </div>
-        <div class="drm-free-promo-stats" aria-label="DRM-free book finder features">
-          <div class="drm-free-stat"><strong>Free + paid</strong><span>One place to start your search</span></div>
-          <div class="drm-free-stat"><strong>EPUB / PDF / TXT</strong><span>Filter by usable formats</span></div>
-          <div class="drm-free-stat"><strong>Format filters</strong><span>Choose the edition you can use</span></div>
-          <div class="drm-free-stat"><strong>Read or download</strong><span>Open supported free books directly</span></div>
+        <div class="drm-free-promo-stats">
+          <strong>Free + paid</strong><span>One place to start your search</span>
+          <strong>EPUB / PDF / TXT</strong><span>Filter by usable formats</span>
+          <strong>Read or download</strong><span>Open supported free books directly</span>
         </div>
       </section>
 
