@@ -10533,7 +10533,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <button id="book-page-next" type="button" aria-label="Next page spread">›</button>
               </div>
             </div>
-            <span id="viewer-wpm-badge" class="viewer-wpm-badge" aria-label="Selected reading speed">${Math.round(Number(state.wpm) || 0).toLocaleString()} WPM</span>
+            <div class="viewer-wpm-control" role="group" aria-label="Reading speed controls">
+              <button id="viewer-wpm-down" class="viewer-wpm-step" type="button" aria-label="Decrease reading speed by 25 words per minute">−</button>
+              <span id="viewer-wpm-badge" class="viewer-wpm-badge" aria-label="Selected reading speed">${Math.round(Number(state.wpm) || 0).toLocaleString()} WPM</span>
+              <button id="viewer-wpm-up" class="viewer-wpm-step" type="button" aria-label="Increase reading speed by 25 words per minute">+</button>
+            </div>
           </div>
         </div>
         <div id="right-pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize right pane" tabindex="0"></div>
@@ -10928,6 +10932,22 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   const speedBadgeInput = app.querySelector('#speed');
   speedBadgeInput?.addEventListener('input', updateViewerWpmBadge);
   speedBadgeInput?.addEventListener('change', updateViewerWpmBadge);
+  app.querySelector('#viewer-wpm-down')?.addEventListener('click', () => adjustReaderWpm(-25));
+  app.querySelector('#viewer-wpm-up')?.addEventListener('click', () => adjustReaderWpm(25));
+
+  // Arrow keys mirror the lower-right WPM controls while the Reader is active.
+  // Remove the previous Reader instance's handler first so navigation/re-entry
+  // can never accumulate duplicate document-level key listeners.
+  if (state.viewerWpmKeyHandler) document.removeEventListener('keydown', state.viewerWpmKeyHandler);
+  state.viewerWpmKeyHandler = (event) => {
+    if ((event.key !== 'ArrowUp' && event.key !== 'ArrowDown') || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('input, textarea, select, button, a, summary, [contenteditable="true"], [role="textbox"]')) return;
+    if (!app.querySelector('#reader')) return;
+    event.preventDefault();
+    adjustReaderWpm(event.key === 'ArrowUp' ? 25 : -25);
+  };
+  document.addEventListener('keydown', state.viewerWpmKeyHandler);
   updateViewerWpmBadge();
 
   app.querySelectorAll('#mode-select, #speed, #word-count, #pointer-style, #pointer-color, #meaningful-chunks, #focus-anchor-font-size, #focus-anchor-color, #focus-anchor-bold, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
@@ -13258,6 +13278,31 @@ function moveReadingGuide(reader, step, tickMs) {
 let lastReaderStatusPaintAt = 0;
 let lastReaderStatusText = '';
 let lastViewerWpmText = '';
+
+function adjustReaderWpm(delta) {
+  const speedInput = app.querySelector('#speed');
+  if (!speedInput) return;
+
+  const min = Number(speedInput.min) || 30;
+  const max = Number(speedInput.max) || 900;
+  const current = Number(speedInput.value) || Number(state.wpm) || 300;
+  const next = Math.min(max, Math.max(min, Math.round(current + Number(delta || 0))));
+  if (next === current) return;
+
+  const wasRunning = isReaderRunning();
+  if (wasRunning) stopReader();
+
+  speedInput.value = String(next);
+  state.wpm = next;
+
+  const fullscreenSpeed = app.querySelector('#fs-speed');
+  if (fullscreenSpeed) fullscreenSpeed.value = String(next);
+
+  updateViewerWpmBadge();
+  persistReaderSession();
+
+  if (wasRunning && getSelectedMode() !== 'two-column') startReader();
+}
 
 function updateViewerWpmBadge() {
   const badge = app.querySelector('#viewer-wpm-badge');

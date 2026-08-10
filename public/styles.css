@@ -13242,3 +13242,51 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
     margin-top: 3px;
   }
 }
+
+
+/* Lower-right Reader WPM stepper. Uses the existing viewer badge as the single visible value. */
+.reader-viewer-footer .viewer-wpm-control {
+  grid-column: 3;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: .28rem;
+}
+
+.reader-viewer-footer .viewer-wpm-control .viewer-wpm-badge {
+  grid-column: auto;
+  justify-self: auto;
+}
+
+.viewer-wpm-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  padding: 0;
+  border: 1px solid rgb(20 31 43 / .18);
+  border-radius: .4rem;
+  background: rgb(20 31 43 / .06);
+  color: inherit;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.viewer-wpm-step:hover {
+  background: rgb(20 31 43 / .11);
+}
+
+.viewer-wpm-step:active {
+  transform: translateY(1px);
+}
+
+@media (max-width: 760px) {
+  .reader-viewer-footer .viewer-wpm-control {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}

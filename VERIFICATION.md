@@ -1,36 +1,34 @@
-# Whole-guide quiz configuration patch verification
+# Lower-right Reader WPM stepper — verification
 
-Runtime files changed:
-- `server.js`
+Baseline: user-uploaded `mark-set-go-web-feature-ask-mark-premium-phase-1 (8).zip`.
+
+Runtime path verified in `server.js`: Express serves the `public/` directory and `public/index.html`. Root duplicates were intentionally not changed.
+
+## Changed runtime files
 - `public/app.js`
-- `public/index.html` (app cache key only)
+- `public/styles.css`
+- `public/index.html` (cache key only)
 
-Behavior contract:
-- Whole-guide quiz defaults to 10 questions.
-- User may choose any integer from 5 through 25.
-- Mixed mode randomly combines prior questions with newly generated questions when prior history exists.
-- New-only mode requests fresh questions and sends prior question stems as an avoidance list.
-- Review-previous mode randomly samples stored whole-guide questions for that book and does not call the API.
-- Section-level guide quizzes remain exactly 4 questions.
-- Whole-guide question history is stored per document in browser localStorage, capped at 200 unique questions per document.
-- `Randomize another quiz` returns the user to the whole-guide setup screen.
+## Behavior
+- Lower-right footer: `[ − ] <WPM> [ + ]`
+- Minus: -25 WPM
+- Plus: +25 WPM
+- Up Arrow: +25 WPM
+- Down Arrow: -25 WPM
+- Existing input min/max remain authoritative: 30–900 WPM.
+- Uses existing `state.wpm`, `#speed`, fullscreen speed mirror, WPM badge, and reader-session persistence.
+- If playback is running, the current position is retained while playback restarts at the new speed.
+- Arrow shortcuts do not fire from form/editable/interactive controls.
 
-Checks run:
-- `node --check server.js`: PASS
+## Checks run
 - `node --check public/app.js`: PASS
-- Static count/limit contract: PASS
-- Section quiz 4-question contract present: PASS
-- Chromium 144 functional test using the actual modified whole-guide functions: PASS
-  - default: 10 / Mixed
-  - New only 25: request 25, render 25
-  - Mixed 10 with history: request 5 new + sample 5 old, render 10
-  - Review previous 5: zero network request, render 5 prior questions
-- Chromium visual rendering with the production app stylesheet: PASS
-- No guide text files changed.
-- No CSS files changed.
-- No Reader module files changed.
-- No new MutationObserver introduced by this patch.
+- Executing `public/` path in `server.js`: PASS
+- Markup/step/arrow/clamp/persistence/static contract checks: PASS
+- All three patch files differ from the uploaded baseline: PASS
+- MutationObserver occurrence count unchanged: PASS
+- `contextmenu` occurrence count unchanged: PASS
+- `word-context-menu` occurrence count unchanged: PASS
 - ZIP integrity: PASS
 
-Chromium environment note:
-Direct navigation to localhost is blocked by the execution environment's organization policy. Chromium verification therefore loaded the production stylesheet and the exact modified quiz functions through the Chrome DevTools Protocol into a browser document and exercised the actual controls and generation logic there. This is a real Chromium execution, but not a localhost end-to-end server navigation.
+## Chromium
+Chromium was invoked against the app, but this sandbox's Chromium process did not complete before timeout. Therefore this patch is **not claimed as Chromium-tested**. No browser PASS is asserted.
