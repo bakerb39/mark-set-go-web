@@ -1,12 +1,25 @@
-Mark, Set, Go! — Reader Workspace Tabs patch
+Mark, Set, Go! — Reader Workspace merge onto latest user files
 2026-08-10
 
-IMPORTANT BASE FILES
-- app.js in this ZIP is the exact app(3).js file supplied by the user.
-- index.html in this ZIP is the exact index(4).html file supplied by the user.
-- styles.css contains the reader-workspace tab styling from the v9.7.1 workspace patch.
+BASE FILES USED
+- app.js: exact latest uploaded app(4).js, with Reader Workspace changes merged into it.
+- index.html: exact latest uploaded index(5).html, preserving the user's Classic Guides cache tokens and other changes except for the app.js cache bust and one additive workspace stylesheet link.
 
-Reader workspace tabs implemented in app.js:
-Read | Companion | Notes | Progress | Study | Contents
+FILES TO COPY TO REPO PUBLIC FOLDER
+- public/app.js
+- public/index.html
+- public/reader-workspace-shell.css
 
-No reader-engine module files are included in this patch.
+WHAT CHANGED
+- Restores persistent desktop Reader Workspace beside the reader.
+- Tabs: Read | Companion | Notes | Progress | Study | Contents.
+- Companion remains the full existing Ask Mark/Beth writing panel.
+- Progress renders current-text KPIs plus annual WPM/comprehension charts and goal lines.
+- Study and Contents render inside the same right workspace.
+- Desktop opens the workspace automatically; mobile remains collapsed.
+- Uses an additive reader-workspace-shell.css so the user's existing styles.css is NOT replaced.
+
+PROTECTED
+- No files under public/reader/ modified.
+- No right-click handler changes.
+- No VirtualRenderer / ReaderEngine / pagination module changes.
