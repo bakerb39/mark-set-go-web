@@ -1,18 +1,15 @@
-Mark, Set, Go! — Double-click-only Reader playback v2
+Mark, Set, Go! — corrected reader click behavior
 
-Built from:
+Built from the user's latest:
 - app(5).js
 - index(6).html
 
-Fixes:
-- Removed Spacebar playback.
-- Removed blank-space playback from BOTH existing click paths:
-  1. the early Reader pointerup/stable-click handler
-  2. the later readerFrame click handler
-- This is the key fix for scrollbar clicks/drags unexpectedly starting or pausing.
-- Double-click inside the Reader toggles play/pause.
-- Native scrollbars and pane splitters are excluded from double-click playback.
-- Existing single-click text seek remains intact.
-- Alt+double-click remains reserved for Ask Mark paragraph selection.
-- Existing Start/Pause buttons remain unchanged.
-- No /reader engine files modified.
+Behavior:
+- Spacebar behavior is LEFT ALONE and continues to toggle Start/Pause.
+- Single click on BLANK reader space does nothing to playback.
+- Scrollbar clicks/drags do nothing to playback.
+- Single click on visible text keeps the existing seek-to-position behavior.
+- Double-click directly in the Reader toggles Start/Pause.
+- Alt+double-click keeps the existing Ask Mark paragraph-selection behavior.
+- Start/Pause buttons are unchanged.
+- No files under public/reader/ were modified.
