@@ -1,0 +1,16 @@
+{
+  "id": "classic-plato-symposium",
+  "slug": "plato-symposium",
+  "title": "Symposium",
+  "author": "Plato",
+  "tagline": "Love, beauty, desire, immortality, philosophy, comedy, tragedy, and the education of longing.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

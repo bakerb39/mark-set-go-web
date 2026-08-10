@@ -1,0 +1,16 @@
+{
+  "id": "classic-aristotle-categories",
+  "slug": "aristotle-categories",
+  "title": "Categories",
+  "author": "Aristotle",
+  "tagline": "Predication, substance, quantity, quality, relation, opposition, priority, and the grammar of being.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

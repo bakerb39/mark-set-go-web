@@ -1,0 +1,16 @@
+{
+  "id": "classic-plato-dialogues",
+  "slug": "plato-dialogues",
+  "title": "Dialogues and The Seventh Letter",
+  "author": "Plato",
+  "tagline": "A map of Platonic inquiry: Socratic examination, forms, politics, love, knowledge, and philosophical authorship.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

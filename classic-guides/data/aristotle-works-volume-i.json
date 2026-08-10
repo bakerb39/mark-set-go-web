@@ -1,0 +1,16 @@
+{
+  "id": "classic-aristotle-works-volume-i",
+  "slug": "aristotle-works-volume-i",
+  "title": "Works, Volume I",
+  "author": "Aristotle",
+  "tagline": "A guided synthesis of Aristotle’s logical, natural-philosophical, and metaphysical foundations.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

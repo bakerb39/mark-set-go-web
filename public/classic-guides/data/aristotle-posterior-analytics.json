@@ -1,0 +1,16 @@
+{
+  "id": "classic-aristotle-posterior-analytics",
+  "slug": "aristotle-posterior-analytics",
+  "title": "Posterior Analytics",
+  "author": "Aristotle",
+  "tagline": "Scientific knowledge, demonstration, causes, definitions, first principles, induction, and explanation.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

@@ -3045,11 +3045,33 @@ const CLASSIC_GUIDES = Object.freeze({
   'Sophocles Oedipus Colonus': { id:'classic-oedipus-colonus', slug:'oedipus-at-colonus', title:"Oedipus at Colonus", author:"Sophocles" },
   'Sophocles Oedipus Rex': { id:'classic-oedipus-king', slug:'oedipus-the-king', title:"Oedipus the King", author:"Sophocles" },
   'Sophocles plays': { id:'classic-sophocles-plays', slug:'sophocles-plays', title:"Sophocles \u2014 Plays", author:"Sophocles" },
-  'Herodotus Persian Wars': { id:'classic-herodotus-persian-wars', slug:'herodotus-persian-wars', title:"The History of the Persian Wars", author:"Herodotus" }
+  'Herodotus Persian Wars': { id:'classic-herodotus-persian-wars', slug:'herodotus-persian-wars', title:"The History of the Persian Wars", author:"Herodotus" },
+  "Thucydides Peloponnesian War": { id:"classic-thucydides-peloponnesian-war", slug:"thucydides-peloponnesian-war", title:"The History of the Peloponnesian War", author:"Thucydides" },
+  "Plato Apology": { id:"classic-plato-apology", slug:"plato-apology", title:"Apology", author:"Plato" },
+  "Plato Crito": { id:"classic-plato-crito", slug:"plato-crito", title:"Crito", author:"Plato" },
+  "Plato Dialogues": { id:"classic-plato-dialogues", slug:"plato-dialogues", title:"Dialogues and The Seventh Letter", author:"Plato" },
+  "Plato Laws": { id:"classic-plato-laws", slug:"plato-laws", title:"Laws", author:"Plato" },
+  "Plato Phaedo": { id:"classic-plato-phaedo", slug:"plato-phaedo", title:"Phaedo", author:"Plato" },
+  "Plato Phaedrus": { id:"classic-plato-phaedrus", slug:"plato-phaedrus", title:"Phaedrus", author:"Plato" },
+  "Plato Republic": { id:"classic-plato-republic", slug:"plato-republic", title:"Republic", author:"Plato" },
+  "Plato Symposium": { id:"classic-plato-symposium", slug:"plato-symposium", title:"Symposium", author:"Plato" },
+  "Plato Theaetetus": { id:"classic-plato-theaetetus", slug:"plato-theaetetus", title:"Theaetetus", author:"Plato" },
+  "Plato Timaeus": { id:"classic-plato-timaeus", slug:"plato-timaeus", title:"Timaeus", author:"Plato" },
+  "Aristotle Categories": { id:"classic-aristotle-categories", slug:"aristotle-categories", title:"Categories", author:"Aristotle" },
+  "Aristotle Metaphysics": { id:"classic-aristotle-metaphysics", slug:"aristotle-metaphysics", title:"Metaphysics", author:"Aristotle" },
+  "Aristotle On Interpretation": { id:"classic-aristotle-on-interpretation", slug:"aristotle-on-interpretation", title:"On Interpretation", author:"Aristotle" },
+  "Aristotle Physics": { id:"classic-aristotle-physics", slug:"aristotle-physics", title:"Physics", author:"Aristotle" },
+  "Aristotle Posterior Analytics": { id:"classic-aristotle-posterior-analytics", slug:"aristotle-posterior-analytics", title:"Posterior Analytics", author:"Aristotle" },
+  "Aristotle Prior Analytics": { id:"classic-aristotle-prior-analytics", slug:"aristotle-prior-analytics", title:"Prior Analytics", author:"Aristotle" },
+  "Aristotle works::Works, Volume I": { id:"classic-aristotle-works-volume-i", slug:"aristotle-works-volume-i", title:"Works, Volume I", author:"Aristotle" },
+  "Aristotle Nicomachean Ethics": { id:"classic-aristotle-nicomachean-ethics", slug:"aristotle-nicomachean-ethics", title:"Nicomachean Ethics", author:"Aristotle" },
+  "Aristotle On the Soul": { id:"classic-aristotle-on-the-soul", slug:"aristotle-on-the-soul", title:"On the Soul", author:"Aristotle" }
 });
 
 function classicGuideForGreatBook(book) {
-  return CLASSIC_GUIDES[String(book?.query || '')] || null;
+  const query = String(book?.query || '');
+  const titleKey = `${query}::${String(book?.title || '')}`;
+  return CLASSIC_GUIDES[titleKey] || CLASSIC_GUIDES[query] || null;
 }
 
 function classicGuidePathForGreatBook(book) {
@@ -9887,7 +9909,7 @@ function modernGuideInteractionConfig(source = state?.source || {}) {
 }
 
 function modernGuideActionToken(word) {
-  const match = String(word || '').match(/^\[\[MSG:(SECTION|DISCUSS|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
+  const match = String(word || '').match(/^\[\[MSG:(SECTION|DISCUSS|SECTIONQUIZ|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
   return match ? match[1].toLowerCase() : '';
 }
 
@@ -9899,6 +9921,7 @@ function modernGuideActionLabel(action) {
   return ({
     section: '',
     discuss: 'Discuss with Mark',
+    sectionquiz: 'Quiz me',
     quiz: 'Quiz me on the whole guide',
     action: 'Add to Action Center',
     ideas: 'Explore related Great Ideas',
@@ -9918,6 +9941,40 @@ function modernGuideContextRange(markerIndex) {
   }
 
   const startIndex = sectionMarker >= 0 ? sectionMarker + 1 : 0;
+  const cleanWords = [];
+  let firstReal = null;
+  let lastReal = null;
+
+  for (let index = startIndex; index < safeMarker; index += 1) {
+    if (isModernGuideActionToken(state.words[index])) continue;
+    if (firstReal == null) firstReal = index;
+    lastReal = index;
+    cleanWords.push(state.words[index]);
+  }
+
+  return {
+    startIndex: firstReal == null ? startIndex : firstReal,
+    endIndex: lastReal == null ? safeMarker : lastReal + 1,
+    text: cleanWords.join(' ').trim()
+  };
+}
+
+function modernGuideSectionQuizContextRange(markerIndex) {
+  const safeMarker = Math.max(0, Math.min(state.words.length, Number(markerIndex) || 0));
+  let boundary = -1;
+
+  // A guide can contain several quiz checkpoints under one umbrella SECTION
+  // marker (for example a book-by-book roadmap). The preceding quiz checkpoint
+  // is therefore a stronger boundary than the umbrella section heading.
+  for (let index = safeMarker - 1; index >= 0; index -= 1) {
+    const action = modernGuideActionToken(state.words[index]);
+    if (action === 'sectionquiz' || action === 'section') {
+      boundary = index;
+      break;
+    }
+  }
+
+  const startIndex = boundary >= 0 ? boundary + 1 : 0;
   const cleanWords = [];
   let firstReal = null;
   let lastReal = null;
@@ -10132,6 +10189,47 @@ function openModernGuideGreatIdea(source = state?.source || {}) {
   });
 }
 
+async function startModernGuideSectionComprehensionCheck(markerIndex, source = state?.source || {}) {
+  if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) return;
+
+  const context = modernGuideSectionQuizContextRange(markerIndex);
+  const passageWords = context.text.split(/\s+/).filter(Boolean);
+  if (passageWords.length < 120) {
+    window.alert(`This guide section has ${passageWords.length} readable words; a comprehension check needs at least 120.`);
+    return;
+  }
+
+  const wasRunning = isReaderRunning();
+  if (wasRunning) pauseReader();
+
+  const sectionTitle = tocTitleForWordIndex(context.startIndex) || 'Guide section';
+  try {
+    const response = await fetch('/api/comprehension', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `${source.originalTitle || state.title || 'Modern Guide'} — ${sectionTitle}`,
+        passage: context.text,
+        scope: 'guide_section'
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
+
+    renderComprehensionQuiz(payload, {
+      startIndex: context.startIndex,
+      endIndex: context.endIndex,
+      words: passageWords.length,
+      passage: context.text,
+      guideSection: true,
+      sectionTitle
+    });
+  } catch (error) {
+    window.alert(`Section comprehension check unavailable: ${error.message}`);
+  }
+}
+
 async function startModernGuideWholeComprehensionCheck(source = state?.source || {}) {
   if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
     return window.MarkSetGoStartComprehension?.();
@@ -10179,6 +10277,11 @@ function activateModernGuideInlineAction(button, source = state?.source || {}) {
 
   if (action === 'discuss') {
     openModernGuideContextInAskMark(index);
+    return;
+  }
+
+  if (action === 'sectionquiz') {
+    startModernGuideSectionComprehensionCheck(index, source);
     return;
   }
 

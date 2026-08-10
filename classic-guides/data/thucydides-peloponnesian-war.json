@@ -1,0 +1,16 @@
+{
+  "id": "classic-thucydides-peloponnesian-war",
+  "slug": "thucydides-peloponnesian-war",
+  "title": "The History of the Peloponnesian War",
+  "author": "Thucydides",
+  "tagline": "Power, fear, honor, necessity, rhetoric, civil war, plague, empire, and the limits of political judgment.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "classic-plato-phaedo",
+  "slug": "plato-phaedo",
+  "title": "Phaedo",
+  "author": "Plato",
+  "tagline": "Death, philosophy, soul, recollection, forms, argument, and the discipline of intellectual courage.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "classic-plato-laws",
+  "slug": "plato-laws",
+  "title": "Laws",
+  "author": "Plato",
+  "tagline": "Law, education, civic character, mixed government, theology, punishment, and the design of a second-best city.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

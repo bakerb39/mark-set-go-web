@@ -1,0 +1,16 @@
+{
+  "id": "classic-plato-crito",
+  "slug": "plato-crito",
+  "title": "Crito",
+  "author": "Plato",
+  "tagline": "Justice, law, friendship, civil obligation, and the refusal to answer wrong with wrong.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

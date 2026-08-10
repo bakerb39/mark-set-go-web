@@ -1,0 +1,16 @@
+{
+  "id": "classic-aristotle-on-interpretation",
+  "slug": "aristotle-on-interpretation",
+  "title": "On Interpretation",
+  "author": "Aristotle",
+  "tagline": "Language, propositions, affirmation, negation, contradiction, truth, modality, and future contingents.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

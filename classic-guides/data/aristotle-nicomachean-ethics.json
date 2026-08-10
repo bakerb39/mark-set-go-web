@@ -1,0 +1,16 @@
+{
+  "id": "classic-aristotle-nicomachean-ethics",
+  "slug": "aristotle-nicomachean-ethics",
+  "title": "Nicomachean Ethics",
+  "author": "Aristotle",
+  "tagline": "Happiness, virtue, character, choice, friendship, pleasure, justice, contemplation, and practical wisdom.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

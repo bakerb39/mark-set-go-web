@@ -1,0 +1,16 @@
+{
+  "id": "classic-plato-timaeus",
+  "slug": "plato-timaeus",
+  "title": "Timaeus",
+  "author": "Plato",
+  "tagline": "Cosmos, order, mathematics, soul, body, necessity, creation, and the limits of likely explanation.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "classic-plato-republic",
+  "slug": "plato-republic",
+  "title": "Republic",
+  "author": "Plato",
+  "tagline": "Justice, education, political order, psychology, knowledge, forms, art, and the good life.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

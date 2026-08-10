@@ -1,0 +1,16 @@
+{
+  "id": "classic-aristotle-on-the-soul",
+  "slug": "aristotle-on-the-soul",
+  "title": "On the Soul",
+  "author": "Aristotle",
+  "tagline": "Life, soul, body, nutrition, perception, imagination, desire, movement, and intellect.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

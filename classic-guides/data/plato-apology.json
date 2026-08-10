@@ -1,0 +1,16 @@
+{
+  "id": "classic-plato-apology",
+  "slug": "plato-apology",
+  "title": "Apology",
+  "author": "Plato",
+  "tagline": "Philosophy on trial: examination, piety, civic duty, death, and the care of the soul.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

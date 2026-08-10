@@ -1,0 +1,16 @@
+{
+  "id": "classic-plato-phaedrus",
+  "slug": "plato-phaedrus",
+  "title": "Phaedrus",
+  "author": "Plato",
+  "tagline": "Love, rhetoric, dialectic, soul, beauty, memory, and the powers and limits of writing.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

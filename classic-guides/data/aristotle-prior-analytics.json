@@ -1,0 +1,16 @@
+{
+  "id": "classic-aristotle-prior-analytics",
+  "slug": "aristotle-prior-analytics",
+  "title": "Prior Analytics",
+  "author": "Aristotle",
+  "tagline": "Syllogism, deduction, figures, moods, conversion, necessity, possibility, and the architecture of inference.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

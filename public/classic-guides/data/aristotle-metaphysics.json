@@ -1,0 +1,16 @@
+{
+  "id": "classic-aristotle-metaphysics",
+  "slug": "aristotle-metaphysics",
+  "title": "Metaphysics",
+  "author": "Aristotle",
+  "tagline": "Being, substance, cause, form, matter, actuality, potentiality, unity, and first philosophy.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

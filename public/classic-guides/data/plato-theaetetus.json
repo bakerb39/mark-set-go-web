@@ -1,0 +1,16 @@
+{
+  "id": "classic-plato-theaetetus",
+  "slug": "plato-theaetetus",
+  "title": "Theaetetus",
+  "author": "Plato",
+  "tagline": "Knowledge, perception, judgment, explanation, relativism, memory, and philosophical method.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

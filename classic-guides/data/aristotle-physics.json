@@ -1,0 +1,16 @@
+{
+  "id": "classic-aristotle-physics",
+  "slug": "aristotle-physics",
+  "title": "Physics",
+  "author": "Aristotle",
+  "tagline": "Nature, change, cause, chance, infinity, place, time, continuity, motion, and first principles.",
+  "format": "reader-guide-v3-section-quizzes",
+  "actions": [
+    "buy",
+    "discuss",
+    "sectionquiz",
+    "ideas",
+    "action",
+    "quiz"
+  ]
+}

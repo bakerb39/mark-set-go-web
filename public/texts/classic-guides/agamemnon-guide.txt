@@ -281,6 +281,7 @@ READING CHECK
 Find one early and one late passage involving justice and revenge. What changed in the meaning of the idea, and what caused the change?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 2: SACRIFICE
@@ -297,6 +298,7 @@ READING CHECK
 Find one early and one late passage involving sacrifice. What changed in the meaning of the idea, and what caused the change?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 3: GENDER AND POLITICAL AUTHORITY
@@ -313,6 +315,7 @@ READING CHECK
 Find one early and one late passage involving gender and political authority. What changed in the meaning of the idea, and what caused the change?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 4: PROPHECY AND KNOWLEDGE
@@ -329,6 +332,7 @@ READING CHECK
 Find one early and one late passage involving prophecy and knowledge. What changed in the meaning of the idea, and what caused the change?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 5: WAR RETURNING HOME
@@ -345,6 +349,7 @@ READING CHECK
 Find one early and one late passage involving war returning home. What changed in the meaning of the idea, and what caused the change?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 DEEP DIVE 6: INHERITED GUILT
@@ -361,6 +366,7 @@ READING CHECK
 Find one early and one late passage involving inherited guilt. What changed in the meaning of the idea, and what caused the change?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 CHARACTERS AS ARGUMENTS
@@ -393,6 +399,7 @@ Chorus of Argive Elders should be read as more than a plot function. In Agamemno
 Also watch how other speakers describe Chorus of Argive Elders. Reputation in classical literature is rarely neutral. Praise, accusation, genealogy, rumor, prophecy, lament, and public speech create competing versions of the same person. Compare self-description with description by enemies, allies, family, chorus, narrator, or gods. The distance between these portraits often reveals the work’s deepest uncertainty about motive and responsibility. A good seminar question is: what does the audience know about Chorus of Argive Elders that no single character in the work can fully know?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 LANGUAGE, FORM, AND CLOSE READING
@@ -406,6 +413,7 @@ For oral works, drama, and epic, sound matters as well. Repetition, formal addre
 Finally, distinguish dramatic or narrative irony from simple contradiction. The audience may possess information a character lacks, or may see that two characters speak partial truths that cannot be reconciled within the available institutions. That gap creates much of the intellectual pleasure of classical reading. It lets Agamemnon ask the reader to judge without giving the reader the comfort of perfect innocence.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 HISTORICAL AND CULTURAL LENSES
@@ -417,6 +425,7 @@ At the same time, avoid the opposite mistake of treating the work as a museum pi
 Translation is another part of context. Different English versions can make a speaker sound archaic, conversational, formal, brutal, lyrical, or psychologically modern. If a sentence seems especially important, compare two translations or consult a note on the underlying Greek term. You do not need Greek to benefit from this practice. The purpose is to remember that interpretive confidence should remain proportional to what the translation can securely carry.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 THE GREAT CONVERSATION — COMPARATIVE PATHS
@@ -434,6 +443,7 @@ Agamemnon AND Homer — The Odyssey
 Reading Agamemnon beside Homer — The Odyssey sharpens the Great Books conversation around prophecy and knowledge. The point of comparison is not to force the works into agreement, but to notice that each assigns different weight to authority, character, institutions, divine order, historical circumstance, and consequences. Begin with one concrete scene or claim from Agamemnon, then ask what the other work would recognize, reject, or redescribe. This produces a more useful comparison than simply listing shared themes. It also makes visible a long-running Western argument: whether moral order is discovered, inherited, negotiated, legislated, narrated, or painfully built after older forms of order fail.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 INTERPRETIVE POSITIONS TO TEST
@@ -449,6 +459,7 @@ POSITION 4 — The work ultimately endorses the victorious or surviving position
 POSITION 5 — Modern moral categories are enough to settle the work. Test this by identifying at least one ancient institution or obligation that changes the terms of judgment. Then reverse the exercise: identify one feature of the work that invites criticism of its own inherited world. The best reading is historically informed without surrendering moral intelligence.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 SEMINAR PREPARATION — TWELVE QUESTIONS
@@ -467,6 +478,7 @@ SEMINAR PREPARATION — TWELVE QUESTIONS
 12. What would a reader of The Libation Bearers notice in Agamemnon that a first-time reader might miss?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 REREADING PLAN
@@ -492,6 +504,7 @@ Next place the passage within the whole of Agamemnon. What happened immediately 
 Finally connect the passage to the moral problem of the work: whether revenge can be called justice when every act of punishment reproduces an earlier crime. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -504,6 +517,7 @@ Next place the passage within the whole of Agamemnon. What happened immediately 
 Finally connect the passage to the moral problem of the work: whether revenge can be called justice when every act of punishment reproduces an earlier crime. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -516,6 +530,7 @@ Next place the passage within the whole of Agamemnon. What happened immediately 
 Finally connect the passage to the moral problem of the work: whether revenge can be called justice when every act of punishment reproduces an earlier crime. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -528,6 +543,7 @@ Next place the passage within the whole of Agamemnon. What happened immediately 
 Finally connect the passage to the moral problem of the work: whether revenge can be called justice when every act of punishment reproduces an earlier crime. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -540,6 +556,7 @@ Next place the passage within the whole of Agamemnon. What happened immediately 
 Finally connect the passage to the moral problem of the work: whether revenge can be called justice when every act of punishment reproduces an earlier crime. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -552,6 +569,7 @@ Next place the passage within the whole of Agamemnon. What happened immediately 
 Finally connect the passage to the moral problem of the work: whether revenge can be called justice when every act of punishment reproduces an earlier crime. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -564,6 +582,7 @@ Next place the passage within the whole of Agamemnon. What happened immediately 
 Finally connect the passage to the moral problem of the work: whether revenge can be called justice when every act of punishment reproduces an earlier crime. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
@@ -576,6 +595,7 @@ Next place the passage within the whole of Agamemnon. What happened immediately 
 Finally connect the passage to the moral problem of the work: whether revenge can be called justice when every act of punishment reproduces an earlier crime. Do not ask merely whether the speaker is right. Ask what the speaker can see, what the speaker cannot see, and what institutional or relational pressures shape the available choices. Then formulate a seminar claim beginning, 'This passage matters because…' and include one qualification beginning, 'However…'. That two-part structure produces a stronger interpretation than an unqualified verdict.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 ABOUT THIS GUIDE
