@@ -739,34 +739,25 @@
   function configureShell() {
     const candidate = $('.reader-control-shell.mark-shell');
     if (!candidate) return false;
-
-    const workspaceCompanion = candidate.querySelector('#mark-selection-panel[data-mark-panel="selection"]');
-    const mount = workspaceCompanion || candidate;
-
-    if (candidate.dataset.premiumConfigured === '1' && mount.querySelector('[data-askmark-premium]') && mount.querySelector('[data-askmark-view="format"]')) {
+    if (candidate.dataset.premiumConfigured === '1' && candidate.querySelector('[data-askmark-premium]') && candidate.querySelector('[data-askmark-view="format"]')) {
       shell = candidate;
       syncSelection();
       return true;
     }
-
+    // The reader can rebuild the contents of the same shell when a different document loads.
+    // In that case the dataset flag survives even though Ask Mark's premium/Format UI was removed.
     if (candidate.dataset.premiumConfigured === '1') delete candidate.dataset.premiumConfigured;
+
     shell = candidate;
     shell.dataset.premiumConfigured = '1';
-
-    if (workspaceCompanion) {
-      workspaceCompanion.replaceChildren();
-      workspaceCompanion.insertAdjacentHTML('beforeend', premiumMarkup());
-      legacyHost = null;
-    } else {
-      legacyHost = document.createElement('div');
-      legacyHost.className = 'askmark-legacy-host';
-      legacyHost.hidden = true;
-      while (shell.firstChild) legacyHost.appendChild(shell.firstChild);
-      shell.appendChild(legacyHost);
-      shell.insertAdjacentHTML('beforeend', premiumMarkup());
-    }
-
+    legacyHost = document.createElement('div');
+    legacyHost.className = 'askmark-legacy-host';
+    legacyHost.hidden = true;
+    while (shell.firstChild) legacyHost.appendChild(shell.firstChild);
+    shell.appendChild(legacyHost);
+    shell.insertAdjacentHTML('beforeend', premiumMarkup());
     bindPremiumEvents();
+
     syncSelection();
     syncContext();
     window.setTimeout(()=>refreshMarkProgress(),80);

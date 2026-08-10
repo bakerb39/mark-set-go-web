@@ -11950,10 +11950,8 @@ function bindReaderResize(readerFrame, reader) {
   if (Number.isFinite(savedLeft)) layout.style.setProperty('--navigation-width', `${Math.max(260, Math.min(420, savedLeft))}px`);
   if (Number.isFinite(savedRight)) {
     const layoutWidth = Math.max(0, layout.getBoundingClientRect().width || 0);
-    const desktopWorkspace = window.matchMedia('(min-width: 980px)').matches;
-    const rightMin = desktopWorkspace ? 520 : 320;
-    const rightMax = Math.max(rightMin, Math.min(760, layoutWidth - 320));
-    layout.style.setProperty('--word-panel-width', `${Math.max(rightMin, Math.min(rightMax, savedRight))}px`);
+    const rightMax = Math.max(480, Math.min(760, layoutWidth - 320));
+    layout.style.setProperty('--word-panel-width', `${Math.max(320, Math.min(rightMax, savedRight))}px`);
   }
 
   const bindSplitter = (splitter, side) => {
