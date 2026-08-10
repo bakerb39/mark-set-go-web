@@ -1,35 +1,12 @@
-Mark, Set, Go! — Reader Workspace Tabs UI
+Mark, Set, Go! — Reader Workspace Tabs patch
 2026-08-10
 
-BASE
-Built directly from the latest files supplied by the user:
-- app(1).js
-- styles(1).css
-- index(2).html
-- PATCH-NOTES.txt
+IMPORTANT BASE FILES
+- app.js in this ZIP is the exact app(3).js file supplied by the user.
+- index.html in this ZIP is the exact index(4).html file supplied by the user.
+- styles.css contains the reader-workspace tab styling from the v9.7.1 workspace patch.
 
-FILES IN PATCH
-- public/app.js
-- public/styles.css
-- public/index.html
-- PATCH-NOTES.txt
+Reader workspace tabs implemented in app.js:
+Read | Companion | Notes | Progress | Study | Contents
 
-WHAT CHANGED
-- Replaces the compact Reader Tools / Mark / Notebook / History side-panel tabs with a reader-first workspace:
-  Read | Companion | Notes | Progress | Study | Contents
-- Keeps the current reader visible while switching workspace tabs.
-- Companion continues to use the existing Ask Mark/Beth selection/writing panel and existing response logic.
-- Notes continues to use the existing notebook system.
-- Progress adds an embedded current-text performance dashboard with:
-  current text title, completion, session time, WPM, comprehension, effective WPM,
-  yearly WPM chart + goal line, yearly comprehension chart + goal line,
-  and quick actions for Explain Passage, Take Quiz, Save Note, and View Full Progress.
-- Study adds quick access to comprehension, mnemonics, Great Ideas, and language learning.
-- Contents adds in-workspace TOC navigation and Add Bookmark.
-- Adds polished navy/light-blue/gold styling, larger clean workspace tabs, cards, icons, and responsive layouts.
-- Updates app.js/styles.css cache-busting token in index.html.
-
-SAFETY / SCOPE
-- Reader engine modules were NOT modified.
-- Core reader rendering, playback cursor, virtual renderer, pause/resume, book pages, context-menu/right-click code were NOT modified.
-- Existing full Progress & Awards dashboard remains available.
+No reader-engine module files are included in this patch.
