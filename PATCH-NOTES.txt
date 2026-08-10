@@ -1,0 +1,18 @@
+Mark, Set, Go! - Progress Dashboard Speed + Comprehension Focus
+2026-08-10
+
+Files:
+- app.js
+- styles.css
+- index.html
+
+Dashboard changes only:
+- Puts the most recently completed/current reading session first.
+- Adds training goals for target WPM and target comprehension alongside annual book goal.
+- Makes overall speed, comprehension, effective WPM, and recent WPM change the primary KPIs.
+- Adds dedicated speed-over-time and comprehension-over-time charts.
+- Keeps volume/time/consistency as secondary expandable detail.
+- Keeps recommendations, practice tools, trophies, and recent books available without overwhelming the main view.
+- Updates app.js/styles.css cache-busting token in index.html.
+
+Reader engine/modules were not modified.
