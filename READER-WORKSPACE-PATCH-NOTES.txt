@@ -1,0 +1,35 @@
+Mark, Set, Go! — Persistent Reader Workspace Tabs
+2026-08-10
+
+Base:
+- Built directly from mark-set-go-web-feature-ask-mark-premium-phase-1 (9).zip supplied by the user.
+
+Files changed:
+- ask-mark-hub.js
+- ask-mark-hub.css
+- index.html (cache token only)
+
+What changed:
+- The reader right rail now opens automatically and remains visible with persistent tabs:
+  Read | Companion | Notes | Progress | Study | Contents
+- Read gives a calm current-text snapshot and shortcuts.
+- Companion embeds the existing full Ask Mark/Beth chat/composer experience; it is not reduced to a small card.
+- Progress provides the compact current-text performance experience in the reader:
+  current text, completion, time, WPM, comprehension, effective WPM,
+  yearly WPM chart + goal, yearly comprehension chart + goal, and quick actions.
+- Study exposes comprehension, mnemonics, Great Ideas, and language learning shortcuts.
+- Contents mirrors the current TOC and forwards chapter clicks to the existing TOC handler.
+- The right workspace widens on desktop and keeps the existing navy/light-blue/gold theme.
+
+Protected code not changed:
+- app.js
+- reader/BookModel.js
+- reader/SessionManager.js
+- reader/ReaderEngine.js
+- reader/VirtualRenderer.js
+- right-click/context-menu code
+- reader playback/pagination/cursor logic
+
+Verification:
+- node --check ask-mark-hub.js passed.
+- index.html cache tokens updated to v9.7.0-reader-workspace.
