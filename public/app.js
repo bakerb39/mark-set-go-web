@@ -9842,9 +9842,9 @@ function bindMarkCompanion(reader){
       return;
     }
 
-    if(isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
+    // Blank-space pointer/click interactions are playback-neutral.
+    // This also keeps scrollbar clicks/drags completely out of start/pause behavior.
+    return;
   };
 
   reader.addEventListener('pointerup',(event)=>{
@@ -11001,22 +11001,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     switchReadingMode(modeSelect.value);
   });
 
-  // Spacebar acts as a simple play/pause toggle while the reader is open.
-  // Remove the previous handler first because loading another book rebuilds this view.
+  // Playback is intentionally not bound to the Space key.
   if (state.spacebarHandler) document.removeEventListener('keydown', state.spacebarHandler);
-  state.spacebarHandler = (event) => {
-    if (event.code !== 'Space' || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
-
-    const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest('input, textarea, select, button, a, summary, [contenteditable="true"], [role="textbox"]')) return;
-    if (!app.querySelector('#reader') || getSelectedMode() === 'two-column') return;
-
-    event.preventDefault();
-    if (isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
-  };
-  document.addEventListener('keydown', state.spacebarHandler);
+  state.spacebarHandler = null;
 
   readerFrame.addEventListener('click', (event) => {
     if (state.readerSuppressSyntheticClick) {
@@ -11079,11 +11066,51 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       return;
     }
 
-    if (mode === 'two-column') return;
+    // Blank-area single clicks are playback-neutral.
+    return;
+  });
+
+  // Double-click is the only direct reader-canvas gesture that toggles playback.
+  // Alt+double-click remains reserved for Ask Mark paragraph selection.
+  readerFrame.addEventListener('dblclick', (event) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+    if (target.closest(
+      'button, input, textarea, select, a, summary, [contenteditable="true"], [role="textbox"], ' +
+      '#fullscreen-control-strip, #fullscreen-mark-drawer, .pane-splitter, [role="separator"]'
+    )) return;
+
+    // Ignore native Reader scrollbars.
+    if (reader && (target === reader || reader.contains(target))) {
+      const rect = reader.getBoundingClientRect();
+      const vScrollbar = Math.max(0, reader.offsetWidth - reader.clientWidth);
+      const hScrollbar = Math.max(0, reader.offsetHeight - reader.clientHeight);
+      const onVScrollbar = vScrollbar > 0 && event.clientX >= rect.right - vScrollbar;
+      const onHScrollbar = hScrollbar > 0 && event.clientY >= rect.bottom - hScrollbar;
+      if (onVScrollbar || onHScrollbar) return;
+    }
+
+    if (state.readerSuppressSyntheticClick
+        || state.markSuppressNextReaderClick
+        || state.markSelectionLocked
+        || state.markResumeOnNextReaderClick !== null) return;
+
+    const liveSelection = window.getSelection?.();
+    if (liveSelection && !liveSelection.isCollapsed && liveSelection.rangeCount) {
+      const range = liveSelection.getRangeAt(0);
+      if (reader.contains(range.commonAncestorContainer)
+          || reader.contains(range.startContainer)
+          || reader.contains(range.endContainer)) return;
+    }
+
+    event.preventDefault();
     if (isReaderRunning()) pauseReader();
     else startReader();
     persistReaderSession();
   });
+
   bindDictionaryMenu(reader);
   window.requestAnimationFrame(updateReaderBookmarkMarkers);
   app.querySelector('#start-reader').addEventListener('click', () => {
