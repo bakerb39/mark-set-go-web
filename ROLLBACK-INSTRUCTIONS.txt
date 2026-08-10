@@ -1,0 +1,17 @@
+ROLLBACK TO PRE-WORKSPACE READER UI
+
+Replace these files in your repo:
+  public/app.js
+  public/index.html
+  public/ask-mark-hub.js
+
+Also DELETE this file if it exists:
+  public/reader-workspace-shell.css
+
+Do NOT replace public/styles.css as part of this rollback.
+Do NOT touch public/reader/*.
+
+Basis:
+- app.js = user's app(4).js uploaded immediately before the workspace merge
+- index.html = user's index(5).html uploaded immediately before the workspace merge
+- ask-mark-hub.js = unmodified version from the user's full source ZIP
