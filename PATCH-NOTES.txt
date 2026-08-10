@@ -1,20 +1,8 @@
-Mark, Set, Go! Reader Workspace UI Repair v9.7.4
-
-Built from the exact public/ files in the user's latest full source ZIP (10).
-
-Fixes:
-- Keeps Ask Mark/Beth inside the Companion tab instead of replacing the workspace shell.
-- Forces the six workspace tabs into a fixed horizontal navigation row.
-- Prevents old .mark-tabs CSS from stretching the tabs vertically.
-- Prevents saved 320px panel widths from crushing the workspace on desktop.
-- Gives Progress KPIs a clean second row and keeps the two charts side by side on desktop.
-- Preserves the full Companion writing/chat panel.
-- Cache-busts reader-workspace-shell.css and ask-mark-hub.js.
-
-Files changed under public/ only:
-- app.js
-- ask-mark-hub.js
-- reader-workspace-shell.css
-- index.html
-
-Protected reader engine files were not changed.
+Reader Workspace layout repair
+- Built from the public/ files in the latest uploaded full project ZIP.
+- Fixes the workspace shell grid so Header, Tabs, and Active Panel have three explicit rows.
+- Prevents the tab bar from stretching vertically.
+- Forces tabs to stay horizontal and scroll horizontally if space becomes too narrow.
+- Enforces a 520px minimum desktop workspace width, including restored splitter widths.
+- Updates app.js and reader-workspace-shell.css cache tokens.
+- Reader engine modules were not changed.

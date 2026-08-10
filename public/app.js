@@ -11947,17 +11947,13 @@ function bindReaderResize(readerFrame, reader) {
 
   const savedLeft = Number(localStorage.getItem('msg-navigation-width'));
   const savedRight = Number(localStorage.getItem('msg-word-panel-width'));
-  const desktopWorkspace = window.matchMedia('(min-width: 980px)').matches;
   if (Number.isFinite(savedLeft)) layout.style.setProperty('--navigation-width', `${Math.max(260, Math.min(420, savedLeft))}px`);
   if (Number.isFinite(savedRight)) {
     const layoutWidth = Math.max(0, layout.getBoundingClientRect().width || 0);
-    const rightMin = desktopWorkspace ? 560 : 320;
-    const rightMax = Math.max(rightMin, Math.min(760, layoutWidth - 380));
+    const desktopWorkspace = window.matchMedia('(min-width: 980px)').matches;
+    const rightMin = desktopWorkspace ? 520 : 320;
+    const rightMax = Math.max(rightMin, Math.min(760, layoutWidth - 320));
     layout.style.setProperty('--word-panel-width', `${Math.max(rightMin, Math.min(rightMax, savedRight))}px`);
-  } else if (desktopWorkspace) {
-    const layoutWidth = Math.max(0, layout.getBoundingClientRect().width || 0);
-    const preferred = Math.max(560, Math.min(700, Math.round(layoutWidth * .44)));
-    layout.style.setProperty('--word-panel-width', `${preferred}px`);
   }
 
   const bindSplitter = (splitter, side) => {
@@ -11973,10 +11969,9 @@ function bindReaderResize(readerFrame, reader) {
       const delta = event.clientX - startX;
       const next = side === 'left' ? startWidth + delta : startWidth - delta;
       const layoutWidth = Math.max(0, layout.getBoundingClientRect().width || 0);
-      const rightMin = window.matchMedia('(min-width: 980px)').matches ? 560 : 320;
-      const rightMax = Math.max(rightMin, Math.min(760, layoutWidth - 380));
+      const rightMax = Math.max(480, Math.min(760, layoutWidth - 320));
       const width = Math.max(
-        side === 'left' ? 260 : rightMin,
+        side === 'left' ? 260 : 320,
         Math.min(side === 'left' ? 420 : rightMax, next)
       );
       layout.style.setProperty(property, `${width}px`);
