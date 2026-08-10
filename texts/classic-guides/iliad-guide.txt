@@ -38,6 +38,7 @@ TAKEAWAY
 The Iliad begins with a private injury, expands into collective catastrophe, and ends with shared grief.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 HISTORICAL & MYTHOLOGICAL BACKGROUND
@@ -54,6 +55,7 @@ TAKEAWAY
 Read the poem as heroic memory shaped by centuries of oral tradition, not as a modern historical chronicle.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 THE WORLD OF HOMER
@@ -70,6 +72,7 @@ TAKEAWAY
 Homeric society is held together by visible practices of recognition, reciprocity, hospitality, oath, and funeral duty.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 MAJOR CHARACTERS
@@ -98,6 +101,7 @@ TAKEAWAY
 The poem moves from anger → absence → loss → vengeance → pity.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 BOOK-BY-BOOK READING GUIDE
@@ -194,6 +198,7 @@ TAKEAWAY
 The Iliad remains a great book because it makes glory and grief visible at the same time.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 FURTHER READING
@@ -220,6 +225,7 @@ TAKEAWAY
 Use the guide to return to Homer with better questions.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 CHARACTERS
@@ -267,6 +273,7 @@ Apollo — Divine ally of Troy
 His anger begins the poem’s plague, and his support helps shape the deaths of Patroclus and others.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 GREAT IDEAS & CONNECTIONS
@@ -382,6 +389,7 @@ Connections in the Great Conversation:
 • Marcus Aurelius — Meditations
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 BOOK-BY-BOOK GUIDE — ALL 24 BOOKS
@@ -411,6 +419,7 @@ QUESTIONS FOR READING
 • At what point does Achilles’ justified anger become morally dangerous?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 2: THE GREAT MUSTER
 
@@ -437,6 +446,7 @@ QUESTIONS FOR READING
 • Why might Homer interrupt the action with such an extensive catalogue of names and places?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 3: PARIS, MENELAUS, AND HELEN
 
@@ -463,6 +473,7 @@ QUESTIONS FOR READING
 • Why does Homer make Paris both attractive and disappointing?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 4: THE TRUCE IS BROKEN
 
@@ -489,6 +500,7 @@ QUESTIONS FOR READING
 • What does the broken truce suggest about the possibility of ending cycles of violence?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 5: DIOMEDES’ GREAT DAY
 
@@ -515,6 +527,7 @@ QUESTIONS FOR READING
 • Why does Apollo finally remind Diomedes that mortals and gods are not equals?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 6: HECTOR IN TROY
 
@@ -541,6 +554,7 @@ QUESTIONS FOR READING
 • How does the Diomedes–Glaucus episode challenge the idea that wartime enemies must always be treated as enemies?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 7: HECTOR AND AJAX
 
@@ -567,6 +581,7 @@ QUESTIONS FOR READING
 • What forms of moral restraint still survive inside the war?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 8: ZEUS TIPS THE BALANCE
 
@@ -593,6 +608,7 @@ QUESTIONS FOR READING
 • How is Hector changed by the sudden success of the Trojan army?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 9: THE EMBASSY TO ACHILLES
 
@@ -619,6 +635,7 @@ QUESTIONS FOR READING
 • Is Achilles’ rejection of heroic glory a moment of wisdom, wounded pride, or both?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 10: THE NIGHT RAID
 
@@ -645,6 +662,7 @@ QUESTIONS FOR READING
 • What does Book 10 suggest about the relationship between heroic courage and strategic intelligence?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 11: AGAMEMNON’S GREAT DAY
 
@@ -671,6 +689,7 @@ QUESTIONS FOR READING
 • At this point, what responsibility does Achilles bear for the Greek losses?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 12: THE TROJANS BREACH THE WALL
 
@@ -697,6 +716,7 @@ QUESTIONS FOR READING
 • According to Sarpedon, what obligations come with social privilege?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 13: POSEIDON HELPS THE GREEKS
 
@@ -723,6 +743,7 @@ QUESTIONS FOR READING
 • Does divine intervention make the battle feel more meaningful or more arbitrary?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 14: HERA DECEIVES ZEUS
 
@@ -749,6 +770,7 @@ QUESTIONS FOR READING
 • What moral difference does immortality create between the gods and human beings?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 15: ZEUS RESTORES THE TROJAN ADVANCE
 
@@ -775,6 +797,7 @@ QUESTIONS FOR READING
 • What does Zeus’s restoration of order tell us about power among the gods?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 16: PATROCLUS
 
@@ -801,6 +824,7 @@ QUESTIONS FOR READING
 • Who is responsible for Patroclus’ death—Patroclus, Achilles, Hector, Apollo, fate, or some combination?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 17: THE FIGHT FOR PATROCLUS’ BODY
 
@@ -827,6 +851,7 @@ QUESTIONS FOR READING
 • What is the symbolic significance of Hector putting on Achilles’ armor?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 18: THE SHIELD OF ACHILLES
 
@@ -853,6 +878,7 @@ QUESTIONS FOR READING
 • How does the shield change the meaning of Achilles’ return to battle?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 19: ACHILLES AND AGAMEMNON RECONCILE
 
@@ -879,6 +905,7 @@ QUESTIONS FOR READING
 • Why do the gifts matter less to Achilles now than they would have earlier?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 20: ACHILLES RETURNS TO BATTLE
 
@@ -905,6 +932,7 @@ QUESTIONS FOR READING
 • Why must the gods protect the larger order of fate from Achilles’ rage?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 21: ACHILLES AND THE RIVER
 
@@ -931,6 +959,7 @@ QUESTIONS FOR READING
 • Does Achilles’ grief excuse the extremity of his violence?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 22: THE DEATH OF HECTOR
 
@@ -957,6 +986,7 @@ QUESTIONS FOR READING
 • At what point does Achilles’ vengeance cease to look like justice?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 23: THE FUNERAL GAMES FOR PATROCLUS
 
@@ -983,6 +1013,7 @@ QUESTIONS FOR READING
 • What do Achilles’ decisions as judge reveal about his development?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 BOOK 24: PRIAM AND ACHILLES
 
@@ -1009,6 +1040,7 @@ QUESTIONS FOR READING
 • Why does Homer end with Hector’s funeral rather than the fall of Troy or the death of Achilles?
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 READING & STUDY PLANS
@@ -1040,6 +1072,7 @@ Turn The Iliad into the first node of a Great Ideas reading sequence.
 • Mortality: compare Plato’s Phaedo, Marcus Aurelius, and Tolstoy.
 
 [[MSG:DISCUSS]]
+[[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 VISUAL STUDY MAPS
