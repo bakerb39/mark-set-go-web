@@ -13010,37 +13010,235 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
   }
 }
 
-/* Classic Guide action layout: exact Modern Guide action contract with only
-   the class prefix changed from modern-guide-* to classic-guide-*. */
-.reader .classic-guide-action-word,
-.interactive-reader .classic-guide-action-word {
-  display:inline-flex !important;
-  width:auto !important;
-  min-width:0 !important;
-  max-width:max-content !important;
-  margin:.42rem .42rem .42rem 0 !important;
-  vertical-align:middle !important;
+
+
+/* v9.2.52 Browse discovery facelift — Popular Libraries + DRM-Free Finder only */
+.browse-library-hub-section.browse-feature-panel,
+.drm-free-browse-promo.browse-feature-panel {
+  border: 1px solid rgba(62, 111, 170, .20);
+  border-radius: 22px;
+  box-shadow: 0 14px 34px rgba(25, 57, 96, .07);
 }
-.reader .classic-guide-action-word > .classic-guide-inline-action,
-.interactive-reader .classic-guide-action-word > .classic-guide-inline-action,
-.reader .classic-guide-action-word > a.classic-guide-inline-action,
-.interactive-reader .classic-guide-action-word > a.classic-guide-inline-action {
-  display:inline-flex !important;
-  width:auto !important;
-  min-width:0 !important;
-  max-width:max-content !important;
-  flex:0 0 auto !important;
-  margin:0 !important;
-  border-radius:999px !important;
+
+.browse-library-hub-section.browse-feature-panel {
+  padding: 24px;
+  background: linear-gradient(180deg, #f7fbff 0%, #f2f7fd 100%);
 }
-@media (max-width:720px) {
-  .reader .classic-guide-action-word,
-  .interactive-reader .classic-guide-action-word,
-  .reader .classic-guide-action-word > .classic-guide-inline-action,
-  .interactive-reader .classic-guide-action-word > .classic-guide-inline-action {
-    width:auto !important;
-    min-width:0 !important;
-    max-width:max-content !important;
+
+.browse-feature-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.browse-feature-heading h2,
+.drm-free-browse-promo h2 {
+  margin-top: 4px;
+  color: #102f55;
+  font-size: clamp(1.45rem, 2vw, 1.8rem);
+  letter-spacing: -.02em;
+}
+
+.browse-feature-heading p,
+.drm-free-browse-promo p {
+  color: #415a75;
+  line-height: 1.55;
+}
+
+.browse-feature-kicker {
+  flex: 0 0 auto;
+  padding: 7px 11px;
+  border: 1px solid rgba(27, 81, 139, .13);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .78);
+  color: #244d78;
+  font-size: .76rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+
+.browse-library-hub-section .browse-library-hub {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.browse-library-card-featured {
+  position: relative;
+  min-height: 154px;
+  align-content: start;
+  grid-template-columns: 48px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 5px;
+  padding: 17px;
+  border-radius: 16px;
+  background: #fff;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+
+.browse-library-card-featured:hover {
+  transform: translateY(-2px);
+  border-color: rgba(36, 103, 181, .38);
+  box-shadow: 0 14px 28px rgba(18, 58, 103, .11);
+}
+
+.browse-library-card-featured .browse-library-icon {
+  grid-row: 1 / span 2;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(35, 91, 157, .08);
+  background: #eaf3ff;
+  color: #123f73;
+  font-size: .86rem;
+}
+
+.browse-library-card-copy {
+  display: grid;
+  gap: 4px;
+  align-self: center;
+}
+
+.browse-library-card-copy strong {
+  color: #102f55;
+  font-size: .98rem;
+  line-height: 1.2;
+}
+
+.browse-library-card-copy small {
+  color: #58708a;
+  line-height: 1.4;
+}
+
+.browse-library-card-action {
+  grid-column: 1 / -1;
+  margin-top: 9px;
+  color: #195c9f;
+  font-size: .79rem;
+  font-weight: 800;
+}
+
+.drm-free-browse-promo.browse-feature-panel {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(310px, .85fr);
+  gap: 24px;
+  padding: 26px;
+  background:
+    radial-gradient(circle at 92% 15%, rgba(255, 211, 83, .13), transparent 28%),
+    linear-gradient(135deg, #f7fbff 0%, #edf5ff 100%);
+}
+
+.drm-free-browse-promo.browse-feature-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: #123f73;
+}
+
+.drm-free-promo-copy {
+  min-width: 0;
+}
+
+.drm-free-promo-copy p {
+  max-width: 780px;
+  margin-bottom: 16px;
+}
+
+.drm-free-promo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+
+.drm-free-promo-actions .primary {
+  margin-right: 4px;
+}
+
+.drm-free-browse-label {
+  color: #536a83;
+  font-size: .82rem;
+  font-weight: 800;
+}
+
+.drm-free-promo-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: center;
+}
+
+.drm-free-stat {
+  display: grid;
+  gap: 4px;
+  min-height: 86px;
+  padding: 13px 14px;
+  border: 1px solid rgba(45, 97, 157, .14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .82);
+}
+
+.drm-free-stat strong {
+  color: #123c6d;
+  font-size: .86rem;
+}
+
+.drm-free-stat span {
+  color: #61758b;
+  font-size: .77rem;
+  line-height: 1.35;
+}
+
+#browse-modern-guides {
+  margin-top: 8px;
+}
+
+@media (max-width: 1040px) {
+  .browse-library-hub-section .browse-library-hub {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .drm-free-browse-promo.browse-feature-panel {
+    grid-template-columns: 1fr;
+  }
+  .drm-free-promo-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 
+@media (max-width: 760px) {
+  .browse-library-hub-section.browse-feature-panel,
+  .drm-free-browse-promo.browse-feature-panel {
+    padding: 19px;
+    border-radius: 18px;
+  }
+  .browse-feature-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .browse-feature-kicker {
+    display: none;
+  }
+  .drm-free-promo-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .browse-library-hub-section .browse-library-hub,
+  .drm-free-promo-stats {
+    grid-template-columns: 1fr;
+  }
+  .browse-library-card-featured {
+    min-height: 0;
+  }
+  .drm-free-promo-actions .primary {
+    width: 100%;
+  }
+  .drm-free-browse-label {
+    width: 100%;
+    margin-top: 3px;
+  }
+}

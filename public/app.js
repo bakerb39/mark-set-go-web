@@ -3045,33 +3045,11 @@ const CLASSIC_GUIDES = Object.freeze({
   'Sophocles Oedipus Colonus': { id:'classic-oedipus-colonus', slug:'oedipus-at-colonus', title:"Oedipus at Colonus", author:"Sophocles" },
   'Sophocles Oedipus Rex': { id:'classic-oedipus-king', slug:'oedipus-the-king', title:"Oedipus the King", author:"Sophocles" },
   'Sophocles plays': { id:'classic-sophocles-plays', slug:'sophocles-plays', title:"Sophocles \u2014 Plays", author:"Sophocles" },
-  'Herodotus Persian Wars': { id:'classic-herodotus-persian-wars', slug:'herodotus-persian-wars', title:"The History of the Persian Wars", author:"Herodotus" },
-  "Thucydides Peloponnesian War": { id:"classic-thucydides-peloponnesian-war", slug:"thucydides-peloponnesian-war", title:"The History of the Peloponnesian War", author:"Thucydides" },
-  "Plato Apology": { id:"classic-plato-apology", slug:"plato-apology", title:"Apology", author:"Plato" },
-  "Plato Crito": { id:"classic-plato-crito", slug:"plato-crito", title:"Crito", author:"Plato" },
-  "Plato Dialogues": { id:"classic-plato-dialogues", slug:"plato-dialogues", title:"Dialogues and The Seventh Letter", author:"Plato" },
-  "Plato Laws": { id:"classic-plato-laws", slug:"plato-laws", title:"Laws", author:"Plato" },
-  "Plato Phaedo": { id:"classic-plato-phaedo", slug:"plato-phaedo", title:"Phaedo", author:"Plato" },
-  "Plato Phaedrus": { id:"classic-plato-phaedrus", slug:"plato-phaedrus", title:"Phaedrus", author:"Plato" },
-  "Plato Republic": { id:"classic-plato-republic", slug:"plato-republic", title:"Republic", author:"Plato" },
-  "Plato Symposium": { id:"classic-plato-symposium", slug:"plato-symposium", title:"Symposium", author:"Plato" },
-  "Plato Theaetetus": { id:"classic-plato-theaetetus", slug:"plato-theaetetus", title:"Theaetetus", author:"Plato" },
-  "Plato Timaeus": { id:"classic-plato-timaeus", slug:"plato-timaeus", title:"Timaeus", author:"Plato" },
-  "Aristotle Categories": { id:"classic-aristotle-categories", slug:"aristotle-categories", title:"Categories", author:"Aristotle" },
-  "Aristotle Metaphysics": { id:"classic-aristotle-metaphysics", slug:"aristotle-metaphysics", title:"Metaphysics", author:"Aristotle" },
-  "Aristotle On Interpretation": { id:"classic-aristotle-on-interpretation", slug:"aristotle-on-interpretation", title:"On Interpretation", author:"Aristotle" },
-  "Aristotle Physics": { id:"classic-aristotle-physics", slug:"aristotle-physics", title:"Physics", author:"Aristotle" },
-  "Aristotle Posterior Analytics": { id:"classic-aristotle-posterior-analytics", slug:"aristotle-posterior-analytics", title:"Posterior Analytics", author:"Aristotle" },
-  "Aristotle Prior Analytics": { id:"classic-aristotle-prior-analytics", slug:"aristotle-prior-analytics", title:"Prior Analytics", author:"Aristotle" },
-  "Aristotle works::Works, Volume I": { id:"classic-aristotle-works-volume-i", slug:"aristotle-works-volume-i", title:"Works, Volume I", author:"Aristotle" },
-  "Aristotle Nicomachean Ethics": { id:"classic-aristotle-nicomachean-ethics", slug:"aristotle-nicomachean-ethics", title:"Nicomachean Ethics", author:"Aristotle" },
-  "Aristotle On the Soul": { id:"classic-aristotle-on-the-soul", slug:"aristotle-on-the-soul", title:"On the Soul", author:"Aristotle" }
+  'Herodotus Persian Wars': { id:'classic-herodotus-persian-wars', slug:'herodotus-persian-wars', title:"The History of the Persian Wars", author:"Herodotus" }
 });
 
 function classicGuideForGreatBook(book) {
-  const query = String(book?.query || '');
-  const titleKey = `${query}::${String(book?.title || '')}`;
-  return CLASSIC_GUIDES[titleKey] || CLASSIC_GUIDES[query] || null;
+  return CLASSIC_GUIDES[String(book?.query || '')] || null;
 }
 
 function classicGuidePathForGreatBook(book) {
@@ -3257,13 +3235,12 @@ function setWordContent(element, word, index = null) {
       ? Number(index)
       : Number(element?.dataset?.index ?? element?.dataset?.startIndex);
 
-    const guideClassPrefix = state.source?.classicGuide ? 'classic-guide' : 'modern-guide';
-    element.classList.add(`${guideClassPrefix}-action-word`);
+    element.classList.add('modern-guide-action-word');
     element.dataset.guideAction = guideAction;
 
     if (guideAction === 'buy' && state.source?.buyUrl) {
       const link = document.createElement('a');
-      link.className = `${guideClassPrefix}-inline-action ${guideClassPrefix}-inline-buy`;
+      link.className = 'modern-guide-inline-action modern-guide-inline-buy';
       link.href = state.source.buyUrl;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
@@ -3276,7 +3253,7 @@ function setWordContent(element, word, index = null) {
     const button = document.createElement('button');
     button.type = 'button';
     const actionClass = guideAction === 'action' ? 'add' : guideAction;
-    button.className = `${guideClassPrefix}-inline-action ${guideClassPrefix}-inline-${actionClass}`;
+    button.className = `modern-guide-inline-action modern-guide-inline-${actionClass}`;
     button.dataset.modernGuideInlineAction = guideAction;
     if (Number.isFinite(resolvedIndex)) button.dataset.guideWordIndex = String(resolvedIndex);
     button.textContent = modernGuideActionLabel(guideAction);
@@ -6445,20 +6422,15 @@ function renderComprehensionQuiz(quiz, context) {
     <div class="comprehension-actions">
       <span id="comprehension-status" class="status"></span>
       <button id="score-comprehension" class="primary" type="button">Score Check</button>
-      ${context.wholeGuide ? '<button id="randomize-whole-guide" class="secondary" type="button">Randomize another quiz</button>' : ''}
       <button class="secondary" value="cancel" type="submit">Close</button>
     </div>
   </form>`;
   dialog.showModal();
 
-  dialog.querySelector('#randomize-whole-guide')?.addEventListener('click', () => {
-    showModernGuideWholeQuizSetup(context.guideSource || state?.source || {});
-  });
-
   dialog.querySelector('#score-comprehension')?.addEventListener('click', () => {
     const unanswered = quiz.questions.some((_, index) => !dialog.querySelector(`input[name="question-${index}"]:checked`));
     if (unanswered) {
-      dialog.querySelector('#comprehension-status').textContent = `Answer all ${quiz.questions.length} questions first.`;
+      dialog.querySelector('#comprehension-status').textContent = 'Answer all four questions first.';
       return;
     }
 
@@ -9915,7 +9887,7 @@ function modernGuideInteractionConfig(source = state?.source || {}) {
 }
 
 function modernGuideActionToken(word) {
-  const match = String(word || '').match(/^\[\[MSG:(SECTION|DISCUSS|SECTIONQUIZ|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
+  const match = String(word || '').match(/^\[\[MSG:(SECTION|DISCUSS|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
   return match ? match[1].toLowerCase() : '';
 }
 
@@ -9926,8 +9898,7 @@ function isModernGuideActionToken(word) {
 function modernGuideActionLabel(action) {
   return ({
     section: '',
-    discuss: 'Discuss with reading companion',
-    sectionquiz: 'Quiz me',
+    discuss: 'Discuss with Mark',
     quiz: 'Quiz me on the whole guide',
     action: 'Add to Action Center',
     ideas: 'Explore related Great Ideas',
@@ -9947,40 +9918,6 @@ function modernGuideContextRange(markerIndex) {
   }
 
   const startIndex = sectionMarker >= 0 ? sectionMarker + 1 : 0;
-  const cleanWords = [];
-  let firstReal = null;
-  let lastReal = null;
-
-  for (let index = startIndex; index < safeMarker; index += 1) {
-    if (isModernGuideActionToken(state.words[index])) continue;
-    if (firstReal == null) firstReal = index;
-    lastReal = index;
-    cleanWords.push(state.words[index]);
-  }
-
-  return {
-    startIndex: firstReal == null ? startIndex : firstReal,
-    endIndex: lastReal == null ? safeMarker : lastReal + 1,
-    text: cleanWords.join(' ').trim()
-  };
-}
-
-function modernGuideSectionQuizContextRange(markerIndex) {
-  const safeMarker = Math.max(0, Math.min(state.words.length, Number(markerIndex) || 0));
-  let boundary = -1;
-
-  // A guide can contain several quiz checkpoints under one umbrella SECTION
-  // marker (for example a book-by-book roadmap). The preceding quiz checkpoint
-  // is therefore a stronger boundary than the umbrella section heading.
-  for (let index = safeMarker - 1; index >= 0; index -= 1) {
-    const action = modernGuideActionToken(state.words[index]);
-    if (action === 'sectionquiz' || action === 'section') {
-      boundary = index;
-      break;
-    }
-  }
-
-  const startIndex = boundary >= 0 ? boundary + 1 : 0;
   const cleanWords = [];
   let firstReal = null;
   let lastReal = null;
@@ -10195,129 +10132,7 @@ function openModernGuideGreatIdea(source = state?.source || {}) {
   });
 }
 
-async function startModernGuideSectionComprehensionCheck(markerIndex, source = state?.source || {}) {
-  if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) return;
-
-  const context = modernGuideSectionQuizContextRange(markerIndex);
-  const passageWords = context.text.split(/\s+/).filter(Boolean);
-  if (passageWords.length < 120) {
-    window.alert(`This guide section has ${passageWords.length} readable words; a comprehension check needs at least 120.`);
-    return;
-  }
-
-  const wasRunning = isReaderRunning();
-  if (wasRunning) pauseReader();
-
-  const sectionTitle = tocTitleForWordIndex(context.startIndex) || 'Guide section';
-  try {
-    const response = await fetch('/api/comprehension', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: `${source.originalTitle || state.title || 'Modern Guide'} — ${sectionTitle}`,
-        passage: context.text,
-        scope: 'guide_section'
-      })
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
-    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
-
-    renderComprehensionQuiz(payload, {
-      startIndex: context.startIndex,
-      endIndex: context.endIndex,
-      words: passageWords.length,
-      passage: context.text,
-      guideSection: true,
-      sectionTitle
-    });
-  } catch (error) {
-    window.alert(`Section comprehension check unavailable: ${error.message}`);
-  }
-}
-
-const WHOLE_GUIDE_QUESTION_HISTORY_KEY = 'marksetgo_whole_guide_question_history_v1';
-
-function wholeGuideQuestionHistory(documentId = state?.documentId) {
-  if (!documentId) return [];
-  try {
-    const store = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
-    return Array.isArray(store[documentId]) ? store[documentId] : [];
-  } catch {
-    return [];
-  }
-}
-
-function rememberWholeGuideQuestions(documentId, questions = []) {
-  if (!documentId || !Array.isArray(questions) || !questions.length) return;
-  try {
-    const store = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
-    const previous = Array.isArray(store[documentId]) ? store[documentId] : [];
-    const merged = [...questions, ...previous];
-    const seen = new Set();
-    store[documentId] = merged.filter((item) => {
-      const key = String(item?.question || '').trim().toLowerCase();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).slice(0, 200);
-    localStorage.setItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY, JSON.stringify(store));
-  } catch {}
-}
-
-function shuffledWholeGuideQuestions(items = []) {
-  const copy = [...items];
-  for (let index = copy.length - 1; index > 0; index -= 1) {
-    const swapIndex = Math.floor(Math.random() * (index + 1));
-    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
-  }
-  return copy;
-}
-
-function showModernGuideWholeQuizSetup(source = state?.source || {}) {
-  const dialog = app.querySelector('#comprehension-dialog');
-  if (!dialog) return;
-  const historyCount = wholeGuideQuestionHistory().length;
-  dialog.innerHTML = `<form method="dialog" class="comprehension-card" id="whole-guide-quiz-setup">
-    <div class="comprehension-heading">
-      <div><span class="comprehension-kicker">Whole-guide quiz</span><h2>Build your quiz</h2><p>${escapeHtml(source.originalTitle || state.title || 'Reading guide')}</p></div>
-      <button class="comprehension-close" value="cancel" type="submit" aria-label="Close">×</button>
-    </div>
-    <div class="comprehension-questions">
-      <fieldset class="comprehension-question">
-        <legend><span>1</span><div><small>Length</small>How many questions?</div></legend>
-        <label>Questions
-          <input id="whole-guide-question-count" type="number" min="5" max="25" step="1" value="10" inputmode="numeric">
-        </label>
-      </fieldset>
-      <fieldset class="comprehension-question">
-        <legend><span>2</span><div><small>Question mix</small>Choose new and review questions</div></legend>
-        <label>Mix
-          <select id="whole-guide-question-mode">
-            <option value="mixed" selected>Mixed — new + previous</option>
-            <option value="new">New only</option>
-            <option value="review">Review previous</option>
-          </select>
-        </label>
-        <p class="status">${historyCount ? `${historyCount} previous whole-guide question${historyCount === 1 ? '' : 's'} available for this book.` : 'No previous whole-guide questions yet. Mixed will generate new questions until history exists.'}</p>
-      </fieldset>
-    </div>
-    <div class="comprehension-actions">
-      <span id="comprehension-status" class="status"></span>
-      <button id="generate-whole-guide-quiz" class="primary" type="button">Generate randomized quiz</button>
-      <button class="secondary" value="cancel" type="submit">Close</button>
-    </div>
-  </form>`;
-  if (!dialog.open) dialog.showModal();
-  dialog.querySelector('#generate-whole-guide-quiz')?.addEventListener('click', () => {
-    const requestedCount = Number(dialog.querySelector('#whole-guide-question-count')?.value);
-    const questionCount = Number.isInteger(requestedCount) ? Math.max(5, Math.min(25, requestedCount)) : 10;
-    const questionMode = String(dialog.querySelector('#whole-guide-question-mode')?.value || 'mixed');
-    generateModernGuideWholeComprehensionCheck(source, { questionCount, questionMode });
-  });
-}
-
-async function generateModernGuideWholeComprehensionCheck(source = state?.source || {}, options = {}) {
+async function startModernGuideWholeComprehensionCheck(source = state?.source || {}) {
   if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
     return window.MarkSetGoStartComprehension?.();
   }
@@ -10325,40 +10140,6 @@ async function generateModernGuideWholeComprehensionCheck(source = state?.source
   const passageWords = state.words.filter((word) => !isModernGuideActionToken(word));
   const passage = passageWords.join(' ').replace(/\s+/g, ' ').trim();
   if (passageWords.length < 120) return;
-
-  const requestedCount = Number(options.questionCount);
-  const questionCount = Number.isInteger(requestedCount) ? Math.max(5, Math.min(25, requestedCount)) : 10;
-  const questionMode = ['mixed', 'new', 'review'].includes(options.questionMode) ? options.questionMode : 'mixed';
-  const history = wholeGuideQuestionHistory();
-
-  if (questionMode === 'review') {
-    if (history.length < questionCount) {
-      const dialog = app.querySelector('#comprehension-dialog');
-      const status = dialog?.querySelector('#comprehension-status');
-      if (status) status.textContent = `Only ${history.length} previous question${history.length === 1 ? '' : 's'} are available. Choose a smaller quiz or use Mixed/New only.`;
-      return;
-    }
-    const reviewed = shuffledWholeGuideQuestions(history).slice(0, questionCount);
-    renderComprehensionQuiz({ questions: reviewed }, {
-      startIndex: 0,
-      endIndex: state.words.length,
-      words: passageWords.length,
-      passage,
-      wholeGuide: true,
-      wholeGuideOptions: { questionCount, questionMode },
-      guideSource: source
-    });
-    return;
-  }
-
-  const oldTarget = questionMode === 'mixed' && history.length ? Math.min(history.length, Math.floor(questionCount / 2)) : 0;
-  const oldQuestions = oldTarget ? shuffledWholeGuideQuestions(history).slice(0, oldTarget) : [];
-  const newTarget = questionCount - oldQuestions.length;
-  const dialog = app.querySelector('#comprehension-dialog');
-  const generateButton = dialog?.querySelector('#generate-whole-guide-quiz');
-  const status = dialog?.querySelector('#comprehension-status');
-  if (generateButton) { generateButton.disabled = true; generateButton.textContent = 'Generating…'; }
-  if (status) status.textContent = '';
 
   const wasRunning = isReaderRunning();
   if (wasRunning) pauseReader();
@@ -10370,39 +10151,23 @@ async function generateModernGuideWholeComprehensionCheck(source = state?.source
       body: JSON.stringify({
         title: `${source.originalTitle || state.title || 'Modern Guide'} — Whole Guide`,
         passage,
-        scope: 'whole_guide',
-        questionCount: newTarget,
-        questionMode: 'new',
-        avoidQuestions: history.map((item) => item?.question).filter(Boolean).slice(0, 100)
+        scope: 'whole_guide'
       })
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
-    if (!Array.isArray(payload.questions) || payload.questions.length !== newTarget) throw new Error('The whole-guide quiz response was incomplete.');
+    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
 
-    rememberWholeGuideQuestions(state.documentId, payload.questions);
-    const questions = shuffledWholeGuideQuestions([...oldQuestions, ...payload.questions]);
-    renderComprehensionQuiz({ ...payload, questions }, {
+    renderComprehensionQuiz(payload, {
       startIndex: 0,
       endIndex: state.words.length,
       words: passageWords.length,
       passage,
-      wholeGuide: true,
-      wholeGuideOptions: { questionCount, questionMode },
-      guideSource: source
+      wholeGuide: true
     });
   } catch (error) {
-    if (status) status.textContent = `Whole-guide comprehension check unavailable: ${error.message}`;
-    else window.alert(`Whole-guide comprehension check unavailable: ${error.message}`);
-    if (generateButton) { generateButton.disabled = false; generateButton.textContent = 'Generate randomized quiz'; }
+    window.alert(`Whole-guide comprehension check unavailable: ${error.message}`);
   }
-}
-
-async function startModernGuideWholeComprehensionCheck(source = state?.source || {}) {
-  if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
-    return window.MarkSetGoStartComprehension?.();
-  }
-  showModernGuideWholeQuizSetup(source);
 }
 
 function activateModernGuideInlineAction(button, source = state?.source || {}) {
@@ -10414,11 +10179,6 @@ function activateModernGuideInlineAction(button, source = state?.source || {}) {
 
   if (action === 'discuss') {
     openModernGuideContextInAskMark(index);
-    return;
-  }
-
-  if (action === 'sectionquiz') {
-    startModernGuideSectionComprehensionCheck(index, source);
     return;
   }
 
@@ -16978,40 +16738,46 @@ function renderBrowseHub() {
         <p class="browse-helper-copy">Choose cover view for browsing or switch to a compact list when you want to scan titles quickly.</p>
       </section>
 
-      <section id="browse-popular-libraries" class="browse-section browse-library-hub-section">
-        <div class="section-heading">
+      <section id="browse-popular-libraries" class="browse-section browse-library-hub-section browse-feature-panel">
+        <div class="section-heading browse-feature-heading">
           <div>
-            <span class="source-category">Sources</span>
-            <h2>Popular libraries</h2>
+            <span class="source-category">Libraries</span>
+            <h2>Popular Libraries</h2>
             <p>Search trusted sources for full texts, editions, previews, and books you can borrow or read online.</p>
           </div>
+          <span class="browse-feature-kicker" aria-hidden="true">Trusted book sources</span>
         </div>
         <div class="browse-library-hub">
           ${BROWSE_LIBRARY_SOURCES.map((item) => `
-            <button class="browse-library-card" type="button" data-browse-provider="${escapeHtml(item.provider)}">
+            <button class="browse-library-card browse-library-card-featured" type="button" data-browse-provider="${escapeHtml(item.provider)}">
               <span class="browse-library-icon">${escapeHtml(item.icon)}</span>
-              <strong>${escapeHtml(item.title)}</strong>
-              <small>${escapeHtml(item.note)}</small>
+              <span class="browse-library-card-copy">
+                <strong>${escapeHtml(item.title)}</strong>
+                <small>${escapeHtml(item.note)}</small>
+              </span>
+              <span class="browse-library-card-action" aria-hidden="true">Browse source →</span>
             </button>`).join('')}
         </div>
       </section>
 
-      <section id="browse-drm-free" class="browse-section drm-free-browse-promo">
+      <section id="browse-drm-free" class="browse-section drm-free-browse-promo browse-feature-panel">
         <div class="drm-free-promo-copy">
-          <span class="source-category">Open & portable ebooks</span>
-          <h2>DRM-Free Book Finder</h2>
-          <p>Search free public-domain books by category, author, subject, language, format, and popularity—then browse a curated directory of stores and publishers that sell modern DRM-free ebooks.</p>
+          <span class="source-category">DRM-free books</span>
+          <h2>Find DRM-Free Books</h2>
+          <p>Search free public-domain books by category, author, subject, language, format, and popularity—then browse stores and publishers that sell modern DRM-free ebooks.</p>
           <div class="drm-free-promo-actions">
             <button class="primary" type="button" data-action="drm-free-books">Search DRM-free books</button>
-            <button class="secondary" type="button" data-drm-quick-category="philosophy">Browse Philosophy</button>
-            <button class="secondary" type="button" data-drm-quick-category="history">Browse History</button>
-            <button class="secondary" type="button" data-drm-quick-category="science-fiction">Browse Science Fiction</button>
+            <span class="drm-free-browse-label">Browse:</span>
+            <button class="secondary" type="button" data-drm-quick-category="philosophy">Philosophy</button>
+            <button class="secondary" type="button" data-drm-quick-category="history">History</button>
+            <button class="secondary" type="button" data-drm-quick-category="science-fiction">Science Fiction</button>
           </div>
         </div>
-        <div class="drm-free-promo-stats">
-          <strong>Free + paid</strong><span>One place to start your search</span>
-          <strong>EPUB / PDF / TXT</strong><span>Filter by usable formats</span>
-          <strong>Read or download</strong><span>Open supported free books directly</span>
+        <div class="drm-free-promo-stats" aria-label="DRM-free book finder features">
+          <div class="drm-free-stat"><strong>Free + paid</strong><span>One place to start your search</span></div>
+          <div class="drm-free-stat"><strong>EPUB / PDF / TXT</strong><span>Filter by usable formats</span></div>
+          <div class="drm-free-stat"><strong>Format filters</strong><span>Choose the edition you can use</span></div>
+          <div class="drm-free-stat"><strong>Read or download</strong><span>Open supported free books directly</span></div>
         </div>
       </section>
 
