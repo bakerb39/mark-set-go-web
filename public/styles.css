@@ -14055,3 +14055,548 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
   .progress-dashboard-performance .performance-goal-controls { grid-template-columns:1fr; }
   .progress-dashboard-performance .yearly-performance-chart { min-height:190px; }
 }
+
+/* v9.7.0 Reader Workspace tabs — reader-first tools without leaving the book */
+.reader-layout:not(.word-panel-hidden).navigation-hidden {
+  --word-panel-width: min(48vw, 700px);
+}
+
+.reader-layout:not(.word-panel-hidden) .word-panel.reader-control-panel {
+  border: 1px solid #cbd9e8 !important;
+  border-radius: 18px !important;
+  background: #f8fbff !important;
+  box-shadow: 0 14px 34px rgba(18, 54, 88, .08) !important;
+}
+
+.reader-layout:not(.word-panel-hidden) .reader-control-shell.reader-workspace-shell {
+  padding: 0 !important;
+  background: #f8fbff;
+}
+
+.reader-workspace-header {
+  min-height: 52px;
+  padding: 10px 14px !important;
+  border-bottom: 1px solid #d9e4ef;
+  background: #fff;
+}
+
+.reader-workspace-header > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.reader-workspace-header span {
+  color: #75899d;
+  font-size: .62rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.reader-workspace-header strong {
+  overflow: hidden;
+  color: #153b65;
+  font-size: .86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-workspace-tabs {
+  display: grid !important;
+  grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  gap: 0 !important;
+  padding: 0 8px !important;
+  border-bottom: 1px solid #d9e4ef !important;
+  background: #fff !important;
+}
+
+.reader-workspace-tabs button {
+  position: relative;
+  min-width: 0;
+  min-height: 54px !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 5px !important;
+  border-radius: 0 !important;
+  color: #38516d !important;
+  font-size: .67rem !important;
+  font-weight: 750 !important;
+  white-space: nowrap;
+}
+
+.reader-workspace-tabs button:hover {
+  background: #f1f6fc !important;
+  color: #153f6e !important;
+}
+
+.reader-workspace-tabs button.active {
+  background: #0d3158 !important;
+  color: #fff !important;
+  border-radius: 10px 10px 0 0 !important;
+  box-shadow: 0 -1px 0 #0d3158, 0 5px 14px rgba(13,49,88,.18) !important;
+}
+
+.reader-workspace-tabs button.active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: #0d3158;
+  transform: translateX(-50%) rotate(45deg);
+  z-index: 2;
+}
+
+.workspace-tab-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: #2e689f;
+  font-size: .9rem;
+  line-height: 1;
+}
+
+.reader-workspace-tabs button.active .workspace-tab-icon {
+  color: #f3c54a;
+}
+
+.reader-layout:not(.word-panel-hidden) .reader-workspace-shell .mark-panel-view {
+  padding: 14px !important;
+  background: #f8fbff;
+}
+
+/* Companion and Notes retain the full writing area. */
+.reader-workspace-shell #mark-selection-panel,
+.reader-workspace-shell #mark-notebook-panel {
+  padding: 16px !important;
+  background: #fff !important;
+}
+
+.reader-workspace-shell #mark-selection-panel .mark-question-form > div {
+  grid-template-columns: 1fr !important;
+}
+
+.reader-workspace-shell #mark-selection-panel .mark-question-form input {
+  min-height: 76px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #c8d6e5;
+  background: #fbfdff;
+}
+
+.reader-workspace-shell #mark-selection-panel .mark-question-form button {
+  justify-self: end;
+  min-width: 92px;
+}
+
+.reader-workspace-shell .mark-empty {
+  padding: 18px;
+  border: 1px solid #d7e4f0;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #f4f9ff, #fff);
+}
+
+.reader-workspace-shell .mark-action-grid {
+  gap: 8px;
+}
+
+.reader-workspace-shell .mark-action-grid button {
+  min-height: 48px;
+  border-color: #d7e3ef;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 5px 12px rgba(17,55,90,.035);
+}
+
+.reader-workspace-shell .mark-action-grid button:hover {
+  border-color: #9dbbd8;
+  background: #f2f7fd;
+}
+
+/* Embedded Progress tab */
+.reader-workspace-progress {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.reader-progress-companion-card {
+  position: relative;
+  min-height: 104px;
+  display: grid;
+  grid-template-columns: 66px minmax(0,1fr) 118px;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  overflow: hidden;
+  border: 1px solid #d6e3f0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #f6faff 0%, #eaf4ff 62%, #fff8df 100%);
+}
+
+.reader-progress-avatar {
+  width: 62px;
+  height: 62px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 6px 16px rgba(15,53,88,.14);
+}
+
+.reader-progress-companion-card > div:nth-child(2) {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.reader-progress-companion-card > div:nth-child(2) span {
+  color: #b58513;
+  font-size: .62rem;
+  font-weight: 850;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.reader-progress-companion-card > div:nth-child(2) strong {
+  color: #153b65;
+  font-size: .94rem;
+}
+
+.reader-progress-companion-card > div:nth-child(2) p {
+  margin: 0;
+  color: #546d86;
+  font-size: .72rem;
+  line-height: 1.4;
+}
+
+.reader-progress-path {
+  position: relative;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #d39d22;
+}
+
+.reader-progress-path i {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  top: 50%;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,#91bce6,#d9b44c);
+  transform: translateY(-50%);
+}
+
+.reader-progress-path span,
+.reader-progress-path b {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 3px 10px rgba(20,55,90,.12);
+}
+
+.reader-progress-current-card {
+  display: grid;
+  grid-template-columns: 48px minmax(150px,1fr) minmax(0,2.2fr);
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid #d7e3ef;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(20,55,90,.04);
+}
+
+.reader-progress-book-mark {
+  width: 46px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: linear-gradient(160deg,#0e3157,#184f82);
+  color: #f0c44b;
+  font-size: 1.35rem;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+}
+
+.reader-progress-current-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.reader-progress-current-copy span,
+.reader-progress-current-copy small {
+  color: #73879d;
+  font-size: .62rem;
+}
+
+.reader-progress-current-copy strong {
+  overflow: hidden;
+  color: #153b65;
+  font-size: .86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader-progress-current-kpis {
+  display: grid;
+  grid-template-columns: repeat(5,minmax(0,1fr));
+  align-items: stretch;
+}
+
+.reader-progress-current-kpis article {
+  min-width: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 3px;
+  padding: 6px 8px;
+  border-left: 1px solid #e0e8f1;
+  text-align: center;
+}
+
+.reader-progress-current-kpis strong {
+  color: #102f55;
+  font-size: .98rem;
+}
+
+.reader-progress-current-kpis span {
+  color: #73879d;
+  font-size: .56rem;
+  white-space: nowrap;
+}
+
+.reader-progress-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 12px;
+}
+
+.reader-progress-chart-card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid #d7e3ef;
+  border-radius: 16px;
+  background: linear-gradient(180deg,#fff,#f8fbff);
+  box-shadow: 0 6px 18px rgba(20,55,90,.035);
+}
+
+.reader-progress-chart-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.reader-progress-chart-heading > div {
+  display: grid;
+  gap: 2px;
+}
+
+.reader-progress-chart-heading strong {
+  color: #153b65;
+  font-size: .78rem;
+}
+
+.reader-progress-chart-heading span {
+  color: #788da1;
+  font-size: .56rem;
+}
+
+.reader-progress-chart-heading b {
+  flex: 0 0 auto;
+  color: #1261b0;
+  font-size: .61rem;
+}
+
+.reader-progress-chart-card.comprehension-card .reader-progress-chart-heading b {
+  color: #b17a00;
+}
+
+.reader-workspace-progress .yearly-performance-chart {
+  width: 100%;
+  min-height: 160px;
+  max-height: 190px;
+  display: block;
+}
+
+.reader-workspace-progress .performance-grid { stroke:#dbe5ef; stroke-width:1; }
+.reader-workspace-progress .performance-axis-label,
+.reader-workspace-progress .performance-month-label { fill:#71869b; font-size:10px; }
+.reader-workspace-progress .performance-line { fill:none; stroke-width:3.5; stroke-linecap:round; stroke-linejoin:round; }
+.reader-workspace-progress .performance-line-speed { stroke:#1767bd; }
+.reader-workspace-progress .performance-line-comprehension { stroke:#dfa00c; }
+.reader-workspace-progress .performance-point { stroke:#fff; stroke-width:2; }
+.reader-workspace-progress circle.performance-line-speed { fill:#1767bd; }
+.reader-workspace-progress circle.performance-line-comprehension { fill:#dfa00c; }
+.reader-workspace-progress .performance-area-speed-start { stop-color:#2e80d0;stop-opacity:.32; }
+.reader-workspace-progress .performance-area-speed-end { stop-color:#a9d5fb;stop-opacity:.03; }
+.reader-workspace-progress .performance-area-comprehension-start { stop-color:#e3a519;stop-opacity:.30; }
+.reader-workspace-progress .performance-area-comprehension-end { stop-color:#f6df9f;stop-opacity:.03; }
+.reader-workspace-progress .performance-goal-line { stroke:#d49a16;stroke-width:2;stroke-dasharray:7 5; }
+.reader-workspace-progress .performance-goal-label rect { fill:#fff5cd;stroke:#d49a16; }
+.reader-workspace-progress .performance-goal-label text { fill:#9c6e06;font-size:10px;font-weight:800; }
+.reader-workspace-progress .chart-empty { fill:#7c90a4;font-size:12px; }
+
+.reader-progress-actions {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 9px;
+}
+
+.reader-progress-actions button {
+  min-width: 0;
+  min-height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 9px 8px;
+  border: 1px solid #d6e2ee;
+  border-radius: 14px;
+  background: #fff;
+  color: #173c65;
+  box-shadow: 0 5px 12px rgba(20,55,90,.035);
+}
+
+.reader-progress-actions button:hover {
+  border-color: #9ebad6;
+  background: #f3f8fd;
+  transform: translateY(-1px);
+}
+
+.reader-progress-actions button span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 9px;
+  background: #eaf3ff;
+  color: #1767bd;
+  font-size: 1rem;
+}
+
+.reader-progress-actions button:nth-child(3) span {
+  background: #fff5d7;
+  color: #c58b09;
+}
+
+.reader-progress-actions strong {
+  font-size: .64rem;
+  line-height: 1.25;
+}
+
+.reader-progress-mini-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 13px;
+  border: 1px solid #ead9a3;
+  border-radius: 13px;
+  background: #fffaf0;
+}
+
+.reader-progress-mini-summary > div { display:grid;gap:2px; }
+.reader-progress-mini-summary span { color:#9f7514;font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em; }
+.reader-progress-mini-summary strong { color:#173b63;font-size:.72rem; }
+.reader-progress-mini-summary button { min-height:30px;border:0;border-radius:9px;padding:5px 9px;background:#0f4b82;color:#fff;font-size:.62rem;font-weight:800; }
+
+/* Study and Contents workspace tabs */
+.reader-workspace-section-heading {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.reader-workspace-section-heading > span { color:#b17f0d;font-size:.61rem;font-weight:850;letter-spacing:.08em;text-transform:uppercase; }
+.reader-workspace-section-heading > strong { color:#153b65;font-size:1.02rem; }
+.reader-workspace-section-heading > p { margin:0;color:#637c94;font-size:.72rem; }
+
+.reader-study-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 10px;
+}
+.reader-study-grid button {
+  min-height: 86px;
+  display: grid;
+  grid-template-columns: 38px minmax(0,1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d5e1ed;
+  border-radius: 14px;
+  background: #fff;
+  color: #153b65;
+  text-align: left;
+}
+.reader-study-grid button:hover { border-color:#9db9d5;background:#f3f8fd; }
+.reader-study-grid button > span { width:36px;height:36px;display:grid;place-items:center;border-radius:10px;background:#eaf3ff;color:#1767bd;font-weight:900; }
+.reader-study-grid button > div { display:grid;gap:3px; }
+.reader-study-grid strong { font-size:.76rem; }
+.reader-study-grid small { color:#71869a;font-size:.61rem;line-height:1.3; }
+
+.reader-workspace-contents-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.reader-workspace-contents-actions button { min-height:34px;border:0;border-radius:10px;padding:7px 11px;background:#0f4b82;color:#fff;font-size:.68rem;font-weight:800; }
+.reader-workspace-contents-actions span { color:#71869a;font-size:.65rem; }
+.reader-workspace-toc { display:grid;gap:7px; }
+.reader-workspace-toc button {
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: 28px minmax(0,1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border: 1px solid #dae5ef;
+  border-radius: 11px;
+  background: #fff;
+  color: #173d66;
+  text-align: left;
+}
+.reader-workspace-toc button:hover { border-color:#9db8d3;background:#f4f8fc; }
+.reader-workspace-toc button span { display:grid;place-items:center;width:26px;height:26px;border-radius:8px;background:#edf4fb;color:#2b659b;font-size:.62rem;font-weight:850; }
+.reader-workspace-toc button strong { overflow:hidden;font-size:.69rem;text-overflow:ellipsis;white-space:nowrap; }
+
+@media (max-width: 1180px) {
+  .reader-workspace-tabs { overflow-x:auto; grid-template-columns:repeat(6,minmax(92px,1fr)) !important; }
+  .reader-progress-current-card { grid-template-columns:48px minmax(0,1fr); }
+  .reader-progress-current-kpis { grid-column:1/-1; }
+}
+
+@media (max-width: 1050px) {
+  .reader-progress-chart-grid { grid-template-columns:1fr; }
+  .reader-progress-actions { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .reader-progress-companion-card { grid-template-columns:58px minmax(0,1fr); }
+  .reader-progress-path { display:none; }
+}
+
+@media (max-width: 620px) {
+  .reader-workspace-tabs { grid-template-columns:repeat(6,92px) !important; }
+  .reader-workspace-tabs button { min-height:48px !important; }
+  .reader-progress-current-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .reader-progress-current-kpis article { border-left:0;border-top:1px solid #e0e8f1; }
+  .reader-progress-actions,
+  .reader-study-grid { grid-template-columns:1fr; }
+}

@@ -1,26 +1,35 @@
-Mark, Set, Go! — Progress Dashboard Yearly Performance Facelift
+Mark, Set, Go! — Reader Workspace Tabs UI
 2026-08-10
 
+BASE
 Built directly from the latest files supplied by the user:
 - app(1).js
 - styles(1).css
 - index(2).html
+- PATCH-NOTES.txt
 
-Dashboard-only changes:
-- Primary KPI cards now appear first: Reading Speed, Comprehension, Effective WPM, and Speed Change This Year.
-- Adds two large, full-color 12-month charts immediately below the KPIs:
-  - Reading Speed by month for the current year
-  - Comprehension by month for the current year
-- Both yearly charts include a visible gold goal line tied to the reader's saved target.
-- Adds compact goal controls for target WPM, target comprehension, and annual books.
-- Adds a Current Text performance section showing:
-  - text WPM
-  - comprehension
-  - effective WPM
-  - time invested
-  - reading progress
-- Adds Performance by Text comparison table for up to 10 recent texts.
-- Keeps coaching, overall volume/consistency, learning tools, and trophies lower on the page.
+FILES IN PATCH
+- public/app.js
+- public/styles.css
+- public/index.html
+- PATCH-NOTES.txt
+
+WHAT CHANGED
+- Replaces the compact Reader Tools / Mark / Notebook / History side-panel tabs with a reader-first workspace:
+  Read | Companion | Notes | Progress | Study | Contents
+- Keeps the current reader visible while switching workspace tabs.
+- Companion continues to use the existing Ask Mark/Beth selection/writing panel and existing response logic.
+- Notes continues to use the existing notebook system.
+- Progress adds an embedded current-text performance dashboard with:
+  current text title, completion, session time, WPM, comprehension, effective WPM,
+  yearly WPM chart + goal line, yearly comprehension chart + goal line,
+  and quick actions for Explain Passage, Take Quiz, Save Note, and View Full Progress.
+- Study adds quick access to comprehension, mnemonics, Great Ideas, and language learning.
+- Contents adds in-workspace TOC navigation and Add Bookmark.
+- Adds polished navy/light-blue/gold styling, larger clean workspace tabs, cards, icons, and responsive layouts.
 - Updates app.js/styles.css cache-busting token in index.html.
 
-Reader engine/modules were not modified.
+SAFETY / SCOPE
+- Reader engine modules were NOT modified.
+- Core reader rendering, playback cursor, virtual renderer, pause/resume, book pages, context-menu/right-click code were NOT modified.
+- Existing full Progress & Awards dashboard remains available.
