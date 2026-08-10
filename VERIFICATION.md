@@ -1,34 +1,44 @@
-# Lower-right Reader WPM stepper — verification
+# Guide quiz regression fix verification
 
-Baseline: user-uploaded `mark-set-go-web-feature-ask-mark-premium-phase-1 (8).zip`.
+Baseline: `mark-set-go-web-feature-ask-mark-premium-phase-1 (8).zip`
 
-Runtime path verified in `server.js`: Express serves the `public/` directory and `public/index.html`. Root duplicates were intentionally not changed.
+## Root causes fixed
 
-## Changed runtime files
+1. Executing `public/app.js` did not recognize `[[MSG:SECTIONQUIZ]]`, so it rendered as literal text.
+2. Executing whole-guide client still required exactly 4 questions while the current server defaults whole-guide quizzes to 10 and supports configurable counts through 25.
+
+## Files changed
+
 - `public/app.js`
-- `public/styles.css`
-- `public/index.html` (cache key only)
+- `public/index.html` (app cache key only)
 
-## Behavior
-- Lower-right footer: `[ − ] <WPM> [ + ]`
-- Minus: -25 WPM
-- Plus: +25 WPM
-- Up Arrow: +25 WPM
-- Down Arrow: -25 WPM
-- Existing input min/max remain authoritative: 30–900 WPM.
-- Uses existing `state.wpm`, `#speed`, fullscreen speed mirror, WPM badge, and reader-session persistence.
-- If playback is running, the current position is retained while playback restarts at the new speed.
-- Arrow shortcuts do not fire from form/editable/interactive controls.
+The current `server.js` already contains the configurable whole-guide contract and was not changed.
+No Classic Guide content files were changed.
+No CSS files were changed.
+No protected Reader module files were changed.
 
-## Checks run
+## Chromium regression
+
+Chromium executable: `/usr/bin/chromium`
+
+Because direct localhost navigation is blocked by the execution environment, the actual `public/index.html` runtime was loaded into Chromium with the app's local JS/CSS resources inlined. Only `/api/comprehension` was mocked deterministically for behavioral testing.
+
+PASS:
+- `[[MSG:SECTIONQUIZ]]` parsed as `sectionquiz`.
+- Classic Guide render displayed `Quiz me` instead of the literal token.
+- Clicking section `Quiz me` opened 4 questions.
+- Whole-guide setup opened with default count 10.
+- Whole-guide setup defaulted to Mixed mode.
+- Generating the default whole-guide quiz rendered 10 questions.
+- `Randomize another quiz` appeared.
+- Zero Chromium page errors during the regression scenario.
+
+## Static validation
+
 - `node --check public/app.js`: PASS
-- Executing `public/` path in `server.js`: PASS
-- Markup/step/arrow/clamp/persistence/static contract checks: PASS
-- All three patch files differ from the uploaded baseline: PASS
-- MutationObserver occurrence count unchanged: PASS
-- `contextmenu` occurrence count unchanged: PASS
-- `word-context-menu` occurrence count unchanged: PASS
-- ZIP integrity: PASS
-
-## Chromium
-Chromium was invoked against the app, but this sandbox's Chromium process did not complete before timeout. Therefore this patch is **not claimed as Chromium-tested**. No browser PASS is asserted.
+- Section quiz parser/handler presence: PASS
+- Whole-guide configurable setup presence: PASS
+- Stale whole-guide `questions.length !== 4` validation removed: PASS
+- Dynamic unanswered-question count: PASS
+- Existing server default 10 / max 25 contract confirmed: PASS
+- No new `MutationObserver` added by this patch.

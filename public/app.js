@@ -5378,8 +5378,6 @@ const READING_ACTIVITY_KEY = 'markSetGoReadingActivityV1';
 const COMPREHENSION_RESULTS_KEY = 'markSetGoComprehensionV1';
 const COMPREHENSION_POSITION_KEY = 'markSetGoComprehensionPositionV1';
 const READING_GOAL_KEY = 'markSetGoAnnualReadingGoalV1';
-const READING_SPEED_GOAL_KEY = 'markSetGoReadingSpeedGoalV1';
-const READING_COMPREHENSION_GOAL_KEY = 'markSetGoReadingComprehensionGoalV1';
 const READING_AWARDS_KEY = 'markSetGoReadingAwardsV1';
 
 const LEARNING_ACTIVITY_KEY = 'markSetGoLearningActivityV1';
@@ -5885,28 +5883,6 @@ function setAnnualReadingGoal(value) {
   return goal;
 }
 
-function getReadingSpeedGoal() {
-  const stored = Number(localStorage.getItem(READING_SPEED_GOAL_KEY));
-  return Number.isFinite(stored) && stored >= 50 ? Math.min(1200, Math.round(stored)) : 350;
-}
-
-function setReadingSpeedGoal(value) {
-  const goal = Math.max(50, Math.min(1200, Math.round(Number(value) || 350)));
-  localStorage.setItem(READING_SPEED_GOAL_KEY, String(goal));
-  return goal;
-}
-
-function getReadingComprehensionGoal() {
-  const stored = Number(localStorage.getItem(READING_COMPREHENSION_GOAL_KEY));
-  return Number.isFinite(stored) && stored >= 50 ? Math.min(100, Math.round(stored)) : 85;
-}
-
-function setReadingComprehensionGoal(value) {
-  const goal = Math.max(50, Math.min(100, Math.round(Number(value) || 85)));
-  localStorage.setItem(READING_COMPREHENSION_GOAL_KEY, String(goal));
-  return goal;
-}
-
 function completedBooksThisYear(progress, readingList) {
   const year = new Date().getFullYear();
   const ids = new Set();
@@ -5995,43 +5971,6 @@ function lineChartSvg(data, valueKey, { label = '', suffix = '', empty = 'No tre
     }).join('')}
     ${nonzero ? `<polyline points="${polyline}" class="chart-line"/>${points.map((p) => `<circle cx="${p.x}" cy="${p.y}" r="3.5"><title>${escapeSvg(p.row.label)}: ${(Number(p.row[valueKey])||0).toLocaleString()}${escapeSvg(suffix)}</title></circle>`).join('')}` : `<text x="${width/2}" y="${height/2}" text-anchor="middle" class="chart-empty">${escapeSvg(empty)}</text>`}
     ${points.filter((_,i)=>i===0 || i===points.length-1 || i%7===0).map((p) => `<text x="${p.x}" y="${height-12}" text-anchor="middle">${escapeSvg(p.row.label)}</text>`).join('')}
-  </svg>`;
-}
-
-function yearlyPerformanceChartSvg(data, valueKey, { label = '', suffix = '', goal = 0, kind = 'speed' } = {}) {
-  const width=920,height=270,left=54,right=24,top=20,bottom=42;
-  const values=data.map((row)=>Number(row[valueKey])||0);
-  const hasData=values.some((value)=>value>0);
-  const baseMax=kind==='comprehension' ? 100 : Math.max(400, goal, ...values);
-  const max=kind==='comprehension' ? 100 : Math.ceil(baseMax/50)*50;
-  const min=0;
-  const usableW=width-left-right, usableH=height-top-bottom;
-  const x=(index)=>left+(data.length===1?usableW/2:index*usableW/Math.max(1,data.length-1));
-  const y=(value)=>top+usableH-((Math.max(min,Math.min(max,Number(value)||0))-min)/Math.max(1,max-min))*usableH;
-  const points=data.map((row,index)=>({x:x(index),y:y(row[valueKey]),row,value:Number(row[valueKey])||0}));
-  const valid=points.filter((point)=>point.value>0);
-  const linePoints=valid.map((point)=>`${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
-  const areaPath=valid.length>1
-    ? `M ${valid[0].x.toFixed(1)} ${top+usableH} L ${valid.map((point)=>`${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' L ')} L ${valid[valid.length-1].x.toFixed(1)} ${top+usableH} Z`
-    : '';
-  const goalY=y(goal);
-  const gradientId=`performance-${kind}-gradient`;
-  const lineClass=kind==='comprehension'?'performance-line-comprehension':'performance-line-speed';
-  const areaClass=kind==='comprehension'?'performance-area-comprehension':'performance-area-speed';
-  return `<svg class="progress-chart yearly-performance-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeSvg(label)}">
-    <defs>
-      <linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%" class="${areaClass}-start"/><stop offset="100%" class="${areaClass}-end"/>
-      </linearGradient>
-    </defs>
-    ${[0,.25,.5,.75,1].map((ratio)=>{const value=Math.round(min+(max-min)*ratio);const gy=y(value);return `<line x1="${left}" y1="${gy}" x2="${width-right}" y2="${gy}" class="performance-grid"/><text x="${left-10}" y="${gy+4}" text-anchor="end" class="performance-axis-label">${value}${kind==='comprehension'?'%':''}</text>`;}).join('')}
-    <line x1="${left}" y1="${goalY}" x2="${width-right}" y2="${goalY}" class="performance-goal-line"/>
-    <g class="performance-goal-label"><rect x="${width-right-102}" y="${Math.max(2,goalY-23)}" width="100" height="20" rx="10"/><text x="${width-right-52}" y="${Math.max(16,goalY-9)}" text-anchor="middle">Goal ${goal}${escapeSvg(suffix)}</text></g>
-    ${areaPath?`<path d="${areaPath}" fill="url(#${gradientId})" class="performance-area"/>`:''}
-    ${valid.length>1?`<polyline points="${linePoints}" class="performance-line ${lineClass}"/>`:''}
-    ${valid.map((point)=>`<circle cx="${point.x}" cy="${point.y}" r="5" class="performance-point ${lineClass}"><title>${escapeSvg(point.row.label)}: ${point.value.toLocaleString()}${escapeSvg(suffix)}</title></circle>`).join('')}
-    ${!hasData?`<text x="${width/2}" y="${height/2}" text-anchor="middle" class="chart-empty">Your ${kind==='comprehension'?'comprehension':'reading speed'} trend will appear here as you build a reading record.</text>`:''}
-    ${points.map((point)=>`<text x="${point.x}" y="${height-14}" text-anchor="middle" class="performance-month-label">${escapeSvg(point.row.label)}</text>`).join('')}
   </svg>`;
 }
 
@@ -6145,257 +6084,210 @@ function renderProgressDashboard() {
   const earned=awards.definitions.filter((item)=>item.earned).length;
   const goalPercent=Math.min(100,Math.round(awards.completed/Math.max(1,goal)*100));
   const learning=learningMetricsSummary();
-  const speedGoal=getReadingSpeedGoal();
-  const comprehensionGoal=getReadingComprehensionGoal();
-  const latestSession=activity[0] || null;
-  const goalBooksRemaining=Math.max(0,goal-awards.completed);
-  const currentYear=new Date().getFullYear();
-  const monthFormatter=new Intl.DateTimeFormat(undefined,{month:'short'});
-  const yearMonths=Array.from({length:12},(_,month)=>({
-    month,
-    label:monthFormatter.format(new Date(currentYear,month,1)),
-    wpm:0,
-    comprehension:0,
-    words:0,
-    seconds:0,
-    comprehensionTotal:0,
-    comprehensionCount:0
-  }));
 
-  activity.forEach((item)=>{
-    const date=new Date(item.endedAt || item.startedAt || 0);
-    if (!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
-    const bucket=yearMonths[date.getMonth()];
-    bucket.words += Number(item.wordsRead)||0;
-    bucket.seconds += Number(item.seconds)||0;
-  });
-  comprehension.forEach((item)=>{
-    const date=new Date(item.createdAt || 0);
-    if (!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
-    const score=Number(item.scorePercent);
-    if (!Number.isFinite(score)) return;
-    const bucket=yearMonths[date.getMonth()];
-    bucket.comprehensionTotal += score;
-    bucket.comprehensionCount += 1;
-  });
-  yearMonths.forEach((bucket)=>{
-    bucket.wpm=bucket.seconds ? Math.round(bucket.words/(bucket.seconds/60)) : 0;
-    bucket.comprehension=bucket.comprehensionCount ? Math.round(bucket.comprehensionTotal/bucket.comprehensionCount) : 0;
-  });
+  const modeCounts = activity.reduce((map,item)=>{
+    const label=({
+      highlight:'Highlight',
+      'pointing-guide':'Pointing Guide',
+      'bold-focus':'Bold Focus',
+      flash:'Flash',
+      'smooth-glide':'Smooth Glide',
+      marquee:'Marquee',
+      'digital-sign':'Digital Sign',
+      'auto-scroll':'Auto Scroll'
+    })[item.mode] || 'Other';
+    map[label]=(map[label]||0)+1;
+    return map;
+  },{});
+  const modeEntries=Object.entries(modeCounts).map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,6);
 
-  const thisYearSpeeds=yearMonths.map((item)=>item.wpm).filter(Boolean);
-  const latestYearSpeed=[...yearMonths].reverse().find((item)=>item.wpm)?.wpm || averageWpm;
-  const firstYearSpeed=yearMonths.find((item)=>item.wpm)?.wpm || latestYearSpeed;
-  const yearlySpeedChange=firstYearSpeed && latestYearSpeed ? latestYearSpeed-firstYearSpeed : 0;
-
-  const progressByDocument=new Map(progress.map((item)=>[String(item.documentId||''),item]));
-  const compByDocument=new Map();
-  comprehension.forEach((item)=>{
-    const key=String(item.documentId||'');
-    if (!key) return;
-    const list=compByDocument.get(key)||[];
-    list.push(item);
-    compByDocument.set(key,list);
-  });
-  const activityByDocument=new Map();
-  activity.forEach((item)=>{
-    const key=String(item.documentId||'');
-    if (!key) return;
-    const list=activityByDocument.get(key)||[];
-    list.push(item);
-    activityByDocument.set(key,list);
-  });
-  const textIds=[...new Set([...activityByDocument.keys(),...progressByDocument.keys(),...compByDocument.keys()])];
-  const textKpis=textIds.map((documentId)=>{
-    const sessions=activityByDocument.get(documentId)||[];
-    const checks=compByDocument.get(documentId)||[];
-    const record=progressByDocument.get(documentId)||{};
-    const words=sessions.reduce((sum,item)=>sum+(Number(item.wordsRead)||0),0);
-    const seconds=sessions.reduce((sum,item)=>sum+(Number(item.seconds)||0),0);
-    const wpm=seconds?Math.round(words/(seconds/60)):0;
-    const comp=checks.length?Math.round(checks.reduce((sum,item)=>sum+(Number(item.scorePercent)||0),0)/checks.length):0;
-    const eff=checks.length?Math.round(checks.reduce((sum,item)=>sum+(Number(item.effectiveWpm)||0),0)/checks.length):0;
-    const totalWords=Number(record.totalWords)||Number(sessions[0]?.totalWords)||0;
-    const furthest=Math.max(Number(record.furthestWord)||0,...sessions.map((item)=>Number(item.endIndex)||0),0);
-    const percent=totalWords?Math.min(100,Math.round(furthest/totalWords*100)):0;
-    const latestAt=[record.lastReadAt,...sessions.map((item)=>item.endedAt),...checks.map((item)=>item.createdAt)].filter(Boolean).sort().pop()||'';
-    const title=record.title || sessions[0]?.title || checks[0]?.title || 'Untitled';
-    return {documentId,title,sessions:sessions.length,checks:checks.length,words,seconds,wpm,comp,eff,percent,latestAt};
-  }).sort((a,b)=>{
-    const currentId=String(latestSession?.documentId||'');
-    if (a.documentId===currentId && b.documentId!==currentId) return -1;
-    if (b.documentId===currentId && a.documentId!==currentId) return 1;
-    return new Date(b.latestAt||0)-new Date(a.latestAt||0);
-  });
-  const currentText=textKpis[0] || null;
-
-  const currentComp=Number(comprehension[0]?.scorePercent)||awards.compAverage||0;
-  const speedGoalGap=latestYearSpeed ? speedGoal-latestYearSpeed : speedGoal;
-  const compGoalGap=currentComp ? comprehensionGoal-currentComp : comprehensionGoal;
-
-  app.innerHTML = `<section class="panel progress-analytics-page progress-dashboard-performance">
-    <header class="performance-dashboard-header">
+  app.innerHTML = `<section class="panel progress-analytics-page compact-progress-dashboard">
+    <div class="progress-hero">
       <div>
-        <span class="source-category">Reading performance</span>
+        <span class="source-category">Recorded analysis</span>
         <h1>Progress &amp; Awards</h1>
-        <p>The two numbers that matter most: read faster, understand more, and see whether both are improving together.</p>
+        <p>A visual record of reading consistency, speed, comprehension, completed books, and long-term growth.</p>
       </div>
       <div class="progress-hero-actions">
         <button class="secondary" type="button" data-action="my-reading">My Reading List</button>
         <button id="clear-reading-progress" class="secondary" type="button">Clear recorded history</button>
       </div>
-    </header>
+    </div>
 
-    <section class="performance-kpi-grid" aria-label="Primary reading KPIs">
-      <article class="performance-kpi-card speed-kpi">
-        <span>Reading speed</span>
-        <strong>${latestYearSpeed||'—'} <small>WPM</small></strong>
-        <p>Goal <b>${speedGoal} WPM</b>${latestYearSpeed?` · ${speedGoalGap<=0?'Goal reached':`${speedGoalGap} to go`}`:''}</p>
-      </article>
-      <article class="performance-kpi-card comprehension-kpi">
-        <span>Comprehension</span>
-        <strong>${currentComp||'—'}${currentComp?'%':''}</strong>
-        <p>Goal <b>${comprehensionGoal}%</b>${currentComp?` · ${compGoalGap<=0?'Goal reached':`${compGoalGap} points to go`}`:''}</p>
-      </article>
-      <article class="performance-kpi-card effective-kpi">
-        <span>Effective reading speed</span>
-        <strong>${effectiveWpm||'—'} <small>WPM</small></strong>
-        <p>Speed adjusted for measured comprehension</p>
-      </article>
-      <article class="performance-kpi-card improvement-kpi">
-        <span>Speed change this year</span>
-        <strong>${yearlySpeedChange>0?'+':''}${yearlySpeedChange||0} <small>WPM</small></strong>
-        <p>${thisYearSpeeds.length>1?'First recorded month vs latest':'Build more monthly history to see change'}</p>
-      </article>
+    <div class="progress-stat-grid">
+      <article class="progress-stat"><span>Recorded words</span><strong>${totalWords.toLocaleString()}</strong><small>${activity.length.toLocaleString()} sessions</small></article>
+      <article class="progress-stat"><span>Reading time</span><strong>${formatDuration(totalSeconds)}</strong><small>${awards.activeDays} active days</small></article>
+      <article class="progress-stat"><span>Average pace</span><strong>${averageWpm||'—'}</strong><small>WPM</small></article>
+      <article class="progress-stat"><span>Comprehension</span><strong>${awards.compAverage||'—'}${awards.compAverage?'%':''}</strong><small>${comprehension.length} checks</small></article>
+      <article class="progress-stat"><span>Learning activity</span><strong>${learning.totalActivities.toLocaleString()}</strong><small>quizzes, skills &amp; study</small></article>
+      <article class="progress-stat"><span>Current streak</span><strong>${awards.streak}</strong><small>${awards.streak===1?'day':'days'}</small></article>
+    </div>
+
+    <section class="annual-goal-card">
+      <div>
+        <span class="source-category">Annual reading goal</span>
+        <h2>${awards.completed} of ${goal} books completed</h2>
+        <p>Set a yearly target and the dashboard will calculate pace, progress, and goal-based awards.</p>
+      </div>
+      <div class="annual-goal-control">
+        <label for="annual-reading-goal">Books per year
+          <input id="annual-reading-goal" type="number" min="1" max="500" value="${goal}">
+        </label>
+        <button id="save-annual-reading-goal" class="secondary" type="button">Save goal</button>
+      </div>
+      <div class="annual-goal-meter"><span style="width:${goalPercent}%"></span></div>
+      <strong class="annual-goal-percent">${goalPercent}%</strong>
     </section>
 
-    <section class="performance-year-grid">
-      <article class="performance-year-card speed-year-card">
-        <div class="performance-chart-heading">
-          <div>
-            <span class="source-category">${currentYear} progress</span>
-            <h2>Reading speed</h2>
-            <p>Monthly average WPM across your recorded reading sessions.</p>
+    <section class="learning-progress-overview">
+      <div class="section-heading">
+        <div><span class="source-category">Learning</span><h2>Learning progress</h2><p>Your core reading KPIs stay visible above. Open a category when you want the details.</p></div>
+        <button class="secondary" type="button" data-action="reading-skills">Open Reading Skills</button>
+      </div>
+
+      <div class="learning-progress-details">
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Reading Speed</strong><small>WPM tests and effective pace</small></span><span>${learning.latestWpm || averageWpm || '—'} WPM</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>WPM tests</span><strong>${learning.wpmTests}</strong><small>completed</small></article>
+              <article><span>Latest test</span><strong>${learning.latestWpm || '—'}</strong><small>WPM</small></article>
+              <article><span>Best test</span><strong>${learning.bestWpm || '—'}</strong><small>WPM</small></article>
+              <article><span>Recorded pace</span><strong>${averageWpm || '—'}</strong><small>session average</small></article>
+              <article><span>Effective pace</span><strong>${effectiveWpm || '—'}</strong><small>WPM × comprehension</small></article>
+            </div>
+            <button class="secondary" type="button" data-test="wpm">Take WPM Test</button>
           </div>
-          <div class="performance-chart-stat"><strong>${latestYearSpeed||'—'}</strong><span>current WPM</span></div>
-        </div>
-        ${yearlyPerformanceChartSvg(yearMonths,'wpm',{label:`${currentYear} monthly reading speed`,suffix:' WPM',goal:speedGoal,kind:'speed'})}
-      </article>
+        </details>
 
-      <article class="performance-year-card comprehension-year-card">
-        <div class="performance-chart-heading">
-          <div>
-            <span class="source-category">${currentYear} progress</span>
-            <h2>Comprehension</h2>
-            <p>Monthly average quiz score. The gold line is your personal target.</p>
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Comprehension Quizzes</strong><small>Understanding across current and past books</small></span><span>${learning.comprehensionAverage || '—'}${learning.comprehensionAverage ? '%' : ''}</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Checks</span><strong>${learning.comprehensionChecks}</strong><small>completed</small></article>
+              <article><span>Average</span><strong>${learning.comprehensionAverage || '—'}${learning.comprehensionAverage ? '%' : ''}</strong><small>all checks</small></article>
+              <article><span>Best</span><strong>${learning.bestComprehension || '—'}${learning.bestComprehension ? '%' : ''}</strong><small>highest score</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="comprehension-library">Open quizzes</button>
           </div>
-          <div class="performance-chart-stat"><strong>${currentComp||'—'}${currentComp?'%':''}</strong><span>latest score</span></div>
-        </div>
-        ${yearlyPerformanceChartSvg(yearMonths,'comprehension',{label:`${currentYear} monthly comprehension`,suffix:'%',goal:comprehensionGoal,kind:'comprehension'})}
-      </article>
-    </section>
+        </details>
 
-    <section class="performance-goals-strip">
-      <div class="performance-goals-copy">
-        <span class="source-category">Your targets</span>
-        <strong>Adjust the finish lines on the graphs</strong>
-        <p>Choose a speed goal you can grow into while protecting comprehension.</p>
-      </div>
-      <div class="performance-goal-controls">
-        <label>Target WPM<input id="reading-speed-goal" type="number" min="50" max="1200" step="10" value="${speedGoal}"></label>
-        <label>Target comprehension<input id="reading-comprehension-goal" type="number" min="50" max="100" step="1" value="${comprehensionGoal}"></label>
-        <label>Books / year<input id="annual-reading-goal" type="number" min="1" max="500" value="${goal}"></label>
-        <button id="save-reading-goals" class="primary" type="button">Save goals</button>
-      </div>
-    </section>
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Great Ideas / Syntopicon</strong><small>Cross-book conceptual study</small></span><span>${learning.greatIdeasSessions} sessions</span></summary>
+          <div class="progress-collapsible-body">
+            <p>You have opened Great Ideas / Syntopicon ${learning.greatIdeasSessions} time${learning.greatIdeasSessions===1?'':'s'} since learning tracking began.</p>
+            <button class="secondary" type="button" data-read="syntopicon">Explore Great Ideas</button>
+          </div>
+        </details>
 
-    <section class="current-text-performance">
-      <div class="performance-section-heading">
-        <div>
-          <span class="source-category">Current text</span>
-          <h2>${escapeHtml(currentText?.title || 'No current text yet')}</h2>
-          <p>${currentText?'See how your performance changes with the difficulty and style of this particular text.':'Your most recently read text will appear here after a reading session.'}</p>
-        </div>
-        ${currentText?`<span class="current-text-badge">${currentText.percent}% read</span>`:''}
-      </div>
-      ${currentText?`<div class="current-text-kpis">
-        <article><span>Text WPM</span><strong>${currentText.wpm||'—'}</strong><small>${currentText.sessions} session${currentText.sessions===1?'':'s'}</small></article>
-        <article><span>Comprehension</span><strong>${currentText.comp?`${currentText.comp}%`:'—'}</strong><small>${currentText.checks} check${currentText.checks===1?'':'s'}</small></article>
-        <article><span>Effective WPM</span><strong>${currentText.eff||'—'}</strong><small>speed × understanding</small></article>
-        <article><span>Time invested</span><strong>${formatDuration(currentText.seconds)}</strong><small>${currentText.words.toLocaleString()} words</small></article>
-        <article><span>Progress</span><strong>${currentText.percent}%</strong><small>through this text</small></article>
-      </div>`:''}
-    </section>
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Mnemonics</strong><small>Memory aids tied to your books</small></span><span>${learning.mnemonicsCreated} created</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Mnemonics</span><strong>${learning.mnemonicsCreated}</strong><small>created</small></article>
+              <article><span>Books covered</span><strong>${learning.mnemonicBooks}</strong><small>books / guides</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="mnemonics">Create mnemonics</button>
+          </div>
+        </details>
 
-    <section class="text-performance-section">
-      <div class="performance-section-heading">
-        <div>
-          <span class="source-category">Performance by text</span>
-          <h2>How different books affect your reading</h2>
-          <p>Compare speed and comprehension by text so a difficult classic is not judged by the same standard as lighter reading.</p>
-        </div>
-      </div>
-      <div class="text-performance-table-wrap">
-        <table class="text-performance-table">
-          <thead><tr><th>Text</th><th>Progress</th><th>WPM</th><th>Comprehension</th><th>Effective WPM</th><th>Time</th><th>Sessions</th></tr></thead>
-          <tbody>${textKpis.slice(0,10).map((item,index)=>`<tr class="${index===0?'is-current-text':''}"><td><strong>${escapeHtml(item.title)}</strong>${index===0?'<small>Current</small>':''}</td><td>${item.percent}%</td><td>${item.wpm||'—'}</td><td>${item.comp?`${item.comp}%`:'—'}</td><td>${item.eff||'—'}</td><td>${formatDuration(item.seconds)}</td><td>${item.sessions}</td></tr>`).join('') || '<tr><td colspan="7" class="navigation-empty">Complete a reading session to begin comparing texts.</td></tr>'}</tbody>
-        </table>
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Language Learning</strong><small>Lessons generated from your reading</small></span><span>${learning.languageLessons} lessons</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Lessons</span><strong>${learning.languageLessons}</strong><small>completed</small></article>
+              <article><span>Languages</span><strong>${learning.languagesPracticed.length}</strong><small>${escapeHtml(learning.languagesPracticed.slice(0,3).join(', ') || 'none yet')}</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="language-learning">Practice a language</button>
+          </div>
+        </details>
+
+        <details class="analytics-card learning-progress-detail">
+          <summary><span><strong>Courses &amp; Learning Modules</strong><small>Outside learning connected to your books</small></span><span>${learning.courseOpens} opened</span></summary>
+          <div class="progress-collapsible-body">
+            <div class="analysis-grid compact-learning-analysis">
+              <article><span>Course links opened</span><strong>${learning.courseOpens}</strong><small>tracked</small></article>
+              <article><span>Providers explored</span><strong>${learning.courseProviders.length}</strong><small>${escapeHtml(learning.courseProviders.slice(0,4).join(', ') || 'none yet')}</small></article>
+            </div>
+            <button class="secondary" type="button" data-action="learning-courses">Find courses</button>
+          </div>
+        </details>
       </div>
     </section>
 
-    <details class="analytics-card recommendation-card progress-collapsible performance-coach" open>
-      <summary><span><span class="source-category">Reading coach</span><strong>What should I work on next?</strong></span><small>Open</small></summary>
+    <div class="progress-chart-grid">
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Daily reading volume</h2><p>Words recorded over the last 30 days.</p></div></div>
+        ${lineChartSvg(daily,'words',{label:'Daily words read during the last 30 days'})}
+      </section>
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Weekly reading time</h2><p>Minutes across the last eight weeks.</p></div></div>
+        ${barChartSvg(weekly,'minutes',{label:'Weekly reading minutes',suffix:' min'})}
+      </section>
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Reading modes</h2><p>Share of recorded sessions by mode.</p></div></div>
+        ${pieChartSvg(modeEntries,{label:'Reading sessions by mode'})}
+      </section>
+      <section class="analytics-card">
+        <div class="analytics-heading"><div><h2>Pace trend</h2><p>Daily average WPM. Empty days remain visible so consistency is not hidden.</p></div></div>
+        ${lineChartSvg(daily,'wpm',{label:'Daily average reading speed',suffix:' WPM'})}
+      </section>
+    </div>
+
+    <details class="analytics-card progress-collapsible">
+      <summary><span><span class="source-category">Statistical analysis</span><strong>What the record shows</strong></span><small>Open</small></summary>
       <div class="progress-collapsible-body">
-        <div class="analytics-heading">
-          <div><h2>Recommendations</h2><p>Guidance is based on your reading record, with special attention to speed and comprehension.</p></div>
-          <button id="generate-ai-progress" class="primary" type="button">Generate AI analysis</button>
-        </div>
-        <div id="progress-recommendations" class="recommendation-grid">
-          ${recommendations.map((item)=>`<article><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.text)}</p></article>`).join('')}
-        </div>
-        <p id="progress-ai-status" class="status"></p>
+      <div class="analysis-grid">
+        <article><span>Average session</span><strong>${activity.length?Math.round(totalWords/activity.length).toLocaleString():'—'}</strong><small>words</small></article>
+        <article><span>Average duration</span><strong>${activity.length?formatDuration(totalSeconds/activity.length):'—'}</strong><small>per session</small></article>
+        <article><span>30-day consistency</span><strong>${awards.monthlyDays}/30</strong><small>active days</small></article>
+        <article><span>Recent improvement</span><strong>${awards.improvement>0?'+':''}${awards.improvement||0}</strong><small>WPM vs prior sessions</small></article>
+        <article><span>Books completed</span><strong>${awards.completed}</strong><small>this year</small></article>
+        <article><span>Awards earned</span><strong>${earned}/${awards.definitions.length}</strong><small>trophies</small></article>
+      </div>
       </div>
     </details>
 
-    <details class="analytics-card progress-collapsible secondary-progress-section">
-      <summary><span><span class="source-category">Overall reading KPIs</span><strong>Volume, consistency &amp; annual goal</strong></span><small>Open details</small></summary>
+    <details class="analytics-card recommendation-card progress-collapsible">
+      <summary><span><span class="source-category">Coach</span><strong>Recommendations</strong></span><small>Open</small></summary>
       <div class="progress-collapsible-body">
-        <div class="progress-stat-grid secondary-kpi-grid">
-          <article class="progress-stat"><span>Recorded words</span><strong>${totalWords.toLocaleString()}</strong><small>${activity.length.toLocaleString()} sessions</small></article>
-          <article class="progress-stat"><span>Total reading time</span><strong>${formatDuration(totalSeconds)}</strong><small>${awards.activeDays} active days</small></article>
-          <article class="progress-stat"><span>Current streak</span><strong>${awards.streak}</strong><small>${awards.streak===1?'day':'days'}</small></article>
-          <article class="progress-stat"><span>Annual book goal</span><strong>${goalPercent}%</strong><small>${goalBooksRemaining} book${goalBooksRemaining===1?'':'s'} remaining</small></article>
-        </div>
-        <div class="progress-chart-grid secondary-chart-grid">
-          <section class="analytics-card"><div class="analytics-heading"><div><h2>Daily reading volume</h2><p>Words recorded over the last 30 days.</p></div></div>${lineChartSvg(daily,'words',{label:'Daily words read during the last 30 days'})}</section>
-          <section class="analytics-card"><div class="analytics-heading"><div><h2>Weekly reading time</h2><p>Minutes across the last eight weeks.</p></div></div>${barChartSvg(weekly,'minutes',{label:'Weekly reading minutes',suffix:' min'})}</section>
-        </div>
+      <div class="analytics-heading">
+        <div><span class="source-category">Coach</span><h2>Recommendations</h2><p>Immediate guidance is calculated privately from the reading record. An optional AI analysis can add a more nuanced interpretation.</p></div>
+        <button id="generate-ai-progress" class="primary" type="button">Generate AI analysis</button>
       </div>
-    </details>
-
-    <details class="analytics-card progress-collapsible secondary-progress-section">
-      <summary><span><span class="source-category">Practice tools</span><strong>Reading skills &amp; learning</strong></span><small>${learning.totalActivities} activities</small></summary>
-      <div class="progress-collapsible-body">
-        <div class="learning-tool-grid-focused">
-          <article><div><strong>Reading Speed</strong><small>Latest ${learning.latestWpm || averageWpm || '—'} WPM · Best ${learning.bestWpm || '—'} WPM</small></div><button class="secondary" type="button" data-test="wpm">Take WPM Test</button></article>
-          <article><div><strong>Comprehension</strong><small>${learning.comprehensionAverage || '—'}${learning.comprehensionAverage?'%':''} average · ${learning.comprehensionChecks} checks</small></div><button class="secondary" type="button" data-action="comprehension-library">Open quizzes</button></article>
-          <article><div><strong>Great Ideas / Syntopicon</strong><small>${learning.greatIdeasSessions} study sessions</small></div><button class="secondary" type="button" data-read="syntopicon">Explore Great Ideas</button></article>
-          <article><div><strong>Mnemonics</strong><small>${learning.mnemonicsCreated} created</small></div><button class="secondary" type="button" data-action="mnemonics">Create mnemonics</button></article>
-        </div>
+      <div id="progress-recommendations" class="recommendation-grid">
+        ${recommendations.map((item)=>`<article><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.text)}</p></article>`).join('')}
+      </div>
+      <p id="progress-ai-status" class="status"></p>
       </div>
     </details>
 
     <details class="analytics-card progress-collapsible">
       <summary><span><span class="source-category">Achievement cabinet</span><strong>Trophies &amp; milestones</strong></span><small>${earned} earned</small></summary>
-      <div class="progress-collapsible-body"><div class="trophy-grid">
-        ${awards.definitions.map((award)=>`<article class="trophy-card ${award.earned?'earned':'locked'}"><div class="trophy-icon" aria-hidden="true">${award.icon}</div><div><h3>${escapeHtml(award.title)}</h3><p>${escapeHtml(award.description)}</p></div><div class="trophy-progress"><span style="width:${Math.round(award.progress*100)}%"></span></div><small>${award.earned?'Earned':'In progress · '+Math.round(award.progress*100)+'%'}</small></article>`).join('')}
-      </div></div>
+      <div class="progress-collapsible-body">
+      <div class="trophy-grid">
+        ${awards.definitions.map((award)=>`<article class="trophy-card ${award.earned?'earned':'locked'}">
+          <div class="trophy-icon" aria-hidden="true">${award.icon}</div>
+          <div><h3>${escapeHtml(award.title)}</h3><p>${escapeHtml(award.description)}</p></div>
+          <div class="trophy-progress"><span style="width:${Math.round(award.progress*100)}%"></span></div>
+          <small>${award.earned?'Earned':'In progress · '+Math.round(award.progress*100)+'%'}</small>
+        </article>`).join('')}
+      </div>
+      </div>
+    </details>
+
+    <details class="analytics-card progress-collapsible">
+      <summary><span><strong>Recent books &amp; documents</strong></span><small>Open</small></summary>
+      <div class="progress-collapsible-body">
+      <div class="progress-book-list">${progress.sort((x,y)=>new Date(y.lastReadAt||0)-new Date(x.lastReadAt||0)).slice(0,10).map((item)=>{
+        const percent=item.totalWords?Math.min(100,Math.round((Number(item.furthestWord)||0)/item.totalWords*100)):0;
+        return `<article class="progress-book-card"><div><h3>${escapeHtml(item.title||'Untitled')}</h3><p>${percent}% complete · ${formatDuration(item.totalSeconds)} · ${Number(item.sessions)||0} sessions</p></div><div class="progress-meter"><span style="width:${percent}%"></span></div><button class="secondary" type="button" data-progress-open="${escapeHtml(item.documentId)}">Resume saved text</button></article>`;
+      }).join('')||'<p class="navigation-empty">Complete a reading session to begin the analysis.</p>'}</div>
+      </div>
     </details>
   </section>`;
 
-  app.querySelector('#save-reading-goals')?.addEventListener('click',()=>{
-    setReadingSpeedGoal(app.querySelector('#reading-speed-goal')?.value);
-    setReadingComprehensionGoal(app.querySelector('#reading-comprehension-goal')?.value);
+  app.querySelector('#save-annual-reading-goal')?.addEventListener('click',()=>{
     setAnnualReadingGoal(app.querySelector('#annual-reading-goal')?.value);
     renderProgressDashboard();
   });
@@ -6409,6 +6301,16 @@ function renderProgressDashboard() {
     localStorage.removeItem(LEARNING_ACTIVITY_KEY);
     renderProgressDashboard();
   });
+
+  app.querySelectorAll('[data-progress-open]').forEach((button)=>button.addEventListener('click',()=>{
+    const documentId=button.dataset.progressOpen;
+    let data=null;
+    try{data=JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`)||'null');}catch{}
+    if(!data?.text) return window.alert('That text is not stored in this browser. Open it again from My Reading or its original library.');
+    renderReaderWithText(data.title,data.text,data.source||{type:'saved'});
+    const record=readStoredObject(READING_PROGRESS_KEY)[documentId];
+    requestAnimationFrame(()=>jumpToWordIndex(record?.lastWord||0));
+  }));
 
   app.querySelector('#generate-ai-progress')?.addEventListener('click',async()=>{
     const button=app.querySelector('#generate-ai-progress');
@@ -6430,8 +6332,6 @@ function renderProgressDashboard() {
             activeDays:awards.activeDays,
             completedBooks:awards.completed,
             annualGoal:goal,
-            speedGoal,
-            comprehensionGoal,
             recentImprovementWpm:awards.improvement,
             learning
           },
@@ -6439,13 +6339,14 @@ function renderProgressDashboard() {
           weekly
         })
       });
-      const items=Array.isArray(payload?.recommendations)?payload.recommendations:[];
-      if(!items.length) throw new Error('No AI recommendations were returned.');
-      container.innerHTML=items.slice(0,4).map((item)=>`<article><h3>${escapeHtml(item.title||'Recommendation')}</h3><p>${escapeHtml(item.text||item.recommendation||'')}</p></article>`).join('');
-      status.textContent='AI analysis added.';
+      const items=Array.isArray(payload.recommendations)?payload.recommendations:[];
+      if(!items.length) throw new Error('No recommendations were returned.');
+      container.innerHTML=items.map((item)=>`<article><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.recommendation)}</p><small>${escapeHtml(item.reason||'')}</small></article>`).join('');
+      status.className='status success';
+      status.textContent='AI analysis complete.';
     }catch(error){
       status.className='status error';
-      status.textContent=error?.message||'AI analysis could not be generated.';
+      status.textContent=error.message||'AI analysis is unavailable.';
     }finally{button.disabled=false;}
   });
 }
@@ -6521,15 +6422,20 @@ function renderComprehensionQuiz(quiz, context) {
     <div class="comprehension-actions">
       <span id="comprehension-status" class="status"></span>
       <button id="score-comprehension" class="primary" type="button">Score Check</button>
+      ${context.wholeGuide ? '<button id="randomize-whole-guide" class="secondary" type="button">Randomize another quiz</button>' : ''}
       <button class="secondary" value="cancel" type="submit">Close</button>
     </div>
   </form>`;
   dialog.showModal();
 
+  dialog.querySelector('#randomize-whole-guide')?.addEventListener('click', () => {
+    showModernGuideWholeQuizSetup(context.guideSource || state?.source || {});
+  });
+
   dialog.querySelector('#score-comprehension')?.addEventListener('click', () => {
     const unanswered = quiz.questions.some((_, index) => !dialog.querySelector(`input[name="question-${index}"]:checked`));
     if (unanswered) {
-      dialog.querySelector('#comprehension-status').textContent = 'Answer all four questions first.';
+      dialog.querySelector('#comprehension-status').textContent = `Answer all ${quiz.questions.length} questions first.`;
       return;
     }
 
@@ -9986,7 +9892,7 @@ function modernGuideInteractionConfig(source = state?.source || {}) {
 }
 
 function modernGuideActionToken(word) {
-  const match = String(word || '').match(/^\[\[MSG:(SECTION|DISCUSS|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
+  const match = String(word || '').match(/^\[\[MSG:(SECTION|DISCUSS|SECTIONQUIZ|QUIZ|ACTION|IDEAS|BUY)\]\]$/);
   return match ? match[1].toLowerCase() : '';
 }
 
@@ -9998,6 +9904,7 @@ function modernGuideActionLabel(action) {
   return ({
     section: '',
     discuss: 'Discuss with Mark',
+    sectionquiz: 'Quiz me',
     quiz: 'Quiz me on the whole guide',
     action: 'Add to Action Center',
     ideas: 'Explore related Great Ideas',
@@ -10017,6 +9924,40 @@ function modernGuideContextRange(markerIndex) {
   }
 
   const startIndex = sectionMarker >= 0 ? sectionMarker + 1 : 0;
+  const cleanWords = [];
+  let firstReal = null;
+  let lastReal = null;
+
+  for (let index = startIndex; index < safeMarker; index += 1) {
+    if (isModernGuideActionToken(state.words[index])) continue;
+    if (firstReal == null) firstReal = index;
+    lastReal = index;
+    cleanWords.push(state.words[index]);
+  }
+
+  return {
+    startIndex: firstReal == null ? startIndex : firstReal,
+    endIndex: lastReal == null ? safeMarker : lastReal + 1,
+    text: cleanWords.join(' ').trim()
+  };
+}
+
+function modernGuideSectionQuizContextRange(markerIndex) {
+  const safeMarker = Math.max(0, Math.min(state.words.length, Number(markerIndex) || 0));
+  let boundary = -1;
+
+  // A guide can contain several quiz checkpoints under one umbrella SECTION
+  // marker (for example a book-by-book roadmap). The preceding quiz checkpoint
+  // is therefore a stronger boundary than the umbrella section heading.
+  for (let index = safeMarker - 1; index >= 0; index -= 1) {
+    const action = modernGuideActionToken(state.words[index]);
+    if (action === 'sectionquiz' || action === 'section') {
+      boundary = index;
+      break;
+    }
+  }
+
+  const startIndex = boundary >= 0 ? boundary + 1 : 0;
   const cleanWords = [];
   let firstReal = null;
   let lastReal = null;
@@ -10231,7 +10172,129 @@ function openModernGuideGreatIdea(source = state?.source || {}) {
   });
 }
 
-async function startModernGuideWholeComprehensionCheck(source = state?.source || {}) {
+async function startModernGuideSectionComprehensionCheck(markerIndex, source = state?.source || {}) {
+  if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) return;
+
+  const context = modernGuideSectionQuizContextRange(markerIndex);
+  const passageWords = context.text.split(/\s+/).filter(Boolean);
+  if (passageWords.length < 120) {
+    window.alert(`This guide section has ${passageWords.length} readable words; a comprehension check needs at least 120.`);
+    return;
+  }
+
+  const wasRunning = isReaderRunning();
+  if (wasRunning) pauseReader();
+
+  const sectionTitle = tocTitleForWordIndex(context.startIndex) || 'Guide section';
+  try {
+    const response = await fetch('/api/comprehension', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `${source.originalTitle || state.title || 'Modern Guide'} — ${sectionTitle}`,
+        passage: context.text,
+        scope: 'guide_section'
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
+
+    renderComprehensionQuiz(payload, {
+      startIndex: context.startIndex,
+      endIndex: context.endIndex,
+      words: passageWords.length,
+      passage: context.text,
+      guideSection: true,
+      sectionTitle
+    });
+  } catch (error) {
+    window.alert(`Section comprehension check unavailable: ${error.message}`);
+  }
+}
+
+const WHOLE_GUIDE_QUESTION_HISTORY_KEY = 'marksetgo_whole_guide_question_history_v1';
+
+function wholeGuideQuestionHistory(documentId = state?.documentId) {
+  if (!documentId) return [];
+  try {
+    const store = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
+    return Array.isArray(store[documentId]) ? store[documentId] : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberWholeGuideQuestions(documentId, questions = []) {
+  if (!documentId || !Array.isArray(questions) || !questions.length) return;
+  try {
+    const store = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
+    const previous = Array.isArray(store[documentId]) ? store[documentId] : [];
+    const merged = [...questions, ...previous];
+    const seen = new Set();
+    store[documentId] = merged.filter((item) => {
+      const key = String(item?.question || '').trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, 200);
+    localStorage.setItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY, JSON.stringify(store));
+  } catch {}
+}
+
+function shuffledWholeGuideQuestions(items = []) {
+  const copy = [...items];
+  for (let index = copy.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+  }
+  return copy;
+}
+
+function showModernGuideWholeQuizSetup(source = state?.source || {}) {
+  const dialog = app.querySelector('#comprehension-dialog');
+  if (!dialog) return;
+  const historyCount = wholeGuideQuestionHistory().length;
+  dialog.innerHTML = `<form method="dialog" class="comprehension-card" id="whole-guide-quiz-setup">
+    <div class="comprehension-heading">
+      <div><span class="comprehension-kicker">Whole-guide quiz</span><h2>Build your quiz</h2><p>${escapeHtml(source.originalTitle || state.title || 'Reading guide')}</p></div>
+      <button class="comprehension-close" value="cancel" type="submit" aria-label="Close">×</button>
+    </div>
+    <div class="comprehension-questions">
+      <fieldset class="comprehension-question">
+        <legend><span>1</span><div><small>Length</small>How many questions?</div></legend>
+        <label>Questions
+          <input id="whole-guide-question-count" type="number" min="5" max="25" step="1" value="10" inputmode="numeric">
+        </label>
+      </fieldset>
+      <fieldset class="comprehension-question">
+        <legend><span>2</span><div><small>Question mix</small>Choose new and review questions</div></legend>
+        <label>Mix
+          <select id="whole-guide-question-mode">
+            <option value="mixed" selected>Mixed — new + previous</option>
+            <option value="new">New only</option>
+            <option value="review">Review previous</option>
+          </select>
+        </label>
+        <p class="status">${historyCount ? `${historyCount} previous whole-guide question${historyCount === 1 ? '' : 's'} available for this book.` : 'No previous whole-guide questions yet. Mixed will generate new questions until history exists.'}</p>
+      </fieldset>
+    </div>
+    <div class="comprehension-actions">
+      <span id="comprehension-status" class="status"></span>
+      <button id="generate-whole-guide-quiz" class="primary" type="button">Generate randomized quiz</button>
+      <button class="secondary" value="cancel" type="submit">Close</button>
+    </div>
+  </form>`;
+  if (!dialog.open) dialog.showModal();
+  dialog.querySelector('#generate-whole-guide-quiz')?.addEventListener('click', () => {
+    const requestedCount = Number(dialog.querySelector('#whole-guide-question-count')?.value);
+    const questionCount = Number.isInteger(requestedCount) ? Math.max(5, Math.min(25, requestedCount)) : 10;
+    const questionMode = String(dialog.querySelector('#whole-guide-question-mode')?.value || 'mixed');
+    generateModernGuideWholeComprehensionCheck(source, { questionCount, questionMode });
+  });
+}
+
+async function generateModernGuideWholeComprehensionCheck(source = state?.source || {}, options = {}) {
   if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
     return window.MarkSetGoStartComprehension?.();
   }
@@ -10239,6 +10302,40 @@ async function startModernGuideWholeComprehensionCheck(source = state?.source ||
   const passageWords = state.words.filter((word) => !isModernGuideActionToken(word));
   const passage = passageWords.join(' ').replace(/\s+/g, ' ').trim();
   if (passageWords.length < 120) return;
+
+  const requestedCount = Number(options.questionCount);
+  const questionCount = Number.isInteger(requestedCount) ? Math.max(5, Math.min(25, requestedCount)) : 10;
+  const questionMode = ['mixed', 'new', 'review'].includes(options.questionMode) ? options.questionMode : 'mixed';
+  const history = wholeGuideQuestionHistory();
+
+  if (questionMode === 'review') {
+    if (history.length < questionCount) {
+      const dialog = app.querySelector('#comprehension-dialog');
+      const status = dialog?.querySelector('#comprehension-status');
+      if (status) status.textContent = `Only ${history.length} previous question${history.length === 1 ? '' : 's'} are available. Choose a smaller quiz or use Mixed/New only.`;
+      return;
+    }
+    const reviewed = shuffledWholeGuideQuestions(history).slice(0, questionCount);
+    renderComprehensionQuiz({ questions: reviewed }, {
+      startIndex: 0,
+      endIndex: state.words.length,
+      words: passageWords.length,
+      passage,
+      wholeGuide: true,
+      wholeGuideOptions: { questionCount, questionMode },
+      guideSource: source
+    });
+    return;
+  }
+
+  const oldTarget = questionMode === 'mixed' && history.length ? Math.min(history.length, Math.floor(questionCount / 2)) : 0;
+  const oldQuestions = oldTarget ? shuffledWholeGuideQuestions(history).slice(0, oldTarget) : [];
+  const newTarget = questionCount - oldQuestions.length;
+  const dialog = app.querySelector('#comprehension-dialog');
+  const generateButton = dialog?.querySelector('#generate-whole-guide-quiz');
+  const status = dialog?.querySelector('#comprehension-status');
+  if (generateButton) { generateButton.disabled = true; generateButton.textContent = 'Generating…'; }
+  if (status) status.textContent = '';
 
   const wasRunning = isReaderRunning();
   if (wasRunning) pauseReader();
@@ -10250,23 +10347,39 @@ async function startModernGuideWholeComprehensionCheck(source = state?.source ||
       body: JSON.stringify({
         title: `${source.originalTitle || state.title || 'Modern Guide'} — Whole Guide`,
         passage,
-        scope: 'whole_guide'
+        scope: 'whole_guide',
+        questionCount: newTarget,
+        questionMode: 'new',
+        avoidQuestions: history.map((item) => item?.question).filter(Boolean).slice(0, 100)
       })
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
-    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
+    if (!Array.isArray(payload.questions) || payload.questions.length !== newTarget) throw new Error('The whole-guide quiz response was incomplete.');
 
-    renderComprehensionQuiz(payload, {
+    rememberWholeGuideQuestions(state.documentId, payload.questions);
+    const questions = shuffledWholeGuideQuestions([...oldQuestions, ...payload.questions]);
+    renderComprehensionQuiz({ ...payload, questions }, {
       startIndex: 0,
       endIndex: state.words.length,
       words: passageWords.length,
       passage,
-      wholeGuide: true
+      wholeGuide: true,
+      wholeGuideOptions: { questionCount, questionMode },
+      guideSource: source
     });
   } catch (error) {
-    window.alert(`Whole-guide comprehension check unavailable: ${error.message}`);
+    if (status) status.textContent = `Whole-guide comprehension check unavailable: ${error.message}`;
+    else window.alert(`Whole-guide comprehension check unavailable: ${error.message}`);
+    if (generateButton) { generateButton.disabled = false; generateButton.textContent = 'Generate randomized quiz'; }
   }
+}
+
+async function startModernGuideWholeComprehensionCheck(source = state?.source || {}) {
+  if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
+    return window.MarkSetGoStartComprehension?.();
+  }
+  showModernGuideWholeQuizSetup(source);
 }
 
 function activateModernGuideInlineAction(button, source = state?.source || {}) {
@@ -10278,6 +10391,11 @@ function activateModernGuideInlineAction(button, source = state?.source || {}) {
 
   if (action === 'discuss') {
     openModernGuideContextInAskMark(index);
+    return;
+  }
+
+  if (action === 'sectionquiz') {
+    startModernGuideSectionComprehensionCheck(index, source);
     return;
   }
 
@@ -10632,11 +10750,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <button id="book-page-next" type="button" aria-label="Next page spread">›</button>
               </div>
             </div>
-            <div class="viewer-wpm-control" role="group" aria-label="Reading speed controls">
-              <button id="viewer-wpm-down" class="viewer-wpm-step" type="button" aria-label="Decrease reading speed by 25 words per minute">−</button>
-              <span id="viewer-wpm-badge" class="viewer-wpm-badge" aria-label="Selected reading speed">${Math.round(Number(state.wpm) || 0).toLocaleString()} WPM</span>
-              <button id="viewer-wpm-up" class="viewer-wpm-step" type="button" aria-label="Increase reading speed by 25 words per minute">+</button>
-            </div>
+            <span id="viewer-wpm-badge" class="viewer-wpm-badge" aria-label="Selected reading speed">${Math.round(Number(state.wpm) || 0).toLocaleString()} WPM</span>
           </div>
         </div>
         <div id="right-pane-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize right pane" tabindex="0"></div>
@@ -11031,22 +11145,6 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   const speedBadgeInput = app.querySelector('#speed');
   speedBadgeInput?.addEventListener('input', updateViewerWpmBadge);
   speedBadgeInput?.addEventListener('change', updateViewerWpmBadge);
-  app.querySelector('#viewer-wpm-down')?.addEventListener('click', () => adjustReaderWpm(-25));
-  app.querySelector('#viewer-wpm-up')?.addEventListener('click', () => adjustReaderWpm(25));
-
-  // Arrow keys mirror the lower-right WPM controls while the Reader is active.
-  // Remove the previous Reader instance's handler first so navigation/re-entry
-  // can never accumulate duplicate document-level key listeners.
-  if (state.viewerWpmKeyHandler) document.removeEventListener('keydown', state.viewerWpmKeyHandler);
-  state.viewerWpmKeyHandler = (event) => {
-    if ((event.key !== 'ArrowUp' && event.key !== 'ArrowDown') || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
-    const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest('input, textarea, select, button, a, summary, [contenteditable="true"], [role="textbox"]')) return;
-    if (!app.querySelector('#reader')) return;
-    event.preventDefault();
-    adjustReaderWpm(event.key === 'ArrowUp' ? 25 : -25);
-  };
-  document.addEventListener('keydown', state.viewerWpmKeyHandler);
   updateViewerWpmBadge();
 
   app.querySelectorAll('#mode-select, #speed, #word-count, #pointer-style, #pointer-color, #meaningful-chunks, #focus-anchor-font-size, #focus-anchor-color, #focus-anchor-bold, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
@@ -13377,31 +13475,6 @@ function moveReadingGuide(reader, step, tickMs) {
 let lastReaderStatusPaintAt = 0;
 let lastReaderStatusText = '';
 let lastViewerWpmText = '';
-
-function adjustReaderWpm(delta) {
-  const speedInput = app.querySelector('#speed');
-  if (!speedInput) return;
-
-  const min = Number(speedInput.min) || 30;
-  const max = Number(speedInput.max) || 900;
-  const current = Number(speedInput.value) || Number(state.wpm) || 300;
-  const next = Math.min(max, Math.max(min, Math.round(current + Number(delta || 0))));
-  if (next === current) return;
-
-  const wasRunning = isReaderRunning();
-  if (wasRunning) stopReader();
-
-  speedInput.value = String(next);
-  state.wpm = next;
-
-  const fullscreenSpeed = app.querySelector('#fs-speed');
-  if (fullscreenSpeed) fullscreenSpeed.value = String(next);
-
-  updateViewerWpmBadge();
-  persistReaderSession();
-
-  if (wasRunning && getSelectedMode() !== 'two-column') startReader();
-}
 
 function updateViewerWpmBadge() {
   const badge = app.querySelector('#viewer-wpm-badge');
