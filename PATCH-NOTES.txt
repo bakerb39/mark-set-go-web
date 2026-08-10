@@ -1,18 +1,26 @@
-Mark, Set, Go! - Progress Dashboard Speed + Comprehension Focus
+Mark, Set, Go! — Progress Dashboard Yearly Performance Facelift
 2026-08-10
 
-Files:
-- app.js
-- styles.css
-- index.html
+Built directly from the latest files supplied by the user:
+- app(1).js
+- styles(1).css
+- index(2).html
 
-Dashboard changes only:
-- Puts the most recently completed/current reading session first.
-- Adds training goals for target WPM and target comprehension alongside annual book goal.
-- Makes overall speed, comprehension, effective WPM, and recent WPM change the primary KPIs.
-- Adds dedicated speed-over-time and comprehension-over-time charts.
-- Keeps volume/time/consistency as secondary expandable detail.
-- Keeps recommendations, practice tools, trophies, and recent books available without overwhelming the main view.
+Dashboard-only changes:
+- Primary KPI cards now appear first: Reading Speed, Comprehension, Effective WPM, and Speed Change This Year.
+- Adds two large, full-color 12-month charts immediately below the KPIs:
+  - Reading Speed by month for the current year
+  - Comprehension by month for the current year
+- Both yearly charts include a visible gold goal line tied to the reader's saved target.
+- Adds compact goal controls for target WPM, target comprehension, and annual books.
+- Adds a Current Text performance section showing:
+  - text WPM
+  - comprehension
+  - effective WPM
+  - time invested
+  - reading progress
+- Adds Performance by Text comparison table for up to 10 recent texts.
+- Keeps coaching, overall volume/consistency, learning tools, and trophies lower on the page.
 - Updates app.js/styles.css cache-busting token in index.html.
 
 Reader engine/modules were not modified.

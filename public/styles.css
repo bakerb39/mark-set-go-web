@@ -13290,3 +13290,768 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
     grid-row: 2;
   }
 }
+
+/* v2026-08-10 Progress dashboard: session + goals first, speed/comprehension focus */
+.progress-dashboard-focused {
+  display: grid;
+  gap: 18px;
+}
+
+.progress-dashboard-focused .progress-hero-focused {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px 20px;
+  border: 1px solid rgba(47,117,181,.16);
+  border-radius: 18px;
+  background: linear-gradient(180deg, #f3f8fe 0%, #ffffff 100%);
+  box-shadow: 0 8px 24px rgba(18,52,86,.05);
+}
+
+.progress-dashboard-focused .progress-hero-focused h1 {
+  margin: 4px 0 6px;
+  color: #102f52;
+}
+
+.progress-dashboard-focused .progress-hero-focused p {
+  max-width: 760px;
+  margin: 0;
+  color: #55708d;
+  line-height: 1.5;
+}
+
+.progress-dashboard-focused .progress-hero-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.progress-dashboard-focused .progress-priority-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr);
+  gap: 16px;
+}
+
+.progress-dashboard-focused .progress-priority-card {
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid rgba(47,117,181,.16);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(18,52,86,.045);
+}
+
+.progress-dashboard-focused .current-session-card {
+  background: linear-gradient(145deg, #eef6ff 0%, #ffffff 62%);
+}
+
+.progress-dashboard-focused .reading-goals-card {
+  background: linear-gradient(145deg, #fffaf0 0%, #ffffff 64%);
+  border-color: rgba(181,137,47,.22);
+}
+
+.progress-dashboard-focused .priority-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.progress-dashboard-focused .priority-card-heading h2 {
+  margin: 4px 0 5px;
+  font-size: 1.28rem;
+  color: #153a64;
+}
+
+.progress-dashboard-focused .priority-card-heading p {
+  margin: 0;
+  color: #607891;
+  line-height: 1.45;
+  font-size: .88rem;
+}
+
+.progress-dashboard-focused .session-progress-pill,
+.progress-dashboard-focused .chart-value-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #e4f0fd;
+  color: #15508a;
+  font-size: .76rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.progress-dashboard-focused .current-session-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 10px;
+}
+
+.progress-dashboard-focused .current-session-stats article {
+  min-width: 0;
+  padding: 13px 12px;
+  border: 1px solid rgba(47,117,181,.12);
+  border-radius: 13px;
+  background: rgba(255,255,255,.82);
+  display: grid;
+  gap: 3px;
+}
+
+.progress-dashboard-focused .current-session-stats span,
+.progress-dashboard-focused .current-session-stats small {
+  color: #617893;
+  font-size: .72rem;
+}
+
+.progress-dashboard-focused .current-session-stats strong {
+  color: #0f4d8c;
+  font-size: 1.35rem;
+  line-height: 1.05;
+}
+
+.progress-dashboard-focused .training-goal-row {
+  display: grid;
+  gap: 7px;
+  margin: 13px 0;
+}
+
+.progress-dashboard-focused .training-goal-copy {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: .84rem;
+}
+
+.progress-dashboard-focused .training-goal-copy strong { color: #193c63; }
+.progress-dashboard-focused .training-goal-copy span { color: #5b7390; }
+
+.progress-dashboard-focused .training-goal-meter {
+  height: 9px;
+  border-radius: 999px;
+  background: #e6edf5;
+  overflow: hidden;
+}
+
+.progress-dashboard-focused .training-goal-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #347dbe 0%, #78afe5 100%);
+}
+
+.progress-dashboard-focused .annual-training-goal .training-goal-meter > span {
+  background: linear-gradient(90deg, #c4932e 0%, #e3bd62 100%);
+}
+
+.progress-dashboard-focused .reading-goal-controls {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0,1fr)) auto;
+  gap: 8px;
+  align-items: end;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(100,116,139,.14);
+}
+
+.progress-dashboard-focused .reading-goal-controls label {
+  display: grid;
+  gap: 4px;
+  color: #506a85;
+  font-size: .7rem;
+  font-weight: 700;
+}
+
+.progress-dashboard-focused .reading-goal-controls input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid #ccd9e6;
+  border-radius: 8px;
+  background: #fff;
+  color: #17365d;
+}
+
+.progress-dashboard-focused .reading-goal-controls button {
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.progress-dashboard-focused .overall-reading-kpis,
+.progress-dashboard-focused .key-trends-section {
+  padding: 18px 20px;
+  border: 1px solid rgba(47,117,181,.14);
+  border-radius: 18px;
+  background: #fbfdff;
+}
+
+.progress-dashboard-focused .progress-section-heading {
+  margin-bottom: 14px;
+}
+
+.progress-dashboard-focused .progress-section-heading h2 {
+  margin: 3px 0 4px;
+  font-size: 1.18rem;
+  color: #17365d;
+}
+
+.progress-dashboard-focused .progress-section-heading p {
+  margin: 0;
+  color: #617993;
+}
+
+.progress-dashboard-focused .progress-stat-grid-core {
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 12px;
+  margin: 0;
+}
+
+.progress-dashboard-focused .core-kpi {
+  min-height: 100px;
+  padding: 15px 16px;
+  border-radius: 14px;
+  border-color: rgba(47,117,181,.14);
+  background: #fff;
+}
+
+.progress-dashboard-focused .core-kpi strong {
+  font-size: 1.75rem;
+  color: #0e4f91;
+}
+
+.progress-dashboard-focused .progress-chart-grid-key {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 14px;
+  margin: 0;
+}
+
+.progress-dashboard-focused .key-chart-card {
+  margin: 0;
+  padding: 16px 17px;
+  border-radius: 15px;
+  background: #fff;
+}
+
+.progress-dashboard-focused .key-chart-card .analytics-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+.progress-dashboard-focused .key-chart-card .analytics-heading h2 {
+  margin: 0 0 3px;
+  font-size: 1rem;
+}
+
+.progress-dashboard-focused .key-chart-card .analytics-heading p {
+  margin: 0;
+  font-size: .75rem;
+  color: #6a8098;
+}
+
+.progress-dashboard-focused .key-chart-card .progress-chart {
+  height: 180px;
+  max-height: 180px;
+}
+
+.progress-dashboard-focused .performance-guidance-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.progress-dashboard-focused .performance-guidance-strip > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #eef5fd;
+  color: #466582;
+}
+
+.progress-dashboard-focused .performance-guidance-strip strong { color: #173e6b; }
+.progress-dashboard-focused .performance-guidance-strip span { font-size: .82rem; line-height: 1.4; }
+
+.progress-dashboard-focused .focused-coach-card {
+  border-color: rgba(47,117,181,.2);
+  background: linear-gradient(180deg, #f3f8fe 0%, #fff 100%);
+}
+
+.progress-dashboard-focused .progress-collapsible {
+  margin: 0;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.progress-dashboard-focused .progress-collapsible > summary {
+  padding: 15px 17px;
+}
+
+.progress-dashboard-focused .secondary-kpi-grid {
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.progress-dashboard-focused .secondary-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
+}
+
+.progress-dashboard-focused .secondary-chart-grid .analytics-card {
+  margin: 0;
+}
+
+.progress-dashboard-focused .learning-tool-grid-focused {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 10px;
+}
+
+.progress-dashboard-focused .learning-tool-grid-focused article {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 1px solid rgba(47,117,181,.12);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.progress-dashboard-focused .learning-tool-grid-focused article > div {
+  display: grid;
+  gap: 4px;
+}
+
+.progress-dashboard-focused .learning-tool-grid-focused strong { color: #17365d; }
+.progress-dashboard-focused .learning-tool-grid-focused small { color: #657d98; }
+.progress-dashboard-focused .learning-tool-grid-focused button { white-space: nowrap; }
+
+@media (max-width: 1100px) {
+  .progress-dashboard-focused .progress-priority-grid,
+  .progress-dashboard-focused .progress-chart-grid-key {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-dashboard-focused .progress-stat-grid-core,
+  .progress-dashboard-focused .secondary-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+
+  .progress-dashboard-focused .reading-goal-controls {
+    grid-template-columns: repeat(3, minmax(0,1fr));
+  }
+
+  .progress-dashboard-focused .reading-goal-controls button {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .progress-dashboard-focused .progress-hero-focused {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .progress-dashboard-focused .current-session-stats,
+  .progress-dashboard-focused .progress-stat-grid-core,
+  .progress-dashboard-focused .secondary-kpi-grid,
+  .progress-dashboard-focused .secondary-chart-grid,
+  .progress-dashboard-focused .performance-guidance-strip,
+  .progress-dashboard-focused .learning-tool-grid-focused,
+  .progress-dashboard-focused .reading-goal-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-dashboard-focused .priority-card-heading,
+  .progress-dashboard-focused .key-chart-card .analytics-heading,
+  .progress-dashboard-focused .learning-tool-grid-focused article {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .progress-dashboard-focused .session-progress-pill,
+  .progress-dashboard-focused .chart-value-chip {
+    align-self: flex-start;
+  }
+
+  .progress-dashboard-focused .key-chart-card .progress-chart {
+    height: 155px;
+    max-height: 155px;
+  }
+}
+
+/* v9.7.0 Progress dashboard — performance-first annual view */
+.progress-dashboard-performance {
+  display:grid;
+  gap:18px;
+  padding:clamp(18px,2.2vw,30px) !important;
+  background:linear-gradient(180deg,#f8fbff 0%,#ffffff 22%,#f7fbff 100%);
+}
+
+.progress-dashboard-performance .performance-dashboard-header {
+  display:flex;
+  align-items:end;
+  justify-content:space-between;
+  gap:22px;
+  padding:4px 2px 14px;
+  border-bottom:1px solid #d7e3ef;
+}
+.progress-dashboard-performance .performance-dashboard-header h1 {
+  margin:4px 0 6px;
+  color:#0a3f70;
+  font-size:clamp(2rem,3vw,2.9rem);
+  line-height:1;
+  letter-spacing:-.035em;
+}
+.progress-dashboard-performance .performance-dashboard-header p {
+  margin:0;
+  max-width:780px;
+  color:#4b6784;
+  font-size:.96rem;
+  line-height:1.5;
+}
+.progress-dashboard-performance .progress-hero-actions {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.progress-dashboard-performance .performance-kpi-grid {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+}
+.progress-dashboard-performance .performance-kpi-card {
+  position:relative;
+  min-height:132px;
+  overflow:hidden;
+  padding:17px 18px 16px;
+  border:1px solid rgba(28,87,145,.14);
+  border-radius:18px;
+  background:#fff;
+  box-shadow:0 10px 24px rgba(20,57,93,.06);
+}
+.progress-dashboard-performance .performance-kpi-card::before {
+  content:"";
+  position:absolute;
+  inset:0 0 auto;
+  height:5px;
+  background:#2f75b5;
+}
+.progress-dashboard-performance .comprehension-kpi::before { background:#7b5cc7; }
+.progress-dashboard-performance .effective-kpi::before { background:#2e9b8c; }
+.progress-dashboard-performance .improvement-kpi::before { background:#d4a62a; }
+.progress-dashboard-performance .performance-kpi-card > span {
+  display:block;
+  margin:4px 0 10px;
+  color:#54708d;
+  font-size:.76rem;
+  font-weight:800;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.progress-dashboard-performance .performance-kpi-card > strong {
+  display:block;
+  color:#113f6d;
+  font-size:clamp(1.7rem,2.4vw,2.45rem);
+  line-height:1;
+  letter-spacing:-.03em;
+}
+.progress-dashboard-performance .performance-kpi-card > strong small {
+  font-size:.84rem;
+  font-weight:800;
+  letter-spacing:0;
+  color:#66809a;
+}
+.progress-dashboard-performance .performance-kpi-card p {
+  margin:10px 0 0;
+  color:#607991;
+  font-size:.78rem;
+  line-height:1.35;
+}
+.progress-dashboard-performance .performance-kpi-card b { color:#173e69; }
+
+.progress-dashboard-performance .performance-year-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:14px;
+}
+.progress-dashboard-performance .performance-year-card {
+  min-width:0;
+  padding:20px 20px 14px;
+  border:1px solid rgba(31,92,153,.16);
+  border-radius:20px;
+  background:#fff;
+  box-shadow:0 14px 34px rgba(22,62,103,.07);
+}
+.progress-dashboard-performance .speed-year-card {
+  background:linear-gradient(180deg,#f7fbff 0%,#fff 32%);
+}
+.progress-dashboard-performance .comprehension-year-card {
+  background:linear-gradient(180deg,#fbf9ff 0%,#fff 32%);
+}
+.progress-dashboard-performance .performance-chart-heading {
+  display:flex;
+  align-items:start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:8px;
+}
+.progress-dashboard-performance .performance-chart-heading h2 {
+  margin:4px 0 4px;
+  color:#113f6d;
+  font-size:1.35rem;
+}
+.progress-dashboard-performance .performance-chart-heading p {
+  margin:0;
+  color:#627b94;
+  font-size:.82rem;
+  line-height:1.4;
+}
+.progress-dashboard-performance .performance-chart-stat {
+  flex:0 0 auto;
+  min-width:100px;
+  padding:9px 11px;
+  border-radius:14px;
+  background:#eef5fc;
+  text-align:right;
+}
+.progress-dashboard-performance .comprehension-year-card .performance-chart-stat { background:#f2edfb; }
+.progress-dashboard-performance .performance-chart-stat strong,
+.progress-dashboard-performance .performance-chart-stat span { display:block; }
+.progress-dashboard-performance .performance-chart-stat strong { color:#0f4d89;font-size:1.15rem; }
+.progress-dashboard-performance .comprehension-year-card .performance-chart-stat strong { color:#6748ad; }
+.progress-dashboard-performance .performance-chart-stat span { margin-top:2px;color:#667f98;font-size:.67rem; }
+
+.progress-dashboard-performance .yearly-performance-chart {
+  display:block;
+  width:100%;
+  height:auto;
+  min-height:230px;
+  overflow:visible;
+}
+.progress-dashboard-performance .performance-grid {
+  stroke:#dce7f1;
+  stroke-width:1;
+}
+.progress-dashboard-performance .performance-axis-label,
+.progress-dashboard-performance .performance-month-label {
+  fill:#70869c;
+  font-size:11px;
+}
+.progress-dashboard-performance .performance-line {
+  fill:none;
+  stroke-width:4;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  filter:drop-shadow(0 3px 5px rgba(25,74,122,.13));
+}
+.progress-dashboard-performance .performance-line-speed { stroke:#2477c6; }
+.progress-dashboard-performance .performance-line-comprehension { stroke:#7b5ac7; }
+.progress-dashboard-performance .performance-point {
+  stroke:#fff;
+  stroke-width:3;
+}
+.progress-dashboard-performance circle.performance-line-speed { fill:#2477c6; }
+.progress-dashboard-performance circle.performance-line-comprehension { fill:#7b5ac7; }
+.progress-dashboard-performance .performance-area-speed-start { stop-color:#3b8bd7; stop-opacity:.34; }
+.progress-dashboard-performance .performance-area-speed-end { stop-color:#9ed0ff; stop-opacity:.03; }
+.progress-dashboard-performance .performance-area-comprehension-start { stop-color:#8d6bd1; stop-opacity:.32; }
+.progress-dashboard-performance .performance-area-comprehension-end { stop-color:#d9c9f4; stop-opacity:.03; }
+.progress-dashboard-performance .performance-goal-line {
+  stroke:#d5a62b;
+  stroke-width:2.5;
+  stroke-dasharray:9 7;
+}
+.progress-dashboard-performance .performance-goal-label rect { fill:#fff4c7; stroke:#d5a62b; }
+.progress-dashboard-performance .performance-goal-label text {
+  fill:#8a6410;
+  font-size:10px;
+  font-weight:800;
+}
+.progress-dashboard-performance .chart-empty { fill:#8194a8;font-size:12px; }
+
+.progress-dashboard-performance .performance-goals-strip {
+  display:grid;
+  grid-template-columns:minmax(240px,1fr) minmax(520px,1.6fr);
+  gap:20px;
+  align-items:center;
+  padding:16px 18px;
+  border:1px solid #d8e4ef;
+  border-radius:18px;
+  background:linear-gradient(90deg,#edf5fd 0%,#f9fbfe 55%,#fffaf0 100%);
+}
+.progress-dashboard-performance .performance-goals-copy strong { display:block;margin:3px 0;color:#173f6d;font-size:1rem; }
+.progress-dashboard-performance .performance-goals-copy p { margin:0;color:#617b95;font-size:.78rem; }
+.progress-dashboard-performance .performance-goal-controls {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr)) auto;
+  gap:9px;
+  align-items:end;
+}
+.progress-dashboard-performance .performance-goal-controls label {
+  display:grid;
+  gap:5px;
+  color:#4f6881;
+  font-size:.7rem;
+  font-weight:800;
+}
+.progress-dashboard-performance .performance-goal-controls input {
+  width:100%;
+  min-height:36px;
+  padding:6px 8px;
+  border:1px solid #bfd0e0;
+  border-radius:9px;
+  background:#fff;
+  color:#173f6d;
+}
+.progress-dashboard-performance .performance-goal-controls button { min-height:36px; }
+
+.progress-dashboard-performance .current-text-performance,
+.progress-dashboard-performance .text-performance-section {
+  padding:19px 20px;
+  border:1px solid rgba(31,92,153,.15);
+  border-radius:20px;
+  background:#fff;
+  box-shadow:0 10px 26px rgba(20,57,93,.045);
+}
+.progress-dashboard-performance .performance-section-heading {
+  display:flex;
+  align-items:start;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:14px;
+}
+.progress-dashboard-performance .performance-section-heading h2 {
+  margin:4px 0 4px;
+  color:#123f6d;
+  font-size:1.25rem;
+}
+.progress-dashboard-performance .performance-section-heading p {
+  margin:0;
+  color:#627b94;
+  font-size:.82rem;
+  line-height:1.45;
+}
+.progress-dashboard-performance .current-text-badge {
+  flex:0 0 auto;
+  padding:7px 11px;
+  border:1px solid #b9d0e5;
+  border-radius:999px;
+  background:#edf5fc;
+  color:#174f86;
+  font-size:.76rem;
+  font-weight:800;
+}
+.progress-dashboard-performance .current-text-kpis {
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:10px;
+}
+.progress-dashboard-performance .current-text-kpis article {
+  padding:12px 13px;
+  border-radius:14px;
+  background:#f7fafe;
+  border:1px solid #dce7f1;
+}
+.progress-dashboard-performance .current-text-kpis span,
+.progress-dashboard-performance .current-text-kpis small { display:block;color:#6a8198;font-size:.69rem; }
+.progress-dashboard-performance .current-text-kpis strong { display:block;margin:4px 0;color:#124b82;font-size:1.2rem; }
+
+.progress-dashboard-performance .text-performance-table-wrap {
+  overflow-x:auto;
+  border:1px solid #dce6ef;
+  border-radius:14px;
+}
+.progress-dashboard-performance .text-performance-table {
+  width:100%;
+  border-collapse:collapse;
+  background:#fff;
+  font-size:.8rem;
+}
+.progress-dashboard-performance .text-performance-table th {
+  padding:10px 12px;
+  background:#eef5fb;
+  color:#49657f;
+  font-size:.69rem;
+  letter-spacing:.03em;
+  text-transform:uppercase;
+  text-align:right;
+  white-space:nowrap;
+}
+.progress-dashboard-performance .text-performance-table th:first-child,
+.progress-dashboard-performance .text-performance-table td:first-child { text-align:left; }
+.progress-dashboard-performance .text-performance-table td {
+  padding:11px 12px;
+  border-top:1px solid #e4ebf2;
+  color:#35526e;
+  text-align:right;
+  white-space:nowrap;
+}
+.progress-dashboard-performance .text-performance-table td:first-child {
+  min-width:240px;
+  white-space:normal;
+}
+.progress-dashboard-performance .text-performance-table td strong { color:#153f69; }
+.progress-dashboard-performance .text-performance-table td small {
+  display:inline-flex;
+  margin-left:8px;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#fff1b8;
+  color:#82600e;
+  font-size:.62rem;
+  font-weight:800;
+  text-transform:uppercase;
+}
+.progress-dashboard-performance .text-performance-table tr.is-current-text td { background:#fbfdff; }
+
+.progress-dashboard-performance .performance-coach,
+.progress-dashboard-performance .secondary-progress-section,
+.progress-dashboard-performance > details.analytics-card {
+  margin-top:0;
+  border-radius:18px;
+  border-color:#d9e4ee;
+}
+.progress-dashboard-performance .progress-collapsible > summary {
+  padding:15px 17px;
+}
+.progress-dashboard-performance .progress-collapsible > .progress-collapsible-body {
+  padding:0 17px 17px;
+}
+
+@media (max-width:1100px) {
+  .progress-dashboard-performance .performance-kpi-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .progress-dashboard-performance .performance-year-grid { grid-template-columns:1fr; }
+  .progress-dashboard-performance .performance-goals-strip { grid-template-columns:1fr; }
+  .progress-dashboard-performance .current-text-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media (max-width:760px) {
+  .progress-dashboard-performance .performance-dashboard-header,
+  .progress-dashboard-performance .performance-chart-heading,
+  .progress-dashboard-performance .performance-section-heading { flex-direction:column;align-items:stretch; }
+  .progress-dashboard-performance .performance-kpi-grid,
+  .progress-dashboard-performance .current-text-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .progress-dashboard-performance .performance-goal-controls { grid-template-columns:1fr 1fr; }
+  .progress-dashboard-performance .performance-goal-controls button { grid-column:1/-1; }
+  .progress-dashboard-performance .performance-chart-stat { align-self:flex-start;text-align:left; }
+}
+@media (max-width:520px) {
+  .progress-dashboard-performance { padding:12px !important; }
+  .progress-dashboard-performance .performance-kpi-grid,
+  .progress-dashboard-performance .current-text-kpis,
+  .progress-dashboard-performance .performance-goal-controls { grid-template-columns:1fr; }
+  .progress-dashboard-performance .yearly-performance-chart { min-height:190px; }
+}
