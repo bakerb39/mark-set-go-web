@@ -4220,7 +4220,7 @@ app.post('/api/read-anything/transform', async (req, res) => {
   if (text.length > 120000) return res.status(413).json({ error: 'This document is too long to transform in one request. Try a chapter or shorter selection.' });
   const model = process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 105000);
+  const timeout = setTimeout(() => controller.abort(), 135000);
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST', signal: controller.signal,
