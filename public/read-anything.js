@@ -242,8 +242,89 @@
     return paragraphs.join('\n\n');
   }
 
+
+  function isStrongDocumentHeading(line, previousBlank = true, nextBlank = true) {
+    const value = String(line || '').replace(/\s+/g, ' ').trim();
+    if (!value || value.length > 120) return false;
+
+    // Explicit structural labels are strong enough on their own.
+    if (/^(?:chapter|chap\.?|book|part|section|article|canto|act|scene|letter)\s+(?:\d{1,3}|[ivxlcdm]+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty(?:[- ](?:one|two|three|four|five|six|seven|eight|nine))?|thirty(?:[- ](?:one|two|three|four|five|six|seven|eight|nine))?)\b/i.test(value)) {
+      return true;
+    }
+    if (/^(?:prologue|epilogue|introduction|preface|foreword|afterword|conclusion|appendix)(?:\b|$)/i.test(value)) {
+      return true;
+    }
+
+    // All-caps text is only a heading when it is actually isolated as a block.
+    // This prevents wrapped prose lines from becoming false chapter headings.
+    const words = value.split(/\s+/).filter(Boolean);
+    const allCaps = /^[A-Z0-9][A-Z0-9 ’'“”"—–:,&().-]{2,119}$/.test(value)
+      && /[A-Z]/.test(value)
+      && words.length <= 10
+      && !/[.!?]["'’”)]?$/.test(value);
+    return Boolean(previousBlank && nextBlank && allCaps);
+  }
+
+  function repairFalseProseLineBreaks(value) {
+    const source = String(value || '').replace(/\r/g, '');
+    if (!source.trim()) return source;
+
+    const structure = detectDocumentStructure(source);
+    // These formats use line breaks semantically; do not flatten them.
+    if (['poetry', 'table_of_contents', 'bibliography'].includes(structure.type)) return source;
+
+    const lines = source.split('\n').map((line) => line.replace(/[ \t]+/g, ' ').trim());
+    const output = [];
+
+    const nextNonBlankIndex = (from) => {
+      for (let i = from; i < lines.length; i += 1) {
+        if (lines[i]) return i;
+      }
+      return -1;
+    };
+
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i];
+      if (!line) {
+        if (output.length && output[output.length - 1] !== '') output.push('');
+        continue;
+      }
+
+      const nextIndex = nextNonBlankIndex(i + 1);
+      const next = nextIndex >= 0 ? lines[nextIndex] : '';
+      const previousBlank = i === 0 || !lines[i - 1];
+      const nextBlank = i === lines.length - 1 || !lines[i + 1];
+      const thisHeading = isStrongDocumentHeading(line, previousBlank, nextBlank);
+      const nextPreviousBlank = nextIndex <= 0 || !lines[nextIndex - 1];
+      const nextNextBlank = nextIndex < 0 || nextIndex === lines.length - 1 || !lines[nextIndex + 1];
+      const nextHeading = next ? isStrongDocumentHeading(next, nextPreviousBlank, nextNextBlank) : false;
+      const thisList = /^(?:[•▪◦*-]\s+|\d+[.)]\s+)/.test(line);
+      const nextList = /^(?:[•▪◦*-]\s+|\d+[.)]\s+)/.test(next);
+
+      output.push(line);
+      if (!next || thisHeading || nextHeading || thisList || nextList) continue;
+      if (nextIndex !== i + 1) continue; // a real blank paragraph boundary exists
+
+      const current = output[output.length - 1];
+      const likelyContinuation =
+        /[,;:—–-]$/.test(current) ||
+        !/[.!?]["'’”)]?$/.test(current) ||
+        /^[a-zà-öø-ÿ]/u.test(next) ||
+        /^(?:and|or|but|nor|for|so|yet|that|which|who|whom|whose|where|when|while|because|although|though|if|unless|until|as|of|to|in|on|at|by|with|from|into|upon|through|than|then)\b/i.test(next);
+
+      if (likelyContinuation) {
+        output[output.length - 1] = `${current} ${next}`.replace(/\s+/g, ' ').trim();
+        i = nextIndex;
+      }
+    }
+
+    return output.join('\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   function cleanFormatText(value) {
-    const lines = String(value || '')
+    const lines = repairFalseProseLineBreaks(value)
       .replace(/\r/g, '')
       .replace(/[ \t]+\n/g, '\n')
       .split('\n')
@@ -256,13 +337,15 @@
       if (joined) output.push(paragraphizeLongText(joined));
       paragraph = [];
     };
-    for (const line of lines) {
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+      const line = lines[lineIndex];
       if (!line) {
         flush();
         continue;
       }
-      const isHeading = /^(chapter|part|section|article|book)\s+[\divxlcdm]+\b/i.test(line)
-        || (/^[A-Z0-9][A-Z0-9 ’'“”"—–:-]{3,90}$/.test(line) && line.split(/\s+/).length < 12);
+      const previousBlank = lineIndex === 0 || !lines[lineIndex - 1];
+      const nextBlank = lineIndex === lines.length - 1 || !lines[lineIndex + 1];
+      const isHeading = isStrongDocumentHeading(line, previousBlank, nextBlank);
       const isList = /^[•▪◦*-]\s+/.test(line) || /^\d+[.)]\s+/.test(line);
       const isShortQuote = /^[“"].*[”"]$/.test(line) && line.length < 420;
       if (isHeading || isList || isShortQuote) {
@@ -635,6 +718,7 @@
         kept.push(line);
       });
       text = kept.join('\n');
+      text = repairFalseProseLineBreaks(text);
     }
 
     // Common scan/encoding noise that can be corrected without changing meaning.
@@ -667,7 +751,11 @@
   }
 
   async function requestAiCleanupText(value, title = 'Untitled', level = 'deep') {
-    const sourceText = String(value || '').replace(/\r/g, '').trim();
+    const rawSourceText = String(value || '').replace(/\r/g, '').trim();
+    const rawStructure = detectDocumentStructure(rawSourceText);
+    const sourceText = ['poetry', 'table_of_contents', 'bibliography'].includes(rawStructure.type)
+      ? rawSourceText
+      : repairFalseProseLineBreaks(rawSourceText);
     if (sourceText.length < 20) throw new Error('There is not enough text to format.');
     if (sourceText.length > 120000) throw new Error('This AI cleanup segment is too large. The full-document formatter should split long documents automatically.');
     const structure = detectDocumentStructure(sourceText);
@@ -686,8 +774,14 @@ ${structureGuidance}
 
 Do NOT summarize, paraphrase, simplify, modernize, censor, or rewrite the author's prose. Preserve every meaningful sentence, quotation, name, date, number, footnote marker, and intentional wording unless it is clearly scan/OCR corruption.
 
-Repair only what is justified by the text and surrounding context:
+Repair only what is justified by the text and surrounding context.
+IMPORTANT ORDER OF OPERATIONS: reconstruct ordinary prose paragraphs FIRST, then identify headings. A PDF line break is not a paragraph or heading boundary by itself.
+
 - fix obvious OCR character substitutions, garbled characters, and scan noise;
+- join false hard line breaks created by PDF/page extraction when two adjacent lines are clearly one continuing prose sentence or paragraph;
+- if a line ends without sentence-ending punctuation and the following line continues the grammar/sentence, join them with one space;
+- do not promote a short or isolated continuation line to a chapter/section heading merely because it appears on its own line;
+- treat a heading as structural only when there is strong evidence: an explicit Chapter/Book/Part/Section label, a known front-matter label, or clear title-like isolation supported by surrounding blank lines;
 - repair words broken across scanned page/line boundaries and obvious spacing errors;
 - remove running page headers, repeated book/author titles, page numbers, footer fragments, and other recurring scan artifacts when they are not part of the prose;
 - reconstruct damaged chapter, book, part, and section headings when the intended heading is reasonably clear;
@@ -714,8 +808,11 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       // Finish with only safe character/spacing normalization; do not run structural regex cleanup over AI output.
       const finalPass = cleanupTextContent(payload.text, 'light');
       const finalStructure = detectDocumentStructure(finalPass.text);
+      const finalText = ['poetry', 'table_of_contents', 'bibliography'].includes(finalStructure.type)
+        ? finalPass.text
+        : repairFalseProseLineBreaks(finalPass.text);
       return {
-        text: finalPass.text,
+        text: finalText,
         report: {
           ...finalPass.report,
           level: 'deep',
@@ -941,9 +1038,11 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     const out = [];
     for (const block of blocks) {
       const lines = block.split('\n').map(x => x.trim()).filter(Boolean);
-      for (const line of lines) {
-        const heading = /^(chapter|part|section|article|book|act|scene|letter)\s+[\divxlcdm]+\b/i.test(line)
-          || (/^[A-Z0-9][A-Z0-9 ’'“”"—–:,-]{3,90}$/.test(line) && line.split(/\s+/).length <= 12);
+      for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+        const line = lines[lineIndex];
+        const previousBlank = lineIndex === 0;
+        const nextBlank = lineIndex === lines.length - 1;
+        const heading = isStrongDocumentHeading(line, previousBlank, nextBlank);
         const list = /^[•▪◦*-]\s+/.test(line) || /^\d+[.)]\s+/.test(line);
         if ((mode === 'sections' || mode === 'all') && (heading || list)) { out.push(line); continue; }
         if (mode === 'sections') { out.push(line); continue; }
