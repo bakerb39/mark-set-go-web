@@ -3235,11 +3235,11 @@ function normalizedChunkWord(word) {
 }
 
 function modeSupportsMeaningfulChunks(mode) {
-  return ['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
+  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
 }
 
 function modeSupportsBookPages(mode) {
-  return ['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee'].includes(mode);
+  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee'].includes(mode);
 }
 
 function chooseMeaningfulChunkEnd(startIndex, maximumEnd) {
@@ -3459,7 +3459,7 @@ function renderFocusAnchorPhrase(element, words) {
 }
 
 function modeSupportsFocusAnchorOverlay(mode) {
-  return ['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
+  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
 }
 
 function refreshFocusAnchorStyle() {
@@ -6401,6 +6401,7 @@ function renderProgressDashboard() {
   const modeCounts = activity.reduce((map,item)=>{
     const label=({
       highlight:'Highlight',
+      manual:'Manual Pace',
       'pointing-guide':'Pointing Guide',
       'bold-focus':'Bold Focus',
       flash:'Flash',
@@ -11072,6 +11073,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <option value="bold-focus">Bold Focus</option>
                 <option value="smooth-glide">Smooth Glide</option>
                 <option value="pointing-guide">Pointing Guide</option>
+                <option value="manual">Manual Pace</option>
                 <option value="marquee">Marquee</option>
                 <option value="flash">Flash</option>
                 <option value="digital-sign">Digital Sign</option>
@@ -11435,7 +11437,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   };
   
 document.addEventListener('keydown', (event) => {
-  const mode = String(state.mode || state.readerMode || '').toLowerCase();
+  const mode = String(
+    app.querySelector('#mode-select')?.value
+    || state.renderedMode
+    || ''
+  ).toLowerCase();
   if (mode !== 'manual') return;
 
   const target = event.target;
@@ -13959,6 +13965,14 @@ function switchReadingMode(nextMode) {
     prepareReaderView(mode, groupSize);
     updateModeControls(mode);
     restoreCapturedReaderLocation(snapshot, { rerendered: true });
+    if (mode === 'manual') {
+      state.index = Math.max(0, Math.min(state.words.length - 1, snapshot.anchorIndex || state.index || 0));
+      resetManualPaceSession();
+      ensureManualPaceSession();
+      renderManualPaceHighlight(reader);
+    } else if (state.manualPace?.active) {
+      state.manualPace.active = false;
+    }
   });
 }
 
@@ -14014,7 +14028,7 @@ function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-cou
     return;
   }
 
-  if (mode === 'highlight') reader.classList.add('highlight-mode');
+  if (mode === 'highlight' || mode === 'manual') reader.classList.add('highlight-mode');
   else if (mode === 'bold-focus') reader.classList.add('bold-focus-mode');
   else if (mode === 'smooth-glide') reader.classList.add('smooth-glide-mode');
   else if (mode === 'pointing-guide') reader.classList.add('pointing-guide-mode', 'reading-guide-enabled');
