@@ -728,7 +728,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     } catch (error) {
       if (error?.name === 'AbortError') throw new Error('AI Deep Clean took too long. Try a shorter chapter or use Standard cleanup.');
       throw new Error(error?.message === 'Failed to fetch'
-        ? 'The AI formatter connection was interrupted.'
+        ? 'The AI formatter connection was interrupted. Try again.'
         : error?.message || 'AI Deep Clean could not be completed.');
     } finally {
       window.clearTimeout(timeout);
@@ -789,7 +789,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   async function requestAiCleanupDocument(value, title = 'Untitled', onProgress = null) {
-    const chunks = splitTextForDeepCleanup(value, 25000);
+    const chunks = splitTextForDeepCleanup(value, 70000);
     if (!chunks.length) throw new Error('There is not enough text to format.');
     if (chunks.length === 1) return requestAiCleanupText(chunks[0], title, 'deep');
 
@@ -808,42 +808,11 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           percent: Math.round((index / chunks.length) * 100)
         });
       }
-      let result = null;
-      let lastError = null;
-      const maxAttempts = 3;
-
-      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-        try {
-          if (attempt > 1 && typeof onProgress === 'function') {
-            onProgress({
-              chunk: index + 1,
-              totalChunks: chunks.length,
-              percent: Math.round((index / chunks.length) * 100),
-              retry: attempt - 1,
-              message: `Retrying section ${index + 1} of ${chunks.length}…`
-            });
-          }
-
-          result = await requestAiCleanupText(
-            chunks[index],
-            `${title} — section ${index + 1} of ${chunks.length}`,
-            'deep'
-          );
-          lastError = null;
-          break;
-        } catch (error) {
-          lastError = error;
-          const message = String(error?.message || '');
-          const retryable = /interrupted|too long|timeout|timed out|HTTP 429|HTTP 500|HTTP 502|HTTP 503|HTTP 504|network|fetch/i.test(message);
-          if (!retryable || attempt >= maxAttempts) break;
-          await new Promise((resolve) => window.setTimeout(resolve, 1200 * attempt));
-        }
-      }
-
-      if (!result) {
-        throw lastError || new Error(`AI Deep Clean could not process section ${index + 1} of ${chunks.length}.`);
-      }
-
+      const result = await requestAiCleanupText(
+        chunks[index],
+        `${title} — section ${index + 1} of ${chunks.length}`,
+        'deep'
+      );
       cleanedChunks.push(String(result.text || '').trim());
       const report = result.report || {};
       ['badCharacters','pageArtifacts','repeatedHeaders','brokenWords','spacingFixes'].forEach((key) => {
@@ -1175,6 +1144,11 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     const lower = file.name.toLowerCase();
     if (lower.endsWith('.docx')) return importDocx(file);
     if (lower.endsWith('.epub') || lower.endsWith('.pdf') || /\.(mobi|azw3?|prc)$/i.test(lower)) {
+      // Carry the already-selected File into the legacy importer. Previously
+      // Read Anything navigated to Import and opened a second file picker,
+      // forcing the user to select the same document twice.
+      window.__markSetGoPendingUploadFile = file;
+
       allowLegacyUpload = true;
       const legacy = document.createElement('button');
       legacy.type = 'button';
@@ -1184,7 +1158,6 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       legacy.click();
       legacy.remove();
       allowLegacyUpload = false;
-      window.setTimeout(() => document.getElementById('text-file')?.click(), 50);
       return;
     }
     const raw = await file.text();

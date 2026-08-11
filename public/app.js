@@ -16708,13 +16708,12 @@ function renderUpload() {
           <span><strong>TXT</strong><small>Plain text</small></span>
         </div>
 
-        <button id="choose-import-file" class="import-drop-zone compact import-file-button" type="button">
+        <label class="import-drop-zone compact" for="text-file">
           <span class="import-upload-icon">⇧</span>
           <span><strong>Choose a file</strong><small>EPUB, MOBI, AZW/AZW3, PDF, or TXT</small></span>
-        </button>
-        <input id="text-file" type="file"
-          accept=".epub,application/epub+zip,.mobi,.azw,.azw3,.prc,application/x-mobipocket-ebook,.pdf,application/pdf,.txt,text/plain"
-          hidden>
+          <input id="text-file" type="file"
+            accept=".epub,application/epub+zip,.mobi,.azw,.azw3,.prc,application/x-mobipocket-ebook,.pdf,application/pdf,.txt,text/plain">
+        </label>
       </div>
 
       <div id="pdf-import-progress" class="pdf-import-progress" hidden>
@@ -16738,19 +16737,17 @@ function renderUpload() {
     </section>`;
 
   const uploadInput = app.querySelector('#text-file');
-  const chooseFileButton = app.querySelector('#choose-import-file');
   let importInFlight = false;
 
-  // Warm PDF.js in the background. The selected File is no longer dependent
-  // on the native input's change event in Chromium browsers.
-  loadPdfJs().catch(() => {});
+  // Warm PDF.js as soon as the Import page opens so the first file selection
+  // does not also have to initialize the PDF engine.
+  loadPdfJs().catch(() => { /* surfaced normally if/when a PDF is selected */ });
 
-  const setImportBusy = (busy) => {
-    importInFlight = Boolean(busy);
-    if (chooseFileButton) chooseFileButton.disabled = importInFlight;
-  };
+  uploadInput?.addEventListener('click', (event) => {
+    if (!importInFlight) event.currentTarget.value = '';
+  });
 
-  const processImportedFile = async (file) => {
+  const processUploadFile = async (file, input = uploadInput) => {
     if (!file || importInFlight) return;
 
     const status = app.querySelector('#upload-status');
@@ -16760,7 +16757,6 @@ function renderUpload() {
     const progressBar = app.querySelector('#pdf-progress-bar');
 
     const setProgress = (percent, label) => {
-      if (!progress || !progressBar || !progressPercent || !progressLabel) return;
       progress.hidden = false;
       const value = Math.max(0, Math.min(100, Number(percent) || 0));
       progressBar.style.width = `${value}%`;
@@ -16768,11 +16764,9 @@ function renderUpload() {
       progressLabel.textContent = label || 'Processing PDF…';
     };
 
-    setImportBusy(true);
-    if (status) {
-      status.className = 'status import-status';
-      status.textContent = `Selected ${file.name}. Preparing import…`;
-    }
+    importInFlight = true;
+    status.className = 'status import-status';
+    status.textContent = `Selected ${file.name}. Preparing import…`;
 
     try {
       const isEpub = /\.epub$/i.test(file.name) || file.type === 'application/epub+zip';
@@ -16780,17 +16774,19 @@ function renderUpload() {
       const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
 
       if (isEpub) {
-        if (progress) progress.hidden = true;
-        if (status) status.textContent = 'Opening EPUB…';
+        progress.hidden = true;
+        status.textContent = 'Opening EPUB…';
         const book = await parseEpubFile(file);
         renderReaderWithText(book.title, book.text, book.source);
         return;
       }
 
       if (isKindle) {
-        if (progress) progress.hidden = true;
-        if (status) status.textContent = 'Opening DRM-free Kindle eBook…';
+        progress.hidden = true;
+        status.textContent = 'Opening DRM-free Kindle eBook…';
         const book = await parseKindleEbookFile(file);
+        status.className = 'status success import-status';
+        status.textContent = `${book.stats.format} text extracted. Opening ${book.title}…`;
         renderReaderWithText(book.title, book.text, book.source);
         return;
       }
@@ -16798,12 +16794,14 @@ function renderUpload() {
       if (isPdf) {
         setProgress(1, `Opening ${file.name}…`);
         const book = await parsePdfFile(file, setProgress);
+        status.className = 'status success import-status';
+        status.textContent = `${book.stats.pageCount} pages / ${book.stats.textPages} text pages / ${book.stats.extractedCharacters.toLocaleString()} characters extracted. Opening ${book.title}…`;
         renderReaderWithText(book.title, book.text, book.source);
         return;
       }
 
-      if (progress) progress.hidden = true;
-      if (status) status.textContent = 'Opening text file…';
+      progress.hidden = true;
+      status.textContent = 'Opening text file…';
       const rawText = await file.text();
       if (!rawText.trim()) throw new Error('This text file is empty.');
       const importedTitle = file.name.replace(/\.txt$/i, '');
@@ -16818,69 +16816,28 @@ function renderUpload() {
       });
     } catch (error) {
       console.error('Book import failed.', error);
-      if (progress) progress.hidden = true;
-      if (status) {
-        status.className = 'status error import-status';
-        status.textContent = error?.message || 'The file could not be read.';
-      }
+      progress.hidden = true;
+      status.className = 'status error import-status';
+      status.textContent = error?.message || 'The file could not be read.';
     } finally {
-      setImportBusy(false);
-      if (uploadInput) {
-        try { uploadInput.value = ''; } catch {}
-      }
+      importInFlight = false;
+      try { input.value = ''; } catch {}
     }
-  };
-
-  chooseFileButton?.addEventListener('click', async (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    if (importInFlight) return;
-
-    // Chrome/Edge path: get the File directly from the browser picker. This
-    // completely bypasses the input/change lifecycle that was swallowing the
-    // first selection in the SPA.
-    if (typeof window.showOpenFilePicker === 'function') {
-      try {
-        const handles = await window.showOpenFilePicker({
-          multiple: false,
-          types: [{
-            description: 'Books and documents',
-            accept: {
-              'application/pdf': ['.pdf'],
-              'application/epub+zip': ['.epub'],
-              'text/plain': ['.txt'],
-              'application/octet-stream': ['.mobi', '.azw', '.azw3', '.prc']
-            }
-          }]
-        });
-        const handle = handles?.[0];
-        if (!handle) return;
-        const file = await handle.getFile();
-        await processImportedFile(file);
-      } catch (error) {
-        if (error?.name !== 'AbortError') {
-          console.warn('Native file picker failed; falling back to file input.', error);
-          if (uploadInput) {
-            uploadInput.value = '';
-            uploadInput.click();
-          }
-        }
-      }
-      return;
-    }
-
-    // Safari/Firefox fallback.
-    if (uploadInput) {
-      uploadInput.value = '';
-      uploadInput.click();
-    }
-  });
+    };
 
   uploadInput?.addEventListener('change', async (event) => {
-    const file = event.currentTarget.files?.[0];
-    if (!file) return;
-    await processImportedFile(file);
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    await processUploadFile(file, input);
   });
+
+  // Read Anything may arrive here with a File that was already selected on
+  // the previous page. Consume it once instead of asking the user to choose it again.
+  const pendingUploadFile = window.__markSetGoPendingUploadFile;
+  if (pendingUploadFile instanceof File) {
+    window.__markSetGoPendingUploadFile = null;
+    queueMicrotask(() => processUploadFile(pendingUploadFile, uploadInput));
+  }
 }
 
 
