@@ -11563,8 +11563,8 @@ function renderFullscreenMarkFormat() {
       </div>
       <fieldset class="fullscreen-format-scope">
         <legend>Apply to</legend>
-        <label><input type="radio" name="fs-format-scope" value="document" ${hasSelection ? '' : 'checked'}> Entire document</label>
-        <label><input type="radio" name="fs-format-scope" value="selection" ${hasSelection ? 'checked' : ''}> Highlighted passage</label>
+        <label><input type="radio" name="fs-format-scope" value="document" checked> Entire document</label>
+        <label><input type="radio" name="fs-format-scope" value="selection" ${hasSelection ? '' : 'disabled'}> Highlighted passage</label>
       </fieldset>
       <div class="fullscreen-format-actions">
         <button class="primary" type="button" data-fs-format-apply>Format Text</button>
@@ -11592,8 +11592,15 @@ function renderFullscreenMarkFormat() {
       if (scope === 'selection' && !selected) throw new Error('Highlight a passage first, or choose Entire document.');
       if (scope === 'document' && !api.hasActiveDocument?.()) throw new Error('The current Reader text could not be accessed.');
 
-      if (status) status.textContent = level === 'deep' ? 'AI Deep Clean is reviewing the text…' : 'Formatting text…';
-      await api.applyCleanup(level, scope, selected, selectionRange);
+      if (status) status.textContent = level === 'deep'
+        ? (scope === 'document' ? 'AI Deep Clean is preparing the entire document…' : 'AI Deep Clean is reviewing the highlighted passage…')
+        : 'Formatting text…';
+      await api.applyCleanup(level, scope, selected, selectionRange, (progress) => {
+        if (!status || !progress) return;
+        if (progress.totalChunks > 1) {
+          status.textContent = `AI Deep Clean: section ${progress.chunk} of ${progress.totalChunks} (${progress.percent}%)…`;
+        }
+      });
       if (status) status.textContent = 'Formatting complete.';
     } catch (error) {
       if (status) status.textContent = error?.message || 'Formatting could not be completed.';
@@ -16790,10 +16797,19 @@ async function parsePdfFile(file, onProgress = () => {}) {
   // page, that page's text is part of the document. Do not let later TOC cleanup
   // remove a large range from a long book. Kindle-to-PDF style exports can carry
   // a visible printed contents page while their embedded PDF outline is partial.
-  const rawPdfText = pages
-    .map((page) => `\n\n[PDF Page ${page.pageNumber}]\n\n${page.text}`)
-    .join('')
-    .trim();
+  // Keep PDF page boundaries as metadata, not visible reader text.
+  // Older builds inserted [PDF Page N] strings into the book itself, which
+  // polluted the reading experience and formatter input.
+  const pageWordStarts = new Map();
+  let runningWordIndex = 0;
+  const rawPdfTextParts = [];
+  pages.forEach((page) => {
+    pageWordStarts.set(page.pageNumber, runningWordIndex);
+    const pageText = String(page.text || '').trim();
+    rawPdfTextParts.push(pageText);
+    runningWordIndex += splitWords(pageText).length;
+  });
+  const rawPdfText = rawPdfTextParts.filter(Boolean).join('\n\n').trim();
 
   // Keep the printed TOC in the PDF reading text for import reliability. It can
   // still be represented in the Contents pane, but it must never be allowed to
@@ -16819,12 +16835,11 @@ async function parsePdfFile(file, onProgress = () => {}) {
   }
 
   const pdfDocumentToc = toc.map((item) => {
-    const marker = item.pageNumber ? `[PDF Page ${item.pageNumber}]` : '';
-    const position = marker ? text.indexOf(marker) : -1;
-    if (position < 0) return null;
+    const pageWordIndex = item.pageNumber ? pageWordStarts.get(item.pageNumber) : null;
+    if (!Number.isFinite(pageWordIndex)) return null;
     const cleanTitle = String(item.title || '').replace(/\s+/g, ' ').trim();
     if (!cleanTitle || /kindletopdf\.com/i.test(cleanTitle)) return null;
-    return { title:cleanTitle, index:splitWords(text.slice(0, position)).length, type:'chapter', pageNumber:item.pageNumber };
+    return { title:cleanTitle, index:pageWordIndex, type:'chapter', pageNumber:item.pageNumber };
   }).filter(Boolean);
 
   // A partial embedded outline must not override a much richer TOC detected
@@ -16858,7 +16873,12 @@ async function parsePdfFile(file, onProgress = () => {}) {
       pageCount: pdf.numPages,
       importedAt: new Date().toISOString(),
       toc,
-      pages: pages.map(({ pageNumber, width, height }) => ({ pageNumber, width, height })),
+      pages: pages.map(({ pageNumber, width, height }) => ({
+        pageNumber,
+        width,
+        height,
+        wordIndex: pageWordStarts.get(pageNumber) || 0
+      })),
       textCoverage,
       cleanup: normalizedPdf.report,
       documentToc
@@ -16912,7 +16932,7 @@ function renderUpload() {
 
       <details class="pdf-import-note compact-note">
         <summary>PDF import details</summary>
-        <p>Modern PDFs with selectable text work best. Page labels such as <em>PDF Page 12</em> are inserted into the extracted text so notes, AI questions, and reading progress retain a connection to the source pages. Image-only scans are not silently imported as blank documents.</p>
+        <p>Modern PDFs with selectable text work best. PDF page positions are retained as hidden document metadata so notes, navigation, and reading progress can stay connected to the source without placing page-marker text inside the book. Image-only scans are not silently imported as blank documents.</p>
       </details>
       <details class="pdf-import-note compact-note">
         <summary>Kindle-format import details</summary>
@@ -16920,16 +16940,27 @@ function renderUpload() {
       </details>
     </section>`;
 
-  app.querySelector('#text-file').addEventListener('change', async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const uploadInput = app.querySelector('#text-file');
+  let importInFlight = false;
+
+  // Warm PDF.js as soon as the Import page opens so the first file selection
+  // does not also have to initialize the PDF engine.
+  loadPdfJs().catch(() => { /* surfaced normally if/when a PDF is selected */ });
+
+  uploadInput?.addEventListener('click', (event) => {
+    if (!importInFlight) event.currentTarget.value = '';
+  });
+
+  uploadInput?.addEventListener('change', async (event) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    if (!file || importInFlight) return;
 
     const status = app.querySelector('#upload-status');
     const progress = app.querySelector('#pdf-import-progress');
     const progressLabel = app.querySelector('#pdf-progress-label');
     const progressPercent = app.querySelector('#pdf-progress-percent');
     const progressBar = app.querySelector('#pdf-progress-bar');
-    const input = event.currentTarget;
 
     const setProgress = (percent, label) => {
       progress.hidden = false;
@@ -16939,9 +16970,9 @@ function renderUpload() {
       progressLabel.textContent = label || 'Processing PDF…';
     };
 
-    input.disabled = true;
+    importInFlight = true;
     status.className = 'status import-status';
-    status.textContent = '';
+    status.textContent = `Selected ${file.name}. Preparing import…`;
 
     try {
       const isEpub = /\.epub$/i.test(file.name) || file.type === 'application/epub+zip';
@@ -16962,16 +16993,16 @@ function renderUpload() {
         const book = await parseKindleEbookFile(file);
         status.className = 'status success import-status';
         status.textContent = `${book.stats.format} text extracted. Opening ${book.title}…`;
-        window.setTimeout(() => renderReaderWithText(book.title, book.text, book.source), 180);
+        renderReaderWithText(book.title, book.text, book.source);
         return;
       }
 
       if (isPdf) {
-        setProgress(1, 'Loading PDF support…');
+        setProgress(1, `Opening ${file.name}…`);
         const book = await parsePdfFile(file, setProgress);
         status.className = 'status success import-status';
-        status.textContent = `${book.stats.pageCount} pages extracted. Opening ${book.title}…`;
-        window.setTimeout(() => renderReaderWithText(book.title, book.text, book.source), 250);
+        status.textContent = `${book.stats.pageCount} pages / ${book.stats.textPages} text pages / ${book.stats.extractedCharacters.toLocaleString()} characters extracted. Opening ${book.title}…`;
+        renderReaderWithText(book.title, book.text, book.source);
         return;
       }
 
@@ -16994,8 +17025,9 @@ function renderUpload() {
       progress.hidden = true;
       status.className = 'status error import-status';
       status.textContent = error?.message || 'The file could not be read.';
-      input.disabled = false;
-      input.value = '';
+    } finally {
+      importInFlight = false;
+      try { input.value = ''; } catch {}
     }
   });
 }

@@ -669,7 +669,7 @@
   async function requestAiCleanupText(value, title = 'Untitled', level = 'deep') {
     const sourceText = String(value || '').replace(/\r/g, '').trim();
     if (sourceText.length < 20) throw new Error('There is not enough text to format.');
-    if (sourceText.length > 120000) throw new Error('AI Deep Clean currently supports up to 120,000 characters at a time. Format a chapter or shorter section, or use Standard for the full document.');
+    if (sourceText.length > 120000) throw new Error('This AI cleanup segment is too large. The full-document formatter should split long documents automatically.');
     const structure = detectDocumentStructure(sourceText);
     const structureGuidance = {
       table_of_contents: `The passage appears to be a TABLE OF CONTENTS. Treat each Introduction/Book/Chapter/Part/Section entry as a distinct structural item. Put each entry on its own line or block, preserve the original labels and titles, preserve their order, and do not merge the entries into prose. Do not invent page numbers or titles.`,
@@ -735,7 +735,102 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     }
   }
 
-  async function applyCleanup(level = 'standard', scope = 'document', selectedText = '', selectionRange = null) {
+  function splitTextForDeepCleanup(value, maximumCharacters = 70000) {
+    const text = String(value || '').replace(/\r/g, '').trim();
+    if (!text) return [];
+    if (text.length <= maximumCharacters) return [text];
+
+    // Prefer paragraph and section boundaries. Never intentionally drop text.
+    const blocks = text.split(/\n{2,}/).map((block) => block.trim()).filter(Boolean);
+    const chunks = [];
+    let current = '';
+
+    const pushCurrent = () => {
+      if (current.trim()) chunks.push(current.trim());
+      current = '';
+    };
+
+    const splitOversizedBlock = (block) => {
+      let remaining = block;
+      while (remaining.length > maximumCharacters) {
+        let cut = maximumCharacters;
+        const floor = Math.floor(maximumCharacters * 0.65);
+        const candidates = [
+          remaining.lastIndexOf('\n', maximumCharacters),
+          remaining.lastIndexOf('. ', maximumCharacters),
+          remaining.lastIndexOf('? ', maximumCharacters),
+          remaining.lastIndexOf('! ', maximumCharacters),
+          remaining.lastIndexOf('; ', maximumCharacters),
+          remaining.lastIndexOf(' ', maximumCharacters)
+        ].filter((position) => position >= floor);
+        if (candidates.length) cut = Math.max(...candidates) + 1;
+        chunks.push(remaining.slice(0, cut).trim());
+        remaining = remaining.slice(cut).trim();
+      }
+      if (remaining) current = remaining;
+    };
+
+    for (const block of blocks) {
+      if (block.length > maximumCharacters) {
+        pushCurrent();
+        splitOversizedBlock(block);
+        continue;
+      }
+      const candidate = current ? `${current}\n\n${block}` : block;
+      if (candidate.length > maximumCharacters) {
+        pushCurrent();
+        current = block;
+      } else {
+        current = candidate;
+      }
+    }
+    pushCurrent();
+    return chunks;
+  }
+
+  async function requestAiCleanupDocument(value, title = 'Untitled', onProgress = null) {
+    const chunks = splitTextForDeepCleanup(value, 70000);
+    if (!chunks.length) throw new Error('There is not enough text to format.');
+    if (chunks.length === 1) return requestAiCleanupText(chunks[0], title, 'deep');
+
+    const cleanedChunks = [];
+    const aggregate = {
+      level: 'deep', ai: true, chunked: true, chunks: chunks.length,
+      badCharacters: 0, pageArtifacts: 0, repeatedHeaders: 0,
+      brokenWords: 0, spacingFixes: 0
+    };
+
+    for (let index = 0; index < chunks.length; index += 1) {
+      if (typeof onProgress === 'function') {
+        onProgress({
+          chunk: index + 1,
+          totalChunks: chunks.length,
+          percent: Math.round((index / chunks.length) * 100)
+        });
+      }
+      const result = await requestAiCleanupText(
+        chunks[index],
+        `${title} — section ${index + 1} of ${chunks.length}`,
+        'deep'
+      );
+      cleanedChunks.push(String(result.text || '').trim());
+      const report = result.report || {};
+      ['badCharacters','pageArtifacts','repeatedHeaders','brokenWords','spacingFixes'].forEach((key) => {
+        aggregate[key] += Number(report[key]) || 0;
+      });
+    }
+
+    if (typeof onProgress === 'function') {
+      onProgress({ chunk: chunks.length, totalChunks: chunks.length, percent: 100 });
+    }
+
+    return {
+      text: cleanedChunks.filter(Boolean).join('\n\n'),
+      report: aggregate
+    };
+  }
+
+  async function applyCleanup(level = 'standard', scope = 'document', selectedText = '', selectionRange = null, onProgress = null) {
     // The live Reader is the source of truth at action time.
     ensureActiveReaderDocument();
 
@@ -808,7 +903,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       }
     } else {
       result = level === 'deep'
-        ? await requestAiCleanupText(original, activeImportedDocument.title || 'Untitled', level)
+        ? await requestAiCleanupDocument(original, activeImportedDocument.title || 'Untitled', onProgress)
         : cleanupTextContent(original, level);
     }
 
