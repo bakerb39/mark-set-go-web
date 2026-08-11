@@ -3157,7 +3157,8 @@ const CLASSIC_GUIDES = Object.freeze({
   "Voltaire Candide": { id:"classic-voltaire-candide", slug:"voltaire-candide", title:"Candide", author:"Voltaire" },
   "Rousseau Discourse Inequality": { id:"classic-rousseau-discourse-on-inequality", slug:"rousseau-discourse-on-inequality", title:"Discourse on Inequality", author:"Jean-Jacques Rousseau" },
   "Rousseau Social Contract": { id:"classic-rousseau-political-writings-social-contract", slug:"rousseau-political-writings-social-contract", title:"Political Writings including The Social Contract", author:"Jean-Jacques Rousseau" },
-  "Rousseau Social Contract": { id:"classic-rousseau-social-contract", slug:"rousseau-social-contract", title:"The Social Contract", author:"Jean-Jacques Rousseau" }
+  "Rousseau Social Contract": { id:"classic-rousseau-social-contract", slug:"rousseau-social-contract", title:"The Social Contract", author:"Jean-Jacques Rousseau" },
+  "Montesquieu Spirit Laws": { id:"classic-montesquieu-spirit-of-laws", slug:"montesquieu-spirit-of-laws", title:"The Spirit of Laws", author:"Montesquieu" }
 });
 
 function classicGuideForGreatBook(book) {
@@ -17938,6 +17939,58 @@ async function loadBundledModernGuideDocument(source = {}) {
   };
 }
 
+
+function addLibraryDocumentToReadingList(record) {
+  if (!record?.documentId || !String(record.title || '').trim()) return { added:false, reason:'missing' };
+
+  const title = String(record.title || '').trim();
+  const documentId = String(record.documentId || '');
+  const current = getReadingList();
+  const normalizedTitle = title.toLowerCase().replace(/\s+/g, ' ').trim();
+
+  const existing = current.find((item) =>
+    String(item.documentId || '') === documentId
+    || (
+      String(item.title || '').toLowerCase().replace(/\s+/g, ' ').trim() === normalizedTitle
+      && normalizedTitle
+    )
+  );
+
+  if (existing) return { added:false, reason:'exists', item:existing };
+
+  const sourceAuthor = record.source?.author
+    || record.source?.originalAuthor
+    || record.author
+    || '';
+
+  const item = {
+    id:`reading-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    title,
+    author:String(sourceAuthor || '').trim(),
+    status:'want-to-read',
+    note:'',
+    source:record.source || null,
+    documentId,
+    addedAt:new Date().toISOString()
+  };
+
+  saveReadingList([item, ...current]);
+  return { added:true, item };
+}
+
+function libraryDocumentIsOnReadingList(record, readingList = getReadingList()) {
+  if (!record) return false;
+  const documentId = String(record.documentId || '');
+  const normalizedTitle = String(record.title || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return readingList.some((item) =>
+    (documentId && String(item.documentId || '') === documentId)
+    || (
+      normalizedTitle
+      && String(item.title || '').toLowerCase().replace(/\s+/g, ' ').trim() === normalizedTitle
+    )
+  );
+}
+
 function renderMyLibraryHub() {
   finalizeReadingSession();
   stopReader();
@@ -18114,6 +18167,7 @@ function renderMyLibraryHub() {
 
   const continueCards = progress.slice(0, 6).map((item, index) => {
     const difficulty = storedDifficultyForProgress(item);
+    const onReadingList = libraryDocumentIsOnReadingList(item, readingList);
     const percent = item.totalWords
       ? Math.min(100, Math.round((Number(item.furthestWord) || 0) / item.totalWords * 100))
       : 0;
@@ -18132,6 +18186,7 @@ function renderMyLibraryHub() {
         <div class="library-progress-track"><span style="width:${percent}%"></span></div>
         <div class="library-book-actions">
           <button class="${index === 0 ? 'primary' : 'secondary'}" type="button" data-library-document="${escapeHtml(item.documentId)}">Resume reading</button>
+          <button class="secondary library-reading-list-link" type="button" data-library-add-reading="${escapeHtml(item.documentId)}" ${onReadingList ? 'disabled aria-disabled="true"' : ''}>${onReadingList ? '✓ In Reading List' : '＋ Reading List'}</button>
           <button class="secondary library-delete-book" type="button" data-library-delete="${escapeHtml(item.documentId)}" data-library-title="${escapeHtml(item.title || 'Untitled')}" aria-label="Delete ${escapeHtml(item.title || 'book')}">Delete</button>
         </div>
       </div>
@@ -18167,6 +18222,7 @@ function renderMyLibraryHub() {
               <div class="library-progress-track large"><span style="width:${primaryPercent}%"></span></div>
               <div class="focus-actions">
                 <button class="primary" type="button" data-library-document="${escapeHtml(primaryBook.documentId)}">Resume reading</button>
+                <button class="secondary library-reading-list-link" type="button" data-library-add-reading="${escapeHtml(primaryBook.documentId)}" ${libraryDocumentIsOnReadingList(primaryBook, readingList) ? 'disabled aria-disabled="true"' : ''}>${libraryDocumentIsOnReadingList(primaryBook, readingList) ? '✓ In Reading List' : '＋ Reading List'}</button>
                 <button class="secondary" type="button" data-action="reader">Open Reader</button>
                 <button class="secondary library-delete-book" type="button" data-library-delete="${escapeHtml(primaryBook.documentId)}" data-library-title="${escapeHtml(primaryBook.title || 'Untitled')}">Delete</button>
               </div>
@@ -18218,6 +18274,21 @@ function renderMyLibraryHub() {
 
   app.querySelectorAll('[data-library-document]').forEach((button) => {
     button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
+  });
+  app.querySelectorAll('[data-library-add-reading]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const documentId = button.dataset.libraryAddReading;
+      const record = progress.find((item) => String(item.documentId || '') === String(documentId || ''));
+      if (!record) return;
+      const result = addLibraryDocumentToReadingList(record);
+      if (result.added || result.reason === 'exists') {
+        document.querySelectorAll(`[data-library-add-reading="${CSS.escape(documentId)}"]`).forEach((target) => {
+          target.textContent = '✓ In Reading List';
+          target.disabled = true;
+          target.setAttribute('aria-disabled', 'true');
+        });
+      }
+    });
   });
   app.querySelectorAll('[data-library-delete]').forEach((button) => {
     button.addEventListener('click', () => deleteStoredDocument(button.dataset.libraryDelete, button.dataset.libraryTitle || 'this book'));
