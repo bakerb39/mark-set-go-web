@@ -11445,6 +11445,35 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     persistReaderSession();
   };
   
+
+function toggleManualPaceWithSpace() {
+  const session = ensureManualPaceSession();
+
+  if (session.timer) {
+    stopManualPaceMotion({ keepDirection:true });
+    session.paused = true;
+    updateReaderStatus('Manual Pace paused.');
+    return;
+  }
+
+  session.paused = false;
+
+  // Space can resume only while a horizontal arrow is physically held.
+  // Releasing the arrow always wins and stops the cursor.
+  if (session.heldRight || session.heldLeft) {
+    session.direction = session.heldRight ? 1 : -1;
+    scheduleManualPaceMotion();
+    const wpm = manualPaceWpm();
+    updateReaderStatus(
+      wpm > 0
+        ? `Manual Pace resumed ${session.direction > 0 ? 'forward' : 'reverse'} at ${wpm} WPM.`
+        : 'Manual Pace ready, but WPM is 0.'
+    );
+  } else {
+    updateReaderStatus('Manual Pace ready. Hold ← or → to move.');
+  }
+}
+
 if (state.manualPaceKeyHandler) {
   document.removeEventListener('keydown', state.manualPaceKeyHandler, true);
 }
@@ -11459,20 +11488,49 @@ state.manualPaceKeyHandler = (event) => {
   if (target?.closest?.('select') && !modeSelectorTarget) return;
   if (!app.querySelector('#reader')) return;
 
+  if (event.code === 'Space' && !event.repeat && !event.altKey && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggleManualPaceWithSpace();
+    persistReaderSession();
+    return;
+  }
+
   if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
     event.preventDefault();
     event.stopImmediatePropagation();
-    startOrToggleManualPaceDirection(event.key === 'ArrowRight' ? 1 : -1);
+    if (!event.repeat) {
+      startManualPaceHeldDirection(event.key === 'ArrowRight' ? 1 : -1);
+    }
     return;
   }
 
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault();
     event.stopImmediatePropagation();
-    manualPaceMoveLine(event.key === 'ArrowDown' ? 1 : -1);
+    if (!event.repeat) {
+      manualPaceMoveLine(event.key === 'ArrowDown' ? 1 : -1);
+    }
   }
 };
 document.addEventListener('keydown', state.manualPaceKeyHandler, true);
+
+if (state.manualPaceKeyUpHandler) {
+  document.removeEventListener('keyup', state.manualPaceKeyUpHandler, true);
+}
+state.manualPaceKeyUpHandler = (event) => {
+  const selectedMode = String(app.querySelector('#mode-select')?.value || '').toLowerCase();
+  const manualActive = Boolean(state.manualPaceEnabled) || selectedMode === 'manual';
+  if (!manualActive) return;
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    releaseManualPaceHeldDirection(event.key === 'ArrowRight' ? 1 : -1);
+  }
+};
+document.addEventListener('keyup', state.manualPaceKeyUpHandler, true);
+
 
 document.addEventListener('keydown', state.spacebarHandler);
 
@@ -12631,7 +12689,10 @@ function resetManualPaceSession() {
     wordsAdvanced: 0,
     stepIntervals: [],
     direction: 0,
-    timer: null
+    timer: null,
+    paused: false,
+    heldLeft: false,
+    heldRight: false
   };
 }
 
@@ -12762,8 +12823,9 @@ function scheduleManualPaceMotion() {
   stopManualPaceMotion({ keepDirection:true });
 
   const direction = Number(session.direction) || 0;
+  const horizontalHeld = Boolean(session.heldLeft || session.heldRight);
   const wpm = manualPaceWpm();
-  if (!direction || wpm <= 0) {
+  if (!direction || !horizontalHeld || wpm <= 0) {
     updateReaderStatus('Manual Pace: WPM is 0. Use ↑/↓ for one line at a time, or raise WPM to move automatically.');
     updateManualPaceStatus();
     return;
@@ -12780,112 +12842,204 @@ function scheduleManualPaceMotion() {
   }, delay);
 }
 
-function startOrToggleManualPaceDirection(direction) {
+function startManualPaceHeldDirection(direction) {
   const session = ensureManualPaceSession();
   const next = direction < 0 ? -1 : 1;
 
-  if (session.direction === next && session.timer) {
-    stopManualPaceMotion();
-    updateReaderStatus('Manual Pace paused. Press ← or → to resume.');
-    return;
-  }
+  if (next > 0) session.heldRight = true;
+  else session.heldLeft = true;
 
+  // If both are physically held, the most recently pressed key wins.
   session.direction = next;
+  session.paused = false;
   scheduleManualPaceMotion();
 
   const wpm = manualPaceWpm();
-  if (wpm > 0) {
-    updateReaderStatus(`Manual Pace: ${next > 0 ? 'forward' : 'reverse'} at ${wpm} WPM.`);
-  } else {
-    updateReaderStatus(`Manual Pace: ${next > 0 ? 'forward' : 'reverse'} direction selected; WPM is 0.`);
-  }
+  updateReaderStatus(
+    wpm > 0
+      ? `Manual Pace: ${next > 0 ? 'forward' : 'reverse'} while arrow is held · ${wpm} WPM.`
+      : `Manual Pace: ${next > 0 ? 'forward' : 'reverse'} arrow held · WPM is 0.`
+  );
 }
 
+function releaseManualPaceHeldDirection(direction) {
+  const session = ensureManualPaceSession();
+  const released = direction < 0 ? -1 : 1;
+
+  if (released > 0) session.heldRight = false;
+  else session.heldLeft = false;
+
+  // If the opposite key is still being held, immediately continue in that
+  // direction. Otherwise stop as soon as the reader releases the key.
+  if (session.heldRight) {
+    session.direction = 1;
+    session.paused = false;
+    scheduleManualPaceMotion();
+    return;
+  }
+  if (session.heldLeft) {
+    session.direction = -1;
+    session.paused = false;
+    scheduleManualPaceMotion();
+    return;
+  }
+
+  stopManualPaceMotion();
+  session.paused = true;
+  updateReaderStatus('Manual Pace stopped. Hold ← or → to move.');
+}
+
+
 function renderedManualLineMap(reader) {
-  const candidates = Array.from(reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]'))
-    .filter((element) => {
-      const rect = element.getBoundingClientRect?.();
-      return rect && rect.width > 0 && rect.height > 0;
-    })
+  const readerRect = reader.getBoundingClientRect();
+  const tolerance = 3;
+
+  const candidates = Array.from(
+    reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]')
+  )
     .map((element) => {
-      const rect = element.getBoundingClientRect();
+      const rect = element.getBoundingClientRect?.();
       const index = Number(element.dataset.index ?? element.dataset.startIndex);
-      return { element, index, top: Math.round(rect.top), left: rect.left };
+      if (!rect || !Number.isFinite(index) || rect.width <= 0 || rect.height <= 0) return null;
+
+      // Only use elements actually visible in the current reader viewport/spread.
+      const visible = (
+        rect.bottom > readerRect.top + 1 &&
+        rect.top < readerRect.bottom - 1 &&
+        rect.right > readerRect.left + 1 &&
+        rect.left < readerRect.right - 1
+      );
+      if (!visible) return null;
+
+      return {
+        element,
+        index,
+        top: rect.top,
+        left: rect.left,
+        right: rect.right
+      };
     })
-    .filter((item) => Number.isFinite(item.index))
-    .sort((a,b) => a.top - b.top || a.left - b.left);
+    .filter(Boolean)
+    .sort((a,b) => a.top - b.top || a.left - b.left || a.index - b.index);
 
   const lines = [];
   for (const item of candidates) {
-    let line = lines.find((row) => Math.abs(row.top - item.top) <= 3);
+    let line = lines.find((row) => Math.abs(row.top - item.top) <= tolerance);
     if (!line) {
-      line = { top:item.top, items:[] };
+      line = {
+        top:item.top,
+        items:[],
+        minIndex:item.index,
+        maxIndex:item.index
+      };
       lines.push(line);
     }
     line.items.push(item);
+    line.minIndex = Math.min(line.minIndex, item.index);
+    line.maxIndex = Math.max(line.maxIndex, item.index);
   }
-  return lines;
+
+  lines.forEach((line) => {
+    line.items.sort((a,b)=>a.left-b.left || a.index-b.index);
+  });
+
+  return lines.sort((a,b)=>a.top-b.top);
 }
 
 function manualPaceMoveLine(direction) {
   const reader = app.querySelector('#reader');
   if (!reader || !state.words?.length) return;
 
-  stopManualPaceMotion();
+  // Vertical navigation is deliberately manual and pauses horizontal travel,
+  // but remembers the prior direction so Space can resume it.
+  stopManualPaceMotion({ keepDirection:true });
+  const session = ensureManualPaceSession();
+  session.paused = true;
+
   const lines = renderedManualLineMap(reader);
   if (!lines.length) return;
 
-  const currentIndex = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
-  let currentLineIndex = lines.findIndex((line) =>
-    line.items.some((item) => item.index <= currentIndex && (
-      item.index === currentIndex ||
-      item === line.items[line.items.length - 1]
-    ))
+  const currentIndex = Math.max(
+    0,
+    Math.min(state.words.length - 1, Number(state.index) || 0)
   );
 
+  // Find the actual line whose rendered word-index range contains the cursor.
+  let currentLineIndex = lines.findIndex(
+    (line) => currentIndex >= line.minIndex && currentIndex <= line.maxIndex
+  );
+
+  // If the active cursor is between rendered groups, use the nearest line by
+  // index range rather than accidentally choosing the first earlier line.
   if (currentLineIndex < 0) {
     currentLineIndex = lines.reduce((best, line, idx) => {
-      const distance = Math.min(...line.items.map((item)=>Math.abs(item.index-currentIndex)));
+      const distance = currentIndex < line.minIndex
+        ? line.minIndex - currentIndex
+        : currentIndex > line.maxIndex
+          ? currentIndex - line.maxIndex
+          : 0;
       return distance < best.distance ? { idx, distance } : best;
     }, { idx:0, distance:Infinity }).idx;
   }
 
-  let targetLineIndex = currentLineIndex + (direction > 0 ? 1 : -1);
+  const targetLineIndex = currentLineIndex + (direction > 0 ? 1 : -1);
 
   if (targetLineIndex < 0 || targetLineIndex >= lines.length) {
-    if (state.bookPages) {
-      const currentSpread = getCurrentBookSpread(reader);
-      const nextSpread = currentSpread + (direction > 0 ? 1 : -1);
-      if (nextSpread >= 0) {
-        goToBookSpread(nextSpread, {
-          behavior:'auto',
-          ensureRendered:true,
-          syncReaderPosition:false
-        });
-        requestAnimationFrame(() => {
-          const refreshed = renderedManualLineMap(reader);
-          if (!refreshed.length) return;
-          const target = direction > 0 ? refreshed[0] : refreshed[refreshed.length - 1];
-          state.index = target.items[0]?.index ?? state.index;
-          renderManualPaceHighlight(reader);
-        });
-      }
+    if (!state.bookPages) {
+      updateReaderStatus(direction > 0
+        ? 'Manual Pace: already at the last visible line.'
+        : 'Manual Pace: already at the first visible line.');
+      return;
     }
+
+    const currentSpread = getCurrentBookSpread(reader);
+    const maxSpread = Math.max(0, getBookSpreadCount(reader) - 1);
+    const nextSpread = Math.max(0, Math.min(maxSpread, currentSpread + (direction > 0 ? 1 : -1)));
+    if (nextSpread === currentSpread) return;
+
+    goToBookSpread(nextSpread, {
+      behavior:'auto',
+      ensureRendered:true,
+      syncReaderPosition:false
+    });
+
+    // Wait until the exact spread position has painted, then select a visible
+    // line from that spread without asking the normal reader to resync index.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const refreshed = renderedManualLineMap(reader);
+      if (!refreshed.length) return;
+      const targetLine = direction > 0 ? refreshed[0] : refreshed[refreshed.length - 1];
+      const targetItem = direction > 0
+        ? targetLine.items[0]
+        : targetLine.items[targetLine.items.length - 1];
+      if (!targetItem) return;
+
+      state.index = targetItem.index;
+      state.viewportAnchorIndex = targetItem.index;
+      renderManualPaceHighlight(reader);
+      updateReaderStatus(`Manual Pace: moved ${direction > 0 ? 'down' : 'up'} one line.`);
+    }));
     return;
   }
 
   const currentLine = lines[currentLineIndex];
   const targetLine = lines[targetLineIndex];
-  const currentElement = currentLine.items.reduce((best,item) =>
-    Math.abs(item.index-currentIndex) < Math.abs(best.index-currentIndex) ? item : best,
-    currentLine.items[0]
-  );
-  const target = targetLine.items.reduce((best,item) =>
-    Math.abs(item.left-currentElement.left) < Math.abs(best.left-currentElement.left) ? item : best,
-    targetLine.items[0]
-  );
 
-  state.index = target.index;
+  // Preserve the horizontal reading position as closely as possible when
+  // moving vertically, like moving the caret up/down in a text editor.
+  const currentItem = currentLine.items.reduce((best,item) => {
+    const distance = Math.abs(item.index - currentIndex);
+    return distance < best.distance ? { item, distance } : best;
+  }, { item:currentLine.items[0], distance:Infinity }).item;
+
+  const targetItem = targetLine.items.reduce((best,item) => {
+    const distance = Math.abs(item.left - currentItem.left);
+    return distance < best.distance ? { item, distance } : best;
+  }, { item:targetLine.items[0], distance:Infinity }).item;
+
+  if (!targetItem) return;
+  state.index = targetItem.index;
+  state.viewportAnchorIndex = targetItem.index;
   renderManualPaceHighlight(reader);
   updateReaderStatus(`Manual Pace: moved ${direction > 0 ? 'down' : 'up'} one line.`);
 }
@@ -14218,7 +14372,11 @@ function switchReadingMode(nextMode) {
     } else {
       state.manualPaceEnabled = false;
       stopManualPaceMotion();
-      if (state.manualPace?.active) state.manualPace.active = false;
+      if (state.manualPace) {
+        state.manualPace.heldLeft = false;
+        state.manualPace.heldRight = false;
+        state.manualPace.active = false;
+      }
     }
   });
 }
