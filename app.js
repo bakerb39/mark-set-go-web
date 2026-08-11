@@ -11504,7 +11504,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       const reader = app.querySelector('#reader');
       if (reader) {
         if (!reader.hasAttribute('tabindex')) reader.setAttribute('tabindex', '-1');
-        requestAnimationFrame(() => reader.focus({ preventScroll:true }));
+        try { reader.focus({ preventScroll:true }); } catch { reader.focus(); }
       }
     }
   });
@@ -11526,12 +11526,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   };
   
 document.addEventListener('keydown', (event) => {
-  const mode = String(
-    app.querySelector('#mode-select')?.value
-    || state.renderedMode
-    || ''
-  ).toLowerCase();
-  if (mode !== 'manual') return;
+  const selectedMode = String(app.querySelector('#mode-select')?.value || '').toLowerCase();
+  const manualActive = Boolean(state.manualPaceEnabled) || selectedMode === 'manual';
+  if (!manualActive) return;
 
   const target = event.target;
   const modeSelectorTarget = target?.closest?.('#mode-select, #fs-mode-select');
@@ -12694,15 +12691,9 @@ function firstReadingIndexInVisibleBookSpread(reader) {
 
 
 function manualPaceChunkSize() {
-  // Reuse the reader's existing chunk-size setting whenever possible.
-  const direct = Number(state.chunkSize || state.wordsPerChunk || state.groupSize || 0);
-  if (Number.isFinite(direct) && direct > 0) return Math.max(1, Math.round(direct));
-
-  const control = app.querySelector(
-    '#chunk-size, [data-setting="chunkSize"], [name="chunkSize"], [data-reader-chunk-size]'
-  );
-  const fromControl = Number(control?.value || 0);
-  return Number.isFinite(fromControl) && fromControl > 0 ? Math.max(1, Math.round(fromControl)) : 1;
+  const control = app.querySelector('#word-count, #fs-word-count');
+  const count = Number(control?.value || state.renderedGroupSize || 1);
+  return Number.isFinite(count) && count > 0 ? Math.min(10, Math.max(1, Math.round(count))) : 1;
 }
 
 function resetManualPaceSession() {
@@ -12767,57 +12758,58 @@ function renderManualPaceHighlight(reader) {
   }
   state.activeElements = [];
 
-  const startIndex = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
-  const groupSize = manualPaceChunkSize();
+  const index = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
 
-  // Manual Pace is a control scheme, not a new rendering engine. Make sure
-  // the Highlight renderer has a window containing the current cursor.
+  // Manual Pace deliberately does NOT rebuild or rerender the reader.
+  // It rides on the already-rendered Highlight DOM.
   if (state.virtualized
-      && (startIndex < state.renderedWordStart || startIndex >= state.renderedWordEnd)) {
-    virtualRenderer.renderWindowAround(reader, 'highlight', groupSize, startIndex);
+      && (index < state.renderedWordStart || index >= state.renderedWordEnd)) {
+    virtualRenderer.renderWindowAround(
+      reader,
+      'highlight',
+      Number(app.querySelector('#word-count')?.value) || 1,
+      index
+    );
   } else {
-    ensureWordsRendered(reader, 'highlight', groupSize, Math.min(state.words.length, startIndex + groupSize + 100));
+    ensureWordsRendered(
+      reader,
+      'highlight',
+      Number(app.querySelector('#word-count')?.value) || 1,
+      Math.min(state.words.length, index + 250)
+    );
   }
 
-  // Rebuild semantic groups using the same chunk rules as Highlight.
-  refreshReadingGroups('highlight', groupSize);
-  const group = findReadingGroup(startIndex);
-  const groupStart = group?.start ?? startIndex;
-  const groupEnd = group?.end ?? Math.min(state.words.length, startIndex + groupSize);
+  let group = Array.from(reader.querySelectorAll('.reader-group[data-start-index][data-end-index]'))
+    .find((element) => {
+      const startIndex = Number(element.dataset.startIndex);
+      const endIndex = Number(element.dataset.endIndex);
+      return startIndex <= index && endIndex > index;
+    });
 
-  let active = reader.querySelector(`.reader-group[data-start-index="${groupStart}"]`);
-  if (!active) {
-    const words = Array.from(reader.querySelectorAll('.reader-word[data-index]'))
-      .filter((el) => {
-        const index = Number(el.dataset.index);
-        return index >= groupStart && index < groupEnd;
-      });
-    if (words.length) {
-      words.forEach((el) => el.classList.add('active-group'));
-      state.activeElements = words;
-      active = words[0];
+  if (!group) {
+    const word = reader.querySelector(`.reader-word[data-index="${index}"]`);
+    group = word?.closest?.('.reader-group') || word;
+  }
+
+  if (group) {
+    group.classList.add('active-group');
+    state.activeElements = [group];
+    if (state.bookPages) {
+      const spread = bookSpreadForWordIndex(reader, index);
+      if (spread != null && spread !== getCurrentBookSpread(reader)) {
+        goToBookSpread(spread, {
+          behavior:'auto',
+          ensureRendered:true,
+          syncReaderPosition:false
+        });
+      }
+    } else {
+      group.scrollIntoView?.({ block:'center', inline:'nearest', behavior:'auto' });
     }
-  } else {
-    active.classList.add('active-group');
-    state.activeElements = [active];
   }
 
-  state.viewportAnchorIndex = startIndex;
-
-  if (state.bookPages) {
-    const spread = bookSpreadForWordIndex(reader, startIndex);
-    if (spread != null) {
-      goToBookSpread(spread, {
-        behavior:'auto',
-        ensureRendered:true,
-        syncReaderPosition:false
-      });
-    }
-  } else if (active?.scrollIntoView) {
-    active.scrollIntoView({ block:'center', inline:'nearest', behavior:'auto' });
-  }
-
-  updateReaderStatus();
+  state.viewportAnchorIndex = index;
+  updateReaderStatus('Manual Pace: use ← and → to move through the text.');
   updateManualPaceStatus();
 }
 
@@ -13084,12 +13076,16 @@ function updateModeControls(mode) {
       : '';
   }
   if (speedInput) {
-    speedInput.disabled = staticMode;
-    speedInput.title = staticMode ? 'Two Columns is intended for self-paced reading.' : '';
+    const manualMode = mode === 'manual';
+    speedInput.disabled = staticMode || manualMode;
+    speedInput.title = manualMode
+      ? 'Manual Pace is controlled with the left and right arrow keys.'
+      : (staticMode ? 'Two Columns is intended for self-paced reading.' : '');
   }
   if (start) {
+    const manualMode = mode === 'manual';
     start.disabled = staticMode;
-    start.textContent = staticMode ? 'Self-paced' : 'Start';
+    start.textContent = manualMode ? 'Manual' : (staticMode ? 'Self-paced' : 'Start');
   }
   if (pause) pause.disabled = true;
 }
@@ -14088,41 +14084,63 @@ function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
 
 function switchReadingMode(nextMode) {
   if (nextMode === 'two-column') nextMode = 'highlight';
-  state.pendingReadingMode = nextMode;
+  const manualRequested = nextMode === 'manual';
+  const renderMode = manualRequested ? 'highlight' : nextMode;
 
-  // A fullscreen select can emit several closely spaced input/change events.
-  // Coalesce them into one render on the next frame instead of rebuilding the
-  // word DOM repeatedly while the browser is still painting the menu.
+  state.pendingReadingMode = nextMode;
+  state.manualPaceEnabled = manualRequested;
+
   if (state.modeChangeFrame) cancelAnimationFrame(state.modeChangeFrame);
   state.modeChangeFrame = requestAnimationFrame(() => {
     state.modeChangeFrame = null;
-    const mode = state.pendingReadingMode || nextMode;
+    const requestedMode = state.pendingReadingMode || nextMode;
     state.pendingReadingMode = null;
+    const manual = requestedMode === 'manual';
+    const effectiveMode = manual ? 'highlight' : requestedMode;
     const reader = app.querySelector('#reader');
-    if (!reader || state.renderedMode === mode) {
-      updateModeControls(mode);
-      return;
-    }
+    if (!reader) return;
 
     const snapshot = captureReaderLocation();
     const groupSize = Number(app.querySelector('#word-count')?.value) || 1;
     stopReader();
-    state.index = snapshot.anchorIndex;
-    prepareReaderView(mode, groupSize);
-    updateModeControls(mode);
-    restoreCapturedReaderLocation(snapshot, { rerendered: true });
-    if (mode === 'manual') {
-      state.index = Math.max(0, Math.min(state.words.length - 1, snapshot.anchorIndex || state.index || 0));
+
+    if (state.renderedMode !== effectiveMode || state.renderedGroupSize !== groupSize) {
+      state.index = snapshot.anchorIndex;
+      prepareReaderView(effectiveMode, groupSize);
+    }
+
+    // Keep the visible select on Manual Pace even though the protected
+    // renderer itself remains Highlight.
+    const primarySelect = app.querySelector('#mode-select');
+    if (primarySelect && primarySelect.value !== requestedMode) primarySelect.value = requestedMode;
+    const fullSelect = app.querySelector('#fs-mode-select');
+    if (fullSelect && fullSelect.value !== requestedMode) fullSelect.value = requestedMode;
+
+    updateModeControls(manual ? 'manual' : effectiveMode);
+    restoreCapturedReaderLocation(snapshot, { rerendered:true });
+
+    if (manual) {
+      state.manualPaceEnabled = true;
+      state.index = Math.max(0, Math.min(state.words.length - 1, snapshot.anchorIndex || 0));
       resetManualPaceSession();
       ensureManualPaceSession();
       renderManualPaceHighlight(reader);
-    } else if (state.manualPace?.active) {
-      state.manualPace.active = false;
+      const start = app.querySelector('#start-reader');
+      const pause = app.querySelector('#pause-reader');
+      if (start) {
+        start.disabled = false;
+        start.textContent = 'Manual';
+      }
+      if (pause) pause.disabled = true;
+    } else {
+      state.manualPaceEnabled = false;
+      if (state.manualPace?.active) state.manualPace.active = false;
     }
   });
 }
 
 function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-count')?.value) || 1) {
+  if (mode === 'manual') mode = 'highlight';
   const reader = app.querySelector('#reader');
   if (!reader) return;
   reader.classList.remove('flash', 'highlight-mode', 'bold-focus-mode', 'smooth-glide-mode', 'pointing-guide-mode', 'marquee-mode', 'digital-sign-mode', 'two-column-mode', 'auto-scroll-mode', 'pacman-mode', 'reading-guide-enabled', 'book-pages-layout', 'illustrated-reading');
@@ -14463,7 +14481,7 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 function startReader() {
   if(state.markPersistentSelection || state.markSelectionLocked) clearMarkSelectionForReadingResume();
   const selectedMode = getSelectedMode();
-  if (selectedMode === 'manual') {
+  if (state.manualPaceEnabled || selectedMode === 'manual') {
     stopReader();
     ensureManualPaceSession();
     renderManualPaceHighlight(app.querySelector('#reader'));
