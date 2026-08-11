@@ -11525,12 +11525,15 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     persistReaderSession();
   };
   
-document.addEventListener('keydown', (event) => {
+if (state.manualPaceKeyHandler) {
+  document.removeEventListener('keydown', state.manualPaceKeyHandler, true);
+}
+state.manualPaceKeyHandler = (event) => {
   const selectedMode = String(app.querySelector('#mode-select')?.value || '').toLowerCase();
   const manualActive = Boolean(state.manualPaceEnabled) || selectedMode === 'manual';
   if (!manualActive) return;
 
-  const target = event.target;
+  const target = event.target instanceof Element ? event.target : null;
   const modeSelectorTarget = target?.closest?.('#mode-select, #fs-mode-select');
   if (target?.closest?.('input, textarea, [contenteditable="true"], [role="textbox"]')) return;
   if (target?.closest?.('select') && !modeSelectorTarget) return;
@@ -11538,17 +11541,18 @@ document.addEventListener('keydown', (event) => {
 
   if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
     startOrToggleManualPaceDirection(event.key === 'ArrowRight' ? 1 : -1);
     return;
   }
 
   if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
     event.preventDefault();
-    event.stopPropagation();
+    event.stopImmediatePropagation();
     manualPaceMoveLine(event.key === 'ArrowDown' ? 1 : -1);
   }
-}, true);
+};
+document.addEventListener('keydown', state.manualPaceKeyHandler, true);
 
 document.addEventListener('keydown', state.spacebarHandler);
 
@@ -11789,8 +11793,14 @@ document.addEventListener('keydown', state.spacebarHandler);
   app.querySelector('#translate-text').addEventListener('click', translateCurrentText);
   app.querySelector('#restore-english').addEventListener('click', restoreEnglish);
   const speedBadgeInput = app.querySelector('#speed');
-  speedBadgeInput?.addEventListener('input', updateViewerWpmBadge);
-  speedBadgeInput?.addEventListener('change', updateViewerWpmBadge);
+  const syncReaderWpmInput = () => {
+    const value = Number(speedBadgeInput?.value);
+    if (Number.isFinite(value)) state.wpm = Math.max(0, value);
+    updateViewerWpmBadge();
+    if (state.manualPaceEnabled && state.manualPace?.direction) scheduleManualPaceMotion();
+  };
+  speedBadgeInput?.addEventListener('input', syncReaderWpmInput);
+  speedBadgeInput?.addEventListener('change', syncReaderWpmInput);
   app.querySelector('#viewer-wpm-down')?.addEventListener('click', () => adjustReaderWpm(-25));
   app.querySelector('#viewer-wpm-up')?.addEventListener('click', () => adjustReaderWpm(25));
 
@@ -11800,6 +11810,8 @@ document.addEventListener('keydown', state.spacebarHandler);
   if (state.viewerWpmKeyHandler) document.removeEventListener('keydown', state.viewerWpmKeyHandler);
   state.viewerWpmKeyHandler = (event) => {
     if ((event.key !== 'ArrowUp' && event.key !== 'ArrowDown') || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+    const selectedMode = String(app.querySelector('#mode-select')?.value || '').toLowerCase();
+    if (state.manualPaceEnabled || selectedMode === 'manual') return;
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest('input, textarea, select, button, a, summary, [contenteditable="true"], [role="textbox"]')) return;
     if (!app.querySelector('#reader')) return;
@@ -14542,9 +14554,12 @@ function adjustReaderWpm(delta) {
   const speedInput = app.querySelector('#speed');
   if (!speedInput) return;
 
-  const min = Number(speedInput.min) || 30;
-  const max = Number(speedInput.max) || 900;
-  const current = Number(speedInput.value) || Number(state.wpm) || 300;
+  const parsedMin = Number(speedInput.min);
+  const parsedMax = Number(speedInput.max);
+  const parsedCurrent = Number(speedInput.value);
+  const min = Number.isFinite(parsedMin) ? parsedMin : 30;
+  const max = Number.isFinite(parsedMax) ? parsedMax : 900;
+  const current = Number.isFinite(parsedCurrent) ? parsedCurrent : (Number(state.wpm) || 300);
   const next = Math.min(max, Math.max(min, Math.round(current + Number(delta || 0))));
   if (next === current) return;
 
@@ -14566,8 +14581,9 @@ function adjustReaderWpm(delta) {
 function updateViewerWpmBadge() {
   const badge = app.querySelector('#viewer-wpm-badge');
   if (!badge) return;
-  const inputSpeed = Number(app.querySelector('#speed')?.value);
-  const speed = Math.max(0, Math.round(Number.isFinite(inputSpeed) && inputSpeed > 0 ? inputSpeed : Number(state.wpm) || 0));
+  const rawSpeed = app.querySelector('#speed')?.value;
+  const inputSpeed = rawSpeed === '' || rawSpeed == null ? NaN : Number(rawSpeed);
+  const speed = Math.max(0, Math.round(Number.isFinite(inputSpeed) ? inputSpeed : Number(state.wpm) || 0));
   const nextText = `${speed.toLocaleString()} WPM`;
   if (nextText === lastViewerWpmText && badge.textContent === nextText) return;
   lastViewerWpmText = nextText;
