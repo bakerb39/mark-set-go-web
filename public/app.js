@@ -6090,6 +6090,43 @@ function lineChartSvg(data, valueKey, { label = '', suffix = '', empty = 'No tre
   </svg>`;
 }
 
+function yearlyPerformanceChartSvg(data, valueKey, { label = '', suffix = '', goal = 0, kind = 'speed' } = {}) {
+  const width=920,height=270,left=54,right=24,top=20,bottom=42;
+  const values=data.map((row)=>Number(row[valueKey])||0);
+  const hasData=values.some((value)=>value>0);
+  const baseMax=kind==='comprehension' ? 100 : Math.max(400, goal, ...values);
+  const max=kind==='comprehension' ? 100 : Math.ceil(baseMax/50)*50;
+  const min=0;
+  const usableW=width-left-right, usableH=height-top-bottom;
+  const x=(index)=>left+(data.length===1?usableW/2:index*usableW/Math.max(1,data.length-1));
+  const y=(value)=>top+usableH-((Math.max(min,Math.min(max,Number(value)||0))-min)/Math.max(1,max-min))*usableH;
+  const points=data.map((row,index)=>({x:x(index),y:y(row[valueKey]),row,value:Number(row[valueKey])||0}));
+  const valid=points.filter((point)=>point.value>0);
+  const linePoints=valid.map((point)=>`${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
+  const areaPath=valid.length>1
+    ? `M ${valid[0].x.toFixed(1)} ${top+usableH} L ${valid.map((point)=>`${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' L ')} L ${valid[valid.length-1].x.toFixed(1)} ${top+usableH} Z`
+    : '';
+  const goalY=y(goal);
+  const gradientId=`performance-${kind}-gradient`;
+  const lineClass=kind==='comprehension'?'performance-line-comprehension':'performance-line-speed';
+  const areaClass=kind==='comprehension'?'performance-area-comprehension':'performance-area-speed';
+  return `<svg class="progress-chart yearly-performance-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeSvg(label)}">
+    <defs>
+      <linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" class="${areaClass}-start"/><stop offset="100%" class="${areaClass}-end"/>
+      </linearGradient>
+    </defs>
+    ${[0,.25,.5,.75,1].map((ratio)=>{const value=Math.round(min+(max-min)*ratio);const gy=y(value);return `<line x1="${left}" y1="${gy}" x2="${width-right}" y2="${gy}" class="performance-grid"/><text x="${left-10}" y="${gy+4}" text-anchor="end" class="performance-axis-label">${value}${kind==='comprehension'?'%':''}</text>`;}).join('')}
+    <line x1="${left}" y1="${goalY}" x2="${width-right}" y2="${goalY}" class="performance-goal-line"/>
+    <g class="performance-goal-label"><rect x="${width-right-102}" y="${Math.max(2,goalY-23)}" width="100" height="20" rx="10"/><text x="${width-right-52}" y="${Math.max(16,goalY-9)}" text-anchor="middle">Goal ${goal}${escapeSvg(suffix)}</text></g>
+    ${areaPath?`<path d="${areaPath}" fill="url(#${gradientId})" class="performance-area"/>`:''}
+    ${valid.length>1?`<polyline points="${linePoints}" class="performance-line ${lineClass}"/>`:''}
+    ${valid.map((point)=>`<circle cx="${point.x}" cy="${point.y}" r="5" class="performance-point ${lineClass}"><title>${escapeSvg(point.row.label)}: ${point.value.toLocaleString()}${escapeSvg(suffix)}</title></circle>`).join('')}
+    ${!hasData?`<text x="${width/2}" y="${height/2}" text-anchor="middle" class="chart-empty">Your ${kind==='comprehension'?'comprehension':'reading speed'} trend will appear here as you build a reading record.</text>`:''}
+    ${points.map((point)=>`<text x="${point.x}" y="${height-14}" text-anchor="middle" class="performance-month-label">${escapeSvg(point.row.label)}</text>`).join('')}
+  </svg>`;
+}
+
 function barChartSvg(data, valueKey, { label = '', suffix = '' } = {}) {
   const width=760,height=165,left=42,right=12,top=10,bottom=28;
   const max=Math.max(1,...data.map((row)=>Number(row[valueKey])||0));
@@ -6177,6 +6214,80 @@ function localProgressRecommendations({ daily, weekly, awards, comprehension, go
   if (!recommendations.length) recommendations.push({title:'Keep building evidence',text:'Complete several reading sessions and comprehension checks so the dashboard can identify meaningful trends.'});
   return recommendations.slice(0,4);
 }
+function readerWorkspaceYearData() {
+  const currentYear=new Date().getFullYear();
+  const formatter=new Intl.DateTimeFormat(undefined,{month:'short'});
+  const rows=Array.from({length:12},(_,month)=>({
+    month,
+    label:formatter.format(new Date(currentYear,month,1)),
+    words:0,
+    seconds:0,
+    wpm:0,
+    comprehensionTotal:0,
+    comprehensionCount:0,
+    comprehension:0
+  }));
+  readStoredArray(READING_ACTIVITY_KEY).forEach((item)=>{
+    const date=new Date(item.endedAt || item.startedAt || 0);
+    if(!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
+    const row=rows[date.getMonth()];
+    row.words += Number(item.wordsRead)||0;
+    row.seconds += Number(item.seconds)||0;
+  });
+  getComprehensionResults().forEach((item)=>{
+    const date=new Date(item.createdAt || 0);
+    if(!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
+    const score=Number(item.scorePercent);
+    if(!Number.isFinite(score)) return;
+    const row=rows[date.getMonth()];
+    row.comprehensionTotal += score;
+    row.comprehensionCount += 1;
+  });
+  rows.forEach((row)=>{
+    row.wpm=row.seconds?Math.round(row.words/(row.seconds/60)):0;
+    row.comprehension=row.comprehensionCount?Math.round(row.comprehensionTotal/row.comprehensionCount):0;
+  });
+  return rows;
+}
+
+function readerWorkspaceCurrentTextStats() {
+  const documentId=String(state.documentId || '');
+  const activity=readStoredArray(READING_ACTIVITY_KEY).filter((item)=>String(item.documentId||'')===documentId);
+  const comprehension=getComprehensionResults().filter((item)=>String(item.documentId||'')===documentId);
+  const progress=readStoredObject(READING_PROGRESS_KEY)[documentId] || {};
+  const totalWords=Math.max(0,Number(progress.totalWords)||Number(state.words?.length)||0);
+  const currentIndex=Math.max(Number(progress.lastWord)||0,Number(progress.furthestWord)||0,Number(state.index)||0);
+  const percent=totalWords?Math.min(100,Math.round(currentIndex/totalWords*100)):0;
+  const latestComp=Number(comprehension[0]?.scorePercent)||0;
+  const selectedPace=Math.max(0,Math.round(Number(state.wpm)||Number(app.querySelector('#speed')?.value)||0));
+  const completedSeconds=activity.reduce((sum,item)=>sum+(Number(item.seconds)||0),0);
+  let liveSeconds=0;
+  if(state.sessionActive && Number(state.sessionStartedAt)) liveSeconds=Math.max(0,(Date.now()-Number(state.sessionStartedAt))/1000);
+  const sessionSeconds=liveSeconds || Number(activity[0]?.seconds)||0;
+  const effective=latestComp && selectedPace ? Math.round(selectedPace*(latestComp/100)) : 0;
+  return {
+    documentId,
+    title:state.title || progress.title || activity[0]?.title || 'Current text',
+    percent,
+    pace:selectedPace,
+    comprehension:latestComp,
+    effective,
+    sessionSeconds,
+    totalSeconds:completedSeconds+liveSeconds,
+    sessions:activity.length + (state.sessionActive?1:0)
+  };
+}
+
+function readerWorkspaceSpeedGoal() {
+  const stored = Number(localStorage.getItem('markSetGoReadingSpeedGoalV1'));
+  return Number.isFinite(stored) && stored >= 100 && stored <= 2000 ? Math.round(stored) : 350;
+}
+
+function readerWorkspaceComprehensionGoal() {
+  const stored = Number(localStorage.getItem('markSetGoReadingComprehensionGoalV1'));
+  return Number.isFinite(stored) && stored >= 1 && stored <= 100 ? Math.round(stored) : 85;
+}
+
 function renderProgressDashboard() {
   finalizeReadingSession();
   stopReader();
@@ -8930,7 +9041,7 @@ function showBookDifficultyDialog(payload) {
       <div class="prepare-me-panel">
         <p>A short orientation should cover:</p>
         <ul>${topics.map((topic) => `<li>${escapeHtml(topic)}</li>`).join('')}</ul>
-        <button class="primary" type="button" data-prepare-book="${encodeURIComponent(JSON.stringify({book, topics}))}">Prepare with Ask Mark</button>
+        <button class="primary" type="button" data-prepare-book="${encodeURIComponent(JSON.stringify({book, topics}))}">Open with Ask Mark</button>
       </div>
     </details>
 
@@ -8976,12 +9087,15 @@ function showBookDifficultyDialog(payload) {
     let request = null;
     try { request = JSON.parse(decodeURIComponent(event.currentTarget.dataset.prepareBook || '')); } catch {}
     if (!request) return;
-    requestBookPreparation({
-      dialog,
+
+    queueAskMarkBookPreparation({
       book: request.book || book,
-      topics: request.topics || topics,
-      button: event.currentTarget
+      topics: request.topics || topics
     });
+
+    dialog.close();
+    ReaderContinuity?.saveBeforeNavigation?.();
+    renderAiCenter();
   });
 
   dialog.addEventListener('click', (event) => {
@@ -18591,6 +18705,93 @@ function renderGlobalNotebook(){
   renderGlobalNotebookEntries();
 }
 
+
+function queueAskMarkBookPreparation({ book, topics = [] } = {}) {
+  const title = String(book?.title || state.title || 'this book').trim();
+  const author = String(book?.author || state.source?.author || '').trim();
+  const cleanTopics = Array.isArray(topics) ? topics.filter(Boolean).map(String) : [];
+
+  window.__markSetGoPendingAskMarkPreparation = {
+    book: {
+      ...(book || {}),
+      title,
+      author
+    },
+    topics: cleanTopics,
+    prompt: `Prepare me to read ${title}${author ? ` by ${author}` : ''}. Give me a concise, spoiler-free orientation. Cover ${cleanTopics.length ? cleanTopics.join(', ') : 'the author, setting, central themes, major characters or figures, historical/intellectual context, and the best way to approach the book'}. Tell me what to pay attention to while reading and what I should know before I begin.`
+  };
+}
+
+async function runPendingAskMarkPreparation(output) {
+  const pending = window.__markSetGoPendingAskMarkPreparation;
+  if (!pending || !output) return false;
+  window.__markSetGoPendingAskMarkPreparation = null;
+
+  output.hidden = false;
+  output.classList.add('ask-mark-auto-prep-output');
+  output.innerHTML = `
+    <div class="ask-mark-auto-prep-heading">
+      <span class="source-category">Ask Mark</span>
+      <h2>Preparing you for ${escapeHtml(pending.book?.title || 'this book')}</h2>
+      <p class="status">Mark is preparing a spoiler-free orientation…</p>
+    </div>`;
+
+  try {
+    const text = currentBookTextForProfile(pending.book);
+    const response = await fetch('/api/book-guide', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        book:{
+          ...pending.book,
+          description:[
+            String(pending.book?.description || '').trim(),
+            `Ask Mark preparation request: ${pending.prompt}`
+          ].filter(Boolean).join('\n')
+        },
+        spoilerMode:'none',
+        sample:boundedAiBookSample(text, 22000)
+      })
+    });
+
+    const payload = await response.json().catch(()=>({}));
+    if (!response.ok) throw new Error(payload.detail || payload.error || `HTTP ${response.status}`);
+    const guide = payload.guide || {};
+    const context = Array.isArray(guide.context) ? guide.context : [];
+    const characters = Array.isArray(guide.characters) ? guide.characters : [];
+    const themes = Array.isArray(guide.themes) ? guide.themes : [];
+    const readingTips = Array.isArray(guide.readingTips) ? guide.readingTips : [];
+
+    output.innerHTML = `
+      <article class="ask-mark-auto-prep-response">
+        <div class="mark-response-heading">
+          <span>Ask Mark</span>
+          <strong>Before you read ${escapeHtml(pending.book?.title || 'this book')}</strong>
+        </div>
+        <p>${escapeHtml(guide.overview || 'Here is a spoiler-free orientation for the book.')}</p>
+        ${guide.setting ? `<section><h3>Setting</h3><p>${escapeHtml(guide.setting)}</p></section>` : ''}
+        ${context.length ? `<section><h3>What you should know first</h3><ul>${context.map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+        ${characters.length ? `<section><h3>People to recognize</h3><ul>${characters.slice(0,8).map((item)=>`<li><strong>${escapeHtml(item.name || '')}</strong>${item.role ? ` — ${escapeHtml(item.role)}` : ''}</li>`).join('')}</ul></section>` : ''}
+        ${themes.length ? `<section><h3>Ideas and themes to watch</h3><ul>${themes.slice(0,8).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+        ${readingTips.length ? `<section><h3>Recommended approach</h3><ul>${readingTips.slice(0,8).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+        ${guide.spoilerNote ? `<p class="difficulty-disclaimer">${escapeHtml(guide.spoilerNote)}</p>` : ''}
+        <div class="ask-mark-auto-prep-question">
+          <strong>Your request</strong>
+          <p>${escapeHtml(pending.prompt)}</p>
+        </div>
+      </article>`;
+    return true;
+  } catch (error) {
+    output.innerHTML = `
+      <article class="ask-mark-auto-prep-response">
+        <div class="mark-response-heading"><span>Ask Mark</span><strong>Preparation unavailable</strong></div>
+        <p class="status error">${escapeHtml(error.message)}</p>
+      </article>`;
+    return false;
+  }
+}
+
+
 function renderAiCenter() {
   stopReader();
   const hasBook = Boolean(state.title && state.currentText && state.words?.length);
@@ -18635,6 +18836,11 @@ function renderAiCenter() {
     output.hidden = false;
     output.innerHTML = `<h2>Current-context summary workspace</h2><p>The AI summary action will use a bounded section around the current reading position rather than sending the entire book. Return to the Reader, position the text, and use the Learn controls for passage-based analysis.</p><blockquote>${escapeHtml(sample.slice(0,700))}${sample.length>700?'…':''}</blockquote><button class="primary" type="button" data-action="reader">Return to Reader</button>`;
   });
+
+  const pendingPreparationOutput = app.querySelector('#ai-center-output');
+  if (window.__markSetGoPendingAskMarkPreparation && pendingPreparationOutput) {
+    requestAnimationFrame(() => runPendingAskMarkPreparation(pendingPreparationOutput));
+  }
 }
 
 function renderKnowledgeGraph() {

@@ -8959,7 +8959,7 @@ function showBookDifficultyDialog(payload) {
       <div class="prepare-me-panel">
         <p>A short orientation should cover:</p>
         <ul>${topics.map((topic) => `<li>${escapeHtml(topic)}</li>`).join('')}</ul>
-        <button class="primary" type="button" data-prepare-book="${encodeURIComponent(JSON.stringify({book, topics}))}">Prepare with Ask Mark</button>
+        <button class="primary" type="button" data-prepare-book="${encodeURIComponent(JSON.stringify({book, topics}))}">Open with Ask Mark</button>
       </div>
     </details>
 
@@ -9005,12 +9005,15 @@ function showBookDifficultyDialog(payload) {
     let request = null;
     try { request = JSON.parse(decodeURIComponent(event.currentTarget.dataset.prepareBook || '')); } catch {}
     if (!request) return;
-    requestBookPreparation({
-      dialog,
+
+    queueAskMarkBookPreparation({
       book: request.book || book,
-      topics: request.topics || topics,
-      button: event.currentTarget
+      topics: request.topics || topics
     });
+
+    dialog.close();
+    ReaderContinuity?.saveBeforeNavigation?.();
+    renderAiCenter();
   });
 
   dialog.addEventListener('click', (event) => {
@@ -18795,6 +18798,93 @@ function renderGlobalNotebook(){
   renderGlobalNotebookEntries();
 }
 
+
+function queueAskMarkBookPreparation({ book, topics = [] } = {}) {
+  const title = String(book?.title || state.title || 'this book').trim();
+  const author = String(book?.author || state.source?.author || '').trim();
+  const cleanTopics = Array.isArray(topics) ? topics.filter(Boolean).map(String) : [];
+
+  window.__markSetGoPendingAskMarkPreparation = {
+    book: {
+      ...(book || {}),
+      title,
+      author
+    },
+    topics: cleanTopics,
+    prompt: `Prepare me to read ${title}${author ? ` by ${author}` : ''}. Give me a concise, spoiler-free orientation. Cover ${cleanTopics.length ? cleanTopics.join(', ') : 'the author, setting, central themes, major characters or figures, historical/intellectual context, and the best way to approach the book'}. Tell me what to pay attention to while reading and what I should know before I begin.`
+  };
+}
+
+async function runPendingAskMarkPreparation(output) {
+  const pending = window.__markSetGoPendingAskMarkPreparation;
+  if (!pending || !output) return false;
+  window.__markSetGoPendingAskMarkPreparation = null;
+
+  output.hidden = false;
+  output.classList.add('ask-mark-auto-prep-output');
+  output.innerHTML = `
+    <div class="ask-mark-auto-prep-heading">
+      <span class="source-category">Ask Mark</span>
+      <h2>Preparing you for ${escapeHtml(pending.book?.title || 'this book')}</h2>
+      <p class="status">Mark is preparing a spoiler-free orientation…</p>
+    </div>`;
+
+  try {
+    const text = currentBookTextForProfile(pending.book);
+    const response = await fetch('/api/book-guide', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        book:{
+          ...pending.book,
+          description:[
+            String(pending.book?.description || '').trim(),
+            `Ask Mark preparation request: ${pending.prompt}`
+          ].filter(Boolean).join('\n')
+        },
+        spoilerMode:'none',
+        sample:boundedAiBookSample(text, 22000)
+      })
+    });
+
+    const payload = await response.json().catch(()=>({}));
+    if (!response.ok) throw new Error(payload.detail || payload.error || `HTTP ${response.status}`);
+    const guide = payload.guide || {};
+    const context = Array.isArray(guide.context) ? guide.context : [];
+    const characters = Array.isArray(guide.characters) ? guide.characters : [];
+    const themes = Array.isArray(guide.themes) ? guide.themes : [];
+    const readingTips = Array.isArray(guide.readingTips) ? guide.readingTips : [];
+
+    output.innerHTML = `
+      <article class="ask-mark-auto-prep-response">
+        <div class="mark-response-heading">
+          <span>Ask Mark</span>
+          <strong>Before you read ${escapeHtml(pending.book?.title || 'this book')}</strong>
+        </div>
+        <p>${escapeHtml(guide.overview || 'Here is a spoiler-free orientation for the book.')}</p>
+        ${guide.setting ? `<section><h3>Setting</h3><p>${escapeHtml(guide.setting)}</p></section>` : ''}
+        ${context.length ? `<section><h3>What you should know first</h3><ul>${context.map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+        ${characters.length ? `<section><h3>People to recognize</h3><ul>${characters.slice(0,8).map((item)=>`<li><strong>${escapeHtml(item.name || '')}</strong>${item.role ? ` — ${escapeHtml(item.role)}` : ''}</li>`).join('')}</ul></section>` : ''}
+        ${themes.length ? `<section><h3>Ideas and themes to watch</h3><ul>${themes.slice(0,8).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+        ${readingTips.length ? `<section><h3>Recommended approach</h3><ul>${readingTips.slice(0,8).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+        ${guide.spoilerNote ? `<p class="difficulty-disclaimer">${escapeHtml(guide.spoilerNote)}</p>` : ''}
+        <div class="ask-mark-auto-prep-question">
+          <strong>Your request</strong>
+          <p>${escapeHtml(pending.prompt)}</p>
+        </div>
+      </article>`;
+    return true;
+  } catch (error) {
+    output.innerHTML = `
+      <article class="ask-mark-auto-prep-response">
+        <div class="mark-response-heading"><span>Ask Mark</span><strong>Preparation unavailable</strong></div>
+        <p class="status error">${escapeHtml(error.message)}</p>
+      </article>`;
+    return false;
+  }
+}
+
+
 function renderAiCenter() {
   stopReader();
   const hasBook = Boolean(state.title && state.currentText && state.words?.length);
@@ -18839,6 +18929,11 @@ function renderAiCenter() {
     output.hidden = false;
     output.innerHTML = `<h2>Current-context summary workspace</h2><p>The AI summary action will use a bounded section around the current reading position rather than sending the entire book. Return to the Reader, position the text, and use the Learn controls for passage-based analysis.</p><blockquote>${escapeHtml(sample.slice(0,700))}${sample.length>700?'…':''}</blockquote><button class="primary" type="button" data-action="reader">Return to Reader</button>`;
   });
+
+  const pendingPreparationOutput = app.querySelector('#ai-center-output');
+  if (window.__markSetGoPendingAskMarkPreparation && pendingPreparationOutput) {
+    requestAnimationFrame(() => runPendingAskMarkPreparation(pendingPreparationOutput));
+  }
 }
 
 function renderKnowledgeGraph() {

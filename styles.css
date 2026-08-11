@@ -13998,3 +13998,44 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
 #reader.manual-pace-active {
   cursor:default;
 }
+
+
+/* Ask Mark automatic Prepare Me handoff */
+.ask-mark-auto-prep-output {
+  display:block;
+  margin-top:1rem;
+}
+.ask-mark-auto-prep-response {
+  padding:1rem 1.1rem;
+  border:1px solid rgba(31,78,121,.18);
+  border-radius:14px;
+  background:linear-gradient(180deg,#fff,#f7f9fc);
+}
+.ask-mark-auto-prep-response .mark-response-heading {
+  margin-bottom:.8rem;
+}
+.ask-mark-auto-prep-response section {
+  margin:.9rem 0;
+}
+.ask-mark-auto-prep-response h3 {
+  margin:0 0 .3rem;
+  color:#153e68;
+  font-size:1rem;
+}
+.ask-mark-auto-prep-response ul {
+  margin:.35rem 0 0;
+  padding-left:1.15rem;
+}
+.ask-mark-auto-prep-response li {
+  margin:.25rem 0;
+  line-height:1.45;
+}
+.ask-mark-auto-prep-question {
+  margin-top:1rem;
+  padding:.75rem;
+  border-left:3px solid #d4af37;
+  background:rgba(220,235,247,.35);
+}
+.ask-mark-auto-prep-question p {
+  margin:.25rem 0 0;
+}
