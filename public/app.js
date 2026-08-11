@@ -923,6 +923,18 @@ const BROWSE_LIBRARY_SOURCES = [
   { provider: 'google', title: 'Google Books', note: 'Preview modern and public-domain titles', icon: 'GB' }
 ];
 
+
+const FOUNDING_DOCUMENTS_CATALOG = [{"id":"founding-1","title":"Magna Carta (1215)","author":"King John / English barons","era":"Colonial Foundations","year":1215,"topics":"rights law liberty charter","query":"Magna Carta 1215","sourceUrl":"https://www.archives.gov/founding-docs"},{"id":"founding-2","title":"Petition of Right","author":"Parliament of England","era":"Colonial Foundations","year":1628,"topics":"rights taxation due process","query":"Petition of Right 1628","sourceUrl":"https://avalon.law.yale.edu/17th_century/petright.asp"},{"id":"founding-3","title":"Mayflower Compact","author":"Pilgrims at Plymouth","era":"Colonial Foundations","year":1620,"topics":"self government covenant compact","query":"Mayflower Compact","sourceUrl":"https://www.loc.gov/resource/rbpe.03302400/"},{"id":"founding-4","title":"Massachusetts Body of Liberties","author":"Massachusetts Bay Colony","era":"Colonial Foundations","year":1641,"topics":"rights liberties colonial law","query":"Massachusetts Body of Liberties 1641","sourceUrl":"https://avalon.law.yale.edu/17th_century/mass01.asp"},{"id":"founding-5","title":"Fundamental Orders of Connecticut","author":"Connecticut Colony","era":"Colonial Foundations","year":1639,"topics":"constitution self government Connecticut","query":"Fundamental Orders of Connecticut","sourceUrl":"https://avalon.law.yale.edu/17th_century/order.asp"},{"id":"founding-6","title":"English Bill of Rights","author":"Parliament of England","era":"Colonial Foundations","year":1689,"topics":"rights parliament monarchy","query":"English Bill of Rights 1689","sourceUrl":"https://avalon.law.yale.edu/17th_century/england.asp"},{"id":"founding-7","title":"Two Treatises of Government","author":"John Locke","era":"Colonial Foundations","year":1689,"topics":"natural rights government consent property","query":"Locke Two Treatises Government","sourceUrl":"https://www.gutenberg.org/ebooks/7370"},{"id":"founding-8","title":"Cato's Letters","author":"John Trenchard & Thomas Gordon","era":"Colonial Foundations","year":1720,"topics":"liberty republicanism corruption","query":"Cato Letters Trenchard Gordon","sourceUrl":"https://oll.libertyfund.org/title/trenchard-cato-s-letters-vol-1"},{"id":"founding-9","title":"Albany Plan of Union","author":"Benjamin Franklin","era":"Road to Revolution","year":1754,"topics":"union colonies Franklin","query":"Albany Plan of Union","sourceUrl":"https://avalon.law.yale.edu/18th_century/albany.asp"},{"id":"founding-10","title":"Resolutions of the Stamp Act Congress","author":"Stamp Act Congress","era":"Road to Revolution","year":1765,"topics":"taxation representation rights","query":"Stamp Act Congress resolutions 1765","sourceUrl":"https://avalon.law.yale.edu/18th_century/resolu65.asp"},{"id":"founding-11","title":"Virginia Resolves on the Stamp Act","author":"Patrick Henry / Virginia House of Burgesses","era":"Road to Revolution","year":1765,"topics":"taxation representation Virginia","query":"Virginia Resolves Stamp Act","sourceUrl":"https://avalon.law.yale.edu/18th_century/virginia_resolutions_1765.asp"},{"id":"founding-12","title":"Letters from a Farmer in Pennsylvania","author":"John Dickinson","era":"Road to Revolution","year":1767,"topics":"taxation liberty parliament","query":"Letters Farmer Pennsylvania Dickinson","sourceUrl":"https://oll.libertyfund.org/title/dickinson-letters-from-a-farmer-in-pennsylvania"},{"id":"founding-13","title":"Massachusetts Circular Letter","author":"Samuel Adams / James Otis","era":"Road to Revolution","year":1768,"topics":"taxation colonial rights","query":"Massachusetts Circular Letter 1768","sourceUrl":"https://avalon.law.yale.edu/18th_century/mass_circ_let_1768.asp"},{"id":"founding-14","title":"Declaration and Resolves of the First Continental Congress","author":"Continental Congress","era":"Road to Revolution","year":1774,"topics":"rights grievances congress","query":"Declaration Resolves First Continental Congress","sourceUrl":"https://avalon.law.yale.edu/18th_century/resolves.asp"},{"id":"founding-15","title":"Articles of Association","author":"First Continental Congress","era":"Road to Revolution","year":1774,"topics":"boycott association congress","query":"Continental Association 1774","sourceUrl":"https://avalon.law.yale.edu/18th_century/contcong_10-20-74.asp"},{"id":"founding-16","title":"Patrick Henry's 'Give Me Liberty' Speech","author":"Patrick Henry","era":"Road to Revolution","year":1775,"topics":"liberty revolution speech","query":"Patrick Henry Give Me Liberty speech","sourceUrl":"https://avalon.law.yale.edu/18th_century/patrick.asp"},{"id":"founding-17","title":"Olive Branch Petition","author":"Second Continental Congress","era":"Road to Revolution","year":1775,"topics":"petition George III reconciliation","query":"Olive Branch Petition 1775","sourceUrl":"https://avalon.law.yale.edu/18th_century/olive.asp"},{"id":"founding-18","title":"Common Sense","author":"Thomas Paine","era":"Road to Revolution","year":1776,"topics":"independence monarchy republic","query":"Thomas Paine Common Sense","sourceUrl":"https://www.gutenberg.org/ebooks/147"},{"id":"founding-19","title":"Virginia Declaration of Rights","author":"George Mason","era":"Independence","year":1776,"topics":"rights liberty Virginia Mason","query":"Virginia Declaration of Rights","sourceUrl":"https://www.archives.gov/founding-docs/virginia-declaration-of-rights"},{"id":"founding-20","title":"Lee Resolution","author":"Richard Henry Lee","era":"Independence","year":1776,"topics":"independence resolution congress","query":"Lee Resolution independence 1776","sourceUrl":"https://www.archives.gov/milestone-documents/lee-resolution"},{"id":"founding-21","title":"Declaration of Independence","author":"Continental Congress / Thomas Jefferson","era":"Independence","year":1776,"topics":"independence natural rights equality","query":"Declaration of Independence","sourceUrl":"https://www.archives.gov/founding-docs/declaration"},{"id":"founding-22","title":"Jefferson's Rough Draft of the Declaration","author":"Thomas Jefferson","era":"Independence","year":1776,"topics":"declaration draft Jefferson","query":"Jefferson rough draft Declaration Independence","sourceUrl":"https://www.loc.gov/exhibits/declara/ruffdrft.html"},{"id":"founding-23","title":"Articles of Confederation","author":"Continental Congress","era":"Revolutionary Government","year":1777,"topics":"confederation first constitution states","query":"Articles of Confederation","sourceUrl":"https://guides.loc.gov/articles-of-confederation"},{"id":"founding-24","title":"Pennsylvania Constitution of 1776","author":"Pennsylvania Convention","era":"Revolutionary Government","year":1776,"topics":"state constitution Pennsylvania","query":"Pennsylvania Constitution 1776","sourceUrl":"https://avalon.law.yale.edu/18th_century/pa08.asp"},{"id":"founding-25","title":"Massachusetts Constitution of 1780","author":"John Adams / Massachusetts Convention","era":"Revolutionary Government","year":1780,"topics":"state constitution Adams rights","query":"Massachusetts Constitution 1780","sourceUrl":"https://malegislature.gov/Laws/Constitution"},{"id":"founding-26","title":"Virginia Plan","author":"Edmund Randolph / James Madison","era":"Constitutional Convention","year":1787,"topics":"Virginia Plan convention representation","query":"Virginia Plan 1787","sourceUrl":"https://avalon.law.yale.edu/18th_century/vatexta.asp"},{"id":"founding-27","title":"New Jersey Plan","author":"William Paterson","era":"Constitutional Convention","year":1787,"topics":"New Jersey Plan convention representation","query":"New Jersey Plan 1787","sourceUrl":"https://avalon.law.yale.edu/18th_century/patexta.asp"},{"id":"founding-28","title":"Hamilton Plan","author":"Alexander Hamilton","era":"Constitutional Convention","year":1787,"topics":"Hamilton Plan convention executive","query":"Hamilton Plan 1787","sourceUrl":"https://avalon.law.yale.edu/18th_century/hamtexta.asp"},{"id":"founding-29","title":"Madison's Notes of the Constitutional Convention","author":"James Madison","era":"Constitutional Convention","year":1787,"topics":"convention debates Madison notes","query":"Madison Notes Constitutional Convention","sourceUrl":"https://avalon.law.yale.edu/subject_menus/debcont.asp"},{"id":"founding-30","title":"Committee of Detail Draft","author":"Constitutional Convention","era":"Constitutional Convention","year":1787,"topics":"constitution draft committee detail","query":"Committee of Detail Draft Constitution 1787","sourceUrl":"https://avalon.law.yale.edu/18th_century/const08.asp"},{"id":"founding-31","title":"Constitution of the United States","author":"Constitutional Convention","era":"Constitutional Convention","year":1787,"topics":"constitution federal government articles","query":"United States Constitution","sourceUrl":"https://www.archives.gov/founding-docs/constitution"},{"id":"founding-32","title":"George Mason's Objections to the Constitution","author":"George Mason","era":"Ratification Debate","year":1787,"topics":"anti federalist objections rights","query":"George Mason objections Constitution 1787","sourceUrl":"https://avalon.law.yale.edu/18th_century/mason.asp"},{"id":"founding-33","title":"Brutus I","author":"Robert Yates (attributed)","era":"Ratification Debate","year":1787,"topics":"anti federalist Brutus consolidated government","query":"Brutus I anti federalist","sourceUrl":"https://teachingamericanhistory.org/document/brutus-i/"},{"id":"founding-34","title":"Centinel I","author":"Samuel Bryan (attributed)","era":"Ratification Debate","year":1787,"topics":"anti federalist Centinel liberty","query":"Centinel I anti federalist","sourceUrl":"https://teachingamericanhistory.org/document/centinel-i/"},{"id":"founding-35","title":"Federal Farmer I","author":"Federal Farmer (traditionally Richard Henry Lee)","era":"Ratification Debate","year":1787,"topics":"anti federalist Federal Farmer","query":"Federal Farmer Letter I","sourceUrl":"https://teachingamericanhistory.org/document/letters-from-the-federal-farmer-letter-i/"},{"id":"founding-36","title":"Cato III","author":"Cato (attributed)","era":"Ratification Debate","year":1787,"topics":"anti federalist executive presidency","query":"Cato III anti federalist","sourceUrl":"https://teachingamericanhistory.org/document/cato-iii/"},{"id":"founding-37","title":"Luther Martin's Genuine Information","author":"Luther Martin","era":"Ratification Debate","year":1788,"topics":"anti federalist convention Maryland","query":"Luther Martin Genuine Information","sourceUrl":"https://avalon.law.yale.edu/18th_century/martin.asp"},{"id":"founding-38","title":"James Madison's Proposed Amendments","author":"James Madison","era":"Rights & Amendments","year":1789,"topics":"bill rights amendments Madison","query":"Madison proposed amendments 1789","sourceUrl":"https://www.archives.gov/founding-docs/bill-of-rights/how-did-it-happen"},{"id":"founding-39","title":"Bill of Rights (12 Proposed Amendments)","author":"First Congress","era":"Rights & Amendments","year":1789,"topics":"bill rights twelve proposed amendments","query":"Bill of Rights 1789 proposed twelve amendments","sourceUrl":"https://www.archives.gov/founding-docs/bill-of-rights"},{"id":"founding-40","title":"Bill of Rights (First Ten Amendments)","author":"United States","era":"Rights & Amendments","year":1791,"topics":"bill rights amendments liberty","query":"Bill of Rights first ten amendments","sourceUrl":"https://www.archives.gov/founding-docs/bill-of-rights"},{"id":"founding-41","title":"Washington's First Inaugural Address","author":"George Washington","era":"Early Republic","year":1789,"topics":"inaugural executive republic Washington","query":"George Washington First Inaugural Address","sourceUrl":"https://avalon.law.yale.edu/18th_century/wash1.asp"},{"id":"founding-42","title":"Washington's Farewell Address","author":"George Washington","era":"Early Republic","year":1796,"topics":"farewell parties foreign alliances","query":"Washington Farewell Address","sourceUrl":"https://avalon.law.yale.edu/18th_century/washing.asp"},{"id":"founding-43","title":"Alien and Sedition Acts","author":"Fifth Congress","era":"Early Republic","year":1798,"topics":"sedition aliens civil liberties","query":"Alien Sedition Acts 1798","sourceUrl":"https://avalon.law.yale.edu/subject_menus/alsedact.asp"},{"id":"founding-44","title":"Kentucky Resolutions","author":"Thomas Jefferson (drafted)","era":"Early Republic","year":1798,"topics":"states rights nullification Kentucky","query":"Kentucky Resolutions 1798","sourceUrl":"https://avalon.law.yale.edu/18th_century/kenres.asp"},{"id":"founding-45","title":"Virginia Resolutions","author":"James Madison (drafted)","era":"Early Republic","year":1798,"topics":"states rights Virginia resolutions","query":"Virginia Resolutions 1798","sourceUrl":"https://avalon.law.yale.edu/18th_century/virres.asp"},{"id":"founding-46","title":"Jefferson's First Inaugural Address","author":"Thomas Jefferson","era":"Early Republic","year":1801,"topics":"inaugural republican government Jefferson","query":"Jefferson First Inaugural Address","sourceUrl":"https://avalon.law.yale.edu/19th_century/jefinau1.asp"},{"id":"founding-47","title":"Marbury v. Madison","author":"U.S. Supreme Court / John Marshall","era":"Early Republic","year":1803,"topics":"judicial review supreme court","query":"Marbury v Madison opinion","sourceUrl":"https://www.loc.gov/resource/llst.008/?sp=137"},{"id":"founding-48","title":"McCulloch v. Maryland","author":"U.S. Supreme Court / John Marshall","era":"Early Republic","year":1819,"topics":"implied powers supremacy bank","query":"McCulloch v Maryland opinion","sourceUrl":"https://www.loc.gov/resource/llst.017/?sp=316"},{"id":"founding-49","title":"Monroe Doctrine","author":"James Monroe","era":"Early Republic","year":1823,"topics":"foreign policy Americas Europe","query":"Monroe Doctrine 1823","sourceUrl":"https://avalon.law.yale.edu/19th_century/monroe.asp"},{"id":"federalist-1","title":"Federalist No. 1","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 1","query":"Federalist No. 1 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-2","title":"Federalist No. 2","author":"John Jay","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 2","query":"Federalist No. 2 John Jay","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-3","title":"Federalist No. 3","author":"John Jay","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 3","query":"Federalist No. 3 John Jay","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-4","title":"Federalist No. 4","author":"John Jay","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 4","query":"Federalist No. 4 John Jay","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-5","title":"Federalist No. 5","author":"John Jay","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 5","query":"Federalist No. 5 John Jay","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-6","title":"Federalist No. 6","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 6","query":"Federalist No. 6 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-7","title":"Federalist No. 7","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 7","query":"Federalist No. 7 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-8","title":"Federalist No. 8","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 8","query":"Federalist No. 8 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-9","title":"Federalist No. 9","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 9","query":"Federalist No. 9 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-10","title":"Federalist No. 10","author":"James Madison","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 10","query":"Federalist No. 10 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-11","title":"Federalist No. 11","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 11","query":"Federalist No. 11 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-12","title":"Federalist No. 12","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 12","query":"Federalist No. 12 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-13","title":"Federalist No. 13","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 13","query":"Federalist No. 13 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-14","title":"Federalist No. 14","author":"James Madison","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 14","query":"Federalist No. 14 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-15","title":"Federalist No. 15","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 15","query":"Federalist No. 15 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-16","title":"Federalist No. 16","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 16","query":"Federalist No. 16 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-17","title":"Federalist No. 17","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 17","query":"Federalist No. 17 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-18","title":"Federalist No. 18","author":"James Madison & Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 18","query":"Federalist No. 18 James Madison & Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-19","title":"Federalist No. 19","author":"James Madison & Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 19","query":"Federalist No. 19 James Madison & Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-20","title":"Federalist No. 20","author":"James Madison & Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 20","query":"Federalist No. 20 James Madison & Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-21","title":"Federalist No. 21","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 21","query":"Federalist No. 21 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-22","title":"Federalist No. 22","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 22","query":"Federalist No. 22 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-23","title":"Federalist No. 23","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 23","query":"Federalist No. 23 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-24","title":"Federalist No. 24","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 24","query":"Federalist No. 24 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-25","title":"Federalist No. 25","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 25","query":"Federalist No. 25 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-26","title":"Federalist No. 26","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 26","query":"Federalist No. 26 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-27","title":"Federalist No. 27","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 27","query":"Federalist No. 27 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-28","title":"Federalist No. 28","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 28","query":"Federalist No. 28 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-29","title":"Federalist No. 29","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 29","query":"Federalist No. 29 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-30","title":"Federalist No. 30","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 30","query":"Federalist No. 30 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-31","title":"Federalist No. 31","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 31","query":"Federalist No. 31 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-32","title":"Federalist No. 32","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 32","query":"Federalist No. 32 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-33","title":"Federalist No. 33","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 33","query":"Federalist No. 33 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-34","title":"Federalist No. 34","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 34","query":"Federalist No. 34 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-35","title":"Federalist No. 35","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 35","query":"Federalist No. 35 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-36","title":"Federalist No. 36","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 36","query":"Federalist No. 36 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-37","title":"Federalist No. 37","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 37","query":"Federalist No. 37 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-38","title":"Federalist No. 38","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 38","query":"Federalist No. 38 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-39","title":"Federalist No. 39","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 39","query":"Federalist No. 39 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-40","title":"Federalist No. 40","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 40","query":"Federalist No. 40 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-41","title":"Federalist No. 41","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 41","query":"Federalist No. 41 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-42","title":"Federalist No. 42","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 42","query":"Federalist No. 42 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-43","title":"Federalist No. 43","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 43","query":"Federalist No. 43 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-44","title":"Federalist No. 44","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 44","query":"Federalist No. 44 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-45","title":"Federalist No. 45","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 45","query":"Federalist No. 45 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-46","title":"Federalist No. 46","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 46","query":"Federalist No. 46 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-47","title":"Federalist No. 47","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 47","query":"Federalist No. 47 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-48","title":"Federalist No. 48","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 48","query":"Federalist No. 48 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-49","title":"Federalist No. 49","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 49","query":"Federalist No. 49 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-50","title":"Federalist No. 50","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 50","query":"Federalist No. 50 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-51","title":"Federalist No. 51","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 51","query":"Federalist No. 51 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-52","title":"Federalist No. 52","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 52","query":"Federalist No. 52 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-53","title":"Federalist No. 53","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 53","query":"Federalist No. 53 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-54","title":"Federalist No. 54","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 54","query":"Federalist No. 54 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-55","title":"Federalist No. 55","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 55","query":"Federalist No. 55 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-56","title":"Federalist No. 56","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 56","query":"Federalist No. 56 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-57","title":"Federalist No. 57","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 57","query":"Federalist No. 57 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-58","title":"Federalist No. 58","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 58","query":"Federalist No. 58 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-59","title":"Federalist No. 59","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 59","query":"Federalist No. 59 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-60","title":"Federalist No. 60","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 60","query":"Federalist No. 60 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-61","title":"Federalist No. 61","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 61","query":"Federalist No. 61 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-62","title":"Federalist No. 62","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 62","query":"Federalist No. 62 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-63","title":"Federalist No. 63","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 63","query":"Federalist No. 63 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-64","title":"Federalist No. 64","author":"John Jay","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 64","query":"Federalist No. 64 John Jay","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-65","title":"Federalist No. 65","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 65","query":"Federalist No. 65 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-66","title":"Federalist No. 66","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 66","query":"Federalist No. 66 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-67","title":"Federalist No. 67","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 67","query":"Federalist No. 67 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-68","title":"Federalist No. 68","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 68","query":"Federalist No. 68 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-69","title":"Federalist No. 69","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 69","query":"Federalist No. 69 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-70","title":"Federalist No. 70","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 70","query":"Federalist No. 70 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-71","title":"Federalist No. 71","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 71","query":"Federalist No. 71 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-72","title":"Federalist No. 72","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 72","query":"Federalist No. 72 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-73","title":"Federalist No. 73","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 73","query":"Federalist No. 73 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-74","title":"Federalist No. 74","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 74","query":"Federalist No. 74 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-75","title":"Federalist No. 75","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 75","query":"Federalist No. 75 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-76","title":"Federalist No. 76","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 76","query":"Federalist No. 76 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-77","title":"Federalist No. 77","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 77","query":"Federalist No. 77 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-78","title":"Federalist No. 78","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 78","query":"Federalist No. 78 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-79","title":"Federalist No. 79","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 79","query":"Federalist No. 79 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-80","title":"Federalist No. 80","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 80","query":"Federalist No. 80 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-81","title":"Federalist No. 81","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 81","query":"Federalist No. 81 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-81-85"},{"id":"federalist-82","title":"Federalist No. 82","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 82","query":"Federalist No. 82 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-81-85"},{"id":"federalist-83","title":"Federalist No. 83","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 83","query":"Federalist No. 83 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-81-85"},{"id":"federalist-84","title":"Federalist No. 84","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 84","query":"Federalist No. 84 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-81-85"},{"id":"federalist-85","title":"Federalist No. 85","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 85","query":"Federalist No. 85 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-81-85"}];
+
+const FOUNDING_READING_PATHS = [
+  { id:'essential', label:'Essential 10', query:'Declaration Constitution Bill of Rights Federalist 10 Federalist 51 Common Sense Virginia Declaration Articles Confederation Farewell Brutus I' },
+  { id:'independence', label:'Road to Independence', era:'Road to Revolution' },
+  { id:'constitution', label:'Creating the Constitution', era:'Constitutional Convention' },
+  { id:'ratification', label:'Federalists vs. Anti-Federalists', era:'Ratification Debate' },
+  { id:'rights', label:'Origins of the Bill of Rights', era:'Rights & Amendments' },
+  { id:'republic', label:'Early Republic', era:'Early Republic' }
+];
+
 const BROWSE_COLLECTIONS = [
   ['Great Books of the Western World', 'Great Books of the Western World'],
   ['Classics for first-time readers', 'The Great Gatsby Pride and Prejudice A Tale of Two Cities'],
@@ -9093,6 +9105,7 @@ async function renderReader(kind) {
   if (normalizedKind === 'unified-library') return renderUnifiedLibrary();
   if (normalizedKind === 'gutenberg') return renderGutenbergLibrary();
   if (normalizedKind === 'great-books') return renderGreatBooksLibrary();
+  if (normalizedKind === 'founding-documents') return renderFoundingDocumentsLibrary();
   if (normalizedKind === 'syntopicon') return renderSyntopicon();
   if (normalizedKind === 'bible') return renderBibleStudy();
   if (normalizedKind === 'current-reading') return renderCurrentReading();
@@ -15418,6 +15431,227 @@ async function renderBibleStudy() {
   });
 }
 
+
+function foundingDocumentSearchText(item) {
+  return `${item.title} ${item.author} ${item.era} ${item.year} ${item.topics || ''}`.toLowerCase();
+}
+
+function openFoundingDocumentSearch(item, format = 'best') {
+  if (!item) return;
+  localStorage.setItem('markSetGoPendingLibrarySearch', item.query || item.title);
+  localStorage.setItem('markSetGoPendingBrowseScope', 'all');
+  renderUnifiedLibrary({ query:item.query || item.title, scope:'all', provider:'all' });
+  requestAnimationFrame(() => {
+    const formatSelect = app.querySelector('#unified-library-format');
+    if (formatSelect) formatSelect.value = format;
+  });
+}
+
+function downloadFoundingDocumentText(item, button, status) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Finding text…';
+  status.className = 'status founding-doc-status';
+  status.textContent = 'Searching connected public-text libraries…';
+
+  const queries = [item.query, `${item.title} ${item.author}`, item.title].filter(Boolean);
+  const tryQuery = async (index = 0) => {
+    if (index >= queries.length) throw new Error('No directly downloadable plain-text edition was found. Use Original Source or Find & Read.');
+    const payload = await loadApiPayload(`/api/library/search?q=${encodeURIComponent(queries[index])}&provider=all&format=text`);
+    const candidates = (payload.books || []).filter((book) => book.readable);
+    if (!candidates.length) return tryQuery(index + 1);
+
+    for (const candidate of candidates.slice(0, 6)) {
+      try {
+        const loaded = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(candidate.provider)}&id=${encodeURIComponent(candidate.id)}&format=text`);
+        const text = String(loaded.text || '').trim();
+        if (splitWords(text).length < 120) continue;
+        const blob = new Blob([text], { type:'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${item.title.replace(/[^\w\s.-]+/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').toLowerCase() || 'founding-document'}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        status.className = 'status success founding-doc-status';
+        status.textContent = `Downloaded readable text from ${LIBRARY_PROVIDERS[candidate.provider]?.label || candidate.provider}.`;
+        return;
+      } catch {}
+    }
+    return tryQuery(index + 1);
+  };
+
+  tryQuery().catch((error) => {
+    status.className = 'status error founding-doc-status';
+    status.textContent = error.message;
+  }).finally(() => {
+    button.disabled = false;
+    button.textContent = original;
+  });
+}
+
+function renderFoundingDocumentsLibrary() {
+  stopReader();
+  const eras = [...new Set(FOUNDING_DOCUMENTS_CATALOG.map((item) => item.era))];
+
+  app.innerHTML = `
+    <section class="panel curated-library founding-documents-library">
+      <div class="library-heading founding-documents-heading">
+        <div>
+          <span class="source-category">Browse · American Founding</span>
+          <h1>Founding Documents</h1>
+          <p>Read the primary sources that shaped American independence, constitutional government, rights, ratification, and the early republic.</p>
+        </div>
+        <div class="source-actions">
+          <button class="secondary" type="button" data-read="great-books">Great Books</button>
+          <button class="secondary" type="button" data-action="browse">Back to Browse</button>
+        </div>
+      </div>
+
+      <div class="founding-featured-grid">
+        ${[
+          ['Declaration of Independence','1776 · Independence'],
+          ['Constitution of the United States','1787 · Constitutional Convention'],
+          ['Bill of Rights (First Ten Amendments)','1791 · Rights & Amendments'],
+          ['Federalist No. 10','1787 · Ratification Debate']
+        ].map(([title,meta]) => {
+          const item = FOUNDING_DOCUMENTS_CATALOG.find((doc) => doc.title === title);
+          return `<button class="founding-feature-card" type="button" data-founding-read="${escapeHtml(item?.id || '')}">
+            <span class="source-category">Featured</span>
+            <strong>${escapeHtml(title)}</strong>
+            <small>${escapeHtml(meta)}</small>
+          </button>`;
+        }).join('')}
+      </div>
+
+      <div class="great-books-study-intro founding-doc-stats">
+        <article><strong>${FOUNDING_DOCUMENTS_CATALOG.length}</strong><span>curated primary documents</span></article>
+        <article><strong>85</strong><span>Federalist essays</span></article>
+        <article><strong>${eras.length}</strong><span>historical collections</span></article>
+      </div>
+
+      <div class="founding-reading-paths">
+        <span class="source-category">Reading paths</span>
+        <div class="browse-collection-list">
+          ${FOUNDING_READING_PATHS.map((path) => `<button class="browse-collection-chip" type="button" data-founding-path="${escapeHtml(path.id)}">${escapeHtml(path.label)}</button>`).join('')}
+          <button class="browse-collection-chip is-active" type="button" data-founding-path="all">All documents</button>
+        </div>
+      </div>
+
+      <div class="founding-filter-bar">
+        <label class="curated-filter">Search documents, authors, years, or ideas
+          <input id="founding-doc-filter" type="search" placeholder="Madison, natural rights, executive power, 1787…">
+        </label>
+        <label>Collection
+          <select id="founding-era-filter">
+            <option value="all">All collections</option>
+            ${eras.map((era) => `<option value="${escapeHtml(era)}">${escapeHtml(era)}</option>`).join('')}
+          </select>
+        </label>
+        <label>Sort
+          <select id="founding-sort">
+            <option value="chronological">Chronological</option>
+            <option value="title">Title</option>
+            <option value="author">Author</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="founding-documents-results" class="curated-groups founding-document-results"></div>
+      <p class="library-note">Core constitutional sources are anchored to authoritative repositories including the National Archives and Library of Congress. “Find & Read” searches Mark, Set, Go!’s connected public-text libraries for a readable edition. “Download TXT” downloads a readable text edition when one is available; “Original Source” opens the curated source record.</p>
+    </section>`;
+
+  let activePath = 'all';
+
+  const renderResults = () => {
+    const query = (app.querySelector('#founding-doc-filter')?.value || '').trim().toLowerCase();
+    const era = app.querySelector('#founding-era-filter')?.value || 'all';
+    const sort = app.querySelector('#founding-sort')?.value || 'chronological';
+    const path = FOUNDING_READING_PATHS.find((item) => item.id === activePath);
+
+    let items = FOUNDING_DOCUMENTS_CATALOG.filter((item) => {
+      if (era !== 'all' && item.era !== era) return false;
+      if (path?.era && item.era !== path.era) return false;
+      if (path?.query) {
+        const wanted = path.query.toLowerCase();
+        const exactEssential = [
+          'Declaration of Independence','Constitution of the United States','Bill of Rights (First Ten Amendments)',
+          'Federalist No. 10','Federalist No. 51','Common Sense','Virginia Declaration of Rights',
+          'Articles of Confederation',"Washington's Farewell Address",'Brutus I'
+        ];
+        if (!exactEssential.includes(item.title)) return false;
+      }
+      return !query || foundingDocumentSearchText(item).includes(query);
+    });
+
+    items = [...items].sort((a,b) => {
+      if (sort === 'title') return a.title.localeCompare(b.title);
+      if (sort === 'author') return a.author.localeCompare(b.author) || a.year - b.year;
+      return a.year - b.year || a.title.localeCompare(b.title);
+    });
+
+    const grouped = groupBy(items, 'era');
+    const orderedEras = eras.filter((name) => grouped[name]?.length);
+    const results = app.querySelector('#founding-documents-results');
+    results.innerHTML = items.length ? orderedEras.map((eraName) => `
+      <details class="curated-era founding-era" open>
+        <summary>${escapeHtml(eraName)} <span>${grouped[eraName].length}</span></summary>
+        <div class="curated-grid founding-doc-grid">
+          ${grouped[eraName].map((item) => `
+            <article class="curated-card founding-document-card" data-founding-card="${escapeHtml(item.id)}">
+              <div>
+                <span class="source-category">${escapeHtml(String(item.year))}</span>
+                <h2>${escapeHtml(item.title)}</h2>
+                <p>${escapeHtml(item.author)}</p>
+                <small>${escapeHtml(item.era)}</small>
+              </div>
+              <div class="founding-doc-actions">
+                <button class="primary" type="button" data-founding-read="${escapeHtml(item.id)}">Find &amp; Read</button>
+                <button class="secondary" type="button" data-founding-download="${escapeHtml(item.id)}">Download TXT</button>
+                ${item.sourceUrl ? `<a class="secondary button-link" href="${escapeHtml(item.sourceUrl)}" target="_blank" rel="noopener noreferrer">Original Source</a>` : ''}
+              </div>
+              <p class="status founding-doc-status"></p>
+            </article>`).join('')}
+        </div>
+      </details>`).join('') : `<div class="empty-library"><h2>No matching documents</h2><p>Try another keyword, collection, or reading path.</p></div>`;
+
+    results.querySelectorAll('[data-founding-read]').forEach((button) => button.addEventListener('click', () => {
+      const item = FOUNDING_DOCUMENTS_CATALOG.find((doc) => doc.id === button.dataset.foundingRead);
+      openFoundingDocumentSearch(item, 'best');
+    }));
+    results.querySelectorAll('[data-founding-download]').forEach((button) => button.addEventListener('click', () => {
+      const item = FOUNDING_DOCUMENTS_CATALOG.find((doc) => doc.id === button.dataset.foundingDownload);
+      if (!item) return;
+      downloadFoundingDocumentText(item, button, button.closest('.founding-document-card')?.querySelector('.founding-doc-status'));
+    }));
+  };
+
+  app.querySelector('#founding-doc-filter')?.addEventListener('input', renderResults);
+  app.querySelector('#founding-era-filter')?.addEventListener('change', renderResults);
+  app.querySelector('#founding-sort')?.addEventListener('change', renderResults);
+  app.querySelectorAll('[data-founding-path]').forEach((button) => button.addEventListener('click', () => {
+    activePath = button.dataset.foundingPath || 'all';
+    app.querySelectorAll('[data-founding-path]').forEach((item) => item.classList.toggle('is-active', item === button));
+    if (activePath !== 'all') {
+      const path = FOUNDING_READING_PATHS.find((item) => item.id === activePath);
+      if (path?.era) app.querySelector('#founding-era-filter').value = path.era;
+      else app.querySelector('#founding-era-filter').value = 'all';
+    } else {
+      app.querySelector('#founding-era-filter').value = 'all';
+    }
+    renderResults();
+  }));
+  app.querySelectorAll('.founding-feature-card').forEach((button) => button.addEventListener('click', () => {
+    const item = FOUNDING_DOCUMENTS_CATALOG.find((doc) => doc.id === button.dataset.foundingRead);
+    openFoundingDocumentSearch(item, 'best');
+  }));
+
+  renderResults();
+}
+
+
 function renderGreatBooksLibrary() {
   stopReader();
   const grouped = groupBy(greatBooksCatalog, 'volume');
@@ -17176,6 +17410,7 @@ function renderBrowseHub() {
           <nav class="browse-hero-tags browse-hero-links" aria-label="Jump to Browse section">
             <a href="#browse-modern-guides">Modern Guides</a>
             <a href="#browse-free-books">Free Books</a>
+            <a href="#browse-founding-documents">Founding Documents</a>
             <a href="#browse-drm-free">DRM-Free Finder</a>
             <a href="#browse-collections">Collections</a>
           </nav>
@@ -17260,6 +17495,24 @@ function renderBrowseHub() {
           </div>
         </div>
         ${renderShelf(MODERN_GUIDE_SHELF, 'guide')}
+      </section>
+
+
+      <section id="browse-founding-documents" class="browse-section browse-founding-documents-section">
+        <div class="founding-browse-banner">
+          <div>
+            <span class="source-category">Primary Sources</span>
+            <h2>Founding Documents</h2>
+            <p>Explore more than 100 documents from colonial foundations through the early republic—including the Declaration, Constitution, Bill of Rights, all 85 Federalist essays, Anti-Federalist writings, Convention materials, and landmark early constitutional texts.</p>
+            <div class="founding-browse-pills">
+              <span>Independence</span><span>Constitution</span><span>Federalist</span><span>Anti-Federalist</span><span>Bill of Rights</span>
+            </div>
+          </div>
+          <div class="founding-browse-actions">
+            <strong>134 documents</strong>
+            <button class="primary" type="button" data-read="founding-documents">Explore collection</button>
+          </div>
+        </div>
       </section>
 
       <section id="browse-free-books" class="browse-section browse-free-books-section">
