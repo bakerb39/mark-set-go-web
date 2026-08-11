@@ -16785,18 +16785,55 @@ async function parsePdfFile(file, onProgress = () => {}) {
 
   const outline = await pdf.getOutline().catch(() => null);
   const toc = pdfOutlineToToc(outline || [], pageRefs);
-  let text = pages
+
+  // PDF imports must be page-authoritative: once PDF.js successfully extracts a
+  // page, that page's text is part of the document. Do not let later TOC cleanup
+  // remove a large range from a long book. Kindle-to-PDF style exports can carry
+  // a visible printed contents page while their embedded PDF outline is partial.
+  const rawPdfText = pages
     .map((page) => `\n\n[PDF Page ${page.pageNumber}]\n\n${page.text}`)
     .join('')
     .trim();
-  const normalizedPdf = normalizeImportedBookText(text, { title, author:pdfAuthor, removePrintedToc:true, removeRepeatedHeaders:false });
-  text = normalizedPdf.text;
+
+  // Keep the printed TOC in the PDF reading text for import reliability. It can
+  // still be represented in the Contents pane, but it must never be allowed to
+  // delete chapter text from the sequential page stream.
+  const normalizedPdf = normalizeImportedBookText(rawPdfText, {
+    title,
+    author: pdfAuthor,
+    removePrintedToc: false,
+    removeRepeatedHeaders: false
+  });
+  let text = normalizedPdf.text || rawPdfText;
+
+  // Safety guard: normalization of a PDF should never discard a meaningful
+  // portion of text that PDF.js already extracted. Fall back to the complete
+  // page stream if a future formatter regression becomes overly destructive.
+  if (rawPdfText.length && text.length < rawPdfText.length * 0.9) {
+    console.warn('PDF cleanup removed too much extracted text; using the complete page stream instead.', {
+      rawCharacters: rawPdfText.length,
+      normalizedCharacters: text.length,
+      pageCount: pdf.numPages
+    });
+    text = rawPdfText;
+  }
+
   const pdfDocumentToc = toc.map((item) => {
     const marker = item.pageNumber ? `[PDF Page ${item.pageNumber}]` : '';
     const position = marker ? text.indexOf(marker) : -1;
     if (position < 0) return null;
-    return { title:item.title, index:splitWords(text.slice(0, position)).length, type:'chapter', pageNumber:item.pageNumber };
+    const cleanTitle = String(item.title || '').replace(/\s+/g, ' ').trim();
+    if (!cleanTitle || /kindletopdf\.com/i.test(cleanTitle)) return null;
+    return { title:cleanTitle, index:splitWords(text.slice(0, position)).length, type:'chapter', pageNumber:item.pageNumber };
   }).filter(Boolean);
+
+  // A partial embedded outline must not override a much richer TOC detected
+  // from the actual book text. This is common in generated Kindle PDFs.
+  const detectedPdfToc = Array.isArray(normalizedPdf.toc) ? normalizedPdf.toc : [];
+  const minimumUsefulOutlineEntries = pdf.numPages >= 100 ? 5 : 2;
+  const outlineLooksComplete = pdfDocumentToc.length >= minimumUsefulOutlineEntries
+    && (!detectedPdfToc.length || pdfDocumentToc.length >= Math.max(2, Math.floor(detectedPdfToc.length * 0.35)));
+  const documentToc = outlineLooksComplete ? pdfDocumentToc : detectedPdfToc;
 
   const textCoverage = pdf.numPages ? textPages / pdf.numPages : 0;
   const likelyScanned = extractedCharacters < Math.max(200, pdf.numPages * 35)
@@ -16824,7 +16861,7 @@ async function parsePdfFile(file, onProgress = () => {}) {
       pages: pages.map(({ pageNumber, width, height }) => ({ pageNumber, width, height })),
       textCoverage,
       cleanup: normalizedPdf.report,
-      documentToc: pdfDocumentToc.length ? pdfDocumentToc : normalizedPdf.toc
+      documentToc
     },
     stats: {
       pageCount: pdf.numPages,
