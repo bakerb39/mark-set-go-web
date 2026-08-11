@@ -13608,11 +13608,9 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
   appearance: none;
   font: inherit;
   color: inherit;
+  text-align: left;
 }
 .import-file-button:disabled {
   cursor: progress;
-  opacity: .7;
-}
-.import-file-input[hidden] {
-  display: none !important;
+  opacity: .72;
 }
