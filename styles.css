@@ -13691,3 +13691,231 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
   .founding-filter-bar { grid-template-columns:1fr; }
   .founding-filter-bar .curated-filter { grid-column:auto; }
 }
+
+
+/* 2026-08-11: Reading List row repair.
+   The generic presentation-list rules are useful for ordinary cards, but they
+   must not flatten the Reading List's nested title/meta/download controls. */
+.presentation-list .reading-list-group > summary {
+  gap: .35rem !important;
+}
+.presentation-list .reading-list-group > summary span {
+  margin-left: .1rem !important;
+}
+.presentation-list .reading-list-item {
+  grid-template-columns: minmax(0,1fr) 170px 34px !important;
+  align-items: center !important;
+  gap: 14px !important;
+  padding: 9px 10px !important;
+  min-height: 58px !important;
+}
+.presentation-list .reading-list-item > div:first-child {
+  display: grid !important;
+  grid-template-columns: minmax(0,1fr) auto;
+  align-items: center !important;
+  column-gap: 10px !important;
+  row-gap: 3px !important;
+  min-width: 0 !important;
+}
+.presentation-list .reading-list-item > div:first-child h3 {
+  grid-column: 1;
+  min-width: 0;
+}
+.presentation-list .reading-list-item > div:first-child > p:not(.reading-list-item-note) {
+  grid-column: 1;
+}
+.presentation-list .reading-list-item > div:first-child > .difficulty-badge,
+.presentation-list .reading-list-item > div:first-child > [class*="difficulty"] {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  align-self: center;
+  white-space: nowrap;
+}
+.presentation-list .reading-list-item .free-text-links {
+  grid-column: 1 / -1 !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin: 3px 0 0 !important;
+}
+.presentation-list .reading-list-item .reading-list-item-note {
+  grid-column: 1 / -1;
+  margin-top: 3px !important;
+}
+.presentation-list .reading-list-item > label {
+  display: grid !important;
+  grid-template-columns: 1fr;
+  gap: 3px;
+  margin: 0 !important;
+  font-size: .68rem !important;
+  color: var(--muted);
+}
+.presentation-list .reading-list-item > label select {
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 32px !important;
+  padding: 4px 28px 4px 8px !important;
+  font-size: .72rem !important;
+}
+.presentation-list .reading-list-item > .bookmark-remove {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 30px !important;
+  min-width: 30px !important;
+  max-width: 30px !important;
+  height: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  justify-self: end !important;
+  border-radius: 7px !important;
+  font-size: 1rem !important;
+}
+.presentation-list .reading-title-link {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  text-align: left;
+}
+.presentation-list .reading-list-item .free-text-open,
+.presentation-list .reading-list-item .subtle-link {
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+/* Restored Progress & Awards primary dashboard */
+.progress-primary-kpis {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:12px;
+  margin:14px 0 18px;
+}
+.progress-primary-kpi {
+  display:grid;
+  gap:5px;
+  padding:16px;
+  border:1px solid rgba(31,78,121,.18);
+  border-radius:14px;
+  background:linear-gradient(180deg,#fff,#f7f9fc);
+}
+.progress-primary-kpi > span {
+  color:#173f69;
+  font-size:.74rem;
+  font-weight:800;
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+.progress-primary-kpi strong {
+  color:#102f55;
+  font-size:2rem;
+  line-height:1;
+}
+.progress-primary-kpi strong small {
+  font-size:.8rem;
+  font-weight:700;
+}
+.progress-primary-kpi p,
+.progress-primary-kpi small {
+  margin:0;
+  color:#64748b;
+  font-size:.74rem;
+}
+.progress-goal-track {
+  height:6px;
+  border-radius:999px;
+  background:rgba(148,163,184,.18);
+  overflow:hidden;
+}
+.progress-goal-track i {
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,#1c4f80,#d4af37);
+}
+.progress-performance-section,
+.progress-current-text,
+.progress-by-text {
+  margin:18px 0;
+  padding:16px;
+  border:1px solid rgba(148,163,184,.18);
+  border-radius:14px;
+  background:#fff;
+}
+.progress-performance-charts {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.progress-performance-chart {
+  min-width:0;
+}
+.current-text-kpis {
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:10px;
+}
+.current-text-kpis article {
+  display:grid;
+  gap:3px;
+  padding:11px;
+  border-radius:10px;
+  background:rgba(220,235,247,.42);
+}
+.current-text-kpis span,
+.current-text-kpis small {
+  font-size:.7rem;
+  color:#64748b;
+}
+.current-text-kpis strong {
+  color:#153e68;
+  font-size:1.3rem;
+}
+.performance-table-wrap {
+  overflow-x:auto;
+}
+.performance-by-text-table {
+  width:100%;
+  border-collapse:collapse;
+  font-size:.78rem;
+}
+.performance-by-text-table th,
+.performance-by-text-table td {
+  padding:9px 10px;
+  border-bottom:1px solid rgba(148,163,184,.16);
+  text-align:left;
+}
+.performance-by-text-table th {
+  color:#475569;
+  font-size:.68rem;
+  text-transform:uppercase;
+  letter-spacing:.035em;
+}
+.progress-secondary-heading {
+  margin:22px 0 8px;
+}
+.progress-secondary-heading h2 {
+  margin:3px 0 0;
+  color:#153e68;
+}
+
+@media(max-width:1000px) {
+  .progress-primary-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .progress-performance-charts { grid-template-columns:1fr; }
+  .current-text-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+@media(max-width:760px) {
+  .presentation-list .reading-list-item {
+    grid-template-columns:1fr !important;
+  }
+  .presentation-list .reading-list-item > .bookmark-remove {
+    justify-self:start !important;
+  }
+  .progress-primary-kpis { grid-template-columns:1fr; }
+  .current-text-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:480px) {
+  .current-text-kpis { grid-template-columns:1fr; }
+}

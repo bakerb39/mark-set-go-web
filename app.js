@@ -6238,6 +6238,92 @@ function renderProgressDashboard() {
   const goalPercent=Math.min(100,Math.round(awards.completed/Math.max(1,goal)*100));
   const learning=learningMetricsSummary();
 
+  // Primary performance dashboard restored.
+  const yearlyRows = readerWorkspaceYearData();
+  const speedGoal = readerWorkspaceSpeedGoal();
+  const comprehensionGoal = readerWorkspaceComprehensionGoal();
+  const latestYearWpm = [...yearlyRows].reverse().find((row)=>Number(row.wpm)>0)?.wpm || averageWpm || 0;
+  const latestYearComprehension = [...yearlyRows].reverse().find((row)=>Number(row.comprehension)>0)?.comprehension || awards.compAverage || 0;
+  const primaryEffectiveWpm = latestYearWpm && latestYearComprehension
+    ? Math.round(latestYearWpm * (latestYearComprehension / 100))
+    : effectiveWpm || 0;
+
+  const recentPaceRows = activity
+    .filter((row)=>Number(row.seconds)>0 && Number(row.wordsRead)>0)
+    .slice(0, 12);
+  const recentSplit = Math.max(1, Math.floor(recentPaceRows.length / 2));
+  const paceForRows = (rows) => {
+    const words = rows.reduce((sum,row)=>sum+(Number(row.wordsRead)||0),0);
+    const seconds = rows.reduce((sum,row)=>sum+(Number(row.seconds)||0),0);
+    return seconds ? Math.round(words/(seconds/60)) : 0;
+  };
+  const recentPace = paceForRows(recentPaceRows.slice(0,recentSplit));
+  const priorPace = paceForRows(recentPaceRows.slice(recentSplit));
+  const paceChange = priorPace ? Math.round(((recentPace-priorPace)/priorPace)*100) : 0;
+
+  const currentStats = readerWorkspaceCurrentTextStats();
+  let currentText = {
+    title: currentStats.title || '',
+    documentId: currentStats.documentId || '',
+    percent: Number(currentStats.percent)||0,
+    pace: Number(currentStats.pace)||0,
+    comprehension: Number(currentStats.comprehension)||0,
+    effective: Number(currentStats.effective)||0,
+    totalSeconds: Number(currentStats.totalSeconds)||0,
+    sessions: Number(currentStats.sessions)||0
+  };
+
+  if (!currentText.documentId) {
+    const fallback = [...progress].sort((a,b)=>new Date(b.updatedAt||b.lastReadAt||0)-new Date(a.updatedAt||a.lastReadAt||0))[0];
+    if (fallback) {
+      const id = String(fallback.documentId||'');
+      const rows = activity.filter((row)=>String(row.documentId||'')===id);
+      const comps = comprehension.filter((row)=>String(row.documentId||'')===id);
+      const seconds = rows.reduce((sum,row)=>sum+(Number(row.seconds)||0),0);
+      const words = rows.reduce((sum,row)=>sum+(Number(row.wordsRead)||0),0);
+      const comp = comps.length
+        ? Math.round(comps.reduce((sum,row)=>sum+(Number(row.scorePercent)||0),0)/comps.length)
+        : 0;
+      const totalWordsForBook = Math.max(0,Number(fallback.totalWords)||0);
+      const position = Math.max(0,Number(fallback.lastWord)||0,Number(fallback.furthestWord)||0);
+      const pace = seconds ? Math.round(words/(seconds/60)) : 0;
+      currentText = {
+        title:fallback.title||'Most recent text',
+        documentId:id,
+        percent:totalWordsForBook ? Math.min(100,Math.round(position/totalWordsForBook*100)) : 0,
+        pace,
+        comprehension:comp,
+        effective:pace&&comp ? Math.round(pace*(comp/100)) : 0,
+        totalSeconds:seconds,
+        sessions:rows.length
+      };
+    }
+  }
+
+  const performanceByText = progress.map((book)=>{
+    const id=String(book.documentId||'');
+    const rows=activity.filter((row)=>String(row.documentId||'')===id);
+    const comps=comprehension.filter((row)=>String(row.documentId||'')===id);
+    const seconds=rows.reduce((sum,row)=>sum+(Number(row.seconds)||0),0);
+    const words=rows.reduce((sum,row)=>sum+(Number(row.wordsRead)||0),0);
+    const wpm=seconds?Math.round(words/(seconds/60)):0;
+    const comp=comps.length?Math.round(comps.reduce((sum,row)=>sum+(Number(row.scorePercent)||0),0)/comps.length):0;
+    const effective=wpm&&comp?Math.round(wpm*(comp/100)):0;
+    const totalWordsForBook=Math.max(0,Number(book.totalWords)||0);
+    const position=Math.max(0,Number(book.lastWord)||0,Number(book.furthestWord)||0);
+    return {
+      id,
+      title:book.title||'Untitled',
+      wpm,
+      comprehension:comp,
+      effective,
+      sessions:rows.length,
+      percent:totalWordsForBook?Math.min(100,Math.round(position/totalWordsForBook*100)):0
+    };
+  }).filter((row)=>row.sessions||row.percent||row.comprehension)
+    .sort((a,b)=>b.sessions-a.sessions||b.percent-a.percent)
+    .slice(0,8);
+
   const modeCounts = activity.reduce((map,item)=>{
     const label=({
       highlight:'Highlight',
@@ -6265,6 +6351,84 @@ function renderProgressDashboard() {
         <button class="secondary" type="button" data-action="my-reading">My Reading List</button>
         <button id="clear-reading-progress" class="secondary" type="button">Clear recorded history</button>
       </div>
+    </div>
+
+    <section class="progress-primary-kpis">
+      <article class="progress-primary-kpi">
+        <span>Reading Speed</span>
+        <strong>${latestYearWpm || '—'}${latestYearWpm ? '<small> WPM</small>' : ''}</strong>
+        <p>Current recorded pace</p>
+        <div class="progress-goal-track"><i style="width:${latestYearWpm ? Math.min(100,Math.round(latestYearWpm/Math.max(1,speedGoal)*100)) : 0}%"></i></div>
+        <small>Goal: ${speedGoal} WPM</small>
+      </article>
+      <article class="progress-primary-kpi">
+        <span>Comprehension</span>
+        <strong>${latestYearComprehension || '—'}${latestYearComprehension ? '%' : ''}</strong>
+        <p>Current recorded understanding</p>
+        <div class="progress-goal-track"><i style="width:${latestYearComprehension ? Math.min(100,Math.round(latestYearComprehension/Math.max(1,comprehensionGoal)*100)) : 0}%"></i></div>
+        <small>Goal: ${comprehensionGoal}%</small>
+      </article>
+      <article class="progress-primary-kpi">
+        <span>Effective WPM</span>
+        <strong>${primaryEffectiveWpm || '—'}</strong>
+        <p>Speed adjusted for comprehension</p>
+        <small>Use this to avoid trading understanding for speed.</small>
+      </article>
+      <article class="progress-primary-kpi">
+        <span>Recent Pace Change</span>
+        <strong>${priorPace ? `${paceChange>0?'+':''}${paceChange}%` : '—'}</strong>
+        <p>${priorPace ? `${priorPace} → ${recentPace || 0} WPM` : 'More sessions needed'}</p>
+        <small>Recent sessions vs. the preceding group</small>
+      </article>
+    </section>
+
+    <section class="progress-performance-section">
+      <div class="section-heading">
+        <div><span class="source-category">Your reading year</span><h2>Speed &amp; comprehension over time</h2><p>Monthly performance with your current goals shown as reference lines.</p></div>
+      </div>
+      <div class="progress-performance-charts">
+        <article class="analytics-card progress-performance-chart">
+          <div class="analytics-heading"><div><h2>Reading speed</h2><p>${new Date().getFullYear()} monthly average</p></div><strong>${speedGoal} WPM goal</strong></div>
+          ${yearlyPerformanceChartSvg(yearlyRows,'wpm',{label:'Reading speed progress this year',suffix:' WPM',goal:speedGoal,kind:'speed'})}
+        </article>
+        <article class="analytics-card progress-performance-chart">
+          <div class="analytics-heading"><div><h2>Comprehension</h2><p>${new Date().getFullYear()} monthly average</p></div><strong>${comprehensionGoal}% goal</strong></div>
+          ${yearlyPerformanceChartSvg(yearlyRows,'comprehension',{label:'Comprehension progress this year',suffix:'%',goal:comprehensionGoal,kind:'comprehension'})}
+        </article>
+      </div>
+    </section>
+
+    <section class="progress-current-text">
+      <div class="section-heading">
+        <div><span class="source-category">Current text</span><h2>${escapeHtml(currentText.title || 'No current text yet')}</h2><p>How you are performing in the book or document you are reading now.</p></div>
+      </div>
+      <div class="current-text-kpis">
+        <article><span>Progress</span><strong>${currentText.documentId ? `${currentText.percent}%` : '—'}</strong><small>through this text</small></article>
+        <article><span>Reading pace</span><strong>${currentText.pace || '—'}</strong><small>${currentText.pace ? 'WPM' : 'no session yet'}</small></article>
+        <article><span>Comprehension</span><strong>${currentText.comprehension || '—'}${currentText.comprehension ? '%' : ''}</strong><small>quiz/check average</small></article>
+        <article><span>Effective WPM</span><strong>${currentText.effective || '—'}</strong><small>pace × comprehension</small></article>
+        <article><span>Reading time</span><strong>${currentText.totalSeconds ? formatDuration(currentText.totalSeconds) : '—'}</strong><small>${currentText.sessions} session${currentText.sessions===1?'':'s'}</small></article>
+      </div>
+    </section>
+
+    <section class="progress-by-text">
+      <div class="section-heading"><div><span class="source-category">Overall reading KPIs</span><h2>Performance by text</h2><p>Compare pace, understanding, and effective reading across the books and documents you have actually read.</p></div></div>
+      ${performanceByText.length ? `<div class="performance-table-wrap"><table class="performance-by-text-table">
+        <thead><tr><th>Text</th><th>Progress</th><th>WPM</th><th>Comprehension</th><th>Effective WPM</th><th>Sessions</th></tr></thead>
+        <tbody>${performanceByText.map((row)=>`<tr>
+          <td>${escapeHtml(row.title)}</td>
+          <td>${row.percent}%</td>
+          <td>${row.wpm||'—'}</td>
+          <td>${row.comprehension ? `${row.comprehension}%` : '—'}</td>
+          <td>${row.effective||'—'}</td>
+          <td>${row.sessions}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : `<p class="navigation-empty">Read a few sessions to build text-by-text performance history.</p>`}
+    </section>
+
+    <div class="progress-secondary-heading">
+      <span class="source-category">Lifetime &amp; supporting metrics</span>
+      <h2>Your broader reading record</h2>
     </div>
 
     <div class="progress-stat-grid">
