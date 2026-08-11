@@ -14372,3 +14372,82 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
 @media(max-width:480px) {
   .current-text-kpis { grid-template-columns:1fr; }
 }
+
+
+/* Quick Book Guide / Prepare Me reliability UI */
+.book-guide-status {
+  margin:.55rem 0 0;
+  font-size:.76rem;
+}
+.quick-guide-request {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:.55rem .7rem;
+  align-items:end;
+}
+.quick-guide-request > p:first-child,
+.quick-guide-request > .book-guide-status {
+  grid-column:1 / -1;
+}
+.quick-guide-request > label {
+  grid-column:1;
+}
+.quick-guide-request > select {
+  grid-column:1;
+}
+.quick-guide-request > button {
+  grid-column:2;
+  grid-row:3;
+}
+.prepare-book-output {
+  margin-top:1rem;
+  padding:1rem;
+  border:1px solid rgba(31,78,121,.18);
+  border-radius:12px;
+  background:linear-gradient(180deg,#fff,#f7f9fc);
+}
+.prepare-book-output h3 {
+  margin:.15rem 0 .55rem;
+  color:#153e68;
+}
+.prepare-book-output h4 {
+  margin:.7rem 0 .25rem;
+  color:#173f69;
+}
+.prepare-book-output p,
+.prepare-book-output li {
+  line-height:1.5;
+}
+.prepare-book-result-heading {
+  border-bottom:1px solid rgba(148,163,184,.18);
+  margin-bottom:.7rem;
+  padding-bottom:.45rem;
+}
+@media(max-width:700px){
+  .quick-guide-request {
+    grid-template-columns:1fr;
+  }
+  .quick-guide-request > label,
+  .quick-guide-request > select,
+  .quick-guide-request > button {
+    grid-column:1;
+    grid-row:auto;
+  }
+}
+
+
+/* Manual Pace reader mode */
+.manual-pace-status {
+  display:block;
+  margin-top:.35rem;
+  color:#64748b;
+  font-size:.72rem;
+  line-height:1.35;
+}
+.manual-pace-status[hidden] {
+  display:none !important;
+}
+.reader.manual-pace-active,
+#reader.manual-pace-active {
+  cursor:default;
+}

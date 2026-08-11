@@ -8685,9 +8685,100 @@ async function enhanceReadingProfileWithAi({ dialog, book, localProfile, button 
   }
 }
 
+
+function setBookGuideStatus(dialog, message = '', type = '') {
+  const status = dialog?.querySelector('#book-guide-status');
+  if (!status) return;
+  status.hidden = !message;
+  status.className = `status book-guide-status${type ? ` ${type}` : ''}`;
+  status.textContent = message;
+}
+
+function renderBookPreparation(dialog, guide, book) {
+  let panel = dialog.querySelector('#prepare-book-output');
+  if (!panel) {
+    panel = document.createElement('section');
+    panel.id = 'prepare-book-output';
+    panel.className = 'prepare-book-output';
+    dialog.querySelector('.prepare-me-panel')?.appendChild(panel);
+  }
+
+  const context = Array.isArray(guide.context) ? guide.context : [];
+  const themes = Array.isArray(guide.themes) ? guide.themes : [];
+  const tips = Array.isArray(guide.readingTips) ? guide.readingTips : [];
+  const characters = Array.isArray(guide.characters) ? guide.characters : [];
+
+  panel.innerHTML = `
+    <div class="prepare-book-result-heading">
+      <span class="source-category">Ask Mark · Before you read</span>
+      <h3>${escapeHtml(book?.title || 'This book')}</h3>
+    </div>
+    <p>${escapeHtml(guide.overview || 'Here is a concise orientation for the book.')}</p>
+    ${guide.setting ? `<section><h4>Setting</h4><p>${escapeHtml(guide.setting)}</p></section>` : ''}
+    ${context.length ? `<section><h4>Background worth knowing</h4><ul>${context.map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+    ${characters.length ? `<section><h4>People to recognize</h4><ul>${characters.slice(0,8).map((item)=>`<li><strong>${escapeHtml(item.name)}</strong> — ${escapeHtml(item.role)}</li>`).join('')}</ul></section>` : ''}
+    ${themes.length ? `<section><h4>Ideas to watch</h4><ul>${themes.slice(0,8).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+    ${tips.length ? `<section><h4>Recommended approach</h4><ul>${tips.slice(0,6).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+    ${guide.spoilerNote ? `<p class="difficulty-disclaimer">${escapeHtml(guide.spoilerNote)}</p>` : ''}
+  `;
+  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+async function requestBookPreparation({ dialog, book, topics, button }) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Preparing…';
+
+  let status = dialog.querySelector('#prepare-book-status');
+  if (!status) {
+    status = document.createElement('p');
+    status.id = 'prepare-book-status';
+    status.className = 'status book-guide-status';
+    button.insertAdjacentElement('afterend', status);
+  }
+  status.className = 'status book-guide-status';
+  status.textContent = 'Ask Mark is preparing a spoiler-free orientation…';
+
+  try {
+    const text = currentBookTextForProfile(book);
+    const response = await fetch('/api/book-guide', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({
+        book:{
+          ...book,
+          description:[
+            String(book?.description || '').trim(),
+            topics?.length ? `Preparation topics: ${topics.join('; ')}` : ''
+          ].filter(Boolean).join('\n')
+        },
+        spoilerMode:'none',
+        sample:boundedAiBookSample(text, 22000)
+      })
+    });
+
+    const payload = await response.json().catch(()=>({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || payload.error || `Request failed with HTTP ${response.status}.`);
+    }
+    if (!payload.guide) throw new Error('The server returned no book preparation.');
+
+    renderBookPreparation(dialog, payload.guide, book);
+    status.className = 'status success book-guide-status';
+    status.textContent = 'Preparation ready.';
+  } catch (error) {
+    status.className = 'status error book-guide-status';
+    status.textContent = `Preparation unavailable: ${error.message}`;
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
 async function requestQuickBookGuide({ dialog, book, spoilerMode, button }) {
   const cached = savedBookGuide(book, spoilerMode);
   if (cached?.guide) {
+    setBookGuideStatus(dialog, 'Loaded saved Quick Book Guide.', 'success');
     renderQuickBookGuide(dialog, cached.guide, book, spoilerMode);
     return;
   }
@@ -8695,6 +8786,7 @@ async function requestQuickBookGuide({ dialog, book, spoilerMode, button }) {
   const original = button.textContent;
   button.disabled = true;
   button.textContent = 'Creating guide…';
+  setBookGuideStatus(dialog, 'Creating your Quick Book Guide…');
 
   try {
     const text = currentBookTextForProfile(book);
@@ -8709,12 +8801,16 @@ async function requestQuickBookGuide({ dialog, book, spoilerMode, button }) {
     });
 
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+    if (!response.ok) {
+      throw new Error(payload.detail || payload.error || `Request failed with HTTP ${response.status}.`);
+    }
+    if (!payload.guide) throw new Error('The server returned no guide.');
 
     saveBookGuide(book, spoilerMode, payload.guide);
     renderQuickBookGuide(dialog, payload.guide, book, spoilerMode);
+    setBookGuideStatus(dialog, 'Quick Book Guide ready.', 'success');
   } catch (error) {
-    window.alert(`Quick Book Guide unavailable: ${error.message}`);
+    setBookGuideStatus(dialog, `Quick Book Guide unavailable: ${error.message}`, 'error');
   } finally {
     button.disabled = false;
     button.textContent = original;
@@ -8825,6 +8921,7 @@ function showBookDifficultyDialog(payload) {
           <option value="full">Full-work guide</option>
         </select>
         <button class="primary" type="button" data-create-book-guide>Create Quick Book Guide</button>
+        <p id="book-guide-status" class="status book-guide-status" hidden></p>
       </div>
     </details>
 
@@ -8833,7 +8930,7 @@ function showBookDifficultyDialog(payload) {
       <div class="prepare-me-panel">
         <p>A short orientation should cover:</p>
         <ul>${topics.map((topic) => `<li>${escapeHtml(topic)}</li>`).join('')}</ul>
-        <button class="primary" type="button" data-prepare-book="${encodeURIComponent(JSON.stringify({book, topics}))}">Open with Ask Mark</button>
+        <button class="primary" type="button" data-prepare-book="${encodeURIComponent(JSON.stringify({book, topics}))}">Prepare with Ask Mark</button>
       </div>
     </details>
 
@@ -8879,16 +8976,12 @@ function showBookDifficultyDialog(payload) {
     let request = null;
     try { request = JSON.parse(decodeURIComponent(event.currentTarget.dataset.prepareBook || '')); } catch {}
     if (!request) return;
-    dialog.close();
-    ReaderContinuity?.saveBeforeNavigation?.();
-    renderAiCenter();
-    window.setTimeout(() => {
-      const input = app.querySelector('textarea, input[type="text"]');
-      if (input) {
-        input.value = `Prepare me to read ${request.book?.title || 'this book'}${request.book?.author ? ` by ${request.book.author}` : ''}. Cover: ${(request.topics || []).join('; ')}. Keep it concise and avoid spoilers.`;
-        input.focus();
-      }
-    }, 0);
+    requestBookPreparation({
+      dialog,
+      book: request.book || book,
+      topics: request.topics || topics,
+      button: event.currentTarget
+    });
   });
 
   dialog.addEventListener('click', (event) => {
@@ -10953,7 +11046,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <summary>Reading</summary>
                 <div class="fullscreen-options-grid fullscreen-options-grid-reading">
                   <label>Mode<select id="fs-mode-select">
-                    <option value="highlight">Highlight</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
+                    <option value="highlight">Highlight</option>
+<option value="manual">Manual Pace</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
                     <option value="digital-sign">Digital Sign</option><option value="auto-scroll">Auto Scroll</option><option value="pacman">Pac-Man Chomp</option>
                   </select></label>
                   <label>Pointer<select id="fs-pointer-style">
@@ -11225,7 +11319,23 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     else startReader();
     persistReaderSession();
   };
-  document.addEventListener('keydown', state.spacebarHandler);
+  
+document.addEventListener('keydown', (event) => {
+  const mode = String(state.mode || state.readerMode || '').toLowerCase();
+  if (mode !== 'manual') return;
+
+  const target = event.target;
+  if (target?.closest?.('input, textarea, select, [contenteditable="true"], [role="textbox"]')) return;
+  if (!app.querySelector('#reader')) return;
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+    event.preventDefault();
+    event.stopPropagation();
+    manualPaceStep(event.key === 'ArrowRight' ? 1 : -1, event.shiftKey ? 5 : 1);
+  }
+}, true);
+
+document.addEventListener('keydown', state.spacebarHandler);
 
   readerFrame.addEventListener('click', (event) => {
     if (state.readerSuppressSyntheticClick) {
@@ -12350,6 +12460,163 @@ function firstReadingIndexInVisibleBookSpread(reader) {
   }
 
   return Number.isFinite(firstIndex) ? firstIndex : Math.max(0, state.index || 0);
+}
+
+
+function manualPaceChunkSize() {
+  // Reuse the reader's existing chunk-size setting whenever possible.
+  const direct = Number(state.chunkSize || state.wordsPerChunk || state.groupSize || 0);
+  if (Number.isFinite(direct) && direct > 0) return Math.max(1, Math.round(direct));
+
+  const control = app.querySelector(
+    '#chunk-size, [data-setting="chunkSize"], [name="chunkSize"], [data-reader-chunk-size]'
+  );
+  const fromControl = Number(control?.value || 0);
+  return Number.isFinite(fromControl) && fromControl > 0 ? Math.max(1, Math.round(fromControl)) : 1;
+}
+
+function resetManualPaceSession() {
+  state.manualPace = {
+    active: false,
+    startedAt: 0,
+    lastStepAt: 0,
+    forwardSteps: 0,
+    backwardSteps: 0,
+    wordsAdvanced: 0,
+    stepIntervals: []
+  };
+}
+
+function ensureManualPaceSession() {
+  if (!state.manualPace || typeof state.manualPace !== 'object') resetManualPaceSession();
+  if (!state.manualPace.active) {
+    const now = Date.now();
+    state.manualPace.active = true;
+    state.manualPace.startedAt = now;
+    state.manualPace.lastStepAt = now;
+  }
+  return state.manualPace;
+}
+
+function manualPaceSessionStats() {
+  const session = state.manualPace || {};
+  const now = Date.now();
+  const elapsedMs = session.active && session.startedAt ? Math.max(1, now - session.startedAt) : 0;
+  const elapsedMinutes = elapsedMs / 60000;
+  const netWords = Math.max(0, Number(session.wordsAdvanced) || 0);
+  const wpm = elapsedMinutes > 0 ? Math.round(netWords / elapsedMinutes) : 0;
+  const intervals = Array.isArray(session.stepIntervals) ? session.stepIntervals.filter((n)=>n>0) : [];
+  const avgStepMs = intervals.length
+    ? Math.round(intervals.reduce((a,b)=>a+b,0) / intervals.length)
+    : 0;
+
+  return {
+    wpm,
+    forwardSteps:Number(session.forwardSteps)||0,
+    backtracks:Number(session.backwardSteps)||0,
+    wordsAdvanced:netWords,
+    avgStepMs
+  };
+}
+
+function updateManualPaceStatus() {
+  const stats = manualPaceSessionStats();
+  const targets = app.querySelectorAll('[data-manual-pace-status]');
+  targets.forEach((target) => {
+    target.textContent = stats.forwardSteps || stats.backtracks
+      ? `Manual pace ${stats.wpm || 0} WPM · ${stats.backtracks} backtrack${stats.backtracks === 1 ? '' : 's'}`
+      : 'Use ← and → to guide the highlight.';
+  });
+}
+
+function renderManualPaceHighlight(reader) {
+  if (!reader || !state.words?.length) return;
+
+  for (const active of state.activeElements || []) {
+    active.classList.remove('active-group', 'active-bold-group');
+  }
+  state.activeElements = [];
+
+  const start = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
+  const chunk = manualPaceChunkSize();
+  const end = Math.min(state.words.length, start + chunk);
+  const elements = [];
+
+  for (let i = start; i < end; i += 1) {
+    const el = state.words[i];
+    if (!el?.classList) continue;
+    el.classList.add('active-group');
+    elements.push(el);
+  }
+  state.activeElements = elements;
+
+  const anchor = elements[0];
+  if (anchor?.scrollIntoView) {
+    anchor.scrollIntoView({ block:'center', inline:'nearest', behavior:'smooth' });
+  }
+
+  updateReaderStatus?.();
+  updateManualPaceStatus();
+}
+
+function manualPaceStep(direction = 1, multiplier = 1) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !state.words?.length) return;
+
+  const session = ensureManualPaceSession();
+  const now = Date.now();
+  const sinceLast = session.lastStepAt ? now - session.lastStepAt : 0;
+  if (sinceLast > 40 && sinceLast < 15000) {
+    session.stepIntervals.push(sinceLast);
+    if (session.stepIntervals.length > 240) session.stepIntervals.shift();
+  }
+  session.lastStepAt = now;
+
+  const chunk = manualPaceChunkSize();
+  const amount = Math.max(1, chunk * Math.max(1, multiplier));
+  const current = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
+  const next = Math.max(0, Math.min(state.words.length - 1, current + (direction * amount)));
+
+  if (direction > 0) {
+    session.forwardSteps += 1;
+    session.wordsAdvanced += Math.max(0, next - current);
+  } else {
+    session.backwardSteps += 1;
+    session.wordsAdvanced = Math.max(0, session.wordsAdvanced - Math.max(0, current - next));
+  }
+
+  state.index = next;
+
+  // In Book Pages mode, ensure the current cursor's spread is visible using
+  // the existing page navigation architecture rather than creating a new one.
+  try {
+    const word = state.words[state.index];
+    if (word && typeof firstReadingIndexInVisibleBookSpread === 'function') {
+      const rect = word.getBoundingClientRect?.();
+      const readerRect = reader.getBoundingClientRect?.();
+      const outside = rect && readerRect && (
+        rect.right < readerRect.left || rect.left > readerRect.right ||
+        rect.bottom < readerRect.top || rect.top > readerRect.bottom
+      );
+      if (outside && typeof ensureReaderIndexVisible === 'function') {
+        ensureReaderIndexVisible(state.index, { behavior:'smooth' });
+      }
+    }
+  } catch {}
+
+  renderManualPaceHighlight(reader);
+}
+
+function setManualPaceMode(active) {
+  if (!active) {
+    if (state.manualPace) state.manualPace.active = false;
+    updateManualPaceStatus();
+    return;
+  }
+
+  ensureManualPaceSession();
+  const reader = app.querySelector('#reader');
+  renderManualPaceHighlight(reader);
 }
 
 function syncReaderToVisibleBookSpread(reader) {
@@ -19330,3 +19597,20 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') ReaderContinuity.scheduleCheckpoint({ immediate: true });
 });
 
+
+
+// manual-pace-mode-change-hook
+document.addEventListener('change', (event) => {
+  const control = event.target;
+  if (!control?.matches?.('#mode, #reader-mode, [data-setting="mode"], [name="mode"], [data-reader-mode]')) return;
+  const mode = String(control.value || '').toLowerCase();
+  if (mode === 'manual') {
+    state.mode = 'manual';
+    setManualPaceMode(true);
+  } else {
+    setManualPaceMode(false);
+  }
+  app.querySelectorAll('[data-manual-pace-status]').forEach((el) => {
+    el.hidden = mode !== 'manual';
+  });
+});
