@@ -7441,6 +7441,14 @@ function classifyStructureLine(line, wordCount) {
   if (exactTypes.has(lower)) return exactTypes.get(lower);
 
   if (/^(?:chapter|chap\.?)(?:\s+|\s*[ivxlcdm\d]+\b)/i.test(clean)) return 'chapter';
+
+  // Kindle/PDF trade books often use the number-word itself as the chapter
+  // heading: "One: The First Philosopher", "Twenty-nine: Worlds at War", etc.
+  // Require chapter-style punctuation so ordinary prose beginning with "One"
+  // is not misclassified.
+  const spelledNumber = '(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?)';
+  if (new RegExp(`^${spelledNumber}\\s*[:.\u2013\u2014-]\\s+\\S`, 'i').test(clean)) return 'chapter';
+
   if (/^(?:book|part)\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(clean)) return 'part';
   if (/^(?:section|article)\s+(?:[ivxlcdm]+|\d+|[a-z])\b/i.test(clean)) return 'section';
   if (/^appendix(?:\s+[a-z0-9ivxlcdm]+)?\b/i.test(clean)) return 'appendix';
@@ -16654,7 +16662,8 @@ async function parsePdfFile(file, onProgress = () => {}) {
       pageCount: pdf.numPages,
       textPages,
       extractedCharacters,
-      tocEntries: toc.length
+      tocEntries: toc.length,
+      detectedSections: documentToc.length
     }
   };
 }
@@ -16757,7 +16766,7 @@ function renderUpload() {
         setProgress(1, 'Loading PDF support…');
         const book = await parsePdfFile(file, setProgress);
         status.className = 'status success import-status';
-        status.textContent = `${book.stats.pageCount} pages extracted. Opening ${book.title}…`;
+        status.textContent = `${book.stats.pageCount} pages · ${book.stats.textPages} text pages · ${book.stats.extractedCharacters.toLocaleString()} characters · ${book.stats.detectedSections || 0} sections detected. Opening ${book.title}…`;
         window.setTimeout(() => renderReaderWithText(book.title, book.text, book.source), 250);
         return;
       }
