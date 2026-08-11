@@ -16912,12 +16912,13 @@ function renderUpload() {
           <span><strong>TXT</strong><small>Plain text</small></span>
         </div>
 
-        <label class="import-drop-zone compact" for="text-file">
+        <button id="choose-import-file" class="import-drop-zone compact import-file-button" type="button">
           <span class="import-upload-icon">⇧</span>
           <span><strong>Choose a file</strong><small>EPUB, MOBI, AZW/AZW3, PDF, or TXT</small></span>
-          <input id="text-file" type="file"
-            accept=".epub,application/epub+zip,.mobi,.azw,.azw3,.prc,application/x-mobipocket-ebook,.pdf,application/pdf,.txt,text/plain">
-        </label>
+        </button>
+        <input id="text-file" class="import-file-input" type="file"
+          accept=".epub,application/epub+zip,.mobi,.azw,.azw3,.prc,application/x-mobipocket-ebook,.pdf,application/pdf,.txt,text/plain"
+          hidden>
       </div>
 
       <div id="pdf-import-progress" class="pdf-import-progress" hidden>
@@ -16941,14 +16942,22 @@ function renderUpload() {
     </section>`;
 
   const uploadInput = app.querySelector('#text-file');
+  const chooseFileButton = app.querySelector('#choose-import-file');
   let importInFlight = false;
 
   // Warm PDF.js as soon as the Import page opens so the first file selection
   // does not also have to initialize the PDF engine.
   loadPdfJs().catch(() => { /* surfaced normally if/when a PDF is selected */ });
 
-  uploadInput?.addEventListener('click', (event) => {
-    if (!importInFlight) event.currentTarget.value = '';
+  // Do not wrap the native file input in a <label>. In this SPA that could
+  // forward/duplicate activation and leave the first selection attached to a
+  // stale input after the Import view changed. Open the picker explicitly.
+  chooseFileButton?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (importInFlight || !uploadInput) return;
+    uploadInput.value = '';
+    uploadInput.click();
   });
 
   uploadInput?.addEventListener('change', async (event) => {
@@ -16971,6 +16980,7 @@ function renderUpload() {
     };
 
     importInFlight = true;
+    if (chooseFileButton) chooseFileButton.disabled = true;
     status.className = 'status import-status';
     status.textContent = `Selected ${file.name}. Preparing import…`;
 
@@ -17027,6 +17037,7 @@ function renderUpload() {
       status.textContent = error?.message || 'The file could not be read.';
     } finally {
       importInFlight = false;
+      if (chooseFileButton) chooseFileButton.disabled = false;
       try { input.value = ''; } catch {}
     }
   });

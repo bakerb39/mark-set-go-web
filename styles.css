@@ -13602,3 +13602,17 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
   .workspace-chart-grid { grid-template-columns: 1fr; }
   .workspace-quick-actions { grid-template-columns: repeat(2,1fr); }
 }
+
+.import-file-button {
+  width: 100%;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+}
+.import-file-button:disabled {
+  cursor: progress;
+  opacity: .7;
+}
+.import-file-input[hidden] {
+  display: none !important;
+}
