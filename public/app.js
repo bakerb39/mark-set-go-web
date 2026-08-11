@@ -7916,7 +7916,7 @@ function jumpToWordIndex(wordIndex) {
         && (index < Number(state.renderedWordStart || 0)
           || index > Number(state.renderedWordEnd || 0) + 1600);
       if (distantTocJump) {
-        virtualRenderer.renderWindowAround(reader, mode, groupSize, index);
+        virtualRenderer.renderWindowAround(reader, readerRenderMode(mode), groupSize, index);
       } else {
         ensureWordsRendered(reader, mode, groupSize, index + 100);
       }
@@ -11417,7 +11417,16 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
 
   const modeSelect = app.querySelector('#mode-select');
   modeSelect.addEventListener('change', () => {
-    switchReadingMode(modeSelect.value);
+    const nextMode = modeSelect.value;
+    switchReadingMode(nextMode);
+    if (nextMode === 'manual') {
+      modeSelect.blur();
+      const reader = app.querySelector('#reader');
+      if (reader) {
+        if (!reader.hasAttribute('tabindex')) reader.setAttribute('tabindex', '-1');
+        requestAnimationFrame(() => reader.focus({ preventScroll:true }));
+      }
+    }
   });
 
   // Spacebar acts as a simple play/pause toggle while the reader is open.
@@ -11445,7 +11454,9 @@ document.addEventListener('keydown', (event) => {
   if (mode !== 'manual') return;
 
   const target = event.target;
-  if (target?.closest?.('input, textarea, select, [contenteditable="true"], [role="textbox"]')) return;
+  const modeSelectorTarget = target?.closest?.('#mode-select, #fs-mode-select');
+  if (target?.closest?.('input, textarea, [contenteditable="true"], [role="textbox"]')) return;
+  if (target?.closest?.('select') && !modeSelectorTarget) return;
   if (!app.querySelector('#reader')) return;
 
   if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
@@ -11496,7 +11507,7 @@ document.addEventListener('keydown', state.spacebarHandler);
     const clickedWord = target.closest('.reader-word[data-index]');
     const clickedGroup = target.closest('.reader-group[data-start-index]');
     const mode = getSelectedMode();
-    const seekableModes = new Set(['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'auto-scroll']);
+    const seekableModes = new Set(['highlight', 'manual', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'auto-scroll']);
 
     // In full-text modes, clicking visible text changes the reading position
     // instead of toggling pause. Support both individual word spans and grouped
@@ -11512,8 +11523,13 @@ document.addEventListener('keydown', state.spacebarHandler);
         state.viewportAnchorIndex = state.index;
         persistReaderSession({ immediate: true });
         updateReaderStatus(`Reading position moved to word ${(state.index + 1).toLocaleString()}.`);
-        startReader();
-        if (!wasRunning) window.setTimeout(pauseReader, 0);
+        if (mode === 'manual') {
+          ensureManualPaceSession();
+          renderManualPaceHighlight(reader);
+        } else {
+          startReader();
+          if (!wasRunning) window.setTimeout(pauseReader, 0);
+        }
       }
       return;
     }
@@ -12402,7 +12418,7 @@ function bindReaderFullscreen(readerFrame, button) {
           && (anchorIndex < state.renderedWordStart || anchorIndex >= state.renderedWordEnd)) {
         const recover = () => {
           if (sequence !== restoreSequence || !reader.isConnected) return;
-          virtualRenderer.renderWindowAround(reader, mode, groupSize, anchorIndex);
+          virtualRenderer.renderWindowAround(reader, readerRenderMode(mode), groupSize, anchorIndex);
           restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
           positionPointerAtWord(anchorIndex);
         };
@@ -12653,29 +12669,61 @@ function renderManualPaceHighlight(reader) {
   if (!reader || !state.words?.length) return;
 
   for (const active of state.activeElements || []) {
-    active.classList.remove('active-group', 'active-bold-group');
+    active?.classList?.remove('active-group', 'active-bold-group');
   }
   state.activeElements = [];
 
-  const start = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
-  const chunk = manualPaceChunkSize();
-  const end = Math.min(state.words.length, start + chunk);
-  const elements = [];
+  const startIndex = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
+  const groupSize = manualPaceChunkSize();
 
-  for (let i = start; i < end; i += 1) {
-    const el = state.words[i];
-    if (!el?.classList) continue;
-    el.classList.add('active-group');
-    elements.push(el);
-  }
-  state.activeElements = elements;
-
-  const anchor = elements[0];
-  if (anchor?.scrollIntoView) {
-    anchor.scrollIntoView({ block:'center', inline:'nearest', behavior:'smooth' });
+  // Manual Pace is a control scheme, not a new rendering engine. Make sure
+  // the Highlight renderer has a window containing the current cursor.
+  if (state.virtualized
+      && (startIndex < state.renderedWordStart || startIndex >= state.renderedWordEnd)) {
+    virtualRenderer.renderWindowAround(reader, 'highlight', groupSize, startIndex);
+  } else {
+    ensureWordsRendered(reader, 'highlight', groupSize, Math.min(state.words.length, startIndex + groupSize + 100));
   }
 
-  updateReaderStatus?.();
+  // Rebuild semantic groups using the same chunk rules as Highlight.
+  refreshReadingGroups('highlight', groupSize);
+  const group = findReadingGroup(startIndex);
+  const groupStart = group?.start ?? startIndex;
+  const groupEnd = group?.end ?? Math.min(state.words.length, startIndex + groupSize);
+
+  let active = reader.querySelector(`.reader-group[data-start-index="${groupStart}"]`);
+  if (!active) {
+    const words = Array.from(reader.querySelectorAll('.reader-word[data-index]'))
+      .filter((el) => {
+        const index = Number(el.dataset.index);
+        return index >= groupStart && index < groupEnd;
+      });
+    if (words.length) {
+      words.forEach((el) => el.classList.add('active-group'));
+      state.activeElements = words;
+      active = words[0];
+    }
+  } else {
+    active.classList.add('active-group');
+    state.activeElements = [active];
+  }
+
+  state.viewportAnchorIndex = startIndex;
+
+  if (state.bookPages) {
+    const spread = bookSpreadForWordIndex(reader, startIndex);
+    if (spread != null) {
+      goToBookSpread(spread, {
+        behavior:'auto',
+        ensureRendered:true,
+        syncReaderPosition:false
+      });
+    }
+  } else if (active?.scrollIntoView) {
+    active.scrollIntoView({ block:'center', inline:'nearest', behavior:'auto' });
+  }
+
+  updateReaderStatus();
   updateManualPaceStatus();
 }
 
@@ -13821,12 +13869,16 @@ function appendWordDocumentChunk(reader, mode, groupSize, targetWordEnd) {
   return virtualRenderer.appendWordDocumentChunk(reader, mode, groupSize, targetWordEnd);
 }
 
+function readerRenderMode(mode) {
+  return mode === 'manual' ? 'highlight' : mode;
+}
+
 function ensureWordsRendered(reader, mode, groupSize, requiredWordEnd) {
-  return virtualRenderer.ensureWordsRendered(reader, mode, groupSize, requiredWordEnd);
+  return virtualRenderer.ensureWordsRendered(reader, readerRenderMode(mode), groupSize, requiredWordEnd);
 }
 
 function renderWordDocument(reader, mode, groupSize = 1) {
-  return virtualRenderer.renderWordDocument(reader, mode, groupSize);
+  return virtualRenderer.renderWordDocument(reader, readerRenderMode(mode), groupSize);
 }
 
 function visibleReadingAnchor(reader, fallbackIndex = state.index) {
@@ -13834,7 +13886,7 @@ function visibleReadingAnchor(reader, fallbackIndex = state.index) {
 }
 
 function restoreReadingAnchor(reader, mode, groupSize, wordIndex) {
-  return virtualRenderer.restoreReadingAnchor(reader, mode, groupSize, wordIndex);
+  return virtualRenderer.restoreReadingAnchor(reader, readerRenderMode(mode), groupSize, wordIndex);
 }
 
 function captureReaderViewport(anchorIndex = state.index) {
@@ -13922,7 +13974,7 @@ function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
           && !['flash', 'digital-sign', 'two-column'].includes(mode)
           && state.virtualized
           && (anchorIndex < state.renderedWordStart || anchorIndex >= state.renderedWordEnd)) {
-        virtualRenderer.renderWindowAround(reader, mode, groupSize, anchorIndex);
+        virtualRenderer.renderWindowAround(reader, readerRenderMode(mode), groupSize, anchorIndex);
       }
       restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
       if (state.bookPages) {
@@ -14317,6 +14369,13 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 function startReader() {
   if(state.markPersistentSelection || state.markSelectionLocked) clearMarkSelectionForReadingResume();
   const selectedMode = getSelectedMode();
+  if (selectedMode === 'manual') {
+    stopReader();
+    ensureManualPaceSession();
+    renderManualPaceHighlight(app.querySelector('#reader'));
+    updateReaderStatus('Manual Pace: use ← and → to move through the text.');
+    return;
+  }
   if (selectedMode === 'two-column') return;
   const currentTickerStage = app.querySelector('.digital-sign-stage');
   const canResumeTicker = selectedMode === 'digital-sign'
@@ -19629,7 +19688,7 @@ document.addEventListener('change', (event) => {
       && state.virtualized
       && (anchorIndex < state.renderedWordStart || anchorIndex >= state.renderedWordEnd)
     ) {
-      virtualRenderer.renderWindowAround(reader, mode, groupSize, anchorIndex);
+      virtualRenderer.renderWindowAround(reader, readerRenderMode(mode), groupSize, anchorIndex);
     }
 
     restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
