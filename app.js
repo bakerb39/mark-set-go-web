@@ -11175,7 +11175,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
               <label for="pointer-color">Pointer color</label>
               <input id="pointer-color" type="color" value="#20a866" aria-label="Pointer color">
             </div>
-            <div class="control"><label for="speed">Speed</label><div class="input-suffix"><input id="speed" type="number" min="30" max="900" value="${Math.min(900, state.wpm)}"><span>WPM</span></div></div>
+            <div class="control"><label for="speed">Speed</label><div class="input-suffix"><input id="speed" type="number" min="0" max="900" value="${Math.min(900, state.wpm)}"><span>WPM</span></div></div>
             <div class="control"><label for="word-count">Words shown</label><input id="word-count" type="number" min="1" max="10" value="1"></div>
             <label class="compact-toggle meaningful-toggle" title="Group words into punctuation- and phrase-aware chunks up to the selected maximum."><input id="meaningful-chunks" type="checkbox"><span>Meaningful chunks</span></label>
           </div>
@@ -11539,7 +11539,14 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
     event.preventDefault();
     event.stopPropagation();
-    manualPaceStep(event.key === 'ArrowRight' ? 1 : -1, event.shiftKey ? 5 : 1);
+    startOrToggleManualPaceDirection(event.key === 'ArrowRight' ? 1 : -1);
+    return;
+  }
+
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    event.stopPropagation();
+    manualPaceMoveLine(event.key === 'ArrowDown' ? 1 : -1);
   }
 }, true);
 
@@ -12704,7 +12711,9 @@ function resetManualPaceSession() {
     forwardSteps: 0,
     backwardSteps: 0,
     wordsAdvanced: 0,
-    stepIntervals: []
+    stepIntervals: [],
+    direction: 0,
+    timer: null
   };
 }
 
@@ -12813,7 +12822,157 @@ function renderManualPaceHighlight(reader) {
   updateManualPaceStatus();
 }
 
-function manualPaceStep(direction = 1, multiplier = 1) {
+
+function manualPaceWpm() {
+  const control = app.querySelector('#wpm, #wpm-input, #speed, #speed-input, #fs-wpm, [data-reader-wpm]');
+  const value = Number(control?.value ?? state.wpm ?? state.speed ?? 0);
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function stopManualPaceMotion({ keepDirection = false } = {}) {
+  const session = ensureManualPaceSession();
+  if (session.timer) {
+    clearTimeout(session.timer);
+    session.timer = null;
+  }
+  if (!keepDirection) session.direction = 0;
+  updateManualPaceStatus();
+}
+
+function scheduleManualPaceMotion() {
+  const session = ensureManualPaceSession();
+  stopManualPaceMotion({ keepDirection:true });
+
+  const direction = Number(session.direction) || 0;
+  const wpm = manualPaceWpm();
+  if (!direction || wpm <= 0) {
+    updateReaderStatus('Manual Pace: WPM is 0. Use ↑/↓ for one line at a time, or raise WPM to move automatically.');
+    updateManualPaceStatus();
+    return;
+  }
+
+  const chunk = manualPaceChunkSize();
+  const delay = Math.max(30, Math.round((60000 * chunk) / Math.max(1, wpm)));
+
+  session.timer = setTimeout(() => {
+    session.timer = null;
+    if (!state.manualPaceEnabled || !session.direction) return;
+    manualPaceStep(session.direction, 1, { fromTimer:true });
+    scheduleManualPaceMotion();
+  }, delay);
+}
+
+function startOrToggleManualPaceDirection(direction) {
+  const session = ensureManualPaceSession();
+  const next = direction < 0 ? -1 : 1;
+
+  if (session.direction === next && session.timer) {
+    stopManualPaceMotion();
+    updateReaderStatus('Manual Pace paused. Press ← or → to resume.');
+    return;
+  }
+
+  session.direction = next;
+  scheduleManualPaceMotion();
+
+  const wpm = manualPaceWpm();
+  if (wpm > 0) {
+    updateReaderStatus(`Manual Pace: ${next > 0 ? 'forward' : 'reverse'} at ${wpm} WPM.`);
+  } else {
+    updateReaderStatus(`Manual Pace: ${next > 0 ? 'forward' : 'reverse'} direction selected; WPM is 0.`);
+  }
+}
+
+function renderedManualLineMap(reader) {
+  const candidates = Array.from(reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]'))
+    .filter((element) => {
+      const rect = element.getBoundingClientRect?.();
+      return rect && rect.width > 0 && rect.height > 0;
+    })
+    .map((element) => {
+      const rect = element.getBoundingClientRect();
+      const index = Number(element.dataset.index ?? element.dataset.startIndex);
+      return { element, index, top: Math.round(rect.top), left: rect.left };
+    })
+    .filter((item) => Number.isFinite(item.index))
+    .sort((a,b) => a.top - b.top || a.left - b.left);
+
+  const lines = [];
+  for (const item of candidates) {
+    let line = lines.find((row) => Math.abs(row.top - item.top) <= 3);
+    if (!line) {
+      line = { top:item.top, items:[] };
+      lines.push(line);
+    }
+    line.items.push(item);
+  }
+  return lines;
+}
+
+function manualPaceMoveLine(direction) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !state.words?.length) return;
+
+  stopManualPaceMotion();
+  const lines = renderedManualLineMap(reader);
+  if (!lines.length) return;
+
+  const currentIndex = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
+  let currentLineIndex = lines.findIndex((line) =>
+    line.items.some((item) => item.index <= currentIndex && (
+      item.index === currentIndex ||
+      item === line.items[line.items.length - 1]
+    ))
+  );
+
+  if (currentLineIndex < 0) {
+    currentLineIndex = lines.reduce((best, line, idx) => {
+      const distance = Math.min(...line.items.map((item)=>Math.abs(item.index-currentIndex)));
+      return distance < best.distance ? { idx, distance } : best;
+    }, { idx:0, distance:Infinity }).idx;
+  }
+
+  let targetLineIndex = currentLineIndex + (direction > 0 ? 1 : -1);
+
+  if (targetLineIndex < 0 || targetLineIndex >= lines.length) {
+    if (state.bookPages) {
+      const currentSpread = getCurrentBookSpread(reader);
+      const nextSpread = currentSpread + (direction > 0 ? 1 : -1);
+      if (nextSpread >= 0) {
+        goToBookSpread(nextSpread, {
+          behavior:'auto',
+          ensureRendered:true,
+          syncReaderPosition:false
+        });
+        requestAnimationFrame(() => {
+          const refreshed = renderedManualLineMap(reader);
+          if (!refreshed.length) return;
+          const target = direction > 0 ? refreshed[0] : refreshed[refreshed.length - 1];
+          state.index = target.items[0]?.index ?? state.index;
+          renderManualPaceHighlight(reader);
+        });
+      }
+    }
+    return;
+  }
+
+  const currentLine = lines[currentLineIndex];
+  const targetLine = lines[targetLineIndex];
+  const currentElement = currentLine.items.reduce((best,item) =>
+    Math.abs(item.index-currentIndex) < Math.abs(best.index-currentIndex) ? item : best,
+    currentLine.items[0]
+  );
+  const target = targetLine.items.reduce((best,item) =>
+    Math.abs(item.left-currentElement.left) < Math.abs(best.left-currentElement.left) ? item : best,
+    targetLine.items[0]
+  );
+
+  state.index = target.index;
+  renderManualPaceHighlight(reader);
+  updateReaderStatus(`Manual Pace: moved ${direction > 0 ? 'down' : 'up'} one line.`);
+}
+
+function manualPaceStep(direction = 1, multiplier = 1, { fromTimer = false } = {}) {
   const reader = app.querySelector('#reader');
   if (!reader || !state.words?.length) return;
 
@@ -12830,6 +12989,12 @@ function manualPaceStep(direction = 1, multiplier = 1) {
   const amount = Math.max(1, chunk * Math.max(1, multiplier));
   const current = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
   const next = Math.max(0, Math.min(state.words.length - 1, current + (direction * amount)));
+
+  if (next === current && fromTimer) {
+    stopManualPaceMotion();
+    updateReaderStatus(direction > 0 ? 'Manual Pace reached the end.' : 'Manual Pace reached the beginning.');
+    return;
+  }
 
   if (direction > 0) {
     session.forwardSteps += 1;
@@ -14134,6 +14299,7 @@ function switchReadingMode(nextMode) {
       if (pause) pause.disabled = true;
     } else {
       state.manualPaceEnabled = false;
+      stopManualPaceMotion();
       if (state.manualPace?.active) state.manualPace.active = false;
     }
   });
@@ -20003,4 +20169,13 @@ document.addEventListener('change', (event) => {
   app.querySelectorAll('[data-manual-pace-status]').forEach((el) => {
     el.hidden = mode !== 'manual';
   });
+});
+
+
+document.addEventListener('input', (event) => {
+  if (!state.manualPaceEnabled) return;
+  const control = event.target;
+  if (!control?.matches?.('#wpm, #wpm-input, #speed, #speed-input, #fs-wpm, [data-reader-wpm]')) return;
+  const session = ensureManualPaceSession();
+  if (session.direction) scheduleManualPaceMotion();
 });
