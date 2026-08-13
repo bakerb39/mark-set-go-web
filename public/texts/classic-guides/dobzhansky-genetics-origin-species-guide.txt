@@ -1,0 +1,188 @@
+GENETICS AND THE ORIGIN OF SPECIES
+An Independent Mark, Set, Go! Classic Guide
+Original work by Theodosius Dobzhansky
+
+A guide to population genetics, variation, mutation, natural selection, speciation, reproductive isolation, and the modern evolutionary synthesis.
+
+ABOUT THIS GUIDE
+This independently written educational guide is designed for serious first reading, rereading, and seminar study. It follows the Mark, Set, Go! Classic Guide pattern with focused sections, discussion prompts, section quizzes, Great Ideas, review, and whole-guide quiz hooks.
+
+HOW TO USE IT
+Read one section at a time. Use Discuss with reading companion after each section for interpretation and Quiz me for a short comprehension check. Save the full-guide quiz for the end.
+
+[[MSG:BUY]]
+
+[[MSG:SECTION]]
+
+AT A GLANCE
+
+Dobzhansky helped unite Mendelian genetics with Darwinian evolution. Instead of treating species as fixed types or evolution as vague transformation, he explained evolutionary change through shifting gene frequencies in populations.
+
+QUESTION TO CARRY FORWARD
+Why was population genetics the bridge needed to unite Darwin and Mendel?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+GENETIC VARIATION
+
+Natural populations contain substantial heritable variation.
+
+QUESTION TO CARRY FORWARD
+Why is variation the raw material of evolutionary change?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+MUTATION
+
+Mutation introduces new genetic variants but does not by itself explain adaptive direction.
+
+QUESTION TO CARRY FORWARD
+Why is mutation necessary but insufficient for evolution by natural selection?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+POPULATIONS
+
+Evolution occurs in populations through changes in allele frequencies.
+
+QUESTION TO CARRY FORWARD
+Why is the population, rather than the individual, the central unit of evolutionary change?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+NATURAL SELECTION
+
+Selection changes the representation of variants based on reproductive success.
+
+QUESTION TO CARRY FORWARD
+How does selection interact with existing genetic diversity?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+GENETIC DRIFT
+
+Chance can alter gene frequencies, especially in small populations.
+
+QUESTION TO CARRY FORWARD
+Why does evolution not require every change to be adaptive?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+GEOGRAPHIC VARIATION
+
+Populations separated across environments can diverge genetically.
+
+QUESTION TO CARRY FORWARD
+How does geography contribute to evolutionary differentiation?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+SPECIES
+
+Dobzhansky emphasizes reproductive communities rather than mere morphological similarity.
+
+QUESTION TO CARRY FORWARD
+Why is reproductive isolation important to defining species?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+SPECIATION
+
+New species arise when populations become genetically and reproductively differentiated.
+
+QUESTION TO CARRY FORWARD
+What mechanisms can turn population differences into species boundaries?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+THE SYNTHESIS
+
+The book became central to the modern synthesis joining genetics, natural selection, systematics, and population biology.
+
+QUESTION TO CARRY FORWARD
+Why was conceptual integration across biological fields so important?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HUMAN IMPLICATIONS
+
+Dobzhansky later argued strongly for human genetic unity and against simplistic racial essentialism.
+
+QUESTION TO CARRY FORWARD
+How does population genetics undermine fixed racial typologies?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+LEGACY
+
+Modern genomics has transformed evolutionary biology, but the population-genetic framework Dobzhansky helped establish remains foundational.
+
+QUESTION TO CARRY FORWARD
+Which parts of evolutionary biology today still depend directly on the synthesis he helped build?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+REVIEW — TEN CLAIMS TO REMEMBER
+
+1. State the work’s central problem in one sentence.
+2. Identify its strongest argument, insight, experiment, or explanatory move.
+3. Distinguish description from endorsement.
+4. Track the work’s major conceptual or causal relationships.
+5. Identify one historical assumption or limitation.
+6. Explain one major term, model, experiment, image, or distinction.
+7. Connect the work to at least two earlier Great Books.
+8. State the strongest objection or criticism.
+9. Identify one insight that survives even if some details are outdated.
+10. Explain why the work still belongs in a Great Books curriculum.
+
+QUESTION TO CARRY FORWARD
+Which idea from this work most changes the way you understand its subject?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DEEPER READING LABS
+
+LAB 1 — ARGUMENT MAP
+Map the central thesis and strongest supporting moves.
+
+LAB 2 — KEY DISTINCTIONS
+Identify five distinctions the work relies on and explain why each matters.
+
+LAB 3 — HISTORICAL TEST
+Choose one historical assumption, scientific limitation, or institutional context and evaluate how much the work depends on it.
+
+LAB 4 — STRONGEST OBJECTION
+Construct the strongest objection you can, then answer it from within the work’s own framework.
+
+LAB 5 — GREAT BOOKS CONNECTION
+Compare this work with at least two earlier authors on science, mathematics, truth, nature, knowledge, or human understanding.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]

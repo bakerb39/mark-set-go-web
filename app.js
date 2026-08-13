@@ -3218,6 +3218,16 @@ const CLASSIC_GUIDES = Object.freeze({
   "Fitzgerald Great Gatsby": { id:"classic-fitzgerald-great-gatsby", slug:"fitzgerald-great-gatsby", title:"The Great Gatsby", author:"F. Scott Fitzgerald" },
   "Orwell Animal Farm": { id:"classic-orwell-animal-farm", slug:"orwell-animal-farm", title:"Animal Farm", author:"George Orwell" },
   "Beckett Waiting Godot": { id:"classic-beckett-waiting-godot", slug:"beckett-waiting-godot", title:"Waiting for Godot", author:"Samuel Beckett" },
+  "Whitehead Introduction Mathematics": { id:"classic-whitehead-introduction-mathematics", slug:"whitehead-introduction-mathematics", title:"An Introduction to Mathematics", author:"Alfred North Whitehead" },
+  "Eddington Expanding Universe": { id:"classic-eddington-expanding-universe", slug:"eddington-expanding-universe", title:"The Expanding Universe", author:"Arthur Eddington" },
+  "Waddington Nature Life": { id:"classic-waddington-nature-life", slug:"waddington-nature-life", title:"The Nature of Life", author:"C. H. Waddington" },
+  "Hardy Mathematicians Apology": { id:"classic-hardy-mathematicians-apology", slug:"hardy-mathematicians-apology", title:"A Mathematician’s Apology", author:"G. H. Hardy" },
+  "Poincare Science Hypothesis": { id:"classic-poincare-science-hypothesis", slug:"poincare-science-hypothesis", title:"Science and Hypothesis", author:"Henri Poincaré" },
+  "Planck Scientific Autobiography": { id:"classic-planck-scientific-autobiography-papers", slug:"planck-scientific-autobiography-papers", title:"Scientific Autobiography and Other Papers", author:"Max Planck" },
+  "Bohr Atomic Theory": { id:"classic-bohr-atomic-theory-selected-essays", slug:"bohr-atomic-theory-selected-essays", title:"Atomic Theory and Selected Essays", author:"Niels Bohr" },
+  "Dobzhansky Genetics Origin Species": { id:"classic-dobzhansky-genetics-origin-species", slug:"dobzhansky-genetics-origin-species", title:"Genetics and the Origin of Species", author:"Theodosius Dobzhansky" },
+  "Hardy Mathematician Apology": { id:"classic-hardy-mathematicians-apology", slug:"hardy-mathematicians-apology", title:"A Mathematician’s Apology", author:"G. H. Hardy" },
+  "Kant Major Critical Moral": { id:"classic-kant-major-critical-moral", slug:"kant-major-critical-moral", title:"Major Critical and Moral Works", author:"Immanuel Kant" },
 });
 
 function classicGuideForGreatBook(book) {
@@ -3230,7 +3240,105 @@ function classicGuidePathForGreatBook(book) {
   return classicGuideForGreatBook(book) ? '#reader' : '';
 }
 
+
+function classicGuideGreatIdea(meta = {}) {
+  const title = String(meta.title || '').toLowerCase();
+  const author = String(meta.author || '').toLowerCase();
+  const haystack = `${title} ${author}`;
+
+  const rules = [
+    [/\bodyssey\b|\bhomer\b/, 'Fate'],
+    [/seventh letter|plato/, 'Philosophy'],
+    [/heisenberg|physics and philosophy/, 'Physics'],
+    [/schr[oö]dinger|what is life/, 'Life and Death'],
+    [/veblen|leisure class/, 'Wealth'],
+    [/keynes|general theory/, 'Wealth'],
+    [/frazer|golden bough/, 'Religion'],
+    [/weber|sociology/, 'State'],
+    [/huizinga|middle ages/, 'History'],
+    [/heart of darkness|conrad/, 'Good and Evil'],
+    [/uncle vanya|chekhov/, 'Happiness'],
+    [/portrait of the artist|joyce/, 'Art'],
+    [/to the lighthouse|woolf/, 'Memory and Imagination'],
+    [/metamorphosis|kafka/, 'Man'],
+    [/waste land|eliot/, 'Poetry'],
+    [/great gatsby|fitzgerald/, 'Wealth'],
+    [/animal farm|orwell/, 'Tyranny'],
+    [/waiting for godot|beckett/, 'Time'],
+    [/origin of species|darwin/, 'Evolution'],
+    [/descent of man/, 'Evolution'],
+    [/communist manifesto|capital, vol|marx|engels/, 'Labor'],
+    [/war and peace|tolstoy/, 'War and Peace'],
+    [/brothers karamazov|dostoevsky/, 'Good and Evil'],
+    [/doll.?s house|ibsen/, 'Freedom'],
+    [/principles of psychology|william james/, 'Mind'],
+    [/interpretation of dreams|freud/, 'Mind'],
+    [/civilization and its discontents/, 'Custom and Convention'],
+    [/pragmatism/, 'Truth'],
+    [/experience and education|dewey/, 'Education'],
+    [/science and the modern world|whitehead/, 'Science'],
+    [/problems of philosophy|russell/, 'Knowledge'],
+    [/philosophical investigations|wittgenstein/, 'Language'],
+    [/relativity|einstein/, 'Space'],
+    [/democracy in america|tocqueville/, 'Democracy'],
+    [/beyond good and evil|nietzsche/, 'Good and Evil'],
+    [/fear and trembling|kierkegaard/, 'Faith'],
+    [/philosophy of right|hegel/, 'State'],
+    [/philosophy of history/, 'History'],
+    [/faust|goethe/, 'Will'],
+    [/emma|austen/, 'Judgment'],
+    [/middlemarch|george eliot/, 'Judgment'],
+    [/little dorrit|dickens/, 'Wealth'],
+    [/moby-dick|melville/, 'Nature'],
+    [/huckleberry finn|twain/, 'Freedom'],
+    [/wealth of nations|adam smith/, 'Wealth'],
+    [/decline and fall|gibbon/, 'History'],
+    [/kant/, 'Duty'],
+    [/federalist/, 'Constitution'],
+    [/on liberty|mill/, 'Liberty'],
+    [/utilitarianism/, 'Happiness'],
+    [/lavoisier/, 'Science'],
+    [/faraday/, 'Physics'],
+    [/spirit of laws|montesquieu/, 'Law']
+  ];
+
+  for (const [pattern, idea] of rules) {
+    if (pattern.test(haystack)) return idea;
+  }
+  return 'Philosophy';
+}
+
+function findGreatBookIndexForClassicGuide(meta = {}) {
+  const wantedTitle = String(meta.title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const wantedAuthor = String(meta.author || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+  let bestIndex = -1;
+  let bestScore = -1;
+
+  greatBooksCatalog.forEach((book, index) => {
+    const title = String(book.title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const author = String(book.author || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    let score = 0;
+
+    if (title === wantedTitle) score += 100;
+    else if (title.includes(wantedTitle) || wantedTitle.includes(title)) score += 60;
+
+    if (wantedAuthor && author) {
+      const tokens = wantedAuthor.split(/\s+/).filter((token) => token.length > 2);
+      score += tokens.filter((token) => author.includes(token)).length * 10;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  });
+
+  return bestScore >= 60 ? bestIndex : -1;
+}
+
 function classicGuideSource(meta = {}) {
+  const greatIdea = classicGuideGreatIdea(meta);
   return {
     type:'modern-guide',
     classicGuide:true,
@@ -3239,7 +3347,18 @@ function classicGuideSource(meta = {}) {
     originalTitle:meta.title,
     originalAuthor:meta.author,
     buyUrl:`https://www.amazon.com/s?k=${encodeURIComponent(`${meta.author} ${meta.title}`)}`,
-    subtitle:'An Independent Mark, Set, Go! Classic Guide'
+    subtitle:'An Independent Mark, Set, Go! Classic Guide',
+    guideInteractions:{
+      greatIdea,
+      actionTitle:`Apply one insight from ${meta.title || 'this Classic Guide'}`,
+      actionType:'reflection',
+      dueDays:3,
+      dueHour:19,
+      priority:'normal',
+      repeat:'none',
+      reminder:'day1',
+      actionNote:`Choose one important idea from ${meta.title || 'this Classic Guide'} and turn it into a concrete reflection or action.`
+    }
   };
 }
 
@@ -10810,25 +10929,57 @@ function addModernGuideActionToCenter(source = state?.source || {}, trigger = nu
 }
 
 function openModernGuideGreatIdea(source = state?.source || {}) {
-  const config = modernGuideInteractionConfig(source);
-  const idea = config?.greatIdea || '';
-  rememberReaderForReturn();
+  const config = modernGuideInteractionConfig(source) || {};
+  const idea = String(config.greatIdea || (source?.classicGuide ? classicGuideGreatIdea({
+    title: source.originalTitle,
+    author: source.originalAuthor
+  }) : '') || 'Philosophy');
+
+  try {
+    rememberReaderForReturn();
+  } catch (error) {
+    console.warn('Could not save Reader return state before Great Ideas:', error);
+  }
+
   renderSyntopicon();
 
-  requestAnimationFrame(() => {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     const select = app.querySelector('#syntopicon-idea');
-    if (select && idea && Array.from(select.options).some((option) => option.value === idea)) {
+    const custom = app.querySelector('#syntopicon-custom-idea');
+    const status = app.querySelector('#syntopicon-status');
+
+    if (select && Array.from(select.options).some((option) => option.value === idea)) {
       select.value = idea;
       select.dispatchEvent(new Event('change', { bubbles:true }));
-      select.focus();
-      return;
-    }
-    const custom = app.querySelector('#syntopicon-custom-idea');
-    if (custom) {
+    } else if (custom) {
       custom.value = idea;
-      custom.focus();
+      custom.dispatchEvent(new Event('input', { bubbles:true }));
     }
-  });
+
+    if (source?.classicGuide) {
+      const bookIndex = findGreatBookIndexForClassicGuide({
+        title: source.originalTitle,
+        author: source.originalAuthor
+      });
+      if (bookIndex >= 0) {
+        const checkbox = app.querySelector(`[data-syntopicon-book="${bookIndex}"]`);
+        if (checkbox) {
+          checkbox.checked = true;
+          checkbox.closest('[data-syntopicon-book-card]')?.scrollIntoView({
+            block:'nearest',
+            behavior:'auto'
+          });
+        }
+      }
+
+      if (status) {
+        status.className = 'status';
+        status.textContent = `Great Idea loaded: ${idea}. Your current book has been selected; choose at least one more source to compare.`;
+      }
+    }
+
+    (select || custom)?.focus();
+  }));
 }
 
 async function startModernGuideSectionComprehensionCheck(markerIndex, source = state?.source || {}) {

@@ -1,0 +1,188 @@
+AN INTRODUCTION TO MATHEMATICS
+An Independent Mark, Set, Go! Classic Guide
+Original work by Alfred North Whitehead
+
+A guide to mathematical abstraction, number, algebra, geometry, variables, functions, symbolism, and Whitehead’s vision of mathematics as a mode of thought.
+
+ABOUT THIS GUIDE
+This independently written educational guide is designed for serious first reading, rereading, and seminar study. It follows the Mark, Set, Go! Classic Guide pattern with focused sections, discussion prompts, section quizzes, Great Ideas, review, and whole-guide quiz hooks.
+
+HOW TO USE IT
+Read one section at a time. Use Discuss with reading companion after each section for interpretation and Quiz me for a short comprehension check. Save the full-guide quiz for the end.
+
+[[MSG:BUY]]
+
+[[MSG:SECTION]]
+
+AT A GLANCE
+
+Whitehead presents mathematics as a language of abstraction that reveals patterns across very different kinds of problems. The book aims less to teach advanced calculation than to show how mathematical ideas grow from number, measurement, geometry, symbolism, and generalization.
+
+QUESTION TO CARRY FORWARD
+Why does Whitehead treat mathematics as a way of organizing thought rather than merely a collection of techniques?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+NUMBER AND COUNTING
+
+Arithmetic begins with abstraction from particular objects toward number itself. Three apples and three stones differ physically but share a numerical structure.
+
+QUESTION TO CARRY FORWARD
+What is gained when mathematics ignores the concrete differences among counted objects?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+VARIABLES
+
+Algebra introduces symbols that can stand for many possible quantities. This shift greatly expands the range of relationships mathematics can express.
+
+QUESTION TO CARRY FORWARD
+Why are variables one of the decisive steps from arithmetic toward general mathematics?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+FUNCTIONS
+
+Functions describe dependence between quantities. A changing quantity can be understood through its systematic relation to another.
+
+QUESTION TO CARRY FORWARD
+How does functional thinking help mathematics model change?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+GEOMETRY
+
+Geometry links spatial intuition with logical structure. Whitehead emphasizes how mathematical reasoning can move beyond direct visual experience.
+
+QUESTION TO CARRY FORWARD
+Why is geometry both intuitive and abstract?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+MEASUREMENT
+
+Measurement connects continuous physical magnitudes with numerical representation.
+
+QUESTION TO CARRY FORWARD
+What assumptions are involved whenever a continuous feature is represented by a number?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+SYMBOLISM
+
+Mathematical notation compresses complex relationships into manageable forms. Good notation can make new reasoning possible.
+
+QUESTION TO CARRY FORWARD
+How can symbols become tools for discovery rather than merely shorthand?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+ABSTRACTION
+
+Abstraction allows mathematics to identify structures common to many situations. Its power comes from leaving details out.
+
+QUESTION TO CARRY FORWARD
+When does abstraction clarify reality, and when can it conceal important differences?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+INFINITY
+
+Whitehead introduces the conceptual importance of infinite processes and the difficulties they pose to common sense.
+
+QUESTION TO CARRY FORWARD
+Why does infinity force mathematics beyond ordinary physical intuition?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+MATHEMATICS AND SCIENCE
+
+Mathematics becomes indispensable to modern science because it can express stable quantitative relationships.
+
+QUESTION TO CARRY FORWARD
+Why is mathematical structure so effective in physical explanation?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+EDUCATION
+
+Whitehead criticizes mechanical learning that separates procedures from ideas. Mathematical education should reveal patterns and meanings.
+
+QUESTION TO CARRY FORWARD
+What makes conceptual understanding different from procedural competence?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+LEGACY
+
+The book remains valuable as an accessible philosophical introduction to mathematical thought. Its central theme is that mathematics trains the mind to recognize structure across changing contexts.
+
+QUESTION TO CARRY FORWARD
+What habit of mind does mathematical abstraction cultivate most powerfully?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+REVIEW — TEN CLAIMS TO REMEMBER
+
+1. State the work’s central problem in one sentence.
+2. Identify its strongest argument, insight, experiment, or explanatory move.
+3. Distinguish description from endorsement.
+4. Track the work’s major conceptual or causal relationships.
+5. Identify one historical assumption or limitation.
+6. Explain one major term, model, experiment, image, or distinction.
+7. Connect the work to at least two earlier Great Books.
+8. State the strongest objection or criticism.
+9. Identify one insight that survives even if some details are outdated.
+10. Explain why the work still belongs in a Great Books curriculum.
+
+QUESTION TO CARRY FORWARD
+Which idea from this work most changes the way you understand its subject?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DEEPER READING LABS
+
+LAB 1 — ARGUMENT MAP
+Map the central thesis and strongest supporting moves.
+
+LAB 2 — KEY DISTINCTIONS
+Identify five distinctions the work relies on and explain why each matters.
+
+LAB 3 — HISTORICAL TEST
+Choose one historical assumption, scientific limitation, or institutional context and evaluate how much the work depends on it.
+
+LAB 4 — STRONGEST OBJECTION
+Construct the strongest objection you can, then answer it from within the work’s own framework.
+
+LAB 5 — GREAT BOOKS CONNECTION
+Compare this work with at least two earlier authors on science, mathematics, truth, nature, knowledge, or human understanding.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]

@@ -1023,7 +1023,7 @@
     "volume": 56,
     "era": "20th Century",
     "category": "Mathematics",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "heisenberg-physics-philosophy",
@@ -1167,6 +1167,48 @@
     "volume": 60,
     "era": "20th Century",
     "category": "Drama",
+    "status": "ready"
+  },
+  {
+    "id": "whitehead-introduction-mathematics",
+    "title": "An Introduction to Mathematics",
+    "author": "Alfred North Whitehead",
+    "status": "ready"
+  },
+  {
+    "id": "eddington-expanding-universe",
+    "title": "The Expanding Universe",
+    "author": "Arthur Eddington",
+    "status": "ready"
+  },
+  {
+    "id": "waddington-nature-life",
+    "title": "The Nature of Life",
+    "author": "C. H. Waddington",
+    "status": "ready"
+  },
+  {
+    "id": "poincare-science-hypothesis",
+    "title": "Science and Hypothesis",
+    "author": "Henri Poincaré",
+    "status": "ready"
+  },
+  {
+    "id": "planck-scientific-autobiography",
+    "title": "Scientific Autobiography and Other Papers",
+    "author": "Max Planck",
+    "status": "ready"
+  },
+  {
+    "id": "bohr-atomic-theory",
+    "title": "Atomic Theory and Selected Essays",
+    "author": "Niels Bohr",
+    "status": "ready"
+  },
+  {
+    "id": "dobzhansky-genetics-origin-species",
+    "title": "Genetics and the Origin of Species",
+    "author": "Theodosius Dobzhansky",
     "status": "ready"
   }
 ]

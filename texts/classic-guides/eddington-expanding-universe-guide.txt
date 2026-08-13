@@ -1,0 +1,188 @@
+THE EXPANDING UNIVERSE
+An Independent Mark, Set, Go! Classic Guide
+Original work by Arthur Eddington
+
+A guide to relativity, cosmology, redshift, expanding space, observational evidence, and the early twentieth-century transformation of our picture of the universe.
+
+ABOUT THIS GUIDE
+This independently written educational guide is designed for serious first reading, rereading, and seminar study. It follows the Mark, Set, Go! Classic Guide pattern with focused sections, discussion prompts, section quizzes, Great Ideas, review, and whole-guide quiz hooks.
+
+HOW TO USE IT
+Read one section at a time. Use Discuss with reading companion after each section for interpretation and Quiz me for a short comprehension check. Save the full-guide quiz for the end.
+
+[[MSG:BUY]]
+
+[[MSG:SECTION]]
+
+AT A GLANCE
+
+Eddington explains the emerging idea that the universe is not static but expanding. Writing during the early development of relativistic cosmology, he connects Einstein’s equations, astronomical observations, and philosophical questions about cosmic structure.
+
+QUESTION TO CARRY FORWARD
+Why was an expanding universe conceptually harder to accept than a static one?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+RELATIVITY AND COSMOLOGY
+
+General relativity made spacetime itself dynamic and allowed cosmological models in which the geometry of the universe changes.
+
+QUESTION TO CARRY FORWARD
+Why does general relativity make cosmology a problem of geometry rather than merely astronomy?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+THE STATIC UNIVERSE
+
+Earlier models often assumed large-scale cosmic stability. Eddington examines why this assumption became difficult to maintain.
+
+QUESTION TO CARRY FORWARD
+What evidence and theory challenged the idea of a permanently static cosmos?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+REDSHIFT
+
+Spectral redshifts from distant galaxies became central evidence for cosmic expansion.
+
+QUESTION TO CARRY FORWARD
+Why does redshift require interpretation through a physical model rather than serving as a self-explanatory fact?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HUBBLE’S RELATION
+
+The relationship between distance and recession speed suggested a systematic large-scale pattern.
+
+QUESTION TO CARRY FORWARD
+Why is a correlation between distance and recession so important cosmologically?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+EXPANDING SPACE
+
+Expansion is not simply galaxies flying outward into preexisting empty space; in relativistic cosmology, spatial relationships themselves evolve.
+
+QUESTION TO CARRY FORWARD
+Why is the balloon analogy useful but limited?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+COSMIC AGE
+
+Expansion raises questions about the universe’s past state and age.
+
+QUESTION TO CARRY FORWARD
+How does a dynamic universe create historical questions for cosmology?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+OBSERVATION AND THEORY
+
+Eddington emphasizes that cosmology combines sparse observations with powerful theoretical frameworks.
+
+QUESTION TO CARRY FORWARD
+Why is cosmology unusually dependent on inference from limited evidence?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+THEORETICAL UNCERTAINTY
+
+Early cosmology contained unresolved tensions in measurements, constants, and models.
+
+QUESTION TO CARRY FORWARD
+Why is scientific uncertainty especially visible in rapidly developing fields?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+PHILOSOPHICAL QUESTIONS
+
+A changing universe invites questions about beginnings, causality, and the status of physical laws.
+
+QUESTION TO CARRY FORWARD
+Which philosophical questions genuinely follow from cosmology, and which exceed what physics can decide?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HISTORICAL LIMITS
+
+Many numerical values and models available to Eddington were later revised.
+
+QUESTION TO CARRY FORWARD
+How should we read an important scientific classic whose data are outdated but whose conceptual shift remains foundational?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+LEGACY
+
+The expanding-universe framework became central to modern cosmology, later enriched by the Big Bang model, cosmic microwave background, and dark-energy research.
+
+QUESTION TO CARRY FORWARD
+What survives from an early cosmological text after its measurements have been superseded?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+REVIEW — TEN CLAIMS TO REMEMBER
+
+1. State the work’s central problem in one sentence.
+2. Identify its strongest argument, insight, experiment, or explanatory move.
+3. Distinguish description from endorsement.
+4. Track the work’s major conceptual or causal relationships.
+5. Identify one historical assumption or limitation.
+6. Explain one major term, model, experiment, image, or distinction.
+7. Connect the work to at least two earlier Great Books.
+8. State the strongest objection or criticism.
+9. Identify one insight that survives even if some details are outdated.
+10. Explain why the work still belongs in a Great Books curriculum.
+
+QUESTION TO CARRY FORWARD
+Which idea from this work most changes the way you understand its subject?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DEEPER READING LABS
+
+LAB 1 — ARGUMENT MAP
+Map the central thesis and strongest supporting moves.
+
+LAB 2 — KEY DISTINCTIONS
+Identify five distinctions the work relies on and explain why each matters.
+
+LAB 3 — HISTORICAL TEST
+Choose one historical assumption, scientific limitation, or institutional context and evaluate how much the work depends on it.
+
+LAB 4 — STRONGEST OBJECTION
+Construct the strongest objection you can, then answer it from within the work’s own framework.
+
+LAB 5 — GREAT BOOKS CONNECTION
+Compare this work with at least two earlier authors on science, mathematics, truth, nature, knowledge, or human understanding.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]

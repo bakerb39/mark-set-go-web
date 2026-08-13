@@ -1,0 +1,188 @@
+SCIENCE AND HYPOTHESIS
+An Independent Mark, Set, Go! Classic Guide
+Original work by Henri Poincaré
+
+A guide to geometry, convention, physical law, hypothesis, measurement, mathematics, and Poincaré’s philosophy of science.
+
+ABOUT THIS GUIDE
+This independently written educational guide is designed for serious first reading, rereading, and seminar study. It follows the Mark, Set, Go! Classic Guide pattern with focused sections, discussion prompts, section quizzes, Great Ideas, review, and whole-guide quiz hooks.
+
+HOW TO USE IT
+Read one section at a time. Use Discuss with reading companion after each section for interpretation and Quiz me for a short comprehension check. Save the full-guide quiz for the end.
+
+[[MSG:BUY]]
+
+[[MSG:SECTION]]
+
+AT A GLANCE
+
+Poincaré asks how mathematics and physics achieve certainty, what role conventions play in geometry, and how scientific hypotheses organize experience. He rejects both naive empiricism and the idea that science is arbitrary.
+
+QUESTION TO CARRY FORWARD
+Why does Poincaré think some scientific principles are neither simple facts nor arbitrary inventions?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+MATHEMATICAL REASONING
+
+Mathematics uses definitions, deduction, and creative generalization.
+
+QUESTION TO CARRY FORWARD
+What role does intuition play alongside formal proof?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+ARITHMETIC
+
+Poincaré examines the foundations of number and mathematical induction.
+
+QUESTION TO CARRY FORWARD
+Why is induction in mathematics different from induction in empirical science?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+GEOMETRY
+
+Different geometries can be internally coherent. Physical geometry depends partly on conventions connecting spatial concepts to measurement.
+
+QUESTION TO CARRY FORWARD
+What does it mean to say geometry is conventional without saying it is arbitrary?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+SPACE
+
+Our conception of space emerges through bodily movement, measurement, and mathematical structure.
+
+QUESTION TO CARRY FORWARD
+How does physical experience interact with abstract geometry?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HYPOTHESIS
+
+Scientific hypotheses organize observations and make prediction possible.
+
+QUESTION TO CARRY FORWARD
+What distinguishes a productive hypothesis from an ad hoc assumption?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+PHYSICAL LAW
+
+Laws often express relationships among measured quantities rather than hidden essences.
+
+QUESTION TO CARRY FORWARD
+Why can a law remain valuable even if its underlying interpretation changes?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+CONVENTION
+
+Some principles function as frameworks chosen partly for simplicity and usefulness.
+
+QUESTION TO CARRY FORWARD
+How does convention differ from subjective preference?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+OBJECTIVITY
+
+Science achieves objectivity through shared relations, reproducibility, and coherent structure.
+
+QUESTION TO CARRY FORWARD
+Can objectivity depend on human conventions?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+SIMPLICITY
+
+Scientists prefer simpler frameworks when multiple descriptions fit the evidence.
+
+QUESTION TO CARRY FORWARD
+Why is simplicity a methodological value rather than a direct observation?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+LIMITS OF CERTAINTY
+
+Poincaré stresses that scientific knowledge combines deduction with revisable empirical assumptions.
+
+QUESTION TO CARRY FORWARD
+Where should certainty end and provisional confidence begin?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+LEGACY
+
+His work influenced logical positivism, conventionalism, relativity debates, and philosophy of science.
+
+QUESTION TO CARRY FORWARD
+Which of Poincaré’s ideas became especially important once relativity challenged classical geometry?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+REVIEW — TEN CLAIMS TO REMEMBER
+
+1. State the work’s central problem in one sentence.
+2. Identify its strongest argument, insight, experiment, or explanatory move.
+3. Distinguish description from endorsement.
+4. Track the work’s major conceptual or causal relationships.
+5. Identify one historical assumption or limitation.
+6. Explain one major term, model, experiment, image, or distinction.
+7. Connect the work to at least two earlier Great Books.
+8. State the strongest objection or criticism.
+9. Identify one insight that survives even if some details are outdated.
+10. Explain why the work still belongs in a Great Books curriculum.
+
+QUESTION TO CARRY FORWARD
+Which idea from this work most changes the way you understand its subject?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DEEPER READING LABS
+
+LAB 1 — ARGUMENT MAP
+Map the central thesis and strongest supporting moves.
+
+LAB 2 — KEY DISTINCTIONS
+Identify five distinctions the work relies on and explain why each matters.
+
+LAB 3 — HISTORICAL TEST
+Choose one historical assumption, scientific limitation, or institutional context and evaluate how much the work depends on it.
+
+LAB 4 — STRONGEST OBJECTION
+Construct the strongest objection you can, then answer it from within the work’s own framework.
+
+LAB 5 — GREAT BOOKS CONNECTION
+Compare this work with at least two earlier authors on science, mathematics, truth, nature, knowledge, or human understanding.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]
