@@ -951,7 +951,7 @@
     "volume": 54,
     "era": "20th Century",
     "category": "Psychology",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "freud-civilization",
@@ -960,7 +960,7 @@
     "volume": 54,
     "era": "20th Century",
     "category": "Psychology",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "james-pragmatism",
@@ -969,7 +969,7 @@
     "volume": 55,
     "era": "20th Century",
     "category": "Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "dewey-experience-education",
@@ -978,7 +978,7 @@
     "volume": 55,
     "era": "20th Century",
     "category": "Education & Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "whitehead-science-modern-world",
@@ -987,7 +987,7 @@
     "volume": 55,
     "era": "20th Century",
     "category": "Philosophy & Science",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "russell-problems-philosophy",
@@ -996,7 +996,7 @@
     "volume": 55,
     "era": "20th Century",
     "category": "Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "wittgenstein-investigations",
@@ -1005,7 +1005,7 @@
     "volume": 55,
     "era": "20th Century",
     "category": "Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "einstein-relativity",
@@ -1014,7 +1014,7 @@
     "volume": 56,
     "era": "20th Century",
     "category": "Science",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "hardy-apology",

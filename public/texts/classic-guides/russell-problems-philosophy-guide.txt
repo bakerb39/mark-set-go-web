@@ -1,0 +1,188 @@
+THE PROBLEMS OF PHILOSOPHY
+An Independent Mark, Set, Go! Classic Guide
+Original work by Bertrand Russell
+
+A guide to appearance and reality, sense-data, knowledge by acquaintance and description, induction, universals, and philosophical method.
+
+ABOUT THIS GUIDE
+This independently written educational guide is designed for serious first reading, rereading, and seminar study. It follows the Mark, Set, Go! Classic Guide pattern with focused sections, discussion prompts, section quizzes, Great Ideas, review, and whole-guide quiz hooks.
+
+HOW TO USE IT
+Read one section at a time. Use Discuss with reading companion after each section for interpretation and Quiz me for a short comprehension check. Save the full-guide quiz for the end.
+
+[[MSG:BUY]]
+
+[[MSG:SECTION]]
+
+AT A GLANCE
+
+Russell introduces philosophy by beginning with ordinary experience and asking how much we really know. A familiar table quickly becomes a problem about appearance, perception, matter, inference, and the relation between mind and world.
+
+QUESTION TO CARRY FORWARD
+Why is an ordinary table enough to generate deep philosophical problems?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+APPEARANCE AND REALITY
+
+The table appears different under varying light, angle, and observers. Russell distinguishes what is immediately experienced from what we infer to be the physical object.
+
+QUESTION TO CARRY FORWARD
+Why does perceptual variation force a distinction between appearance and reality?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+SENSE-DATA
+
+Russell uses sense-data for the immediately given colors, shapes, textures, and other features in experience. Physical objects are not simply identical with these appearances.
+
+QUESTION TO CARRY FORWARD
+What problem does the concept of sense-data attempt to solve?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+THE EXISTENCE OF MATTER
+
+We naturally believe objects continue to exist when unperceived. Russell examines whether this belief can be justified beyond immediate sensory experience.
+
+QUESTION TO CARRY FORWARD
+Why is belief in an external world an inference rather than a direct perception on Russell’s account?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+IDEALISM
+
+Russell considers arguments that reality is fundamentally mental and rejects the claim that whatever is known must therefore exist only in a mind.
+
+QUESTION TO CARRY FORWARD
+Why does being known not imply being mental?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+KNOWLEDGE BY ACQUAINTANCE
+
+We are directly acquainted with certain elements of experience rather than knowing them through description. This provides one foundation for other knowledge.
+
+QUESTION TO CARRY FORWARD
+What kinds of things does Russell think can be known directly?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+KNOWLEDGE BY DESCRIPTION
+
+We know many things through descriptions, such as historical persons or distant objects, without direct acquaintance. Language allows knowledge to extend beyond immediate experience.
+
+QUESTION TO CARRY FORWARD
+How does descriptive knowledge depend on more basic acquaintance?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+INDUCTION
+
+Scientific and everyday reasoning assume that patterns observed in the past will continue. Russell emphasizes that this principle cannot simply be proved by past success without circularity.
+
+QUESTION TO CARRY FORWARD
+Why can’t induction be justified merely by saying induction has worked before?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+A PRIORI KNOWLEDGE
+
+Some knowledge, especially logical and mathematical relations, appears independent of particular sensory experiences. Russell examines how such knowledge is possible.
+
+QUESTION TO CARRY FORWARD
+What distinguishes knowledge of a logical relation from knowledge of a particular physical event?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+UNIVERSALS
+
+Relations and qualities such as whiteness, similarity, or being north of are not particular physical objects. Russell argues that universals have a real role in knowledge.
+
+QUESTION TO CARRY FORWARD
+Why do general truths seem to require more than collections of individual objects?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+THE VALUE OF PHILOSOPHY
+
+Philosophy rarely provides the certainty people initially seek. Its value lies partly in enlarging possibilities, challenging assumptions, and freeing thought from narrow habitual certainty.
+
+QUESTION TO CARRY FORWARD
+Why can uncertainty itself have intellectual value?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+LEGACY
+
+The book remains a model of analytic clarity and an accessible introduction to epistemology and metaphysics. Many of Russell’s specific views changed later, but his method of breaking large questions into precise problems endured.
+
+QUESTION TO CARRY FORWARD
+What is gained by beginning philosophy with small, carefully defined questions rather than comprehensive systems?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+REVIEW — TEN CLAIMS TO REMEMBER
+
+1. State the work’s central problem in one sentence.
+2. Identify its strongest argument, insight, or achievement.
+3. Distinguish description from endorsement.
+4. Track the work’s major causal, conceptual, scientific, or interpretive relationships.
+5. Identify one historical assumption or limitation the work depends on.
+6. Explain one major term, experiment, image, or distinction in the work’s own framework.
+7. Connect the work to at least two earlier Great Books.
+8. State the strongest objection or criticism.
+9. Identify one insight that survives even if some conclusions fail.
+10. Explain why the work still belongs in a Great Books curriculum.
+
+QUESTION TO CARRY FORWARD
+Which claim from this work most changes the way you understand its subject?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DEEPER READING LABS
+
+LAB 1 — ARGUMENT MAP
+Map the central thesis and the strongest supporting moves. Identify where the author moves from observation to explanation, or from explanation to broader philosophical conclusion.
+
+LAB 2 — KEY DISTINCTIONS
+Identify five distinctions the work relies on and explain what becomes difficult to understand if each one is blurred.
+
+LAB 3 — HISTORICAL TEST
+Choose one historical assumption, scientific limitation, institution, or cultural context and evaluate how much the work depends on it.
+
+LAB 4 — STRONGEST OBJECTION
+Construct the strongest objection you can, then answer it using evidence from the work itself.
+
+LAB 5 — GREAT BOOKS CONNECTION
+Compare this work with at least two earlier authors on truth, mind, freedom, science, society, education, religion, or human nature.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]

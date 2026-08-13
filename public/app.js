@@ -3192,6 +3192,14 @@ const CLASSIC_GUIDES = Object.freeze({
   "Dostoevsky Brothers Karamazov": { id:"classic-dostoevsky-brothers-karamazov", slug:"dostoevsky-brothers-karamazov", title:"The Brothers Karamazov", author:"Fyodor Dostoevsky" },
   "Ibsen plays": { id:"classic-ibsen-dolls-house", slug:"ibsen-dolls-house", title:"A Doll’s House", author:"Henrik Ibsen" },
   "William James Principles Psychology": { id:"classic-william-james-principles-psychology", slug:"william-james-principles-psychology", title:"The Principles of Psychology", author:"William James" },
+  "Freud Interpretation Dreams": { id:"classic-freud-interpretation-dreams", slug:"freud-interpretation-dreams", title:"The Interpretation of Dreams", author:"Sigmund Freud" },
+  "Freud Civilization Discontents": { id:"classic-freud-civilization-discontents", slug:"freud-civilization-discontents", title:"Civilization and Its Discontents", author:"Sigmund Freud" },
+  "William James Pragmatism": { id:"classic-william-james-pragmatism", slug:"william-james-pragmatism", title:"Pragmatism", author:"William James" },
+  "Dewey Experience Education": { id:"classic-dewey-experience-education", slug:"dewey-experience-education", title:"Experience and Education", author:"John Dewey" },
+  "Whitehead Science Modern World": { id:"classic-whitehead-science-modern-world", slug:"whitehead-science-modern-world", title:"Science and the Modern World", author:"Alfred North Whitehead" },
+  "Russell Problems Philosophy": { id:"classic-russell-problems-philosophy", slug:"russell-problems-philosophy", title:"The Problems of Philosophy", author:"Bertrand Russell" },
+  "Wittgenstein Philosophical Investigations": { id:"classic-wittgenstein-philosophical-investigations", slug:"wittgenstein-philosophical-investigations", title:"Philosophical Investigations", author:"Ludwig Wittgenstein" },
+  "Einstein Relativity": { id:"classic-einstein-relativity", slug:"einstein-relativity", title:"Relativity: The Special and the General Theory", author:"Albert Einstein" },
 });
 
 function classicGuideForGreatBook(book) {
