@@ -1,0 +1,188 @@
+EXPERIMENTAL RESEARCHES IN ELECTRICITY
+An Independent Mark, Set, Go! Classic Guide
+Original work by Michael Faraday
+
+A focused guide to electromagnetic induction, electrochemistry, lines of force, dielectric action, magnetism, experimental method, and the field concept.
+
+ABOUT THIS GUIDE
+This independently written educational guide is designed for serious first reading, rereading, and seminar study. It follows the Mark, Set, Go! Classic Guide pattern with focused sections, discussion prompts, section quizzes, Great Ideas, review, and whole-guide quiz hooks.
+
+HOW TO USE IT
+Read one substantial section at a time. After each section, use Discuss with reading companion for interpretation and Quiz me for a short comprehension check based on that section. Use the final whole-guide quiz after completing the guide.
+
+[[MSG:BUY]]
+
+[[MSG:SECTION]]
+
+AT A GLANCE
+
+Faraday’s Experimental Researches record a long program of experiments that transformed electricity and magnetism. The papers include electromagnetic induction, electrolysis, dielectric effects, magneto-optical phenomena, and the development of lines of force.
+
+QUESTION TO CARRY FORWARD
+How can a sequence of experiments produce a new physical picture before a final mathematical theory?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+FARADAY’S METHOD
+
+Faraday works through apparatus, variation, controls, repeated trials, and physical models. He was mathematically less formal than later theorists but extraordinarily precise about experimental conditions and conceptual distinctions.
+
+QUESTION TO CARRY FORWARD
+What kinds of reasoning can experiment provide that equations alone cannot?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+ELECTROMAGNETIC INDUCTION
+
+Faraday discovers that changing magnetic conditions can induce electric current. A steady magnet alone is not the key; change in magnetic flux or relative arrangement produces the effect.
+
+QUESTION TO CARRY FORWARD
+Why is change rather than mere presence the crucial feature of induction?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+RINGS AND COILS
+
+Experiments with coils wound around an iron ring show that changing current in one circuit can induce current in another. The result reveals a dynamic relationship among electricity, magnetism, and the surrounding medium.
+
+QUESTION TO CARRY FORWARD
+How does induction allow energy transfer without direct electrical contact?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+MOTOR–GENERATOR SYMMETRY
+
+Earlier work showed electricity producing motion; induction shows motion or changing magnetism producing electricity. Together these effects reveal reciprocity central to electrical technology.
+
+QUESTION TO CARRY FORWARD
+Why is reversibility between electrical and mechanical effects conceptually important?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+ELECTROCHEMISTRY
+
+Faraday’s laws of electrolysis connect the amount of chemical change to the quantity of electricity passing through a system. The work links electricity to definite quantitative transformations of matter.
+
+QUESTION TO CARRY FORWARD
+What does proportionality between charge and chemical decomposition suggest?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+SCIENTIFIC LANGUAGE
+
+Faraday introduced or popularized terms such as electrode, anode, cathode, ion, anion, and cation with help from collaborators including William Whewell. New terminology clarified processes without forcing them into older speculative pictures.
+
+QUESTION TO CARRY FORWARD
+Why does scientific progress sometimes require new words before new equations?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+LINES OF FORCE
+
+Faraday increasingly imagines electrical and magnetic action through lines of force occupying space rather than instantaneous action at a distance. These lines become part of his physical interpretation.
+
+QUESTION TO CARRY FORWARD
+How does the field-like picture change what counts as physically real between interacting objects?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIELECTRICS
+
+Faraday studies how insulating materials affect electrostatic induction. The space and material between charged objects are active in determining electrical behavior.
+
+QUESTION TO CARRY FORWARD
+Why is the material between charges important if action is not simply direct at a distance?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+MAGNETO-OPTICAL EFFECT
+
+Faraday discovers that a magnetic field can rotate the plane of polarization of light in certain materials. This gives experimental evidence that magnetism and light are connected.
+
+QUESTION TO CARRY FORWARD
+Why was linking magnetism and light a major step toward unification?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+FROM FARADAY TO MAXWELL
+
+James Clerk Maxwell translated Faraday’s field ideas into mathematical theory. Faraday’s work illustrates how physical intuition and mathematical formalization can arrive in different stages.
+
+QUESTION TO CARRY FORWARD
+What is lost if Faraday is described merely as a precursor to Maxwell?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+GREAT IDEAS AND LEGACY
+
+Faraday’s work underlies motors, generators, transformers, electrochemistry, and field theory. His achievement joins disciplined experiment with bold conceptual imagination.
+
+QUESTION TO CARRY FORWARD
+Is Faraday’s greatest legacy a set of discoveries, a method, or the field concept?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+REVIEW — TEN CLAIMS TO REMEMBER
+
+1. State the central problem of the work in one sentence.
+2. Identify the author’s strongest argument.
+3. Distinguish description from prescription.
+4. Track the major causal or conceptual relationships.
+5. Identify the historical assumptions the argument depends on.
+6. Explain one major term in the author’s own framework.
+7. Connect the work to at least two earlier Great Books.
+8. State the strongest objection to the work.
+9. Identify one idea that survives even if some conclusions fail.
+10. Explain why the work still belongs in a Great Books curriculum.
+
+QUESTION TO CARRY FORWARD
+Which one claim from this work most changes the way you understand its subject?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DEEPER READING LABS
+
+LAB 1 — ARGUMENT MAP
+Write the central thesis, then list the three strongest supporting arguments and evidence for each.
+
+LAB 2 — KEY DISTINCTIONS
+Identify five distinctions the author relies on and explain what breaks if each is ignored.
+
+LAB 3 — HISTORICAL TEST
+Choose one historical example and ask whether it really proves what the author says it proves.
+
+LAB 4 — STRONGEST OBJECTION
+Construct the strongest objection you can, then answer it using the work itself.
+
+LAB 5 — GREAT BOOKS CONNECTION
+Compare the work with at least two earlier authors on authority, knowledge, morality, politics, science, or human nature.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]

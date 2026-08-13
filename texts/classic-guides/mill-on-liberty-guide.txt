@@ -1,0 +1,177 @@
+ON LIBERTY
+An Independent Mark, Set, Go! Classic Guide
+Original work by John Stuart Mill
+
+A focused guide to individual liberty, social authority, freedom of thought and discussion, individuality, experimentation in living, paternalism, and the harm principle.
+
+ABOUT THIS GUIDE
+This independently written educational guide is designed for serious first reading, rereading, and seminar study. It follows the Mark, Set, Go! Classic Guide pattern with focused sections, discussion prompts, section quizzes, Great Ideas, review, and whole-guide quiz hooks.
+
+HOW TO USE IT
+Read one substantial section at a time. After each section, use Discuss with reading companion for interpretation and Quiz me for a short comprehension check based on that section. Use the final whole-guide quiz after completing the guide.
+
+[[MSG:BUY]]
+
+[[MSG:SECTION]]
+
+AT A GLANCE
+
+Mill asks where society may legitimately limit individual freedom. His answer is organized around a strong presumption of liberty: coercion is justified to prevent harm to others, not merely because authorities think a person’s choices are foolish or morally wrong.
+
+QUESTION TO CARRY FORWARD
+Why does Mill treat social pressure as a threat to liberty alongside legal coercion?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+THE HARM PRINCIPLE
+
+Power may be rightfully exercised over a competent adult against his will only to prevent harm to others. His own good, physical or moral, is not sufficient. The principle is powerful but leaves difficult questions about what counts as harm.
+
+QUESTION TO CARRY FORWARD
+How narrow or broad must harm be if the principle is to protect a meaningful private sphere?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+TYRANNY OF THE MAJORITY
+
+Democratic government does not eliminate domination. Majorities can use law, custom, reputation, and moral pressure to suppress dissenting ways of life. Mill shifts the liberty problem from rulers versus subjects to society versus individuals.
+
+QUESTION TO CARRY FORWARD
+Why can social conformity be coercive even when no law is violated?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+FREEDOM OF DISCUSSION
+
+Suppressing an opinion is dangerous because the opinion may be true, partly true, or false in a way that forces truth to be understood rather than repeated as dead dogma. Debate improves not only discovery but comprehension.
+
+QUESTION TO CARRY FORWARD
+Why does Mill think even false opinions can contribute to knowledge?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+FALLIBILITY
+
+No individual or age is infallible. To silence an opposing view is to assume certainty that human beings repeatedly lack. Mill makes epistemic humility a political principle.
+
+QUESTION TO CARRY FORWARD
+What political institutions follow from taking human fallibility seriously?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+INDIVIDUALITY
+
+Mill values individuality as a condition of human development. People need room to exercise judgment, choose projects, make mistakes, and form character. Passive conformity weakens the faculties required for mature agency.
+
+QUESTION TO CARRY FORWARD
+Why does Mill connect liberty with development of human capacities?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+EXPERIMENTS IN LIVING
+
+Different ways of life function as social experiments. When coercion does not force uniformity, societies can learn from diverse practices. Variation produces social information.
+
+QUESTION TO CARRY FORWARD
+How can a society benefit from lifestyles most citizens do not choose for themselves?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+SELF-REGARDING AND OTHER-REGARDING CONDUCT
+
+Mill distinguishes conduct primarily concerning oneself from conduct that harms others. In practice the boundary is difficult because actions have indirect effects.
+
+QUESTION TO CARRY FORWARD
+What criteria can distinguish genuine harm from mere offense, dislike, or moral disapproval?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+LIMITS AND EXCEPTIONS
+
+Mill excludes children and those not yet capable of self-government from the full scope of the principle and controversially extends this reasoning to societies he calls barbarous. These passages expose imperial assumptions requiring criticism.
+
+QUESTION TO CARRY FORWARD
+How do Mill’s exclusions complicate the universality of his defense of liberty?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+APPLICATIONS
+
+Mill discusses trade, contracts, intoxication, public conduct, education, family authority, and administrative centralization. The examples show that liberty requires drawing lines among prevention, information, regulation, and coercion.
+
+QUESTION TO CARRY FORWARD
+Which application best tests the limits of the harm principle?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+GREAT IDEAS AND LEGACY
+
+On Liberty became a foundational statement of liberal individualism. Its enduring questions concern free speech, paternalism, social conformity, autonomy, minority rights, and pluralism.
+
+QUESTION TO CARRY FORWARD
+Does the harm principle settle liberty disputes, or mainly clarify what must be argued about?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+REVIEW — TEN CLAIMS TO REMEMBER
+
+1. State the central problem of the work in one sentence.
+2. Identify the author’s strongest argument.
+3. Distinguish description from prescription.
+4. Track the major causal or conceptual relationships.
+5. Identify the historical assumptions the argument depends on.
+6. Explain one major term in the author’s own framework.
+7. Connect the work to at least two earlier Great Books.
+8. State the strongest objection to the work.
+9. Identify one idea that survives even if some conclusions fail.
+10. Explain why the work still belongs in a Great Books curriculum.
+
+QUESTION TO CARRY FORWARD
+Which one claim from this work most changes the way you understand its subject?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DEEPER READING LABS
+
+LAB 1 — ARGUMENT MAP
+Write the central thesis, then list the three strongest supporting arguments and evidence for each.
+
+LAB 2 — KEY DISTINCTIONS
+Identify five distinctions the author relies on and explain what breaks if each is ignored.
+
+LAB 3 — HISTORICAL TEST
+Choose one historical example and ask whether it really proves what the author says it proves.
+
+LAB 4 — STRONGEST OBJECTION
+Construct the strongest objection you can, then answer it using the work itself.
+
+LAB 5 — GREAT BOOKS CONNECTION
+Compare the work with at least two earlier authors on authority, knowledge, morality, politics, science, or human nature.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]

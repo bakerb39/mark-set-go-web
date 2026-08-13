@@ -672,7 +672,7 @@
     "volume": 36,
     "era": "Enlightenment",
     "category": "Economics",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "gibbon-decline-fall",
@@ -681,7 +681,7 @@
     "volume": "37–38",
     "era": "Enlightenment",
     "category": "History",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "kant-pure-reason",
@@ -690,7 +690,7 @@
     "volume": 39,
     "era": "Enlightenment",
     "category": "Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "kant-morals",
@@ -699,7 +699,7 @@
     "volume": 39,
     "era": "Enlightenment",
     "category": "Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "american-state-papers",
@@ -708,7 +708,7 @@
     "volume": 40,
     "era": "Enlightenment",
     "category": "Politics & History",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "federalist-papers",
@@ -717,7 +717,7 @@
     "volume": 40,
     "era": "Enlightenment",
     "category": "Politics",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "mill-on-liberty",
@@ -726,7 +726,7 @@
     "volume": 40,
     "era": "19th Century",
     "category": "Politics & Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "mill-utilitarianism",
@@ -735,7 +735,7 @@
     "volume": 40,
     "era": "19th Century",
     "category": "Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "boswell-johnson",
@@ -744,7 +744,7 @@
     "volume": 41,
     "era": "18th Century",
     "category": "Biography",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "lavoisier-chemistry",
@@ -753,7 +753,7 @@
     "volume": 42,
     "era": "Enlightenment",
     "category": "Science",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "faraday-electricity",
@@ -762,7 +762,7 @@
     "volume": 42,
     "era": "19th Century",
     "category": "Science",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "hegel-right",

@@ -3158,7 +3158,19 @@ const CLASSIC_GUIDES = Object.freeze({
   "Rousseau Discourse Inequality": { id:"classic-rousseau-discourse-on-inequality", slug:"rousseau-discourse-on-inequality", title:"Discourse on Inequality", author:"Jean-Jacques Rousseau" },
   "Rousseau Social Contract": { id:"classic-rousseau-political-writings-social-contract", slug:"rousseau-political-writings-social-contract", title:"Political Writings including The Social Contract", author:"Jean-Jacques Rousseau" },
   "Rousseau Social Contract": { id:"classic-rousseau-social-contract", slug:"rousseau-social-contract", title:"The Social Contract", author:"Jean-Jacques Rousseau" },
-  "Montesquieu Spirit Laws": { id:"classic-montesquieu-spirit-of-laws", slug:"montesquieu-spirit-of-laws", title:"The Spirit of Laws", author:"Montesquieu" }
+  "Montesquieu Spirit Laws": { id:"classic-montesquieu-spirit-of-laws", slug:"montesquieu-spirit-of-laws", title:"The Spirit of Laws", author:"Montesquieu" },
+  "Adam Smith Wealth Nations": { id:"classic-adam-smith-wealth-of-nations", slug:"adam-smith-wealth-of-nations", title:"The Wealth of Nations", author:"Adam Smith" },
+  "Gibbon Decline Fall Roman Empire::The Decline and Fall of the Roman Empire, Volume I": { id:"classic-gibbon-decline-fall-volume-i", slug:"gibbon-decline-fall-volume-i", title:"The Decline and Fall of the Roman Empire, Volume I", author:"Edward Gibbon" },
+  "Gibbon Decline Fall Roman Empire::The Decline and Fall of the Roman Empire, Volume II": { id:"classic-gibbon-decline-fall-volume-ii", slug:"gibbon-decline-fall-volume-ii", title:"The Decline and Fall of the Roman Empire, Volume II", author:"Edward Gibbon" },
+  "Kant Critique Pure Reason Major Critical and Moral Works": { id:"classic-kant-major-critical-moral-works", slug:"kant-major-critical-moral-works", title:"Major Critical and Moral Works", author:"Immanuel Kant" },
+  "Federalist Papers": { id:"classic-federalist-papers", slug:"federalist-papers", title:"The Federalist Papers", author:"Alexander Hamilton, James Madison, and John Jay" },
+  "Mill On Liberty": { id:"classic-mill-on-liberty", slug:"mill-on-liberty", title:"On Liberty", author:"John Stuart Mill" },
+  "John Stuart Mill On Liberty": { id:"classic-mill-on-liberty", slug:"mill-on-liberty", title:"On Liberty", author:"John Stuart Mill" },
+  "Mill Utilitarianism": { id:"classic-mill-utilitarianism", slug:"mill-utilitarianism", title:"Utilitarianism", author:"John Stuart Mill" },
+  "United States Constitution Declaration Independence": { id:"classic-american-founding-state-papers", slug:"american-founding-state-papers", title:"Declaration, Articles of Confederation, and Constitution", author:"United States founding generation" },
+  "Boswell Life Samuel Johnson": { id:"classic-boswell-life-samuel-johnson", slug:"boswell-life-samuel-johnson", title:"The Life of Samuel Johnson", author:"James Boswell" },
+  "Lavoisier Elements Chemistry": { id:"classic-lavoisier-elements-chemistry", slug:"lavoisier-elements-chemistry", title:"Elements of Chemistry", author:"Antoine Lavoisier" },
+  "Faraday Experimental Researches Electricity": { id:"classic-faraday-experimental-researches-electricity", slug:"faraday-experimental-researches-electricity", title:"Experimental Researches in Electricity", author:"Michael Faraday" }
 });
 
 function classicGuideForGreatBook(book) {

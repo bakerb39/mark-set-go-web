@@ -1,0 +1,177 @@
+ELEMENTS OF CHEMISTRY
+An Independent Mark, Set, Go! Classic Guide
+Original work by Antoine Lavoisier
+
+A focused guide to chemical method, measurement, conservation of mass, combustion, oxygen, nomenclature, elements, compounds, and quantitative chemistry.
+
+ABOUT THIS GUIDE
+This independently written educational guide is designed for serious first reading, rereading, and seminar study. It follows the Mark, Set, Go! Classic Guide pattern with focused sections, discussion prompts, section quizzes, Great Ideas, review, and whole-guide quiz hooks.
+
+HOW TO USE IT
+Read one substantial section at a time. After each section, use Discuss with reading companion for interpretation and Quiz me for a short comprehension check based on that section. Use the final whole-guide quiz after completing the guide.
+
+[[MSG:BUY]]
+
+[[MSG:SECTION]]
+
+AT A GLANCE
+
+Lavoisier’s Elements presents a new framework for chemical science grounded in careful measurement, balance experiments, a revised account of combustion, and systematic nomenclature. It is both textbook and scientific manifesto.
+
+QUESTION TO CARRY FORWARD
+Why can changing scientific language alter what researchers are able to see and test?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+CHEMISTRY BEFORE LAVOISIER
+
+Eighteenth-century chemistry inherited phlogiston theory, inconsistent names, and a mixture of craft knowledge and experimental science. Lavoisier’s achievement was a reorganization of concepts, measurements, and vocabulary.
+
+QUESTION TO CARRY FORWARD
+What makes a scientific revolution more than replacing one isolated theory?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+THE BALANCE
+
+Mass measurement is central to Lavoisier’s method. Reactants and products must be accounted for, including gases earlier experimenters could overlook. The balance turns chemistry into quantitative bookkeeping.
+
+QUESTION TO CARRY FORWARD
+How does measurement reveal substances that qualitative observation might miss?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+CONSERVATION OF MASS
+
+Lavoisier’s experiments support the principle that in ordinary chemical reactions matter is transformed rather than created or destroyed. Accurate accounting of closed systems becomes a check on explanation.
+
+QUESTION TO CARRY FORWARD
+Why is conservation a methodological principle as well as a statement about matter?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+COMBUSTION AND OXYGEN
+
+Against phlogiston theory, Lavoisier explains combustion as combination with oxygen. Metals gain mass when calcined because they combine with a component of air rather than losing an invisible fire-like substance.
+
+QUESTION TO CARRY FORWARD
+Why was the increase in mass during calcination such a decisive clue?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+AIR AS A MIXTURE
+
+Air is not one elementary substance. Experiments distinguish oxygen, nitrogen-like residual gases, carbon dioxide, and other components. Pneumatic chemistry becomes part of the new system.
+
+QUESTION TO CARRY FORWARD
+What changes scientifically when air becomes a mixture with measurable components?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+WATER AND COMPOSITION
+
+Water, long treated as an element, is shown to be a compound associated with hydrogen and oxygen. This challenges inherited elemental schemes and demonstrates synthesis and decomposition.
+
+QUESTION TO CARRY FORWARD
+Why are both analysis and synthesis important when identifying composition?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+WHAT COUNTS AS AN ELEMENT
+
+Lavoisier offers a pragmatic definition: an element is a substance not yet decomposed by available chemical methods. This avoids claiming knowledge of ultimate metaphysical simplicity.
+
+QUESTION TO CARRY FORWARD
+Why is a method-based definition scientifically useful even if future chemistry changes the list?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+CHEMICAL NOMENCLATURE
+
+Systematic naming links substances to composition and theory. Regular nomenclature makes relationships easier to communicate and reduces arbitrary traditional names.
+
+QUESTION TO CARRY FORWARD
+How can classification and naming become instruments of discovery?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+CALORIC AND LIMITS
+
+Not every part of Lavoisier’s system survived. He treated caloric as a material-like substance and included heat-related entities among elements. The errors show that a revolutionary framework can still contain provisional components.
+
+QUESTION TO CARRY FORWARD
+How should we evaluate a scientific work when some central assumptions later fail?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+GREAT IDEAS AND LEGACY
+
+Elements helped establish quantitative chemistry, conservation reasoning, modern nomenclature, and a new conception of chemical reactions. Its deepest legacy is methodological: weigh, define, classify, and account for every transformation.
+
+QUESTION TO CARRY FORWARD
+Which mattered more—specific discoveries or new standards of method and language?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+REVIEW — TEN CLAIMS TO REMEMBER
+
+1. State the central problem of the work in one sentence.
+2. Identify the author’s strongest argument.
+3. Distinguish description from prescription.
+4. Track the major causal or conceptual relationships.
+5. Identify the historical assumptions the argument depends on.
+6. Explain one major term in the author’s own framework.
+7. Connect the work to at least two earlier Great Books.
+8. State the strongest objection to the work.
+9. Identify one idea that survives even if some conclusions fail.
+10. Explain why the work still belongs in a Great Books curriculum.
+
+QUESTION TO CARRY FORWARD
+Which one claim from this work most changes the way you understand its subject?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DEEPER READING LABS
+
+LAB 1 — ARGUMENT MAP
+Write the central thesis, then list the three strongest supporting arguments and evidence for each.
+
+LAB 2 — KEY DISTINCTIONS
+Identify five distinctions the author relies on and explain what breaks if each is ignored.
+
+LAB 3 — HISTORICAL TEST
+Choose one historical example and ask whether it really proves what the author says it proves.
+
+LAB 4 — STRONGEST OBJECTION
+Construct the strongest objection you can, then answer it using the work itself.
+
+LAB 5 — GREAT BOOKS CONNECTION
+Compare the work with at least two earlier authors on authority, knowledge, morality, politics, science, or human nature.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]] [[MSG:BUY]]
