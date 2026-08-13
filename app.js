@@ -15869,11 +15869,11 @@ const BIBLE_GUIDE_CATALOG = Object.freeze([
   { testament:"Old Testament", group:"History", title:"Ezra", slug:"ezra", status:"ready" },
   { testament:"Old Testament", group:"History", title:"Nehemiah", slug:"nehemiah", status:"ready" },
   { testament:"Old Testament", group:"History", title:"Esther", slug:"esther", status:"ready" },
-  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Job", slug:"job", status:"planned" },
-  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Psalms", slug:"psalms", status:"planned" },
-  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Proverbs", slug:"proverbs", status:"planned" },
-  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Ecclesiastes", slug:"ecclesiastes", status:"planned" },
-  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Song of Solomon", slug:"song-of-solomon", status:"planned" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Job", slug:"job", status:"ready" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Psalms", slug:"psalms", status:"ready" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Proverbs", slug:"proverbs", status:"ready" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Ecclesiastes", slug:"ecclesiastes", status:"ready" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Song of Solomon", slug:"song-of-solomon", status:"ready" },
   { testament:"Old Testament", group:"Major Prophets", title:"Isaiah", slug:"isaiah", status:"planned" },
   { testament:"Old Testament", group:"Major Prophets", title:"Jeremiah", slug:"jeremiah", status:"planned" },
   { testament:"Old Testament", group:"Major Prophets", title:"Lamentations", slug:"lamentations", status:"planned" },
@@ -15937,7 +15937,12 @@ const BIBLE_GUIDES = Object.freeze({
   "2 Chronicles": { slug:"2-chronicles", title:"2 Chronicles", greatIdea:"Religion" },
   "Ezra": { slug:"ezra", title:"Ezra", greatIdea:"Law" },
   "Nehemiah": { slug:"nehemiah", title:"Nehemiah", greatIdea:"Government" },
-  "Esther": { slug:"esther", title:"Esther", greatIdea:"Providence" }
+  "Esther": { slug:"esther", title:"Esther", greatIdea:"Providence" },
+  "Job": { slug:"job", title:"Job", greatIdea:"Suffering" },
+  "Psalms": { slug:"psalms", title:"Psalms", greatIdea:"Worship" },
+  "Proverbs": { slug:"proverbs", title:"Proverbs", greatIdea:"Wisdom" },
+  "Ecclesiastes": { slug:"ecclesiastes", title:"Ecclesiastes", greatIdea:"Happiness" },
+  "Song of Solomon": { slug:"song-of-solomon", title:"Song of Solomon", greatIdea:"Love" }
 });
 
 const LAST_BIBLE_PASSAGE_KEY = 'markSetGoLastBiblePassageV1';
@@ -16444,6 +16449,20 @@ function renderBibleGuides() {
       </div>
     </section>`;
 
+  app.querySelectorAll('[data-read="bible"]').forEach((button) => {
+    button.addEventListener('click', () => renderBibleStudy());
+  });
+
+  app.querySelectorAll('[data-action="reader"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      try {
+        renderReader();
+      } catch {
+        renderCurrentReading?.();
+      }
+    });
+  });
+
   const filter = app.querySelector('#bible-guides-filter');
   filter?.addEventListener('input', () => {
     const query = filter.value.trim().toLowerCase();
@@ -16576,7 +16595,11 @@ async function renderBibleStudy() {
   const notesKey = () => `markSetGoBibleNotesV1:${translationSelect.value}:${bookSelect.value}:${chapterSelect.value}`;
 
   const selectTab = (tab) => {
-    app.querySelectorAll('[data-bible-tab]').forEach((button) => {
+    app.querySelectorAll('[data-read="bible-guides"]').forEach((button) => {
+    button.addEventListener('click', () => renderBibleGuides());
+  });
+
+  app.querySelectorAll('[data-bible-tab]').forEach((button) => {
       const active = button.dataset.bibleTab === tab;
       button.classList.toggle('active', active);
       button.setAttribute('aria-selected', String(active));
