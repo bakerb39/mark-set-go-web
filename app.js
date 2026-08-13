@@ -3170,7 +3170,20 @@ const CLASSIC_GUIDES = Object.freeze({
   "United States Constitution Declaration Independence": { id:"classic-american-founding-state-papers", slug:"american-founding-state-papers", title:"Declaration, Articles of Confederation, and Constitution", author:"United States founding generation" },
   "Boswell Life Samuel Johnson": { id:"classic-boswell-life-samuel-johnson", slug:"boswell-life-samuel-johnson", title:"The Life of Samuel Johnson", author:"James Boswell" },
   "Lavoisier Elements Chemistry": { id:"classic-lavoisier-elements-chemistry", slug:"lavoisier-elements-chemistry", title:"Elements of Chemistry", author:"Antoine Lavoisier" },
-  "Faraday Experimental Researches Electricity": { id:"classic-faraday-experimental-researches-electricity", slug:"faraday-experimental-researches-electricity", title:"Experimental Researches in Electricity", author:"Michael Faraday" }
+  "Faraday Experimental Researches Electricity": { id:"classic-faraday-experimental-researches-electricity", slug:"faraday-experimental-researches-electricity", title:"Experimental Researches in Electricity", author:"Michael Faraday" },
+  "Hegel Philosophy Right History": { id:"classic-hegel-philosophy-right-history", slug:"hegel-philosophy-right-history", title:"The Philosophy of Right and The Philosophy of History", author:"G. W. F. Hegel" },
+  "Hegel Philosophy Right": { id:"classic-hegel-philosophy-right", slug:"hegel-philosophy-right", title:"The Philosophy of Right", author:"G. W. F. Hegel" },
+  "Hegel Philosophy History": { id:"classic-hegel-philosophy-history", slug:"hegel-philosophy-history", title:"The Philosophy of History", author:"G. W. F. Hegel" },
+  "Kierkegaard Fear Trembling": { id:"classic-kierkegaard-fear-trembling", slug:"kierkegaard-fear-trembling", title:"Fear and Trembling", author:"Søren Kierkegaard" },
+  "Nietzsche Beyond Good Evil": { id:"classic-nietzsche-beyond-good-evil", slug:"nietzsche-beyond-good-evil", title:"Beyond Good and Evil", author:"Friedrich Nietzsche" },
+  "Tocqueville Democracy America": { id:"classic-tocqueville-democracy-america", slug:"tocqueville-democracy-america", title:"Democracy in America", author:"Alexis de Tocqueville" },
+  "Goethe Faust": { id:"classic-goethe-faust", slug:"goethe-faust", title:"Faust", author:"Johann Wolfgang von Goethe" },
+  "Balzac Cousin Bette": { id:"classic-balzac-cousin-bette", slug:"balzac-cousin-bette", title:"Cousin Bette", author:"Honoré de Balzac" },
+  "Jane Austen Emma": { id:"classic-austen-emma", slug:"austen-emma", title:"Emma", author:"Jane Austen" },
+  "George Eliot Middlemarch": { id:"classic-eliot-middlemarch", slug:"eliot-middlemarch", title:"Middlemarch", author:"George Eliot" },
+  "Dickens Little Dorrit": { id:"classic-dickens-little-dorrit", slug:"dickens-little-dorrit", title:"Little Dorrit", author:"Charles Dickens" },
+  "Melville Moby Dick": { id:"classic-melville-moby-dick", slug:"melville-moby-dick", title:"Moby-Dick", author:"Herman Melville" },
+  "Mark Twain Huckleberry Finn": { id:"classic-twain-huckleberry-finn", slug:"twain-huckleberry-finn", title:"Adventures of Huckleberry Finn", author:"Mark Twain" },
 });
 
 function classicGuideForGreatBook(book) {

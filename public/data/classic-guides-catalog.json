@@ -771,7 +771,7 @@
     "volume": 43,
     "era": "19th Century",
     "category": "Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "hegel-history",
@@ -780,7 +780,7 @@
     "volume": 43,
     "era": "19th Century",
     "category": "Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "kierkegaard-fear-trembling",
@@ -789,7 +789,7 @@
     "volume": 43,
     "era": "19th Century",
     "category": "Religion & Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "nietzsche-beyond-good-evil",
@@ -798,7 +798,7 @@
     "volume": 43,
     "era": "19th Century",
     "category": "Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "tocqueville-democracy",
@@ -807,7 +807,7 @@
     "volume": 44,
     "era": "19th Century",
     "category": "Politics & History",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "goethe-faust",
@@ -816,7 +816,7 @@
     "volume": 45,
     "era": "19th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "balzac-cousin-bette",
@@ -825,7 +825,7 @@
     "volume": 45,
     "era": "19th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "austen-emma",
@@ -834,7 +834,7 @@
     "volume": 46,
     "era": "19th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "eliot-middlemarch",
@@ -843,7 +843,7 @@
     "volume": 46,
     "era": "19th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "dickens-little-dorrit",
@@ -852,7 +852,7 @@
     "volume": 47,
     "era": "19th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "melville-moby-dick",
@@ -861,7 +861,7 @@
     "volume": 48,
     "era": "19th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "twain-huckleberry-finn",
@@ -870,7 +870,7 @@
     "volume": 48,
     "era": "19th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "darwin-origin",
