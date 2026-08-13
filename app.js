@@ -9590,6 +9590,7 @@ async function renderReader(kind) {
   if (normalizedKind === 'founding-documents') return renderFoundingDocumentsLibrary();
   if (normalizedKind === 'syntopicon') return renderSyntopicon();
   if (normalizedKind === 'bible') return renderBibleStudy();
+  if (normalizedKind === 'bible-guides') return renderBibleGuides();
   if (normalizedKind === 'current-reading') return renderCurrentReading();
   if (normalizedKind === 'weather') return renderWeather();
 
@@ -15832,6 +15833,86 @@ async function loadGreatBookEdition(item, status, button) {
 
 
 const STUDY_LANGUAGE_KEY = 'markSetGoStudyLanguageV1';
+const BIBLE_GUIDE_CATALOG = Object.freeze([
+  { testament:"Old Testament", group:"Law", title:"Genesis", slug:"genesis", status:"ready" },
+  { testament:"Old Testament", group:"Law", title:"Exodus", slug:"exodus", status:"ready" },
+  { testament:"Old Testament", group:"Law", title:"Leviticus", slug:"leviticus", status:"ready" },
+  { testament:"Old Testament", group:"Law", title:"Numbers", slug:"numbers", status:"ready" },
+  { testament:"Old Testament", group:"Law", title:"Deuteronomy", slug:"deuteronomy", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"Joshua", slug:"joshua", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"Judges", slug:"judges", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"Ruth", slug:"ruth", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"1 Samuel", slug:"1-samuel", status:"planned" },
+  { testament:"Old Testament", group:"History", title:"2 Samuel", slug:"2-samuel", status:"planned" },
+  { testament:"Old Testament", group:"History", title:"1 Kings", slug:"1-kings", status:"planned" },
+  { testament:"Old Testament", group:"History", title:"2 Kings", slug:"2-kings", status:"planned" },
+  { testament:"Old Testament", group:"History", title:"1 Chronicles", slug:"1-chronicles", status:"planned" },
+  { testament:"Old Testament", group:"History", title:"2 Chronicles", slug:"2-chronicles", status:"planned" },
+  { testament:"Old Testament", group:"History", title:"Ezra", slug:"ezra", status:"planned" },
+  { testament:"Old Testament", group:"History", title:"Nehemiah", slug:"nehemiah", status:"planned" },
+  { testament:"Old Testament", group:"History", title:"Esther", slug:"esther", status:"planned" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Job", slug:"job", status:"planned" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Psalms", slug:"psalms", status:"planned" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Proverbs", slug:"proverbs", status:"planned" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Ecclesiastes", slug:"ecclesiastes", status:"planned" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Song of Solomon", slug:"song-of-solomon", status:"planned" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Isaiah", slug:"isaiah", status:"planned" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Jeremiah", slug:"jeremiah", status:"planned" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Lamentations", slug:"lamentations", status:"planned" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Ezekiel", slug:"ezekiel", status:"planned" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Daniel", slug:"daniel", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Hosea", slug:"hosea", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Joel", slug:"joel", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Amos", slug:"amos", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Obadiah", slug:"obadiah", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Jonah", slug:"jonah", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Micah", slug:"micah", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Nahum", slug:"nahum", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Habakkuk", slug:"habakkuk", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Zephaniah", slug:"zephaniah", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Haggai", slug:"haggai", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Zechariah", slug:"zechariah", status:"planned" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Malachi", slug:"malachi", status:"planned" },
+  { testament:"New Testament", group:"Gospels", title:"Matthew", slug:"matthew", status:"planned" },
+  { testament:"New Testament", group:"Gospels", title:"Mark", slug:"mark", status:"planned" },
+  { testament:"New Testament", group:"Gospels", title:"Luke", slug:"luke", status:"planned" },
+  { testament:"New Testament", group:"Gospels", title:"John", slug:"john", status:"planned" },
+  { testament:"New Testament", group:"History", title:"Acts", slug:"acts", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Romans", slug:"romans", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"1 Corinthians", slug:"1-corinthians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"2 Corinthians", slug:"2-corinthians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Galatians", slug:"galatians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Ephesians", slug:"ephesians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Philippians", slug:"philippians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Colossians", slug:"colossians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"1 Thessalonians", slug:"1-thessalonians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"2 Thessalonians", slug:"2-thessalonians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"1 Timothy", slug:"1-timothy", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"2 Timothy", slug:"2-timothy", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Titus", slug:"titus", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Philemon", slug:"philemon", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"Hebrews", slug:"hebrews", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"James", slug:"james", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"1 Peter", slug:"1-peter", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"2 Peter", slug:"2-peter", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"1 John", slug:"1-john", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"2 John", slug:"2-john", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"3 John", slug:"3-john", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"Jude", slug:"jude", status:"planned" },
+  { testament:"New Testament", group:"Apocalyptic", title:"Revelation", slug:"revelation", status:"planned" }
+]);
+
+const BIBLE_GUIDES = Object.freeze({
+  "Genesis": { slug:"genesis", title:"Genesis", greatIdea:"God" },
+  "Exodus": { slug:"exodus", title:"Exodus", greatIdea:"Freedom" },
+  "Leviticus": { slug:"leviticus", title:"Leviticus", greatIdea:"Law" },
+  "Numbers": { slug:"numbers", title:"Numbers", greatIdea:"Faith" },
+  "Deuteronomy": { slug:"deuteronomy", title:"Deuteronomy", greatIdea:"Duty" },
+  "Joshua": { slug:"joshua", title:"Joshua", greatIdea:"War and Peace" },
+  "Judges": { slug:"judges", title:"Judges", greatIdea:"Government" },
+  "Ruth": { slug:"ruth", title:"Ruth", greatIdea:"Love" }
+});
+
 const LAST_BIBLE_PASSAGE_KEY = 'markSetGoLastBiblePassageV1';
 const SYNTOPICON_SAVED_KEY = 'markSetGoSyntopiconSavedV1';
 
@@ -16236,6 +16317,138 @@ function collectDatasetReferences(payload) {
   return refs.slice(0, 500);
 }
 
+
+function bibleGuideMeta(title = '') {
+  return BIBLE_GUIDES[String(title || '').trim()] || null;
+}
+
+function bibleGuideSource(meta = {}) {
+  return {
+    type:'modern-guide',
+    bibleGuide:true,
+    id:`bible-guide-${meta.slug}`,
+    bibleGuideSlug:meta.slug,
+    originalTitle:meta.title,
+    originalAuthor:'The Bible',
+    subtitle:'An Independent Mark, Set, Go! Bible Guide',
+    guideInteractions:{
+      greatIdea:meta.greatIdea || 'God',
+      actionTitle:`Apply one insight from ${meta.title || 'this Bible book'}`,
+      actionType:'reflection',
+      dueDays:3,
+      dueHour:19,
+      priority:'normal',
+      repeat:'none',
+      reminder:'day1',
+      actionNote:`Choose one important truth or question from ${meta.title || 'this Bible book'}. Record the passage, what it teaches in context, and one concrete implication for study, prayer, character, or action.`
+    }
+  };
+}
+
+async function openBibleGuideInReader(title = '') {
+  const meta = bibleGuideMeta(title);
+  if (!meta) throw new Error('This Bible Guide is not ready yet.');
+  const response = await fetch(`/texts/bible-guides/${encodeURIComponent(meta.slug)}-guide.txt`, { cache:'no-store' });
+  if (!response.ok) throw new Error(`Bible Guide could not be loaded (${response.status}).`);
+  const text = await response.text();
+  if (!String(text || '').trim()) throw new Error('Bible Guide file is empty.');
+  renderReaderWithText(`${meta.title} — Bible Guide`, text, bibleGuideSource(meta));
+}
+
+function renderBibleGuides() {
+  stopReader();
+
+  const grouped = BIBLE_GUIDE_CATALOG.reduce((out, item) => {
+    const key = `${item.testament} · ${item.group}`;
+    (out[key] ||= []).push(item);
+    return out;
+  }, {});
+
+  const readyCount = BIBLE_GUIDE_CATALOG.filter((item) => item.status === 'ready').length;
+
+  app.innerHTML = `
+    <section class="panel curated-library bible-guides-library">
+      <div class="library-heading">
+        <div>
+          <span class="source-category">Bible Study · Book Guides</span>
+          <h1>Bible Guides</h1>
+          <p>Study every book of the Bible as a complete work—structure, context, theology, difficult passages, canonical connections, Great Ideas, discussion, and comprehension.</p>
+        </div>
+        <div class="source-actions">
+          <button class="secondary" type="button" data-read="bible">Bible Study</button>
+          <button class="secondary" type="button" data-action="reader">Return to Reader</button>
+        </div>
+      </div>
+
+      <div class="great-books-study-intro">
+        <article><strong>${BIBLE_GUIDE_CATALOG.length}</strong><span>books in the 66-book guide plan</span></article>
+        <article><strong>${readyCount}</strong><span>guides ready</span></article>
+        <article><strong>Book-by-book</strong><span>not a generic Bible summary</span></article>
+      </div>
+
+      <div class="list-toolbar-row">
+        <label class="curated-filter">Filter Bible Guides
+          <input id="bible-guides-filter" type="search" placeholder="Genesis, Gospel, Psalms, Paul…">
+        </label>
+      </div>
+
+      <div id="bible-guide-groups" class="curated-groups presentation-tiles">
+        ${Object.entries(grouped).map(([group, items]) => `
+          <details class="curated-era" ${group.startsWith('Old Testament · Law') ? 'open' : ''}>
+            <summary>${escapeHtml(group)} <span>${items.length}</span></summary>
+            <div class="curated-grid">
+              ${items.map((item) => `
+                <article class="curated-card" data-bible-guide-card data-search-text="${escapeHtml(`${item.title} ${item.group} ${item.testament}`.toLowerCase())}">
+                  <div>
+                    <span class="source-category">${escapeHtml(item.group)}</span>
+                    <h2>${escapeHtml(item.title)}</h2>
+                    <p>${item.status === 'ready' ? 'Bible Guide ready' : 'Guide planned'}</p>
+                  </div>
+                  <div class="great-book-actions">
+                    ${item.status === 'ready'
+                      ? `<button class="primary" type="button" data-open-bible-guide="${escapeHtml(item.title)}">Open Bible Guide</button>`
+                      : `<button class="secondary" type="button" disabled>Coming soon</button>`}
+                    <button class="secondary" type="button" data-bible-study-book="${escapeHtml(item.title)}">Bible Study</button>
+                  </div>
+                  <p class="status"></p>
+                </article>`).join('')}
+            </div>
+          </details>`).join('')}
+      </div>
+    </section>`;
+
+  const filter = app.querySelector('#bible-guides-filter');
+  filter?.addEventListener('input', () => {
+    const query = filter.value.trim().toLowerCase();
+    app.querySelectorAll('[data-bible-guide-card]').forEach((card) => {
+      card.hidden = Boolean(query) && !card.dataset.searchText.includes(query);
+    });
+    app.querySelectorAll('#bible-guide-groups .curated-era').forEach((group) => {
+      group.hidden = !Array.from(group.querySelectorAll('[data-bible-guide-card]')).some((card) => !card.hidden);
+    });
+  });
+
+  app.querySelectorAll('[data-open-bible-guide]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await openBibleGuideInReader(button.dataset.openBibleGuide);
+      } catch (error) {
+        window.alert(error?.message || 'The Bible Guide could not be opened.');
+      }
+    });
+  });
+
+  app.querySelectorAll('[data-bible-study-book]').forEach((button) => {
+    button.addEventListener('click', () => {
+      try {
+        localStorage.setItem('markSetGoBibleGuideRequestedBookV1', button.dataset.bibleStudyBook || '');
+      } catch {}
+      renderBibleStudy();
+    });
+  });
+}
+
+
 async function renderBibleStudy() {
   stopReader();
   app.innerHTML = `
@@ -16263,6 +16476,7 @@ async function renderBibleStudy() {
         <button id="bible-reader" class="secondary" type="button" disabled>Read Chapter</button>
         <button id="bible-read-book" class="secondary" type="button" disabled>Read Entire Book</button>
         <button id="bible-study-guide" class="secondary" type="button" disabled>Study / Great Ideas</button>
+        <button class="secondary" type="button" data-read="bible-guides">Bible Guides</button>
         <a id="bible-grokipedia" class="secondary button-link" href="${grokipediaSearchUrl('Bible')}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
       </div>
 
@@ -16404,6 +16618,16 @@ async function renderBibleStudy() {
     const books = payload.books || [];
     bookSelect.innerHTML = books.map((book)=>`<option value="${escapeHtml(book.id)}" data-chapters="${Number(book.numberOfChapters)}">${escapeHtml(book.name)}${book.isApocryphal ? ' · Deuterocanonical/Apocryphal' : ''}</option>`).join('');
     bookSelect.disabled = false;
+    try {
+      const requestedBook = localStorage.getItem('markSetGoBibleGuideRequestedBookV1') || '';
+      if (requestedBook) {
+        const requestedOption = Array.from(bookSelect.options).find((option) =>
+          option.textContent.replace(/\s+·.*$/,'').trim().toLowerCase() === requestedBook.trim().toLowerCase()
+        );
+        if (requestedOption) bookSelect.value = requestedOption.value;
+        localStorage.removeItem('markSetGoBibleGuideRequestedBookV1');
+      }
+    } catch {}
     updateChapters();
     setStatus('');
   }
@@ -16953,7 +17177,7 @@ function renderGreatBooksLibrary() {
     <section class="panel curated-library great-books-study-library">
       <div class="library-heading">
         <div><span class="source-category">Browse · Study</span><h1>Great Books of the Western World</h1><p>The 1990 60-volume framework expanded into individual works, plus the Bible collection referenced by the Syntopicon tradition.</p></div>
-        <div class="source-actions"><button class="secondary" type="button" data-read="gutenberg">Search Gutenberg</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
+        <div class="source-actions"><button class="secondary" type="button" data-read="bible-guides">Bible Guides</button><button class="secondary" type="button" data-read="gutenberg">Search Gutenberg</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
       </div>
       <div class="study-language-bar">
         <div><strong>Study language</strong><span>AI study guides can be generated in another language; imported books can be translated from the Reader.</span></div>
