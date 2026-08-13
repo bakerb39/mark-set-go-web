@@ -6540,6 +6540,80 @@ function localProgressRecommendations({ daily, weekly, awards, comprehension, go
   if (!recommendations.length) recommendations.push({title:'Keep building evidence',text:'Complete several reading sessions and comprehension checks so the dashboard can identify meaningful trends.'});
   return recommendations.slice(0,4);
 }
+function readerWorkspaceYearData() {
+  const currentYear=new Date().getFullYear();
+  const formatter=new Intl.DateTimeFormat(undefined,{month:'short'});
+  const rows=Array.from({length:12},(_,month)=>({
+    month,
+    label:formatter.format(new Date(currentYear,month,1)),
+    words:0,
+    seconds:0,
+    wpm:0,
+    comprehensionTotal:0,
+    comprehensionCount:0,
+    comprehension:0
+  }));
+  readStoredArray(READING_ACTIVITY_KEY).forEach((item)=>{
+    const date=new Date(item.endedAt || item.startedAt || 0);
+    if(!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
+    const row=rows[date.getMonth()];
+    row.words += Number(item.wordsRead)||0;
+    row.seconds += Number(item.seconds)||0;
+  });
+  getComprehensionResults().forEach((item)=>{
+    const date=new Date(item.createdAt || 0);
+    if(!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
+    const score=Number(item.scorePercent);
+    if(!Number.isFinite(score)) return;
+    const row=rows[date.getMonth()];
+    row.comprehensionTotal += score;
+    row.comprehensionCount += 1;
+  });
+  rows.forEach((row)=>{
+    row.wpm=row.seconds?Math.round(row.words/(row.seconds/60)):0;
+    row.comprehension=row.comprehensionCount?Math.round(row.comprehensionTotal/row.comprehensionCount):0;
+  });
+  return rows;
+}
+
+function readerWorkspaceCurrentTextStats() {
+  const documentId=String(state.documentId || '');
+  const activity=readStoredArray(READING_ACTIVITY_KEY).filter((item)=>String(item.documentId||'')===documentId);
+  const comprehension=getComprehensionResults().filter((item)=>String(item.documentId||'')===documentId);
+  const progress=readStoredObject(READING_PROGRESS_KEY)[documentId] || {};
+  const totalWords=Math.max(0,Number(progress.totalWords)||Number(state.words?.length)||0);
+  const currentIndex=Math.max(Number(progress.lastWord)||0,Number(progress.furthestWord)||0,Number(state.index)||0);
+  const percent=totalWords?Math.min(100,Math.round(currentIndex/totalWords*100)):0;
+  const latestComp=Number(comprehension[0]?.scorePercent)||0;
+  const selectedPace=Math.max(0,Math.round(Number(state.wpm)||Number(app.querySelector('#speed')?.value)||0));
+  const completedSeconds=activity.reduce((sum,item)=>sum+(Number(item.seconds)||0),0);
+  let liveSeconds=0;
+  if(state.sessionActive && Number(state.sessionStartedAt)) liveSeconds=Math.max(0,(Date.now()-Number(state.sessionStartedAt))/1000);
+  const sessionSeconds=liveSeconds || Number(activity[0]?.seconds)||0;
+  const effective=latestComp && selectedPace ? Math.round(selectedPace*(latestComp/100)) : 0;
+  return {
+    documentId,
+    title:state.title || progress.title || activity[0]?.title || 'Current text',
+    percent,
+    pace:selectedPace,
+    comprehension:latestComp,
+    effective,
+    sessionSeconds,
+    totalSeconds:completedSeconds+liveSeconds,
+    sessions:activity.length + (state.sessionActive?1:0)
+  };
+}
+
+function readerWorkspaceSpeedGoal() {
+  const stored = Number(localStorage.getItem('markSetGoReadingSpeedGoalV1'));
+  return Number.isFinite(stored) && stored >= 100 && stored <= 2000 ? Math.round(stored) : 350;
+}
+
+function readerWorkspaceComprehensionGoal() {
+  const stored = Number(localStorage.getItem('markSetGoReadingComprehensionGoalV1'));
+  return Number.isFinite(stored) && stored >= 1 && stored <= 100 ? Math.round(stored) : 85;
+}
+
 function renderProgressDashboard() {
   finalizeReadingSession();
   stopReader();
@@ -7982,6 +8056,14 @@ function classifyStructureLine(line, wordCount) {
   if (exactTypes.has(lower)) return exactTypes.get(lower);
 
   if (/^(?:chapter|chap\.?)(?:\s+|\s*[ivxlcdm\d]+\b)/i.test(clean)) return 'chapter';
+
+  // Kindle/PDF trade books often use the number-word itself as the chapter
+  // heading: "One: The First Philosopher", "Twenty-nine: Worlds at War", etc.
+  // Require chapter-style punctuation so ordinary prose beginning with "One"
+  // is not misclassified.
+  const spelledNumber = '(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?)';
+  if (new RegExp(`^${spelledNumber}\\s*[:.\u2013\u2014-]\\s+\\S`, 'i').test(clean)) return 'chapter';
+
   if (/^(?:book|part)\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(clean)) return 'part';
   if (/^(?:section|article)\s+(?:[ivxlcdm]+|\d+|[a-z])\b/i.test(clean)) return 'section';
   if (/^appendix(?:\s+[a-z0-9ivxlcdm]+)?\b/i.test(clean)) return 'appendix';
@@ -9935,195 +10017,10 @@ function openMarkPanel(tab='selection'){
   }
 }
 function activateMarkTab(tab){
-  app.querySelectorAll('[data-mark-tab]').forEach((button)=>{
-    const active=button.dataset.markTab===tab;
-    button.classList.toggle('active',active);
-    button.setAttribute('aria-selected',String(active));
-  });
+  app.querySelectorAll('[data-mark-tab]').forEach(b=>b.classList.toggle('active',b.dataset.markTab===tab));
   app.querySelectorAll('[data-mark-panel]').forEach(p=>p.hidden=p.dataset.markPanel!==tab);
   if(tab==='history') renderMarkHistory();
   if(tab==='notebook') renderMarkNotebook();
-  if(tab==='progress') renderReaderWorkspaceProgress();
-  if(tab==='study') renderReaderWorkspaceStudy();
-  if(tab==='contents') renderReaderWorkspaceContents();
-}
-
-function readerWorkspaceYearData() {
-  const currentYear=new Date().getFullYear();
-  const formatter=new Intl.DateTimeFormat(undefined,{month:'short'});
-  const rows=Array.from({length:12},(_,month)=>({
-    month,
-    label:formatter.format(new Date(currentYear,month,1)),
-    words:0,
-    seconds:0,
-    wpm:0,
-    comprehensionTotal:0,
-    comprehensionCount:0,
-    comprehension:0
-  }));
-  readStoredArray(READING_ACTIVITY_KEY).forEach((item)=>{
-    const date=new Date(item.endedAt || item.startedAt || 0);
-    if(!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
-    const row=rows[date.getMonth()];
-    row.words += Number(item.wordsRead)||0;
-    row.seconds += Number(item.seconds)||0;
-  });
-  getComprehensionResults().forEach((item)=>{
-    const date=new Date(item.createdAt || 0);
-    if(!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
-    const score=Number(item.scorePercent);
-    if(!Number.isFinite(score)) return;
-    const row=rows[date.getMonth()];
-    row.comprehensionTotal += score;
-    row.comprehensionCount += 1;
-  });
-  rows.forEach((row)=>{
-    row.wpm=row.seconds?Math.round(row.words/(row.seconds/60)):0;
-    row.comprehension=row.comprehensionCount?Math.round(row.comprehensionTotal/row.comprehensionCount):0;
-  });
-  return rows;
-}
-
-function readerWorkspaceCurrentTextStats() {
-  const documentId=String(state.documentId || '');
-  const activity=readStoredArray(READING_ACTIVITY_KEY).filter((item)=>String(item.documentId||'')===documentId);
-  const comprehension=getComprehensionResults().filter((item)=>String(item.documentId||'')===documentId);
-  const progress=readStoredObject(READING_PROGRESS_KEY)[documentId] || {};
-  const totalWords=Math.max(0,Number(progress.totalWords)||Number(state.words?.length)||0);
-  const currentIndex=Math.max(Number(progress.lastWord)||0,Number(progress.furthestWord)||0,Number(state.index)||0);
-  const percent=totalWords?Math.min(100,Math.round(currentIndex/totalWords*100)):0;
-  const latestComp=Number(comprehension[0]?.scorePercent)||0;
-  const selectedPace=Math.max(0,Math.round(Number(state.wpm)||Number(app.querySelector('#speed')?.value)||0));
-  const completedSeconds=activity.reduce((sum,item)=>sum+(Number(item.seconds)||0),0);
-  let liveSeconds=0;
-  if(state.sessionActive && Number(state.sessionStartedAt)) liveSeconds=Math.max(0,(Date.now()-Number(state.sessionStartedAt))/1000);
-  const sessionSeconds=liveSeconds || Number(activity[0]?.seconds)||0;
-  const effective=latestComp && selectedPace ? Math.round(selectedPace*(latestComp/100)) : 0;
-  return {
-    documentId,
-    title:state.title || progress.title || activity[0]?.title || 'Current text',
-    percent,
-    pace:selectedPace,
-    comprehension:latestComp,
-    effective,
-    sessionSeconds,
-    totalSeconds:completedSeconds+liveSeconds,
-    sessions:activity.length + (state.sessionActive?1:0)
-  };
-}
-
-function readerWorkspaceSpeedGoal() {
-  const stored = Number(localStorage.getItem('markSetGoReadingSpeedGoalV1'));
-  return Number.isFinite(stored) && stored >= 100 && stored <= 2000 ? Math.round(stored) : 350;
-}
-
-function readerWorkspaceComprehensionGoal() {
-  const stored = Number(localStorage.getItem('markSetGoReadingComprehensionGoalV1'));
-  return Number.isFinite(stored) && stored >= 1 && stored <= 100 ? Math.round(stored) : 85;
-}
-
-
-function renderReaderWorkspaceProgress() {
-  const panel=app.querySelector('#mark-progress-panel');
-  if(!panel) return;
-  const rows=readerWorkspaceYearData();
-  const stats=readerWorkspaceCurrentTextStats();
-  const speedGoal=readerWorkspaceSpeedGoal();
-  const comprehensionGoal=readerWorkspaceComprehensionGoal();
-  const latestWpm=[...rows].reverse().find((row)=>row.wpm)?.wpm || stats.pace || 0;
-  const latestComp=[...rows].reverse().find((row)=>row.comprehension)?.comprehension || stats.comprehension || 0;
-  const identity=currentCompanionIdentity();
-  const avatar=identity?.avatar || '/assets/ask-mark/ask-mark-avatar.png';
-  const name=identity?.name || 'Mark';
-  const speedStatus=latestWpm ? (latestWpm>=speedGoal?'Goal reached':'Keep building toward your goal') : 'Your trend will appear as you read';
-  const compStatus=latestComp ? (latestComp>=comprehensionGoal?'Goal reached':'Protect understanding as speed rises') : 'Take a comprehension check to start the trend';
-
-  panel.innerHTML=`
-    <section class="reader-progress-companion-card">
-      <img src="${escapeHtml(avatar)}" alt="${escapeHtml(name)}" class="reader-progress-avatar">
-      <div><span>${escapeHtml(name)} says</span><strong>${escapeHtml(speedStatus)}.</strong><p>${escapeHtml(compStatus)}.</p></div>
-      <div class="reader-progress-path" aria-hidden="true"><span>●</span><i></i><b>⚑</b></div>
-    </section>
-
-    <section class="reader-progress-current-card">
-      <div class="reader-progress-book-mark" aria-hidden="true">▤</div>
-      <div class="reader-progress-current-copy"><span>Current text</span><strong>${escapeHtml(stats.title)}</strong><small>${stats.percent}% complete</small></div>
-      <div class="reader-progress-current-kpis">
-        <article><strong>${stats.percent}%</strong><span>Complete</span></article>
-        <article><strong>${formatDuration(stats.sessionSeconds)}</strong><span>Session</span></article>
-        <article><strong>${stats.pace||'—'}</strong><span>WPM</span></article>
-        <article><strong>${stats.comprehension?`${stats.comprehension}%`:'—'}</strong><span>Comprehension</span></article>
-        <article><strong>${stats.effective||'—'}</strong><span>Effective WPM</span></article>
-      </div>
-    </section>
-
-    <div class="reader-progress-chart-grid">
-      <article class="reader-progress-chart-card">
-        <div class="reader-progress-chart-heading"><div><strong>WPM Progress</strong><span>${new Date().getFullYear()} · monthly average</span></div><b>Goal: ${speedGoal} WPM</b></div>
-        ${yearlyPerformanceChartSvg(rows,'wpm',{label:'Reading speed progress this year',suffix:' WPM',goal:speedGoal,kind:'speed'})}
-      </article>
-      <article class="reader-progress-chart-card comprehension-card">
-        <div class="reader-progress-chart-heading"><div><strong>Comprehension</strong><span>${new Date().getFullYear()} · monthly average</span></div><b>Goal: ${comprehensionGoal}%</b></div>
-        ${yearlyPerformanceChartSvg(rows,'comprehension',{label:'Comprehension progress this year',suffix:'%',goal:comprehensionGoal,kind:'comprehension'})}
-      </article>
-    </div>
-
-    <div class="reader-progress-actions">
-      <button type="button" data-reader-progress-action="explain"><span>▣</span><strong>Explain passage</strong></button>
-      <button type="button" data-reader-progress-action="quiz"><span>◎</span><strong>Take quiz</strong></button>
-      <button type="button" data-reader-progress-action="note"><span>◆</span><strong>Save note</strong></button>
-      <button type="button" data-reader-progress-action="full"><span>▥</span><strong>View full progress</strong></button>
-    </div>
-
-    <section class="reader-progress-mini-summary">
-      <div><span>Current goals</span><strong>${speedGoal} WPM · ${comprehensionGoal}% comprehension</strong></div>
-      <button type="button" data-reader-progress-action="goals">Edit goals</button>
-    </section>`;
-
-  panel.querySelector('[data-reader-progress-action="explain"]')?.addEventListener('click',()=>{
-    activateMarkTab('selection');
-    renderMarkSelectionCard();
-    requestAnimationFrame(()=>app.querySelector('#mark-question')?.focus());
-  });
-  panel.querySelector('[data-reader-progress-action="quiz"]')?.addEventListener('click',()=>startComprehensionCheck());
-  panel.querySelector('[data-reader-progress-action="note"]')?.addEventListener('click',()=>{
-    activateMarkTab('notebook');
-    renderMarkNotebook();
-  });
-  panel.querySelector('[data-reader-progress-action="full"]')?.addEventListener('click',()=>renderProgressDashboard());
-  panel.querySelector('[data-reader-progress-action="goals"]')?.addEventListener('click',()=>renderProgressDashboard());
-}
-
-function renderReaderWorkspaceStudy() {
-  const panel=app.querySelector('#mark-study-panel');
-  if(!panel) return;
-  panel.innerHTML=`
-    <div class="reader-workspace-section-heading"><span>Study this text</span><strong>Turn reading into learning</strong><p>Use the current book without leaving the Reader.</p></div>
-    <div class="reader-study-grid">
-      <button type="button" data-study-action="quiz"><span>◎</span><div><strong>Comprehension</strong><small>Check what you understood</small></div></button>
-      <button type="button" data-study-action="mnemonics"><span>M</span><div><strong>Mnemonics</strong><small>Create a memory aid</small></div></button>
-      <button type="button" data-study-action="ideas"><span>★</span><div><strong>Great Ideas</strong><small>Connect themes across books</small></div></button>
-      <button type="button" data-study-action="language"><span>文</span><div><strong>Language</strong><small>Practice with this text</small></div></button>
-    </div>`;
-  panel.querySelector('[data-study-action="quiz"]')?.addEventListener('click',()=>startComprehensionCheck());
-  panel.querySelector('[data-study-action="mnemonics"]')?.addEventListener('click',()=>renderMnemonics?.());
-  panel.querySelector('[data-study-action="ideas"]')?.addEventListener('click',()=>renderSyntopicon?.());
-  panel.querySelector('[data-study-action="language"]')?.addEventListener('click',()=>renderLanguageLearning?.());
-}
-
-function renderReaderWorkspaceContents() {
-  const panel=app.querySelector('#mark-contents-panel');
-  if(!panel) return;
-  const bookmarks=getReaderBookmarks().filter((item)=>item.documentId===state.documentId);
-  const toc=Array.isArray(state.toc)?state.toc:[];
-  panel.innerHTML=`
-    <div class="reader-workspace-section-heading"><span>Navigate</span><strong>Contents &amp; bookmarks</strong><p>Jump around without leaving the Reader.</p></div>
-    <div class="reader-workspace-contents-actions"><button type="button" data-workspace-bookmark>＋ Add bookmark</button><span>${bookmarks.length} saved</span></div>
-    <div class="reader-workspace-toc">
-      ${toc.length?toc.map((entry,index)=>`<button type="button" data-workspace-toc="${Number(entry.index)||0}"><span>${index+1}</span><strong>${escapeHtml(entry.title)}</strong></button>`).join(''):'<p class="navigation-empty">No chapter headings were detected for this text.</p>'}
-    </div>`;
-  panel.querySelector('[data-workspace-bookmark]')?.addEventListener('click',()=>addBookmark());
-  panel.querySelectorAll('[data-workspace-toc]').forEach((button)=>button.addEventListener('click',()=>jumpToWordIndex(button.dataset.workspaceToc)));
 }
 function notifyAskMarkLegacyUpdated(kind='selection'){
   document.dispatchEvent(new CustomEvent('marksetgo:askmark-legacy-updated',{detail:{kind}}));
@@ -10666,9 +10563,8 @@ function bindMarkCompanion(reader){
       return;
     }
 
-    if(isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
+    // Blank reader space must never start or pause playback.
+    return;
   };
 
   reader.addEventListener('pointerup',(event)=>{
@@ -10730,7 +10626,31 @@ function bindMarkCompanion(reader){
     event.stopImmediatePropagation();
   },true);
 
-  reader.addEventListener('dblclick',event=>{if(event.altKey)selectReaderParagraphFromEvent(event);});
+  reader.addEventListener('dblclick',(event)=>{
+    // Preserve the existing Alt+double-click paragraph-selection behavior.
+    if(event.altKey){
+      selectReaderParagraphFromEvent(event);
+      return;
+    }
+    if(event.ctrlKey || event.metaKey) return;
+
+    const target=event.target instanceof Element ? event.target : null;
+    if(!target) return;
+    if(target.closest('button, input, textarea, select, a, summary, [contenteditable="true"], [role="textbox"]')) return;
+
+    // A native scrollbar belongs to scrolling only, never playback.
+    const rect=reader.getBoundingClientRect();
+    const verticalScrollbar=Math.max(0,reader.offsetWidth-reader.clientWidth);
+    const horizontalScrollbar=Math.max(0,reader.offsetHeight-reader.clientHeight);
+    const onVerticalScrollbar=verticalScrollbar>0 && event.clientX>=rect.right-verticalScrollbar;
+    const onHorizontalScrollbar=horizontalScrollbar>0 && event.clientY>=rect.bottom-horizontalScrollbar;
+    if(onVerticalScrollbar || onHorizontalScrollbar) return;
+
+    event.preventDefault();
+    if(isReaderRunning()) pauseReader();
+    else startReader();
+    persistReaderSession();
+  });
   toolbar.addEventListener('mousedown',e=>e.preventDefault());
   toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
     openMarkPanel('selection');
@@ -11696,7 +11616,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
               <div id="fullscreen-mark-notebook" data-fs-mark-panel="notebook" hidden></div>
               <div id="fullscreen-mark-format" data-fs-mark-panel="format" hidden></div>
             </aside>
-          <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text" title="Click a word to move the reading position; click empty space to pause or resume"></article>
+          <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text" title="Click a word to move the reading position; double-click to pause or resume"></article>
           </div>
           <div class="reader-viewer-footer" aria-label="Reader pace and page navigation">
             <div id="book-page-controls-home" class="book-page-controls-home">
@@ -12039,10 +11959,8 @@ document.addEventListener('keydown', state.spacebarHandler);
       return;
     }
 
-    if (mode === 'two-column') return;
-    if (isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
+    // Blank reader space must never start or pause playback.
+    return;
   });
   bindDictionaryMenu(reader);
   window.requestAnimationFrame(updateReaderBookmarkMarkers);
@@ -12618,16 +12536,9 @@ function arrangeReaderSidePanels() {
   const wordPanel=app.querySelector('#word-panel'), toolbar=app.querySelector('.reader-toolbar'), media=app.querySelector('.reader-music-actions'), translation=app.querySelector('.translation-tools'), wordResult=app.querySelector('#word-result');
   if(!wordPanel||!toolbar)return;
   wordPanel.classList.add('reader-control-panel','mark-companion-panel');wordPanel.setAttribute('aria-label','Mark and reader tools');
-  const shell=document.createElement('div');shell.className='reader-control-shell mark-shell reader-workspace-shell';shell.innerHTML=`
-    <div class="reader-control-header reader-workspace-header"><div><span>Reading workspace</span><strong>${escapeHtml(state.title || 'Current text')}</strong></div><button id="close-reader-controls" class="reader-panel-close" type="button" aria-label="Close right pane">×</button></div>
-    <nav class="mark-tabs reader-workspace-tabs" role="tablist" aria-label="Reader workspace">
-      <button type="button" role="tab" aria-selected="true" data-mark-tab="tools" class="active"><span class="workspace-tab-icon" aria-hidden="true">▤</span><span>Read</span></button>
-      <button type="button" role="tab" aria-selected="false" data-mark-tab="selection"><span class="workspace-tab-icon" aria-hidden="true">✦</span><span>Companion</span></button>
-      <button type="button" role="tab" aria-selected="false" data-mark-tab="notebook"><span class="workspace-tab-icon" aria-hidden="true">✎</span><span>Notes</span></button>
-      <button type="button" role="tab" aria-selected="false" data-mark-tab="progress"><span class="workspace-tab-icon workspace-bars" aria-hidden="true">▥</span><span>Progress</span></button>
-      <button type="button" role="tab" aria-selected="false" data-mark-tab="study"><span class="workspace-tab-icon" aria-hidden="true">◇</span><span>Study</span></button>
-      <button type="button" role="tab" aria-selected="false" data-mark-tab="contents"><span class="workspace-tab-icon" aria-hidden="true">☷</span><span>Contents</span></button>
-    </nav>
+  const shell=document.createElement('div');shell.className='reader-control-shell mark-shell';shell.innerHTML=`
+    <div class="reader-control-header"><div><span>Reading companion</span><strong>Ask Mark</strong></div><button id="close-reader-controls" class="reader-panel-close" type="button" aria-label="Close right pane">×</button></div>
+    <nav class="mark-tabs" aria-label="Reader tools and Mark tabs"><button type="button" data-mark-tab="tools" class="active">Reader Tools</button><button type="button" data-mark-tab="selection">Mark</button><button type="button" data-mark-tab="notebook">Notebook</button><button type="button" data-mark-tab="history">History</button></nav>
     <div id="mark-tools-panel" data-mark-panel="tools" class="mark-panel-view">
       <div id="reader-control-core" class="reader-control-section"></div>
       <details class="settings-panel reader-tool-settings-panel"><summary><span>Media</span><span class="settings-summary">Music &amp; focus</span></summary><div id="reader-control-media" class="settings-content reader-control-group-body"></div></details>
@@ -12635,9 +12546,7 @@ function arrangeReaderSidePanels() {
     </div>
     <div id="mark-selection-panel" data-mark-panel="selection" class="mark-panel-view" hidden></div>
     <div id="mark-notebook-panel" data-mark-panel="notebook" class="mark-panel-view" hidden></div>
-    <div id="mark-progress-panel" data-mark-panel="progress" class="mark-panel-view reader-workspace-progress" hidden></div>
-    <div id="mark-study-panel" data-mark-panel="study" class="mark-panel-view reader-workspace-study" hidden></div>
-    <div id="mark-contents-panel" data-mark-panel="contents" class="mark-panel-view reader-workspace-contents" hidden></div>`;
+    <div id="mark-history-panel" data-mark-panel="history" class="mark-panel-view" hidden></div>`;
   wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
   shell.querySelector('#close-reader-controls')?.addEventListener('click',()=>app.querySelector('#toggle-word-panel')?.click());
 }
@@ -12657,13 +12566,10 @@ function bindReaderPaneControls() {
     button.title = `${visible ? 'Close' : 'Open'} ${label}`;
   };
 
-  // v9.7.2 Persistent desktop Reading Workspace.
-  // Keep the navigation pane closed, but make the tabbed workspace visible beside
-  // the Reader on desktop. Mobile keeps the previous collapsed behavior.
+  // Keep the reading canvas clean. The labeled side-panel buttons remain visible
+  // so readers can discover Contents/Bookmarks and Reader Controls when needed.
   setPane('navigation', false);
-  const persistentWorkspace = window.matchMedia('(min-width: 980px)').matches;
-  setPane('word', persistentWorkspace);
-  if (persistentWorkspace) activateMarkTab('tools');
+  setPane('word', false);
   navigationButton.addEventListener('click', () => {
     const anchorIndex = state.bookPages ? Math.max(0, Number(state.index) || 0) : null;
     setPane('navigation', layout.classList.contains('navigation-hidden'));
@@ -18727,7 +18633,8 @@ async function parsePdfFile(file, onProgress = () => {}) {
       pageCount: pdf.numPages,
       textPages,
       extractedCharacters,
-      tocEntries: toc.length
+      tocEntries: toc.length,
+      detectedSections: documentToc.length
     }
   };
 }
