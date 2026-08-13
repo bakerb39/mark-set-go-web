@@ -3200,6 +3200,14 @@ const CLASSIC_GUIDES = Object.freeze({
   "Russell Problems Philosophy": { id:"classic-russell-problems-philosophy", slug:"russell-problems-philosophy", title:"The Problems of Philosophy", author:"Bertrand Russell" },
   "Wittgenstein Philosophical Investigations": { id:"classic-wittgenstein-philosophical-investigations", slug:"wittgenstein-philosophical-investigations", title:"Philosophical Investigations", author:"Ludwig Wittgenstein" },
   "Einstein Relativity": { id:"classic-einstein-relativity", slug:"einstein-relativity", title:"Relativity: The Special and the General Theory", author:"Albert Einstein" },
+  "Homer Odyssey": { id:"classic-homer-odyssey", slug:"homer-odyssey", title:"The Odyssey", author:"Homer" },
+  "Plato Seventh Letter": { id:"classic-plato-seventh-letter", slug:"plato-seventh-letter", title:"The Seventh Letter", author:"Plato" },
+  "Heisenberg Physics Philosophy": { id:"classic-heisenberg-physics-philosophy", slug:"heisenberg-physics-philosophy", title:"Physics and Philosophy", author:"Werner Heisenberg" },
+  "Schrodinger What Is Life": { id:"classic-schrodinger-what-is-life", slug:"schrodinger-what-is-life", title:"What Is Life?", author:"Erwin Schrödinger" },
+  "Veblen Leisure Class": { id:"classic-veblen-theory-leisure-class", slug:"veblen-theory-leisure-class", title:"The Theory of the Leisure Class", author:"Thorstein Veblen" },
+  "Keynes General Theory": { id:"classic-keynes-general-theory", slug:"keynes-general-theory", title:"The General Theory of Employment, Interest and Money", author:"John Maynard Keynes" },
+  "Frazer Golden Bough": { id:"classic-frazer-golden-bough-selections", slug:"frazer-golden-bough-selections", title:"The Golden Bough (Selections)", author:"James George Frazer" },
+  "Weber Essays Sociology": { id:"classic-weber-essays-sociology-selections", slug:"weber-essays-sociology-selections", title:"Essays in Sociology (Selections)", author:"Max Weber" },
 });
 
 function classicGuideForGreatBook(book) {

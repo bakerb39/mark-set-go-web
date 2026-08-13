@@ -15,7 +15,7 @@
     "volume": 3,
     "era": "Ancient",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "aeschylus-plays",
@@ -87,7 +87,7 @@
     "volume": 6,
     "era": "Ancient",
     "category": "Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "aristotle-works",
@@ -1032,7 +1032,7 @@
     "volume": 56,
     "era": "20th Century",
     "category": "Science & Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "schrodinger-what-is-life",
@@ -1041,7 +1041,7 @@
     "volume": 56,
     "era": "20th Century",
     "category": "Science",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "veblen-leisure-class",
@@ -1050,7 +1050,7 @@
     "volume": 57,
     "era": "20th Century",
     "category": "Social Science",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "keynes-general-theory",
@@ -1059,7 +1059,7 @@
     "volume": 57,
     "era": "20th Century",
     "category": "Economics",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "frazer-golden-bough",
@@ -1068,7 +1068,7 @@
     "volume": 58,
     "era": "20th Century",
     "category": "Anthropology",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "weber-sociology",
@@ -1077,7 +1077,7 @@
     "volume": 58,
     "era": "20th Century",
     "category": "Social Science",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "huizinga-waning",
