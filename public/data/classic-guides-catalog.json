@@ -1086,7 +1086,7 @@
     "volume": 58,
     "era": "20th Century",
     "category": "History",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "conrad-heart-darkness",
@@ -1095,7 +1095,7 @@
     "volume": 59,
     "era": "20th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "chekhov-uncle-vanya",
@@ -1104,7 +1104,7 @@
     "volume": 59,
     "era": "20th Century",
     "category": "Drama",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "joyce-portrait",
@@ -1113,7 +1113,7 @@
     "volume": 59,
     "era": "20th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "woolf-lighthouse",
@@ -1122,7 +1122,7 @@
     "volume": 60,
     "era": "20th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "kafka-metamorphosis",
@@ -1131,7 +1131,7 @@
     "volume": 60,
     "era": "20th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "eliot-waste-land",
@@ -1140,7 +1140,7 @@
     "volume": 60,
     "era": "20th Century",
     "category": "Poetry",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "fitzgerald-gatsby",
@@ -1149,7 +1149,7 @@
     "volume": 60,
     "era": "20th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "orwell-animal-farm",
@@ -1158,7 +1158,7 @@
     "volume": 60,
     "era": "20th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "beckett-godot",
@@ -1167,6 +1167,6 @@
     "volume": 60,
     "era": "20th Century",
     "category": "Drama",
-    "status": "planned"
+    "status": "ready"
   }
 ]

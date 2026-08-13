@@ -3208,6 +3208,16 @@ const CLASSIC_GUIDES = Object.freeze({
   "Keynes General Theory": { id:"classic-keynes-general-theory", slug:"keynes-general-theory", title:"The General Theory of Employment, Interest and Money", author:"John Maynard Keynes" },
   "Frazer Golden Bough": { id:"classic-frazer-golden-bough-selections", slug:"frazer-golden-bough-selections", title:"The Golden Bough (Selections)", author:"James George Frazer" },
   "Weber Essays Sociology": { id:"classic-weber-essays-sociology-selections", slug:"weber-essays-sociology-selections", title:"Essays in Sociology (Selections)", author:"Max Weber" },
+  "Huizinga Waning Middle Ages": { id:"classic-huizinga-waning-middle-ages", slug:"huizinga-waning-middle-ages", title:"The Waning of the Middle Ages", author:"Johan Huizinga" },
+  "Conrad Heart Darkness": { id:"classic-conrad-heart-darkness", slug:"conrad-heart-darkness", title:"Heart of Darkness", author:"Joseph Conrad" },
+  "Chekhov Uncle Vanya": { id:"classic-chekhov-uncle-vanya", slug:"chekhov-uncle-vanya", title:"Uncle Vanya", author:"Anton Chekhov" },
+  "Joyce Portrait Artist": { id:"classic-joyce-portrait-artist", slug:"joyce-portrait-artist", title:"A Portrait of the Artist as a Young Man", author:"James Joyce" },
+  "Woolf To Lighthouse": { id:"classic-woolf-to-the-lighthouse", slug:"woolf-to-the-lighthouse", title:"To the Lighthouse", author:"Virginia Woolf" },
+  "Kafka Metamorphosis": { id:"classic-kafka-metamorphosis", slug:"kafka-metamorphosis", title:"The Metamorphosis", author:"Franz Kafka" },
+  "Eliot Waste Land": { id:"classic-eliot-waste-land", slug:"eliot-waste-land", title:"The Waste Land", author:"T. S. Eliot" },
+  "Fitzgerald Great Gatsby": { id:"classic-fitzgerald-great-gatsby", slug:"fitzgerald-great-gatsby", title:"The Great Gatsby", author:"F. Scott Fitzgerald" },
+  "Orwell Animal Farm": { id:"classic-orwell-animal-farm", slug:"orwell-animal-farm", title:"Animal Farm", author:"George Orwell" },
+  "Beckett Waiting Godot": { id:"classic-beckett-waiting-godot", slug:"beckett-waiting-godot", title:"Waiting for Godot", author:"Samuel Beckett" },
 });
 
 function classicGuideForGreatBook(book) {
