@@ -3258,9 +3258,62 @@ const CLASSIC_GUIDES = Object.freeze({
 });
 
 function classicGuideForGreatBook(book) {
-  const query = String(book?.query || '');
-  const titleKey = `${query}::${String(book?.title || '')}`;
-  return CLASSIC_GUIDES[titleKey] || CLASSIC_GUIDES[query] || null;
+  const query = String(book?.query || '').trim();
+  const title = String(book?.title || '').trim();
+  const author = String(book?.author || '').trim();
+  const titleKey = `${query}::${title}`;
+
+  const direct = CLASSIC_GUIDES[titleKey] || CLASSIC_GUIDES[query];
+  if (direct) return direct;
+
+  // Great Books queries have changed over time. Do not hide an existing guide
+  // merely because its legacy query key differs from the current card query.
+  const normalize = (value) => String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u2018\u2019\u02BC\u2032]/g, "'")
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  const wantedTitle = normalize(title);
+  const wantedAuthor = normalize(author);
+  const authorTokens = wantedAuthor
+    .split(/\s+/)
+    .filter((token) => token.length > 2);
+
+  let best = null;
+  let bestScore = -1;
+
+  Object.values(CLASSIC_GUIDES).forEach((guide) => {
+    if (!guide || typeof guide !== 'object') return;
+
+    const guideTitle = normalize(guide.title);
+    const guideAuthor = normalize(guide.author);
+    let score = 0;
+
+    if (wantedTitle && guideTitle === wantedTitle) {
+      score += 100;
+    } else if (
+      wantedTitle &&
+      guideTitle &&
+      (guideTitle.includes(wantedTitle) || wantedTitle.includes(guideTitle))
+    ) {
+      score += 55;
+    }
+
+    if (authorTokens.length) {
+      const matches = authorTokens.filter((token) => guideAuthor.includes(token)).length;
+      score += matches * 15;
+      if (matches === authorTokens.length) score += 20;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = guide;
+    }
+  });
+
+  return bestScore >= 100 ? best : null;
 }
 
 function classicGuidePathForGreatBook(book) {
@@ -16060,6 +16113,120 @@ function renderSyntopicon() {
   }));
 }
 
+
+
+function greatBookStudyIdea(book = {}) {
+  const title = String(book?.title || '').toLowerCase();
+  const author = String(book?.author || '').toLowerCase();
+  const haystack = `${title} ${author}`;
+
+  const rules = [
+    [/genesis|exodus|bible/, 'God'],
+    [/isaiah|jeremiah|revelation/, 'Prophecy'],
+    [/psalms/, 'Worship'],
+    [/proverbs/, 'Wisdom'],
+    [/romans/, 'Justice'],
+    [/gospel|matthew|john/, 'God'],
+    [/acts of the apostles/, 'Religion'],
+    [/bergson|metaphysics|heidegger/, 'Metaphysics'],
+    [/barth/, 'Religion'],
+    [/plato/, 'Philosophy'],
+    [/aristotle/, 'Being'],
+    [/aquinas|augustine/, 'God'],
+    [/hume|berkeley|locke/, 'Knowledge'],
+    [/kant/, 'Duty'],
+    [/darwin|dobzhansky/, 'Evolution'],
+    [/einstein|relativity/, 'Space'],
+    [/bohr|heisenberg/, 'Physics'],
+    [/whitehead|science/, 'Science'],
+    [/freud|psychology/, 'Mind'],
+    [/marx|labor|capital/, 'Labor'],
+    [/keynes|veblen|wealth/, 'Wealth'],
+    [/tocqueville|democracy/, 'Democracy'],
+    [/nietzsche|dostoevsky/, 'Good and Evil'],
+    [/shakespeare|poetry|eliot/, 'Poetry'],
+    [/tolstoy|war/, 'War and Peace'],
+    [/love|romeo|song of solomon/, 'Love'],
+    [/history|gibbon|tacitus|herodotus/, 'History']
+  ];
+
+  for (const [pattern, idea] of rules) {
+    if (pattern.test(haystack) && greatIdeasCatalog.includes(idea)) return idea;
+  }
+
+  const guide = classicGuideForGreatBook(book);
+  if (guide) {
+    const mapped = classicGuideGreatIdea(guide);
+    if (greatIdeasCatalog.includes(mapped)) return mapped;
+  }
+
+  return greatIdeasCatalog.includes('Philosophy') ? 'Philosophy' : (greatIdeasCatalog[0] || '');
+}
+
+function renderGreatBookStudy(book, sourceButton = null) {
+  if (!book) return;
+
+  const selectedIndex = greatBooksCatalog.findIndex((candidate) =>
+    candidate === book ||
+    (
+      String(candidate?.query || '') === String(book?.query || '') &&
+      String(candidate?.title || '') === String(book?.title || '')
+    )
+  );
+
+  const idea = greatBookStudyIdea(book);
+
+  try {
+    renderSyntopicon();
+  } catch (error) {
+    console.error('Great Books study workspace could not open.', error);
+    const cardStatus = sourceButton?.closest?.('.curated-card')?.querySelector?.('.book-load-status');
+    if (cardStatus) {
+      cardStatus.className = 'status error book-load-status';
+      cardStatus.textContent = error?.message || 'Great Ideas study could not be opened.';
+    } else {
+      window.alert(error?.message || 'Great Ideas study could not be opened.');
+    }
+    return;
+  }
+
+  // renderSyntopicon() replaces app.innerHTML. Wait until the new controls exist.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const ideaSelect = app.querySelector('#syntopicon-idea');
+    const customIdea = app.querySelector('#syntopicon-custom-idea');
+    const status = app.querySelector('#syntopicon-status');
+
+    if (ideaSelect && idea) {
+      const optionExists = Array.from(ideaSelect.options).some((option) => option.value === idea);
+      if (optionExists) {
+        ideaSelect.value = idea;
+        if (customIdea) customIdea.value = '';
+      } else if (customIdea) {
+        customIdea.value = idea;
+      }
+    }
+
+    if (selectedIndex >= 0) {
+      const source = app.querySelector(`[data-syntopicon-book="${selectedIndex}"]`);
+      if (source) {
+        source.checked = true;
+        source.closest?.('[data-syntopicon-book-card]')?.scrollIntoView?.({
+          block:'nearest',
+          behavior:'smooth'
+        });
+      }
+    }
+
+    if (status) {
+      status.className = 'status';
+      status.textContent = selectedIndex >= 0
+        ? `${book.title} is selected. Choose at least one more source, then compare.`
+        : `Great Ideas study opened for ${book.title}. Choose at least two sources to compare.`;
+    }
+
+    (ideaSelect || customIdea)?.focus?.();
+  }));
+}
 
 function greatBookGrokipediaUrl(book) {
   return grokipediaSearchUrl(book.title, book.author);
