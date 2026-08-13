@@ -1288,5 +1288,23 @@
     "title": "A Rose for Emily",
     "author": "William Faulkner",
     "status": "ready"
+  },
+  {
+    "id": "bergson-introduction-metaphysics",
+    "title": "An Introduction to Metaphysics",
+    "author": "Henri Bergson",
+    "status": "ready"
+  },
+  {
+    "id": "barth-word-god-word-man",
+    "title": "The Word of God and the Word of Man",
+    "author": "Karl Barth",
+    "status": "ready"
+  },
+  {
+    "id": "heidegger-what-metaphysics",
+    "title": "What Is Metaphysics?",
+    "author": "Martin Heidegger",
+    "status": "ready"
   }
 ]

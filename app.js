@@ -3241,6 +3241,20 @@ const CLASSIC_GUIDES = Object.freeze({
   "Hemingway Macomber": { id:"classic-hemingway-short-happy-life-macomber", slug:"hemingway-short-happy-life-macomber", title:"The Short Happy Life of Francis Macomber", author:"Ernest Hemingway" },
   "ONeill Mourning Electra": { id:"classic-oneill-mourning-electra", slug:"oneill-mourning-electra", title:"Mourning Becomes Electra", author:"Eugene O’Neill" },
   "Faulkner Rose Emily": { id:"classic-faulkner-rose-emily", slug:"faulkner-rose-emily", title:"A Rose for Emily", author:"William Faulkner" },
+  "Kant Critique Pure Reason": { id:"classic-kant-major-critical-moral-works", slug:"kant-major-critical-moral-works", title:"Major Critical and Moral Works", author:"Immanuel Kant" },
+  "Keynes General Theory Employment Interest Money": { id:"classic-keynes-general-theory", slug:"keynes-general-theory", title:"The General Theory of Employment, Interest and Money", author:"John Maynard Keynes" },
+  "Veblen Theory Leisure Class": { id:"classic-veblen-theory-leisure-class", slug:"veblen-theory-leisure-class", title:"The Theory of the Leisure Class", author:"Thorstein Veblen" },
+  "Max Weber Sociology Essays": { id:"classic-weber-essays-sociology-selections", slug:"weber-essays-sociology-selections", title:"Essays in Sociology (Selections)", author:"Max Weber" },
+  "Henry James Beast Jungle": { id:"classic-james-beast-jungle", slug:"james-beast-jungle", title:"The Beast in the Jungle", author:"Henry James" },
+  "Joyce Portrait Artist Young Man": { id:"classic-joyce-portrait-artist", slug:"joyce-portrait-artist", title:"A Portrait of the Artist as a Young Man", author:"James Joyce" },
+  "Proust Swann in Love": { id:"classic-proust-swanna-love", slug:"proust-swann-love", title:"Swann in Love", author:"Marcel Proust" },
+  "Thomas Mann Death Venice": { id:"classic-mann-death-venice", slug:"mann-death-venice", title:"Death in Venice", author:"Thomas Mann" },
+  "Willa Cather Lost Lady": { id:"classic-cather-lost-lady", slug:"cather-lost-lady", title:"A Lost Lady", author:"Willa Cather" },
+  "Hemingway Francis Macomber": { id:"classic-hemingway-short-happy-life-macomber", slug:"hemingway-short-happy-life-macomber", title:"The Short Happy Life of Francis Macomber", author:"Ernest Hemingway" },
+  "O'Neill Mourning Becomes Electra": { id:"classic-oneill-mourning-electra", slug:"oneill-mourning-electra", title:"Mourning Becomes Electra", author:"Eugene O’Neill" },
+  "Bergson Introduction Metaphysics": { id:"classic-bergson-introduction-metaphysics", slug:"bergson-introduction-metaphysics", title:"An Introduction to Metaphysics", author:"Henri Bergson" },
+  "Karl Barth Word God Word Man": { id:"classic-barth-word-god-word-man", slug:"barth-word-god-word-man", title:"The Word of God and the Word of Man", author:"Karl Barth" },
+  "Heidegger What Is Metaphysics": { id:"classic-heidegger-what-is-metaphysics", slug:"heidegger-what-is-metaphysics", title:"What Is Metaphysics?", author:"Martin Heidegger" },
 });
 
 function classicGuideForGreatBook(book) {
@@ -3260,6 +3274,10 @@ function classicGuideGreatIdea(meta = {}) {
   const haystack = `${title} ${author}`;
 
   const rules = [
+    [/bergson|introduction to metaphysics/, 'Metaphysics'],
+    [/barth|word of god and the word of man/, 'Religion'],
+    [/heidegger|what is metaphysics/, 'Being'],
+
     [/\bodyssey\b|\bhomer\b/, 'Fate'],
     [/seventh letter|plato/, 'Philosophy'],
     [/heisenberg|physics and philosophy/, 'Physics'],
