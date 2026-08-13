@@ -3321,6 +3321,70 @@ function classicGuidePathForGreatBook(book) {
 }
 
 
+
+const GREAT_BOOK_BIBLE_GUIDE_ALIASES = Object.freeze({
+  'genesis': 'Genesis',
+  'exodus': 'Exodus',
+  'leviticus': 'Leviticus',
+  'numbers': 'Numbers',
+  'deuteronomy': 'Deuteronomy',
+  'joshua': 'Joshua',
+  'judges': 'Judges',
+  'ruth': 'Ruth',
+  '1 samuel': '1 Samuel',
+  '2 samuel': '2 Samuel',
+  '1 kings': '1 Kings',
+  '2 kings': '2 Kings',
+  '1 chronicles': '1 Chronicles',
+  '2 chronicles': '2 Chronicles',
+  'ezra': 'Ezra',
+  'nehemiah': 'Nehemiah',
+  'esther': 'Esther',
+  'job': 'Job',
+  'psalms': 'Psalms',
+  'proverbs': 'Proverbs',
+  'ecclesiastes': 'Ecclesiastes',
+  'song of solomon': 'Song of Solomon',
+  'song of songs': 'Song of Solomon',
+
+  // Great Books page title variants used by Volume 0.
+  'the acts of the apostles': 'Acts',
+  'acts of the apostles': 'Acts',
+  'the epistle to the romans': 'Romans',
+  'epistle to the romans': 'Romans',
+  'the gospel according to matthew': 'Matthew',
+  'gospel according to matthew': 'Matthew',
+  'the gospel according to mark': 'Mark',
+  'gospel according to mark': 'Mark',
+  'the gospel according to luke': 'Luke',
+  'gospel according to luke': 'Luke',
+  'the gospel according to john': 'John',
+  'gospel according to john': 'John',
+  'the revelation of st john the divine': 'Revelation',
+  'revelation': 'Revelation',
+  'isaiah': 'Isaiah'
+});
+
+function bibleGuideForGreatBook(book = {}) {
+  if (String(book?.author || '').trim().toLowerCase() !== 'the bible') return null;
+
+  const normalizedTitle = String(book?.title || '')
+    .normalize('NFKD')
+    .replace(/[\u2018\u2019\u02BC\u2032]/g, "'")
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  const canonicalTitle = GREAT_BOOK_BIBLE_GUIDE_ALIASES[normalizedTitle] || book.title;
+  return BIBLE_GUIDES?.[canonicalTitle] || null;
+}
+
+async function openBibleGuideForGreatBook(book = {}) {
+  const meta = bibleGuideForGreatBook(book);
+  if (!meta) throw new Error('This Bible Guide is not available yet.');
+  await openBibleGuideInReader(meta.title);
+}
+
 function classicGuideGreatIdea(meta = {}) {
   const title = String(meta.title || '').toLowerCase();
   const author = String(meta.author || '').toLowerCase();
@@ -17420,6 +17484,7 @@ function renderGreatBooksLibrary() {
                   <button class="primary" type="button" data-load-great-book="${escapeHtml(book.query)}">Find &amp; Import Edition</button>
                   <button class="secondary" type="button" data-study-great-book="${escapeHtml(book.query)}">Study / Great Ideas</button>
                   ${classicGuidePathForGreatBook(book) ? `<button class="secondary" type="button" data-open-classic-guide="${escapeHtml(book.query)}">Classic Guide</button>` : ''}
+                  ${bibleGuideForGreatBook(book) ? `<button class="secondary" type="button" data-open-bible-guide-book="${escapeHtml(book.query)}">Bible Guide</button>` : ''}
                   <a class="secondary button-link" href="${greatBookGrokipediaUrl(book)}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
                 </div>
                 <p class="status book-load-status"></p>
@@ -17468,6 +17533,17 @@ function renderGreatBooksLibrary() {
         await openClassicGuideInReader(item);
       } catch (error) {
         window.alert(error?.message || 'The Classic Guide could not be opened.');
+      }
+    });
+  });
+  app.querySelectorAll('[data-open-bible-guide-book]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const item = greatBooksCatalog.find((book) => book.query === button.dataset.openBibleGuideBook);
+      if (!item) return;
+      try {
+        await openBibleGuideForGreatBook(item);
+      } catch (error) {
+        window.alert(error?.message || 'The Bible Guide could not be opened.');
       }
     });
   });
