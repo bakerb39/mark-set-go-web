@@ -3236,6 +3236,11 @@ const CLASSIC_GUIDES = Object.freeze({
   "Proust Swann Love": { id:"classic-proust-swann-love", slug:"proust-swann-love", title:"Swann in Love", author:"Marcel Proust" },
   "Mann Death Venice": { id:"classic-mann-death-venice", slug:"mann-death-venice", title:"Death in Venice", author:"Thomas Mann" },
   "Cather Lost Lady": { id:"classic-cather-lost-lady", slug:"cather-lost-lady", title:"A Lost Lady", author:"Willa Cather" },
+  "Brecht Mother Courage": { id:"classic-brecht-mother-courage", slug:"brecht-mother-courage", title:"Mother Courage and Her Children", author:"Bertolt Brecht" },
+  "Lawrence Prussian Officer": { id:"classic-lawrence-prussian-officer", slug:"lawrence-prussian-officer", title:"The Prussian Officer", author:"D. H. Lawrence" },
+  "Hemingway Macomber": { id:"classic-hemingway-short-happy-life-macomber", slug:"hemingway-short-happy-life-macomber", title:"The Short Happy Life of Francis Macomber", author:"Ernest Hemingway" },
+  "ONeill Mourning Electra": { id:"classic-oneill-mourning-electra", slug:"oneill-mourning-electra", title:"Mourning Becomes Electra", author:"Eugene O’Neill" },
+  "Faulkner Rose Emily": { id:"classic-faulkner-rose-emily", slug:"faulkner-rose-emily", title:"A Rose for Emily", author:"William Faulkner" },
 });
 
 function classicGuideForGreatBook(book) {

@@ -1258,5 +1258,35 @@
     "title": "A Lost Lady",
     "author": "Willa Cather",
     "status": "ready"
+  },
+  {
+    "id": "brecht-mother-courage",
+    "title": "Mother Courage and Her Children",
+    "author": "Bertolt Brecht",
+    "status": "ready"
+  },
+  {
+    "id": "lawrence-prussian-officer",
+    "title": "The Prussian Officer",
+    "author": "D. H. Lawrence",
+    "status": "ready"
+  },
+  {
+    "id": "hemingway-macomber",
+    "title": "The Short Happy Life of Francis Macomber",
+    "author": "Ernest Hemingway",
+    "status": "ready"
+  },
+  {
+    "id": "oneill-mourning-electra",
+    "title": "Mourning Becomes Electra",
+    "author": "Eugene O’Neill",
+    "status": "ready"
+  },
+  {
+    "id": "faulkner-rose-emily",
+    "title": "A Rose for Emily",
+    "author": "William Faulkner",
+    "status": "ready"
   }
 ]
