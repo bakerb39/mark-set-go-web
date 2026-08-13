@@ -3184,6 +3184,14 @@ const CLASSIC_GUIDES = Object.freeze({
   "Dickens Little Dorrit": { id:"classic-dickens-little-dorrit", slug:"dickens-little-dorrit", title:"Little Dorrit", author:"Charles Dickens" },
   "Melville Moby Dick": { id:"classic-melville-moby-dick", slug:"melville-moby-dick", title:"Moby-Dick", author:"Herman Melville" },
   "Mark Twain Huckleberry Finn": { id:"classic-twain-huckleberry-finn", slug:"twain-huckleberry-finn", title:"Adventures of Huckleberry Finn", author:"Mark Twain" },
+  "Darwin Origin Species": { id:"classic-darwin-origin-species", slug:"darwin-origin-species", title:"The Origin of Species", author:"Charles Darwin" },
+  "Darwin Descent Man": { id:"classic-darwin-descent-man", slug:"darwin-descent-man", title:"The Descent of Man", author:"Charles Darwin" },
+  "Communist Manifesto Marx Engels": { id:"classic-marx-engels-communist-manifesto", slug:"marx-engels-communist-manifesto", title:"Manifesto of the Communist Party", author:"Karl Marx & Friedrich Engels" },
+  "Marx Capital Volume 1": { id:"classic-marx-capital-volume-1", slug:"marx-capital-volume-1", title:"Capital, Vol. 1", author:"Karl Marx" },
+  "Tolstoy War Peace": { id:"classic-tolstoy-war-and-peace", slug:"tolstoy-war-and-peace", title:"War and Peace", author:"Leo Tolstoy" },
+  "Dostoevsky Brothers Karamazov": { id:"classic-dostoevsky-brothers-karamazov", slug:"dostoevsky-brothers-karamazov", title:"The Brothers Karamazov", author:"Fyodor Dostoevsky" },
+  "Ibsen plays": { id:"classic-ibsen-dolls-house", slug:"ibsen-dolls-house", title:"A Doll’s House", author:"Henrik Ibsen" },
+  "William James Principles Psychology": { id:"classic-william-james-principles-psychology", slug:"william-james-principles-psychology", title:"The Principles of Psychology", author:"William James" },
 });
 
 function classicGuideForGreatBook(book) {

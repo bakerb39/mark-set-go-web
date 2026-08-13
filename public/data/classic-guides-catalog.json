@@ -879,7 +879,7 @@
     "volume": 49,
     "era": "19th Century",
     "category": "Science",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "darwin-descent",
@@ -888,7 +888,7 @@
     "volume": 49,
     "era": "19th Century",
     "category": "Science",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "communist-manifesto",
@@ -897,7 +897,7 @@
     "volume": 50,
     "era": "19th Century",
     "category": "Politics & Economics",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "marx-capital",
@@ -906,7 +906,7 @@
     "volume": 50,
     "era": "19th Century",
     "category": "Economics & Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "tolstoy-war-peace",
@@ -915,7 +915,7 @@
     "volume": 51,
     "era": "19th Century",
     "category": "Literature",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "dostoevsky-brothers-karamazov",
@@ -924,7 +924,7 @@
     "volume": 52,
     "era": "19th Century",
     "category": "Literature & Philosophy",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "ibsen-dolls-house",
@@ -933,7 +933,7 @@
     "volume": 52,
     "era": "19th Century",
     "category": "Drama",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "james-principles-psychology",
@@ -942,7 +942,7 @@
     "volume": 53,
     "era": "19th Century",
     "category": "Psychology",
-    "status": "planned"
+    "status": "ready"
   },
   {
     "id": "freud-interpretation-dreams",
