@@ -3228,6 +3228,14 @@ const CLASSIC_GUIDES = Object.freeze({
   "Dobzhansky Genetics Origin Species": { id:"classic-dobzhansky-genetics-origin-species", slug:"dobzhansky-genetics-origin-species", title:"Genetics and the Origin of Species", author:"Theodosius Dobzhansky" },
   "Hardy Mathematician Apology": { id:"classic-hardy-mathematicians-apology", slug:"hardy-mathematicians-apology", title:"A Mathematician’s Apology", author:"G. H. Hardy" },
   "Kant Major Critical Moral": { id:"classic-kant-major-critical-moral", slug:"kant-major-critical-moral", title:"Major Critical and Moral Works", author:"Immanuel Kant" },
+  "Tawney Acquisitive Society": { id:"classic-tawney-acquisitive-society", slug:"tawney-acquisitive-society", title:"The Acquisitive Society", author:"R. H. Tawney" },
+  "Levi Strauss Structural Anthropology": { id:"classic-levi-strauss-structural-anthropology", slug:"levi-strauss-structural-anthropology", title:"Structural Anthropology (Selections)", author:"Claude Lévi-Strauss" },
+  "Shaw Saint Joan": { id:"classic-shaw-saint-joan", slug:"shaw-saint-joan", title:"Saint Joan", author:"George Bernard Shaw" },
+  "James Beast Jungle": { id:"classic-james-beast-jungle", slug:"james-beast-jungle", title:"The Beast in the Jungle", author:"Henry James" },
+  "Pirandello Six Characters": { id:"classic-pirandello-six-characters", slug:"pirandello-six-characters", title:"Six Characters in Search of an Author", author:"Luigi Pirandello" },
+  "Proust Swann Love": { id:"classic-proust-swann-love", slug:"proust-swann-love", title:"Swann in Love", author:"Marcel Proust" },
+  "Mann Death Venice": { id:"classic-mann-death-venice", slug:"mann-death-venice", title:"Death in Venice", author:"Thomas Mann" },
+  "Cather Lost Lady": { id:"classic-cather-lost-lady", slug:"cather-lost-lady", title:"A Lost Lady", author:"Willa Cather" },
 });
 
 function classicGuideForGreatBook(book) {

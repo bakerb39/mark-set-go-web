@@ -1210,5 +1210,53 @@
     "title": "Genetics and the Origin of Species",
     "author": "Theodosius Dobzhansky",
     "status": "ready"
+  },
+  {
+    "id": "tawney-acquisitive-society",
+    "title": "The Acquisitive Society",
+    "author": "R. H. Tawney",
+    "status": "ready"
+  },
+  {
+    "id": "levi-strauss-structural-anthropology",
+    "title": "Structural Anthropology (Selections)",
+    "author": "Claude Lévi-Strauss",
+    "status": "ready"
+  },
+  {
+    "id": "shaw-saint-joan",
+    "title": "Saint Joan",
+    "author": "George Bernard Shaw",
+    "status": "ready"
+  },
+  {
+    "id": "james-beast-jungle",
+    "title": "The Beast in the Jungle",
+    "author": "Henry James",
+    "status": "ready"
+  },
+  {
+    "id": "pirandello-six-characters",
+    "title": "Six Characters in Search of an Author",
+    "author": "Luigi Pirandello",
+    "status": "ready"
+  },
+  {
+    "id": "proust-swann-love",
+    "title": "Swann in Love",
+    "author": "Marcel Proust",
+    "status": "ready"
+  },
+  {
+    "id": "mann-death-venice",
+    "title": "Death in Venice",
+    "author": "Thomas Mann",
+    "status": "ready"
+  },
+  {
+    "id": "cather-lost-lady",
+    "title": "A Lost Lady",
+    "author": "Willa Cather",
+    "status": "ready"
   }
 ]
