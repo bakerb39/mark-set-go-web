@@ -11456,6 +11456,15 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
             </div>
             <div class="control"><label for="speed">Speed</label><div class="input-suffix"><input id="speed" type="number" min="0" max="900" value="${Math.min(900, state.wpm)}"><span>WPM</span></div></div>
             <div class="control"><label for="word-count">Words shown</label><input id="word-count" type="number" min="1" max="10" value="1"></div>
+            <div class="control push-training-control">
+              <label class="compact-toggle" title="Gradually increase WPM during active reading time. Designed especially for Flash mode.">
+                <input id="push-training-enabled" type="checkbox"><span>Push Training</span>
+              </label>
+            </div>
+            <div class="control push-training-control"><label for="push-start-wpm">Push start</label><div class="input-suffix"><input id="push-start-wpm" type="number" min="30" max="900" step="25" value="300"><span>WPM</span></div></div>
+            <div class="control push-training-control"><label for="push-target-wpm">Push target</label><div class="input-suffix"><input id="push-target-wpm" type="number" min="30" max="900" step="25" value="500"><span>WPM</span></div></div>
+            <div class="control push-training-control"><label for="push-ramp-rate">Ramp rate</label><div class="input-suffix"><input id="push-ramp-rate" type="number" min="1" max="300" step="5" value="25"><span>WPM/min</span></div></div>
+            <span id="push-training-status" class="status">Off.</span>
             <label class="compact-toggle meaningful-toggle" title="Group words into punctuation- and phrase-aware chunks up to the selected maximum."><input id="meaningful-chunks" type="checkbox"><span>Meaningful chunks</span></label>
           </div>
         </details>
@@ -11537,6 +11546,10 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                   </label>
                   <label>Speed<div class="input-suffix"><input id="fs-speed" type="number" min="30" max="900"><span>WPM</span></div></label>
                   <label>Words shown<input id="fs-word-count" type="number" min="1" max="10"></label>
+                  <label class="fullscreen-checkbox"><input id="fs-push-training-enabled" type="checkbox"> Push Training</label>
+                  <label>Push start<div class="input-suffix"><input id="fs-push-start-wpm" type="number" min="30" max="900" step="25"><span>WPM</span></div></label>
+                  <label>Push target<div class="input-suffix"><input id="fs-push-target-wpm" type="number" min="30" max="900" step="25"><span>WPM</span></div></label>
+                  <label>Ramp<div class="input-suffix"><input id="fs-push-ramp-rate" type="number" min="1" max="300" step="5"><span>WPM/min</span></div></label>
                 </div>
                 <div class="fullscreen-option-actions fullscreen-reading-actions">
                   <button id="fs-start" class="primary" type="button">Start</button>
@@ -11778,6 +11791,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   modeSelect.addEventListener('change', () => {
     const nextMode = modeSelect.value;
     switchReadingMode(nextMode);
+    updatePushTrainingStatus();
     if (nextMode === 'manual') {
       modeSelect.blur();
       const reader = app.querySelector('#reader');
@@ -12155,8 +12169,9 @@ document.addEventListener('keydown', state.spacebarHandler);
   };
   document.addEventListener('keydown', state.viewerWpmKeyHandler);
   updateViewerWpmBadge();
+  bindPushTrainingControls();
 
-  app.querySelectorAll('#mode-select, #speed, #word-count, #pointer-style, #pointer-color, #meaningful-chunks, #focus-anchor-font-size, #focus-anchor-color, #focus-anchor-bold, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
+  app.querySelectorAll('#mode-select, #speed, #word-count, #pointer-style, #pointer-color, #meaningful-chunks, #focus-anchor-font-size, #focus-anchor-color, #focus-anchor-bold, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode, #push-training-enabled, #push-start-wpm, #push-target-wpm, #push-ramp-rate').forEach((control) => {
     control.addEventListener('change', () => persistReaderSession());
     control.addEventListener('input', () => persistReaderSession());
   });
@@ -12338,6 +12353,10 @@ function bindFullscreenOptions(readerFrame) {
   const pairs = [
     ['#fs-mode-select', '#mode-select'],
     ['#fs-speed', '#speed'],
+    ['#fs-push-training-enabled', '#push-training-enabled'],
+    ['#fs-push-start-wpm', '#push-start-wpm'],
+    ['#fs-push-target-wpm', '#push-target-wpm'],
+    ['#fs-push-ramp-rate', '#push-ramp-rate'],
     ['#fs-word-count', '#word-count'],
     ['#fs-pointer-style', '#pointer-style'],
     ['#fs-pointer-color', '#pointer-color'],
@@ -14973,6 +14992,209 @@ let lastReaderStatusPaintAt = 0;
 let lastReaderStatusText = '';
 let lastViewerWpmText = '';
 
+
+const PUSH_TRAINING_KEY = 'markSetGoPushTrainingV1';
+
+function pushTrainingModeSupported(mode = getSelectedMode()) {
+  return ['flash', 'highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee'].includes(String(mode || ''));
+}
+
+function loadPushTrainingConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PUSH_TRAINING_KEY) || '{}');
+    return {
+      enabled: Boolean(saved.enabled),
+      startWpm: Math.max(30, Math.min(900, Number(saved.startWpm) || 300)),
+      targetWpm: Math.max(30, Math.min(900, Number(saved.targetWpm) || 500)),
+      rampWpmPerMinute: Math.max(1, Math.min(300, Number(saved.rampWpmPerMinute) || 25))
+    };
+  } catch {
+    return { enabled:false, startWpm:300, targetWpm:500, rampWpmPerMinute:25 };
+  }
+}
+
+function ensurePushTrainingState() {
+  if (!state.pushTraining) {
+    const config = loadPushTrainingConfig();
+    state.pushTraining = {
+      ...config,
+      elapsedMs:0,
+      startedAt:0,
+      runtimeActive:false,
+      effectiveWpm:config.startWpm,
+      targetAnnounced:false
+    };
+  }
+  return state.pushTraining;
+}
+
+function persistPushTrainingConfig() {
+  const push = ensurePushTrainingState();
+  try {
+    localStorage.setItem(PUSH_TRAINING_KEY, JSON.stringify({
+      enabled:Boolean(push.enabled),
+      startWpm:Number(push.startWpm) || 300,
+      targetWpm:Number(push.targetWpm) || 500,
+      rampWpmPerMinute:Number(push.rampWpmPerMinute) || 25
+    }));
+  } catch {}
+}
+
+function readPushTrainingControls() {
+  const push = ensurePushTrainingState();
+  const enabled = app.querySelector('#push-training-enabled');
+  const start = app.querySelector('#push-start-wpm');
+  const target = app.querySelector('#push-target-wpm');
+  const ramp = app.querySelector('#push-ramp-rate');
+
+  if (enabled) push.enabled = enabled.checked;
+  if (start) push.startWpm = Math.max(30, Math.min(900, Number(start.value) || push.startWpm || 300));
+  if (target) push.targetWpm = Math.max(push.startWpm, Math.min(900, Number(target.value) || push.targetWpm || 500));
+  if (ramp) push.rampWpmPerMinute = Math.max(1, Math.min(300, Number(ramp.value) || push.rampWpmPerMinute || 25));
+
+  if (start) start.value = String(push.startWpm);
+  if (target) target.value = String(push.targetWpm);
+  if (ramp) ramp.value = String(push.rampWpmPerMinute);
+
+  persistPushTrainingConfig();
+  return push;
+}
+
+function pushTrainingElapsedMs() {
+  const push = ensurePushTrainingState();
+  return push.elapsedMs + (push.runtimeActive && push.startedAt ? performance.now() - push.startedAt : 0);
+}
+
+function syncPushTrainingWpm(wpm) {
+  const value = Math.max(30, Math.min(900, Math.round(Number(wpm) || 300)));
+  state.wpm = value;
+  const speed = app.querySelector('#speed');
+  const fsSpeed = app.querySelector('#fs-speed');
+  if (speed) speed.value = String(value);
+  if (fsSpeed) fsSpeed.value = String(value);
+  updateViewerWpmBadge();
+  return value;
+}
+
+function updatePushTrainingStatus(message = '') {
+  const push = ensurePushTrainingState();
+  const status = app.querySelector('#push-training-status');
+  if (!status) return;
+
+  if (message) {
+    status.textContent = message;
+    return;
+  }
+
+  if (!push.enabled) {
+    status.textContent = 'Off. Turn on to ramp reading speed automatically.';
+    return;
+  }
+
+  const mode = getSelectedMode();
+  if (!pushTrainingModeSupported(mode)) {
+    status.textContent = 'Ready. Use Flash or another guided mode to run Push Training.';
+    return;
+  }
+
+  const current = Math.round(push.effectiveWpm || push.startWpm);
+  status.textContent = `Push: ${current} → ${push.targetWpm} WPM · +${push.rampWpmPerMinute} WPM/min`;
+}
+
+function resetPushTrainingProgress({ syncSpeed = true } = {}) {
+  const push = ensurePushTrainingState();
+  push.elapsedMs = 0;
+  push.startedAt = 0;
+  push.runtimeActive = false;
+  push.effectiveWpm = push.startWpm;
+  push.targetAnnounced = false;
+  if (syncSpeed && push.enabled) syncPushTrainingWpm(push.startWpm);
+  updatePushTrainingStatus();
+}
+
+function beginPushTrainingRuntime(mode = getSelectedMode()) {
+  const push = readPushTrainingControls();
+  if (!push.enabled || !pushTrainingModeSupported(mode)) {
+    push.runtimeActive = false;
+    updatePushTrainingStatus();
+    return false;
+  }
+  if (!push.runtimeActive) {
+    push.startedAt = performance.now();
+    push.runtimeActive = true;
+  }
+  push.effectiveWpm = Math.min(
+    push.targetWpm,
+    push.startWpm + (push.rampWpmPerMinute * (pushTrainingElapsedMs() / 60000))
+  );
+  syncPushTrainingWpm(push.effectiveWpm);
+  updatePushTrainingStatus();
+  return true;
+}
+
+function pausePushTrainingRuntime() {
+  const push = ensurePushTrainingState();
+  if (push.runtimeActive && push.startedAt) {
+    push.elapsedMs += Math.max(0, performance.now() - push.startedAt);
+  }
+  push.startedAt = 0;
+  push.runtimeActive = false;
+  updatePushTrainingStatus();
+}
+
+function currentPushTrainingWpm(fallbackWpm, mode = getSelectedMode()) {
+  const push = ensurePushTrainingState();
+  if (!push.enabled || !pushTrainingModeSupported(mode) || !push.runtimeActive) {
+    return Math.max(30, Number(fallbackWpm) || 300);
+  }
+
+  const effective = Math.min(
+    push.targetWpm,
+    push.startWpm + (push.rampWpmPerMinute * (pushTrainingElapsedMs() / 60000))
+  );
+  push.effectiveWpm = effective;
+  syncPushTrainingWpm(effective);
+
+  if (effective >= push.targetWpm && !push.targetAnnounced) {
+    push.targetAnnounced = true;
+    updatePushTrainingStatus(`Target reached: ${push.targetWpm} WPM. Holding pace.`);
+  } else if (!push.targetAnnounced) {
+    updatePushTrainingStatus();
+  }
+
+  return effective;
+}
+
+function bindPushTrainingControls() {
+  const push = ensurePushTrainingState();
+  const enabled = app.querySelector('#push-training-enabled');
+  const start = app.querySelector('#push-start-wpm');
+  const target = app.querySelector('#push-target-wpm');
+  const ramp = app.querySelector('#push-ramp-rate');
+
+  if (!enabled || !start || !target || !ramp) return;
+
+  enabled.checked = push.enabled;
+  start.value = String(push.startWpm);
+  target.value = String(push.targetWpm);
+  ramp.value = String(push.rampWpmPerMinute);
+
+  const changed = () => {
+    const wasRunning = isReaderRunning();
+    if (wasRunning) pauseReader();
+    readPushTrainingControls();
+    resetPushTrainingProgress({ syncSpeed:true });
+    if (wasRunning && getSelectedMode() !== 'two-column') startReader();
+  };
+
+  enabled.addEventListener('change', changed);
+  start.addEventListener('change', changed);
+  target.addEventListener('change', changed);
+  ramp.addEventListener('change', changed);
+
+  updatePushTrainingStatus();
+}
+
 function adjustReaderWpm(delta) {
   const speedInput = app.querySelector('#speed');
   if (!speedInput) return;
@@ -15109,7 +15331,9 @@ function startReader() {
   const pause = app.querySelector('#pause-reader');
   const mode = getSelectedMode();
 
-  const speed = Math.min(900, Math.max(30, Number(speedInput.value) || 300));
+  let speed = Math.min(900, Math.max(30, Number(speedInput.value) || 300));
+  const pushActive = beginPushTrainingRuntime(mode);
+  if (pushActive) speed = currentPushTrainingWpm(speed, mode);
   const count = (mode === 'digital-sign' || mode === 'auto-scroll' || mode === 'pacman')
     ? 1
     : Math.min(10, Math.max(1, Number(countInput.value) || 1));
@@ -15152,6 +15376,7 @@ function startReader() {
 
   const paintStep = () => {
     if (token !== state.runToken) return;
+    const liveSpeed = currentPushTrainingWpm(speed, mode);
     if (state.index >= state.words.length) {
       pauseReader();
       updateReaderStatus('Finished.');
@@ -15223,15 +15448,15 @@ function startReader() {
           // hand lands beneath the visible words rather than their old screen
           // coordinates.
           const refreshed = getPointingLineStep(reader, stepStart, stepEnd - stepStart);
-          moveReadingGuide(reader, refreshed, Math.max(40, (60000 * (stepEnd - stepStart)) / speed));
+          moveReadingGuide(reader, refreshed, Math.max(40, (60000 * (stepEnd - stepStart)) / liveSpeed));
         });
       } else {
         scrollActiveGroup(reader, groupIndex);
       }
       if (mode === 'smooth-glide' && group) {
         const glideMs = expectedMeaningful
-          ? Math.max(40, (60000 * Math.max(1, nextIndex - startIndex)) / speed)
-          : tickMs;
+          ? Math.max(40, (60000 * Math.max(1, nextIndex - startIndex)) / liveSpeed)
+          : Math.max(40, (60000 * count) / liveSpeed);
         window.requestAnimationFrame(() => moveSmoothFocusMarker(reader, group, glideMs));
       }
     }
@@ -15257,8 +15482,8 @@ function startReader() {
     // pauses. If one frame is late, the following delay becomes shorter rather
     // than permanently shifting the reading rhythm.
     const scheduledTickMs = (mode === 'pointing-guide' || expectedMeaningful)
-      ? Math.max(40, (60000 * Math.max(1, nextIndex - startIndex)) / speed)
-      : tickMs;
+      ? Math.max(40, (60000 * Math.max(1, nextIndex - startIndex)) / liveSpeed)
+      : Math.max(40, (60000 * count) / liveSpeed);
     state.nextTickAt += scheduledTickMs;
     const delay = Math.max(0, state.nextTickAt - performance.now());
     state.interval = window.setTimeout(paintStep, delay);
@@ -15268,6 +15493,7 @@ function startReader() {
 }
 
 function stopReader() {
+  pausePushTrainingRuntime();
   if (state.renderedMode === 'pacman') {
     const reader = app.querySelector('#reader');
     const current = reader?.querySelector('.reader-word.pacman-current-word');
@@ -15318,6 +15544,7 @@ function pauseReader() {
 }
 
 function resetReader() {
+  resetPushTrainingProgress({ syncSpeed:true });
   // Reset is a full restart, not a pause. Cancel the animation and its status
   // timer before replacing the Digital Sign stage so Start cannot accidentally
   // resume an animation whose element is no longer in the document.
@@ -15897,11 +16124,11 @@ const BIBLE_GUIDE_CATALOG = Object.freeze([
   { testament:"Old Testament", group:"Wisdom & Poetry", title:"Proverbs", slug:"proverbs", status:"ready" },
   { testament:"Old Testament", group:"Wisdom & Poetry", title:"Ecclesiastes", slug:"ecclesiastes", status:"ready" },
   { testament:"Old Testament", group:"Wisdom & Poetry", title:"Song of Solomon", slug:"song-of-solomon", status:"ready" },
-  { testament:"Old Testament", group:"Major Prophets", title:"Isaiah", slug:"isaiah", status:"planned" },
-  { testament:"Old Testament", group:"Major Prophets", title:"Jeremiah", slug:"jeremiah", status:"planned" },
-  { testament:"Old Testament", group:"Major Prophets", title:"Lamentations", slug:"lamentations", status:"planned" },
-  { testament:"Old Testament", group:"Major Prophets", title:"Ezekiel", slug:"ezekiel", status:"planned" },
-  { testament:"Old Testament", group:"Major Prophets", title:"Daniel", slug:"daniel", status:"planned" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Isaiah", slug:"isaiah", status:"ready" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Jeremiah", slug:"jeremiah", status:"ready" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Lamentations", slug:"lamentations", status:"ready" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Ezekiel", slug:"ezekiel", status:"ready" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Daniel", slug:"daniel", status:"ready" },
   { testament:"Old Testament", group:"Minor Prophets", title:"Hosea", slug:"hosea", status:"planned" },
   { testament:"Old Testament", group:"Minor Prophets", title:"Joel", slug:"joel", status:"planned" },
   { testament:"Old Testament", group:"Minor Prophets", title:"Amos", slug:"amos", status:"planned" },
@@ -15965,7 +16192,12 @@ const BIBLE_GUIDES = Object.freeze({
   "Psalms": { slug:"psalms", title:"Psalms", greatIdea:"Worship" },
   "Proverbs": { slug:"proverbs", title:"Proverbs", greatIdea:"Wisdom" },
   "Ecclesiastes": { slug:"ecclesiastes", title:"Ecclesiastes", greatIdea:"Happiness" },
-  "Song of Solomon": { slug:"song-of-solomon", title:"Song of Solomon", greatIdea:"Love" }
+  "Song of Solomon": { slug:"song-of-solomon", title:"Song of Solomon", greatIdea:"Love" },
+  "Isaiah": { slug:"isaiah", title:"Isaiah", greatIdea:"Prophecy" },
+  "Jeremiah": { slug:"jeremiah", title:"Jeremiah", greatIdea:"Prophecy" },
+  "Lamentations": { slug:"lamentations", title:"Lamentations", greatIdea:"Suffering" },
+  "Ezekiel": { slug:"ezekiel", title:"Ezekiel", greatIdea:"Prophecy" },
+  "Daniel": { slug:"daniel", title:"Daniel", greatIdea:"Government" },
 });
 
 const LAST_BIBLE_PASSAGE_KEY = 'markSetGoLastBiblePassageV1';
@@ -17359,19 +17591,20 @@ function renderFoundingDocumentsLibrary() {
 
 function renderGreatBooksLibrary() {
   stopReader();
-  const grouped = groupBy(greatBooksCatalog, 'volume');
+  const greatBooksOnly = greatBooksCatalog.filter((book) => Number(book.volume) > 0);
+  const grouped = groupBy(greatBooksOnly, 'volume');
   app.innerHTML = `
     <section class="panel curated-library great-books-study-library">
       <div class="library-heading">
-        <div><span class="source-category">Browse · Study</span><h1>Great Books of the Western World</h1><p>The 1990 60-volume framework expanded into individual works, plus the Bible collection referenced by the Syntopicon tradition.</p></div>
-        <div class="source-actions"><button class="secondary" type="button" data-read="bible-guides">Bible Guides</button><button class="secondary" type="button" data-read="gutenberg">Search Gutenberg</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
+        <div><span class="source-category">Browse · Study</span><h1>Great Books of the Western World</h1><p>The 1990 60-volume framework expanded into individual works. Bible reading and book guides now live in Bible Study.</p></div>
+        <div class="source-actions"><button class="secondary" type="button" data-read="gutenberg">Search Gutenberg</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
       </div>
       <div class="study-language-bar">
         <div><strong>Study language</strong><span>AI study guides can be generated in another language; imported books can be translated from the Reader.</span></div>
         <select id="great-books-study-language">${studyLanguageOptions(getStudyLanguage())}</select>
       </div>
       <div class="great-books-study-intro">
-        <article><strong>${greatBooksCatalog.length}</strong><span>individual works / collections</span></article>
+        <article><strong>${greatBooksOnly.length}</strong><span>individual works / collections</span></article>
         <article><strong>60</strong><span>volume framework</span></article>
         <article><strong>AI</strong><span>Great Ideas study guides</span></article>
       </div>
