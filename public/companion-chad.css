@@ -77,3 +77,27 @@ html[data-companion="chad"] .msg-walkthrough-mark-illustration {
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* v1.0.1: Chad profile chooser fallback.
+   The current Profile renderer itself does not contain a companion selector,
+   so this layer can create the whole Mark/Beth/Chad chooser when the older
+   companion script has not already injected one. */
+.profile-preferences-page [data-chad-fallback-selector] {
+  margin-top: 14px !important;
+  margin-bottom: 14px !important;
+}
+
+.profile-preferences-page .companion-persona-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.profile-preferences-page .companion-persona-options button {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .profile-preferences-page .companion-persona-options {
+    grid-template-columns: 1fr !important;
+  }
+}

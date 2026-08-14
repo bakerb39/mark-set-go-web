@@ -1,23 +1,28 @@
-MARK, SET, GO! — TOPIC FEED READ-IN-READER FIX
+MARK, SET, GO! — CHAD PROFILE VISIBILITY FIX
 
-This package is cumulative with the current Ask Chad + Topic Feeds build.
-
-For this fix, replace:
-  /public/topic-feeds.js
+Replace:
+  /public/companion-chad.js
+  /public/companion-chad.css
   /public/index.html
 
-WHAT WAS HAPPENING
-Topic Feeds saved the refreshed edition to localStorage. The app already stores
-other Reader/import records there too. If browser storage was full or nearly full,
-clicking "Read in Reader" could fail while trying to save the article's read state
-BEFORE openDocument() was called. The click therefore looked like it did nothing.
+WHY CHAD WAS MISSING
+The app's current renderProfilePreferences() creates Quick Setup, interface
+features, and coaching sections, but it does not itself create the companion
+selector. The older Mark/Beth companion layer injects that separately.
+
+The first Chad integration assumed .companion-persona-options already existed.
+If that older layer had not inserted the selector yet, Chad had nowhere to attach
+and therefore did not appear.
 
 FIX
-1. The Reader now opens FIRST.
-2. Marking the article as read and saving Topic Feed state happens afterward.
-3. Topic Feed saveState() can no longer throw into the Reader-open path.
-4. If storage is tight, Topic Feeds automatically try a compact saved form.
-5. If even compact storage cannot be saved, the in-memory feed still works.
-6. The clicked button temporarily shows "Opening…" so the user gets immediate feedback.
+- Chad now looks for the existing Mark/Beth companion selector first.
+- If it exists, Chad is added as the third choice.
+- If it does not exist, Chad creates the complete Mark / Beth / Chad companion
+  selector directly under the Profile hero.
+- The fallback disappears automatically if the original companion selector later
+  appears, preventing duplicate settings.
+- All three options are selectable from the resulting profile selector.
+- Chad remains the finance/markets/investing specialist.
+- Cache-bust versions were changed so the browser receives the new script/CSS.
 
-No Reader-core architecture was changed.
+No Reader-core code changed.

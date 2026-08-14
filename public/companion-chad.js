@@ -106,33 +106,139 @@
     });
   }
 
+  function companionCardMarkup(id) {
+    const configs = {
+      mark: {
+        name: 'Mark',
+        avatar: '/assets/ask-mark/ask-mark-avatar.png',
+        description: 'Your thoughtful general reading companion'
+      },
+      beth: {
+        name: 'Beth',
+        avatar: '/assets/companions/beth/beth-avatar.png',
+        description: 'A warm, encouraging reading companion'
+      },
+      chad: {
+        name: 'Chad',
+        avatar: CHAD.avatar,
+        description: 'Financial analysis, investing, markets & economics'
+      }
+    };
+    const item = configs[id];
+    return `
+      <button type="button" data-companion-choice="${id}" aria-pressed="false">
+        <img src="${item.avatar}" alt="${item.name}">
+        <span>
+          <strong>${item.name}</strong>
+          <small>${item.description}</small>
+        </span>
+        <span class="companion-check" aria-hidden="true">✓</span>
+      </button>`;
+  }
+
+  function activateExistingCompanionSystem(id) {
+    // Use the existing Mark/Beth companion controller when this build exposes it.
+    const api = window.MSGCompanion;
+    for (const method of ['select', 'setPersona', 'set', 'choose']) {
+      if (typeof api?.[method] !== 'function') continue;
+      try {
+        api[method](id);
+        return true;
+      } catch {}
+    }
+    return false;
+  }
+
+  function chooseCompanion(id) {
+    const normalized = ['mark', 'beth', 'chad'].includes(id) ? id : 'mark';
+
+    // Chad is provided by this additive layer. Mark/Beth still get a chance to
+    // use the app's existing companion controller first.
+    if (normalized !== 'chad') activateExistingCompanionSystem(normalized);
+
+    setSelected(normalized);
+    window.setTimeout(scheduleApply, 0);
+  }
+
+  function ensureFallbackProfileSelector() {
+    const page = document.querySelector('#app .profile-preferences-page');
+    if (!page) return null;
+
+    // If the original companion layer already rendered a chooser, use it rather
+    // than creating a duplicate.
+    const existing = page.querySelector('.companion-persona-settings:not([data-chad-fallback-selector])');
+    if (existing) {
+      page.querySelector('[data-chad-fallback-selector]')?.remove();
+      return existing.querySelector('.companion-persona-options');
+    }
+
+    let section = page.querySelector('[data-chad-fallback-selector]');
+    if (!section) {
+      section = document.createElement('section');
+      section.className = 'companion-persona-settings profile-feature-card';
+      section.dataset.chadFallbackSelector = '1';
+      section.innerHTML = `
+        <div class="companion-persona-heading">
+          <div>
+            <span class="companion-persona-kicker">READING COMPANION</span>
+            <h2>Choose your companion</h2>
+          </div>
+          <p>Choose the companion whose perspective you want throughout the Reader and Ask companion tools.</p>
+        </div>
+        <div class="companion-persona-options">
+          ${companionCardMarkup('mark')}
+          ${companionCardMarkup('beth')}
+          ${companionCardMarkup('chad')}
+        </div>`;
+
+      // The actual Profile renderer begins with Quick setup. Put companion choice
+      // immediately after the page hero so it is impossible to miss.
+      const hero = page.querySelector('.platform-hero');
+      if (hero?.nextSibling) page.insertBefore(section, hero.nextSibling);
+      else page.prepend(section);
+    }
+    return section.querySelector('.companion-persona-options');
+  }
+
   function addProfileChoice() {
-    const options = document.querySelector('.companion-persona-options');
+    const page = document.querySelector('#app .profile-preferences-page');
+    if (!page) return;
+
+    let options = page.querySelector('.companion-persona-options');
+    if (!options) options = ensureFallbackProfileSelector();
     if (!options) return;
 
     let button = options.querySelector('[data-companion-choice="chad"], [data-persona="chad"]');
     if (!button) {
-      button = document.createElement('button');
-      button.type = 'button';
-      button.dataset.companionChoice = 'chad';
-      button.className = 'companion-chad-choice';
-      button.innerHTML = `
-        <img src="${CHAD.avatar}" alt="Chad">
-        <span>
-          <strong>Chad</strong>
-          <small>Financial analysis, investing, markets &amp; economics</small>
-        </span>
-        <span class="companion-check" aria-hidden="true">✓</span>`;
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        setSelected('chad');
-      });
+      const holder = document.createElement('div');
+      holder.innerHTML = companionCardMarkup('chad').trim();
+      button = holder.firstElementChild;
       options.appendChild(button);
     }
 
+    // Bind all three choices, including legacy Mark/Beth buttons, without
+    // depending on the older companion script's internal event wiring.
+    options.querySelectorAll('button').forEach((option) => {
+      if (option.dataset.chadChoiceBound === '1') return;
+
+      const explicit = option.dataset.companionChoice || option.dataset.persona || '';
+      const label = (option.textContent || '').toLowerCase();
+      const id = explicit || (label.includes('chad') ? 'chad' : label.includes('beth') ? 'beth' : 'mark');
+
+      option.dataset.chadResolvedCompanion = id;
+      option.dataset.chadChoiceBound = '1';
+      option.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        chooseCompanion(id);
+      });
+    });
+
     const current = selected();
     options.querySelectorAll('button').forEach((option) => {
-      const id = option.dataset.companionChoice || option.dataset.persona ||
+      const id = option.dataset.chadResolvedCompanion ||
+        option.dataset.companionChoice ||
+        option.dataset.persona ||
         (/beth/i.test(option.textContent || '') ? 'beth' :
          /chad/i.test(option.textContent || '') ? 'chad' : 'mark');
       const active = id === current;
@@ -323,15 +429,13 @@
     });
   }
 
-  // Observe the two existing persona options as well, so switching back from Chad
-  // immediately restores normal Mark/Beth behavior.
+  // Keep the UI synchronized when another companion control elsewhere in the
+  // app changes Mark/Beth.
   document.addEventListener('click', (event) => {
     const option = event.target.closest?.('.companion-persona-options button');
     if (!option) return;
-    const label = (option.textContent || '').toLowerCase();
-    if (label.includes('chad')) return;
-    setTimeout(scheduleApply, 0);
-  }, true);
+    window.setTimeout(scheduleApply, 0);
+  });
 
   installFetchBridge();
 
