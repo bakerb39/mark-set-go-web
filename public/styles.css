@@ -14992,6 +14992,48 @@ body:not(.light) .reader-written-annotation {
   content:'Reader workspace'; position:absolute; left:12px; bottom:8px;
   font:700 10px/1 Inter,system-ui,sans-serif; opacity:.35; pointer-events:none;
 }
+
+.reader-workspace-tab {
+  display:none;
+  position:absolute;
+  z-index:9;
+  top:7px;
+  right:8px;
+  width:25px;
+  height:22px;
+  padding:0;
+  border:1px solid rgba(12,35,64,.16);
+  border-radius:0 0 6px 6px;
+  background:rgba(251,247,237,.92);
+  color:#0c2340;
+  font:700 12px/1 Inter,system-ui,sans-serif;
+  cursor:pointer;
+  opacity:.66;
+  box-shadow:0 2px 6px rgba(15,23,42,.08);
+}
+.reader-workspace-tab:hover,.reader-workspace-tab:focus-visible { opacity:1; }
+.reader-workspace-done { margin-left:auto; }
+.reader-inserted-workspace.workspace-collapsed {
+  border-color:transparent;
+  background:transparent;
+  box-shadow:none;
+}
+.reader-inserted-workspace.workspace-collapsed::before { display:none; }
+.reader-inserted-workspace.workspace-collapsed .reader-workspace-tab { display:block; }
+.reader-inserted-workspace.workspace-collapsed .reader-workspace-toolbar,
+.reader-inserted-workspace.workspace-collapsed .reader-workspace-note-color { display:none!important; }
+.reader-inserted-workspace.workspace-collapsed .reader-workspace-note {
+  border-color:transparent;
+  background:transparent;
+  box-shadow:none;
+  resize:none;
+  pointer-events:none;
+  outline:none;
+  padding-left:0;
+  padding-right:0;
+}
+.reader-inserted-workspace.workspace-collapsed .reader-workspace-photo button { display:none; }
+.reader-inserted-workspace.workspace-collapsed .reader-workspace-drawing-layer { pointer-events:none; }
 .reader-workspace-toolbar {
   position:absolute; z-index:8; top:7px; left:8px; right:8px;
   display:flex; align-items:center; flex-wrap:wrap; gap:5px;
@@ -15031,3 +15073,46 @@ body:not(.light) .reader-written-annotation {
 .mark-selection-toolbar .reader-workspace-editor label { display:flex; align-items:center; justify-content:space-between; gap:8px; }
 .mark-selection-toolbar .reader-workspace-editor>div { display:flex; justify-content:flex-end; gap:6px; }
 .mark-selection-toolbar .reader-workspace-editor select,.mark-selection-toolbar .reader-workspace-editor button { min-height:28px; border:1px solid rgba(12,35,64,.15); border-radius:6px; background:#fff; color:#0c2340; }
+
+/* Reader markup v6: movable + freely resizable inserted workspaces ---------- */
+.reader-inserted-workspace.workspace-moving {
+  z-index:30;
+  opacity:.88;
+  box-shadow:0 14px 34px rgba(15,23,42,.18);
+  pointer-events:none;
+}
+.reader-workspace-tab[data-workspace-move],
+.reader-workspace-move {
+  touch-action:none;
+  cursor:grab;
+}
+.reader-workspace-tab[data-workspace-move]:active,
+.reader-workspace-move:active,
+.reader-inserted-workspace.workspace-moving .reader-workspace-tab,
+.reader-inserted-workspace.workspace-moving .reader-workspace-move { cursor:grabbing; }
+.reader-workspace-resize {
+  position:absolute;
+  z-index:10;
+  right:4px;
+  bottom:4px;
+  width:18px;
+  height:18px;
+  padding:0;
+  border:0;
+  background:transparent;
+  cursor:nwse-resize;
+  touch-action:none;
+}
+.reader-workspace-resize::after {
+  content:'';
+  position:absolute;
+  right:2px;
+  bottom:2px;
+  width:9px;
+  height:9px;
+  border-right:2px solid rgba(12,35,64,.48);
+  border-bottom:2px solid rgba(12,35,64,.48);
+}
+.reader-inserted-workspace.workspace-resizing { user-select:none; }
+.reader-inserted-workspace.workspace-collapsed .reader-workspace-resize { display:none; }
+.reader-inserted-workspace:not(.workspace-collapsed) .reader-workspace-tab { display:none; }

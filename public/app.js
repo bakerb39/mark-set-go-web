@@ -8292,7 +8292,16 @@ function saveReaderWorkspaces(items) {
 }
 
 function normalizeReaderWorkspaceHeight(value) {
-  return Math.max(140, Math.min(720, Number(value) || 280));
+  return Math.max(140, Math.min(1200, Number(value) || 280));
+}
+
+function normalizeReaderWorkspaceWidth(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? Math.max(220, Math.min(1200, number)) : 0;
+}
+
+function normalizeReaderWorkspaceX(value) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
 }
 
 function addSavedReaderWorkspace(selectionData, height = 280) {
@@ -8305,11 +8314,14 @@ function addSavedReaderWorkspace(selectionData, height = 280) {
     title:state.title || '',
     anchorIndex:endIndex - 1,
     height:normalizeReaderWorkspaceHeight(height),
+    width:0,
+    x:0,
     note:'',
     noteColor:'#0C2340',
     photoDataUrl:'',
     photoName:'',
     strokes:[],
+    collapsed:false,
     createdAt:new Date().toISOString(),
     updatedAt:new Date().toISOString()
   });
@@ -8323,6 +8335,8 @@ function updateSavedReaderWorkspace(id, patch) {
   if (!item) return false;
   Object.assign(item, patch || {}, {updatedAt:new Date().toISOString()});
   if ('height' in (patch || {})) item.height = normalizeReaderWorkspaceHeight(item.height);
+  if ('width' in (patch || {})) item.width = normalizeReaderWorkspaceWidth(item.width);
+  if ('x' in (patch || {})) item.x = normalizeReaderWorkspaceX(item.x);
   saveReaderWorkspaces(readerWorkspaceCache);
   return true;
 }
@@ -8370,6 +8384,41 @@ function renderReaderWorkspaceStrokes(block, item) {
   ).join('');
 }
 
+function applyReaderWorkspaceGeometry(block, item) {
+  const reader = block.closest('#reader');
+  if (!reader) return;
+  const laneWidth = Math.max(220, reader.clientWidth - 18);
+  const requestedWidth = normalizeReaderWorkspaceWidth(item?.width);
+  const width = Math.max(220, Math.min(laneWidth, requestedWidth || laneWidth));
+  const availableX = Math.max(0, laneWidth - width);
+  const left = 9 + (normalizeReaderWorkspaceX(item?.x) * availableX);
+  block.style.width = `${width}px`;
+  block.style.marginLeft = `${left}px`;
+  block.style.marginRight = '0';
+  block.style.minHeight = `${normalizeReaderWorkspaceHeight(item?.height)}px`;
+}
+
+function closestReaderWorkspaceAnchorIndex(reader, clientX, clientY, ignoredBlock) {
+  let bestIndex = null;
+  let bestDistance = Infinity;
+  const candidates = [...reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]')];
+  for (const element of candidates) {
+    if (ignoredBlock && ignoredBlock.contains(element)) continue;
+    const range = readerElementRange(element);
+    if (!range) continue;
+    const rect = element.getBoundingClientRect();
+    if (!rect.width && !rect.height) continue;
+    const cx = Math.max(rect.left, Math.min(clientX, rect.right));
+    const cy = Math.max(rect.top, Math.min(clientY, rect.bottom));
+    const distance = Math.hypot(clientX - cx, clientY - cy);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = Math.max(range.start, range.end - 1);
+    }
+  }
+  return bestIndex;
+}
+
 function bindReaderWorkspace(block, item) {
   if (block.dataset.workspaceBound === 'true') return;
   block.dataset.workspaceBound = 'true';
@@ -8379,6 +8428,112 @@ function bindReaderWorkspace(block, item) {
   const drawLayer = block.querySelector('[data-workspace-drawing-layer]');
   let drawMode = false;
   let stroke = null;
+  let moveState = null;
+  let resizeState = null;
+  let suppressOpenUntil = 0;
+
+  const currentWorkspace = ()=>readerWorkspaceCache.find((entry)=>String(entry.id)===String(id)) || item;
+
+  const beginWorkspaceMove = (event)=>{
+    if (event.button != null && event.button !== 0) return;
+    event.preventDefault(); event.stopPropagation();
+    const reader = block.closest('#reader');
+    if (!reader) return;
+    const rect = block.getBoundingClientRect();
+    moveState={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,dx:0,dy:0,moved:false,reader,rect};
+    block.classList.add('workspace-moving');
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch {}
+  };
+  const moveWorkspace = (event)=>{
+    if (!moveState || moveState.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    moveState.dx=event.clientX-moveState.startX; moveState.dy=event.clientY-moveState.startY;
+    if (Math.hypot(moveState.dx,moveState.dy)>5) moveState.moved=true;
+    if (moveState.moved) block.style.transform=`translate(${moveState.dx}px, ${moveState.dy}px)`;
+  };
+  const finishWorkspaceMove = (event)=>{
+    if (!moveState || moveState.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    const wasMoved=moveState.moved;
+    const reader=moveState.reader;
+    const current=currentWorkspace();
+    block.classList.remove('workspace-moving');
+    block.style.transform='';
+    if (wasMoved) {
+      suppressOpenUntil=Date.now()+350;
+      const anchorIndex=closestReaderWorkspaceAnchorIndex(reader,event.clientX,event.clientY,block);
+      const laneWidth=Math.max(220,reader.clientWidth-18);
+      const width=Math.max(220,Math.min(laneWidth,block.getBoundingClientRect().width||normalizeReaderWorkspaceWidth(current.width)||laneWidth));
+      const availableX=Math.max(0,laneWidth-width);
+      const desiredLeft=Math.max(9,Math.min(9+availableX,(moveState.rect.left-reader.getBoundingClientRect().left)+moveState.dx));
+      const x=availableX>0 ? (desiredLeft-9)/availableX : 0;
+      updateSavedReaderWorkspace(id,{...(Number.isFinite(anchorIndex)?{anchorIndex}:{}),x});
+      block.remove();
+      applySavedReaderWorkspaces();
+    }
+    moveState=null;
+  };
+
+  block.querySelectorAll('[data-workspace-move]').forEach((handle)=>{
+    handle.addEventListener('pointerdown',beginWorkspaceMove);
+    handle.addEventListener('pointermove',moveWorkspace);
+    handle.addEventListener('pointerup',finishWorkspaceMove);
+    handle.addEventListener('pointercancel',finishWorkspaceMove);
+  });
+
+  const resizeHandle=block.querySelector('[data-workspace-resize]');
+  resizeHandle?.addEventListener('pointerdown',(event)=>{
+    if (event.button != null && event.button !== 0) return;
+    event.preventDefault(); event.stopPropagation();
+    const rect=block.getBoundingClientRect();
+    resizeState={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,startWidth:rect.width,startHeight:rect.height};
+    block.classList.add('workspace-resizing');
+    try { resizeHandle.setPointerCapture(event.pointerId); } catch {}
+  });
+  resizeHandle?.addEventListener('pointermove',(event)=>{
+    if (!resizeState || resizeState.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    const reader=block.closest('#reader');
+    const maxWidth=Math.max(220,(reader?.clientWidth||1200)-18);
+    const width=Math.max(220,Math.min(maxWidth,resizeState.startWidth+(event.clientX-resizeState.startX)));
+    const height=normalizeReaderWorkspaceHeight(resizeState.startHeight+(event.clientY-resizeState.startY));
+    block.style.width=`${width}px`; block.style.minHeight=`${height}px`;
+    const current=currentWorkspace();
+    requestAnimationFrame(()=>renderReaderWorkspaceStrokes(block,{...current,width,height}));
+  });
+  const finishWorkspaceResize=(event)=>{
+    if (!resizeState || resizeState.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    block.classList.remove('workspace-resizing');
+    const width=normalizeReaderWorkspaceWidth(block.getBoundingClientRect().width);
+    const height=normalizeReaderWorkspaceHeight(block.getBoundingClientRect().height);
+    updateSavedReaderWorkspace(id,{width,height});
+    resizeState=null;
+    const current=currentWorkspace();
+    applyReaderWorkspaceGeometry(block,current);
+    renderReaderWorkspaceStrokes(block,current);
+  };
+  resizeHandle?.addEventListener('pointerup',finishWorkspaceResize);
+  resizeHandle?.addEventListener('pointercancel',finishWorkspaceResize);
+
+  const setWorkspaceCollapsed = (collapsed)=>{
+    const isCollapsed = Boolean(collapsed);
+    drawMode = false;
+    block.classList.remove('workspace-drawing-active');
+    block.querySelector('[data-workspace-draw-toggle]')?.classList.remove('active');
+    block.classList.toggle('workspace-collapsed', isCollapsed);
+    updateSavedReaderWorkspace(id,{collapsed:isCollapsed});
+    if (isCollapsed && note) note.hidden = !note.value.trim();
+  };
+  block.querySelector('[data-workspace-open]')?.addEventListener('click',(event)=>{
+    event.preventDefault(); event.stopPropagation();
+    if (Date.now() < suppressOpenUntil) return;
+    setWorkspaceCollapsed(false);
+  });
+  block.querySelector('[data-workspace-done]')?.addEventListener('click',(event)=>{
+    event.preventDefault(); event.stopPropagation();
+    setWorkspaceCollapsed(true);
+  });
 
   block.querySelector('[data-workspace-text-toggle]')?.addEventListener('click',()=>{
     note.hidden = !note.hidden;
@@ -8409,12 +8564,12 @@ function bindReaderWorkspace(block, item) {
   block.querySelector('[data-workspace-grow]')?.addEventListener('click',()=>{
     const current=readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
     const height=normalizeReaderWorkspaceHeight((current?.height||item.height||280)+80);
-    updateSavedReaderWorkspace(id,{height}); block.style.minHeight=`${height}px`; renderReaderWorkspaceStrokes(block,current||item);
+    updateSavedReaderWorkspace(id,{height}); applyReaderWorkspaceGeometry(block,current||item); renderReaderWorkspaceStrokes(block,current||item);
   });
   block.querySelector('[data-workspace-shrink]')?.addEventListener('click',()=>{
     const current=readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
     const height=normalizeReaderWorkspaceHeight((current?.height||item.height||280)-80);
-    updateSavedReaderWorkspace(id,{height}); block.style.minHeight=`${height}px`; renderReaderWorkspaceStrokes(block,current||item);
+    updateSavedReaderWorkspace(id,{height}); applyReaderWorkspaceGeometry(block,current||item); renderReaderWorkspaceStrokes(block,current||item);
   });
   block.querySelector('[data-workspace-delete]')?.addEventListener('click',()=>deleteSavedReaderWorkspace(id));
   block.querySelector('[data-workspace-draw-toggle]')?.addEventListener('click',(event)=>{
@@ -8481,9 +8636,13 @@ function applySavedReaderWorkspaces() {
       block=document.createElement('section');
       block.className='reader-inserted-workspace';
       block.dataset.readerWorkspaceId=String(item.id);
-      block.innerHTML=`<div class="reader-workspace-toolbar"><strong>Workspace</strong><button type="button" data-workspace-text-toggle>Text</button><button type="button" data-workspace-draw-toggle>Draw</button><label class="reader-workspace-color">Color <input type="color" data-workspace-draw-color value="#E9B949"></label><label>Thickness <select data-workspace-draw-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><button type="button" data-workspace-photo>Photo</button><input type="file" accept="image/*" data-workspace-photo-input hidden><button type="button" data-workspace-shrink title="Make workspace shorter">−</button><button type="button" data-workspace-grow title="Make workspace taller">＋</button><button type="button" data-workspace-clear-drawing>Clear drawing</button><button type="button" data-workspace-delete>Delete</button></div><textarea class="reader-workspace-note" data-workspace-note placeholder="Write anything here…" style="color:${escapeHtml(item.noteColor||'#0C2340')}" ${item.note?'':'hidden'}>${escapeHtml(item.note||'')}</textarea>${item.photoDataUrl?`<figure class="reader-workspace-photo"><img src="${escapeHtml(item.photoDataUrl)}" alt="${escapeHtml(item.photoName||'Inserted image')}"><button type="button" data-workspace-remove-photo>Remove photo</button></figure>`:''}<label class="reader-workspace-note-color">Text color <input type="color" data-workspace-note-color value="${escapeHtml(item.noteColor||'#0C2340')}"></label><svg class="reader-workspace-drawing-layer" data-workspace-drawing-layer aria-label="Workspace drawing surface"></svg>`;
+      block.innerHTML=`<button type="button" class="reader-workspace-tab" data-workspace-open data-workspace-move title="Click to edit; drag to move workspace" aria-label="Open or move workspace">✎</button><div class="reader-workspace-toolbar"><button type="button" class="reader-workspace-move" data-workspace-move title="Drag workspace to another location">↕ Move</button><strong>Workspace</strong><button type="button" data-workspace-text-toggle>Text</button><button type="button" data-workspace-draw-toggle>Draw</button><label class="reader-workspace-color">Color <input type="color" data-workspace-draw-color value="#E9B949"></label><label>Thickness <select data-workspace-draw-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><button type="button" data-workspace-photo>Photo</button><input type="file" accept="image/*" data-workspace-photo-input hidden><button type="button" data-workspace-shrink title="Make workspace shorter">−</button><button type="button" data-workspace-grow title="Make workspace taller">＋</button><button type="button" data-workspace-clear-drawing>Clear drawing</button><button type="button" data-workspace-delete>Delete</button><button type="button" class="reader-workspace-done" data-workspace-done>Done</button></div><textarea class="reader-workspace-note" data-workspace-note placeholder="Write anything here…" style="color:${escapeHtml(item.noteColor||'#0C2340')}" ${item.note?'':'hidden'}>${escapeHtml(item.note||'')}</textarea>${item.photoDataUrl?`<figure class="reader-workspace-photo"><img src="${escapeHtml(item.photoDataUrl)}" alt="${escapeHtml(item.photoName||'Inserted image')}"><button type="button" data-workspace-remove-photo>Remove photo</button></figure>`:''}<label class="reader-workspace-note-color">Text color <input type="color" data-workspace-note-color value="${escapeHtml(item.noteColor||'#0C2340')}"></label><svg class="reader-workspace-drawing-layer" data-workspace-drawing-layer aria-label="Workspace drawing surface"></svg><button type="button" class="reader-workspace-resize" data-workspace-resize title="Drag to resize workspace" aria-label="Resize workspace"></button>`;
     }
-    block.style.minHeight=`${normalizeReaderWorkspaceHeight(item.height)}px`;
+    applyReaderWorkspaceGeometry(block,item);
+    // Workspaces are normally presentation-only: their chrome disappears and
+    // only the reader-created note/photo/drawing remains. Legacy workspaces
+    // without a collapsed flag default to this quiet presentation state.
+    block.classList.toggle('workspace-collapsed', item.collapsed !== false);
     // Insert after the closest group when possible. This avoids placing a block
     // inside a word span and gives CSS/book-page flow a real block boundary.
     const group = anchor.closest('.reader-group');
