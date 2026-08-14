@@ -143,10 +143,15 @@
     }
 
     try {
-      const response = await fetch('/api/fetch-text', {
+      const response = await fetch('/api/current/article', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: article.url })
+        body: JSON.stringify({
+          url: article.url,
+          title: article.title,
+          summary: article.summary || '',
+          source: article.sourceName || 'Topic Feed'
+        })
       });
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'The article could not be imported.');
@@ -158,13 +163,15 @@
 
       window.MarkSetGoReadAnything.openDocument({
         title: payload.title || article.title,
-        author: payload.author || article.author || article.sourceName,
+        author: article.author || article.sourceName,
         text: payload.text,
         source: {
           type: 'topic-feed',
           url: article.url,
           topic: topic?.name || '',
           feedSource: article.sourceName,
+          fullArticle: payload.fullArticle !== false,
+          importWarning: payload.warning || '',
           importedAt: new Date().toISOString()
         }
       });

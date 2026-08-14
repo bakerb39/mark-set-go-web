@@ -35,16 +35,29 @@
 
   function addHistory(documentRecord) {
     const key = `${documentRecord.source?.type || 'text'}|${documentRecord.source?.url || ''}|${documentRecord.title}`.toLowerCase();
-    const items = history().filter((item) => item.key !== key);
-    items.unshift({
-      key,
-      title: documentRecord.title,
-      sourceType: documentRecord.source?.type || 'text',
-      sourceUrl: documentRecord.source?.url || '',
+    const entry = {
+      key: key.slice(0, 2400),
+      title: String(documentRecord.title || 'Imported document').slice(0, 300),
+      sourceType: String(documentRecord.source?.type || 'text').slice(0, 80),
+      sourceUrl: String(documentRecord.source?.url || '').slice(0, 2000),
       importedAt: new Date().toISOString(),
-      characters: documentRecord.text.length
-    });
-    localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(items.slice(0, 30)));
+      characters: String(documentRecord.text || '').length
+    };
+    const items = history().filter((item) => item?.key !== key);
+    items.unshift(entry);
+
+    // Import history is optional metadata. A full localStorage quota must never
+    // prevent a document/article from opening in the Reader.
+    try {
+      localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(items.slice(0, 15)));
+    } catch (error) {
+      try {
+        localStorage.removeItem(IMPORT_HISTORY_KEY);
+        localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify([entry]));
+      } catch {
+        console.warn('Import history was skipped because browser storage is full.', error);
+      }
+    }
   }
 
 
