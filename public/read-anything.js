@@ -1111,9 +1111,8 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     const reader = document.querySelector('#app #reader');
     if (!reader) return;
 
-    // This action belongs to the article itself, not to the Reader chrome.
-    // Only show it when the beginning of the article is actually rendered so
-    // virtualization cannot make the button reappear in the middle of an article.
+    // Keep the action inside the Reader, but visually separate from article prose.
+    // It belongs above the first line rather than participating in the text flow.
     const firstIndexed = reader.querySelector(
       '.reader-word[data-index], .reader-group[data-start-index]'
     );
@@ -1126,53 +1125,81 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       return;
     }
 
-    let button = existing;
+    let actionRow = existing;
 
-    if (!button) {
-      button = document.createElement('button');
-      button.id = 'read-anything-article-summary-action';
-      button.type = 'button';
-      button.className = 'read-anything-inline-article-summary';
-      button.dataset.action = 'summarize-whole-article';
-      button.setAttribute('aria-label', 'Summarize this whole article');
-      button.style.cssText = [
-        'display:inline',
-        'width:auto',
-        'max-width:max-content',
-        'margin:0 0 .8em 0',
+    if (!actionRow) {
+      actionRow = document.createElement('div');
+      actionRow.id = 'read-anything-article-summary-action';
+      actionRow.className = 'read-anything-article-summary-row';
+      actionRow.setAttribute('role', 'group');
+      actionRow.setAttribute('aria-label', 'Article actions');
+      actionRow.style.cssText = [
+        'display:block',
+        'width:100%',
+        'box-sizing:border-box',
+        'margin:0 0 .85em 0',
         'padding:0',
-        'border:0',
-        'background:none',
-        'color:inherit',
-        'font:inherit',
-        'font-size:.78em',
-        'font-weight:600',
-        'line-height:1.2',
-        'text-decoration:underline',
-        'text-underline-offset:2px',
-        'opacity:.7',
-        'cursor:pointer',
         'break-inside:avoid',
         'page-break-inside:avoid',
         'position:relative',
-        'z-index:2'
+        'z-index:3'
       ].join(';');
 
-      // Put the actual button into the article text flow. In Book Pages this
-      // naturally places it at the top of the first page before article prose.
-      reader.prepend(button);
-    } else if (button.parentElement !== reader) {
-      reader.prepend(button);
+      const link = document.createElement('button');
+      link.type = 'button';
+      link.className = 'read-anything-inline-article-summary';
+      link.dataset.action = 'summarize-whole-article';
+      link.setAttribute('aria-label', 'Summarize this whole article');
+      link.style.cssText = [
+        'display:inline',
+        'padding:0',
+        'border:0',
+        'background:none',
+        'color:#1769aa',
+        'font:inherit',
+        'font-size:.8em',
+        'font-weight:600',
+        'line-height:1.2',
+        'text-decoration:none',
+        'cursor:pointer'
+      ].join(';');
+
+      link.onmouseenter = () => {
+        link.style.textDecoration = 'underline';
+        link.style.textUnderlineOffset = '2px';
+      };
+      link.onmouseleave = () => {
+        link.style.textDecoration = 'none';
+      };
+      link.onfocus = () => {
+        link.style.textDecoration = 'underline';
+        link.style.textUnderlineOffset = '2px';
+        link.style.outline = '2px solid rgba(23,105,170,.28)';
+        link.style.outlineOffset = '3px';
+        link.style.borderRadius = '2px';
+      };
+      link.onblur = () => {
+        link.style.textDecoration = 'none';
+        link.style.outline = 'none';
+      };
+
+      actionRow.appendChild(link);
+      reader.prepend(actionRow);
+    } else if (actionRow.parentElement !== reader) {
+      reader.prepend(actionRow);
     }
 
+    const link = actionRow.querySelector('[data-action="summarize-whole-article"]');
+    if (!link) return;
+
     const showingSummary = activeImportedVersion.startsWith('summary');
-    button.textContent = showingSummary ? '← Back to article' : 'Summarize article';
-    button.title = showingSummary
+    link.textContent = showingSummary ? '← Back to article' : 'Summarize article';
+    link.title = showingSummary
       ? 'Return to the complete article'
       : 'Summarize the entire article into its key points — no highlighting required.';
-    button.disabled = false;
+    link.disabled = false;
 
-    button.onclick = async (event) => {
+    link.onclick = async (event) => {
       event?.preventDefault?.();
       event?.stopPropagation?.();
 
@@ -1181,20 +1208,20 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         return;
       }
 
-      const originalLabel = button.textContent;
-      button.disabled = true;
-      button.textContent = 'Summarizing whole article…';
+      const originalLabel = link.textContent;
+      link.disabled = true;
+      link.textContent = 'Summarizing…';
 
       try {
         await requestSummary('quick');
       } catch (error) {
         showTransformStatus(error.message, true);
-        button.textContent = 'Summary failed — try again';
-        button.title = error.message || 'The article could not be summarized.';
+        link.textContent = 'Summary failed — try again';
+        link.title = error.message || 'The article could not be summarized.';
         window.setTimeout(() => {
-          if (!button.isConnected) return;
-          button.disabled = false;
-          button.textContent = originalLabel;
+          if (!link.isConnected) return;
+          link.disabled = false;
+          link.textContent = originalLabel;
         }, 2500);
       }
     };

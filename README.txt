@@ -1,16 +1,18 @@
-MARK, SET, GO! — SUBTLE INLINE ARTICLE SUMMARY LINK
-
-This package is cumulative with the current Topic Feeds, article formatting,
-Book Pages, bookmarklet/capture, and cryptocurrency ticker changes.
+MARK, SET, GO! — PROFESSIONAL SUMMARY LINK ABOVE ARTICLE TEXT
 
 Replace:
   public/read-anything.js
   public/index.html
 
-CHANGE:
-- The summary action remains INSIDE the article at the top of page 1.
-- It is now a small understated text link instead of a button.
-- Copy is shortened to "Summarize article".
-- The link uses smaller text, no background, no border, and reduced opacity.
+Change:
+- "Summarize article" remains inside the Reader.
+- It is now on its own small action row ABOVE the first article line.
+- It is no longer part of the article text flow.
+- Uses a restrained professional blue (#1769aa).
+- No button box/background/border.
+- Underlines only on hover/focus.
+- Still summarizes the entire preserved article.
 - In summary view it becomes "← Back to article".
-- Functionality is unchanged: it still summarizes the complete original article.
+
+This package remains cumulative with the current Topic Feeds, article formatting,
+Book Pages, bookmarklet/capture, and cryptocurrency ticker work.
