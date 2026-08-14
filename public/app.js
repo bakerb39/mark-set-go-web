@@ -8385,13 +8385,16 @@ function renderReaderWorkspaceStrokes(block, item) {
 }
 
 function readerWorkspaceLane(reader) {
-  // Keep inserted workspaces inside the Reader's visible content box.
-  // The 9px gutters mirror the normal workspace margins but, unlike the old
-  // 100%-width rule, the returned width is a hard boundary for drag/resize.
+  // Workspaces live inside a single reading lane. In normal scrolling mode the
+  // lane is the visible Reader viewport; in Book Pages it is ONE virtual page,
+  // never the full two-page spread. This keeps inserted markup looking like
+  // part of the page instead of spanning across the gutter/facing page.
   const gutter = 9;
-  const viewportWidth = Math.max(0, Number(reader?.clientWidth) || 0);
-  const laneWidth = Math.max(1, viewportWidth - (gutter * 2));
-  return { gutter, viewportWidth, laneWidth };
+  const fullViewportWidth = Math.max(0, Number(reader?.clientWidth) || 0);
+  const bookPages = Boolean(reader?.classList?.contains('book-pages-layout'));
+  const pageWidth = bookPages ? Math.max(1, getBookPageMetrics(reader).pageWidth) : fullViewportWidth;
+  const laneWidth = Math.max(1, pageWidth - (gutter * 2));
+  return { gutter, viewportWidth: pageWidth, laneWidth, bookPages };
 }
 
 function applyReaderWorkspaceGeometry(block, item) {
