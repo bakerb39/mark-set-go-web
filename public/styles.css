@@ -14606,13 +14606,13 @@ body.light .comprehension-count-control input,
   position: absolute;
   z-index: 0;
   border-radius: .18em;
-  background: linear-gradient(90deg, rgba(251,247,237,.96), rgba(251,247,237,.72));
+  background: linear-gradient(90deg, rgba(233,185,73,.92), rgba(233,185,73,.68));
   pointer-events: none;
   transform: translateZ(0);
   will-change: width, top, left;
 }
 .reader.light.line-sweep-mode .line-sweep-marker {
-  background: linear-gradient(90deg, rgba(251,247,237,.88), rgba(251,247,237,.62));
+  background: linear-gradient(90deg, rgba(233,185,73,.88), rgba(233,185,73,.64));
 }
 @media (prefers-reduced-motion: reduce) {
   .line-sweep-marker { will-change: auto; }
