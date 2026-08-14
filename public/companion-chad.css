@@ -1,0 +1,79 @@
+/* Ask Chad — financial analysis companion */
+.companion-persona-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+}
+
+.companion-chad-choice img {
+  object-fit: contain !important;
+  background: #071d36;
+}
+
+html[data-companion="chad"] .home-mark-icon-stage.companion-frontpage-badge-mode {
+  background: transparent !important;
+}
+
+html[data-companion="chad"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-avatar {
+  width: min(100%, 540px) !important;
+  max-width: 540px !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-companion="chad"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-stage-caption {
+  display: none !important;
+}
+
+html[data-companion="chad"] #toggle-mark-panel img,
+html[data-companion="chad"] .reader-pane-buttons .mark-pane-button img,
+html[data-companion="chad"] .ask-mark-button img,
+html[data-companion="chad"] [data-action="ask-mark"] img {
+  width: 30px !important;
+  height: 30px !important;
+  flex: 0 0 30px !important;
+  object-fit: cover !important;
+  object-position: center !important;
+  border-radius: 50% !important;
+  border: 1px solid #d9ae35 !important;
+}
+
+html[data-companion="chad"] .msg-walkthrough-mark-figure {
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  border: 4px solid #e2bd46 !important;
+  background: #071d36 !important;
+}
+
+html[data-companion="chad"] .msg-walkthrough-mark-figure::after {
+  content: "ASK CHAD";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  transform: translateX(-50%);
+  background: #071d36;
+  color: #ffd55f;
+  border: 1px solid #d9ae35;
+  border-radius: 7px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .08em;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+html[data-companion="chad"] .msg-walkthrough-mark-illustration {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+@media (max-width: 850px) {
+  .companion-persona-options {
+    grid-template-columns: 1fr !important;
+  }
+}

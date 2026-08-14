@@ -2005,6 +2005,10 @@ app.post('/api/mark-selection', async (req, res) => {
   const title = String(req.body?.title || 'Untitled').trim().slice(0,300);
   const chapter = String(req.body?.chapter || '').trim().slice(0,300);
   const targetLanguage = String(req.body?.targetLanguage || '').trim().slice(0,80);
+  const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
+    ? String(req.body.companion).trim().toLowerCase()
+    : 'mark';
+  const companionName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
   if (!selection || selection.split(/\s+/).length > 1800) return res.status(400).json({ error: 'Select between 1 and 1,800 words.' });
 
   const actionInstructions = {
@@ -2023,8 +2027,14 @@ app.post('/api/mark-selection', async (req, res) => {
     keyPoints:{type:'array',minItems:0,maxItems:6,items:{type:'string'}},
     cautions:{type:'array',minItems:0,maxItems:4,items:{type:'string'}}
   }};
-  const prompt=`You are Mark, a careful reading companion inside an e-reader. ${actionInstructions[action]}
-Use the surrounding text only to disambiguate the selection. Never summarize or reveal later plot beyond the supplied context. Do not invent facts, allusions, authorial intentions, or quotations. State uncertainty plainly. Keep the response useful and proportionate to the selection.`;
+  const personaInstruction = companion === 'chad'
+    ? `You are Chad, the finance, markets, economics, business, and investing specialist inside an e-reader. When the passage is financially relevant, emphasize market significance, investor implications, risks, catalysts, incentives, valuation logic, and uncertainty where supported. For non-financial passages, answer the reading request normally and do not force an investment angle.`
+    : companion === 'beth'
+      ? `You are Beth, a warm, thoughtful reading companion inside an e-reader. Be clear, encouraging, grounded in the text, and intellectually serious.`
+      : `You are Mark, a careful reading companion inside an e-reader.`;
+
+  const prompt=`${personaInstruction} ${actionInstructions[action]}
+Use the surrounding text only to disambiguate the selection. Never summarize or reveal later plot beyond the supplied context. Do not invent facts, allusions, authorial intentions, financial facts, or quotations. State uncertainty plainly. Keep the response useful and proportionate to the selection.`;
   try {
     const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({
       model:COMPREHENSION_MODEL,reasoning:{effort:action==='analyze'||action==='related'?'medium':'low'},store:false,
@@ -2046,6 +2056,10 @@ app.post('/api/app-help', async (req, res) => {
   const pageKey = String(req.body?.pageKey || 'unknown').trim().slice(0, 120);
   const pageTitle = String(req.body?.pageTitle || 'Current page').trim().slice(0, 200);
   const question = String(req.body?.question || '').trim().slice(0, 800);
+  const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
+    ? String(req.body.companion).trim().toLowerCase()
+    : 'mark';
+  const companionName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
   const safeObject = (value, maxChars) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     try { return JSON.parse(JSON.stringify(value).slice(0, maxChars)); } catch { return {}; }
@@ -2058,7 +2072,7 @@ app.post('/api/app-help', async (req, res) => {
     type: 'object', additionalProperties: false, required: ['inScope','answer'],
     properties: { inScope: { type: 'boolean' }, answer: { type: 'string' } }
   };
-  const prompt = `You are Mark, the in-app help companion for Mark, Set, Go!.
+  const prompt = `You are ${companionName}, the in-app help companion for Mark, Set, Go!.
 Your ONLY job in this mode is to answer questions about how to use the CURRENT APP PAGE, the controls/features described for that page, or closely related navigation needed to complete a task from that page.
 Use the supplied STORED PAGE HELP as the primary authority and GLOBAL APP HELP only for supporting navigation/context.
 Do not answer general knowledge, book-content questions, personal advice, current events, coding, or unrelated questions.
@@ -4974,12 +4988,16 @@ app.post('/api/read-anything/summarize', async (req, res) => {
 
 app.post('/api/read-anything/investor-analysis', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
-  if (!apiKey) return res.status(503).json({ error: 'Ask Mark investor analysis is not configured. Add OPENAI_API_KEY to the server environment.' });
+  if (!apiKey) return res.status(503).json({ error: 'Investor analysis is not configured. Add OPENAI_API_KEY to the server environment.' });
 
   const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
   const text = String(req.body?.text || '').replace(/\r/g, '').trim();
   const sourceUrl = String(req.body?.sourceUrl || '').trim().slice(0, 4000);
   const topic = String(req.body?.topic || '').trim().slice(0, 200);
+  const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
+    ? String(req.body.companion).trim().toLowerCase()
+    : 'mark';
+  const analystName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
 
   if (text.length < 40) return res.status(400).json({ error: 'There is not enough article text to analyze.' });
   if (text.length > 120000) return res.status(413).json({ error: 'This article is too long to analyze in one request.' });
@@ -5003,7 +5021,7 @@ app.post('/api/read-anything/investor-analysis', async (req, res) => {
     }
   };
 
-  const prompt = `You are Mark, a careful financial-news analyst inside a reading app.
+  const prompt = `You are ${analystName}, a careful financial-news analyst inside a reading app.
 Analyze ONLY the supplied article. Treat the article as the source of facts; do not silently add current market prices, later events, or facts not contained in the supplied text.
 Provide professional-grade investor analysis while clearly distinguishing article facts from your inference.
 
@@ -5055,7 +5073,7 @@ Return only the requested structured result.`;
 
     return res.json({ title, result: JSON.parse(output), model });
   } catch (error) {
-    console.error('Ask Mark investor analysis failed:', error);
+    console.error(`${analystName} investor analysis failed:`, error);
     return res.status(502).json({
       error: error?.name === 'AbortError'
         ? 'Mark’s investor analysis took too long.'
