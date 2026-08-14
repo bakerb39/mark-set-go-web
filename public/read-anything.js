@@ -1293,6 +1293,10 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
             <label class="secondary button-link read-anything-file-button">Choose file<input id="read-anything-file" type="file" accept=".epub,.mobi,.azw,.azw3,.prc,.pdf,.docx,.txt,.md,.markdown" hidden></label>
           </section>
           <section class="read-anything-card">
+            <span class="read-anything-icon">K</span><h2>Kindle Capture</h2><p>Capture Kindle Cloud Reader pages as searchable PDFs, then import them here.</p>
+            <button id="read-anything-kindle" class="secondary" type="button">Set Up Kindle Capture</button>
+          </section>
+          <section class="read-anything-card">
             <span class="read-anything-icon">📋</span><h2>Paste text</h2><p>Paste an article, notes, manuscript, or other text.</p>
             <button id="read-anything-paste" class="secondary" type="button">Paste Text</button>
           </section>
@@ -1337,6 +1341,38 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       workspace.querySelector('#paste-cancel').addEventListener('click', () => { workspace.hidden = true; workspace.innerHTML = ''; });
       workspace.querySelector('#paste-content').focus();
     });
+    app.querySelector('#read-anything-kindle').addEventListener('click', () => {
+      const workspace = app.querySelector('#read-anything-workspace');
+      workspace.hidden = false;
+      workspace.innerHTML = `
+        <h2>Kindle Capture</h2>
+        <p>Install the Mark, Set, Go! Kindle Capture Chrome extension once, then use it from Kindle Cloud Reader to create a searchable PDF.</p>
+        <div class="source-actions">
+          <a class="primary button-link" href="/downloads/mark-set-go-kindle-capture-v0.4.3.zip" download>Download Kindle Capture</a>
+          <button id="kindle-copy-extensions" class="secondary" type="button">Copy chrome://extensions</button>
+        </div>
+        <ol>
+          <li>Download and unzip the extension.</li>
+          <li>Paste <code>chrome://extensions</code> into Chrome's address bar.</li>
+          <li>Turn on <strong>Developer mode</strong>.</li>
+          <li>Click <strong>Load unpacked</strong> and select the unzipped <code>mark-set-go-kindle-capture</code> folder.</li>
+          <li>Open your book in Kindle Cloud Reader and click the Kindle Capture extension.</li>
+          <li>Choose <strong>Current spread</strong>, <strong>Page range</strong>, or <strong>Whole book</strong>.</li>
+          <li>Return here and use <strong>Upload a file</strong> to import the generated PDF.</li>
+        </ol>
+        <p><small>Use only with content you are authorized to copy or export.</small></p>`;
+      workspace.querySelector('#kindle-copy-extensions').addEventListener('click', async (event) => {
+        try {
+          await navigator.clipboard.writeText('chrome://extensions');
+          event.currentTarget.textContent = 'Copied';
+          window.setTimeout(() => { event.currentTarget.textContent = 'Copy chrome://extensions'; }, 1600);
+        } catch {
+          event.currentTarget.textContent = 'Copy: chrome://extensions';
+        }
+      });
+      workspace.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+
     app.querySelector('#read-anything-bookmarklet').addEventListener('click', () => {
       const workspace = app.querySelector('#read-anything-workspace');
       const code = bookmarkletCode();
