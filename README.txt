@@ -1,13 +1,16 @@
-MARK, SET, GO! — TOPIC FEEDS PUBLISHER RSS FIX
+MARK, SET, GO! — TOPIC FEEDS PUBLISHER PAGE FIX
 
-Replace only:
-server.js
+Replace only the ROOT server.js.
 
-Changes:
-- Website sources now try to discover the publisher's own RSS/Atom feed first.
-- If the site advertises a feed, Topic Feeds uses its direct publisher article URLs.
-- Conventional feed paths such as /feed, /rss, /rss.xml, /feed.xml, /atom.xml and /index.xml are also tried.
-- Google News remains only as a fallback for sites with no usable publisher feed.
+New source order for website feeds:
+1. Publisher RSS/Atom feed
+2. Publisher's own latest/news/article listing pages
+3. Google News only as a final fallback
 
-No Reader files changed.
-No public JS/CSS files changed.
+This specifically addresses sites such as Bitcoin Magazine where Google News RSS
+returns encoded news.google.com wrapper URLs instead of direct publisher links.
+
+After deploy, refresh the Topic Feed so old cached Google News URLs are replaced
+by newly discovered direct publisher URLs.
+
+No public files or Reader files are changed by this package.

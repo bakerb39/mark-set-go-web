@@ -138,6 +138,109 @@ async function discoverPublisherFeed(rawUrl) {
 }
 
 
+function samePublisherHost(a, b) {
+  const normalize = (host) => String(host || '').toLowerCase().replace(/^www\./, '');
+  const left = normalize(a);
+  const right = normalize(b);
+  return left === right || left.endsWith(`.${right}`) || right.endsWith(`.${left}`);
+}
+
+function likelyArticlePath(pathname = '') {
+  const path = String(pathname || '').toLowerCase();
+  if (!path || path === '/' || path.length < 8) return false;
+  if (/\/(?:tag|tags|author|authors|category|categories|topic|topics|page|search|about|contact|privacy|terms|newsletter|podcast|video|videos|markets?|news)\/?$/.test(path)) return false;
+  if (/\.(?:jpg|jpeg|png|gif|webp|svg|pdf|xml|rss|atom|css|js)$/i.test(path)) return false;
+  const segments = path.split('/').filter(Boolean);
+  return segments.length >= 2 || /-\w+-\w+/.test(path);
+}
+
+async function discoverPublisherPageArticles(rawUrl, topic = '') {
+  const parsed = await validatePublicUrl(rawUrl);
+  const origin = parsed.origin;
+
+  const pageCandidates = [];
+  const seenPages = new Set();
+  const addPage = (value) => {
+    try {
+      const url = new URL(value, parsed).toString();
+      if (!seenPages.has(url)) {
+        seenPages.add(url);
+        pageCandidates.push(url);
+      }
+    } catch {}
+  };
+
+  addPage(parsed.toString());
+  ['/news', '/latest', '/articles', '/blog', '/markets'].forEach((path) => addPage(new URL(path, origin).toString()));
+
+  const topicWords = String(topic || '').toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 3);
+  const results = [];
+  const seenUrls = new Set();
+
+  for (const pageUrl of pageCandidates.slice(0, 6)) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(await validatePublicUrl(pageUrl), {
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; MarkSetGoWeb/2.4; +publisher discovery)',
+          Accept: 'text/html,application/xhtml+xml,*/*;q=0.1'
+        }
+      });
+      if (!response.ok) continue;
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      const pageBase = response.url || pageUrl;
+
+      $('a[href]').each((_i, element) => {
+        const anchor = $(element);
+        const label = stripMarkup(anchor.text()).replace(/\s+/g, ' ').trim();
+        if (label.length < 24 || label.length > 220) return;
+
+        let absolute;
+        try { absolute = new URL(anchor.attr('href'), pageBase); } catch { return; }
+        if (!/^https?:$/.test(absolute.protocol)) return;
+        if (!samePublisherHost(absolute.hostname, parsed.hostname)) return;
+        if (!likelyArticlePath(absolute.pathname)) return;
+
+        const cleanUrl = absolute.toString().split('#')[0];
+        if (seenUrls.has(cleanUrl)) return;
+
+        const lowerLabel = label.toLowerCase();
+        const topicMatch = !topicWords.length || topicWords.some((word) => lowerLabel.includes(word));
+        const articleClassHint = `${anchor.attr('class') || ''} ${anchor.parent().attr('class') || ''} ${anchor.closest('article').attr('class') || ''}`.toLowerCase();
+        const structuralHint = Boolean(anchor.closest('article').length) || /article|story|post|headline|title|card/.test(articleClassHint);
+
+        // Keep obvious article links even when the exact topic word is absent.
+        if (!topicMatch && !structuralHint) return;
+
+        const container = anchor.closest('article').length ? anchor.closest('article') : anchor.parent();
+        const summary = stripMarkup(container.find('p').first().text()).slice(0, 1800);
+        const timeText = container.find('time').first().attr('datetime') || container.find('time').first().text() || '';
+
+        seenUrls.add(cleanUrl);
+        results.push({
+          title: label,
+          link: cleanUrl,
+          summary,
+          published: String(timeText || '').trim()
+        });
+      });
+
+      if (results.length >= 20) break;
+    } catch (_) {
+      // Try the next likely listing page.
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  return results.slice(0, 30);
+}
+
+
 app.disable('x-powered-by');
 app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: false, limit: '8mb' }));
@@ -4430,15 +4533,23 @@ app.post('/api/topic-feeds/fetch', async (req, res) => {
       let mode = 'rss';
 
       if (type === 'website') {
-        const discovered = await discoverPublisherFeed(parsed.toString());
-        if (discovered?.items?.length) {
-          feedUrl = discovered.feedUrl;
-          items = discovered.items;
+        const discoveredFeed = await discoverPublisherFeed(parsed.toString());
+
+        if (discoveredFeed?.items?.length) {
+          feedUrl = discoveredFeed.feedUrl;
+          items = discoveredFeed.items;
           mode = 'publisher-feed';
         } else {
-          feedUrl = topicFeedGoogleNewsUrl(topic, parsed.hostname);
-          items = await fetchFeedItems({ feedUrl });
-          mode = 'google-news-fallback';
+          const publisherItems = await discoverPublisherPageArticles(parsed.toString(), topic);
+          if (publisherItems.length) {
+            items = publisherItems;
+            feedUrl = parsed.toString();
+            mode = 'publisher-page';
+          } else {
+            feedUrl = topicFeedGoogleNewsUrl(topic, parsed.hostname);
+            items = await fetchFeedItems({ feedUrl });
+            mode = 'google-news-fallback';
+          }
         }
       } else {
         items = await fetchFeedItems({ feedUrl });
