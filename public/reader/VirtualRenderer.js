@@ -102,6 +102,8 @@
         if (structure) {
           group.classList.add('document-structure', `structure-${structure.type}`);
           group.dataset.structureType = structure.type;
+          if (structure.align === 'center') group.classList.add('structure-align-center');
+          if (structure.italic) group.classList.add('structure-italic');
           if (structure.type !== 'paragraph') {
             group.setAttribute('role', 'heading');
             const headingLevel = structure.type === 'part' ? '1' : structure.type === 'chapter' ? '2' : '3';

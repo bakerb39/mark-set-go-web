@@ -11317,8 +11317,10 @@ function bindModernGuideInlineActions(source = state?.source || {}) {
 function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.dataset.viewKey = 'reader';
   const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });
-  const isStructuredBible = Boolean(source?.type === 'bible' || source?.type === 'bible-book');
-  let structure = isStructuredBible && Array.isArray(source?.documentStructure)
+  const suppliedDocumentStructure = Array.isArray(source?.documentStructure) && source.documentStructure.length
+    ? source.documentStructure
+    : null;
+  let structure = suppliedDocumentStructure
     ? source.documentStructure
     : detectDocumentStructure(text);
 
@@ -18717,7 +18719,7 @@ function normalizePdfPageText(items, pageWidth = null) {
 
     if (prev) {
       const verticalStep = Math.abs(line.y - prev.y);
-      const largeVisualGap = verticalStep >= Math.max(normalStep * 1.55, medianHeight * 1.75);
+      const largeVisualGap = verticalStep >= Math.max(normalStep * 1.30, medianHeight * 1.45);
       const headingBoundary = looksLikeHeading(line) || looksLikeHeading(prev);
       const subtitleBoundary = looksLikeHeading(prev)
         && isShort(line)
@@ -18738,7 +18740,7 @@ function normalizePdfPageText(items, pageWidth = null) {
         && isShort(line)
         && isCentered(line);
       const centeredEmphasis = isShort(line) && isCentered(line) && isEmphasized(line);
-      if ((chapterThenSubtitle || centeredEmphasis || nextStep >= Math.max(normalStep * 1.55, medianHeight * 1.75))
+      if ((chapterThenSubtitle || centeredEmphasis || nextStep >= Math.max(normalStep * 1.30, medianHeight * 1.45))
           && output.at(-1) !== '') {
         output.push('');
       }
@@ -18751,6 +18753,64 @@ function normalizePdfPageText(items, pageWidth = null) {
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+function detectPdfDocumentStructure(text) {
+  const rawLines = String(text || '').replace(/\r/g, '').split('\n');
+  const structures = [];
+  let wordIndex = 0;
+  let previousNonEmpty = null;
+
+  const nextNonEmptyLine = (start) => {
+    for (let index = start + 1; index < rawLines.length; index += 1) {
+      const clean = rawLines[index].replace(/\s+/g, ' ').trim();
+      if (clean) return { index, text: clean };
+    }
+    return null;
+  };
+
+  for (let lineIndex = 0; lineIndex < rawLines.length; lineIndex += 1) {
+    const raw = rawLines[lineIndex];
+    const line = raw.replace(/\s+/g, ' ').trim();
+    if (!line) continue;
+
+    const count = splitWords(line).length;
+    let type = classifyStructureLine(line, count);
+    const blankBefore = lineIndex > 0 && !rawLines[lineIndex - 1].trim();
+    const next = nextNonEmptyLine(lineIndex);
+    const blankAfter = lineIndex + 1 < rawLines.length && !rawLines[lineIndex + 1].trim();
+    const shortStandalone = count > 0 && count <= 12 && line.length <= 110 && (blankBefore || blankAfter);
+    const previousType = previousNonEmpty?.type || null;
+
+    if (!type && shortStandalone && ['chapter', 'part', 'section'].includes(previousType)) {
+      type = 'subtitle';
+    }
+
+    if (!type && shortStandalone && next) {
+      const nextCount = splitWords(next.text).length;
+      const nextLooksLikeBody = nextCount >= 10 || /[.!?][”"']?$/.test(next.text);
+      if (nextLooksLikeBody && previousNonEmpty?.blankAfter) type = 'subtitle';
+    }
+
+    if (type && count) {
+      const entry = {
+        title: line,
+        type,
+        start: wordIndex,
+        end: wordIndex + count,
+        preferredToc: type !== 'subtitle',
+        authoritative: true
+      };
+      if (type === 'part') entry.align = 'center';
+      if (type === 'subtitle') entry.italic = true;
+      structures.push(entry);
+    }
+
+    previousNonEmpty = { text: line, type, blankBefore, blankAfter };
+    wordIndex += count;
+  }
+
+  return structures.slice(0, 1500);
 }
 
 function pdfOutlineToToc(outline = [], pageRefs = new Map(), depth = 0) {
@@ -18931,6 +18991,8 @@ async function parsePdfFile(file, onProgress = () => {}) {
     paragraphWordOffset += splitWords(paragraph).length;
   });
 
+  const pdfDocumentStructure = detectPdfDocumentStructure(text);
+
   const pdfDocumentToc = toc.map((item) => {
     const pageWordIndex = item.pageNumber ? pageWordStarts.get(item.pageNumber) : null;
     if (!Number.isFinite(pageWordIndex)) return null;
@@ -18979,6 +19041,7 @@ async function parsePdfFile(file, onProgress = () => {}) {
       textCoverage,
       cleanup: normalizedPdf.report,
       documentToc,
+      documentStructure: pdfDocumentStructure,
       paragraphBreaks: pdfParagraphBreaks
     },
     stats: {

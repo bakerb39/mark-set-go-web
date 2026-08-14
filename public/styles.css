@@ -14492,3 +14492,22 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
 .ask-mark-auto-prep-question p {
   margin:.25rem 0 0;
 }
+
+
+/* PDF-import structural metadata: presentation only; word indexes remain unchanged. */
+.reader-group.structure-subtitle {
+  display: block;
+  width: 100%;
+  margin: .45em 0 1.15em;
+  font-size: 1.12em;
+  font-weight: 650;
+  line-height: 1.35;
+}
+.reader-group.structure-italic { font-style: italic; }
+.reader-group.structure-align-center { text-align: center; }
+.reader-group.structure-part.structure-align-center { text-align: center; }
+.reader .reader-paragraph-break {
+  display: block;
+  width: 100%;
+  height: .72em;
+}
