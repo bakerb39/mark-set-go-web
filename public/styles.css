@@ -14618,3 +14618,189 @@ body.light .comprehension-count-control input,
   .line-sweep-marker { will-change: auto; }
 }
 
+
+
+/* Permanent passage highlighting -------------------------------------------------
+   Stored as document word ranges. The annotation paint sits behind the text and
+   survives reader rerenders, pagination and reopen. */
+#reader .reader-word.saved-passage-highlight,
+#reader .reader-group.saved-passage-highlight {
+  background: color-mix(in srgb, var(--saved-passage-highlight-color, #F7D34A) 72%, transparent) !important;
+  color: inherit !important;
+  border-radius: .15em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* The temporary Ask Mark selection remains visible while the popup is open, but
+   disappears after Highlight/Erase so the permanent annotation color is shown. */
+.mark-selection-toolbar .mark-selection-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 2px;
+  background: rgba(100,116,139,.22);
+}
+
+.mark-selection-toolbar .passage-highlight-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 5px;
+  border: 1px solid rgba(100,116,139,.22);
+  border-radius: 7px;
+  background: #fbf7ed;
+}
+.mark-selection-toolbar .passage-highlight-picker[hidden] { display:none !important; }
+.mark-selection-toolbar .passage-highlight-swatch {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 1px solid rgba(12,35,64,.18);
+  border-radius: 50%;
+  background: var(--swatch) !important;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.45);
+}
+.mark-selection-toolbar .passage-highlight-swatch:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 2px rgba(12,35,64,.12);
+}
+.mark-selection-toolbar .passage-highlight-custom {
+  position: relative;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed rgba(12,35,64,.35);
+  border-radius: 50%;
+  color: #173f67;
+  font-weight: 900;
+  cursor: pointer;
+  overflow: hidden;
+}
+.mark-selection-toolbar .passage-highlight-custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Reader markup v1: persistent written overlays --------------------------------
+   Written annotations are anchored to document word ranges but painted in an
+   absolute layer so they never alter pagination or reader text flow. */
+#reader { position: relative; }
+.reader-writing-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: visible;
+  pointer-events: none;
+}
+.reader-written-annotation {
+  position: absolute;
+  display: inline-block;
+  max-width: min(360px, 52vw);
+  padding: 1px 5px 2px;
+  border-radius: 5px;
+  color: var(--reader-writing-color, #C98900);
+  background: color-mix(in srgb, var(--reader-writing-color, #C98900) 9%, transparent);
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+  font-size: .88em;
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: .01em;
+  text-shadow: 0 1px 0 rgba(255,255,255,.5);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  transform: rotate(-.35deg);
+}
+.reader.dark .reader-written-annotation,
+body:not(.light) .reader-written-annotation {
+  text-shadow: 0 1px 1px rgba(0,0,0,.34);
+}
+
+.mark-selection-toolbar .reader-writing-editor {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 7px);
+  left: 42px;
+  width: min(330px, calc(100vw - 24px));
+  padding: 9px;
+  border: 1px solid rgba(100,116,139,.28);
+  border-radius: 10px;
+  background: #fbf7ed;
+  box-shadow: 0 14px 34px rgba(15,23,42,.24);
+  white-space: normal;
+}
+.mark-selection-toolbar .reader-writing-editor[hidden] { display:none !important; }
+.mark-selection-toolbar .reader-writing-editor textarea {
+  display:block;
+  width:100%;
+  min-height:62px;
+  resize:vertical;
+  padding:8px 9px;
+  border:1px solid rgba(12,35,64,.22);
+  border-radius:7px;
+  background:#fffdf8;
+  color:#0c2340;
+  font:600 13px/1.35 Inter,system-ui,sans-serif;
+  outline:none;
+}
+.mark-selection-toolbar .reader-writing-editor textarea:focus {
+  border-color:rgba(12,35,64,.55);
+  box-shadow:0 0 0 2px rgba(233,185,73,.2);
+}
+.mark-selection-toolbar .reader-writing-colors {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-top:7px;
+}
+.mark-selection-toolbar .reader-writing-color-choice,
+.mark-selection-toolbar .reader-writing-custom-color {
+  width:23px;
+  min-width:23px;
+  height:23px;
+  min-height:23px;
+  padding:0;
+  border:1px solid rgba(12,35,64,.18);
+  border-radius:50%;
+  background:var(--writing-swatch, #C98900) !important;
+  cursor:pointer;
+}
+.mark-selection-toolbar .reader-writing-color-choice.active {
+  box-shadow:0 0 0 2px #fbf7ed, 0 0 0 4px #0c2340;
+}
+.mark-selection-toolbar .reader-writing-custom-color {
+  position:relative;
+  overflow:hidden;
+  background:conic-gradient(#c44747,#c98900,#2f855a,#2b6cb0,#c44747) !important;
+}
+.mark-selection-toolbar .reader-writing-custom-color input[type="color"] {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  opacity:0;
+  cursor:pointer;
+}
+.mark-selection-toolbar .reader-writing-editor-actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:6px;
+  margin-top:7px;
+}
+.mark-selection-toolbar .reader-writing-editor-actions button {
+  min-height:28px;
+  padding:4px 9px;
+  border:1px solid rgba(12,35,64,.16);
+  background:#fffdf8;
+}
+.mark-selection-toolbar .reader-writing-editor-actions [data-reader-writing-save] {
+  background:#0c2340;
+  color:#fff;
+}

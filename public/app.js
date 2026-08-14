@@ -7519,6 +7519,8 @@ function normalizeLookupWord(value) {
 // the Reader while IndexedDB provides the durable store.
 const READER_DEFINITIONS_CACHE_KEY = 'reader-annotations:definitions:v1';
 const READER_NOTES_CACHE_KEY = 'reader-annotations:notes:v1';
+const READER_HIGHLIGHTS_CACHE_KEY = 'reader-annotations:passage-highlights:v1';
+const READER_WRITING_CACHE_KEY = 'reader-annotations:written-overlays:v1';
 
 function readLegacyAnnotationArray(key) {
   try {
@@ -7531,6 +7533,8 @@ function readLegacyAnnotationArray(key) {
 
 let savedDefinitionsCache = readLegacyAnnotationArray(SAVED_DEFINITIONS_KEY).slice(0, 500);
 let readerNotesCache = readLegacyAnnotationArray(NOTE_STORAGE_KEY).slice(0, 1000);
+let readerHighlightsCache = [];
+let readerWritingCache = [];
 let readerAnnotationHydrated = false;
 
 async function persistReaderAnnotationRecord(key, items) {
@@ -7549,13 +7553,17 @@ async function hydrateReaderAnnotationStores() {
   readerAnnotationHydrated = true;
 
   try {
-    const [definitionRecord, noteRecord] = await Promise.all([
+    const [definitionRecord, noteRecord, highlightRecord, writingRecord] = await Promise.all([
       getCachedReadingBook(READER_DEFINITIONS_CACHE_KEY),
-      getCachedReadingBook(READER_NOTES_CACHE_KEY)
+      getCachedReadingBook(READER_NOTES_CACHE_KEY),
+      getCachedReadingBook(READER_HIGHLIGHTS_CACHE_KEY),
+      getCachedReadingBook(READER_WRITING_CACHE_KEY)
     ]);
 
     const indexedDefinitions = Array.isArray(definitionRecord?.items) ? definitionRecord.items : [];
     const indexedNotes = Array.isArray(noteRecord?.items) ? noteRecord.items : [];
+    const indexedHighlights = Array.isArray(highlightRecord?.items) ? highlightRecord.items : [];
+    const indexedWriting = Array.isArray(writingRecord?.items) ? writingRecord.items : [];
 
     // If IndexedDB already has data, it is authoritative. Otherwise migrate the
     // legacy localStorage arrays once.
@@ -7565,6 +7573,9 @@ async function hydrateReaderAnnotationStores() {
     if (indexedNotes.length) readerNotesCache = indexedNotes;
     else if (readerNotesCache.length) await persistReaderAnnotationRecord(READER_NOTES_CACHE_KEY, readerNotesCache);
 
+    readerHighlightsCache = indexedHighlights.slice(0, 5000);
+    readerWritingCache = indexedWriting.slice(0, 3000);
+
     // Remove the bulky legacy copies only after IndexedDB has had a chance to
     // receive them. This also gives localStorage quota back to the rest of app.
     try { localStorage.removeItem(SAVED_DEFINITIONS_KEY); } catch {}
@@ -7573,6 +7584,8 @@ async function hydrateReaderAnnotationStores() {
     if (app.querySelector('#reader')) {
       renderNavigationPane();
       applySavedDefinitionHighlights();
+      applySavedPassageHighlights();
+      applySavedReaderWritingOverlays();
     }
   } catch (error) {
     console.warn('Reader annotation migration could not complete.', error);
@@ -7604,6 +7617,287 @@ function applySavedDefinitionHighlights() {
   app.querySelectorAll('.reader-word[data-index]').forEach((element) => {
     element.classList.toggle('saved-definition-word', indexes.has(element.dataset.index));
   });
+}
+
+
+function normalizePassageHighlightColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : '#F7D34A';
+}
+
+function passageHighlightsForCurrentDocument() {
+  if (!state.documentId) return [];
+  return readerHighlightsCache.filter((item) => item.documentId === state.documentId);
+}
+
+function savePassageHighlights(items) {
+  readerHighlightsCache = (Array.isArray(items) ? items : []).slice(0, 5000);
+  void persistReaderAnnotationRecord(READER_HIGHLIGHTS_CACHE_KEY, readerHighlightsCache);
+  return true;
+}
+
+function mergePassageHighlightRanges(items) {
+  const sorted = [...items].sort((a,b) => Number(a.startIndex)-Number(b.startIndex) || Number(a.endIndex)-Number(b.endIndex));
+  const merged = [];
+  for (const item of sorted) {
+    const start = Math.max(0, Number(item.startIndex) || 0);
+    const end = Math.max(start + 1, Number(item.endIndex) || start + 1);
+    const color = normalizePassageHighlightColor(item.color);
+    const previous = merged[merged.length - 1];
+    if (previous && previous.documentId === item.documentId && previous.color === color && start <= previous.endIndex) {
+      previous.endIndex = Math.max(previous.endIndex, end);
+      previous.updatedAt = new Date().toISOString();
+    } else {
+      merged.push({...item, startIndex:start, endIndex:end, color});
+    }
+  }
+  return merged;
+}
+
+function subtractPassageHighlightRange(items, documentId, startIndex, endIndex) {
+  const result = [];
+  for (const item of items) {
+    if (item.documentId !== documentId) { result.push(item); continue; }
+    const start = Number(item.startIndex) || 0;
+    const end = Math.max(start + 1, Number(item.endIndex) || start + 1);
+    if (end <= startIndex || start >= endIndex) { result.push(item); continue; }
+    if (start < startIndex) {
+      result.push({...item, id:`${item.id || 'hl'}-l-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, endIndex:startIndex});
+    }
+    if (end > endIndex) {
+      result.push({...item, id:`${item.id || 'hl'}-r-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, startIndex:endIndex});
+    }
+  }
+  return result;
+}
+
+function applySavedPassageHighlights() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return;
+  const highlights = passageHighlightsForCurrentDocument();
+
+  reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]').forEach((element) => {
+    element.classList.remove('saved-passage-highlight');
+    element.style.removeProperty('--saved-passage-highlight-color');
+    delete element.dataset.savedPassageHighlight;
+
+    const elementStart = Number(element.dataset.index ?? element.dataset.startIndex);
+    const explicitEnd = Number(element.dataset.endIndex);
+    const elementEnd = Number.isFinite(explicitEnd) ? explicitEnd : elementStart + 1;
+    if (!Number.isFinite(elementStart)) return;
+
+    // Later highlights win if old records somehow overlap.
+    const hit = [...highlights].reverse().find((item) => {
+      const start = Number(item.startIndex) || 0;
+      const end = Math.max(start + 1, Number(item.endIndex) || start + 1);
+      return elementStart < end && elementEnd > start;
+    });
+    if (!hit) return;
+
+    element.classList.add('saved-passage-highlight');
+    element.style.setProperty('--saved-passage-highlight-color', normalizePassageHighlightColor(hit.color));
+    element.dataset.savedPassageHighlight = hit.id || 'saved';
+  });
+}
+
+function addSavedPassageHighlight(selectionData, color) {
+  if (!selectionData?.documentId) return false;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  let items = subtractPassageHighlightRange(readerHighlightsCache, selectionData.documentId, startIndex, endIndex);
+  items.push({
+    id:`passage-highlight-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    documentId:selectionData.documentId,
+    title:selectionData.title || state.title || '',
+    chapter:selectionData.chapter || '',
+    text:selectionData.text || '',
+    startIndex,
+    endIndex,
+    color:normalizePassageHighlightColor(color),
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  });
+  savePassageHighlights(mergePassageHighlightRanges(items));
+  applySavedPassageHighlights();
+  return true;
+}
+
+function eraseSavedPassageHighlight(selectionData) {
+  if (!selectionData?.documentId) return false;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  const next = subtractPassageHighlightRange(readerHighlightsCache, selectionData.documentId, startIndex, endIndex);
+  const changed = next.length !== readerHighlightsCache.length || next.some((item, index) => {
+    const before = readerHighlightsCache[index];
+    return !before || before.startIndex !== item.startIndex || before.endIndex !== item.endIndex;
+  });
+  savePassageHighlights(mergePassageHighlightRanges(next));
+  applySavedPassageHighlights();
+  return changed;
+}
+
+
+function normalizeReaderWritingColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : '#C98900';
+}
+
+function readerWritingForCurrentDocument() {
+  if (!state.documentId) return [];
+  return readerWritingCache.filter((item) => item.documentId === state.documentId);
+}
+
+function saveReaderWriting(items) {
+  readerWritingCache = (Array.isArray(items) ? items : []).slice(0, 3000);
+  void persistReaderAnnotationRecord(READER_WRITING_CACHE_KEY, readerWritingCache);
+  return true;
+}
+
+function ensureReaderWritingLayer(reader) {
+  if (!reader) return null;
+  let layer = reader.querySelector(':scope > [data-reader-writing-layer]');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.className = 'reader-writing-layer';
+    layer.dataset.readerWritingLayer = 'true';
+    layer.setAttribute('aria-label','Written annotations');
+    reader.appendChild(layer);
+  }
+  return layer;
+}
+
+function readerElementRange(element) {
+  const start = Number(element?.dataset?.index ?? element?.dataset?.startIndex);
+  if (!Number.isFinite(start)) return null;
+  const explicitEnd = Number(element?.dataset?.endIndex);
+  return { start, end:Number.isFinite(explicitEnd) ? explicitEnd : start + 1 };
+}
+
+function findReaderAnchorForWriting(reader, item) {
+  const startIndex = Math.max(0, Number(item.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(item.endIndex) || startIndex + 1);
+  const candidates = reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]');
+  let firstOverlap = null;
+  for (const element of candidates) {
+    const range = readerElementRange(element);
+    if (!range) continue;
+    if (range.start <= startIndex && range.end > startIndex) return element;
+    if (!firstOverlap && range.start < endIndex && range.end > startIndex) firstOverlap = element;
+  }
+  return firstOverlap;
+}
+
+function positionReaderWritingOverlay(reader, element, item) {
+  const anchor = findReaderAnchorForWriting(reader, item);
+  if (!anchor) {
+    element.hidden = true;
+    return;
+  }
+  element.hidden = false;
+  const readerRect = reader.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+  const computed = getComputedStyle(reader);
+  const lineHeight = parseFloat(computed.lineHeight) || anchorRect.height || 24;
+  const left = anchorRect.left - readerRect.left + reader.scrollLeft;
+  // Place the writing just above the selected line when room exists; otherwise
+  // float it immediately below. It never changes document layout.
+  const preferredTop = anchorRect.top - readerRect.top + reader.scrollTop - Math.max(16, lineHeight * .72);
+  const belowTop = anchorRect.bottom - readerRect.top + reader.scrollTop + 2;
+  const top = preferredTop >= reader.scrollTop + 2 ? preferredTop : belowTop;
+  element.style.left = `${Math.max(0,left)}px`;
+  element.style.top = `${Math.max(0,top)}px`;
+  element.style.setProperty('--reader-writing-color', normalizeReaderWritingColor(item.color));
+}
+
+function applySavedReaderWritingOverlays() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return;
+  const items = readerWritingForCurrentDocument();
+  let layer = reader.querySelector(':scope > [data-reader-writing-layer]');
+  if (!items.length) {
+    layer?.remove();
+    return;
+  }
+  layer = ensureReaderWritingLayer(reader);
+  if (!layer) return;
+
+  const liveIds = new Set(items.map((item)=>String(item.id)));
+  layer.querySelectorAll('[data-reader-writing-id]').forEach((element)=>{
+    if (!liveIds.has(element.dataset.readerWritingId)) element.remove();
+  });
+
+  for (const item of items) {
+    let element = layer.querySelector(`[data-reader-writing-id="${CSS.escape(String(item.id))}"]`);
+    if (!element) {
+      element = document.createElement('span');
+      element.className = 'reader-written-annotation';
+      element.dataset.readerWritingId = String(item.id);
+      element.setAttribute('role','note');
+      layer.appendChild(element);
+    }
+    element.textContent = String(item.text || '').trim();
+    element.title = `Written annotation: ${String(item.text || '').trim()}`;
+    positionReaderWritingOverlay(reader, element, item);
+  }
+}
+
+function addSavedReaderWriting(selectionData, text, color) {
+  if (!selectionData?.documentId) return false;
+  const cleanText = String(text || '').trim();
+  if (!cleanText) return false;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  readerWritingCache.push({
+    id:`reader-writing-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    documentId:selectionData.documentId,
+    title:selectionData.title || state.title || '',
+    chapter:selectionData.chapter || '',
+    anchorText:selectionData.text || '',
+    startIndex,
+    endIndex,
+    text:cleanText.slice(0,500),
+    color:normalizeReaderWritingColor(color),
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  });
+  saveReaderWriting(readerWritingCache);
+  applySavedReaderWritingOverlays();
+  return true;
+}
+
+function eraseSavedReaderWriting(selectionData) {
+  if (!selectionData?.documentId) return 0;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  const before = readerWritingCache.length;
+  saveReaderWriting(readerWritingCache.filter((item)=>{
+    if (item.documentId !== selectionData.documentId) return true;
+    const start = Math.max(0, Number(item.startIndex) || 0);
+    const end = Math.max(start + 1, Number(item.endIndex) || start + 1);
+    return end <= startIndex || start >= endIndex;
+  }));
+  applySavedReaderWritingOverlays();
+  return before - readerWritingCache.length;
+}
+
+function eraseSavedReaderAnnotations(selectionData) {
+  const beforeHighlights = JSON.stringify(readerHighlightsCache);
+  eraseSavedPassageHighlight(selectionData);
+  const writingRemoved = eraseSavedReaderWriting(selectionData);
+  const highlightChanged = beforeHighlights !== JSON.stringify(readerHighlightsCache);
+  return { highlightChanged, writingRemoved };
+}
+
+function finishPassageHighlightAction() {
+  state.markPersistentSelection = null;
+  state.markSelection = null;
+  state.markSelectionLocked = false;
+  state.markSuppressNextReaderClick = false;
+  clearPersistentMarkSelection();
+  hideMarkToolbar();
+  const selection = window.getSelection?.();
+  if (selection?.rangeCount) selection.removeAllRanges();
+  requestAnimationFrame(applySavedPassageHighlights);
 }
 
 function removeSavedDefinition(id) {
@@ -10861,7 +11155,108 @@ function bindMarkCompanion(reader){
     else startReader();
     persistReaderSession();
   });
-  toolbar.addEventListener('mousedown',e=>e.preventDefault());
+  toolbar.addEventListener('mousedown',(event)=>{
+    // Keep the browser text range alive while using toolbar buttons. Native
+    // color inputs need their default pointer behavior in order to open.
+    if (!event.target.closest('input[type="color"], textarea, input[type="text"]')) event.preventDefault();
+  });
+
+  const highlightPicker = toolbar.querySelector('[data-passage-highlight-picker]');
+  const highlightToggle = toolbar.querySelector('[data-passage-highlight-toggle]');
+  const closeHighlightPicker = () => {
+    if (highlightPicker) highlightPicker.hidden = true;
+    highlightToggle?.setAttribute('aria-expanded','false');
+  };
+  highlightToggle?.addEventListener('click',()=>{
+    if (!highlightPicker) return;
+    highlightPicker.hidden = !highlightPicker.hidden;
+    highlightToggle.setAttribute('aria-expanded', String(!highlightPicker.hidden));
+  });
+  toolbar.querySelectorAll('[data-passage-highlight-color]').forEach((button)=>button.addEventListener('click',()=>{
+    const selected = state.markSelection ? {...state.markSelection} : null;
+    if (!selected) return;
+    addSavedPassageHighlight(selected, button.dataset.passageHighlightColor);
+    closeHighlightPicker();
+    finishPassageHighlightAction();
+    updateReaderStatus('Passage highlighted.');
+  }));
+  toolbar.querySelector('[data-passage-highlight-custom]')?.addEventListener('input',(event)=>{
+    const selected = state.markSelection ? {...state.markSelection} : null;
+    if (!selected) return;
+    addSavedPassageHighlight(selected, event.currentTarget.value);
+    closeHighlightPicker();
+    finishPassageHighlightAction();
+    updateReaderStatus('Passage highlighted.');
+  });
+  const writingEditor = toolbar.querySelector('[data-reader-writing-editor]');
+  const writingToggle = toolbar.querySelector('[data-reader-writing-toggle]');
+  const writingText = toolbar.querySelector('[data-reader-writing-text]');
+  const writingColor = toolbar.querySelector('[data-reader-writing-color]');
+  const closeWritingEditor = () => {
+    if (writingEditor) writingEditor.hidden = true;
+    writingToggle?.setAttribute('aria-expanded','false');
+  };
+  writingToggle?.addEventListener('click',()=>{
+    if (!writingEditor) return;
+    closeHighlightPicker();
+    writingEditor.hidden = !writingEditor.hidden;
+    writingToggle.setAttribute('aria-expanded', String(!writingEditor.hidden));
+    if (!writingEditor.hidden) requestAnimationFrame(()=>writingText?.focus());
+  });
+  toolbar.querySelectorAll('[data-reader-writing-color-choice]').forEach((button)=>button.addEventListener('click',()=>{
+    if (writingColor) writingColor.value = button.dataset.readerWritingColorChoice || '#C98900';
+    toolbar.querySelectorAll('[data-reader-writing-color-choice]').forEach((choice)=>choice.classList.toggle('active', choice === button));
+  }));
+  toolbar.querySelector('[data-reader-writing-save]')?.addEventListener('click',()=>{
+    const selected = state.markSelection ? {...state.markSelection} : null;
+    if (!selected || !writingText) return;
+    if (!addSavedReaderWriting(selected, writingText.value, writingColor?.value)) {
+      writingText.focus();
+      return;
+    }
+    writingText.value = '';
+    closeWritingEditor();
+    finishPassageHighlightAction();
+    updateReaderStatus('Written annotation saved.');
+  });
+  toolbar.querySelector('[data-reader-writing-cancel]')?.addEventListener('click',()=>{
+    if (writingText) writingText.value = '';
+    closeWritingEditor();
+  });
+  toolbar.querySelector('[data-passage-highlight-erase]')?.addEventListener('click',()=>{
+    const selected = state.markSelection ? {...state.markSelection} : null;
+    if (!selected) return;
+    const result = eraseSavedReaderAnnotations(selected);
+    closeHighlightPicker();
+    closeWritingEditor();
+    finishPassageHighlightAction();
+    updateReaderStatus(result.highlightChanged || result.writingRemoved ? 'Markup erased from selected passage.' : 'No saved markup found in the selected passage.');
+  });
+
+  // Virtualized reader windows replace word nodes as the reader moves. Repaint
+  // durable passage highlights and reposition written overlays whenever that DOM
+  // window changes. Ignore mutations generated inside the overlay layer itself.
+  state.passageHighlightObserver?.disconnect?.();
+  state.passageHighlightObserver = new MutationObserver((mutations)=>{
+    if (mutations.length && mutations.every((mutation)=>mutation.target instanceof Element && mutation.target.closest('[data-reader-writing-layer]'))) return;
+    requestAnimationFrame(()=>{
+      applySavedPassageHighlights();
+      applySavedReaderWritingOverlays();
+    });
+  });
+  state.passageHighlightObserver.observe(reader,{childList:true,subtree:true});
+  applySavedPassageHighlights();
+  applySavedReaderWritingOverlays();
+  let writingPositionFrame = 0;
+  const scheduleWritingPosition = () => {
+    cancelAnimationFrame(writingPositionFrame);
+    writingPositionFrame = requestAnimationFrame(applySavedReaderWritingOverlays);
+  };
+  reader.addEventListener('scroll', scheduleWritingPosition, {passive:true});
+  state.readerWritingResizeObserver?.disconnect?.();
+  state.readerWritingResizeObserver = new ResizeObserver(scheduleWritingPosition);
+  state.readerWritingResizeObserver.observe(reader);
+
   toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
     openMarkPanel('selection');
     renderMarkSelectionCard();
@@ -11889,7 +12284,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
 
       <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
