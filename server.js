@@ -81,6 +81,63 @@ async function fetchFeedItems(source) {
 }
 
 
+async function discoverPublisherFeed(rawUrl) {
+  const parsed = await validatePublicUrl(rawUrl);
+  const origin = parsed.origin;
+  const candidates = [];
+  const seen = new Set();
+
+  const add = (value) => {
+    if (!value) return;
+    let absolute = '';
+    try { absolute = new URL(value, parsed).toString(); } catch { return; }
+    if (!/^https?:\/\//i.test(absolute) || seen.has(absolute)) return;
+    seen.add(absolute);
+    candidates.push(absolute);
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(parsed, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; MarkSetGoWeb/2.3; +feed discovery)',
+        Accept: 'text/html,application/xhtml+xml,*/*;q=0.1'
+      }
+    });
+    if (response.ok) {
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      $('link[rel="alternate"]').each((_i, element) => {
+        const type = String($(element).attr('type') || '').toLowerCase();
+        const href = $(element).attr('href');
+        if (href && (type.includes('rss') || type.includes('atom') || type.includes('xml'))) add(href);
+      });
+    }
+  } catch (_) {
+    // Continue to conventional feed paths.
+  } finally {
+    clearTimeout(timeout);
+  }
+
+  [
+    '/feed', '/feed/', '/rss', '/rss/', '/rss.xml', '/feed.xml',
+    '/atom.xml', '/index.xml', '/feeds/posts/default?alt=rss'
+  ].forEach((path) => add(new URL(path, origin).toString()));
+
+  for (const feedUrl of candidates.slice(0, 12)) {
+    try {
+      const items = await fetchFeedItems({ feedUrl });
+      if (items.length) return { feedUrl, items };
+    } catch (_) {}
+  }
+
+  return null;
+}
+
+
 app.disable('x-powered-by');
 app.use(express.json({ limit: '8mb' }));
 app.use(express.urlencoded({ extended: false, limit: '8mb' }));
@@ -4353,71 +4410,89 @@ function topicFeedGoogleNewsUrl(topic, hostname) {
 
 app.post('/api/topic-feeds/fetch', async (req, res) => {
   const topic = cleanText(req.body?.topic, 200);
-  const sources = Array.isArray(req.body?.sources) ? req.body.sources.slice(0, 30) : [];
+  const requestedSources = Array.isArray(req.body?.sources) ? req.body.sources.slice(0, 30) : [];
   if (!topic) return res.status(400).json({ error: 'A topic is required.' });
-  if (!sources.length) return res.status(400).json({ error: 'Add at least one source.' });
+  if (!requestedSources.length) return res.status(400).json({ error: 'Add at least one source.' });
 
-  const results = await Promise.all(sources.map(async (rawSource, sourceOrder) => {
-    const id = cleanText(rawSource?.id, 200) || `source-${sourceOrder + 1}`;
-    const name = cleanText(rawSource?.name, 200) || `Source ${sourceOrder + 1}`;
+  const articles = [];
+  const sourceResults = [];
+
+  for (const rawSource of requestedSources) {
     const type = rawSource?.type === 'rss' ? 'rss' : 'website';
     const rawUrl = cleanText(rawSource?.url, 2000);
+    const name = cleanText(rawSource?.name, 200) || rawUrl;
+    if (!rawUrl) continue;
+
     try {
-      if (!rawUrl) throw new Error('Source URL is required.');
       const parsed = await validatePublicUrl(rawUrl);
-      const feedUrl = type === 'rss'
-        ? parsed.href
-        : topicFeedGoogleNewsUrl(topic, parsed.hostname);
+      let feedUrl = parsed.toString();
+      let items = [];
+      let mode = 'rss';
 
-      if (type === 'rss') await validatePublicUrl(feedUrl);
+      if (type === 'website') {
+        const discovered = await discoverPublisherFeed(parsed.toString());
+        if (discovered?.items?.length) {
+          feedUrl = discovered.feedUrl;
+          items = discovered.items;
+          mode = 'publisher-feed';
+        } else {
+          feedUrl = topicFeedGoogleNewsUrl(topic, parsed.hostname);
+          items = await fetchFeedItems({ feedUrl });
+          mode = 'google-news-fallback';
+        }
+      } else {
+        items = await fetchFeedItems({ feedUrl });
+      }
 
-      const items = await fetchFeedItems({ feedUrl });
-      return {
-        id,
-        name,
-        ok: true,
-        articles: items.slice(0, 20).map((item, index) => ({
-          id: crypto.createHash('sha1').update(`${id}|${item.link}|${item.title}`).digest('hex'),
-          sourceId: id,
-          sourceName: name,
-          sourceRank: index,
+      for (const item of items) {
+        articles.push({
+          id: crypto.createHash('sha1').update(`${name}|${item.link}|${item.title}`).digest('hex'),
           title: item.title,
           url: item.link,
-          summary: item.summary,
-          published: item.published || ''
-        }))
-      };
-    } catch (error) {
-      return { id, name, ok: false, error: error.message || 'Source could not be loaded.', articles: [] };
-    }
-  }));
+          summary: item.summary || '',
+          published: item.published || '',
+          sourceName: name,
+          sourceUrl: rawUrl,
+          sourceType: type,
+          feedMode: mode
+        });
+      }
 
-  const seenUrls = new Set();
-  const articles = [];
-  for (const result of results) {
-    for (const article of result.articles) {
-      const key = String(article.url || '').replace(/[?#].*$/, '').replace(/\/$/, '').toLowerCase();
-      if (!key || seenUrls.has(key)) continue;
-      seenUrls.add(key);
-      articles.push(article);
+      sourceResults.push({
+        name,
+        url: rawUrl,
+        ok: true,
+        count: items.length,
+        feedUrl,
+        mode
+      });
+    } catch (error) {
+      sourceResults.push({
+        name,
+        url: rawUrl,
+        ok: false,
+        count: 0,
+        error: error?.message || 'The source could not be refreshed.'
+      });
     }
   }
 
-  articles.sort((a, b) => {
-    const left = new Date(a.published || 0).getTime() || 0;
-    const right = new Date(b.published || 0).getTime() || 0;
-    return right - left;
-  });
+  const seen = new Set();
+  const deduped = articles
+    .filter((article) => {
+      const key = String(article.url || '').trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => {
+      const at = Date.parse(a.published || '') || 0;
+      const bt = Date.parse(b.published || '') || 0;
+      return bt - at;
+    })
+    .slice(0, 300);
 
-  res.json({
-    topic,
-    articles: articles.slice(0, 300),
-    errors: results.filter((result) => !result.ok).map((result) => ({
-      sourceId: result.id,
-      sourceName: result.name,
-      error: result.error
-    }))
-  });
+  res.json({ topic, articles: deduped, sources: sourceResults });
 });
 
 const server = app.listen(PORT, () => console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`));
