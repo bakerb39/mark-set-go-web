@@ -15520,18 +15520,17 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 /* Feature block moved to /modules/reading/pacman-mode.js */
 
 // Line Sweep mode -----------------------------------------------------------
-// Teleprompter-style line sweep. The document stays fixed while the actual
-// rendered words are highlighted one-by-one across the current visual line.
-// Timing is derived from WPM, so the highlight itself is the eye guide rather
-// than a decorative underline. Geometry is measured fresh on every line so the
-// mode follows responsive reflow and font-size changes without altering the
-// Reader's playback cursor model.
+// Port of the Spiffy Teleprompter line-sweep behavior. A single translucent
+// band sits BEHIND the rendered words and continuously grows from the first
+// word to the last word on the active visual line. When the line completes,
+// the band resets to zero width on the next visual line. This intentionally
+// mirrors the teleprompter's geometry model rather than painting words one at
+// a time or drawing an underline.
 function getLineSweepStep(reader, startIndex) {
   if (!reader || startIndex >= state.words.length) return null;
 
-  // Render enough words to cover the current visual line and the beginning of
-  // the next one. This stays within the existing virtual-renderer boundary.
-  ensureWordsRendered(reader, 'line-sweep', 1, Math.min(state.words.length, startIndex + 220));
+  // Render enough neighboring words for reliable visual-line measurement.
+  ensureWordsRendered(reader, 'line-sweep', 1, Math.min(state.words.length, startIndex + 240));
 
   let target = reader.querySelector(`.reader-word[data-index="${Number(startIndex)}"]`);
   if (!target && state.virtualized) {
@@ -15562,14 +15561,15 @@ function getLineSweepStep(reader, startIndex) {
     else if (lineWords.length && rect.top > lineTop + tolerance) break;
   }
 
-  if (!lineWords.length) lineWords.push({ word: target, index:startIndex, rect:targetRect });
-  lineWords.sort((a,b) => a.index - b.index);
+  if (!lineWords.length) lineWords.push({ word: target, index: startIndex, rect: targetRect });
+  lineWords.sort((a, b) => a.index - b.index);
 
   const first = lineWords[0];
   const last = lineWords[lineWords.length - 1];
-  const startX = first.rect.left - readerRect.left + reader.scrollLeft;
-  const endX = Math.max(startX + 12, last.rect.right - readerRect.left + reader.scrollLeft);
-  const y = first.rect.bottom - readerRect.top + reader.scrollTop + Math.max(2, first.rect.height * 0.08);
+  const left = first.rect.left - readerRect.left + reader.scrollLeft;
+  const right = last.rect.right - readerRect.left + reader.scrollLeft;
+  const top = first.rect.top - readerRect.top + reader.scrollTop;
+  const lineHeight = Math.max(first.rect.height, parseFloat(getComputedStyle(reader).lineHeight) || first.rect.height);
   const nextIndex = Math.min(state.words.length, last.index + 1);
 
   return {
@@ -15577,16 +15577,35 @@ function getLineSweepStep(reader, startIndex) {
     nextIndex,
     wordCount: Math.max(1, nextIndex - startIndex),
     lineWords,
-    startX,
-    endX,
-    y
+    left,
+    top,
+    height: lineHeight,
+    width: Math.max(12, right - left)
   };
 }
 
+function positionLineSweepMarker(reader, step) {
+  const marker = reader?.querySelector('.line-sweep-marker');
+  if (!marker || !step) return null;
+  marker.style.display = 'block';
+  marker.style.left = `${step.left}px`;
+  marker.style.top = `${step.top}px`;
+  marker.style.height = `${step.height}px`;
+  marker.style.width = '0px';
+  marker.style.opacity = '1';
+  return marker;
+}
+
 function clearLineSweepHighlight(reader) {
-  reader?.querySelectorAll('.reader-word.line-sweep-active').forEach((word) => {
-    word.classList.remove('line-sweep-active');
-  });
+  const marker = reader?.querySelector('.line-sweep-marker');
+  if (marker) {
+    marker.style.width = '0px';
+    marker.style.display = 'none';
+  }
+  if (state.lineSweepAnimation) {
+    try { state.lineSweepAnimation.cancel(); } catch (_) {}
+    state.lineSweepAnimation = null;
+  }
 }
 
 function startLineSweepReader({ reader, speed }) {
@@ -15602,7 +15621,7 @@ function startLineSweepReader({ reader, speed }) {
     }
 
     const step = getLineSweepStep(reader, state.index);
-    if (!step || !step.lineWords?.length) {
+    if (!step) {
       clearLineSweepHighlight(reader);
       pauseReader();
       updateReaderStatus('Line Sweep could not locate the current text line.');
@@ -15610,36 +15629,49 @@ function startLineSweepReader({ reader, speed }) {
     }
 
     updateFocusAnchorOverlay();
-    let cursor = 0;
+    const marker = positionLineSweepMarker(reader, step);
+    if (!marker) return;
 
-    const advanceWord = () => {
-      if (token !== state.runToken) return;
-      clearLineSweepHighlight(reader);
+    const liveSpeed = currentPushTrainingWpm(speed, 'line-sweep');
+    const durationMs = Math.max(180, (60000 * step.wordCount) / Math.max(30, liveSpeed));
+    const startedAt = performance.now();
 
-      if (cursor >= step.lineWords.length) {
-        state.index = step.nextIndex;
-        state.viewportAnchorIndex = state.index;
+    // Same visual idea as Spiffy: one rectangular highlight grows continuously
+    // across the line. Words remain above it through z-index layering.
+    state.lineSweepAnimation = marker.animate(
+      [{ width: '0px' }, { width: `${step.width}px` }],
+      { duration: durationMs, easing: 'linear', fill: 'forwards' }
+    );
+
+    // Keep MSG's playback cursor approximately aligned with the physical sweep
+    // without changing the underlying reader architecture.
+    const syncCursor = () => {
+      if (token !== state.runToken || !state.lineSweepAnimation) return;
+      const progress = Math.max(0, Math.min(1, (performance.now() - startedAt) / durationMs));
+      const offset = Math.min(step.wordCount - 1, Math.floor(progress * step.wordCount));
+      const liveIndex = Math.min(step.nextIndex - 1, step.startIndex + offset);
+      if (liveIndex >= state.index) {
+        state.index = liveIndex;
+        state.viewportAnchorIndex = liveIndex;
         updateReaderStatus();
-        sweepNextLine();
-        return;
       }
-
-      const current = step.lineWords[cursor];
-      current.word.classList.add('line-sweep-active');
-      state.index = current.index;
-      state.viewportAnchorIndex = current.index;
-      updateReaderStatus();
-
-      const liveSpeed = currentPushTrainingWpm(speed, 'line-sweep');
-      const wordDurationMs = Math.max(70, 60000 / Math.max(30, liveSpeed));
-      cursor += 1;
-      state.interval = window.setTimeout(() => {
-        state.interval = null;
-        advanceWord();
-      }, wordDurationMs);
+      if (progress < 1) state.lineSweepFrame = requestAnimationFrame(syncCursor);
     };
+    state.lineSweepFrame = requestAnimationFrame(syncCursor);
 
-    advanceWord();
+    state.lineSweepAnimation.onfinish = () => {
+      if (token !== state.runToken) return;
+      if (state.lineSweepFrame) {
+        cancelAnimationFrame(state.lineSweepFrame);
+        state.lineSweepFrame = null;
+      }
+      state.lineSweepAnimation = null;
+      state.index = step.nextIndex;
+      state.viewportAnchorIndex = step.nextIndex;
+      updateReaderStatus();
+      marker.style.width = '0px';
+      sweepNextLine();
+    };
   };
 
   sweepNextLine();
@@ -15850,7 +15882,19 @@ function stopReader() {
   state.interval = null;
   state.nextTickAt = 0;
   const lineSweepMarker = app.querySelector('#reader .line-sweep-marker');
-  if (lineSweepMarker) lineSweepMarker.style.transition = 'none';
+  if (lineSweepMarker) {
+    lineSweepMarker.style.transition = 'none';
+    lineSweepMarker.style.width = '0px';
+    lineSweepMarker.style.display = 'none';
+  }
+  if (state.lineSweepAnimation) {
+    try { state.lineSweepAnimation.cancel(); } catch (_) {}
+    state.lineSweepAnimation = null;
+  }
+  if (state.lineSweepFrame) {
+    cancelAnimationFrame(state.lineSweepFrame);
+    state.lineSweepFrame = null;
+  }
   if (state.tickerStatusTimer) {
     window.clearInterval(state.tickerStatusTimer);
     state.tickerStatusTimer = null;
