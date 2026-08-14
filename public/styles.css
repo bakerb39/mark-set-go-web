@@ -14544,3 +14544,89 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
   line-height: 1.25;
   text-transform: uppercase;
 }
+
+
+/* Kindle Capture companion installer */
+.kindle-capture-install {
+  margin-top: 18px;
+  border: 1px solid rgba(28, 61, 103, 0.18);
+  border-radius: 18px;
+  overflow: hidden;
+  background: linear-gradient(135deg, rgba(9, 35, 67, 0.98), rgba(26, 67, 112, 0.98));
+  box-shadow: 0 12px 30px rgba(8, 29, 52, 0.12);
+  color: #fff;
+}
+.kindle-capture-install-copy { padding: 22px 24px 18px; }
+.kindle-capture-install .source-category { color: #f4c64f; }
+.kindle-capture-install h2 {
+  margin: 5px 0 8px;
+  color: #fff;
+  font-size: clamp(1.15rem, 2vw, 1.45rem);
+}
+.kindle-capture-install p { margin: 0; color: rgba(255,255,255,.86); line-height: 1.55; }
+.kindle-capture-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.kindle-capture-actions .kindle-capture-download,
+.kindle-capture-actions button {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 11px;
+  font-weight: 800;
+}
+.kindle-capture-actions .kindle-capture-download {
+  background: #f4c64f;
+  border: 1px solid #f4c64f;
+  color: #0b2b4f;
+  text-decoration: none;
+  padding: 0 16px;
+}
+.kindle-capture-actions button.secondary {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.24);
+  color: #fff;
+}
+.kindle-capture-local-note { margin-top: 13px !important; font-size: .88rem; }
+.kindle-capture-local-note strong { color: #f4c64f; }
+.kindle-capture-setup {
+  border-top: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.055);
+}
+.kindle-capture-setup summary {
+  cursor: pointer;
+  padding: 15px 24px;
+  font-weight: 800;
+  color: #fff;
+}
+.kindle-capture-setup[open] summary { border-bottom: 1px solid rgba(255,255,255,.12); }
+.kindle-capture-setup ol {
+  margin: 0;
+  padding: 18px 28px 10px 48px;
+  color: rgba(255,255,255,.9);
+}
+.kindle-capture-setup li { margin: 0 0 9px; line-height: 1.45; }
+.kindle-capture-setup code {
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.12);
+  color: #fff;
+}
+.kindle-capture-after-install {
+  margin: 4px 24px 20px;
+  padding: 13px 14px;
+  border-left: 3px solid #f4c64f;
+  border-radius: 9px;
+  background: rgba(255,255,255,.07);
+  display: grid;
+  gap: 4px;
+}
+.kindle-capture-after-install strong { color: #f4c64f; }
+.kindle-capture-after-install span { color: rgba(255,255,255,.88); }
+@media (max-width: 640px) {
+  .kindle-capture-install-copy { padding: 18px; }
+  .kindle-capture-actions { display: grid; }
+  .kindle-capture-actions > * { width: 100%; }
+  .kindle-capture-setup summary { padding-inline: 18px; }
+  .kindle-capture-setup ol { padding-left: 40px; padding-right: 18px; }
+  .kindle-capture-after-install { margin-inline: 18px; }
+}

@@ -262,6 +262,7 @@ function renderHelp() {
             <li><strong>EPUB:</strong> import book text, structure, navigation, and supported embedded images.</li>
             <li><strong>MOBI / AZW / AZW3:</strong> import DRM-free Kindle-format eBooks you are legally able to use. The file is parsed locally; DRM/encrypted books are rejected rather than decrypted. KFX is not supported.</li>
             <li><strong>PDF:</strong> extract readable text and page markers. Image-only/scanned PDFs require OCR.</li>
+            <li><strong>Kindle Cloud Reader:</strong> use the optional Mark, Set, Go! Kindle Capture companion from the Import page. Install it once in Chrome Developer mode, capture a current spread/page range/whole book you are authorized to copy, then import the generated searchable PDF.</li>
             <li><strong>TXT:</strong> import plain text.</li>
             <li><strong>URL:</strong> bring supported web articles or pages into the reading workflow.</li>
             <li><strong>Create Book / Guide:</strong> build a structured reading document or an original educational guide from supplied material.</li>

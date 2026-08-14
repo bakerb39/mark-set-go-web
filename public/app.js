@@ -19097,6 +19097,35 @@ function renderUpload() {
 
       <div id="upload-status" class="status import-status" role="status" aria-live="polite"></div>
 
+      <section class="kindle-capture-install" aria-labelledby="kindle-capture-title">
+        <div class="kindle-capture-install-copy">
+          <span class="source-category">Kindle Cloud Reader</span>
+          <h2 id="kindle-capture-title">Capture Kindle pages for Mark, Set, Go!</h2>
+          <p>Install the Mark, Set, Go! Kindle Capture companion once, then capture a current spread, page range, or whole book from Kindle Cloud Reader and import the generated searchable PDF here.</p>
+          <div class="kindle-capture-actions">
+            <a class="primary button-link kindle-capture-download" href="/downloads/mark-set-go-kindle-capture-v0.4.3.zip" download>Download Kindle Capture</a>
+            <button id="copy-chrome-extensions" class="secondary" type="button">Copy chrome://extensions</button>
+          </div>
+          <p class="kindle-capture-local-note"><strong>Local capture:</strong> page capture and OCR run in your browser; the extension does not upload captured book pages to Mark, Set, Go!</p>
+        </div>
+
+        <details class="kindle-capture-setup">
+          <summary>One-time Chrome setup</summary>
+          <ol>
+            <li><strong>Download</strong> Kindle Capture above, then unzip the downloaded file.</li>
+            <li>Paste <code>chrome://extensions</code> into Chrome's address bar.</li>
+            <li>Turn on <strong>Developer mode</strong>.</li>
+            <li>Choose <strong>Load unpacked</strong>.</li>
+            <li>Select the unzipped <strong>mark-set-go-kindle-capture</strong> folder.</li>
+            <li>Open your book at <strong>read.amazon.com</strong>, refresh the Kindle tab, and open the Kindle Capture extension.</li>
+          </ol>
+          <div class="kindle-capture-after-install">
+            <strong>Then, whenever you want to import from Kindle:</strong>
+            <span>Open the book → choose Current spread, Page range, or Whole book → Capture PDF → return here and choose the generated PDF.</span>
+          </div>
+        </details>
+      </section>
+
       <details class="pdf-import-note compact-note">
         <summary>PDF import details</summary>
         <p>Modern PDFs with selectable text work best. PDF page positions are retained as hidden document metadata so notes, navigation, and reading progress can stay connected to the source without placing page-marker text inside the book. Image-only scans are not silently imported as blank documents.</p>
@@ -19108,7 +19137,20 @@ function renderUpload() {
     </section>`;
 
   const uploadInput = app.querySelector('#text-file');
+  const copyChromeExtensionsButton = app.querySelector('#copy-chrome-extensions');
   let importInFlight = false;
+
+  copyChromeExtensionsButton?.addEventListener('click', async () => {
+    const value = 'chrome://extensions';
+    try {
+      await navigator.clipboard.writeText(value);
+      const original = copyChromeExtensionsButton.textContent;
+      copyChromeExtensionsButton.textContent = 'Copied!';
+      setTimeout(() => { copyChromeExtensionsButton.textContent = original; }, 1600);
+    } catch {
+      window.prompt('Copy this Chrome address:', value);
+    }
+  });
 
   // Warm PDF.js as soon as the Import page opens so the first file selection
   // does not also have to initialize the PDF engine.
