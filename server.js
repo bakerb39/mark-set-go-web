@@ -79,14 +79,25 @@ function directUrlFromEmbeddedText(value, preferredHost = '') {
   for (const match of normalized.matchAll(/https?%3A%2F%2F[^\s"'<>\\]+/gi)) addCandidate(match[0]);
 
   const preferred = String(preferredHost || '').toLowerCase().replace(/^www\./, '');
-  const blockedHosts = ['news.google.com', 'google.com', 'www.google.com', 'gstatic.com', 'googleusercontent.com'];
+  const blockedHosts = [
+    'news.google.com', 'google.com', 'www.google.com', 'gstatic.com', 'googleusercontent.com',
+    'w3.org', 'www.w3.org', 'schema.org', 'www.schema.org',
+    'purl.org', 'www.purl.org', 'xmlns.com', 'www.xmlns.com'
+  ];
 
   const ranked = [...candidates].map((url) => {
     try {
       const parsed = new URL(url);
       const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
       if (blockedHosts.some((blocked) => host === blocked || host.endsWith(`.${blocked}`))) return null;
-      const preferredMatch = preferred && (host === preferred || host.endsWith(`.${preferred}`) || preferred.endsWith(`.${host}`));
+
+      const preferredMatch = Boolean(preferred) &&
+        (host === preferred || host.endsWith(`.${preferred}`) || preferred.endsWith(`.${host}`));
+
+      // If we know the publisher hostname, do not accept random URLs embedded in
+      // XML namespaces, tracking markup, ads, schema metadata, or related links.
+      if (preferred && !preferredMatch) return null;
+
       const pathScore = parsed.pathname.split('/').filter(Boolean).length;
       return { url: parsed.toString(), preferredMatch, pathScore };
     } catch {
@@ -164,7 +175,10 @@ async function fetchFeedItems(source) {
         item.find('content\\:encoded').first().text() ||
         item.find('content').first().text();
 
-      const sourceUrl = item.find('source').first().attr('url') || '';
+      const sourceElement = item.children('source').first();
+      let sourceUrl = sourceElement.attr('url') || '';
+      if (sourceUrl && /w3\.org|schema\.org|xmlns\.com|purl\.org/i.test(sourceUrl)) sourceUrl = '';
+
       let preferredHost = '';
       try { preferredHost = sourceUrl ? new URL(sourceUrl).hostname : ''; } catch {}
 
@@ -3595,7 +3609,14 @@ app.post('/api/current/article', async (req, res) => {
 
   try {
     const host = new URL(originalUrl).hostname.toLowerCase();
-    if (host === 'news.google.com' || host.endsWith('.news.google.com')) {
+    const isGoogleWrapper = host === 'news.google.com' || host.endsWith('.news.google.com');
+    const isMetadataUrl =
+      host === 'w3.org' || host.endsWith('.w3.org') ||
+      host === 'schema.org' || host.endsWith('.schema.org') ||
+      host === 'purl.org' || host.endsWith('.purl.org') ||
+      host === 'xmlns.com' || host.endsWith('.xmlns.com');
+
+    if (isGoogleWrapper) {
       const embedded = await directUrlFromGoogleNewsPage(originalUrl, publisherUrl);
       if (embedded) {
         articleUrl = embedded;
@@ -3603,10 +3624,29 @@ app.post('/api/current/article', async (req, res) => {
         const resolved = await resolvePublisherArticleUrl(publisherUrl, title);
         if (resolved) articleUrl = resolved;
       }
+    } else if (isMetadataUrl) {
+      // Bad URL from an RSS/XML namespace is never an article. Resolve the
+      // headline against the actual publisher site instead.
+      const resolved = await resolvePublisherArticleUrl(publisherUrl, title);
+      if (resolved) articleUrl = resolved;
     }
   } catch {}
 
   try {
+    try {
+      const resolvedHost = new URL(articleUrl).hostname.toLowerCase();
+      if (
+        resolvedHost === 'w3.org' || resolvedHost.endsWith('.w3.org') ||
+        resolvedHost === 'schema.org' || resolvedHost.endsWith('.schema.org') ||
+        resolvedHost === 'purl.org' || resolvedHost.endsWith('.purl.org') ||
+        resolvedHost === 'xmlns.com' || resolvedHost.endsWith('.xmlns.com')
+      ) {
+        throw new Error('The feed supplied XML metadata instead of an article URL.');
+      }
+    } catch (error) {
+      if (error?.message?.includes('XML metadata')) throw error;
+    }
+
     const articleText = await fetchArticleForFeed(articleUrl, title);
     return res.json({
       title,

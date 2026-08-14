@@ -1,14 +1,15 @@
-MARK, SET, GO! — EMBEDDED PUBLISHER URL FIX
+MARK, SET, GO! — TOPIC FEEDS METADATA URL FIX
 
 Replace only the ROOT server.js.
 
-This version follows the approach Brian identified:
+What this fixes:
+- http://www.w3.org/XML/1998/namespace can no longer be treated as an article URL.
+- schema.org, purl.org and xmlns.com metadata URLs are also rejected.
+- When the app encounters one of those bad URLs, it uses the article headline
+  plus the configured publisher site (CoinDesk, Bitcoin Magazine, etc.) to find
+  the actual publisher article.
+- Embedded RSS links are accepted only when they match the known publisher host.
+- Existing cached Topic Feed items with the bad W3 URL can be retried; no feed
+  recreation is required.
 
-1. BEFORE stripping the RSS item description to plain text, inspect its embedded
-   links/serialized URLs.
-2. If a direct non-Google publisher URL is present, use that as the article URL.
-3. If an existing item still has a news.google.com URL, fetch the Google wrapper
-   page and inspect its HTML/serialized page data for the embedded publisher URL.
-4. Only if that fails, fall back to the headline-matching publisher-page resolver.
-
-No public files and no Reader core files are changed.
+No public files and no Reader files changed.
