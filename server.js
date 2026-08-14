@@ -2643,21 +2643,84 @@ async function fetchArticleForFeed(rawUrl, expectedTitle) {
       'main .article-body', 'main .story-body', 'main .entry-content',
       'main .post-content', 'main [role="article"]', 'main'
     ];
+
+    const stopHeadings = [
+      'related assets',
+      'latest crypto news',
+      'latest research',
+      'more from markets',
+      'more from bitcoin',
+      'more from',
+      'recommended',
+      'you may also like',
+      'read more'
+    ];
+
+    const extractArticleBlocks = (element) => {
+      const container = $(element).clone();
+
+      container.find([
+        'nav', 'footer', 'header', 'aside', 'form', 'button', 'figure', 'figcaption',
+        '.advertisement', '.ad', '[class*="promo"]', '[class*="newsletter"]',
+        '[class*="recommend"]', '[class*="related"]', '[class*="sidebar"]',
+        '[class*="latest"]', '[class*="research"]'
+      ].join(',')).remove();
+
+      const blocks = [];
+      const seen = new Set();
+      const nodes = container.find('p, h2, h3, h4, li, blockquote').toArray();
+
+      for (const node of nodes) {
+        const tag = String(node.tagName || node.name || '').toLowerCase();
+        const text = $(node).text().replace(/\s+/g, ' ').trim();
+        if (!text) continue;
+
+        const lowerText = text.toLowerCase().replace(/[:\s]+$/g, '');
+        const isHeading = /^h[234]$/.test(tag);
+
+        if (
+          isHeading &&
+          blocks.length >= 2 &&
+          stopHeadings.some((heading) =>
+            lowerText === heading ||
+            lowerText.startsWith(`${heading} `)
+          )
+        ) {
+          break;
+        }
+
+        // Avoid tiny navigation fragments, but preserve real section headings and list items.
+        if (!isHeading && text.length < 28) continue;
+        if (isHeading && text.length > 160) continue;
+
+        // Skip exact duplicate cards/paragraphs that some publisher pages repeat.
+        const dedupeKey = text.toLowerCase();
+        if (seen.has(dedupeKey)) continue;
+        seen.add(dedupeKey);
+
+        if (isHeading) {
+          blocks.push(text);
+        } else if (tag === 'li') {
+          blocks.push(`• ${text}`);
+        } else {
+          blocks.push(text);
+        }
+      }
+
+      return blocks.join('\n\n').trim();
+    };
+
     let best = '';
     for (const selector of selectors) {
       $(selector).each((_index, element) => {
-        const container = $(element).clone();
-        container.find('nav, footer, header, aside, form, button, figure, figcaption, .advertisement, .ad, [class*="promo"], [class*="related"], [class*="newsletter"]').remove();
-        const paragraphs = container.find('p').toArray()
-          .map((p) => $(p).text().replace(/\s+/g, ' ').trim())
-          .filter((text) => text.length >= 35);
-        const candidate = paragraphs.length >= 3
-          ? paragraphs.join('\n\n')
-          : container.text().replace(/\s+/g, ' ').trim();
+        const candidate = extractArticleBlocks(element);
         if (candidate.length > best.length) best = candidate;
       });
-      if (best.length >= 1200) break;
+
+      // Prefer a focused article container once it has enough substantive text.
+      if (best.length >= 900) break;
     }
+
     if (best.length < 350) throw new Error('The publisher did not expose readable article text.');
     const genericSignals = ['sign in to continue', 'enable javascript', 'accept all cookies', 'latest news and headlines'];
     const lower = best.toLowerCase();

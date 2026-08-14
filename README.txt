@@ -1,24 +1,23 @@
-MARK, SET, GO! — TOPIC FEED URL REPAIR
+MARK, SET, GO! — ARTICLE BODY EXTRACTION FIX
 
-Replace all three files:
+Replace only the ROOT server.js.
 
-ROOT:
-server.js
+This fixes the current CoinDesk symptom where the Reader imported:
+- the first few article paragraphs,
+- missed the article's bullet/list sections,
+- then included unrelated repeated "Latest Research" text.
 
-PUBLIC:
-public/topic-feeds.js
-public/index.html
+Cause:
+The old extractor only collected <p> elements. CoinDesk's "Derivatives positioning"
+and "Token talk" sections are largely list items, so they were skipped. A broader
+container then contributed unrelated research-card paragraphs.
 
-Why this package is different:
-- It does not depend on a successful feed refresh to repair old bad URLs.
-- When Read in Reader receives a Google News, Google Tag Manager, W3/XML,
-  analytics, metadata, or unrelated third-party URL, the server repairs it.
-- The server first searches the publisher's own RSS/Atom feed for the matching
-  headline and takes that feed item's canonical article <link>.
-- Only if that fails does it try the publisher's own listing pages.
-- CoinDesk is recognized even if the browser fails to send publisherUrl.
-- Analytics/metadata URLs are never accepted as article URLs.
-- The browser JS is cache-busted and explicitly sends the configured publisher URL.
+Fix:
+- Preserve article paragraphs, section headings, list items, and blockquotes.
+- Keep list items as bullets.
+- Deduplicate repeated blocks.
+- Remove recommendation/latest/research/sidebar containers.
+- Stop extraction at common post-article boundaries such as Related Assets,
+  Latest Crypto News, Latest Research, and More From.
 
-This means existing cached CoinDesk entries containing googletagmanager.com can
-be repaired when clicked; you do not have to recreate the Topic Feed first.
+No public files and no Reader core files changed.
