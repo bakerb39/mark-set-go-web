@@ -3785,7 +3785,7 @@ function renderFocusAnchorPhrase(element, words) {
 }
 
 function modeSupportsFocusAnchorOverlay(mode) {
-  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'line-sweep', 'pointing-guide', 'marquee', 'flash'].includes(mode);
+  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
 }
 
 function refreshFocusAnchorStyle() {
@@ -15538,6 +15538,24 @@ function getLineSweepStep(reader, startIndex) {
   // Render enough neighboring words for reliable visual-line measurement.
   ensureWordsRendered(reader, 'line-sweep', 1, Math.min(state.words.length, startIndex + 240));
 
+  // Book Pages uses horizontal spreads. Before measuring the next visual line,
+  // explicitly bring the spread containing the logical sweep cursor into view.
+  // Other reader modes already do this handoff during playback; Line Sweep's
+  // animation loop needs the same page-controller notification.
+  if (state.bookPages) {
+    const targetSpread = bookSpreadForWordIndex(reader, startIndex);
+    if (targetSpread != null && targetSpread !== getCurrentBookSpread(reader)) {
+      goToBookSpread(targetSpread, {
+        behavior: 'auto',
+        ensureRendered: true,
+        syncReaderPosition: false
+      });
+      state.index = startIndex;
+      state.bookSpreadIndex = targetSpread;
+      updateBookPageStatus(targetSpread);
+    }
+  }
+
   let target = reader.querySelector(`.reader-word[data-index="${Number(startIndex)}"]`);
   if (!target && state.virtualized) {
     virtualRenderer.renderWindowAround(reader, 'line-sweep', 1, startIndex);
@@ -15674,6 +15692,24 @@ function startLineSweepReader({ reader, speed }) {
       state.lineSweepAnimation = null;
       state.index = step.nextIndex;
       state.viewportAnchorIndex = step.nextIndex;
+
+      // Crossing the right-hand virtual page must advance the horizontal book
+      // spread before the next sweep line is measured. Without this, the cursor
+      // moves into the next spread while the viewport remains on the old pages.
+      if (state.bookPages && step.nextIndex < state.words.length) {
+        const nextSpread = bookSpreadForWordIndex(reader, step.nextIndex);
+        if (nextSpread != null && nextSpread !== getCurrentBookSpread(reader)) {
+          goToBookSpread(nextSpread, {
+            behavior: 'auto',
+            ensureRendered: true,
+            syncReaderPosition: false
+          });
+          state.index = step.nextIndex;
+          state.bookSpreadIndex = nextSpread;
+          updateBookPageStatus(nextSpread);
+        }
+      }
+
       updateReaderStatus();
       marker.style.width = '0px';
       sweepNextLine();
