@@ -1,18 +1,28 @@
-MARK, SET, GO! — PROFESSIONAL SUMMARY LINK ABOVE ARTICLE TEXT
+MARK, SET, GO! — OPTIONAL MAJOR STOCK INDEXES
 
-Replace:
-  public/read-anything.js
+This package is cumulative with the current Topic Feeds / Reader / crypto ticker work.
+
+Replace/add:
+ROOT:
+  server.js
+
+PUBLIC:
   public/index.html
+  public/market-indexes.js   (new)
 
-Change:
-- "Summarize article" remains inside the Reader.
-- It is now on its own small action row ABOVE the first article line.
-- It is no longer part of the article text flow.
-- Uses a restrained professional blue (#1769aa).
-- No button box/background/border.
-- Underlines only on hover/focus.
-- Still summarizes the entire preserved article.
-- In summary view it becomes "← Back to article".
+The other current files are included for completeness.
 
-This package remains cumulative with the current Topic Feeds, article formatting,
-Book Pages, bookmarklet/capture, and cryptocurrency ticker work.
+NEW SETTING
+Profile > Customize My Experience > Major Stock Indexes
+
+OFF by default. When enabled, shows:
+- S&P 500
+- Dow Jones Industrial Average
+- NASDAQ Composite
+- Russell 2000
+
+The strip appears below the top navigation. If Cryptocurrency Ticker is also
+enabled, both strips can be shown.
+
+The server caches values for 60 seconds and retains the last successful values
+if the upstream provider is temporarily unavailable.

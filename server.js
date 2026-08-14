@@ -35,6 +35,9 @@ const WEB_CAPTURE_TTL_MS = 10 * 60 * 1000;
 const TOPIC_ARTICLE_CACHE = new Map();
 const TOPIC_ARTICLE_CACHE_TTL_MS = 18 * 60 * 60 * 1000;
 const CRYPTO_TICKER_CACHE_TTL_MS = 60 * 1000;
+const MARKET_INDEX_CACHE_TTL_MS = 60 * 1000;
+let marketIndexCache = { fetchedAt: 0, data: null };
+
 let cryptoTickerCache = { fetchedAt: 0, data: null };
 
 
@@ -5105,6 +5108,88 @@ function topicFeedGoogleNewsUrl(topic, hostname) {
   });
   return `https://news.google.com/rss/search?${params.toString()}`;
 }
+
+app.get('/api/market-indexes', async (_req, res) => {
+  const now = Date.now();
+
+  if (marketIndexCache.data && now - marketIndexCache.fetchedAt < MARKET_INDEX_CACHE_TTL_MS) {
+    return res.json({ ...marketIndexCache.data, cached: true });
+  }
+
+  const indexes = [
+    { symbol: '^GSPC', label: 'S&P 500', short: 'S&P 500' },
+    { symbol: '^DJI', label: 'Dow Jones Industrial Average', short: 'Dow' },
+    { symbol: '^IXIC', label: 'NASDAQ Composite', short: 'Nasdaq' },
+    { symbol: '^RUT', label: 'Russell 2000', short: 'Russell 2000' }
+  ];
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const rows = await Promise.all(indexes.map(async (item) => {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(item.symbol)}?interval=1d&range=5d`;
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'Mozilla/5.0 MarkSetGo/1.0'
+        }
+      });
+
+      if (!response.ok) throw new Error(`Market data provider returned HTTP ${response.status}.`);
+
+      const payload = await response.json();
+      const result = payload?.chart?.result?.[0];
+      const meta = result?.meta || {};
+      const price = Number(meta.regularMarketPrice);
+      const previousClose = Number(meta.chartPreviousClose ?? meta.previousClose);
+      const change = Number.isFinite(price) && Number.isFinite(previousClose) && previousClose !== 0
+        ? ((price - previousClose) / previousClose) * 100
+        : null;
+
+      if (!Number.isFinite(price)) throw new Error(`No current value was returned for ${item.short}.`);
+
+      return {
+        symbol: item.symbol,
+        label: item.label,
+        short: item.short,
+        value: price,
+        change24h: Number.isFinite(change) ? change : null,
+        marketState: String(meta.marketState || ''),
+        currency: String(meta.currency || 'USD'),
+        exchangeName: String(meta.exchangeName || '')
+      };
+    }));
+
+    const data = {
+      indexes: rows,
+      provider: 'Yahoo Finance',
+      fetchedAt: new Date().toISOString()
+    };
+
+    marketIndexCache = { fetchedAt: now, data };
+    return res.json({ ...data, cached: false });
+  } catch (error) {
+    if (marketIndexCache.data) {
+      return res.json({
+        ...marketIndexCache.data,
+        cached: true,
+        stale: true,
+        warning: error?.message || 'Market index values are temporarily unavailable.'
+      });
+    }
+
+    return res.status(502).json({
+      error: error?.name === 'AbortError'
+        ? 'Market index values took too long to respond.'
+        : error?.message || 'Market index values are temporarily unavailable.'
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
 
 app.get('/api/crypto-ticker', async (_req, res) => {
   const now = Date.now();
