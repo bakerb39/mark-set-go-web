@@ -1283,7 +1283,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
   function bookmarkletCode() {
     const target = `${location.origin}/capture`;
-    return `javascript:(()=>{const e=s=>String(s||'').replace(/\\s+/g,' ').trim(),s=e(window.getSelection?.().toString()),r=document.querySelector('article,main,[role=main]')||document.body,t=e(document.querySelector('meta[property="og:title"]')?.content||document.querySelector('h1')?.innerText||document.title),a=e(document.querySelector('meta[name="author"]')?.content||document.querySelector('[rel=author]')?.innerText),x=s||[...r.querySelectorAll('h1,h2,h3,p,blockquote,li')].map(n=>e(n.innerText)).filter(v=>v.length>20).filter((v,i,z)=>z.indexOf(v)===i).join('\n\n'),k=s?'selection':'page',c=s?e(window.getSelection()?.anchorNode?.parentElement?.closest('p,blockquote,li')?.innerText||''):'',f=document.createElement('form');f.method='POST';f.action='${target}';f.target='_blank';[['title',t],['author',a],['url',location.href],['text',x],['captureType',k],['context',c]].forEach(([n,v])=>{const i=document.createElement('textarea');i.name=n;i.value=v;f.appendChild(i)});f.hidden=true;document.body.appendChild(f);f.submit();f.remove()})()`;
+    return `javascript:(()=>{const e=s=>String(s||'').replace(/\\s+/g,' ').trim(),s=e(window.getSelection?.().toString()),r=document.querySelector('article,main,[role=main]')||document.body,t=e(document.querySelector('meta[property="og:title"]')?.content||document.querySelector('h1')?.innerText||document.title),a=e(document.querySelector('meta[name="author"]')?.content||document.querySelector('[rel=author]')?.innerText),B=[],H=[],S=new Set(),wc=v=>e(v).split(/\\s+/).filter(Boolean).length;let w=0;if(!s){[...r.querySelectorAll('h1,h2,h3,p,blockquote,li')].forEach(n=>{let v=e(n.innerText);if(v.length<=20||S.has(v))return;S.add(v);const h=/^H[1-3]$/.test(n.tagName),o=n.tagName==='LI'?'• '+v:v;if(h)H.push({title:v,index:w,type:'section'});B.push(o);w+=wc(o)})}const x=s||B.join('\\n\\n'),k=s?'selection':'page',c=s?e(window.getSelection()?.anchorNode?.parentElement?.closest('p,blockquote,li')?.innerText||''):'',f=document.createElement('form');f.method='POST';f.action='${target}';f.target='_blank';[['title',t],['author',a],['url',location.href],['text',x],['captureType',k],['context',c],['structure',JSON.stringify(s?[]:H)]].forEach(([n,v])=>{const i=document.createElement('textarea');i.name=n;i.value=v;f.appendChild(i)});f.hidden=true;document.body.appendChild(f);f.submit();f.remove()})()`;
   }
 
   function renderHub() {
@@ -1395,14 +1395,34 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     });
   }
 
-  function openPendingCapture(attempt = 0) {
+  async function openPendingCapture(attempt = 0) {
     let payload = null;
-    try { payload = JSON.parse(CAPTURE_STORAGE.getItem(CAPTURE_KEY) || 'null'); } catch {}
+    const tokenMatch = location.hash.match(/read-anything-capture=([^&]+)/);
+
+    if (tokenMatch?.[1]) {
+      try {
+        const response = await fetch(`/api/capture/${encodeURIComponent(decodeURIComponent(tokenMatch[1]))}`, {
+          cache: 'no-store'
+        });
+        if (response.ok) payload = await response.json();
+        else if (response.status !== 404) throw new Error(`Capture returned HTTP ${response.status}.`);
+      } catch {
+        if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
+        return;
+      }
+    }
+
+    // Backward compatibility for captures created by the older bookmarklet flow.
+    if (!payload) {
+      try { payload = JSON.parse(CAPTURE_STORAGE.getItem(CAPTURE_KEY) || 'null'); } catch {}
+    }
+
     if (!payload?.text) return;
     if (typeof window.renderReaderWithText !== 'function' || attempt < 4) {
       if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
       return;
     }
+
     try {
       const isSelection = payload.captureType === 'selection';
       openDocument({
@@ -1414,10 +1434,11 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           url: payload.url || '',
           context: payload.context || '',
           captureType: payload.captureType || 'page',
+          documentToc: Array.isArray(payload.documentToc) ? payload.documentToc : [],
           importedAt: new Date().toISOString()
         }
       });
-      CAPTURE_STORAGE.removeItem(CAPTURE_KEY);
+      try { CAPTURE_STORAGE.removeItem(CAPTURE_KEY); } catch {}
       if (location.hash.includes('read-anything-capture')) history.replaceState({}, '', location.pathname);
     } catch {
       if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);

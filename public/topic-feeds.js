@@ -7,6 +7,7 @@
   let activeTopicId = state.topics[0]?.id || null;
   let activeTab = 'recommended';
   let loading = false;
+  let preparing = false;
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -100,6 +101,27 @@
     return elapsed >= (topic.cadence === 'weekly' ? 6.5 * 86400000 : 20 * 3600000);
   }
 
+  async function prefetchArticles(articles, { wait = true } = {}) {
+    const list = Array.isArray(articles) ? articles.filter((article) => article?.url).slice(0, 60) : [];
+    if (!list.length) return { prepared: 0, failed: 0 };
+
+    const request = fetch('/api/topic-feeds/prefetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ articles: list })
+    }).then(async (response) => {
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Article preparation failed.');
+      return payload;
+    });
+
+    if (!wait) {
+      request.catch(() => {});
+      return null;
+    }
+    return request;
+  }
+
   async function refreshTopic() {
     const topic = currentTopic();
     if (!topic || loading || !topic.sources.length) return;
@@ -127,9 +149,23 @@
       topic.lastRefresh = new Date().toISOString();
       curate(topic);
       saveState();
+
+      // Prepare the recommended morning edition before calling it ready.
+      const recommended = topic.articles.filter((article) => article.recommended);
+      const remaining = topic.articles.filter((article) => !article.recommended).slice(0, Math.max(0, 60 - recommended.length));
+      preparing = true;
+      render();
+      const prep = await prefetchArticles(recommended, { wait: true }).catch(() => ({ prepared: 0, failed: recommended.length }));
+      topic.preparedAt = new Date().toISOString();
+      topic.preparedRecommended = Number(prep?.prepared) || 0;
+      saveState();
+
+      // Continue warming the rest of the edition without delaying the UI.
+      if (remaining.length) void prefetchArticles(remaining, { wait: false });
     } catch (error) {
       topic.lastErrors = [error.message];
     } finally {
+      preparing = false;
       loading = false;
       render();
     }
@@ -139,7 +175,7 @@
     const status = document.getElementById('topic-feed-status');
     if (status) {
       status.className = 'status';
-      status.textContent = 'Extracting article text…';
+      status.textContent = 'Opening prepared article…';
     }
 
     try {
@@ -173,6 +209,7 @@
           feedSource: article.sourceName,
           fullArticle: payload.fullArticle !== false,
           importWarning: payload.warning || '',
+          documentToc: Array.isArray(payload.documentToc) ? payload.documentToc : [],
           importedAt: new Date().toISOString()
         }
       });
@@ -271,11 +308,11 @@
           <div>
             <span class="source-category">Personal Reading Feeds · Beta</span>
             <h1>${escapeHtml(topic.name)}</h1>
-            <p>${topic.cadence === 'weekly' ? 'Weekly' : 'Daily'} edition · ${topic.sources.length} source${topic.sources.length === 1 ? '' : 's'} · ${all.length} article${all.length === 1 ? '' : 's'}</p>
+            <p>${topic.cadence === 'weekly' ? 'Weekly' : 'Daily'} edition · ${topic.sources.length} source${topic.sources.length === 1 ? '' : 's'} · ${all.length} article${all.length === 1 ? '' : 's'}${topic.preparedAt ? ' · Reader-ready' : ''}</p>
           </div>
           <div class="topic-feeds-hero-actions">
             <button class="secondary" id="topic-manage" type="button">Manage</button>
-            <button class="primary" id="topic-refresh" type="button" ${loading ? 'disabled' : ''}>${loading ? 'Refreshing…' : 'Refresh now'}</button>
+            <button class="primary" id="topic-refresh" type="button" ${(loading || preparing) ? 'disabled' : ''}>${preparing ? 'Preparing articles…' : (loading ? 'Refreshing…' : 'Refresh now')}</button>
           </div>
         </header>
 

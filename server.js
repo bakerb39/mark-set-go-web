@@ -30,6 +30,11 @@ const MAX_TRANSLATION_CHARS = 120000;
 const MAX_GUTENBERG_BOOK_BYTES = 12 * 1024 * 1024;
 const MAX_ACCOUNT_DOCUMENT_BYTES = 5 * 1024 * 1024;
 const GUTENDEX_BASE = 'https://gutendex.com';
+const WEB_CAPTURE_CACHE = new Map();
+const WEB_CAPTURE_TTL_MS = 10 * 60 * 1000;
+const TOPIC_ARTICLE_CACHE = new Map();
+const TOPIC_ARTICLE_CACHE_TTL_MS = 18 * 60 * 60 * 1000;
+
 const GUTENBERG_MIRROR_BASES = (process.env.GUTENBERG_MIRROR_BASES || process.env.GUTENBERG_MIRROR_BASE || 'https://gutenberg.pglaf.org,https://mirrors.xmission.com/gutenberg').split(',').map((value) => value.trim().replace(/\/+$/, '')).filter(Boolean);
 
 const CURRENT_READING_SOURCES = [
@@ -2626,7 +2631,7 @@ async function fetchArticleForFeed(rawUrl, expectedTitle) {
     if (contentType.includes('text/plain')) {
       const text = source.replace(/\s+/g, ' ').trim();
       if (text.length < 300) throw new Error('The publisher did not return enough article text.');
-      return text;
+      return { text, documentToc: [] };
     }
 
     const $ = cheerio.load(source);
@@ -2655,6 +2660,9 @@ async function fetchArticleForFeed(rawUrl, expectedTitle) {
       'you may also like',
       'read more'
     ];
+
+    const readerWordCount = (value) =>
+      String(value || '').trim().split(/\s+/).filter(Boolean).length;
 
     const extractArticleBlocks = (element) => {
       const container = $(element).clone();
@@ -2689,45 +2697,62 @@ async function fetchArticleForFeed(rawUrl, expectedTitle) {
           break;
         }
 
-        // Avoid tiny navigation fragments, but preserve real section headings and list items.
         if (!isHeading && text.length < 28) continue;
         if (isHeading && text.length > 160) continue;
 
-        // Skip exact duplicate cards/paragraphs that some publisher pages repeat.
         const dedupeKey = text.toLowerCase();
         if (seen.has(dedupeKey)) continue;
         seen.add(dedupeKey);
 
-        if (isHeading) {
-          blocks.push(text);
-        } else if (tag === 'li') {
-          blocks.push(`• ${text}`);
-        } else {
-          blocks.push(text);
-        }
+        blocks.push({
+          text: tag === 'li' ? `• ${text}` : text,
+          heading: isHeading,
+          headingTitle: isHeading ? text : ''
+        });
       }
 
-      return blocks.join('\n\n').trim();
+      let wordIndex = 0;
+      const documentToc = [];
+      const pieces = [];
+
+      for (const block of blocks) {
+        if (block.heading && block.headingTitle) {
+          documentToc.push({
+            title: block.headingTitle,
+            index: wordIndex,
+            type: 'section'
+          });
+        }
+        pieces.push(block.text);
+        wordIndex += readerWordCount(block.text);
+      }
+
+      return {
+        text: pieces.join('\n\n').trim(),
+        documentToc
+      };
     };
 
-    let best = '';
+    let best = { text: '', documentToc: [] };
     for (const selector of selectors) {
       $(selector).each((_index, element) => {
         const candidate = extractArticleBlocks(element);
-        if (candidate.length > best.length) best = candidate;
+        if (candidate.text.length > best.text.length) best = candidate;
       });
 
-      // Prefer a focused article container once it has enough substantive text.
-      if (best.length >= 900) break;
+      if (best.text.length >= 900) break;
     }
 
-    if (best.length < 350) throw new Error('The publisher did not expose readable article text.');
+    if (best.text.length < 350) throw new Error('The publisher did not expose readable article text.');
     const genericSignals = ['sign in to continue', 'enable javascript', 'accept all cookies', 'latest news and headlines'];
-    const lower = best.toLowerCase();
-    if (genericSignals.some((signal) => lower.includes(signal)) && best.length < 1200) {
+    const lower = best.text.toLowerCase();
+    if (genericSignals.some((signal) => lower.includes(signal)) && best.text.length < 1200) {
       throw new Error('The publisher returned a consent or navigation page instead of article text.');
     }
-    return best.slice(0, 500000);
+    return {
+      text: best.text.slice(0, 500000),
+      documentToc: best.documentToc.slice(0, 100)
+    };
   } finally {
     clearTimeout(timeout);
   }
@@ -3494,6 +3519,54 @@ app.post('/api/import/docx', express.raw({
   }
 });
 
+
+function cleanCaptureDocumentToc(value) {
+  let parsed = value;
+  if (typeof parsed === 'string') {
+    try { parsed = JSON.parse(parsed); } catch { parsed = []; }
+  }
+  if (!Array.isArray(parsed)) return [];
+  return parsed.slice(0, 200).map((entry) => ({
+    title: String(entry?.title || '').replace(/\s+/g, ' ').trim().slice(0, 220),
+    index: Math.max(0, Number(entry?.index) || 0),
+    type: String(entry?.type || 'section').trim().slice(0, 40) || 'section'
+  })).filter((entry) => entry.title);
+}
+
+function purgeExpiredWebCaptures() {
+  const now = Date.now();
+  for (const [token, record] of WEB_CAPTURE_CACHE) {
+    if (!record?.expiresAt || record.expiresAt <= now) WEB_CAPTURE_CACHE.delete(token);
+  }
+}
+
+function topicArticleCacheKey(url, title = '') {
+  return `${String(url || '').trim().toLowerCase()}|${String(title || '').trim().toLowerCase()}`;
+}
+
+function getCachedTopicArticle(url, title = '') {
+  const key = topicArticleCacheKey(url, title);
+  const record = TOPIC_ARTICLE_CACHE.get(key);
+  if (!record) return null;
+  if (record.expiresAt <= Date.now()) {
+    TOPIC_ARTICLE_CACHE.delete(key);
+    return null;
+  }
+  return record.payload;
+}
+
+function putCachedTopicArticle(urls, title, payload) {
+  const expiresAt = Date.now() + TOPIC_ARTICLE_CACHE_TTL_MS;
+  for (const url of [...new Set((Array.isArray(urls) ? urls : [urls]).filter(Boolean))]) {
+    TOPIC_ARTICLE_CACHE.set(topicArticleCacheKey(url, title), { expiresAt, payload });
+  }
+  // Keep the beta cache bounded.
+  if (TOPIC_ARTICLE_CACHE.size > 800) {
+    const excess = TOPIC_ARTICLE_CACHE.size - 700;
+    for (const key of [...TOPIC_ARTICLE_CACHE.keys()].slice(0, excess)) TOPIC_ARTICLE_CACHE.delete(key);
+  }
+}
+
 app.post('/capture', (req, res) => {
   const payload = {
     title: String(req.body?.title || 'Web Article').trim().slice(0, 500),
@@ -3501,11 +3574,33 @@ app.post('/capture', (req, res) => {
     url: String(req.body?.url || '').trim().slice(0, 4000),
     text: String(req.body?.text || '').trim().slice(0, 5_000_000),
     captureType: req.body?.captureType === 'selection' ? 'selection' : 'page',
-    context: String(req.body?.context || '').trim().slice(0, 10000)
+    context: String(req.body?.context || '').trim().slice(0, 10000),
+    documentToc: cleanCaptureDocumentToc(req.body?.structure)
   };
   if (!payload.text) return res.status(400).send('No readable webpage text was received.');
-  const serialized = JSON.stringify(payload).replace(/</g, '\\u003c');
-  res.type('html').send(`<!doctype html><meta charset="utf-8"><title>Opening Mark, Set, Go!</title><p>Opening the captured content in Mark, Set, Go!…</p><script>localStorage.setItem('markSetGoPendingWebCaptureV1',${JSON.stringify(serialized)});location.replace('/#read-anything-capture=1');<\/script>`);
+
+  purgeExpiredWebCaptures();
+  const token = crypto.randomBytes(18).toString('base64url');
+  WEB_CAPTURE_CACHE.set(token, {
+    payload,
+    expiresAt: Date.now() + WEB_CAPTURE_TTL_MS
+  });
+
+  // Redirect directly into the app. This avoids writing a multi-megabyte capture
+  // into localStorage, which can fail when browser storage is full.
+  return res.redirect(303, `/#read-anything-capture=${encodeURIComponent(token)}`);
+});
+
+app.get('/api/capture/:token', (req, res) => {
+  purgeExpiredWebCaptures();
+  const token = String(req.params?.token || '');
+  const record = WEB_CAPTURE_CACHE.get(token);
+  if (!record || record.expiresAt <= Date.now()) {
+    WEB_CAPTURE_CACHE.delete(token);
+    return res.status(404).json({ error: 'This captured page expired. Run the bookmarklet again.' });
+  }
+  WEB_CAPTURE_CACHE.delete(token);
+  return res.json(record.payload);
 });
 
 app.post('/api/fetch-text', async (req, res) => {
@@ -3779,16 +3874,19 @@ async function resolveArticleFromPublisherFeed(publisherUrl, expectedTitle) {
   }
 }
 
-app.post('/api/current/article', async (req, res) => {
-  const originalUrl = String(req.body?.url || '').trim();
-  const title = String(req.body?.title || 'Article').trim();
-  const summary = String(req.body?.summary || '').trim();
-  const source = String(req.body?.source || 'Feed').trim();
 
-  let publisherUrl = String(req.body?.publisherUrl || '').trim();
-  if (!publisherUrl) publisherUrl = publisherSiteForSourceName(source);
+async function prepareTopicArticle({
+  originalUrl,
+  title = 'Article',
+  summary = '',
+  source = 'Feed',
+  publisherUrl = ''
+}) {
+  const cached = getCachedTopicArticle(originalUrl, title);
+  if (cached) return { ...cached, cacheHit: true };
 
-  if (!originalUrl) return res.status(400).json({ error: 'The article URL is missing.' });
+  let resolvedPublisherUrl = String(publisherUrl || '').trim();
+  if (!resolvedPublisherUrl) resolvedPublisherUrl = publisherSiteForSourceName(source);
 
   let articleUrl = originalUrl;
   let needsRepair = false;
@@ -3796,77 +3894,129 @@ app.post('/api/current/article', async (req, res) => {
   try {
     const host = new URL(originalUrl).hostname;
     needsRepair = isBadArticleHost(host) ||
-      (publisherUrl && !hostMatchesPublisher(originalUrl, publisherUrl));
+      (resolvedPublisherUrl && !hostMatchesPublisher(originalUrl, resolvedPublisherUrl));
   } catch {
     needsRepair = true;
   }
 
-  if (needsRepair && publisherUrl) {
-    // First repair stale/bad links from the publisher's own RSS/Atom feed.
-    // This is especially reliable for CoinDesk because its verified official
-    // feed already contains canonical article <link> values.
-    const feedResolved = await resolveArticleFromPublisherFeed(publisherUrl, title);
-
+  if (needsRepair && resolvedPublisherUrl) {
+    const feedResolved = await resolveArticleFromPublisherFeed(resolvedPublisherUrl, title);
     if (feedResolved) {
       articleUrl = feedResolved;
     } else {
-      // Secondary repair: find the matching headline on publisher listing pages.
-      const pageResolved = await resolvePublisherArticleUrl(publisherUrl, title);
-      if (pageResolved && hostMatchesPublisher(pageResolved, publisherUrl)) {
-        articleUrl = pageResolved;
-      }
+      const pageResolved = await resolvePublisherArticleUrl(resolvedPublisherUrl, title);
+      if (pageResolved && hostMatchesPublisher(pageResolved, resolvedPublisherUrl)) articleUrl = pageResolved;
     }
   }
 
-  // Never import analytics, metadata, or unrelated third-party URLs as articles.
   try {
     const finalHost = new URL(articleUrl).hostname;
     if (
       isBadArticleHost(finalHost) ||
-      (publisherUrl && !hostMatchesPublisher(articleUrl, publisherUrl))
+      (resolvedPublisherUrl && !hostMatchesPublisher(articleUrl, resolvedPublisherUrl))
     ) {
       throw new Error('The feed did not provide a usable publisher article URL.');
     }
   } catch (error) {
-    if (summary) {
-      return res.json({
-        title,
-        fullArticle: false,
-        sourceUrl: publisherUrl || originalUrl,
-        text: `${title}\n\n${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${publisherUrl || originalUrl}`,
-        warning: error?.message || 'A direct publisher article URL could not be resolved.'
-      });
+    const payload = summary ? {
+      title,
+      fullArticle: false,
+      sourceUrl: resolvedPublisherUrl || originalUrl,
+      documentToc: [],
+      text: `${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${resolvedPublisherUrl || originalUrl}`,
+      warning: error?.message || 'A direct publisher article URL could not be resolved.'
+    } : null;
+    if (payload) {
+      putCachedTopicArticle([originalUrl], title, payload);
+      return payload;
     }
-    return res.status(502).json({ error: error?.message || 'A direct publisher article URL could not be resolved.' });
+    throw error;
   }
 
   try {
-    const articleText = await fetchArticleForFeed(articleUrl, title);
-    return res.json({
+    const article = await fetchArticleForFeed(articleUrl, title);
+    const payload = {
       title,
       fullArticle: true,
       sourceUrl: articleUrl,
       repairedUrl: articleUrl !== originalUrl,
-      text: `${title}\n\n${articleText}\n\nSource: ${source}\n${articleUrl}`
-    });
+      documentToc: Array.isArray(article?.documentToc) ? article.documentToc : [],
+      text: `${String(article?.text || '').trim()}\n\nSource: ${source}\n${articleUrl}`
+    };
+    putCachedTopicArticle([originalUrl, articleUrl], title, payload);
+    return payload;
   } catch (error) {
     if (summary) {
-      return res.json({
+      const payload = {
         title,
         fullArticle: false,
         sourceUrl: articleUrl,
         repairedUrl: articleUrl !== originalUrl,
-        text: `${title}\n\n${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${articleUrl}`,
+        documentToc: [],
+        text: `${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${articleUrl}`,
         warning: error?.message || 'The publisher did not expose readable article text.'
-      });
+      };
+      putCachedTopicArticle([originalUrl, articleUrl], title, payload);
+      return payload;
     }
+    throw error;
+  }
+}
 
+app.post('/api/current/article', async (req, res) => {
+  const originalUrl = String(req.body?.url || '').trim();
+  const title = String(req.body?.title || 'Article').trim();
+  const summary = String(req.body?.summary || '').trim();
+  const source = String(req.body?.source || 'Feed').trim();
+  const publisherUrl = String(req.body?.publisherUrl || '').trim();
+
+  if (!originalUrl) return res.status(400).json({ error: 'The article URL is missing.' });
+
+  try {
+    const payload = await prepareTopicArticle({ originalUrl, title, summary, source, publisherUrl });
+    return res.json(payload);
+  } catch (error) {
     const message = error?.name === 'AbortError'
       ? 'The article took too long to respond.'
       : error?.message || 'The article could not be imported.';
     return res.status(502).json({ error: message });
   }
 });
+
+app.post('/api/topic-feeds/prefetch', async (req, res) => {
+  const articles = Array.isArray(req.body?.articles) ? req.body.articles.slice(0, 60) : [];
+  if (!articles.length) return res.json({ prepared: 0, failed: 0 });
+
+  let cursor = 0;
+  let prepared = 0;
+  let failed = 0;
+  const workers = Math.min(6, articles.length);
+
+  async function worker() {
+    while (cursor < articles.length) {
+      const index = cursor++;
+      const article = articles[index] || {};
+      const originalUrl = String(article.url || '').trim();
+      if (!originalUrl) { failed += 1; continue; }
+      try {
+        await prepareTopicArticle({
+          originalUrl,
+          title: String(article.title || 'Article').trim(),
+          summary: String(article.summary || '').trim(),
+          source: String(article.sourceName || 'Topic Feed').trim(),
+          publisherUrl: String(article.sourceUrl || '').trim()
+        });
+        prepared += 1;
+      } catch {
+        failed += 1;
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return res.json({ prepared, failed });
+});
+
 
 app.get('/api/current/sources', (_req, res) => {
   return res.json({ sources: CURRENT_READING_SOURCES.map(({ feedUrl, ...source }) => source) });
