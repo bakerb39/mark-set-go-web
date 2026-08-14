@@ -1,0 +1,131 @@
+.crypto-market-ticker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 34px;
+  padding: 4px 16px;
+  border-bottom: 1px solid rgba(31, 58, 93, .18);
+  background: #f8fbff;
+  color: #14243a;
+  font-size: .82rem;
+  overflow: hidden;
+}
+
+.crypto-market-ticker[hidden] {
+  display: none !important;
+}
+
+.crypto-ticker-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 0 0 auto;
+  color: #17365d;
+}
+
+.crypto-ticker-label strong {
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.crypto-ticker-label span,
+.crypto-ticker-provider {
+  opacity: .6;
+  font-size: .72rem;
+}
+
+.crypto-ticker-viewport {
+  min-width: 0;
+  overflow: hidden;
+  flex: 1 1 auto;
+  mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 14px), transparent);
+}
+
+.crypto-ticker-track {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  animation: cryptoTickerScroll 34s linear infinite;
+  will-change: transform;
+}
+
+.crypto-market-ticker:hover .crypto-ticker-track,
+.crypto-market-ticker:focus-within .crypto-ticker-track {
+  animation-play-state: paused;
+}
+
+.crypto-ticker-set {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.crypto-ticker-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 14px;
+  white-space: nowrap;
+  border-right: 1px solid rgba(31, 58, 93, .14);
+}
+
+.crypto-ticker-item strong {
+  color: #17365d;
+}
+
+.crypto-ticker-change.up {
+  color: #197642;
+}
+
+.crypto-ticker-change.down {
+  color: #a12a2a;
+}
+
+.crypto-ticker-change.flat {
+  color: #586777;
+}
+
+.crypto-ticker-loading,
+.crypto-ticker-error {
+  padding: 0 14px;
+  opacity: .72;
+}
+
+.crypto-ticker-provider {
+  flex: 0 0 auto;
+}
+
+@keyframes cryptoTickerScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crypto-ticker-track {
+    animation: none;
+  }
+
+  .crypto-ticker-set[aria-hidden="true"] {
+    display: none;
+  }
+
+  .crypto-ticker-viewport {
+    overflow-x: auto;
+    mask-image: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .crypto-market-ticker {
+    padding-inline: 10px;
+    gap: 8px;
+  }
+
+  .crypto-ticker-provider {
+    display: none;
+  }
+
+  .crypto-ticker-item {
+    padding-inline: 10px;
+  }
+}

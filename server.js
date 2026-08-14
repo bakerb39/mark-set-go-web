@@ -34,6 +34,9 @@ const WEB_CAPTURE_CACHE = new Map();
 const WEB_CAPTURE_TTL_MS = 10 * 60 * 1000;
 const TOPIC_ARTICLE_CACHE = new Map();
 const TOPIC_ARTICLE_CACHE_TTL_MS = 18 * 60 * 60 * 1000;
+const CRYPTO_TICKER_CACHE_TTL_MS = 60 * 1000;
+let cryptoTickerCache = { fetchedAt: 0, data: null };
+
 
 const GUTENBERG_MIRROR_BASES = (process.env.GUTENBERG_MIRROR_BASES || process.env.GUTENBERG_MIRROR_BASE || 'https://gutenberg.pglaf.org,https://mirrors.xmission.com/gutenberg').split(',').map((value) => value.trim().replace(/\/+$/, '')).filter(Boolean);
 
@@ -5102,6 +5105,95 @@ function topicFeedGoogleNewsUrl(topic, hostname) {
   });
   return `https://news.google.com/rss/search?${params.toString()}`;
 }
+
+app.get('/api/crypto-ticker', async (_req, res) => {
+  const now = Date.now();
+
+  if (cryptoTickerCache.data && now - cryptoTickerCache.fetchedAt < CRYPTO_TICKER_CACHE_TTL_MS) {
+    return res.json({ ...cryptoTickerCache.data, cached: true });
+  }
+
+  const ids = [
+    ['bitcoin', 'BTC', 'Bitcoin'],
+    ['ethereum', 'ETH', 'Ethereum'],
+    ['solana', 'SOL', 'Solana'],
+    ['ripple', 'XRP', 'XRP'],
+    ['dogecoin', 'DOGE', 'Dogecoin']
+  ];
+
+  const url = new URL('https://api.coingecko.com/api/v3/simple/price');
+  url.searchParams.set('ids', ids.map(([id]) => id).join(','));
+  url.searchParams.set('vs_currencies', 'usd');
+  url.searchParams.set('include_24hr_change', 'true');
+  url.searchParams.set('include_last_updated_at', 'true');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'MarkSetGo/1.0 crypto ticker'
+      }
+    });
+
+    if (!response.ok) {
+      const error = new Error(`Crypto price provider returned HTTP ${response.status}.`);
+      error.status = response.status;
+      throw error;
+    }
+
+    const payload = await response.json();
+    const coins = ids.map(([id, symbol, name]) => {
+      const row = payload?.[id] || {};
+      const price = Number(row.usd);
+      const change24h = Number(row.usd_24h_change);
+      const updatedAt = Number(row.last_updated_at);
+
+      return {
+        id,
+        symbol,
+        name,
+        price: Number.isFinite(price) ? price : null,
+        change24h: Number.isFinite(change24h) ? change24h : null,
+        updatedAt: Number.isFinite(updatedAt) ? updatedAt : null
+      };
+    }).filter((coin) => coin.price !== null);
+
+    if (!coins.length) throw new Error('No cryptocurrency prices were returned.');
+
+    const data = {
+      coins,
+      provider: 'CoinGecko',
+      fetchedAt: new Date().toISOString()
+    };
+
+    cryptoTickerCache = { fetchedAt: now, data };
+    return res.json({ ...data, cached: false });
+  } catch (error) {
+    // If the public provider is temporarily rate-limited/unavailable, keep the
+    // last successful strip visible rather than blanking the user's header.
+    if (cryptoTickerCache.data) {
+      return res.json({
+        ...cryptoTickerCache.data,
+        cached: true,
+        stale: true,
+        warning: error?.message || 'Live cryptocurrency prices are temporarily unavailable.'
+      });
+    }
+
+    return res.status(error?.status === 429 ? 429 : 502).json({
+      error: error?.name === 'AbortError'
+        ? 'Cryptocurrency prices took too long to respond.'
+        : error?.message || 'Cryptocurrency prices are temporarily unavailable.'
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
 
 app.post('/api/topic-feeds/fetch', async (req, res) => {
   const topic = cleanText(req.body?.topic, 200);
