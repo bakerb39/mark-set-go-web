@@ -1,21 +1,24 @@
-MARK, SET, GO! — CANONICAL RSS LINK FIX
+MARK, SET, GO! — TOPIC FEED URL REPAIR
 
-Replace only the ROOT server.js.
+Replace all three files:
 
-This fixes the exact CoinDesk failure where the article source became:
-https://www.googletagmanager.com/gtag/js?id=...
+ROOT:
+server.js
 
-Cause:
-The verified CoinDesk RSS feed was being used correctly, but the parser then
-scanned the article description HTML and replaced CoinDesk's legitimate <link>
-with the first embedded URL it found (sometimes Google Tag Manager).
+PUBLIC:
+public/topic-feeds.js
+public/index.html
 
-Fix:
-- If RSS/Atom supplies a normal article <link>, that link is authoritative.
-- Embedded URL extraction is now used ONLY when the primary link itself is a
-  Google News wrapper or XML/schema metadata URL.
-- Analytics, GTM, ads, schema, and other resources inside descriptions cannot
-  replace a valid publisher article link.
+Why this package is different:
+- It does not depend on a successful feed refresh to repair old bad URLs.
+- When Read in Reader receives a Google News, Google Tag Manager, W3/XML,
+  analytics, metadata, or unrelated third-party URL, the server repairs it.
+- The server first searches the publisher's own RSS/Atom feed for the matching
+  headline and takes that feed item's canonical article <link>.
+- Only if that fails does it try the publisher's own listing pages.
+- CoinDesk is recognized even if the browser fails to send publisherUrl.
+- Analytics/metadata URLs are never accepted as article URLs.
+- The browser JS is cache-busted and explicitly sends the configured publisher URL.
 
-After Render deploys, click Refresh in Topic Feeds to replace the existing bad
-cached GTM URLs with the canonical URLs from CoinDesk's official RSS feed.
+This means existing cached CoinDesk entries containing googletagmanager.com can
+be repaired when clicked; you do not have to recreate the Topic Feed first.

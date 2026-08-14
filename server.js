@@ -3639,62 +3639,151 @@ async function resolvePublisherArticleUrl(publisherUrl, expectedTitle) {
   return bestUrl;
 }
 
+
+function publisherSiteForSourceName(sourceName = '') {
+  const name = String(sourceName || '').trim().toLowerCase();
+  if (name.includes('coindesk')) return 'https://www.coindesk.com/';
+  if (name.includes('bitcoin magazine')) return 'https://bitcoinmagazine.com/';
+  if (name === 'sec' || name.includes('u.s. sec') || name.includes('securities and exchange commission')) {
+    return 'https://www.sec.gov/';
+  }
+  return '';
+}
+
+function isBadArticleHost(hostname = '') {
+  const host = String(hostname || '').toLowerCase().replace(/^www\./, '');
+  return [
+    'news.google.com',
+    'googletagmanager.com',
+    'google-analytics.com',
+    'doubleclick.net',
+    'googlesyndication.com',
+    'w3.org',
+    'schema.org',
+    'purl.org',
+    'xmlns.com'
+  ].some((bad) => host === bad || host.endsWith(`.${bad}`));
+}
+
+function hostMatchesPublisher(articleUrl, publisherUrl) {
+  if (!publisherUrl) return true;
+  try {
+    const articleHost = new URL(articleUrl).hostname.toLowerCase().replace(/^www\./, '');
+    const publisherHost = new URL(publisherUrl).hostname.toLowerCase().replace(/^www\./, '');
+    return articleHost === publisherHost ||
+      articleHost.endsWith(`.${publisherHost}`) ||
+      publisherHost.endsWith(`.${articleHost}`);
+  } catch {
+    return false;
+  }
+}
+
+async function resolveArticleFromPublisherFeed(publisherUrl, expectedTitle) {
+  if (!publisherUrl || !expectedTitle) return '';
+
+  try {
+    const discovered = await discoverPublisherFeed(publisherUrl);
+    const items = Array.isArray(discovered?.items) ? discovered.items : [];
+    const expected = normalizedHeadlineWords(expectedTitle);
+    if (!expected.size) return '';
+
+    let bestUrl = '';
+    let bestScore = 0;
+
+    for (const item of items) {
+      if (!item?.link || !hostMatchesPublisher(item.link, publisherUrl)) continue;
+
+      const actual = normalizedHeadlineWords(item.title || '');
+      if (!actual.size) continue;
+
+      let matches = 0;
+      for (const word of expected) if (actual.has(word)) matches += 1;
+
+      const coverage = matches / expected.size;
+      const score = matches / Math.max(expected.size, actual.size);
+
+      if (matches >= Math.min(3, Math.ceil(expected.size * 0.45)) &&
+          coverage >= 0.55 &&
+          score > bestScore) {
+        bestScore = score;
+        bestUrl = item.link;
+      }
+    }
+
+    return bestUrl;
+  } catch {
+    return '';
+  }
+}
+
 app.post('/api/current/article', async (req, res) => {
   const originalUrl = String(req.body?.url || '').trim();
   const title = String(req.body?.title || 'Article').trim();
   const summary = String(req.body?.summary || '').trim();
   const source = String(req.body?.source || 'Feed').trim();
-  const publisherUrl = String(req.body?.publisherUrl || '').trim();
+
+  let publisherUrl = String(req.body?.publisherUrl || '').trim();
+  if (!publisherUrl) publisherUrl = publisherSiteForSourceName(source);
+
   if (!originalUrl) return res.status(400).json({ error: 'The article URL is missing.' });
 
   let articleUrl = originalUrl;
+  let needsRepair = false;
 
   try {
-    const host = new URL(originalUrl).hostname.toLowerCase();
-    const isGoogleWrapper = host === 'news.google.com' || host.endsWith('.news.google.com');
-    const isMetadataUrl =
-      host === 'w3.org' || host.endsWith('.w3.org') ||
-      host === 'schema.org' || host.endsWith('.schema.org') ||
-      host === 'purl.org' || host.endsWith('.purl.org') ||
-      host === 'xmlns.com' || host.endsWith('.xmlns.com');
+    const host = new URL(originalUrl).hostname;
+    needsRepair = isBadArticleHost(host) ||
+      (publisherUrl && !hostMatchesPublisher(originalUrl, publisherUrl));
+  } catch {
+    needsRepair = true;
+  }
 
-    if (isGoogleWrapper) {
-      const embedded = await directUrlFromGoogleNewsPage(originalUrl, publisherUrl);
-      if (embedded) {
-        articleUrl = embedded;
-      } else {
-        const resolved = await resolvePublisherArticleUrl(publisherUrl, title);
-        if (resolved) articleUrl = resolved;
+  if (needsRepair && publisherUrl) {
+    // First repair stale/bad links from the publisher's own RSS/Atom feed.
+    // This is especially reliable for CoinDesk because its verified official
+    // feed already contains canonical article <link> values.
+    const feedResolved = await resolveArticleFromPublisherFeed(publisherUrl, title);
+
+    if (feedResolved) {
+      articleUrl = feedResolved;
+    } else {
+      // Secondary repair: find the matching headline on publisher listing pages.
+      const pageResolved = await resolvePublisherArticleUrl(publisherUrl, title);
+      if (pageResolved && hostMatchesPublisher(pageResolved, publisherUrl)) {
+        articleUrl = pageResolved;
       }
-    } else if (isMetadataUrl) {
-      // Bad URL from an RSS/XML namespace is never an article. Resolve the
-      // headline against the actual publisher site instead.
-      const resolved = await resolvePublisherArticleUrl(publisherUrl, title);
-      if (resolved) articleUrl = resolved;
     }
-  } catch {}
+  }
+
+  // Never import analytics, metadata, or unrelated third-party URLs as articles.
+  try {
+    const finalHost = new URL(articleUrl).hostname;
+    if (
+      isBadArticleHost(finalHost) ||
+      (publisherUrl && !hostMatchesPublisher(articleUrl, publisherUrl))
+    ) {
+      throw new Error('The feed did not provide a usable publisher article URL.');
+    }
+  } catch (error) {
+    if (summary) {
+      return res.json({
+        title,
+        fullArticle: false,
+        sourceUrl: publisherUrl || originalUrl,
+        text: `${title}\n\n${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${publisherUrl || originalUrl}`,
+        warning: error?.message || 'A direct publisher article URL could not be resolved.'
+      });
+    }
+    return res.status(502).json({ error: error?.message || 'A direct publisher article URL could not be resolved.' });
+  }
 
   try {
-    try {
-      const resolvedHost = new URL(articleUrl).hostname.toLowerCase();
-      if (
-        resolvedHost === 'w3.org' || resolvedHost.endsWith('.w3.org') ||
-        resolvedHost === 'schema.org' || resolvedHost.endsWith('.schema.org') ||
-        resolvedHost === 'purl.org' || resolvedHost.endsWith('.purl.org') ||
-        resolvedHost === 'xmlns.com' || resolvedHost.endsWith('.xmlns.com')
-      ) {
-        throw new Error('The feed supplied XML metadata instead of an article URL.');
-      }
-    } catch (error) {
-      if (error?.message?.includes('XML metadata')) throw error;
-    }
-
     const articleText = await fetchArticleForFeed(articleUrl, title);
     return res.json({
       title,
       fullArticle: true,
       sourceUrl: articleUrl,
-      resolvedFromGoogleNews: articleUrl !== originalUrl,
+      repairedUrl: articleUrl !== originalUrl,
       text: `${title}\n\n${articleText}\n\nSource: ${source}\n${articleUrl}`
     });
   } catch (error) {
@@ -3703,11 +3792,12 @@ app.post('/api/current/article', async (req, res) => {
         title,
         fullArticle: false,
         sourceUrl: articleUrl,
-        resolvedFromGoogleNews: articleUrl !== originalUrl,
+        repairedUrl: articleUrl !== originalUrl,
         text: `${title}\n\n${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${articleUrl}`,
         warning: error?.message || 'The publisher did not expose readable article text.'
       });
     }
+
     const message = error?.name === 'AbortError'
       ? 'The article took too long to respond.'
       : error?.message || 'The article could not be imported.';
