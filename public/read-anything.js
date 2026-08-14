@@ -488,9 +488,13 @@
     if (!activeImportedDocument) return;
     const versionKey = `summary${style.charAt(0).toUpperCase()}${style.slice(1)}`;
     if (activeImportedDocument.versions[versionKey]) return renderImportedVersion(versionKey);
-    const sourceText = transformSourceText();
+    const sourceText = String(
+      activeImportedDocument.versions?.original ||
+      activeImportedDocument.originalText ||
+      transformSourceText()
+    ).trim();
     if (sourceText.length < 20) throw new Error('The saved document text is unavailable. Reopen the original item from My Library and try again.');
-    showTransformStatus(`Creating ${style} summary…`);
+    showTransformStatus(`Creating ${style} summary of the whole article…`);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 90000);
     try {
@@ -1091,10 +1095,80 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     });
   }
 
+  function isWholeArticleDocument() {
+    const type = String(activeImportedDocument?.source?.type || '').toLowerCase();
+    return ['topic-feed', 'bookmarklet', 'website'].includes(type);
+  }
+
+  function installArticleSummaryButton() {
+    const existing = document.querySelector('#read-anything-article-summary-action');
+
+    if (!activeImportedDocument || !isWholeArticleDocument()) {
+      existing?.remove();
+      return;
+    }
+
+    const titleCopy = document.querySelector('#app .reader-title-copy');
+    if (!titleCopy) return;
+
+    const links = titleCopy.querySelector('.reader-title-links') || titleCopy;
+    let wrap = existing;
+
+    if (!wrap) {
+      wrap = document.createElement('span');
+      wrap.id = 'read-anything-article-summary-action';
+      wrap.className = 'read-anything-article-summary-action';
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'secondary';
+      button.dataset.action = 'summarize-whole-article';
+      wrap.appendChild(button);
+      links.appendChild(wrap);
+    }
+
+    const button = wrap.querySelector('[data-action="summarize-whole-article"]');
+    if (!button) return;
+
+    const showingSummary = activeImportedVersion.startsWith('summary');
+    button.textContent = showingSummary ? '← Back to full article' : 'Summarize article';
+    button.title = showingSummary
+      ? 'Return to the complete article'
+      : 'Summarize the entire article into its key points — no highlighting required.';
+    button.disabled = false;
+
+    button.onclick = async () => {
+      if (activeImportedVersion.startsWith('summary')) {
+        renderImportedVersion('original');
+        return;
+      }
+
+      const originalLabel = button.textContent;
+      button.disabled = true;
+      button.textContent = 'Summarizing whole article…';
+
+      try {
+        await requestSummary('quick');
+      } catch (error) {
+        showTransformStatus(error.message, true);
+        button.textContent = 'Summary failed — try again';
+        button.title = error.message || 'The article could not be summarized.';
+        window.setTimeout(() => {
+          if (!button.isConnected) return;
+          button.disabled = false;
+          button.textContent = originalLabel;
+        }, 2500);
+      }
+    };
+  }
+
   function scheduleFormatControlAttach() {
     document.querySelector('#read-anything-format-control')?.remove();
     document.dispatchEvent(new CustomEvent('marksetgo:transform-state', { detail: { version: activeImportedVersion, label: versionLabel(activeImportedVersion), active: Boolean(activeImportedDocument) } }));
-    [0, 100, 350, 800].forEach((delay) => window.setTimeout(installDisplayFormatControl, delay));
+    [0, 100, 350, 800].forEach((delay) => window.setTimeout(() => {
+      installDisplayFormatControl();
+      installArticleSummaryButton();
+    }, delay));
     return;
     formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
     formatControlAttachTimers = [];

@@ -4944,7 +4944,7 @@ app.post('/api/read-anything/summarize', async (req, res) => {
       body: JSON.stringify({
         model, reasoning: { effort: 'low' }, store: false,
         input: [
-          { role: 'developer', content: [{ type: 'input_text', text: 'Summarize the supplied reading according to the requested style. Quick: no more than 75 words or 5 short bullets. Study: 180–250 words with the main argument, essential evidence, and key qualifications. Detailed: a concise section-by-section summary that remains substantially shorter than the source. Omit repetition and minor examples unless essential. Preserve critical names, dates, numbers, and uncertainty. Do not invent information, add opinions, or mention these instructions. Return only the summary.' }] },
+          { role: 'developer', content: [{ type: 'input_text', text: 'Summarize the supplied reading according to the requested style. Quick: summarize the WHOLE supplied article as 3–5 short bullet points, no more than 90 words total. Lead with the article’s main takeaway, then preserve the most important facts, evidence, numbers, developments, and qualifications. Do not summarize only the opening paragraphs. Study: 180–250 words with the main argument, essential evidence, and key qualifications. Detailed: a concise section-by-section summary that remains substantially shorter than the source. Omit repetition and minor examples unless essential. Preserve critical names, dates, numbers, and uncertainty. Do not invent information, add opinions, or mention these instructions. Return only the summary.' }] },
           { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, text, style, customInstructions: customInstructions || undefined }) }] }
         ]
       })
