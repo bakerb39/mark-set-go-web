@@ -4972,6 +4972,102 @@ app.post('/api/read-anything/summarize', async (req, res) => {
 });
 
 
+app.post('/api/read-anything/investor-analysis', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return res.status(503).json({ error: 'Ask Mark investor analysis is not configured. Add OPENAI_API_KEY to the server environment.' });
+
+  const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
+  const text = String(req.body?.text || '').replace(/\r/g, '').trim();
+  const sourceUrl = String(req.body?.sourceUrl || '').trim().slice(0, 4000);
+  const topic = String(req.body?.topic || '').trim().slice(0, 200);
+
+  if (text.length < 40) return res.status(400).json({ error: 'There is not enough article text to analyze.' });
+  if (text.length > 120000) return res.status(413).json({ error: 'This article is too long to analyze in one request.' });
+
+  const model = process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 110000);
+
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['heading', 'analysis', 'keyPoints', 'catalysts', 'risks', 'recommendation', 'cautions'],
+    properties: {
+      heading: { type: 'string' },
+      analysis: { type: 'string' },
+      keyPoints: { type: 'array', minItems: 2, maxItems: 6, items: { type: 'string' } },
+      catalysts: { type: 'array', minItems: 0, maxItems: 5, items: { type: 'string' } },
+      risks: { type: 'array', minItems: 0, maxItems: 5, items: { type: 'string' } },
+      recommendation: { type: 'string' },
+      cautions: { type: 'array', minItems: 1, maxItems: 4, items: { type: 'string' } }
+    }
+  };
+
+  const prompt = `You are Mark, a careful financial-news analyst inside a reading app.
+Analyze ONLY the supplied article. Treat the article as the source of facts; do not silently add current market prices, later events, or facts not contained in the supplied text.
+Provide professional-grade investor analysis while clearly distinguishing article facts from your inference.
+
+Cover:
+- the central investment thesis or market significance;
+- the most important facts and signals in the article;
+- plausible bullish and bearish implications;
+- catalysts or developments an investor should monitor next;
+- material risks, uncertainty, and what could invalidate the thesis;
+- a GENERAL investor posture/recommendation based on this article alone.
+
+The recommendation must be useful but not personalized. Do not tell a specific person to buy, sell, short, or allocate a percentage of a portfolio. Prefer general postures such as watch, research further, cautiously constructive, neutral, defensive, or avoid chasing until more evidence appears. If the article does not support a meaningful investment conclusion, say that explicitly rather than manufacturing one.
+Never promise returns or present speculation as certainty.
+If the article is not meaningfully investment-related, say that its investor implications are limited.
+Return only the requested structured result.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        reasoning: { effort: 'medium' },
+        store: false,
+        input: [
+          { role: 'developer', content: [{ type: 'input_text', text: prompt }] },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, topic: topic || undefined, sourceUrl: sourceUrl || undefined, article: text }) }] }
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'ask_mark_investor_analysis',
+            strict: true,
+            schema
+          }
+        }
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error?.message || `OpenAI returned HTTP ${response.status}.`);
+
+    const output = extractOpenAIOutputText(payload).trim();
+    if (!output) throw new Error('No investor analysis was returned.');
+
+    return res.json({ title, result: JSON.parse(output), model });
+  } catch (error) {
+    console.error('Ask Mark investor analysis failed:', error);
+    return res.status(502).json({
+      error: error?.name === 'AbortError'
+        ? 'Mark’s investor analysis took too long.'
+        : 'Mark could not complete the investor analysis.',
+      detail: error?.message || 'Unknown investor analysis error.'
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
+
 app.post('/api/read-anything/transform', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) return res.status(503).json({ error: 'Custom transformation is not configured. Add OPENAI_API_KEY to the server environment.' });

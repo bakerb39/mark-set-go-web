@@ -1100,6 +1100,144 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     return ['topic-feed', 'bookmarklet', 'website'].includes(type);
   }
 
+  function notifyAskMarkPanelUpdated(kind = 'response') {
+    document.dispatchEvent(new CustomEvent('marksetgo:askmark-legacy-updated', {
+      detail: { kind }
+    }));
+  }
+
+  function openAskMarkInvestorPanel() {
+    const layout = document.querySelector('#app #reader-layout');
+    const selectionTab = document.querySelector('#app [data-mark-tab="selection"]');
+    const markPanel = document.querySelector('#app #mark-selection-panel');
+
+    // Prefer the Reader's native Ask Mark opener when it is globally available.
+    if (typeof window.openMarkPanel === 'function') {
+      try { window.openMarkPanel('selection'); } catch {}
+    } else {
+      const hidden = layout?.classList.contains('word-panel-hidden');
+      const selectionActive = selectionTab?.classList.contains('active');
+      if ((hidden || !selectionActive) && document.querySelector('#app #toggle-mark-panel')) {
+        document.querySelector('#app #toggle-mark-panel').click();
+      }
+    }
+
+    // Defensive DOM sync for builds where the legacy functions are not exported.
+    layout?.classList.remove('word-panel-hidden');
+    document.querySelectorAll('#app [data-mark-tab]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.markTab === 'selection');
+    });
+    document.querySelectorAll('#app [data-mark-panel]').forEach((panel) => {
+      panel.hidden = panel.dataset.markPanel !== 'selection';
+    });
+
+    return markPanel || document.querySelector('#app #mark-selection-panel');
+  }
+
+  function renderInvestorAnalysisInAskMark(result, { loading = false, error = '' } = {}) {
+    const panel = openAskMarkInvestorPanel();
+    if (!panel) return;
+
+    if (loading) {
+      panel.innerHTML = `
+        <div class="mark-selection-card">
+          <span>Whole article · Investor view</span>
+          <blockquote>${escapeHtml(activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article')}</blockquote>
+        </div>
+        <div id="mark-response" class="mark-response">
+          <div class="mark-response-heading"><span>Ask Mark</span><strong>Investor analysis</strong></div>
+          <p class="status">Mark is analyzing the full article from an investor perspective…</p>
+        </div>`;
+      notifyAskMarkPanelUpdated('response');
+      return;
+    }
+
+    if (error) {
+      panel.innerHTML = `
+        <div class="mark-selection-card">
+          <span>Whole article · Investor view</span>
+          <blockquote>${escapeHtml(activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article')}</blockquote>
+        </div>
+        <div id="mark-response" class="mark-response">
+          <div class="mark-response-heading"><span>Ask Mark</span><strong>Investor analysis</strong></div>
+          <p class="status error">${escapeHtml(error)}</p>
+        </div>`;
+      notifyAskMarkPanelUpdated('response');
+      return;
+    }
+
+    const keyPoints = Array.isArray(result?.keyPoints) ? result.keyPoints : [];
+    const catalysts = Array.isArray(result?.catalysts) ? result.catalysts : [];
+    const risks = Array.isArray(result?.risks) ? result.risks : [];
+    const cautions = Array.isArray(result?.cautions) ? result.cautions : [];
+
+    panel.innerHTML = `
+      <div class="mark-selection-card">
+        <span>Whole article · Investor view</span>
+        <blockquote>${escapeHtml(activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article')}</blockquote>
+      </div>
+      <div id="mark-response" class="mark-response" data-investor-analysis="1">
+        <div class="mark-response-heading"><span>Ask Mark</span><strong>${escapeHtml(result?.heading || 'Investor analysis')}</strong></div>
+        <p>${escapeHtml(result?.analysis || '')}</p>
+        ${keyPoints.length ? `<h4>Key investor takeaways</h4><ul>${keyPoints.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+        ${catalysts.length ? `<h4>What to watch</h4><ul>${catalysts.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+        ${risks.length ? `<h4>Risks</h4><ul>${risks.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+        <h4>General investor posture</h4>
+        <p>${escapeHtml(result?.recommendation || 'The article alone does not support a clear investment posture.')}</p>
+        ${cautions.length ? `<div class="mark-cautions">${cautions.map((item) => `<p>${escapeHtml(item)}</p>`).join('')}</div>` : ''}
+        <p><small>General market analysis based on this article, not personalized financial advice.</small></p>
+      </div>`;
+
+    notifyAskMarkPanelUpdated('response');
+  }
+
+  async function requestInvestorAnalysis() {
+    if (!activeImportedDocument) throw new Error('No article is open.');
+
+    const cached = activeImportedDocument.source?.investorAnalysis;
+    if (cached?.analysis && cached?.recommendation) {
+      renderInvestorAnalysisInAskMark(cached);
+      return cached;
+    }
+
+    const originalText = String(
+      activeImportedDocument.versions?.original ||
+      activeImportedDocument.originalText ||
+      ''
+    ).trim();
+
+    if (originalText.length < 40) throw new Error('The original article text is unavailable.');
+
+    renderInvestorAnalysisInAskMark(null, { loading: true });
+
+    const response = await fetch('/api/read-anything/investor-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: activeImportedDocument.baseTitle || activeImportedDocument.title,
+        text: originalText,
+        sourceUrl: activeImportedDocument.source?.url || '',
+        topic: activeImportedDocument.source?.topic || ''
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = payload.detail || payload.error || 'Mark could not complete the investor analysis.';
+      renderInvestorAnalysisInAskMark(null, { error: message });
+      throw new Error(message);
+    }
+
+    const result = payload.result || {};
+    activeImportedDocument.source = {
+      ...(activeImportedDocument.source || {}),
+      investorAnalysis: result
+    };
+    saveActiveFormatRecord();
+    renderInvestorAnalysisInAskMark(result);
+    return result;
+  }
+
   function installArticleSummaryButton() {
     const existing = document.querySelector('#read-anything-article-summary-action');
 
@@ -1145,45 +1283,65 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         'z-index:3'
       ].join(';');
 
-      const link = document.createElement('button');
-      link.type = 'button';
-      link.className = 'read-anything-inline-article-summary';
-      link.dataset.action = 'summarize-whole-article';
-      link.setAttribute('aria-label', 'Summarize this whole article');
-      link.style.cssText = [
-        'display:inline',
-        'padding:0',
-        'border:0',
-        'background:none',
-        'color:#1769aa',
-        'font:inherit',
-        'font-size:.8em',
-        'font-weight:600',
-        'line-height:1.2',
-        'text-decoration:none',
-        'cursor:pointer'
-      ].join(';');
+      const makeArticleLink = (action, label, ariaLabel) => {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'read-anything-inline-article-summary';
+        link.dataset.action = action;
+        link.textContent = label;
+        link.setAttribute('aria-label', ariaLabel);
+        link.style.cssText = [
+          'display:inline',
+          'padding:0',
+          'border:0',
+          'background:none',
+          'color:#1769aa',
+          'font:inherit',
+          'font-size:.8em',
+          'font-weight:600',
+          'line-height:1.2',
+          'text-decoration:none',
+          'cursor:pointer'
+        ].join(';');
 
-      link.onmouseenter = () => {
-        link.style.textDecoration = 'underline';
-        link.style.textUnderlineOffset = '2px';
-      };
-      link.onmouseleave = () => {
-        link.style.textDecoration = 'none';
-      };
-      link.onfocus = () => {
-        link.style.textDecoration = 'underline';
-        link.style.textUnderlineOffset = '2px';
-        link.style.outline = '2px solid rgba(23,105,170,.28)';
-        link.style.outlineOffset = '3px';
-        link.style.borderRadius = '2px';
-      };
-      link.onblur = () => {
-        link.style.textDecoration = 'none';
-        link.style.outline = 'none';
+        link.onmouseenter = () => {
+          link.style.textDecoration = 'underline';
+          link.style.textUnderlineOffset = '2px';
+        };
+        link.onmouseleave = () => {
+          link.style.textDecoration = 'none';
+        };
+        link.onfocus = () => {
+          link.style.textDecoration = 'underline';
+          link.style.textUnderlineOffset = '2px';
+          link.style.outline = '2px solid rgba(23,105,170,.28)';
+          link.style.outlineOffset = '3px';
+          link.style.borderRadius = '2px';
+        };
+        link.onblur = () => {
+          link.style.textDecoration = 'none';
+          link.style.outline = 'none';
+        };
+        return link;
       };
 
-      actionRow.appendChild(link);
+      const summaryLink = makeArticleLink(
+        'summarize-whole-article',
+        'Summarize article',
+        'Summarize this whole article'
+      );
+      const separator = document.createElement('span');
+      separator.textContent = ' · ';
+      separator.setAttribute('aria-hidden', 'true');
+      separator.style.cssText = 'font-size:.8em;opacity:.42;margin:0 .18em';
+
+      const investorLink = makeArticleLink(
+        'investor-analysis',
+        'Investor analysis',
+        'Ask Mark for investor analysis of this article'
+      );
+
+      actionRow.append(summaryLink, separator, investorLink);
       reader.prepend(actionRow);
     } else if (actionRow.parentElement !== reader) {
       reader.prepend(actionRow);
@@ -1225,6 +1383,31 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         }, 2500);
       }
     };
+
+    const investorLink = actionRow.querySelector('[data-action="investor-analysis"]');
+    if (investorLink) {
+      investorLink.title = 'Open Ask Mark for a whole-article investor analysis and general investor posture.';
+      investorLink.onclick = async (event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+
+        const originalLabel = investorLink.textContent;
+        investorLink.disabled = true;
+        investorLink.textContent = 'Analyzing…';
+
+        try {
+          await requestInvestorAnalysis();
+        } catch (error) {
+          // The Ask Mark panel already contains the detailed error.
+          console.warn('Investor analysis failed:', error);
+        } finally {
+          if (investorLink.isConnected) {
+            investorLink.disabled = false;
+            investorLink.textContent = originalLabel;
+          }
+        }
+      };
+    }
   }
 
   function observeInlineArticleSummary() {

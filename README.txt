@@ -1,28 +1,36 @@
-MARK, SET, GO! — OPTIONAL MAJOR STOCK INDEXES
+MARK, SET, GO! — ASK MARK INVESTOR ANALYSIS LINK
 
-This package is cumulative with the current Topic Feeds / Reader / crypto ticker work.
+This package is cumulative with:
+- Topic Feeds + Reader-ready article prefetch
+- automatic Format All
+- default Book Pages for articles
+- bookmarklet capture fixes
+- inline professional Summary link
+- Cryptocurrency Ticker setting
+- Major Stock Indexes setting
 
-Replace/add:
+Replace:
 ROOT:
   server.js
 
 PUBLIC:
+  public/read-anything.js
   public/index.html
-  public/market-indexes.js   (new)
 
-The other current files are included for completeness.
+NEW ARTICLE ACTION
+The first Reader page now shows:
+  Summarize article · Investor analysis
 
-NEW SETTING
-Profile > Customize My Experience > Major Stock Indexes
+"Investor analysis":
+- opens the existing Ask Mark side panel;
+- analyzes the WHOLE preserved original article, not a highlighted passage;
+- gives Mark's article-grounded investor analysis;
+- identifies key investor takeaways, catalysts, risks, and what to watch;
+- ends with a GENERAL investor posture/recommendation;
+- does not silently use later/current market facts outside the article;
+- does not give personalized buy/sell/allocation instructions;
+- caches the generated analysis with the saved Read Anything record so reopening
+  it does not need another AI request when that record is restored.
 
-OFF by default. When enabled, shows:
-- S&P 500
-- Dow Jones Industrial Average
-- NASDAQ Composite
-- Russell 2000
-
-The strip appears below the top navigation. If Cryptocurrency Ticker is also
-enabled, both strips can be shown.
-
-The server caches values for 60 seconds and retains the last successful values
-if the upstream provider is temporarily unavailable.
+If an article has little or no investment relevance, Mark is instructed to say so
+rather than inventing an investment thesis.
