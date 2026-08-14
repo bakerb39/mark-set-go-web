@@ -1470,32 +1470,42 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   async function openPendingCapture(attempt = 0) {
+    // Do not fetch/consume the capture until the Reader bridge is actually ready.
+    // The previous version fetched the token first and then deliberately waited
+    // through several retries, so the capture could disappear before it opened.
+    if (typeof window.renderReaderWithText !== 'function') {
+      if (attempt < 40) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
+      return;
+    }
+
     let payload = null;
     const tokenMatch = location.hash.match(/read-anything-capture=([^&]+)/);
 
     if (tokenMatch?.[1]) {
       try {
-        const response = await fetch(`/api/capture/${encodeURIComponent(decodeURIComponent(tokenMatch[1]))}`, {
+        const token = decodeURIComponent(tokenMatch[1]);
+        const response = await fetch(`/api/capture/${encodeURIComponent(token)}`, {
           cache: 'no-store'
         });
-        if (response.ok) payload = await response.json();
-        else if (response.status !== 404) throw new Error(`Capture returned HTTP ${response.status}.`);
+        if (response.ok) {
+          payload = await response.json();
+        } else if (response.status === 404) {
+          return;
+        } else {
+          throw new Error(`Capture returned HTTP ${response.status}.`);
+        }
       } catch {
-        if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
+        if (attempt < 40) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
         return;
       }
     }
 
-    // Backward compatibility for captures created by the older bookmarklet flow.
+    // Backward compatibility for captures created by the older localStorage flow.
     if (!payload) {
       try { payload = JSON.parse(CAPTURE_STORAGE.getItem(CAPTURE_KEY) || 'null'); } catch {}
     }
 
     if (!payload?.text) return;
-    if (typeof window.renderReaderWithText !== 'function' || attempt < 4) {
-      if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
-      return;
-    }
 
     try {
       const isSelection = payload.captureType === 'selection';
@@ -1512,10 +1522,13 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           importedAt: new Date().toISOString()
         }
       });
+
       try { CAPTURE_STORAGE.removeItem(CAPTURE_KEY); } catch {}
-      if (location.hash.includes('read-anything-capture')) history.replaceState({}, '', location.pathname);
+      if (location.hash.includes('read-anything-capture')) {
+        history.replaceState({}, '', `${location.pathname}${location.search}`);
+      }
     } catch {
-      if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
+      if (attempt < 40) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
     }
   }
 

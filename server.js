@@ -3599,7 +3599,9 @@ app.get('/api/capture/:token', (req, res) => {
     WEB_CAPTURE_CACHE.delete(token);
     return res.status(404).json({ error: 'This captured page expired. Run the bookmarklet again.' });
   }
-  WEB_CAPTURE_CACHE.delete(token);
+  // Keep the short-lived capture available for retry until its TTL expires.
+  // The client removes the capture hash after a successful Reader open, so
+  // normal navigation will not reopen it.
   return res.json(record.payload);
 });
 

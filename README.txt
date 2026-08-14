@@ -1,29 +1,25 @@
-MARK, SET, GO! — WHOLE-ARTICLE SUMMARY BUTTON
-
-This package is cumulative with the previous Reader-ready Topic Feeds update.
+MARK, SET, GO! — CAPTURE OPEN FIX
 
 Replace:
 ROOT:
   server.js
 
 PUBLIC:
-  public/index.html
   public/read-anything.js
+  public/index.html
 
-The included public/topic-feeds.js is unchanged from the previous Reader-ready
-package and is included only to keep this ZIP cumulative.
+What was wrong:
+The new bookmarklet/capture flow fetched the capture token immediately, but
+read-anything.js intentionally waited through several startup retries before
+opening the Reader. The server deleted the capture on the first GET, so by the
+time the Reader was ready the token no longer had content.
 
-NEW:
-- Topic Feed articles, bookmarklet articles, and website imports get a visible
-  "Summarize article" button beside the Reader title.
-- It summarizes the complete preserved original article. No selection or
-  highlighting is required.
-- Quick summary returns 3–5 key-point bullets (about 90 words max) based on the
-  whole article, not only the opening paragraphs.
-- After a summary opens, that same action becomes "Back to full article."
-- The existing Transform > Summary option remains available too.
+Fix:
+- The client now waits until window.renderReaderWithText exists BEFORE fetching
+  the token.
+- The server keeps the short-lived capture available for retry until its 10-minute TTL.
+- The capture hash is removed immediately after a successful Reader open.
+- Retry window increased to 10 seconds for slower Render/browser startup.
 
-Still included from the previous cumulative package:
-- Reader-ready Topic Feed prefetch/cache.
-- Article heading/section structure.
-- Bookmarklet one-time server capture handoff.
+This package is cumulative with the previous whole-article summary + Reader-ready
+Topic Feeds changes.
