@@ -14976,6 +14976,7 @@ body:not(.light) .reader-written-annotation {
   display:block;
   box-sizing:border-box;
   width:calc(100% - 18px);
+  max-width:calc(100% - 18px);
   min-height:280px;
   margin:18px 9px;
   padding:44px 12px 12px;
@@ -15062,7 +15063,7 @@ body:not(.light) .reader-written-annotation {
 .reader-workspace-photo button { align-self:flex-start; font-size:10px; }
 .reader-workspace-drawing-layer { position:absolute; z-index:4; inset:40px 0 0; width:100%; height:calc(100% - 40px); pointer-events:none; touch-action:none; overflow:visible; }
 .reader-inserted-workspace.workspace-drawing-active .reader-workspace-drawing-layer { z-index:7; pointer-events:auto; cursor:crosshair; }
-.reader.book-pages-layout .reader-inserted-workspace { width:calc(100% - 14px); margin:12px 7px; }
+.reader.book-pages-layout .reader-inserted-workspace { max-width:calc(100% - 18px); margin-top:12px; margin-bottom:12px; }
 .mark-selection-toolbar .reader-workspace-editor {
   position:absolute; z-index:3; top:calc(100% + 7px); left:190px; display:grid; gap:8px;
   width:min(250px,calc(100vw - 24px)); padding:10px; border:1px solid rgba(100,116,139,.28); border-radius:10px;

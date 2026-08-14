@@ -8384,15 +8384,27 @@ function renderReaderWorkspaceStrokes(block, item) {
   ).join('');
 }
 
+function readerWorkspaceLane(reader) {
+  // Keep inserted workspaces inside the Reader's visible content box.
+  // The 9px gutters mirror the normal workspace margins but, unlike the old
+  // 100%-width rule, the returned width is a hard boundary for drag/resize.
+  const gutter = 9;
+  const viewportWidth = Math.max(0, Number(reader?.clientWidth) || 0);
+  const laneWidth = Math.max(1, viewportWidth - (gutter * 2));
+  return { gutter, viewportWidth, laneWidth };
+}
+
 function applyReaderWorkspaceGeometry(block, item) {
   const reader = block.closest('#reader');
   if (!reader) return;
-  const laneWidth = Math.max(220, reader.clientWidth - 18);
+  const { gutter, laneWidth } = readerWorkspaceLane(reader);
+  const minWidth = Math.min(220, laneWidth);
   const requestedWidth = normalizeReaderWorkspaceWidth(item?.width);
-  const width = Math.max(220, Math.min(laneWidth, requestedWidth || laneWidth));
+  const width = Math.max(minWidth, Math.min(laneWidth, requestedWidth || laneWidth));
   const availableX = Math.max(0, laneWidth - width);
-  const left = 9 + (normalizeReaderWorkspaceX(item?.x) * availableX);
+  const left = gutter + (normalizeReaderWorkspaceX(item?.x) * availableX);
   block.style.width = `${width}px`;
+  block.style.maxWidth = `${laneWidth}px`;
   block.style.marginLeft = `${left}px`;
   block.style.marginRight = '0';
   block.style.minHeight = `${normalizeReaderWorkspaceHeight(item?.height)}px`;
@@ -8449,7 +8461,17 @@ function bindReaderWorkspace(block, item) {
     event.preventDefault(); event.stopPropagation();
     moveState.dx=event.clientX-moveState.startX; moveState.dy=event.clientY-moveState.startY;
     if (Math.hypot(moveState.dx,moveState.dy)>5) moveState.moved=true;
-    if (moveState.moved) block.style.transform=`translate(${moveState.dx}px, ${moveState.dy}px)`;
+    if (moveState.moved) {
+      const readerRect = moveState.reader.getBoundingClientRect();
+      const { gutter } = readerWorkspaceLane(moveState.reader);
+      const minLeft = readerRect.left + gutter;
+      const maxLeft = Math.max(minLeft, readerRect.right - gutter - moveState.rect.width);
+      const desiredLeft = moveState.rect.left + moveState.dx;
+      const clampedLeft = Math.max(minLeft, Math.min(maxLeft, desiredLeft));
+      const clampedDx = clampedLeft - moveState.rect.left;
+      block.style.transform=`translate(${clampedDx}px, ${moveState.dy}px)`;
+      moveState.clampedDx=clampedDx;
+    }
   };
   const finishWorkspaceMove = (event)=>{
     if (!moveState || moveState.pointerId!==event.pointerId) return;
@@ -8462,11 +8484,13 @@ function bindReaderWorkspace(block, item) {
     if (wasMoved) {
       suppressOpenUntil=Date.now()+350;
       const anchorIndex=closestReaderWorkspaceAnchorIndex(reader,event.clientX,event.clientY,block);
-      const laneWidth=Math.max(220,reader.clientWidth-18);
-      const width=Math.max(220,Math.min(laneWidth,block.getBoundingClientRect().width||normalizeReaderWorkspaceWidth(current.width)||laneWidth));
+      const {gutter,laneWidth}=readerWorkspaceLane(reader);
+      const minWidth=Math.min(220,laneWidth);
+      const width=Math.max(minWidth,Math.min(laneWidth,block.getBoundingClientRect().width||normalizeReaderWorkspaceWidth(current.width)||laneWidth));
       const availableX=Math.max(0,laneWidth-width);
-      const desiredLeft=Math.max(9,Math.min(9+availableX,(moveState.rect.left-reader.getBoundingClientRect().left)+moveState.dx));
-      const x=availableX>0 ? (desiredLeft-9)/availableX : 0;
+      const appliedDx=Number.isFinite(moveState.clampedDx)?moveState.clampedDx:moveState.dx;
+      const desiredLeft=Math.max(gutter,Math.min(gutter+availableX,(moveState.rect.left-reader.getBoundingClientRect().left)+appliedDx));
+      const x=availableX>0 ? (desiredLeft-gutter)/availableX : 0;
       updateSavedReaderWorkspace(id,{...(Number.isFinite(anchorIndex)?{anchorIndex}:{}),x});
       block.remove();
       applySavedReaderWorkspaces();
@@ -8494,8 +8518,13 @@ function bindReaderWorkspace(block, item) {
     if (!resizeState || resizeState.pointerId!==event.pointerId) return;
     event.preventDefault(); event.stopPropagation();
     const reader=block.closest('#reader');
-    const maxWidth=Math.max(220,(reader?.clientWidth||1200)-18);
-    const width=Math.max(220,Math.min(maxWidth,resizeState.startWidth+(event.clientX-resizeState.startX)));
+    if (!reader) return;
+    const {gutter,laneWidth}=readerWorkspaceLane(reader);
+    const readerRect=reader.getBoundingClientRect();
+    const currentLeft=Math.max(gutter,block.getBoundingClientRect().left-readerRect.left);
+    const maxWidth=Math.max(1,(gutter+laneWidth)-currentLeft);
+    const minWidth=Math.min(220,maxWidth);
+    const width=Math.max(minWidth,Math.min(maxWidth,resizeState.startWidth+(event.clientX-resizeState.startX)));
     const height=normalizeReaderWorkspaceHeight(resizeState.startHeight+(event.clientY-resizeState.startY));
     block.style.width=`${width}px`; block.style.minHeight=`${height}px`;
     const current=currentWorkspace();
