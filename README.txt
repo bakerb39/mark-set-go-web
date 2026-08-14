@@ -1,51 +1,23 @@
-MARK, SET, GO! — ASK CHAD COMPANION CODE
+MARK, SET, GO! — TOPIC FEED READ-IN-READER FIX
 
-This package is cumulative with the latest Topic Feeds / investor analysis /
-crypto ticker / stock-index work.
+This package is cumulative with the current Ask Chad + Topic Feeds build.
 
-REPLACE:
-  /server.js
+For this fix, replace:
+  /public/topic-feeds.js
   /public/index.html
 
-ADD:
-  /public/companion-chad.js
-  /public/companion-chad.css
-  /public/assets/companions/chad/chad-avatar.png
+WHAT WAS HAPPENING
+Topic Feeds saved the refreshed edition to localStorage. The app already stores
+other Reader/import records there too. If browser storage was full or nearly full,
+clicking "Read in Reader" could fail while trying to save the article's read state
+BEFORE openDocument() was called. The click therefore looked like it did nothing.
 
-The other current public files are included for completeness.
+FIX
+1. The Reader now opens FIRST.
+2. Marking the article as read and saving Topic Feed state happens afterward.
+3. Topic Feed saveState() can no longer throw into the Reader-open path.
+4. If storage is tight, Topic Feeds automatically try a compact saved form.
+5. If even compact storage cannot be saved, the in-memory feed still works.
+6. The clicked button temporarily shows "Opening…" so the user gets immediate feedback.
 
-WHAT ASK CHAD DOES
-
-1. Profile / Customize My Experience
-   - Adds Chad as a third selectable reading companion next to Mark and Beth.
-   - Description: Financial analysis, investing, markets & economics.
-   - Uses the same msg_companion_persona_v2 preference key.
-
-2. Front page
-   - Chad's approved finance badge replaces the companion artwork when selected.
-   - "Meet Mark/Beth" becomes "Meet Chad."
-
-3. Reader buttons / Ask companion controls
-   - Ask Mark/Beth becomes Ask Chad.
-   - Chad's avatar appears on companion buttons.
-   - Fullscreen Ask companion controls follow the selection too.
-
-4. Chat / response area
-   - Ask companion labels and response headings display Ask Chad.
-   - The article Investor analysis action displays "Ask Chad" when Chad is selected.
-
-5. Backend behavior
-   - /api/mark-selection now accepts companion=mark|beth|chad.
-   - When Chad is selected, the AI is explicitly instructed to specialize in
-     finance, markets, economics, business, and investing while remaining grounded
-     in the selected text.
-   - Non-financial passages are still answered normally instead of forcing a
-     finance angle.
-   - The whole-article investor-analysis endpoint identifies the selected analyst.
-   - App-help keeps the same narrow app-help scope but uses the selected companion name.
-
-6. Existing Mark and Beth
-   - They remain selectable.
-   - The Chad layer is additive and does not replace the existing companion system.
-
-No Reader architecture was changed.
+No Reader-core architecture was changed.

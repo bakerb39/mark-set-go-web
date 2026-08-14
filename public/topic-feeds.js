@@ -22,8 +22,47 @@
     return { topics: [] };
   }
 
+  function compactStateForStorage(value) {
+    return {
+      topics: (Array.isArray(value?.topics) ? value.topics : []).map((topic) => ({
+        ...topic,
+        articles: (Array.isArray(topic?.articles) ? topic.articles : [])
+          .slice(0, 140)
+          .map((article) => ({
+            id: article.id,
+            title: String(article.title || '').slice(0, 500),
+            url: String(article.url || '').slice(0, 4000),
+            summary: String(article.summary || '').slice(0, 1400),
+            published: article.published || '',
+            author: article.author || '',
+            sourceName: article.sourceName || '',
+            sourceUrl: article.sourceUrl || '',
+            sourceType: article.sourceType || '',
+            feedMode: article.feedMode || '',
+            recommended: Boolean(article.recommended),
+            read: Boolean(article.read)
+          }))
+      }))
+    };
+  }
+
   function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // Topic Feed persistence is useful, but it must never prevent the Reader
+    // from opening. This app stores other imported documents in localStorage too,
+    // so a full browser quota is a recoverable condition rather than a fatal one.
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      return true;
+    } catch (error) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(compactStateForStorage(state)));
+        console.warn('Topic Feeds were saved in compact form because browser storage is nearly full.', error);
+        return true;
+      } catch (compactError) {
+        console.warn('Topic Feed persistence was skipped because browser storage is full.', compactError);
+        return false;
+      }
+    }
   }
 
   function closeMenus() {
@@ -171,8 +210,13 @@
     }
   }
 
-  async function openArticle(article) {
+  async function openArticle(article, trigger = null) {
     const status = document.getElementById('topic-feed-status');
+    const originalLabel = trigger?.textContent || 'Read in Reader';
+    if (trigger) {
+      trigger.disabled = true;
+      trigger.textContent = 'Opening…';
+    }
     if (status) {
       status.className = 'status';
       status.textContent = 'Opening prepared article…';
@@ -195,9 +239,9 @@
       if (!window.MarkSetGoReadAnything?.openDocument) throw new Error('The Reader importer is not ready.');
 
       const topic = currentTopic();
-      article.read = true;
-      saveState();
 
+      // Opening the Reader is the primary action. Do it BEFORE any optional
+      // localStorage bookkeeping so a quota/storage error cannot swallow the click.
       window.MarkSetGoReadAnything.openDocument({
         title: payload.title || article.title,
         author: article.author || article.sourceName,
@@ -213,10 +257,19 @@
           importedAt: new Date().toISOString()
         }
       });
+
+      // Read-state persistence is secondary and is deliberately non-blocking.
+      article.read = true;
+      saveState();
     } catch (error) {
       if (status) {
         status.className = 'status error';
         status.textContent = error.message;
+      }
+    } finally {
+      if (trigger?.isConnected) {
+        trigger.disabled = false;
+        trigger.textContent = originalLabel;
       }
     }
   }
@@ -489,7 +542,7 @@
     document.querySelectorAll('[data-topic-read]').forEach((button) => {
       button.addEventListener('click', () => {
         const article = currentTopic()?.articles?.find((item) => item.id === button.dataset.topicRead);
-        if (article) openArticle(article);
+        if (article) openArticle(article, button);
       });
     });
   }
