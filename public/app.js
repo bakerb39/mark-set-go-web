@@ -7103,7 +7103,121 @@ function comprehensionPassage() {
     startIndex,
     endIndex,
     words: passageWords.length,
-    passage: passageWords.join(' ')
+    passage: passageWords.join(' '),
+    scope: 'passage',
+    scopeLabel: 'Recent reading'
+  };
+}
+
+function comprehensionSelectionRange() {
+  const selection = state?.markSelection || state?.markPersistentSelection;
+  if (!selection) return null;
+  const startIndex = Math.max(0, Math.min(state.words.length, Number(selection.startIndex) || 0));
+  const endIndex = Math.max(startIndex, Math.min(state.words.length, Number(selection.endIndex) || startIndex));
+  if (endIndex <= startIndex) return null;
+  const words = state.words.slice(startIndex, endIndex).filter((word) => !isModernGuideActionToken(word));
+  return words.length ? { startIndex, endIndex, words } : null;
+}
+
+function comprehensionSectionRange(wordIndex = state.index) {
+  const target = Math.max(0, Math.min(state.words.length, Number(wordIndex) || 0));
+  const toc = (Array.isArray(state.toc) ? state.toc : [])
+    .filter((entry) => Number.isFinite(Number(entry?.index)))
+    .map((entry) => ({ ...entry, index: Math.max(0, Number(entry.index) || 0) }))
+    .sort((a, b) => a.index - b.index);
+
+  if (!toc.length) {
+    const structures = (Array.isArray(state.structure) ? state.structure : [])
+      .filter((entry) => Number.isFinite(Number(entry?.start)) && ['chapter', 'part', 'book', 'section', 'article', 'canto', 'act'].includes(String(entry?.type || '').toLowerCase()))
+      .map((entry) => ({ title: entry.title || '', index: Math.max(0, Number(entry.start) || 0) }))
+      .sort((a, b) => a.index - b.index);
+    toc.push(...structures);
+  }
+
+  if (!toc.length) {
+    const startIndex = Math.max(0, target - 900);
+    const endIndex = Math.min(state.words.length, Math.max(target + 1, startIndex + 1200));
+    return { startIndex, endIndex, title: 'Current section' };
+  }
+
+  let currentPosition = 0;
+  for (let index = 0; index < toc.length; index += 1) {
+    if (toc[index].index <= target) currentPosition = index;
+    else break;
+  }
+  const current = toc[currentPosition];
+  const next = toc[currentPosition + 1];
+  return {
+    startIndex: Math.max(0, current.index),
+    endIndex: Math.min(state.words.length, next ? Math.max(current.index + 1, next.index) : state.words.length),
+    title: String(current.title || 'Current section').trim() || 'Current section'
+  };
+}
+
+function sampleComprehensionWords(words, maxWords = 11500) {
+  const cleaned = (Array.isArray(words) ? words : []).filter((word) => !isModernGuideActionToken(word));
+  if (cleaned.length <= maxWords) return cleaned;
+
+  // Preserve broad coverage for long works: sample equal windows from across the
+  // requested scope instead of truncating to only the opening or ending pages.
+  const windows = 12;
+  const windowSize = Math.max(120, Math.floor(maxWords / windows));
+  const sampled = [];
+  for (let windowIndex = 0; windowIndex < windows; windowIndex += 1) {
+    const progress = windows === 1 ? 0 : windowIndex / (windows - 1);
+    const center = Math.round(progress * Math.max(0, cleaned.length - 1));
+    const start = Math.max(0, Math.min(cleaned.length - windowSize, center - Math.floor(windowSize / 2)));
+    sampled.push(...cleaned.slice(start, Math.min(cleaned.length, start + windowSize)));
+  }
+  return sampled.slice(0, maxWords);
+}
+
+function buildComprehensionContext(scope = 'current_section') {
+  const totalWords = state.words.length;
+  const currentIndex = Math.max(0, Math.min(totalWords, Number(state.index) || 0));
+  let startIndex = 0;
+  let endIndex = currentIndex;
+  let scopeLabel = 'Everything read so far';
+  let rawWords = [];
+
+  if (scope === 'selection') {
+    const selection = comprehensionSelectionRange();
+    if (!selection) throw new Error('Highlight a passage first, then choose Selected passage.');
+    startIndex = selection.startIndex;
+    endIndex = selection.endIndex;
+    rawWords = selection.words;
+    scopeLabel = 'Selected passage';
+  } else if (scope === 'current_section') {
+    const section = comprehensionSectionRange(currentIndex);
+    startIndex = section.startIndex;
+    endIndex = section.endIndex;
+    rawWords = state.words.slice(startIndex, endIndex);
+    scopeLabel = section.title || 'Current section';
+  } else if (scope === 'whole_text') {
+    startIndex = 0;
+    endIndex = totalWords;
+    rawWords = state.words.slice(0, totalWords);
+    scopeLabel = 'Entire text';
+  } else if (scope === 'recent') {
+    return comprehensionPassage();
+  } else {
+    startIndex = 0;
+    endIndex = Math.max(1, currentIndex);
+    rawWords = state.words.slice(startIndex, endIndex);
+    scopeLabel = 'Everything read so far';
+  }
+
+  const cleanedWords = rawWords.filter((word) => !isModernGuideActionToken(word));
+  const sampledWords = sampleComprehensionWords(cleanedWords);
+  return {
+    startIndex,
+    endIndex,
+    words: cleanedWords.length,
+    sampledWords: sampledWords.length,
+    passage: sampledWords.join(' '),
+    scope,
+    scopeLabel,
+    sampled: sampledWords.length < cleanedWords.length
   };
 }
 
@@ -7122,10 +7236,12 @@ function renderComprehensionQuiz(quiz, context) {
     inference: 'Inference',
     deeper_understanding: 'Deeper understanding'
   };
+  const scopeText = context.scopeLabel ? `${context.scopeLabel} · ` : '';
+  const sampleText = context.sampled ? ` · balanced sample of ${context.sampledWords.toLocaleString()} words` : '';
 
   dialog.innerHTML = `<form method="dialog" class="comprehension-card" id="comprehension-form">
     <div class="comprehension-heading">
-      <div><span class="comprehension-kicker">Learning check</span><h2>Comprehension Check</h2><p>${context.words.toLocaleString()} words · ${escapeHtml(state.title)}</p></div>
+      <div><span class="comprehension-kicker">Learning check</span><h2>Comprehension Check</h2><p>${escapeHtml(scopeText)}${context.words.toLocaleString()} words${sampleText} · ${escapeHtml(state.title)}</p></div>
       <button class="comprehension-close" value="cancel" type="submit" aria-label="Close">×</button>
     </div>
     <div class="comprehension-questions">
@@ -7183,6 +7299,8 @@ function renderComprehensionQuiz(quiz, context) {
       startIndex: context.startIndex,
       endIndex: context.endIndex,
       wordsTested: context.words,
+      scope: context.scope || 'passage',
+      scopeLabel: context.scopeLabel || '',
       correct,
       total: quiz.questions.length,
       scorePercent: percent,
@@ -7203,22 +7321,96 @@ function renderComprehensionQuiz(quiz, context) {
   });
 }
 
-async function startComprehensionCheck() {
-  if (!state.documentId || !state.words.length) return;
-  const context = comprehensionPassage();
+function showComprehensionSetup() {
+  const dialog = app.querySelector('#comprehension-dialog');
+  if (!dialog || !state.documentId || !state.words.length) return;
+  const hasSelection = Boolean(comprehensionSelectionRange());
+  const section = comprehensionSectionRange(state.index);
+  const readWords = Math.max(0, Math.min(state.words.length, Number(state.index) || 0));
+
+  dialog.innerHTML = `<form method="dialog" class="comprehension-card comprehension-setup-card" id="comprehension-setup-form">
+    <div class="comprehension-heading">
+      <div><span class="comprehension-kicker">Reader Companion</span><h2>Check Comprehension</h2><p>Choose what Mark should quiz you on and how many questions you want.</p></div>
+      <button class="comprehension-close" value="cancel" type="submit" aria-label="Close">×</button>
+    </div>
+    <div class="comprehension-setup-grid">
+      <fieldset class="comprehension-question comprehension-setup-fieldset">
+        <legend><span>1</span><div><small>Quiz scope</small>What should the quiz cover?</div></legend>
+        <div class="comprehension-scope-options">
+          <label class="comprehension-scope-option ${hasSelection ? '' : 'is-disabled'}">
+            <input type="radio" name="comprehension-scope" value="selection" ${hasSelection ? 'checked' : 'disabled'}>
+            <span><strong>Selected passage</strong><small>${hasSelection ? 'Use the passage you highlighted.' : 'Highlight a passage in the Reader to enable this.'}</small></span>
+          </label>
+          <label class="comprehension-scope-option">
+            <input type="radio" name="comprehension-scope" value="current_section" ${hasSelection ? '' : 'checked'}>
+            <span><strong>Current section / chapter</strong><small>${escapeHtml(section.title || 'Use the section around your current position.')}</small></span>
+          </label>
+          <label class="comprehension-scope-option">
+            <input type="radio" name="comprehension-scope" value="read_so_far">
+            <span><strong>Everything read so far</strong><small>${readWords.toLocaleString()} words from the beginning through your current position.</small></span>
+          </label>
+          <label class="comprehension-scope-option">
+            <input type="radio" name="comprehension-scope" value="whole_text">
+            <span><strong>Entire text</strong><small>Build a cumulative quiz across the whole book or document.</small></span>
+          </label>
+          <label class="comprehension-scope-option">
+            <input type="radio" name="comprehension-scope" value="recent">
+            <span><strong>Recent reading</strong><small>Use the material since your last comprehension check.</small></span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="comprehension-question comprehension-setup-fieldset">
+        <legend><span>2</span><div><small>Length</small>How many questions?</div></legend>
+        <label class="comprehension-count-control">Questions
+          <input id="comprehension-question-count" type="number" min="4" max="25" step="1" value="4" inputmode="numeric">
+          <small>Choose 4–25. Ten works well for a chapter; use more for cumulative reviews.</small>
+        </label>
+        <div class="comprehension-count-presets" aria-label="Question count shortcuts">
+          ${[4, 6, 10, 15, 20].map((count) => `<button type="button" class="secondary" data-comprehension-count="${count}">${count}</button>`).join('')}
+        </div>
+      </fieldset>
+    </div>
+    <div class="comprehension-actions">
+      <span id="comprehension-status" class="status"></span>
+      <button id="generate-comprehension-quiz" class="primary" type="button">Generate Quiz</button>
+      <button class="secondary" value="cancel" type="submit">Close</button>
+    </div>
+  </form>`;
+  if (!dialog.open) dialog.showModal();
+
+  const countInput = dialog.querySelector('#comprehension-question-count');
+  dialog.querySelectorAll('[data-comprehension-count]').forEach((button) => button.addEventListener('click', () => {
+    if (countInput) countInput.value = button.dataset.comprehensionCount || '4';
+  }));
+  dialog.querySelector('#generate-comprehension-quiz')?.addEventListener('click', () => generateComprehensionCheckFromSetup());
+}
+
+async function generateComprehensionCheckFromSetup() {
+  const dialog = app.querySelector('#comprehension-dialog');
+  if (!dialog) return;
+  const scope = String(dialog.querySelector('input[name="comprehension-scope"]:checked')?.value || 'current_section');
+  const requestedCount = Number(dialog.querySelector('#comprehension-question-count')?.value);
+  const questionCount = Number.isInteger(requestedCount) ? Math.max(4, Math.min(25, requestedCount)) : 4;
+  const status = dialog.querySelector('#comprehension-status');
+  const generateButton = dialog.querySelector('#generate-comprehension-quiz');
+
+  let context;
+  try {
+    context = buildComprehensionContext(scope);
+  } catch (error) {
+    if (status) status.textContent = error.message;
+    return;
+  }
   if (context.words < 120) {
-    window.alert(`Read a little farther first. You currently have ${context.words} new words available; a comprehension check needs at least 120.`);
+    if (status) status.textContent = `This scope contains ${context.words} words. Choose at least 120 words for a useful comprehension check.`;
     return;
   }
 
-  const button = app.querySelector('#check-comprehension');
-  const fsButton = app.querySelector('#fs-check-comprehension');
-  const original = button?.textContent;
-  if (button) { button.disabled = true; button.textContent = 'Generating…'; }
-  if (fsButton) { fsButton.disabled = true; fsButton.textContent = 'Generating…'; }
-
-  const wasRunning = isReaderRunning();
-  if (wasRunning) pauseReader();
+  if (generateButton) { generateButton.disabled = true; generateButton.textContent = 'Generating…'; }
+  if (status) status.textContent = context.sampled
+    ? `Building a balanced ${questionCount}-question quiz across ${context.words.toLocaleString()} words…`
+    : `Building ${questionCount} questions from ${context.scopeLabel.toLowerCase()}…`;
 
   try {
     const response = await fetch('/api/comprehension', {
@@ -7226,19 +7418,29 @@ async function startComprehensionCheck() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: state.title,
-        passage: context.passage
+        passage: context.passage,
+        scope: context.scope,
+        scopeLabel: context.scopeLabel,
+        questionCount,
+        sampled: context.sampled,
+        sourceWordCount: context.words
       })
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
-    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
+    if (!Array.isArray(payload.questions) || payload.questions.length !== questionCount) throw new Error('The quiz response was incomplete.');
     renderComprehensionQuiz(payload, context);
   } catch (error) {
-    window.alert(`Comprehension check unavailable: ${error.message}`);
-  } finally {
-    if (button) { button.disabled = false; button.textContent = original || '🧠 Comprehension'; }
-    if (fsButton) { fsButton.disabled = false; fsButton.textContent = 'Check comprehension'; }
+    if (status) status.textContent = `Comprehension check unavailable: ${error.message}`;
+    if (generateButton) { generateButton.disabled = false; generateButton.textContent = 'Generate Quiz'; }
   }
+}
+
+function startComprehensionCheck() {
+  if (!state.documentId || !state.words.length) return;
+  const wasRunning = isReaderRunning();
+  if (wasRunning) pauseReader();
+  showComprehensionSetup();
 }
 
 function vocabularyDue(item) {
@@ -11144,7 +11346,7 @@ function showModernGuideWholeQuizSetup(source = state?.source || {}) {
       <fieldset class="comprehension-question">
         <legend><span>1</span><div><small>Length</small>How many questions?</div></legend>
         <label>Questions
-          <input id="whole-guide-question-count" type="number" min="5" max="25" step="1" value="10" inputmode="numeric">
+          <input id="whole-guide-question-count" type="number" min="5" max="25" step="1" value="4" inputmode="numeric">
         </label>
       </fieldset>
       <fieldset class="comprehension-question">
@@ -19097,35 +19299,6 @@ function renderUpload() {
 
       <div id="upload-status" class="status import-status" role="status" aria-live="polite"></div>
 
-      <section class="kindle-capture-install" aria-labelledby="kindle-capture-title">
-        <div class="kindle-capture-install-copy">
-          <span class="source-category">Kindle Cloud Reader</span>
-          <h2 id="kindle-capture-title">Capture Kindle pages for Mark, Set, Go!</h2>
-          <p>Install the Mark, Set, Go! Kindle Capture companion once, then capture a current spread, page range, or whole book from Kindle Cloud Reader and import the generated searchable PDF here.</p>
-          <div class="kindle-capture-actions">
-            <a class="primary button-link kindle-capture-download" href="/downloads/mark-set-go-kindle-capture-v0.4.3.zip" download>Download Kindle Capture</a>
-            <button id="copy-chrome-extensions" class="secondary" type="button">Copy chrome://extensions</button>
-          </div>
-          <p class="kindle-capture-local-note"><strong>Local capture:</strong> page capture and OCR run in your browser; the extension does not upload captured book pages to Mark, Set, Go!</p>
-        </div>
-
-        <details class="kindle-capture-setup">
-          <summary>One-time Chrome setup</summary>
-          <ol>
-            <li><strong>Download</strong> Kindle Capture above, then unzip the downloaded file.</li>
-            <li>Paste <code>chrome://extensions</code> into Chrome's address bar.</li>
-            <li>Turn on <strong>Developer mode</strong>.</li>
-            <li>Choose <strong>Load unpacked</strong>.</li>
-            <li>Select the unzipped <strong>mark-set-go-kindle-capture</strong> folder.</li>
-            <li>Open your book at <strong>read.amazon.com</strong>, refresh the Kindle tab, and open the Kindle Capture extension.</li>
-          </ol>
-          <div class="kindle-capture-after-install">
-            <strong>Then, whenever you want to import from Kindle:</strong>
-            <span>Open the book → choose Current spread, Page range, or Whole book → Capture PDF → return here and choose the generated PDF.</span>
-          </div>
-        </details>
-      </section>
-
       <details class="pdf-import-note compact-note">
         <summary>PDF import details</summary>
         <p>Modern PDFs with selectable text work best. PDF page positions are retained as hidden document metadata so notes, navigation, and reading progress can stay connected to the source without placing page-marker text inside the book. Image-only scans are not silently imported as blank documents.</p>
@@ -19137,20 +19310,7 @@ function renderUpload() {
     </section>`;
 
   const uploadInput = app.querySelector('#text-file');
-  const copyChromeExtensionsButton = app.querySelector('#copy-chrome-extensions');
   let importInFlight = false;
-
-  copyChromeExtensionsButton?.addEventListener('click', async () => {
-    const value = 'chrome://extensions';
-    try {
-      await navigator.clipboard.writeText(value);
-      const original = copyChromeExtensionsButton.textContent;
-      copyChromeExtensionsButton.textContent = 'Copied!';
-      setTimeout(() => { copyChromeExtensionsButton.textContent = original; }, 1600);
-    } catch {
-      window.prompt('Copy this Chrome address:', value);
-    }
-  });
 
   // Warm PDF.js as soon as the Import page opens so the first file selection
   // does not also have to initialize the PDF engine.

@@ -941,10 +941,13 @@ app.post('/api/comprehension', async (req, res) => {
   const title = String(req.body?.title || 'Untitled reading').trim().slice(0, 300);
   const scope = String(req.body?.scope || 'passage').trim();
   const wholeGuide = scope === 'whole_guide';
+  const broadScope = wholeGuide || ['read_so_far', 'whole_text'].includes(scope);
   const requestedQuestionCount = Number(req.body?.questionCount);
-  const questionCount = wholeGuide
-    ? (Number.isInteger(requestedQuestionCount) ? Math.max(1, Math.min(25, requestedQuestionCount)) : 10)
-    : 4;
+  const questionCount = Number.isInteger(requestedQuestionCount)
+    ? Math.max(wholeGuide ? 1 : 4, Math.min(25, requestedQuestionCount))
+    : (wholeGuide ? 10 : 4);
+  const scopeLabel = String(req.body?.scopeLabel || '').trim().slice(0, 200);
+  const sampled = Boolean(req.body?.sampled);
   const questionMode = wholeGuide && ['new', 'mixed'].includes(String(req.body?.questionMode || '').trim())
     ? String(req.body.questionMode).trim()
     : 'new';
@@ -952,15 +955,16 @@ app.post('/api/comprehension', async (req, res) => {
     ? req.body.avoidQuestions.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 100)
     : [];
   const wordCount = passage ? passage.split(/\s+/).length : 0;
+  const sourceWordCount = Math.max(wordCount, Number(req.body?.sourceWordCount) || 0);
 
   if (wordCount < 120) {
     return res.status(400).json({ error: 'Read at least 120 words before starting a comprehension check.' });
   }
-  const maxWords = wholeGuide ? 12000 : 1200;
-  const maxCharacters = wholeGuide ? 100000 : 12000;
+  const maxWords = broadScope ? 12000 : 12000;
+  const maxCharacters = broadScope ? 100000 : 100000;
   if (wordCount > maxWords || passage.length > maxCharacters) {
     return res.status(400).json({
-      error: wholeGuide ? 'The guide is too large for a whole-guide comprehension check.' : 'The comprehension passage is too large.'
+      error: broadScope ? 'The selected comprehension scope is too large to process safely.' : 'The comprehension passage is too large.'
     });
   }
 
@@ -1003,10 +1007,11 @@ Treat the supplied text as the entire guide, not as a local passage. Spread the 
 Use a balanced mix of factual recall, main idea, inference, and deeper-understanding questions.
 Each question must be answerable from the supplied guide itself. Do not rely on outside knowledge or facts not present in the guide.
 Use plausible distractors. Keep explanations concise and refer to the relevant idea without long quotation.${avoidPrompt}`
-    : `Create exactly four multiple-choice comprehension questions based ONLY on the supplied passage from "${title}".
-The four question types must be, in this order: factual recall, main idea, inference, and deeper understanding.
-Each question must be answerable from the passage itself. Do not rely on outside knowledge, later parts of the work, or facts not present in the passage.
-Use plausible distractors. Keep explanations concise and cite the relevant idea from the passage without long quotation.`;
+    : `Create exactly ${questionCount} multiple-choice comprehension questions based ONLY on the supplied material from "${title}".
+Quiz scope: ${scopeLabel || scope}. ${sampled ? `The supplied material is a balanced sample drawn across a larger ${sourceWordCount}-word scope. Distribute questions broadly across the supplied sample rather than concentrating on one adjacent passage.` : ''}
+Use a balanced mix of factual recall, main idea, inference, and deeper-understanding questions. When there are more than four questions, vary the types across the quiz rather than repeating one type in a block.
+Each question must be answerable from the supplied material itself. Do not rely on outside knowledge, later parts of the work that are not supplied, or facts not present in the material.
+Use plausible distractors. Keep explanations concise and refer to the relevant idea without long quotation.`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
