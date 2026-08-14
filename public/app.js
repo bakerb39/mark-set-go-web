@@ -18916,6 +18916,21 @@ async function parsePdfFile(file, onProgress = () => {}) {
     text = rawPdfText;
   }
 
+  // Reader rendering is word-index based, so newline characters in `text` are
+  // intentionally lost when BookModel tokenizes with splitWords(). Preserve
+  // meaningful PDF paragraph/section gaps separately as word indexes; the
+  // existing VirtualRenderer already renders these as paragraph breaks.
+  const pdfParagraphBreaks = [];
+  let paragraphWordOffset = 0;
+  const pdfParagraphs = String(text || '')
+    .split(/\n\s*\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  pdfParagraphs.forEach((paragraph, index) => {
+    if (index > 0 && paragraphWordOffset > 0) pdfParagraphBreaks.push(paragraphWordOffset);
+    paragraphWordOffset += splitWords(paragraph).length;
+  });
+
   const pdfDocumentToc = toc.map((item) => {
     const pageWordIndex = item.pageNumber ? pageWordStarts.get(item.pageNumber) : null;
     if (!Number.isFinite(pageWordIndex)) return null;
@@ -18963,7 +18978,8 @@ async function parsePdfFile(file, onProgress = () => {}) {
       })),
       textCoverage,
       cleanup: normalizedPdf.report,
-      documentToc
+      documentToc,
+      paragraphBreaks: pdfParagraphBreaks
     },
     stats: {
       pageCount: pdf.numPages,
