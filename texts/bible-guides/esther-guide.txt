@@ -1,188 +1,226 @@
 ESTHER
-An Independent Mark, Set, Go! Bible Guide
-Biblical book: Esther
+Mark, Set, Go! Bible Guide
 
-Diaspora, hidden providence, courage, identity, reversal, political danger, deliverance, and the origin of Purim.
+ABOUT THIS BOOK
 
-HOW TO USE THIS BIBLE GUIDE
-Use this guide alongside the biblical text. Read the assigned chapters first whenever possible. The guide is designed to help with structure, historical and literary context, theology, difficult passages, connections across Scripture, discussion, and comprehension—not to replace Scripture itself.
+Esther tells how Jews in the Persian Empire survive a genocidal plot through courage, providence, political reversal, and communal memory. God is never explicitly named in the Hebrew text, making hidden providence central to the book.
 
-READING PRINCIPLES
-Pay attention to what the text actually says, distinguish description from approval, read each passage in its literary and covenant context, and allow clearer passages and the wider biblical canon to inform difficult ones.
+BOOK STRUCTURE
+
+Esther 1–2 — Vashti, Esther, Mordecai
+Esther 3–4 — Haman’s plot and Esther’s decision
+Esther 5–7 — banquets and reversal
+Esther 8–10 — deliverance, Purim, Mordecai
+
+HOW TO USE THIS GUIDE
+
+Read the biblical text first whenever possible. Then use the guide to trace the argument, narrative movement, theology, historical context, difficult passages, and connections to the rest of Scripture. The goal is serious understanding without turning the guide into a technical commentary.
 
 [[MSG:SECTION]]
 
-PURPOSE AND PLACE IN SCRIPTURE
+1. VASHTI AND IMPERIAL POWER
 
-Esther tells how the Jewish people in the Persian Empire escape a genocidal plot through a chain of reversals involving Esther and Mordecai. God is never explicitly named in the Hebrew text, making providence, human courage, and hiddenness central interpretive themes.
+The opening exposes insecurity beneath royal extravagance.
 
 STUDY QUESTION
-Why might a biblical book about deliverance deliberately avoid explicitly naming God?
+How does the empire’s display of power reveal weakness?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ESTHER 1 — VASHTI
+2. ESTHER BECOMES QUEEN
 
-The book opens with imperial extravagance and Queen Vashti’s refusal of the king’s command.
+Esther enters a system she did not create and initially conceals her identity.
 
 STUDY QUESTION
-How does the opening chapter expose insecurity beneath imperial power?
+How should readers evaluate faithful action under constrained choices?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ESTHER 2 — ESTHER BECOMES QUEEN
+3. MORDECAI’S SERVICE
 
-Esther, a Jewish orphan raised by Mordecai, enters the royal court and becomes queen while initially concealing her identity.
+Mordecai exposes a plot and is temporarily unrewarded.
 
 STUDY QUESTION
-How should readers evaluate Esther’s limited choices within an imperial system she did not control?
+Why do seemingly minor faithful actions matter later?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-MORDECAI AND THE ASSASSINATION PLOT
+4. HAMAN
 
-Mordecai uncovers a conspiracy against the king, and his service is recorded but initially unrewarded.
+Personal pride expands into genocidal policy.
 
 STUDY QUESTION
-Why is this apparently minor event crucial to later reversal?
+How can private resentment become public evil when joined to power?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ESTHER 3 — HAMAN’S PLOT
+5. FOR SUCH A TIME AS THIS
 
-Haman’s rage at Mordecai expands into a plan to destroy all Jews in the empire.
+Esther chooses risk after fasting.
 
 STUDY QUESTION
-How does wounded pride become systemic violence?
+Why is courage action despite fear rather than absence of fear?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ESTHER 4 — FOR SUCH A TIME AS THIS
+6. THE BANQUETS
 
-Mordecai challenges Esther to act despite risk, and Esther calls for a fast before approaching the king.
+Esther uses patience and timing rather than immediate accusation.
 
 STUDY QUESTION
-What does Esther’s decision reveal about courage as action in the presence of fear?
+Why can wisdom require delay?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ESTHER 5 — THE BANQUETS BEGIN
+7. THE SLEEPLESS KING
 
-Esther approaches the king successfully and begins a deliberate strategy using banquets rather than immediate accusation.
+A small coincidence begins the great reversal.
 
 STUDY QUESTION
-Why is patience part of her courage?
+How does Esther portray providence without explicit miracle?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ESTHER 6 — THE GREAT REVERSAL
+8. HAMAN FALLS
 
-The sleepless king discovers Mordecai’s unrewarded service, and Haman is forced to honor the man he hates.
+The instrument prepared for Mordecai becomes Haman’s downfall.
 
 STUDY QUESTION
-How does irony function as the engine of providential reversal?
+Why is reversal central to the book?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ESTHER 7 — HAMAN EXPOSED
+9. PURIM
 
-Esther reveals her identity and Haman’s plot. Haman is executed on the structure he prepared for Mordecai.
+Deliverance becomes annual communal memory.
 
 STUDY QUESTION
-Why is reversal so central to the book’s moral imagination?
+Why must salvation be remembered institutionally?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ESTHER 8 — A NEW DECREE
+10. MORDECAI’S RISE
 
-Because Persian law cannot simply be revoked, a new decree permits Jewish self-defense.
+Political power is used for the welfare of the people rather than self-exaltation.
 
 STUDY QUESTION
-How does deliverance operate through the constraints of an imperfect political system?
+How does Mordecai contrast with Haman?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ESTHER 9 — DELIVERANCE AND PURIM
+HISTORICAL, LITERARY, AND READING CONTEXT
 
-The Jews defeat their attackers and establish Purim as an annual remembrance.
+HISTORICAL AND LITERARY CONTEXT
+
+Esther is set in the Persian diaspora, where Jews live scattered outside the land under foreign government.
+
+The book’s refusal to name God explicitly is one of its most striking literary features. Instead of direct miracles, providence appears through reversals, timing, remembered records, banquets, insomnia, courage, and political opportunity.
+
+That hiddenness makes Esther unusually relevant to believers who do not experience spectacular divine intervention.
+
+REVERSAL AS THE BOOK’S ENGINE
+
+Nearly every major threat reverses:
+Mordecai moves from threatened victim to honored official.
+Haman moves from honored official to condemned enemy.
+The day selected for Jewish destruction becomes a day of deliverance.
+
+The reversals do not make suffering imaginary. They show that apparent control by evil is not the final word.
 
 STUDY QUESTION
-Why does communal memory become part of deliverance itself?
+
+What changes in your reading of Esther when you keep its whole-book purpose in view rather than reading isolated verses?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ESTHER 10 — MORDECAI’S RISE
+KEY PASSAGES TO KNOW
 
-Mordecai becomes second to the king and works for the welfare of his people.
-
-STUDY QUESTION
-How does the ending contrast with Haman’s use of political power?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-HIDDEN PROVIDENCE
-
-Coincidences, timing, insomnia, reversals, and human decisions accumulate into deliverance without an explicit miracle.
-
-STUDY QUESTION
-How can providence be recognized without being mechanically inferred from every event?
+Esther 2:21–23
+Esther 3
+Esther 4:13–16
+Esther 5–7
+Esther 8
+Esther 9
+Esther 10
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIASPORA IDENTITY
+MAJOR THEMES
 
-Esther depicts Jewish faithfulness and survival outside the land under foreign rule.
-
-STUDY QUESTION
-What tensions arise between accommodation to culture and preservation of identity?
+PROVIDENCE, COURAGE, IDENTITY, POWER, REVERSAL, DELIVERANCE, MEMORY, DIASPORA.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-CHRIST AND THE REST OF SCRIPTURE
+READING THIS BOOK WITH THE REST OF SCRIPTURE
 
-Esther preserves the covenant people through whom the larger biblical promises continue. Christian readers may see patterns of providence and deliverance without turning Esther into a direct allegory of Christ.
+A strong reading of Esther moves in three directions.
+
+FIRST: READ BACKWARD.
+
+Ask what earlier Scripture this book assumes. Covenant promises, creation, Exodus, law, priesthood, kingship, wisdom, and earlier family history often give later passages their meaning.
+
+SECOND: READ FORWARD.
+
+Ask what problems remain unresolved. Does the book achieve final rest? Does the king remain faithful? Does sacrifice permanently remove sin? Does wisdom conquer death? Does reform change the heart? The unresolved questions become part of the Bible’s forward movement.
+
+THIRD: READ CANONICALLY.
+
+Follow how later biblical writers actually use the book. This is more reliable than inventing symbolic connections. When the New Testament quotes, echoes, or develops a passage, pay attention to both continuity and transformation.
+
+This three-direction method helps Christian readers avoid two mistakes: treating the Old Testament as if Christ were irrelevant, or treating every Old Testament detail as a secret code whose only purpose was to predict Jesus.
 
 STUDY QUESTION
-Why is preserving the covenant people itself important to the canonical storyline?
+
+What major question does Esther leave unresolved that later Scripture continues to answer?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIFFICULT PASSAGES TO STUDY
+HOW THIS BOOK POINTS FORWARD TO CHRIST
 
-Esther’s marriages and compromises, the absence of God’s name, violence in chapter 9, Haman’s execution, and the theological status of Purim invite careful discussion.
+Esther preserves the covenant people through whom the messianic promise continues.
 
-STUDY QUESTION
-How can readers celebrate deliverance while still taking the book’s violence seriously?
+Christians may see patterns of providential rescue and reversal, but Esther should not be turned into a simplistic allegory where every character equals a Christian figure.
+
+The larger canonical significance is preservation of the people through whom Christ comes.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIFFICULT PASSAGES AND READING CAUTIONS
+
+ABSENCE OF GOD’S NAME — This is a literary feature, not proof the book is secular.
+VIOLENCE IN ESTHER 9 — Deliverance involves real conflict and should be read carefully.
+ESTHER’S COMPROMISES — The book portrays life under empire with moral complexity.
+PURIM — A Jewish festival rooted in this story; Christian reading should respect that identity.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
@@ -190,41 +228,30 @@ How can readers celebrate deliverance while still taking the book’s violence s
 
 WHOLE-BOOK REVIEW
 
-1. Summarize the book’s place in the biblical storyline.
-2. Identify its major literary or narrative divisions.
-3. Name the most important people, events, laws, speeches, or institutions.
-4. Explain the book’s central teaching about God.
-5. Explain what the book reveals about human sin, faith, obedience, leadership, or community.
-6. Identify the book’s major covenant themes.
-7. Explain at least two important connections to later Scripture.
-8. Identify one difficult passage and describe what context is necessary to interpret it responsibly.
-9. State one major Great Idea that this book contributes to syntopical study.
-10. Summarize the book in one paragraph without reducing it to a slogan.
+1. How does the empire’s display of power reveal weakness?
+2. How should readers evaluate faithful action under constrained choices?
+3. Why do seemingly minor faithful actions matter later?
+4. How can private resentment become public evil when joined to power?
+5. Why is courage action despite fear rather than absence of fear?
+6. Why can wisdom require delay?
+7. How does Esther portray providence without explicit miracle?
+8. Why is reversal central to the book?
+9. Why must salvation be remembered institutionally?
+10. How does Mordecai contrast with Haman?
 
-FINAL QUESTION
-What would a reader misunderstand about the Bible as a whole if this book were missing?
+FINAL SYNTHESIS:
+Summarize the book’s contribution to the biblical story of covenant, leadership, sin, and redemption.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-STUDY LABS
+DEEPER READING LABS
 
-LAB 1 — STRUCTURE MAP
-Create a one-page outline using the book’s major literary or narrative movements.
-
-LAB 2 — KEY PASSAGES
-Choose five passages that carry disproportionate importance for the rest of Scripture and explain why.
-
-LAB 3 — CHARACTER OF GOD
-Collect the book’s major statements and demonstrations of God’s character. Distinguish what is explicit from what is inferred.
-
-LAB 4 — CANONICAL CONNECTIONS
-Trace one theme into at least three later biblical books, including the New Testament where appropriate.
-
-LAB 5 — DIFFICULT TEXT
-Choose one ethically, historically, or theologically difficult passage. Identify literary context, covenant setting, major interpretive questions, and what it does and does not authorize.
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+LAB 1 — Create a one-page timeline of the book.
+LAB 2 — Track every major covenant or leadership turning point.
+LAB 3 — Choose one difficult passage and distinguish what the narrator reports from what God approves.
+LAB 4 — Trace one theme into the New Testament.
+LAB 5 — Write a one-paragraph theological summary of the book.
 
 [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]]

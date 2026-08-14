@@ -1,177 +1,227 @@
 2 KINGS
-An Independent Mark, Set, Go! Bible Guide
-Biblical book: 2 Kings
+Mark, Set, Go! Bible Guide
 
-Elisha, prophetic judgment, reform, Assyria, Babylon, exile, covenant failure, and the collapse of Israel and Judah.
+ABOUT THIS BOOK
 
-HOW TO USE THIS BIBLE GUIDE
-Use this guide alongside the biblical text. Read the assigned chapters first whenever possible. The guide is designed to help with structure, historical and literary context, theology, difficult passages, connections across Scripture, discussion, and comprehension—not to replace Scripture itself.
+2 Kings follows Israel and Judah to catastrophe. The northern kingdom falls to Assyria; later Jerusalem and the temple fall to Babylon. The book interprets collapse through covenant unfaithfulness while preserving hints of hope.
 
-READING PRINCIPLES
-Pay attention to what the text actually says, distinguish description from approval, read each passage in its literary and covenant context, and allow clearer passages and the wider biblical canon to inform difficult ones.
+BOOK STRUCTURE
+
+2 Kings 1–8 — Elisha
+2 Kings 9–17 — Jehu and fall of Israel
+2 Kings 18–20 — Hezekiah
+2 Kings 21–23 — Manasseh and Josiah
+2 Kings 24–25 — fall of Jerusalem
+
+HOW TO USE THIS GUIDE
+
+Read the biblical text first whenever possible. Then use the guide to trace the argument, narrative movement, theology, historical context, difficult passages, and connections to the rest of Scripture. The goal is serious understanding without turning the guide into a technical commentary.
 
 [[MSG:SECTION]]
 
-PURPOSE AND PLACE IN SCRIPTURE
+1. ELIJAH TO ELISHA
 
-2 Kings follows the divided kingdoms to their destruction: Israel falls to Assyria in 722 BC and Judah to Babylon in 586 BC. The book interprets political catastrophe through covenant unfaithfulness while preserving signs of mercy and hope.
+The prophetic mission continues beyond one personality.
 
 STUDY QUESTION
-Why does the narrator explain national collapse theologically rather than merely militarily?
+Why does prophetic succession matter?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 KINGS 1–2 — ELIJAH AND ELISHA
+2. ELISHA’S MIRACLES
 
-Elijah’s ministry ends and Elisha receives his prophetic mantle.
+Elisha’s ministry includes provision, healing, resurrection, and international interaction.
 
 STUDY QUESTION
-What does prophetic succession communicate about God’s word outlasting individual leaders?
+Why do so many miracles occur outside centers of power?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 KINGS 3–8 — ELISHA’S MINISTRY
+3. NAAMAN
 
-Miracles involving water, oil, food, resurrection, healing, and international politics show divine power operating among ordinary people and nations.
+A Syrian commander is healed through humble obedience.
 
 STUDY QUESTION
-Why are some of Elisha’s most important miracles directed toward people outside royal power?
+Why does grace often confront pride through simple commands?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 KINGS 5 — NAAMAN
+4. JEHU
 
-The Syrian commander Naaman is healed after humbling himself and obeying a simple prophetic command.
+Jehu destroys Ahab’s dynasty yet continues other idolatry.
 
 STUDY QUESTION
-Why does the story emphasize humility and grace rather than status?
+Why is zeal against one evil not the same as wholehearted faithfulness?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 KINGS 9–10 — JEHU
+5. FALL OF ISRAEL
 
-Jehu destroys Ahab’s dynasty and Baal worship but fails to abandon Jeroboam’s idolatrous system.
+2 Kings 17 interprets Samaria’s fall through idolatry, rejected prophets, and covenant rebellion.
 
 STUDY QUESTION
-Why does zeal against one evil not equal wholehearted faithfulness?
+Why does the narrator give theological interpretation rather than merely military explanation?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 KINGS 17 — FALL OF ISRAEL
+6. HEZEKIAH
 
-Samaria falls to Assyria. The narrator gives an extended theological explanation centered on idolatry, rejected prophets, and covenant violation.
+Hezekiah trusts God against Assyria but later proudly shows treasures to Babylon.
 
 STUDY QUESTION
-Why is chapter 17 a theological interpretation of history rather than just a battle report?
+How can faithful leaders still plant seeds of future trouble?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 KINGS 18–20 — HEZEKIAH
+7. MANASSEH
 
-Hezekiah reforms worship, resists Assyria, receives deliverance, and later displays his wealth foolishly to Babylonian envoys.
+His reign embodies deep idolatry and injustice.
 
 STUDY QUESTION
-How can a faithful reign still contain seeds of future disaster?
+How can leadership shape generations beyond one person’s lifetime?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 KINGS 21 — MANASSEH
+8. JOSIAH
 
-Manasseh’s reign represents severe idolatry and injustice and becomes a major reason given for Judah’s coming judgment.
+Discovery of the law brings reform, but accumulated consequences remain.
 
 STUDY QUESTION
-Why does leadership have generational consequences?
+Why can sincere reform fail to erase every historical consequence?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 KINGS 22–23 — JOSIAH
+9. FALL OF JERUSALEM
 
-The book of the law is rediscovered and Josiah leads sweeping reform.
+Temple, city, land, and monarchy collapse.
 
 STUDY QUESTION
-Why can sincere reform fail to reverse every accumulated consequence of long-term rebellion?
+What theological crisis does exile create?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 KINGS 24–25 — FALL OF JERUSALEM
+10. JEHOIACHIN RELEASED
 
-Babylon captures Jerusalem, destroys the temple, removes the population, and ends the Davidic monarchy in the land.
+The book ends with a Davidic king receiving unexpected favor in Babylon.
 
 STUDY QUESTION
-What theological crisis is created when temple, land, city, and king are all lost?
+Why is this small note a meaningful hint of hope?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXILE
+HISTORICAL, LITERARY, AND READING CONTEXT
 
-Exile fulfills longstanding covenant warnings but also creates the setting for prophetic promises of restoration.
+HISTORICAL AND LITERARY CONTEXT
+
+2 Kings narrates the final collapse of both kingdoms. Israel falls to Assyria in 722 BC; Judah falls to Babylon in 586 BC.
+
+Yet the book does not explain these events merely through military imbalance. Chapter 17 pauses the narrative to interpret exile as the accumulated result of covenant unfaithfulness, idolatry, injustice, and refusal to hear prophets.
+
+The narrative also refuses simplistic moral arithmetic. Good kings can inherit catastrophic historical conditions, and reforms can be sincere without undoing every consequence of generations of rebellion.
+
+EXILE AND HOPE
+
+The destruction of temple, monarchy, city, and land raises a huge theological problem: what happens to God’s promises?
+
+The final note about Jehoiachin is intentionally modest. There is no restored kingdom. But the Davidic line has not disappeared.
+
+The book ends with enough hope to keep the question open.
 
 STUDY QUESTION
-How does judgment become the background for hope?
+
+What changes in your reading of 2 Kings when you keep its whole-book purpose in view rather than reading isolated verses?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-PROPHETS AND KINGS
+KEY PASSAGES TO KNOW
 
-Again and again, prophets challenge kings who possess political power but remain accountable to God’s word.
-
-STUDY QUESTION
-Why is prophetic critique necessary in a monarchy?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-THE FINAL NOTE — JEHOIACHIN
-
-The book ends with the exiled Davidic king Jehoiachin released and given honor in Babylon.
-
-STUDY QUESTION
-Why might this small act of favor function as a hint of future hope?
+2 Kings 2
+2 Kings 5
+2 Kings 9–10
+2 Kings 17
+2 Kings 18–19
+2 Kings 21
+2 Kings 22–23
+2 Kings 24–25
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-CHRIST AND THE REST OF SCRIPTURE
+MAJOR THEMES
 
-Exile becomes a major biblical pattern of judgment and restoration, while the apparent collapse of David’s dynasty intensifies hope for a future faithful king.
-
-STUDY QUESTION
-How does the end of Kings deepen the significance of later messianic promises?
+PROPHETIC WORD, IDOLATRY, EXILE, JUDGMENT, REFORM, LEADERSHIP, HOPE.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIFFICULT PASSAGES TO STUDY
+READING THIS BOOK WITH THE REST OF SCRIPTURE
 
-The bears and youths, Jehu’s violence, war narratives, Assyrian and Babylonian judgment, Manasseh, and inherited consequences require careful attention to genre and covenant history.
+A strong reading of 2 Kings moves in three directions.
+
+FIRST: READ BACKWARD.
+
+Ask what earlier Scripture this book assumes. Covenant promises, creation, Exodus, law, priesthood, kingship, wisdom, and earlier family history often give later passages their meaning.
+
+SECOND: READ FORWARD.
+
+Ask what problems remain unresolved. Does the book achieve final rest? Does the king remain faithful? Does sacrifice permanently remove sin? Does wisdom conquer death? Does reform change the heart? The unresolved questions become part of the Bible’s forward movement.
+
+THIRD: READ CANONICALLY.
+
+Follow how later biblical writers actually use the book. This is more reliable than inventing symbolic connections. When the New Testament quotes, echoes, or develops a passage, pay attention to both continuity and transformation.
+
+This three-direction method helps Christian readers avoid two mistakes: treating the Old Testament as if Christ were irrelevant, or treating every Old Testament detail as a secret code whose only purpose was to predict Jesus.
 
 STUDY QUESTION
-How does the book keep divine judgment from becoming a simplistic explanation for every individual suffering?
+
+What major question does 2 Kings leave unresolved that later Scripture continues to answer?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HOW THIS BOOK POINTS FORWARD TO CHRIST
+
+The collapse of the Davidic monarchy intensifies expectation for a future king who will not fail.
+
+Exile becomes a major biblical pattern that the New Testament ultimately answers through Christ’s kingdom and restoration.
+
+Jesus also explicitly refers to Naaman and Elijah-era outsiders.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIFFICULT PASSAGES AND READING CAUTIONS
+
+BEARS AND YOUTHS — A difficult Elisha narrative requiring attention to prophetic authority and translation.
+JEHU’S VIOLENCE — The text evaluates him both positively and negatively.
+EXILE — Do not turn national judgment texts into formulas for individual suffering.
+MANASSEH — Kings and Chronicles emphasize different dimensions of his story.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
@@ -179,41 +229,30 @@ How does the book keep divine judgment from becoming a simplistic explanation fo
 
 WHOLE-BOOK REVIEW
 
-1. Summarize the book’s place in the biblical storyline.
-2. Identify its major literary or narrative divisions.
-3. Name the most important people, events, laws, speeches, or institutions.
-4. Explain the book’s central teaching about God.
-5. Explain what the book reveals about human sin, faith, obedience, leadership, or community.
-6. Identify the book’s major covenant themes.
-7. Explain at least two important connections to later Scripture.
-8. Identify one difficult passage and describe what context is necessary to interpret it responsibly.
-9. State one major Great Idea that this book contributes to syntopical study.
-10. Summarize the book in one paragraph without reducing it to a slogan.
+1. Why does prophetic succession matter?
+2. Why do so many miracles occur outside centers of power?
+3. Why does grace often confront pride through simple commands?
+4. Why is zeal against one evil not the same as wholehearted faithfulness?
+5. Why does the narrator give theological interpretation rather than merely military explanation?
+6. How can faithful leaders still plant seeds of future trouble?
+7. How can leadership shape generations beyond one person’s lifetime?
+8. Why can sincere reform fail to erase every historical consequence?
+9. What theological crisis does exile create?
+10. Why is this small note a meaningful hint of hope?
 
-FINAL QUESTION
-What would a reader misunderstand about the Bible as a whole if this book were missing?
+FINAL SYNTHESIS:
+Summarize the book’s contribution to the biblical story of covenant, leadership, sin, and redemption.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-STUDY LABS
+DEEPER READING LABS
 
-LAB 1 — STRUCTURE MAP
-Create a one-page outline using the book’s major literary or narrative movements.
-
-LAB 2 — KEY PASSAGES
-Choose five passages that carry disproportionate importance for the rest of Scripture and explain why.
-
-LAB 3 — CHARACTER OF GOD
-Collect the book’s major statements and demonstrations of God’s character. Distinguish what is explicit from what is inferred.
-
-LAB 4 — CANONICAL CONNECTIONS
-Trace one theme into at least three later biblical books, including the New Testament where appropriate.
-
-LAB 5 — DIFFICULT TEXT
-Choose one ethically, historically, or theologically difficult passage. Identify literary context, covenant setting, major interpretive questions, and what it does and does not authorize.
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+LAB 1 — Create a one-page timeline of the book.
+LAB 2 — Track every major covenant or leadership turning point.
+LAB 3 — Choose one difficult passage and distinguish what the narrator reports from what God approves.
+LAB 4 — Trace one theme into the New Testament.
+LAB 5 — Write a one-paragraph theological summary of the book.
 
 [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]]

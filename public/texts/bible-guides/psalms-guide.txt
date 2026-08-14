@@ -1,221 +1,266 @@
 PSALMS
-An Independent Mark, Set, Go! Bible Guide
-Biblical book: Psalms
+Mark, Set, Go! Bible Guide
 
-Prayer, praise, lament, kingship, wisdom, Torah, suffering, thanksgiving, messianic hope, and the formation of worship.
+ABOUT THIS BOOK
 
-HOW TO USE THIS BIBLE GUIDE
-Use this guide alongside the biblical text. Read the assigned passages first whenever possible. The guide is designed to help with structure, literary context, theology, difficult passages, connections across Scripture, discussion, and comprehension—not to replace Scripture itself.
+Psalms is Israel’s prayer and song book. It teaches God’s people how to speak to him in praise, grief, anger, repentance, thanksgiving, confidence, confusion, and hope.
 
-READING PRINCIPLES
-Pay attention to genre. Poetry, wisdom sayings, lament, dialogue, and reflective argument communicate differently from narrative or legal prose. Distinguish description from endorsement, read passages in context, and allow the whole biblical canon to inform difficult texts.
+The Psalter is not a random collection. It is arranged in five books and moves through themes of Torah, kingship, lament, exile, and praise.
+
+BOOK STRUCTURE
+
+Book I — Psalms 1–41
+Book II — 42–72
+Book III — 73–89
+Book IV — 90–106
+Book V — 107–150
+
+Major types: lament, praise, thanksgiving, royal, wisdom, Torah, pilgrimage, imprecatory.
+
+HOW TO USE THIS GUIDE
+
+Read the biblical text first whenever possible. Then use the guide to trace the argument, narrative movement, theology, historical context, difficult passages, and connections to the rest of Scripture. The goal is serious understanding without turning the guide into a technical commentary.
 
 [[MSG:SECTION]]
 
-PURPOSE AND PLACE IN SCRIPTURE
+1. PSALMS 1–2 — THE GATEWAY
 
-Psalms is Israel’s prayer and song book, gathering praise, lament, thanksgiving, wisdom, royal psalms, pilgrimage songs, and reflections on Torah. It teaches readers not only what to believe but how to speak to God across the full range of human experience.
+Psalm 1 presents Torah-shaped life; Psalm 2 presents God’s anointed king.
 
 STUDY QUESTION
-Why does Scripture include prayers of anger, fear, grief, and protest alongside praise?
+Why do law and kingship introduce the Psalter together?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-THE FIVE-BOOK SHAPE
+2. LAMENT
 
-The Psalter is arranged in five books, each ending with a doxology. The collection has editorial shape rather than being a random anthology.
+Lament names pain, asks questions, requests help, and remembers God.
 
 STUDY QUESTION
-How might the five-book structure invite comparison with the Torah?
+Why is lament an act of covenant relationship?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-PSALMS 1–2 — TORAH AND KINGSHIP
+3. PRAISE
 
-Psalm 1 presents the blessed person delighting in Torah; Psalm 2 presents God’s anointed king amid rebellious nations.
+Praise gives reasons rooted in God’s character and works.
 
 STUDY QUESTION
-Why might Torah and kingship serve together as an introduction to the Psalter?
+Why is biblical praise more than emotional intensity?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-LAMENT
+4. THANKSGIVING
 
-Lament psalms name suffering, ask questions, request deliverance, remember God’s character, and often move toward trust.
+Thanksgiving turns rescue into public testimony.
 
 STUDY QUESTION
-What makes lament an act of faith rather than unbelief?
+How does remembered deliverance strengthen community faith?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-PRAISE
+5. ROYAL PSALMS
 
-Praise psalms celebrate God’s character and works in creation, history, salvation, and kingship.
+Royal psalms celebrate the Davidic king and later feed messianic hope.
 
 STUDY QUESTION
-Why does biblical praise give reasons rather than relying only on emotional intensity?
+How can a psalm have original royal meaning and later messianic fulfillment?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-THANKSGIVING
+6. TORAH PSALMS
 
-Thanksgiving often follows remembered danger and answered prayer.
+Psalms 1 and 119 delight in God’s instruction.
 
 STUDY QUESTION
-How does testimony transform private deliverance into communal worship?
+Why is law pictured as delight?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ROYAL AND MESSIANIC PSALMS
+7. PSALM 22
 
-Royal psalms concern Israel’s king and Davidic covenant while later biblical writers apply several to the Messiah.
+Abandonment moves toward vindication and worldwide praise; the crucifixion narratives echo it strongly.
 
 STUDY QUESTION
-How should readers respect the original royal setting while following later canonical interpretation?
+Why must Christians read the whole psalm, not only its opening line?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-TORAH PSALMS
+8. PSALM 23
 
-Psalms such as 1 and 119 portray divine instruction as delight, wisdom, and a path of life.
+God is shepherd and host—guide, protector, provider, companion.
 
 STUDY QUESTION
-Why is law celebrated poetically rather than treated only as obligation?
+Why is “you are with me” the center of the psalm?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-WISDOM PSALMS
+9. PSALM 51
 
-Some psalms contrast righteous and wicked paths, wrestle with prosperity, and teach reflective trust.
+Repentance seeks cleansing, truth, renewed heart, and restored joy.
 
 STUDY QUESTION
-How do Psalms 37, 49, and 73 complicate simplistic ideas of immediate reward?
+What does repentance desire beyond avoiding consequences?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-CREATION PSALMS
+10. PSALM 73
 
-Psalms 8, 19, 29, 104, and others contemplate creation as testimony to divine glory and order.
+The prosperity of the wicked destabilizes faith until worship restores perspective.
 
 STUDY QUESTION
-How does creation shape worship and human self-understanding?
+How does worship change interpretation without denying injustice?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-PSALMS OF ASCENT
+11. IMPRECATORY PSALMS
 
-Psalms 120–134 are associated with pilgrimage and communal movement toward Jerusalem.
+Some prayers ask God to judge enemies severely.
 
 STUDY QUESTION
-How can repeated pilgrimage form spiritual identity?
+How can these be prayed without turning into personal vengeance?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-IMPRECATORY PSALMS
+12. PSALM 110
 
-Some psalms ask God to judge enemies in severe language.
+King and priest imagery becomes central to the New Testament’s theology of Christ.
 
 STUDY QUESTION
-How can these prayers be read honestly without turning them into permission for personal vengeance?
+Why is a priestly king unusual and important?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-PSALM 22
+HISTORICAL, LITERARY, AND READING CONTEXT
 
-The psalm moves from abandonment and mockery toward praise and worldwide worship. The New Testament uses its language prominently in the crucifixion narratives.
+HISTORICAL AND LITERARY CONTEXT
+
+The Psalter developed as a collection over time. Individual psalms arise from many settings, and the final collection has been deliberately arranged.
+
+The five-book shape, the placement of Psalms 1–2, the crisis of Book III, the divine-kingship emphasis of Book IV, and the sustained praise at the end all suggest a theological journey.
+
+Readers therefore benefit from reading both individual psalms and the Psalter as a whole.
+
+HOW TO READ HEBREW POETRY
+
+Hebrew poetry often works through parallel lines rather than rhyme.
+
+The second line may repeat, intensify, contrast, or complete the first.
+
+Images are compressed. Mountains clap, rivers roar, bones waste away, enemies become bulls or dogs.
+
+Poetry must be allowed to remain poetry. Flattening every image into literal prose destroys much of its force.
 
 STUDY QUESTION
-Why is it important to read the entire psalm rather than only its opening line?
+
+What changes in your reading of Psalms when you keep its whole-book purpose in view rather than reading isolated verses?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-PSALM 23
+KEY PASSAGES TO KNOW
 
-The shepherd and host images portray God’s guidance, provision, protection, and presence.
-
-STUDY QUESTION
-Why has this short psalm become so durable across cultures and centuries?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-PSALM 51
-
-David’s penitential prayer emphasizes mercy, cleansing, truth, a clean heart, and restored fellowship.
-
-STUDY QUESTION
-What does genuine repentance seek beyond relief from consequences?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-PSALM 73
-
-The apparent prosperity of the wicked destabilizes the psalmist until worship restores perspective.
-
-STUDY QUESTION
-How does the sanctuary change the psalmist’s interpretation without denying what he sees?
+Psalm 1
+Psalm 2
+Psalm 8
+Psalm 19
+Psalm 22
+Psalm 23
+Psalm 32
+Psalm 46
+Psalm 51
+Psalm 73
+Psalm 90
+Psalm 103
+Psalm 110
+Psalm 119
+Psalm 139
+Psalm 150
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-PSALM 110
+MAJOR THEMES
 
-This royal psalm combines kingship and priestly language and becomes one of the New Testament’s most frequently cited psalms.
-
-STUDY QUESTION
-Why is the combination of king and priest theologically significant?
+WORSHIP, LAMENT, KINGSHIP, TORAH, CREATION, REPENTANCE, WISDOM, ENEMIES, HOPE, PRESENCE.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-CHRIST AND THE REST OF SCRIPTURE
+READING THIS BOOK WITH THE REST OF SCRIPTURE
 
-Jesus and the apostles pray, quote, and interpret the Psalms extensively. Christian worship has continued to use the Psalter as a vocabulary for prayer and Christological reflection.
+A strong reading of Psalms moves in three directions.
+
+FIRST: READ BACKWARD.
+
+Ask what earlier Scripture this book assumes. Covenant promises, creation, Exodus, law, priesthood, kingship, wisdom, and earlier family history often give later passages their meaning.
+
+SECOND: READ FORWARD.
+
+Ask what problems remain unresolved. Does the book achieve final rest? Does the king remain faithful? Does sacrifice permanently remove sin? Does wisdom conquer death? Does reform change the heart? The unresolved questions become part of the Bible’s forward movement.
+
+THIRD: READ CANONICALLY.
+
+Follow how later biblical writers actually use the book. This is more reliable than inventing symbolic connections. When the New Testament quotes, echoes, or develops a passage, pay attention to both continuity and transformation.
+
+This three-direction method helps Christian readers avoid two mistakes: treating the Old Testament as if Christ were irrelevant, or treating every Old Testament detail as a secret code whose only purpose was to predict Jesus.
 
 STUDY QUESTION
-What is gained by praying words Scripture gives us rather than only spontaneous words?
+
+What major question does Psalms leave unresolved that later Scripture continues to answer?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIFFICULT PASSAGES TO STUDY
+HOW THIS BOOK POINTS FORWARD TO CHRIST
 
-Imprecations, enemies, superscriptions, historical settings, messianic interpretation, poetic hyperbole, and statements about the righteous require attention to genre.
+Jesus quotes and fulfills the Psalms extensively.
 
-STUDY QUESTION
-Which psalms become distorted most easily when poetry is read as flat prose?
+Psalm 22 shapes the passion.
+Psalm 110 shapes Christ’s kingship and priesthood.
+The apostles read Davidic royal psalms messianically.
+Jesus prays Psalms in suffering.
+
+The Psalter becomes the church’s prayer book because Christ himself inhabits its language.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIFFICULT PASSAGES AND READING CAUTIONS
+
+IMPRECATION — Direct judgment to God rather than personal revenge.
+SUPERSCRIPTIONS — They are ancient interpretive data but should not be overread.
+POETRY — Parallelism and metaphor should not be flattened into prose.
+MESSIANIC READING — Respect original context while following New Testament usage.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
@@ -223,41 +268,34 @@ Which psalms become distorted most easily when poetry is read as flat prose?
 
 WHOLE-BOOK REVIEW
 
-1. Summarize the book’s place in the biblical storyline or wisdom tradition.
-2. Identify its major literary divisions or recurring forms.
-3. Explain how genre affects interpretation.
-4. State the book’s central teaching about God.
-5. Explain what the book reveals about human experience, suffering, wisdom, worship, work, love, or mortality.
-6. Identify three key passages and explain why they matter.
-7. Explain at least two important connections to later Scripture.
-8. Identify one difficult passage and describe the context needed to interpret it responsibly.
-9. State one major Great Idea this book contributes to syntopical study.
-10. Summarize the book in one paragraph without reducing it to a slogan.
+1. What are the five books of the Psalter?
+2. What does lament do?
+3. Why are Psalms 1–2 important?
+4. What are royal psalms?
+5. Why is Psalm 22 important to Christians?
+6. What is the center of Psalm 23?
+7. What makes Psalm 51 true repentance?
+8. What changes in Psalm 73?
+9. How should imprecatory psalms be read?
+10. Why is Psalm 110 important?
 
-FINAL QUESTION
-What would a reader misunderstand about human life before God if this book were missing from Scripture?
+FINAL SYNTHESIS:
+Explain how Psalms trains believers to bring the whole emotional life under worship.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-STUDY LABS
+DEEPER READING LABS
 
-LAB 1 — STRUCTURE OR FORM MAP
-Create a one-page map of the book’s major literary movements, voices, genres, or collections.
+LAB 1 — Categorize twenty psalms by type.
 
-LAB 2 — KEY PASSAGES
-Choose five passages that carry disproportionate theological or literary importance and explain why.
+LAB 2 — Pray one lament using its structure.
 
-LAB 3 — VOCABULARY OF EXPERIENCE
-Collect the book’s major words and images for wisdom, suffering, worship, love, joy, mortality, justice, or desire.
+LAB 3 — Trace Psalm 110 through the New Testament.
 
-LAB 4 — CANONICAL CONNECTIONS
-Trace one major theme into at least three other biblical books, including the New Testament where appropriate.
+LAB 4 — Compare Psalm 22 with the crucifixion narratives.
 
-LAB 5 — DIFFICULT TEXT
-Choose one ethically, emotionally, or theologically difficult passage. Identify genre, context, major interpretations, and what the passage does and does not claim.
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+LAB 5 — Build a personal index: fear, grief, gratitude, repentance, confidence, anger.
 
 [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]]

@@ -1,141 +1,125 @@
 1 SAMUEL
-An Independent Mark, Set, Go! Bible Guide
-Biblical book: 1 Samuel
+Mark, Set, Go! Bible Guide
 
-Samuel, Saul, David, kingship, prophetic authority, obedience, covenant leadership, and the transition from judges to monarchy.
+ABOUT THIS BOOK
 
-HOW TO USE THIS BIBLE GUIDE
-Use this guide alongside the biblical text. Read the assigned chapters first whenever possible. The guide is designed to help with structure, historical and literary context, theology, difficult passages, connections across Scripture, discussion, and comprehension—not to replace Scripture itself.
+1 Samuel tells the transition from judges to monarchy through Samuel, Saul, and David. It explores prayer, prophetic authority, kingship, obedience, leadership, jealousy, friendship, and the question of what kind of king God’s people need.
 
-READING PRINCIPLES
-Pay attention to what the text actually says, distinguish description from approval, read each passage in its literary and covenant context, and allow clearer passages and the wider biblical canon to inform difficult ones.
+BOOK STRUCTURE
+
+1 Samuel 1–7 — Samuel
+1 Samuel 8–15 — Saul rises and falls
+1 Samuel 16–20 — David anointed, Goliath, Jonathan
+1 Samuel 21–31 — David pursued, Saul declines
+
+HOW TO USE THIS GUIDE
+
+Read the biblical text first whenever possible. Then use the guide to trace the argument, narrative movement, theology, historical context, difficult passages, and connections to the rest of Scripture. The goal is serious understanding without turning the guide into a technical commentary.
 
 [[MSG:SECTION]]
 
-PURPOSE AND PLACE IN SCRIPTURE
+1. HANNAH AND SAMUEL
 
-1 Samuel describes Israel’s transition from the era of the judges to monarchy. Samuel emerges as prophet and judge; Saul becomes Israel’s first king and fails; David is anointed and gradually rises while refusing to seize the throne unlawfully.
+Hannah’s prayer and Samuel’s birth introduce reversal: the lowly are raised, the proud brought down. Her song anticipates themes later echoed in Mary’s Magnificat.
 
 STUDY QUESTION
-Why does the book evaluate kings primarily by their response to God rather than by military success?
+How does Hannah’s song frame the whole book?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-1 SAMUEL 1–3 — HANNAH AND SAMUEL
+2. THE ARK AND GOD’S HOLINESS
 
-Hannah’s prayer, Samuel’s birth, dedication, and prophetic call introduce themes of reversal, faithful prayer, corrupt leadership, and God raising the lowly.
+Israel treats the ark as a talisman and loses it. God demonstrates he cannot be manipulated through religious objects.
 
 STUDY QUESTION
-How does Hannah’s song anticipate the book’s political and theological reversals?
+Why is possessing a sacred symbol not the same as trusting God?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-1 SAMUEL 4–7 — THE ARK AND GOD’S HOLINESS
+3. ISRAEL ASKS FOR A KING
 
-Israel treats the ark as a military guarantee and suffers defeat. The ark’s journey through Philistine territory demonstrates that God cannot be manipulated by ritual objects.
+Israel wants a king “like the nations.” God permits monarchy while warning about royal exploitation.
 
 STUDY QUESTION
-Why does possessing a sacred symbol not guarantee divine favor?
+Is the problem kingship itself or the kind of kingship Israel desires?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-1 SAMUEL 8 — ISRAEL ASKS FOR A KING
+4. SAUL’S BEGINNING
 
-Israel asks for a king 'like the nations.' Samuel warns about royal exploitation while God permits the monarchy.
+Saul begins with humility and promise. God gives him opportunity to lead faithfully.
 
 STUDY QUESTION
-Is the problem kingship itself, Israel’s motive, or the kind of king they desire?
+Why is a good beginning not enough for leadership?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-1 SAMUEL 9–12 — SAUL’S RISE
+5. SAUL’S DISOBEDIENCE
 
-Saul is chosen, publicly confirmed, and initially successful. Samuel reminds Israel that king and people remain under covenant authority.
+Saul repeatedly substitutes partial obedience and image-management for wholehearted obedience. Samuel says, “to obey is better than sacrifice.”
 
 STUDY QUESTION
-Why does monarchy not replace God’s kingship?
+Why is religious activity unable to compensate for disobedience?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-1 SAMUEL 13–15 — SAUL’S FAILURE
+6. DAVID ANOINTED
 
-Saul repeatedly acts impatiently or incompletely, culminating in his failure to carry out the command concerning Amalek.
+God tells Samuel that humans look on outward appearance while God looks on the heart.
 
 STUDY QUESTION
-Why is partial obedience treated as disobedience?
+How does this challenge human methods of evaluating leaders?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-1 SAMUEL 16 — DAVID ANOINTED
+7. DAVID AND GOLIATH
 
-God directs Samuel away from outward appearance and toward the heart. David is anointed while Saul remains on the throne.
+David’s confidence rests on God’s honor and covenant faithfulness, not generic self-esteem.
 
 STUDY QUESTION
-What does the hidden anointing teach about divine choice and human perception?
+Why is this story more theological than motivational?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-1 SAMUEL 17 — DAVID AND GOLIATH
+8. DAVID AND JONATHAN
 
-David confronts Goliath in confidence that the battle belongs to the LORD.
+Jonathan’s covenant loyalty to David is remarkable because David threatens Jonathan’s dynastic future.
 
 STUDY QUESTION
-Why is the narrative more about God’s honor and covenant faithfulness than about generic self-confidence?
+What makes Jonathan’s friendship morally courageous?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-1 SAMUEL 18–20 — DAVID AND JONATHAN
+9. DAVID REFUSES TO KILL SAUL
 
-David’s success provokes Saul’s jealousy while Jonathan forms a covenant bond with David.
+Twice David refuses to seize the throne through murder. He waits for God rather than forcing the promise.
 
 STUDY QUESTION
-How does Jonathan’s loyalty challenge dynastic self-interest?
+Why is refusing unlawful power part of David’s preparation to rule?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-1 SAMUEL 21–26 — DAVID THE FUGITIVE
+10. SAUL’S FINAL DECLINE
 
-David lives as an outlaw but twice refuses to kill Saul when given the opportunity.
-
-STUDY QUESTION
-Why is refusing to seize power central to David’s preparation for kingship?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-1 SAMUEL 28 — SAUL AND THE MEDIUM
-
-Saul, abandoned by prophetic guidance because of persistent disobedience, seeks forbidden counsel at Endor.
-
-STUDY QUESTION
-How does Saul’s final spiritual desperation reveal the trajectory of his kingship?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-1 SAMUEL 29–31 — SAUL’S DEATH
-
-Saul dies in battle on Mount Gilboa. The first king’s reign ends tragically, preparing for David’s accession.
+Saul becomes isolated, fearful, and desperate, culminating in the medium at Endor and death in battle.
 
 STUDY QUESTION
 What makes Saul tragic rather than merely villainous?
@@ -144,23 +128,102 @@ What makes Saul tragic rather than merely villainous?
 
 [[MSG:SECTION]]
 
-CHRIST AND THE REST OF SCRIPTURE
+HISTORICAL, LITERARY, AND READING CONTEXT
 
-The book develops expectations for an anointed king under God’s authority. The term 'anointed' becomes foundational for later messianic hope fulfilled in Christian interpretation in Jesus the Messiah.
+HISTORICAL AND LITERARY CONTEXT
+
+1 Samuel stands at a major constitutional transition in Israel’s history. Samuel belongs to the world of judges but also functions as prophet, priestly figure, and kingmaker. Saul inaugurates monarchy; David is anointed before Saul’s reign is finished.
+
+The book therefore asks what legitimate authority looks like. Israel wants visible political security, but the narrative repeatedly insists that even kings remain under God’s word.
+
+The contrast between Saul and David should not be reduced to “bad man versus good man.” Saul is tragic, and David is still developing. The deeper distinction concerns response to God, repentance, patience, and the use of power.
+
+THEOLOGY OF KINGSHIP
+
+The monarchy is both permitted and dangerous. Deuteronomy had already allowed a king while restricting royal accumulation. 1 Samuel shows why those safeguards matter.
+
+The king cannot replace God as Israel’s true ruler. The best king must himself be obedient.
+
+This becomes the foundation for messianic hope: Israel does not merely need a powerful king; it needs a king whose heart is rightly ordered under God.
 
 STUDY QUESTION
-How does the contrast between Saul and David sharpen the biblical ideal of kingship?
+
+What changes in your reading of 1 Samuel when you keep its whole-book purpose in view rather than reading isolated verses?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIFFICULT PASSAGES TO STUDY
+KEY PASSAGES TO KNOW
 
-The request for a king, the Amalek command, Saul’s troubling spirit, David’s violence, the medium at Endor, and divine judgment require attention to covenant and narrative context.
+1 Samuel 2:1–10
+1 Samuel 3:1–10
+1 Samuel 8
+1 Samuel 12
+1 Samuel 13–15
+1 Samuel 16:7
+1 Samuel 17
+1 Samuel 18–20
+1 Samuel 24
+1 Samuel 28
+1 Samuel 31
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+MAJOR THEMES
+
+PRAYER, PROPHECY, KINGSHIP, OBEDIENCE, HEART, FRIENDSHIP, POWER, PATIENCE, TRAGIC LEADERSHIP.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+READING THIS BOOK WITH THE REST OF SCRIPTURE
+
+A strong reading of 1 Samuel moves in three directions.
+
+FIRST: READ BACKWARD.
+
+Ask what earlier Scripture this book assumes. Covenant promises, creation, Exodus, law, priesthood, kingship, wisdom, and earlier family history often give later passages their meaning.
+
+SECOND: READ FORWARD.
+
+Ask what problems remain unresolved. Does the book achieve final rest? Does the king remain faithful? Does sacrifice permanently remove sin? Does wisdom conquer death? Does reform change the heart? The unresolved questions become part of the Bible’s forward movement.
+
+THIRD: READ CANONICALLY.
+
+Follow how later biblical writers actually use the book. This is more reliable than inventing symbolic connections. When the New Testament quotes, echoes, or develops a passage, pay attention to both continuity and transformation.
+
+This three-direction method helps Christian readers avoid two mistakes: treating the Old Testament as if Christ were irrelevant, or treating every Old Testament detail as a secret code whose only purpose was to predict Jesus.
 
 STUDY QUESTION
-Which passage most clearly warns against confusing divine permission with divine approval?
+
+What major question does 1 Samuel leave unresolved that later Scripture continues to answer?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HOW THIS BOOK POINTS FORWARD TO CHRIST
+
+The book develops the category of the LORD’s “anointed,” which becomes foundational for messianic hope.
+
+David is a better king than Saul but still not the final king.
+
+Jesus is the true anointed king who refuses illegitimate seizure of power and rules through faithful obedience.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIFFICULT PASSAGES AND READING CAUTIONS
+
+THE AMALEK COMMAND — A difficult judgment text requiring covenant and ancient-war context.
+SAUL’S TROUBLING SPIRIT — Theological language about divine judgment and psychological decline should be handled carefully.
+DAVID’S VIOLENCE — David is not morally ideal simply because he is chosen.
+ENDORSING MONARCHY — The book is more nuanced than “kings are bad” or “kings are good.”
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
@@ -168,41 +231,30 @@ Which passage most clearly warns against confusing divine permission with divine
 
 WHOLE-BOOK REVIEW
 
-1. Summarize the book’s place in the biblical storyline.
-2. Identify its major literary or narrative divisions.
-3. Name the most important people, events, laws, speeches, or institutions.
-4. Explain the book’s central teaching about God.
-5. Explain what the book reveals about human sin, faith, obedience, leadership, or community.
-6. Identify the book’s major covenant themes.
-7. Explain at least two important connections to later Scripture.
-8. Identify one difficult passage and describe what context is necessary to interpret it responsibly.
-9. State one major Great Idea that this book contributes to syntopical study.
-10. Summarize the book in one paragraph without reducing it to a slogan.
+1. How does Hannah’s song frame the whole book?
+2. Why is possessing a sacred symbol not the same as trusting God?
+3. Is the problem kingship itself or the kind of kingship Israel desires?
+4. Why is a good beginning not enough for leadership?
+5. Why is religious activity unable to compensate for disobedience?
+6. How does this challenge human methods of evaluating leaders?
+7. Why is this story more theological than motivational?
+8. What makes Jonathan’s friendship morally courageous?
+9. Why is refusing unlawful power part of David’s preparation to rule?
+10. What makes Saul tragic rather than merely villainous?
 
-FINAL QUESTION
-What would a reader misunderstand about the Bible as a whole if this book were missing?
+FINAL SYNTHESIS:
+Summarize the book’s contribution to the biblical story of covenant, leadership, sin, and redemption.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-STUDY LABS
+DEEPER READING LABS
 
-LAB 1 — STRUCTURE MAP
-Create a one-page outline using the book’s major literary or narrative movements.
-
-LAB 2 — KEY PASSAGES
-Choose five passages that carry disproportionate importance for the rest of Scripture and explain why.
-
-LAB 3 — CHARACTER OF GOD
-Collect the book’s major statements and demonstrations of God’s character. Distinguish what is explicit from what is inferred.
-
-LAB 4 — CANONICAL CONNECTIONS
-Trace one theme into at least three later biblical books, including the New Testament where appropriate.
-
-LAB 5 — DIFFICULT TEXT
-Choose one ethically, historically, or theologically difficult passage. Identify literary context, covenant setting, major interpretive questions, and what it does and does not authorize.
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+LAB 1 — Create a one-page timeline of the book.
+LAB 2 — Track every major covenant or leadership turning point.
+LAB 3 — Choose one difficult passage and distinguish what the narrator reports from what God approves.
+LAB 4 — Trace one theme into the New Testament.
+LAB 5 — Write a one-paragraph theological summary of the book.
 
 [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]]

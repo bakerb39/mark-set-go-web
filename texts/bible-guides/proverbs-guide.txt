@@ -1,119 +1,107 @@
 PROVERBS
-An Independent Mark, Set, Go! Bible Guide
-Biblical book: Proverbs
+Mark, Set, Go! Bible Guide
 
-Wisdom, fear of the Lord, speech, work, money, sexuality, friendship, justice, family, discipline, and skillful living.
+ABOUT THIS BOOK
 
-HOW TO USE THIS BIBLE GUIDE
-Use this guide alongside the biblical text. Read the assigned passages first whenever possible. The guide is designed to help with structure, literary context, theology, difficult passages, connections across Scripture, discussion, and comprehension—not to replace Scripture itself.
+Proverbs trains readers in wisdom: skillful, morally serious life under the fear of the LORD. It addresses speech, work, money, sex, friendship, anger, leadership, justice, family, and teachability.
 
-READING PRINCIPLES
-Pay attention to genre. Poetry, wisdom sayings, lament, dialogue, and reflective argument communicate differently from narrative or legal prose. Distinguish description from endorsement, read passages in context, and allow the whole biblical canon to inform difficult texts.
+A proverb describes a pattern, not an automatic promise.
+
+BOOK STRUCTURE
+
+Proverbs 1–9 — extended wisdom instruction
+Proverbs 10–22 — sayings of Solomon
+Proverbs 22–24 — sayings of the wise
+Proverbs 25–29 — Hezekiah collection
+Proverbs 30 — Agur
+Proverbs 31 — Lemuel and woman of valor
+
+HOW TO USE THIS GUIDE
+
+Read the biblical text first whenever possible. Then use the guide to trace the argument, narrative movement, theology, historical context, difficult passages, and connections to the rest of Scripture. The goal is serious understanding without turning the guide into a technical commentary.
 
 [[MSG:SECTION]]
 
-PURPOSE AND PLACE IN SCRIPTURE
+1. THE FEAR OF THE LORD
 
-Proverbs trains readers in wisdom: skillful, morally serious living under the fear of the LORD. Its sayings describe patterns of life rather than mechanical guarantees.
+Wisdom begins with reverence and teachability before God.
 
 STUDY QUESTION
-Why must a proverb be read as a wise generalization rather than an unconditional promise?
+Why is wisdom moral and relational rather than merely intellectual?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-PROVERBS 1 — THE FEAR OF THE LORD
+2. LADY WISDOM
 
-The fear of the LORD is the beginning of knowledge. Wisdom begins with rightly ordered relationship to God rather than autonomous cleverness.
+Wisdom is personified as calling publicly and offering life.
 
 STUDY QUESTION
-How does reverence shape practical judgment?
+Why does personification make wisdom feel like a path to choose?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-PROVERBS 1–9 — PARENTAL INSTRUCTION
+3. THE FOOL
 
-Extended speeches urge the young to seek wisdom, resist violent companions, avoid sexual folly, work diligently, and heed correction.
+Folly is not low IQ; it is moral stubbornness, overconfidence, and resistance to correction.
 
 STUDY QUESTION
-Why does wisdom require formation before crisis arrives?
+Why is teachability a core mark of wisdom?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-LADY WISDOM
+4. SPEECH
 
-Wisdom is poetically personified as a woman calling publicly and offering life.
+Words can heal, deceive, destroy, reconcile, flatter, and reveal character.
 
 STUDY QUESTION
-What does personification accomplish that an abstract definition would not?
+Why does Proverbs treat speech as a major moral discipline?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-THE FOOL
+5. WORK
 
-The fool is not merely unintelligent. Folly involves moral resistance, overconfidence, inability to receive correction, and destructive speech.
+Diligence, planning, skill, and honest labor are praised.
 
 STUDY QUESTION
-Why is teachability more important than raw intelligence in Proverbs?
+How can Christians honor diligence without blaming people limited by circumstances?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-SPEECH
+6. WEALTH
 
-Words can heal, destroy, deceive, reconcile, reveal character, and spread conflict.
+Proverbs values provision but warns against greed, bribery, exploitation, and trust in riches.
 
 STUDY QUESTION
-Why does Proverbs treat speech as a central moral discipline?
+How does Proverbs balance wealth’s usefulness and danger?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-WORK AND SLOTH
+7. SEXUAL WISDOM
 
-Diligence, planning, craftsmanship, and honest labor are praised; laziness and excuse-making are mocked.
+Adultery is portrayed as destructive to covenant, family, reputation, and self.
 
 STUDY QUESTION
-How can the work proverbs be applied without despising people limited by illness, oppression, or circumstance?
+Why is sexual wisdom about more than private desire?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-WEALTH AND POVERTY
+8. FRIENDSHIP
 
-Proverbs praises honest gain and generosity while warning against greed, bribery, exploitation, and trust in riches.
-
-STUDY QUESTION
-How does Proverbs balance the value of provision with suspicion of wealth as a source of security?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-JUSTICE
-
-Honest scales, fair courts, care for the poor, and opposition to oppression appear repeatedly.
-
-STUDY QUESTION
-Why is wisdom inseparable from justice?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-FRIENDSHIP
-
-Faithful friends provide loyalty, counsel, correction, and mutual sharpening.
+Faithful friends correct, counsel, remain loyal, and sharpen.
 
 STUDY QUESTION
 What distinguishes a wise friend from a flattering companion?
@@ -122,31 +110,20 @@ What distinguishes a wise friend from a flattering companion?
 
 [[MSG:SECTION]]
 
-SEXUAL WISDOM
+9. ANGER
 
-Proverbs strongly warns against adultery and celebrates covenant faithfulness.
+Self-control is greater than impulsive dominance.
 
 STUDY QUESTION
-Why does sexual folly affect more than private desire?
+Why is restraint a form of strength?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ANGER AND SELF-CONTROL
+10. LEADERSHIP AND JUSTICE
 
-Patience and restraint are praised above impulsive power.
-
-STUDY QUESTION
-Why does controlling one’s spirit count as a form of strength?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-PROVERBS 25–29 — ROYAL AND SOCIAL WISDOM
-
-These collections address rulers, disputes, honor, restraint, fools, justice, and public life.
+Rulers must value truth, fair judgment, and care for the poor.
 
 STUDY QUESTION
 Why does private character matter for public leadership?
@@ -155,45 +132,131 @@ Why does private character matter for public leadership?
 
 [[MSG:SECTION]]
 
-PROVERBS 30 — AGUR
+11. AGUR
 
-Agur emphasizes human limitation, humility, observation, and contentment.
+Proverbs 30 highlights humility, limits, observation, and contentment.
 
 STUDY QUESTION
-Why is confession of ignorance itself a mark of wisdom?
+Why is knowing what you do not know part of wisdom?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-PROVERBS 31 — KING LEMUEL AND THE WOMAN OF VALOR
+12. PROVERBS 31
 
-The book ends with instruction for a king and an acrostic portrait of a capable, wise, economically active, God-fearing woman.
+The woman of valor is competent, generous, economically active, wise, and God-fearing.
 
 STUDY QUESTION
-Why does the final poem embody wisdom in concrete work, generosity, speech, and household leadership?
+Why is this poem better read as a portrait of wisdom than a checklist for women?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-CHRIST AND THE REST OF SCRIPTURE
+HISTORICAL, LITERARY, AND READING CONTEXT
 
-The New Testament presents Christ as embodying divine wisdom and repeatedly echoes Proverbs in teaching about speech, discipline, generosity, humility, and relationships.
+HISTORICAL AND LITERARY CONTEXT
+
+Proverbs is a collection, not a single uninterrupted argument. It contains extended parental instruction, short sayings, royal wisdom, sayings of other wise figures, and final poems.
+
+The book assumes that God has built moral order into creation. Wise people learn to perceive patterns and live accordingly.
+
+But Proverbs itself knows life is complex. That is why apparently opposite sayings can both be wise depending on situation.
+
+HOW PROVERBS FORMS JUDGMENT
+
+Wisdom cannot be reduced to memorizing slogans.
+
+Proverbs 26:4–5 places opposite instructions side by side:
+do not answer a fool according to folly;
+answer a fool according to folly.
+
+The point is discernment. Wisdom knows when each response fits.
+
+The goal of Proverbs is therefore mature judgment, not automatic rule execution.
 
 STUDY QUESTION
-How does wisdom literature complement biblical law and narrative?
+
+What changes in your reading of Proverbs when you keep its whole-book purpose in view rather than reading isolated verses?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIFFICULT PASSAGES TO STUDY
+KEY PASSAGES TO KNOW
 
-Apparent contradictions between proverbs, discipline texts, wealth sayings, gendered instruction, and verses often treated as promises require genre-sensitive reading.
+Proverbs 1:7
+Proverbs 3:5–6
+Proverbs 4:23
+Proverbs 10:19
+Proverbs 11:1
+Proverbs 15:1
+Proverbs 16:18
+Proverbs 18:21
+Proverbs 27:17
+Proverbs 30
+Proverbs 31:10–31
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+MAJOR THEMES
+
+WISDOM, FEAR OF GOD, SPEECH, WORK, WEALTH, SEXUALITY, FRIENDSHIP, JUSTICE, DISCIPLINE, TEACHABILITY.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+READING THIS BOOK WITH THE REST OF SCRIPTURE
+
+A strong reading of Proverbs moves in three directions.
+
+FIRST: READ BACKWARD.
+
+Ask what earlier Scripture this book assumes. Covenant promises, creation, Exodus, law, priesthood, kingship, wisdom, and earlier family history often give later passages their meaning.
+
+SECOND: READ FORWARD.
+
+Ask what problems remain unresolved. Does the book achieve final rest? Does the king remain faithful? Does sacrifice permanently remove sin? Does wisdom conquer death? Does reform change the heart? The unresolved questions become part of the Bible’s forward movement.
+
+THIRD: READ CANONICALLY.
+
+Follow how later biblical writers actually use the book. This is more reliable than inventing symbolic connections. When the New Testament quotes, echoes, or develops a passage, pay attention to both continuity and transformation.
+
+This three-direction method helps Christian readers avoid two mistakes: treating the Old Testament as if Christ were irrelevant, or treating every Old Testament detail as a secret code whose only purpose was to predict Jesus.
 
 STUDY QUESTION
-How does Proverbs 26:4–5 teach readers how wisdom adapts to circumstance?
+
+What major question does Proverbs leave unresolved that later Scripture continues to answer?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HOW THIS BOOK POINTS FORWARD TO CHRIST
+
+The New Testament presents Christ as the wisdom of God.
+
+Jesus teaches with proverb-like sayings and embodies perfect wisdom.
+
+James strongly echoes Proverbs in speech, anger, humility, wealth, and practical righteousness.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIFFICULT PASSAGES AND READING CAUTIONS
+
+PROVERBS ARE NOT PROMISES — They describe normal moral patterns, not guaranteed outcomes.
+
+DISCIPLINE TEXTS — Must be read with biblical rejection of abuse.
+
+WEALTH — Prosperity sayings do not establish prosperity gospel.
+
+PROVERBS 31 — Do not weaponize the poem as an impossible performance standard.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
@@ -201,41 +264,34 @@ How does Proverbs 26:4–5 teach readers how wisdom adapts to circumstance?
 
 WHOLE-BOOK REVIEW
 
-1. Summarize the book’s place in the biblical storyline or wisdom tradition.
-2. Identify its major literary divisions or recurring forms.
-3. Explain how genre affects interpretation.
-4. State the book’s central teaching about God.
-5. Explain what the book reveals about human experience, suffering, wisdom, worship, work, love, or mortality.
-6. Identify three key passages and explain why they matter.
-7. Explain at least two important connections to later Scripture.
-8. Identify one difficult passage and describe the context needed to interpret it responsibly.
-9. State one major Great Idea this book contributes to syntopical study.
-10. Summarize the book in one paragraph without reducing it to a slogan.
+1. What is the fear of the LORD?
+2. What is a fool?
+3. How does Proverbs treat speech?
+4. What does it teach about work?
+5. How should wealth be viewed?
+6. What makes friendship wise?
+7. Why is self-control strength?
+8. What does Proverbs say about rulers?
+9. What is Agur’s contribution?
+10. What is Proverbs 31 really celebrating?
 
-FINAL QUESTION
-What would a reader misunderstand about human life before God if this book were missing from Scripture?
+FINAL SYNTHESIS:
+Explain wisdom as skilled living under God rather than merely knowing many facts.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-STUDY LABS
+DEEPER READING LABS
 
-LAB 1 — STRUCTURE OR FORM MAP
-Create a one-page map of the book’s major literary movements, voices, genres, or collections.
+LAB 1 — Collect 25 proverbs on speech.
 
-LAB 2 — KEY PASSAGES
-Choose five passages that carry disproportionate theological or literary importance and explain why.
+LAB 2 — Group wealth proverbs into earning, generosity, greed, trust.
 
-LAB 3 — VOCABULARY OF EXPERIENCE
-Collect the book’s major words and images for wisdom, suffering, worship, love, joy, mortality, justice, or desire.
+LAB 3 — Compare apparently conflicting proverbs such as Proverbs 26:4–5.
 
-LAB 4 — CANONICAL CONNECTIONS
-Trace one major theme into at least three other biblical books, including the New Testament where appropriate.
+LAB 4 — Read James and mark echoes of Proverbs.
 
-LAB 5 — DIFFICULT TEXT
-Choose one ethically, emotionally, or theologically difficult passage. Identify genre, context, major interpretations, and what the passage does and does not claim.
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+LAB 5 — Write a one-week wisdom practice plan.
 
 [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]]

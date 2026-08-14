@@ -1,166 +1,229 @@
 2 SAMUEL
-An Independent Mark, Set, Go! Bible Guide
-Biblical book: 2 Samuel
+Mark, Set, Go! Bible Guide
 
-David’s reign, covenant, Jerusalem, sin, family tragedy, judgment, mercy, kingship, and the promise of an enduring dynasty.
+ABOUT THIS BOOK
 
-HOW TO USE THIS BIBLE GUIDE
-Use this guide alongside the biblical text. Read the assigned chapters first whenever possible. The guide is designed to help with structure, historical and literary context, theology, difficult passages, connections across Scripture, discussion, and comprehension—not to replace Scripture itself.
+2 Samuel follows David from accession to national rule, covenant promise, moral collapse, family tragedy, rebellion, and final years. It is one of Scripture’s deepest studies of leadership: a genuinely chosen king can still abuse power and cause devastating harm.
 
-READING PRINCIPLES
-Pay attention to what the text actually says, distinguish description from approval, read each passage in its literary and covenant context, and allow clearer passages and the wider biblical canon to inform difficult ones.
+BOOK STRUCTURE
+
+2 Samuel 1–5 — David becomes king
+2 Samuel 6–10 — ark, covenant, victories
+2 Samuel 11–12 — Bathsheba and Nathan
+2 Samuel 13–20 — family violence and Absalom
+2 Samuel 21–24 — epilogue and atonement
+
+HOW TO USE THIS GUIDE
+
+Read the biblical text first whenever possible. Then use the guide to trace the argument, narrative movement, theology, historical context, difficult passages, and connections to the rest of Scripture. The goal is serious understanding without turning the guide into a technical commentary.
 
 [[MSG:SECTION]]
 
-PURPOSE AND PLACE IN SCRIPTURE
+1. DAVID MOURNS SAUL
 
-2 Samuel narrates David’s reign from consolidation of the kingdom through triumph, covenant promise, catastrophic moral failure, family rebellion, and an uneasy final restoration.
+David refuses to celebrate Saul’s death. He honors the office and grieves Jonathan.
 
 STUDY QUESTION
-Why does Scripture preserve both David’s greatness and his grave sins in such detail?
+Why does David’s mourning matter for the legitimacy of his rise?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 SAMUEL 1–5 — DAVID BECOMES KING
+2. THE ARK TO JERUSALEM
 
-David mourns Saul and Jonathan, rules Judah, survives civil conflict, and is finally recognized as king over all Israel.
+Uzzah’s death and David’s celebration hold holiness and joy together.
 
 STUDY QUESTION
-How does David’s refusal to celebrate Saul’s death shape the moral portrait of his accession?
+Why must worship include both reverence and delight?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 SAMUEL 6 — THE ARK IN JERUSALEM
+3. THE DAVIDIC COVENANT
 
-David brings the ark to Jerusalem amid joy and danger. Uzzah’s death underscores holiness, while Michal despises David’s exuberant worship.
+God promises David a house/dynasty. This becomes central to messianic expectation.
 
 STUDY QUESTION
-Why does the chapter combine celebration with fear?
+Why is God building David a “house” more important than David building a temple?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 SAMUEL 7 — THE DAVIDIC COVENANT
+4. DAVID AND MEPHIBOSHETH
 
-God promises David a dynasty and declares that David’s offspring will build the house. The promise becomes foundational to later messianic expectation.
+David shows covenant kindness to Jonathan’s disabled son.
 
 STUDY QUESTION
-Why is God’s promise to build David a 'house' more important than David’s desire to build God a temple?
+How does covenant loyalty shape the best side of David’s kingship?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 SAMUEL 8–10 — KINGDOM CONSOLIDATION
+5. DAVID AND BATHSHEBA
 
-David wins major victories and shows covenant kindness to Mephibosheth.
+David uses royal power to take Bathsheba and arrange Uriah’s death. This is abuse of power as well as sexual sin.
 
 STUDY QUESTION
-How does loyal kindness function as a mark of righteous rule?
+Why is this story fundamentally about kingship and power?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 SAMUEL 11 — DAVID AND BATHSHEBA
+6. NATHAN’S CONFRONTATION
 
-David commits adultery with Bathsheba and arranges Uriah’s death, abusing royal power to conceal sin.
+Nathan’s parable exposes David. David confesses, receives forgiveness, but consequences remain.
 
 STUDY QUESTION
-Why is this episode fundamentally about misuse of power as well as sexual sin?
+How can forgiveness coexist with lasting consequences?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 SAMUEL 12 — NATHAN CONFRONTS DAVID
+7. AMNON AND TAMAR
 
-Nathan exposes David through a parable. David confesses, receives forgiveness, and nevertheless faces severe consequences.
+Sexual violence enters David’s household, and David’s failure to administer justice deepens the crisis.
 
 STUDY QUESTION
-How can forgiveness and temporal consequences coexist?
+How does leadership passivity become morally destructive?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 SAMUEL 13–14 — AMNON, TAMAR, AND ABSALOM
+8. ABSALOM
 
-Sexual violence and David’s passivity fracture the royal family. Absalom takes vengeance and eventually returns without true reconciliation.
+Absalom’s rebellion grows out of family wounds, political ambition, and David’s failures.
 
 STUDY QUESTION
-How does David’s failure to administer justice within his house contribute to later rebellion?
+Why is David’s grief after victory so complicated?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 SAMUEL 15–18 — ABSALOM’S REBELLION
+9. DAVID RETURNS
 
-Absalom seizes political momentum, David flees Jerusalem, and civil war ends with Absalom’s death.
+The kingdom is restored but tribal fractures remain.
 
 STUDY QUESTION
-Why does David grieve his rebellious son even after victory?
+Why doesn’t political restoration erase deeper damage?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 SAMUEL 19–20 — RETURN AND FRAGILITY
+10. THE CENSUS AND THE ALTAR
 
-David returns, but tribal resentments and another rebellion reveal unresolved political weakness.
+The book ends with judgment, repentance, sacrifice, and the site later associated with the temple.
 
 STUDY QUESTION
-Why does restoration fail to erase structural divisions?
+Why might the narrative end with atonement instead of triumph?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 SAMUEL 21–24 — EPILOGUE
+HISTORICAL, LITERARY, AND READING CONTEXT
 
-The final chapters revisit famine, warriors, songs, judgment, and David’s census, ending with sacrifice on the site later associated with the temple.
+HISTORICAL AND LITERARY CONTEXT
+
+2 Samuel is deliberately structured around David’s rise and fracture. Chapters 1–10 show consolidation, Jerusalem, covenant promise, and military success. Chapters 11 onward show how David’s abuse of power destabilizes his own house and kingdom.
+
+The placement of Bathsheba and Uriah is therefore not a private moral interruption in an otherwise political book. It is the turning point of the reign.
+
+The narrative’s honesty is theologically important. Scripture does not protect David’s reputation by hiding his worst actions.
+
+DAVID: PROMISE AND FAILURE
+
+The Davidic covenant remains valid even though David sins terribly. That distinction matters.
+
+God’s promise is not a declaration that David is morally perfect. Election never functions as immunity from judgment.
+
+For Christians, this combination deepens messianic expectation. If even David cannot embody righteous kingship consistently, the promised enduring kingdom requires a greater Son of David.
 
 STUDY QUESTION
-Why might the book end with atonement rather than royal triumph?
+
+What changes in your reading of 2 Samuel when you keep its whole-book purpose in view rather than reading isolated verses?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DAVID AS KING AND SINNER
+KEY PASSAGES TO KNOW
 
-David is both covenant king and deeply flawed man. The narrative refuses to make election equivalent to moral perfection.
-
-STUDY QUESTION
-Why is this tension essential to biblical theology?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-CHRIST AND THE REST OF SCRIPTURE
-
-The Davidic covenant becomes central to prophetic hope and New Testament claims about Jesus as Son of David whose kingdom endures.
-
-STUDY QUESTION
-How does the failure of David himself create longing for a greater Davidic king?
+2 Samuel 5:1–5
+2 Samuel 6
+2 Samuel 7
+2 Samuel 9
+2 Samuel 11
+2 Samuel 12
+2 Samuel 13
+2 Samuel 15–18
+2 Samuel 22
+2 Samuel 24
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIFFICULT PASSAGES TO STUDY
+MAJOR THEMES
 
-Uzzah, David and Bathsheba, the death of David’s child, sexual violence, Absalom, the Gibeonite episode, and the census require careful attention to justice, covenant, and narrative purpose.
+DAVIDIC COVENANT, KINGSHIP, POWER, SIN, REPENTANCE, CONSEQUENCES, FAMILY, JUSTICE, MERCY, ATONEMENT.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+READING THIS BOOK WITH THE REST OF SCRIPTURE
+
+A strong reading of 2 Samuel moves in three directions.
+
+FIRST: READ BACKWARD.
+
+Ask what earlier Scripture this book assumes. Covenant promises, creation, Exodus, law, priesthood, kingship, wisdom, and earlier family history often give later passages their meaning.
+
+SECOND: READ FORWARD.
+
+Ask what problems remain unresolved. Does the book achieve final rest? Does the king remain faithful? Does sacrifice permanently remove sin? Does wisdom conquer death? Does reform change the heart? The unresolved questions become part of the Bible’s forward movement.
+
+THIRD: READ CANONICALLY.
+
+Follow how later biblical writers actually use the book. This is more reliable than inventing symbolic connections. When the New Testament quotes, echoes, or develops a passage, pay attention to both continuity and transformation.
+
+This three-direction method helps Christian readers avoid two mistakes: treating the Old Testament as if Christ were irrelevant, or treating every Old Testament detail as a secret code whose only purpose was to predict Jesus.
 
 STUDY QUESTION
-Which consequences in the book arise from David’s own choices rather than from arbitrary fate?
+
+What major question does 2 Samuel leave unresolved that later Scripture continues to answer?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HOW THIS BOOK POINTS FORWARD TO CHRIST
+
+The promise of an enduring Davidic dynasty becomes one of the clearest Old Testament foundations for Jesus as Son of David.
+
+David’s failures intensify the need for a king greater than David.
+
+Jesus embodies righteous kingship without abusing power.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIFFICULT PASSAGES AND READING CAUTIONS
+
+BATHSHEBA — Avoid framing the story as mutual adultery; the power imbalance and David’s actions are central.
+DEATH OF THE CHILD — A painful judgment text that should not become a general formula for children suffering because of parents.
+SEXUAL VIOLENCE — The text exposes rather than endorses the horror.
+THE CENSUS — Samuel and Chronicles present the causation differently; compare both accounts carefully.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
@@ -168,41 +231,30 @@ Which consequences in the book arise from David’s own choices rather than from
 
 WHOLE-BOOK REVIEW
 
-1. Summarize the book’s place in the biblical storyline.
-2. Identify its major literary or narrative divisions.
-3. Name the most important people, events, laws, speeches, or institutions.
-4. Explain the book’s central teaching about God.
-5. Explain what the book reveals about human sin, faith, obedience, leadership, or community.
-6. Identify the book’s major covenant themes.
-7. Explain at least two important connections to later Scripture.
-8. Identify one difficult passage and describe what context is necessary to interpret it responsibly.
-9. State one major Great Idea that this book contributes to syntopical study.
-10. Summarize the book in one paragraph without reducing it to a slogan.
+1. Why does David’s mourning matter for the legitimacy of his rise?
+2. Why must worship include both reverence and delight?
+3. Why is God building David a “house” more important than David building a temple?
+4. How does covenant loyalty shape the best side of David’s kingship?
+5. Why is this story fundamentally about kingship and power?
+6. How can forgiveness coexist with lasting consequences?
+7. How does leadership passivity become morally destructive?
+8. Why is David’s grief after victory so complicated?
+9. Why doesn’t political restoration erase deeper damage?
+10. Why might the narrative end with atonement instead of triumph?
 
-FINAL QUESTION
-What would a reader misunderstand about the Bible as a whole if this book were missing?
+FINAL SYNTHESIS:
+Summarize the book’s contribution to the biblical story of covenant, leadership, sin, and redemption.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-STUDY LABS
+DEEPER READING LABS
 
-LAB 1 — STRUCTURE MAP
-Create a one-page outline using the book’s major literary or narrative movements.
-
-LAB 2 — KEY PASSAGES
-Choose five passages that carry disproportionate importance for the rest of Scripture and explain why.
-
-LAB 3 — CHARACTER OF GOD
-Collect the book’s major statements and demonstrations of God’s character. Distinguish what is explicit from what is inferred.
-
-LAB 4 — CANONICAL CONNECTIONS
-Trace one theme into at least three later biblical books, including the New Testament where appropriate.
-
-LAB 5 — DIFFICULT TEXT
-Choose one ethically, historically, or theologically difficult passage. Identify literary context, covenant setting, major interpretive questions, and what it does and does not authorize.
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+LAB 1 — Create a one-page timeline of the book.
+LAB 2 — Track every major covenant or leadership turning point.
+LAB 3 — Choose one difficult passage and distinguish what the narrator reports from what God approves.
+LAB 4 — Trace one theme into the New Testament.
+LAB 5 — Write a one-paragraph theological summary of the book.
 
 [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]]

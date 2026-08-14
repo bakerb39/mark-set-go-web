@@ -1,166 +1,229 @@
 JUDGES
-An Independent Mark, Set, Go! Bible Guide
-Biblical book: Judges
+Mark, Set, Go! Bible Guide
 
-Cycles of rebellion, deliverance, moral collapse, flawed leaders, covenant unfaithfulness, and the need for righteous kingship.
+ABOUT THIS BOOK
 
-HOW TO USE THIS BIBLE GUIDE
-Use this guide alongside the biblical text. Read the assigned chapters first whenever possible. The guide is designed to help with structure, historical and literary context, theology, difficult passages, connections across Scripture, discussion, and comprehension—not to replace Scripture itself.
+Cycles of rebellion, failed leadership, social collapse, deliverance, and the need for righteous kingship.
 
-READING PRINCIPLES
-Pay attention to what the text actually says, distinguish description from approval, read each passage in its literary and covenant context, and allow clearer passages and the wider biblical canon to inform difficult ones.
+BOOK STRUCTURE
+
+Judges 1–2 — incomplete conquest and cycle
+Judges 3–16 — major judges
+Judges 17–21 — social and religious collapse
+
+HOW TO USE THIS GUIDE
+
+Read the biblical text first whenever possible. Then use the guide to trace the argument, narrative movement, theology, historical context, difficult passages, and connections to the rest of Scripture. The goal is serious understanding without turning the guide into a technical commentary.
 
 [[MSG:SECTION]]
 
-PURPOSE AND PLACE IN SCRIPTURE
+1. JUDGES 1–2 — THE CYCLE
 
-Judges describes Israel between Joshua and the monarchy. Repeated cycles of apostasy, oppression, crying out, and deliverance progressively deteriorate until the book ends in social and moral chaos.
+Israel compromises, serves other gods, suffers oppression, cries out, receives a judge, experiences relief, then falls again. The cycle worsens over time.
 
 STUDY QUESTION
-Why do the cycles worsen rather than simply repeat?
+Why does repeated rescue fail to produce lasting transformation?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-JUDGES 1–2 — INCOMPLETE OBEDIENCE
+2. OTHNIEL, EHUD, SHAMGAR
 
-Israel fails to drive out remaining Canaanite peoples and adopts surrounding religious practices.
+The early judges show God using unexpected deliverers. Ehud’s story is violent and darkly comic, undermining Moabite power.
 
 STUDY QUESTION
-How does compromise at the beginning shape later collapse?
+What does the variety of judges teach about God’s freedom in choosing instruments?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-THE JUDGES CYCLE
+3. DEBORAH AND BARAK
 
-Israel abandons God, experiences oppression, cries out, receives a deliverer, and then falls again.
+Deborah leads as prophet and judge. Barak obeys but hesitates. Jael becomes the unexpected agent of victory.
 
 STUDY QUESTION
-Why does external rescue fail to create lasting covenant faithfulness?
+How does Judges repeatedly overturn normal expectations of who holds power?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-OTHNIEL, EHUD, AND SHAMGAR
+4. GIDEON — CALL AND FEAR
 
-The early judges establish the pattern through diverse and sometimes unexpected deliverers.
+Gideon begins fearful and doubtful. God patiently confirms his call and reduces the army so victory cannot be credited to human strength.
 
 STUDY QUESTION
-What does God’s use of unlikely agents reveal about deliverance?
+Why does God reduce Gideon’s military advantage?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DEBORAH AND BARAK
+5. GIDEON — SUCCESS AND CORRUPTION
 
-Deborah leads Israel, Barak hesitates, and Jael unexpectedly becomes decisive in victory.
+After victory, Gideon refuses the title king yet behaves increasingly like one. His ephod becomes a snare. Success exposes character problems.
 
 STUDY QUESTION
-How does the narrative overturn expected sources of honor and power?
+Why can victory become more spiritually dangerous than weakness?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-GIDEON
+6. ABIMELECH
 
-Gideon moves from fearful dependence to military success and then increasingly troubling behavior.
+Gideon’s son seizes kingship through murder. His story is anti-kingship propaganda against violent self-exaltation.
 
 STUDY QUESTION
-Why is Gideon’s later career a warning against assuming that being used by God equals personal faithfulness?
+What distinguishes legitimate leadership from power seized for self?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ABIMELECH
+7. JEPHTHAH
 
-Gideon’s son violently seizes kingship and destroys his brothers.
+Jephthah makes a tragic vow and his daughter suffers. The story should not be read as God approving the vow. It shows Israel’s confused spirituality.
 
 STUDY QUESTION
-How does Abimelech expose the difference between righteous rule and raw political ambition?
+Why is sincere religious language not enough to make a vow wise or righteous?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-JEPHTHAH
+8. SAMSON
 
-Jephthah is an outcast turned military leader whose rash vow produces devastating consequences.
+Samson is Spirit-empowered yet impulsive, sexually undisciplined, violent, and self-centered. God still uses him against Philistines.
 
 STUDY QUESTION
-Why must the reader distinguish narrative description from divine command in Jephthah’s story?
+What does Samson teach about giftedness without character?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-SAMSON
+9. JUDGES 17–18 — RELIGIOUS CHAOS
 
-Samson possesses extraordinary strength but repeatedly violates covenant expectations and pursues destructive desires.
+Private idols, hired priests, tribal theft, and improvised worship show covenant disintegration.
 
 STUDY QUESTION
-How can a divinely empowered leader remain morally disordered?
+Why is “everyone doing what is right in his own eyes” dangerous spiritually?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-JUDGES 17–18 — IDOLATRY
+10. JUDGES 19–21 — MORAL COLLAPSE
 
-Private religion, a wandering Levite, and the tribe of Dan reveal widespread confusion about worship.
+The book ends with sexual violence, civil war, mass death, and desperate human schemes. Israel resembles the Canaanite evil it was supposed to oppose.
 
 STUDY QUESTION
-What happens when everyone constructs religion according to personal preference?
+Why does Judges end without a hero?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-JUDGES 19–21 — SOCIAL COLLAPSE
+HISTORICAL, LITERARY, AND READING CONTEXT
 
-The abuse and death of the Levite’s concubine trigger civil war and further violence.
+HISTORICAL AND LITERARY CONTEXT
+
+Judges begins after Joshua’s death and ends before stable monarchy. The book is intentionally downward-moving. The judges do not become progressively better; many become worse.
+
+The repeated cycle—apostasy, oppression, cry, deliverance, relapse—is only the outer structure. The deeper story is that external rescue cannot cure internal covenant unfaithfulness.
+
+The final chapters are placed to show what Israel becomes when everyone defines right independently. The book’s horror is theological: the people meant to embody God’s order increasingly resemble the surrounding violence.
+
+READING THE JUDGES THEMSELVES
+
+A crucial rule: being used by God does not mean a character’s every action is approved.
+
+Samson is genuinely empowered by the Spirit and genuinely morally compromised. Gideon begins well and ends ambiguously. Jephthah is a deliverer whose religious confusion produces tragedy.
+
+Judges is therefore a powerful antidote to celebrity spirituality. Giftedness, success, charisma, and even divine use are not substitutes for character.
 
 STUDY QUESTION
-Why does the book end with one of Scripture’s most horrifying narratives?
+
+What changes in your reading of Judges when you keep its whole-book purpose in view rather than reading isolated verses?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-NO KING IN ISRAEL
+KEY PASSAGES TO KNOW
 
-The repeated refrain says everyone did what was right in his own eyes.
-
-STUDY QUESTION
-Does the book simply call for a monarchy, or for a particular kind of righteous kingship under God?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-CHRIST AND THE REST OF SCRIPTURE
-
-Judges creates longing for faithful leadership capable of saving without becoming corrupt. Christian reading sees that longing ultimately answered not by merely another human judge but by Christ.
-
-STUDY QUESTION
-How does the failure of the judges sharpen the Bible’s expectation of a righteous deliverer?
+Judges 2:10–19
+Judges 4–5
+Judges 6–8
+Judges 9
+Judges 11
+Judges 13–16
+Judges 17:6
+Judges 19–21
+Judges 21:25
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIFFICULT PASSAGES TO STUDY
+MAJOR THEMES
 
-Ehud’s assassination, Jael, Gideon’s violence, Jephthah’s daughter, Samson, sexual violence, and civil war require careful ethical reading.
+CYCLE OF SIN, FAILED LEADERSHIP, MERCY, SPIRIT-EMPOWERMENT, CHARACTER, MORAL RELATIVISM, NEED FOR RIGHTEOUS KING.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+READING THIS BOOK WITH THE REST OF SCRIPTURE
+
+A strong reading of Judges moves in three directions.
+
+FIRST: READ BACKWARD.
+
+Ask what earlier Scripture this book assumes. Covenant promises, creation, Exodus, law, priesthood, kingship, wisdom, and earlier family history often give later passages their meaning.
+
+SECOND: READ FORWARD.
+
+Ask what problems remain unresolved. Does the book achieve final rest? Does the king remain faithful? Does sacrifice permanently remove sin? Does wisdom conquer death? Does reform change the heart? The unresolved questions become part of the Bible’s forward movement.
+
+THIRD: READ CANONICALLY.
+
+Follow how later biblical writers actually use the book. This is more reliable than inventing symbolic connections. When the New Testament quotes, echoes, or develops a passage, pay attention to both continuity and transformation.
+
+This three-direction method helps Christian readers avoid two mistakes: treating the Old Testament as if Christ were irrelevant, or treating every Old Testament detail as a secret code whose only purpose was to predict Jesus.
 
 STUDY QUESTION
-Why is it especially important in Judges not to assume that every action by a major character is approved by God?
+
+What major question does Judges leave unresolved that later Scripture continues to answer?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HOW THIS BOOK POINTS FORWARD TO CHRIST
+
+Judges creates longing for a king—but the rest of Scripture will show that Israel needs more than just any king.
+
+The refrain “there was no king” points toward Davidic kingship, and ultimately toward Christ, the righteous king who does not exploit the people he saves.
+
+Jesus also breaks the cycle more deeply by transforming hearts, not merely defeating external oppressors.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIFFICULT PASSAGES AND READING CAUTIONS
+
+JEPHTHAH’S DAUGHTER — The text reports a horrific vow; it does not present the act as an ideal.
+
+SAMSON — Giftedness is not approval of character.
+
+VIOLENCE — Judges increasingly describes moral chaos. Description must not be mistaken for endorsement.
+
+WOMEN — Several women are courageous agents, while others become victims of Israel’s collapse. The ending should horrify the reader.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
@@ -168,41 +231,32 @@ Why is it especially important in Judges not to assume that every action by a ma
 
 WHOLE-BOOK REVIEW
 
-1. Summarize the book’s place in the biblical storyline.
-2. Identify its major literary or narrative divisions.
-3. Name the most important people, events, laws, speeches, or institutions.
-4. Explain the book’s central teaching about God.
-5. Explain what the book reveals about human sin, faith, obedience, or community.
-6. Identify the book’s major covenant themes.
-7. Explain at least two important connections to later Scripture.
-8. Identify one difficult passage and describe what context is necessary to interpret it responsibly.
-9. State one major Great Idea that this book contributes to syntopical study.
-10. Summarize the book in one paragraph without reducing it to a slogan.
+1. What is the Judges cycle?
+2. Why does it worsen?
+3. What is Deborah’s role?
+4. What happens to Gideon after success?
+5. What does Abimelech represent?
+6. Why is Jephthah tragic?
+7. What is Samson’s central weakness?
+8. What happens in chapters 17–21?
+9. What does “right in his own eyes” mean?
+10. Why does the book create longing for a king?
 
-FINAL QUESTION
-What would a reader misunderstand about the Bible as a whole if this book were missing?
+FINAL SYNTHESIS:
+Explain Judges as the failure of external rescue to cure an untransformed people.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-STUDY LABS
+DEEPER READING LABS
 
-LAB 1 — STRUCTURE MAP
-Create a one-page outline of the book using its major literary or narrative movements.
+LAB 1 — Chart each judge: oppression, cry, deliverer, result.
 
-LAB 2 — KEY PASSAGES
-Choose five passages that carry disproportionate importance for the rest of Scripture and explain why.
+LAB 2 — Compare Gideon’s beginning and ending.
 
-LAB 3 — CHARACTER OF GOD
-Collect the book’s major statements and demonstrations of God’s character. Distinguish what is explicitly stated from what you infer from events.
+LAB 3 — Trace the phrase “Spirit of the LORD.”
 
-LAB 4 — CANONICAL CONNECTIONS
-Trace one theme from this book into at least three later biblical books, including the New Testament where appropriate.
-
-LAB 5 — DIFFICULT TEXT
-Choose one ethically, historically, or theologically difficult passage. Identify the literary context, covenant setting, major interpretive questions, and what the passage does and does not authorize.
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+LAB 4 — Read the final five chapters as one descent into chaos.
 
 [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]]

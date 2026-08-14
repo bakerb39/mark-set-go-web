@@ -1,177 +1,227 @@
 2 CHRONICLES
-An Independent Mark, Set, Go! Bible Guide
-Biblical book: 2 Chronicles
+Mark, Set, Go! Bible Guide
 
-Solomon, temple, Judah’s kings, reform, apostasy, prophetic warning, exile, repentance, and Cyrus’s decree.
+ABOUT THIS BOOK
 
-HOW TO USE THIS BIBLE GUIDE
-Use this guide alongside the biblical text. Read the assigned chapters first whenever possible. The guide is designed to help with structure, historical and literary context, theology, difficult passages, connections across Scripture, discussion, and comprehension—not to replace Scripture itself.
+2 Chronicles follows Solomon and Judah’s kings with special attention to temple worship, repentance, reform, prophetic warning, exile, and restoration. It ends not with Babylon but with Cyrus permitting return.
 
-READING PRINCIPLES
-Pay attention to what the text actually says, distinguish description from approval, read each passage in its literary and covenant context, and allow clearer passages and the wider biblical canon to inform difficult ones.
+BOOK STRUCTURE
+
+2 Chronicles 1–9 — Solomon
+2 Chronicles 10–28 — Judah’s kings
+2 Chronicles 29–32 — Hezekiah
+2 Chronicles 33 — Manasseh
+2 Chronicles 34–35 — Josiah
+2 Chronicles 36 — exile and Cyrus
+
+HOW TO USE THIS GUIDE
+
+Read the biblical text first whenever possible. Then use the guide to trace the argument, narrative movement, theology, historical context, difficult passages, and connections to the rest of Scripture. The goal is serious understanding without turning the guide into a technical commentary.
 
 [[MSG:SECTION]]
 
-PURPOSE AND PLACE IN SCRIPTURE
+1. SOLOMON AND THE TEMPLE
 
-2 Chronicles continues from Solomon through Judah’s fall and exile, emphasizing temple worship, Davidic kingship, repentance, reform, and the possibility of restoration.
+The temple is built and dedicated as a place of worship, prayer, and forgiveness.
 
 STUDY QUESTION
-Why does Chronicles focus almost entirely on Judah after the kingdom divides?
+Why is prayer more central than architecture in the dedication?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 CHRONICLES 1–7 — SOLOMON AND THE TEMPLE
+2. 2 CHRONICLES 7
 
-Solomon receives wisdom, builds the temple, and dedicates it. God’s response highlights prayer, repentance, and covenant responsibility.
+God connects restoration with humility, prayer, seeking, and turning.
 
 STUDY QUESTION
-Why does 2 Chronicles 7 connect national restoration with humility, prayer, seeking God, and turning from evil?
+Why should this verse first be read in Israel’s covenant context?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 CHRONICLES 8–9 — SOLOMON’S GLORY
+3. ASA AND JEHOSHAPHAT
 
-Solomon’s administration, wealth, and reputation culminate in the Queen of Sheba’s visit.
+Both model reform but also reveal inconsistency.
 
 STUDY QUESTION
-What does the Chronicler emphasize—and omit—about Solomon?
+Why does Chronicles evaluate patterns rather than one successful moment?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 CHRONICLES 10 — DIVISION
+4. JOASH
 
-Rehoboam’s harshness contributes to the kingdom’s division.
+Joash begins well under Jehoiada but collapses after losing external guidance.
 
 STUDY QUESTION
-How does foolish leadership accelerate political fracture?
+Why is borrowed faithfulness unstable?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ASA AND JEHOSHAPHAT
+5. UZZIAH
 
-These kings model significant reform but also reveal inconsistencies in reliance on God.
+Success produces pride, and Uzziah intrudes into priestly service.
 
 STUDY QUESTION
-Why does Chronicles evaluate kings through patterns rather than isolated successes?
+Why can prosperity become a spiritual test?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-JEHORAM THROUGH AHAZ
+6. AHAZ AND HEZEKIAH
 
-A sequence of rulers demonstrates the destructive effects of idolatry, violence, and alliance politics.
+Ahaz deepens idolatry; Hezekiah restores worship and trusts during Assyrian threat.
 
 STUDY QUESTION
-How does compromised worship influence public life?
+Why is worship renewal central to national reform?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 CHRONICLES 24 — JOASH
+7. MANASSEH
 
-Joash begins well under Jehoiada but later abandons faithful worship and permits the killing of Zechariah.
+Chronicles uniquely emphasizes Manasseh’s later repentance.
 
 STUDY QUESTION
-Why does borrowed faithfulness fail when personal conviction is absent?
+Why is his restoration a powerful testimony to grace?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 CHRONICLES 26 — UZZIAH
+8. JOSIAH
 
-Uzziah prospers but becomes proud and unlawfully intrudes into priestly service.
+The law is rediscovered and covenant renewed.
 
 STUDY QUESTION
-Why does success often become the setting for spiritual danger?
+Why must rediscovered Scripture produce action?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 CHRONICLES 28–32 — AHAZ AND HEZEKIAH
+9. EXILE
 
-Ahaz deepens idolatry; Hezekiah reverses course through temple restoration, Passover, and trust during Assyrian invasion.
+Persistent rejection leads to destruction.
 
 STUDY QUESTION
-Why is renewed worship central to Hezekiah’s reform?
+What does “until there was no remedy” communicate?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 CHRONICLES 33 — MANASSEH
+10. CYRUS
 
-Unlike Kings, Chronicles emphasizes Manasseh’s later humiliation and repentance.
+The book ends with permission to return and rebuild.
 
 STUDY QUESTION
-Why does this account make restoration after severe sin especially prominent?
+Why is an open-ended “go up” a hopeful ending?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 CHRONICLES 34–35 — JOSIAH
+HISTORICAL, LITERARY, AND READING CONTEXT
 
-Josiah repairs the temple, hears the law, renews covenant, removes idols, and celebrates Passover.
+HISTORICAL AND LITERARY CONTEXT
+
+2 Chronicles follows only the Davidic kingdom after the division, because its primary concern is Judah, Jerusalem, temple, priesthood, and Davidic promise.
+
+The book repeatedly highlights moments of seeking God, humbling oneself, reform, and restoration. It also shows that religious revival can be temporary when one generation’s conviction does not become the next generation’s own faith.
+
+The final decree of Cyrus functions almost like an unfinished sentence, pointing forward into Ezra.
+
+REFORM AND HEART CHANGE
+
+Chronicles values reforms—temple cleansing, Passover, removal of idols, renewed Scripture—but it also shows their limits.
+
+External reform matters. Yet if a people’s hearts remain unchanged, reform can fade quickly.
+
+This tension prepares readers for prophetic promises of a new heart and new covenant.
 
 STUDY QUESTION
-Why is rediscovery of Scripture transformative only when joined to response?
+
+What changes in your reading of 2 Chronicles when you keep its whole-book purpose in view rather than reading isolated verses?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-2 CHRONICLES 36 — EXILE
+KEY PASSAGES TO KNOW
 
-Persistent rejection of prophetic warnings leads to Babylonian destruction and exile.
-
-STUDY QUESTION
-How does the phrase about there being 'no remedy' summarize accumulated resistance?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-CYRUS’S DECREE
-
-The book ends not with Babylon but with Persia’s Cyrus authorizing return and temple rebuilding.
-
-STUDY QUESTION
-Why is an open-ended command to 'go up' an appropriate ending?
+2 Chronicles 5–7
+2 Chronicles 14–20
+2 Chronicles 24
+2 Chronicles 26
+2 Chronicles 29–32
+2 Chronicles 33
+2 Chronicles 34–35
+2 Chronicles 36
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-CHRIST AND THE REST OF SCRIPTURE
+MAJOR THEMES
 
-Chronicles sustains hope through Davidic promise, temple theology, repentance, and restoration. Its final movement leads directly toward Ezra in the Hebrew ordering.
-
-STUDY QUESTION
-How does restoration remain incomplete even after return becomes possible?
+TEMPLE, REPENTANCE, REFORM, HUMILITY, LEADERSHIP, EXILE, RESTORATION.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIFFICULT PASSAGES TO STUDY
+READING THIS BOOK WITH THE REST OF SCRIPTURE
 
-Retribution patterns, differences from Kings, warfare, prophetic speeches, Manasseh’s repentance, and historical chronology require careful comparison.
+A strong reading of 2 Chronicles moves in three directions.
+
+FIRST: READ BACKWARD.
+
+Ask what earlier Scripture this book assumes. Covenant promises, creation, Exodus, law, priesthood, kingship, wisdom, and earlier family history often give later passages their meaning.
+
+SECOND: READ FORWARD.
+
+Ask what problems remain unresolved. Does the book achieve final rest? Does the king remain faithful? Does sacrifice permanently remove sin? Does wisdom conquer death? Does reform change the heart? The unresolved questions become part of the Bible’s forward movement.
+
+THIRD: READ CANONICALLY.
+
+Follow how later biblical writers actually use the book. This is more reliable than inventing symbolic connections. When the New Testament quotes, echoes, or develops a passage, pay attention to both continuity and transformation.
+
+This three-direction method helps Christian readers avoid two mistakes: treating the Old Testament as if Christ were irrelevant, or treating every Old Testament detail as a secret code whose only purpose was to predict Jesus.
 
 STUDY QUESTION
-How should readers distinguish theological pattern from a simplistic formula that every suffering is immediate punishment?
+
+What major question does 2 Chronicles leave unresolved that later Scripture continues to answer?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HOW THIS BOOK POINTS FORWARD TO CHRIST
+
+Chronicles ends with return still incomplete.
+
+The Davidic promise, temple hope, and longing for restored worship all create the world into which the New Testament’s messianic hope emerges.
+
+Jesus becomes the greater Son of David and the true meeting place with God.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIFFICULT PASSAGES AND READING CAUTIONS
+
+2 CHRONICLES 7:14 — It addresses covenant Israel and should not be directly mapped onto any modern nation.
+RETRIBUTION PATTERNS — Chronicles often highlights immediate moral consequences, but this must not be turned into a formula for every individual suffering.
+MANASSEH — Compare Kings and Chronicles to see complementary theological emphases.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
@@ -179,41 +229,30 @@ How should readers distinguish theological pattern from a simplistic formula tha
 
 WHOLE-BOOK REVIEW
 
-1. Summarize the book’s place in the biblical storyline.
-2. Identify its major literary or narrative divisions.
-3. Name the most important people, events, laws, speeches, or institutions.
-4. Explain the book’s central teaching about God.
-5. Explain what the book reveals about human sin, faith, obedience, leadership, or community.
-6. Identify the book’s major covenant themes.
-7. Explain at least two important connections to later Scripture.
-8. Identify one difficult passage and describe what context is necessary to interpret it responsibly.
-9. State one major Great Idea that this book contributes to syntopical study.
-10. Summarize the book in one paragraph without reducing it to a slogan.
+1. Why is prayer more central than architecture in the dedication?
+2. Why should this verse first be read in Israel’s covenant context?
+3. Why does Chronicles evaluate patterns rather than one successful moment?
+4. Why is borrowed faithfulness unstable?
+5. Why can prosperity become a spiritual test?
+6. Why is worship renewal central to national reform?
+7. Why is his restoration a powerful testimony to grace?
+8. Why must rediscovered Scripture produce action?
+9. What does “until there was no remedy” communicate?
+10. Why is an open-ended “go up” a hopeful ending?
 
-FINAL QUESTION
-What would a reader misunderstand about the Bible as a whole if this book were missing?
+FINAL SYNTHESIS:
+Summarize the book’s contribution to the biblical story of covenant, leadership, sin, and redemption.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-STUDY LABS
+DEEPER READING LABS
 
-LAB 1 — STRUCTURE MAP
-Create a one-page outline using the book’s major literary or narrative movements.
-
-LAB 2 — KEY PASSAGES
-Choose five passages that carry disproportionate importance for the rest of Scripture and explain why.
-
-LAB 3 — CHARACTER OF GOD
-Collect the book’s major statements and demonstrations of God’s character. Distinguish what is explicit from what is inferred.
-
-LAB 4 — CANONICAL CONNECTIONS
-Trace one theme into at least three later biblical books, including the New Testament where appropriate.
-
-LAB 5 — DIFFICULT TEXT
-Choose one ethically, historically, or theologically difficult passage. Identify literary context, covenant setting, major interpretive questions, and what it does and does not authorize.
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+LAB 1 — Create a one-page timeline of the book.
+LAB 2 — Track every major covenant or leadership turning point.
+LAB 3 — Choose one difficult passage and distinguish what the narrator reports from what God approves.
+LAB 4 — Trace one theme into the New Testament.
+LAB 5 — Write a one-paragraph theological summary of the book.
 
 [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]]

@@ -1,130 +1,107 @@
 JOB
-An Independent Mark, Set, Go! Bible Guide
-Biblical book: Job
+Mark, Set, Go! Bible Guide
 
-Suffering, justice, wisdom, lament, divine freedom, human limitation, friendship, and faithful speech before God.
+ABOUT THIS BOOK
 
-HOW TO USE THIS BIBLE GUIDE
-Use this guide alongside the biblical text. Read the assigned passages first whenever possible. The guide is designed to help with structure, literary context, theology, difficult passages, connections across Scripture, discussion, and comprehension—not to replace Scripture itself.
+Job asks whether suffering can be interpreted simply as punishment for personal sin. Through narrative, poetry, debate, lament, wisdom, and divine speech, the book dismantles shallow explanations of suffering while calling readers toward humility before God.
 
-READING PRINCIPLES
-Pay attention to genre. Poetry, wisdom sayings, lament, dialogue, and reflective argument communicate differently from narrative or legal prose. Distinguish description from endorsement, read passages in context, and allow the whole biblical canon to inform difficult texts.
+BOOK STRUCTURE
+
+Job 1–2 — prologue and testing
+Job 3 — lament
+Job 4–27 — debates
+Job 28 — wisdom hymn
+Job 29–31 — Job’s final defense
+Job 32–37 — Elihu
+Job 38–41 — God speaks
+Job 42 — response and restoration
+
+HOW TO USE THIS GUIDE
+
+Read the biblical text first whenever possible. Then use the guide to trace the argument, narrative movement, theology, historical context, difficult passages, and connections to the rest of Scripture. The goal is serious understanding without turning the guide into a technical commentary.
 
 [[MSG:SECTION]]
 
-PURPOSE AND PLACE IN SCRIPTURE
+1. THE PROLOGUE
 
-Job explores the problem of righteous suffering through narrative, poetry, debate, lament, wisdom, and divine speech. The book refuses the simple equation that suffering always proves personal guilt.
+Job is righteous. The reader knows his suffering is not caused by secret wickedness.
 
 STUDY QUESTION
-Why is Job’s innocence essential to the book’s challenge to conventional wisdom?
+Why is Job’s innocence essential to the entire book?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-JOB 1–2 — THE PROLOGUE
+2. JOB 3 — LAMENT
 
-Job is introduced as righteous. In the heavenly council, the Accuser challenges the integrity of Job’s faith, and Job loses property, children, and health.
+Job curses the day of his birth but continues speaking to God.
 
 STUDY QUESTION
-What questions are raised by the reader knowing more than Job knows?
+Why is lament compatible with faith?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-JOB 3 — JOB’S LAMENT
+3. THE FRIENDS
 
-Job curses the day of his birth but does not curse God. His lament opens a space for honest grief within faith.
+They defend a simple moral system: suffering proves guilt.
 
 STUDY QUESTION
-What is the difference between lamenting before God and abandoning God?
+Why can a true general principle become cruel when applied mechanically?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-THE FRIENDS’ BASIC ARGUMENT
+4. JOB’S PROTEST
 
-Eliphaz, Bildad, and Zophar repeatedly defend a retributive moral order: God is just, therefore Job’s suffering must correspond to hidden sin.
+Job refuses to confess sins he did not commit and longs to present his case to God.
 
 STUDY QUESTION
-Why is a generally true principle dangerous when applied mechanically to a particular sufferer?
+Why is false confession not humility?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-JOB’S RESPONSE
+5. JOB 19
 
-Job insists on his integrity, longs to present his case before God, and oscillates among confidence, despair, protest, and hope.
+Job expresses hope for vindication in famously difficult language.
 
 STUDY QUESTION
-Why does Job’s refusal to confess imaginary sins matter ethically?
+Why should later Christian use not erase Job’s immediate argument?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-ELIPHAZ
+6. JOB 28 — WISDOM
 
-Eliphaz often speaks from experience, spiritual intuition, and traditional wisdom.
+Humans can mine deep earth but cannot master wisdom; fear of the Lord is wisdom.
 
 STUDY QUESTION
-How can wise-sounding counsel become harmful when it begins with a false diagnosis?
+Why is technical mastery different from wisdom?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-BILDAD AND ZOPHAR
+7. JOB 29–31
 
-The later speeches intensify the claim that the wicked inevitably suffer and the righteous prosper.
+Job’s oath of innocence reveals a broad moral vision involving sexuality, wealth, justice, workers, strangers, and enemies.
 
 STUDY QUESTION
-Why does the debate become harsher as the friends become more certain?
+What does Job consider a righteous life?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-JOB 19 — REDEEMER AND HOPE
+8. ELIHU
 
-Job expresses one of the book’s most famous hopes for vindication, though interpreters debate the precise meaning of his words.
-
-STUDY QUESTION
-Why is it important to distinguish what the passage meant in Job’s argument from later Christian associations?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-JOB 28 — HYMN TO WISDOM
-
-Human beings can mine the earth for hidden treasure, but wisdom cannot be discovered by technical mastery. The fear of the Lord is identified with wisdom.
-
-STUDY QUESTION
-Why does the poem interrupt the debates with a different kind of answer?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-JOB 29–31 — JOB’S FINAL DEFENSE
-
-Job remembers his former life, laments his humiliation, and gives a detailed oath of innocence concerning justice, sexuality, wealth, enemies, and the vulnerable.
-
-STUDY QUESTION
-What moral vision emerges from Job’s self-defense?
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
-
-[[MSG:SECTION]]
-
-JOB 32–37 — ELIHU
-
-Elihu criticizes both Job and the three friends and emphasizes divine instruction through suffering, though his exact role in the book is debated.
+Elihu critiques both Job and the friends and emphasizes divine instruction.
 
 STUDY QUESTION
 Does Elihu solve the problem or prepare for God’s speeches?
@@ -133,45 +110,122 @@ Does Elihu solve the problem or prepare for God’s speeches?
 
 [[MSG:SECTION]]
 
-JOB 38–41 — GOD ANSWERS
+9. GOD FROM THE WHIRLWIND
 
-God answers from the whirlwind with questions about creation, animals, Behemoth, and Leviathan. The response does not give Job the causal explanation readers received in chapters 1–2.
+God does not explain the heavenly scene. He expands Job’s vision of creation.
 
 STUDY QUESTION
-Why does God answer Job with a vision of creation rather than an explanation of the wager?
+Why might a larger vision of God answer differently than a causal explanation?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-JOB 42 — REPENTANCE AND RESTORATION
+10. JOB 42
 
-Job responds humbly, God rebukes the friends, and Job’s fortunes are restored.
+God rebukes the friends and restores Job.
 
 STUDY QUESTION
-What exactly does Job retract or repent of, and what does he not retract?
+Why does restoration not mean the earlier losses never mattered?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-CHRIST AND THE REST OF SCRIPTURE
+HISTORICAL, LITERARY, AND READING CONTEXT
 
-Job contributes to the Bible’s broader theology of innocent suffering, lament, intercession, wisdom, and trust. Christian readers also place Job alongside the ultimate innocent sufferer, Christ, without turning every detail into direct prediction.
+HISTORICAL AND LITERARY CONTEXT
+
+Job is wisdom literature, not a conventional historical chronicle. Its setting is intentionally outside Israel’s national story: Job is from Uz, and the debate concerns universal questions of righteousness, suffering, justice, and wisdom.
+
+The prose prologue and epilogue frame long poetic dialogues. The poetry is dense, metaphorical, and emotionally intense.
+
+One of the book’s great literary strategies is dramatic irony: readers know from chapters 1–2 that the friends’ central explanation is wrong, while the characters do not.
+
+WHAT JOB DOES TO BAD THEOLOGY
+
+The friends are dangerous precisely because they often say things that sound biblical.
+
+Their error is not always the principle “God is just.” Their error is claiming certainty about why Job suffers.
+
+Job therefore warns readers that correct doctrines can become false accusations when applied without knowledge, humility, or compassion.
 
 STUDY QUESTION
-How does Job prevent Christians from treating suffering as reliable evidence of God’s displeasure?
+
+What changes in your reading of Job when you keep its whole-book purpose in view rather than reading isolated verses?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIFFICULT PASSAGES TO STUDY
+KEY PASSAGES TO KNOW
 
-The heavenly council, the death of Job’s children, Job’s harsh words, the friends’ theology, Elihu, God’s speeches, Behemoth and Leviathan, and the ending all require careful attention.
+Job 1–2
+Job 3
+Job 19:23–27
+Job 28
+Job 29–31
+Job 38–41
+Job 42
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+MAJOR THEMES
+
+SUFFERING, JUSTICE, WISDOM, LAMENT, HUMAN LIMITATION, FRIENDSHIP, DIVINE FREEDOM, INTEGRITY.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+READING THIS BOOK WITH THE REST OF SCRIPTURE
+
+A strong reading of Job moves in three directions.
+
+FIRST: READ BACKWARD.
+
+Ask what earlier Scripture this book assumes. Covenant promises, creation, Exodus, law, priesthood, kingship, wisdom, and earlier family history often give later passages their meaning.
+
+SECOND: READ FORWARD.
+
+Ask what problems remain unresolved. Does the book achieve final rest? Does the king remain faithful? Does sacrifice permanently remove sin? Does wisdom conquer death? Does reform change the heart? The unresolved questions become part of the Bible’s forward movement.
+
+THIRD: READ CANONICALLY.
+
+Follow how later biblical writers actually use the book. This is more reliable than inventing symbolic connections. When the New Testament quotes, echoes, or develops a passage, pay attention to both continuity and transformation.
+
+This three-direction method helps Christian readers avoid two mistakes: treating the Old Testament as if Christ were irrelevant, or treating every Old Testament detail as a secret code whose only purpose was to predict Jesus.
 
 STUDY QUESTION
-Does the ending erase Job’s losses, or does it restore life without undoing grief?
+
+What major question does Job leave unresolved that later Scripture continues to answer?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HOW THIS BOOK POINTS FORWARD TO CHRIST
+
+Job contributes to the biblical theology of innocent suffering.
+
+Christ is the ultimate righteous sufferer, though Job is not a direct prophecy of Jesus.
+
+James refers to Job’s endurance.
+
+Christian hope also adds resurrection and final restoration to questions Job raises.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIFFICULT PASSAGES AND READING CAUTIONS
+
+THE HEAVENLY COUNCIL — Do not reduce God to a reckless bettor; the scene is theological narrative about disinterested faith and cosmic accusation.
+THE FRIENDS — Many statements are orthodox in isolation but wrong in application.
+JOB’S WORDS — God ultimately says Job spoke more rightly than the friends, even though Job is corrected.
+RESTORATION — New children do not erase grief over those who died.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
@@ -179,41 +233,32 @@ Does the ending erase Job’s losses, or does it restore life without undoing gr
 
 WHOLE-BOOK REVIEW
 
-1. Summarize the book’s place in the biblical storyline or wisdom tradition.
-2. Identify its major literary divisions or recurring forms.
-3. Explain how genre affects interpretation.
-4. State the book’s central teaching about God.
-5. Explain what the book reveals about human experience, suffering, wisdom, worship, work, love, or mortality.
-6. Identify three key passages and explain why they matter.
-7. Explain at least two important connections to later Scripture.
-8. Identify one difficult passage and describe the context needed to interpret it responsibly.
-9. State one major Great Idea this book contributes to syntopical study.
-10. Summarize the book in one paragraph without reducing it to a slogan.
+1. Why does Job suffer?
+2. What error do the friends make?
+3. Why does Job protest?
+4. What does Job 28 teach?
+5. What moral vision appears in Job 31?
+6. What role does Elihu play?
+7. Why does God speak about creation?
+8. What does Job repent/retract?
+9. Why are the friends rebuked?
+10. What does the book teach about explaining suffering?
 
-FINAL QUESTION
-What would a reader misunderstand about human life before God if this book were missing from Scripture?
+FINAL SYNTHESIS:
+Explain why Job is a warning against using theology to explain another person’s pain too quickly.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-STUDY LABS
+DEEPER READING LABS
 
-LAB 1 — STRUCTURE OR FORM MAP
-Create a one-page map of the book’s major literary movements, voices, genres, or collections.
+LAB 1 — Chart each friend’s argument.
 
-LAB 2 — KEY PASSAGES
-Choose five passages that carry disproportionate theological or literary importance and explain why.
+LAB 2 — Collect everything Job says about justice.
 
-LAB 3 — VOCABULARY OF EXPERIENCE
-Collect the book’s major words and images for wisdom, suffering, worship, love, joy, mortality, justice, or desire.
+LAB 3 — Read Job 38–41 and list what humans do not control.
 
-LAB 4 — CANONICAL CONNECTIONS
-Trace one major theme into at least three other biblical books, including the New Testament where appropriate.
-
-LAB 5 — DIFFICULT TEXT
-Choose one ethically, emotionally, or theologically difficult passage. Identify genre, context, major interpretations, and what the passage does and does not claim.
-
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+LAB 4 — Compare Job with selected lament Psalms and James 5.
 
 [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]]

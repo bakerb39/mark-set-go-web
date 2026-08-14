@@ -1,166 +1,499 @@
 EXODUS
-An Independent Mark, Set, Go! Bible Guide
-Biblical book: Exodus
+Mark, Set, Go! Bible Guide
 
-Deliverance, Passover, covenant, law, divine presence, worship, and Israel’s formation as God’s people.
+ABOUT THIS BOOK
 
-HOW TO USE THIS BIBLE GUIDE
-Use this guide alongside the biblical text. Read the assigned chapters first whenever possible. The guide is designed to help with structure, historical and literary context, theology, difficult passages, connections across Scripture, discussion, and comprehension—not to replace Scripture itself.
+Exodus tells how God rescues Israel from slavery in Egypt, forms them into a covenant people, gives them his law, and comes to dwell among them. It is one of the foundational books for understanding salvation in the rest of Scripture.
 
-READING PRINCIPLES
-Pay attention to what the text actually says, distinguish description from approval, read each passage in its literary and covenant context, and allow clearer passages and the wider biblical canon to inform difficult ones.
+The book moves from oppression to deliverance, from deliverance to covenant, and from covenant to presence. Pharaoh asks, “Who is the LORD?” The whole book answers that question.
+
+Exodus is therefore not merely about leaving Egypt. It is about belonging to God.
+
+BOOK STRUCTURE
+
+Exodus 1–6 — slavery, Moses, and God’s name
+Exodus 7–12 — plagues and Passover
+Exodus 13–18 — sea crossing and wilderness
+Exodus 19–24 — Sinai covenant
+Exodus 25–31 — tabernacle instructions
+Exodus 32–34 — golden calf, intercession, covenant renewal
+Exodus 35–40 — tabernacle built and glory fills it
+
+HOW TO USE THIS GUIDE
+
+Read the biblical text first whenever possible. Then use the guide to trace the argument, narrative movement, theology, historical context, difficult passages, and connections to the rest of Scripture. The goal is serious understanding without turning the guide into a technical commentary.
 
 [[MSG:SECTION]]
 
-PURPOSE AND PLACE IN SCRIPTURE
+1. EXODUS 1 — OPPRESSION AND THE FEAR OF GOD
 
-Exodus moves from slavery in Egypt to covenant at Sinai and the construction of the tabernacle. God reveals his name, redeems Israel, gives his law, and comes to dwell among his people.
+A new Pharaoh fears Israel’s growth and turns fear into oppression. Forced labor escalates into attempted genocide.
+
+Yet the Hebrew midwives fear God more than Pharaoh and refuse his command.
+
+This contrast introduces one of Exodus’s central questions: Who deserves ultimate allegiance?
+
+Pharaoh claims authority over life and death. The midwives quietly deny that claim.
+
+Biblical courage often begins not with public spectacle but with ordinary people refusing evil.
 
 STUDY QUESTION
-Why does Exodus connect liberation with covenant obligation rather than independence alone?
+What does the contrast between fearing Pharaoh and fearing God teach about moral courage?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXODUS 1–2 — SLAVERY AND MOSES
+2. EXODUS 2–4 — MOSES: CALLING AND RELUCTANCE
 
-Pharaoh oppresses Israel and orders the death of Hebrew sons. Moses is preserved, raised in Pharaoh’s household, flees after killing an Egyptian, and begins life in Midian.
+Moses is born under death threat, raised in Pharaoh’s household, flees after killing an Egyptian, and spends years in Midian.
+
+At the burning bush, God calls him.
+
+Moses responds with objection after objection:
+Who am I?
+What is your name?
+What if they do not believe me?
+I am not eloquent.
+Please send someone else.
+
+God’s answer is not that Moses secretly has enough self-confidence.
+
+“I will be with you.”
+
+Calling rests on God’s presence more than personal adequacy.
 
 STUDY QUESTION
-How does Moses’ divided identity prepare him for his later vocation?
+Why is “I will be with you” a better foundation for calling than self-confidence?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXODUS 3–4 — THE BURNING BUSH
+3. EXODUS 3 — THE NAME OF GOD
 
-God calls Moses and reveals the divine name associated with 'I AM.' Moses repeatedly objects, while God promises presence and equips him for the mission.
+God identifies himself as the God of Abraham, Isaac, and Jacob and reveals the divine name YHWH.
+
+“I AM WHO I AM” has generated enormous theological reflection.
+
+At minimum, the passage communicates God’s self-existence, freedom, faithfulness, and presence.
+
+God is not one deity among others who can be manipulated.
+
+He is the covenant God who sees suffering, remembers promise, and acts.
+
+The divine name becomes central to Israel’s worship and to later biblical theology.
 
 STUDY QUESTION
-Why is God’s promised presence the answer to Moses’ sense of inadequacy?
+How does God’s self-revelation in Exodus 3 answer Pharaoh’s later question, “Who is the LORD?”
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXODUS 5–11 — PHARAOH AND THE PLAGUES
+4. EXODUS 5–11 — PHARAOH, PLAGUES, AND HARDNESS OF HEART
 
-The conflict with Pharaoh becomes a contest over worship, lordship, and the knowledge of God. The plagues expose Egypt’s power as unable to resist the God of Israel.
+The confrontation with Pharaoh escalates through signs and plagues.
+
+The plagues demonstrate that Egypt’s power, gods, economy, and king cannot resist the LORD.
+
+Pharaoh’s hardened heart is described in several ways:
+Pharaoh hardens his heart.
+His heart is hardened.
+God hardens his heart.
+
+The narrative holds human responsibility and divine sovereignty together.
+
+Pharaoh repeatedly resists, bargains, relents temporarily, and returns to defiance.
+
+The deeper issue is not stubborn personality but refusal to recognize God’s authority.
 
 STUDY QUESTION
-What does Pharaoh’s hardened heart reveal about power and resistance to God?
+How does Pharaoh become a picture of what persistent resistance to God does to the human heart?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXODUS 12 — PASSOVER
+5. EXODUS 12 — PASSOVER
 
-Israel is spared through the Passover sacrifice and leaves Egypt. The event becomes a permanent act of remembrance in Israel’s worship.
+The final plague brings death to Egypt’s firstborn.
+
+Israel is commanded to sacrifice a lamb, mark the doorposts with blood, eat in readiness, and remember the night permanently.
+
+Passover becomes one of Israel’s defining acts of memory.
+
+Salvation is both:
+deliverance from judgment,
+and liberation from slavery.
+
+The meal teaches later generations to say not merely, “God rescued them,” but “God rescued us.”
+
+Biblical faith is sustained through remembered salvation.
 
 STUDY QUESTION
-Why is deliverance preserved through ritual memory rather than left as a past historical event?
+Why is Passover designed as a repeated meal rather than a one-time historical memory?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXODUS 13–15 — THE SEA
+6. EXODUS 13–15 — THE SEA CROSSING
 
-God leads Israel through the sea and destroys Pharaoh’s pursuing forces. The song of Moses celebrates divine victory and kingship.
+Israel leaves Egypt but quickly becomes trapped between Pharaoh’s army and the sea.
+
+The people panic.
+
+God opens a way.
+
+The sea crossing is the decisive act of liberation.
+
+Israel does not defeat Egypt militarily. Salvation comes through God’s intervention.
+
+Exodus 15 responds with song.
+
+Worship follows deliverance.
+
+The song celebrates God as warrior, king, and redeemer.
+
+The Bible’s pattern is important:
+God acts,
+then his people sing.
 
 STUDY QUESTION
-How does the sea crossing redefine Israel’s identity?
+Why does the sea crossing become one of Scripture’s central images of salvation?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXODUS 16–18 — WILDERNESS PROVISION
+7. EXODUS 16–18 — WILDERNESS: HUNGER, WATER, AND LEARNING TRUST
 
-Manna, water, conflict, and organizational strain reveal Israel’s dependence and repeated grumbling.
+Freedom does not instantly create maturity.
+
+Israel complains about food and water.
+
+God provides manna, quail, and water.
+
+The wilderness becomes a school of dependence.
+
+Manna cannot be hoarded safely.
+
+Daily provision trains daily trust.
+
+Jethro later advises Moses to share leadership.
+
+Exodus therefore connects spiritual dependence with practical organization.
+
+Trust in God does not eliminate wise delegation.
 
 STUDY QUESTION
-Why does freedom from Egypt not immediately produce trusting obedience?
+What does manna teach about dependence, anxiety, and daily provision?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXODUS 19–24 — SINAI COVENANT
+8. EXODUS 19 — A KINGDOM OF PRIESTS
 
-Israel is called a kingdom of priests and holy nation. The Ten Commandments and covenant laws describe life under the God who has already redeemed them.
+At Sinai, God tells Israel:
+“You shall be to me a kingdom of priests and a holy nation.”
+
+Election now becomes mission.
+
+Priests represent God to people and people before God.
+
+Israel’s covenant identity is therefore not private privilege.
+
+They are called to embody God’s holiness among the nations.
+
+The New Testament later applies similar language to the church.
 
 STUDY QUESTION
-Why does grace precede law in the narrative order of Exodus?
+What responsibilities come with being called a “kingdom of priests”?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-THE TEN COMMANDMENTS
+9. EXODUS 20 — THE TEN COMMANDMENTS
 
-The Decalogue orders worship and neighbor-love through commands concerning God, Sabbath, family, life, marriage, property, truth, and desire.
+The commandments begin with grace:
+“I am the LORD your God, who brought you out of the land of Egypt.”
+
+Only then come commands.
+
+That order matters.
+
+Israel obeys as a rescued people, not in order to persuade God to rescue them.
+
+The commandments order:
+worship,
+speech,
+time,
+family,
+life,
+sexuality,
+property,
+truth,
+and desire.
+
+The final command against coveting moves morality inward.
+
+God cares not only about external acts but disordered desire.
 
 STUDY QUESTION
-How do the commandments shape a community rather than merely private morality?
+Why is the order “redemption first, commands second” essential for understanding biblical law?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXODUS 25–31 — TABERNACLE
+10. EXODUS 21–24 — COVENANT LIFE
 
-Detailed instructions describe a holy dwelling, priesthood, sacrifices, and worship.
+The laws following the Ten Commandments apply covenant principles to ancient Israel’s social world.
+
+They address servants, violence, property, restitution, justice, lending, courts, and treatment of foreigners.
+
+Readers must distinguish:
+the enduring moral principles,
+Israel’s ancient civil covenant,
+and direct Christian application.
+
+One repeated concern is protection against abuse by the powerful.
+
+God reminds Israel:
+“You were strangers in Egypt.”
+
+Memory of oppression should produce compassion.
 
 STUDY QUESTION
-Why does divine presence require attention to holiness and ordered worship?
+How should Israel’s own experience of oppression shape the way they treat vulnerable people?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXODUS 32–34 — THE GOLDEN CALF
+11. EXODUS 25–31 — THE TABERNACLE
 
-Israel breaks covenant almost immediately. Moses intercedes, judgment occurs, and God renews covenant while revealing his merciful and just character.
+The long tabernacle instructions can feel surprising after dramatic deliverance.
+
+But the theological goal of Exodus is not merely getting Israel out of Egypt.
+
+It is God dwelling among them.
+
+The tabernacle uses rich symbolism:
+ark,
+lampstand,
+bread,
+altar,
+priesthood,
+holy place,
+Most Holy Place.
+
+The structure teaches that God is present, holy, and graciously accessible through the means he provides.
 
 STUDY QUESTION
-Why is Exodus 34:6–7 so important to later biblical descriptions of God?
+Why is God’s presence a greater goal than freedom from Egypt by itself?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-EXODUS 35–40 — GOD DWELLS WITH ISRAEL
+12. EXODUS 32 — THE GOLDEN CALF
 
-The people construct the tabernacle, and divine glory fills it. The book ends with God’s presence at the center of Israel’s journey.
+While Moses is on Sinai, Israel builds a golden calf.
+
+The speed of the collapse is shocking.
+
+The people who saw the sea divided now make a visible god.
+
+Idolatry is often an attempt to make God manageable.
+
+Moses intercedes.
+
+He appeals to:
+God’s reputation,
+God’s promises,
+and God’s covenant.
+
+The chapter reveals both the seriousness of sin and the importance of intercession.
 
 STUDY QUESTION
-Why is presence, rather than merely escape from Egypt, the true destination of Exodus?
+Why are people tempted to replace the living God with something visible and controllable?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-CHRIST AND THE REST OF SCRIPTURE
+13. EXODUS 33–34 — “SHOW ME YOUR GLORY”
 
-The New Testament draws heavily on Exodus imagery: Passover, deliverance, baptism through the sea, manna, covenant, priesthood, tabernacle, and God dwelling with his people.
+After the golden calf, Moses asks for God’s presence.
+
+Then he asks:
+“Show me your glory.”
+
+God reveals his name and character:
+merciful,
+gracious,
+slow to anger,
+abounding in steadfast love and faithfulness,
+yet just.
+
+This becomes one of the Old Testament’s most important descriptions of God.
+
+The glory of God is not raw power alone.
+
+His glory is revealed through holy, merciful, faithful character.
 
 STUDY QUESTION
-Why does the Exodus become one of Scripture’s central patterns for salvation?
+Why is Exodus 34:6–7 so important for the Bible’s understanding of God?
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-DIFFICULT PASSAGES TO STUDY
+14. EXODUS 35–40 — GLORY FILLS THE TABERNACLE
 
-The hardening of Pharaoh, the death of Egypt’s firstborn, slavery laws, divine violence, and detailed cultic regulations require careful historical and canonical reading.
+The people build the tabernacle as commanded.
+
+Then the cloud covers it.
+
+God’s glory fills the tabernacle.
+
+Moses cannot enter.
+
+Exodus ends with a paradox:
+God has come to dwell with his people,
+yet his holiness still creates distance.
+
+The rest of the Torah will address the question:
+How can a holy God dwell among sinful people?
 
 STUDY QUESTION
-How should divine judgment be read alongside Exodus’s equally strong revelation of mercy?
+Why does Exodus end with God present but Moses unable to enter?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HISTORICAL, LITERARY, AND READING CONTEXT
+
+HISTORICAL AND LITERARY CONTEXT
+
+Exodus is set against Egypt’s use of forced labor and royal power. The text does not identify the Pharaoh by name, and attempts to fix the Exodus to one precise Egyptian ruler remain debated. For reading the book well, the more important literary point is that Pharaoh represents an empire claiming ownership over people who belong to God.
+
+Exodus also deliberately continues Genesis. Genesis ends with Joseph’s coffin in Egypt; Exodus begins with Israel multiplying there. The promise to Abraham—offspring, land, blessing—now appears threatened by slavery. God’s repeated statement that he “remembered his covenant” does not mean he had forgotten. Biblical remembrance means covenant commitment moving into action.
+
+The book’s geography is also theological. Israel moves from Egypt to the sea, through wilderness, to Sinai. The destination is not yet Canaan. Sinai comes first because redemption creates a people who must learn worship, covenant, and holiness before entering land.
+
+READING EXODUS AS A WHOLE
+
+Watch the repeated phrase “that you may know that I am the LORD.” The plagues reveal God to Pharaoh, Egypt, and Israel.
+
+Also track the movement of service. Israel begins as slaves serving Pharaoh. After deliverance, they are called to serve/worship the LORD. Biblical freedom is therefore not autonomy; it is liberation from a false master for life under the true God.
+
+Finally, notice how often God’s presence drives the story: burning bush, cloud, fire, mountain, tabernacle, glory. Exodus is fundamentally a book about the presence of God with a redeemed people.
+
+STUDY QUESTION
+
+What changes in your reading of Exodus when you keep its whole-book purpose in view rather than reading isolated verses?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+KEY PASSAGES TO KNOW
+
+Exodus 3:14–15 — God’s name
+Exodus 6:6–8 — redemption promises
+Exodus 12 — Passover
+Exodus 14:13–14 — the LORD fights for Israel
+Exodus 15:1–18 — song at the sea
+Exodus 19:4–6 — kingdom of priests
+Exodus 20:1–17 — Ten Commandments
+Exodus 24:3–8 — covenant ratified
+Exodus 32 — golden calf
+Exodus 33:15 — “If your presence will not go...”
+Exodus 34:6–7 — God’s character
+Exodus 40:34–38 — glory fills the tabernacle
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+MAJOR THEMES
+
+REDEMPTION — God rescues slaves who cannot free themselves.
+COVENANT — The rescued people become God’s people.
+WORSHIP — Salvation leads to worship and obedient life.
+LAW — Grace precedes command.
+HOLINESS — God is near but not casual.
+PRESENCE — The true goal is God dwelling with his people.
+MEMORY — Passover teaches salvation through repeated remembrance.
+JUSTICE — The covenant shapes treatment of the vulnerable.
+MEDIATION — Moses and the priestly system stand between holy God and sinful people.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+READING THIS BOOK WITH THE REST OF SCRIPTURE
+
+A strong reading of Exodus moves in three directions.
+
+FIRST: READ BACKWARD.
+
+Ask what earlier Scripture this book assumes. Covenant promises, creation, Exodus, law, priesthood, kingship, wisdom, and earlier family history often give later passages their meaning.
+
+SECOND: READ FORWARD.
+
+Ask what problems remain unresolved. Does the book achieve final rest? Does the king remain faithful? Does sacrifice permanently remove sin? Does wisdom conquer death? Does reform change the heart? The unresolved questions become part of the Bible’s forward movement.
+
+THIRD: READ CANONICALLY.
+
+Follow how later biblical writers actually use the book. This is more reliable than inventing symbolic connections. When the New Testament quotes, echoes, or develops a passage, pay attention to both continuity and transformation.
+
+This three-direction method helps Christian readers avoid two mistakes: treating the Old Testament as if Christ were irrelevant, or treating every Old Testament detail as a secret code whose only purpose was to predict Jesus.
+
+STUDY QUESTION
+
+What major question does Exodus leave unresolved that later Scripture continues to answer?
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+HOW THIS BOOK POINTS FORWARD TO CHRIST
+
+Jesus is presented through Exodus-shaped imagery throughout the New Testament.
+
+John the Baptist identifies Jesus as the Lamb of God.
+Paul calls Christ “our Passover.”
+The Last Supper occurs in Passover context.
+Jesus leads a greater exodus from slavery to sin and death.
+Baptism is compared typologically with Israel passing through the sea.
+The church is called a royal priesthood.
+John’s Gospel presents Jesus as the true tabernacle of God’s presence.
+Revelation sings songs that echo Moses and the Exodus victory.
+
+Exodus therefore provides some of Christianity’s basic vocabulary for salvation.
+
+[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+
+[[MSG:SECTION]]
+
+DIFFICULT PASSAGES AND READING CAUTIONS
+
+HARDENING PHARAOH — Scripture simultaneously affirms Pharaoh’s responsibility and God’s sovereignty. Avoid solving the tension by denying one side.
+
+THE PLAGUES — The suffering involved is severe. Read them as acts of judgment within the story’s confrontation between oppressive empire and God’s liberating rule, not as entertainment.
+
+SLAVERY LAWS — Ancient Israelite servitude differs in important ways from modern race-based chattel slavery, but the laws still reflect an ancient social world rather than the final biblical ideal. Do not use them to defend modern slavery.
+
+PASSOVER AND CHRIST — Christian typology should deepen respect for Passover’s Jewish meaning rather than erase it.
+
+THE LAW — Christians disagree about how Mosaic civil, ceremonial, and moral laws relate to the church. Read individual commands within covenant context and through New Testament teaching.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
@@ -168,41 +501,38 @@ How should divine judgment be read alongside Exodus’s equally strong revelatio
 
 WHOLE-BOOK REVIEW
 
-1. Summarize the book’s place in the biblical storyline.
-2. Identify its major literary or narrative divisions.
-3. Name the most important people, events, laws, speeches, or institutions.
-4. Explain the book’s central teaching about God.
-5. Explain what the book reveals about human sin, faith, obedience, or community.
-6. Identify the book’s major covenant themes.
-7. Explain at least two important connections to later Scripture.
-8. Identify one difficult passage and describe what context is necessary to interpret it responsibly.
-9. State one major Great Idea that this book contributes to syntopical study.
-10. Summarize the book in one paragraph without reducing it to a slogan.
+1. What does Exodus reveal about God’s name?
+2. Why does Moses resist his calling?
+3. What do the plagues accomplish?
+4. What is Passover?
+5. Why is the sea crossing central?
+6. What does manna teach?
+7. What does “kingdom of priests” mean?
+8. Why do the commandments begin with redemption?
+9. What purpose does the tabernacle serve?
+10. Why is the golden calf so serious?
+11. What does Exodus 34 reveal about God?
+12. Why does Exodus end with glory filling the tabernacle?
 
-FINAL QUESTION
-What would a reader misunderstand about the Bible as a whole if this book were missing?
+FINAL SYNTHESIS:
+Explain Exodus as a movement from slavery to worship and from rescue to divine presence.
 
 [[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
 
 [[MSG:SECTION]]
 
-STUDY LABS
+DEEPER READING LABS
 
-LAB 1 — STRUCTURE MAP
-Create a one-page outline of the book using its major literary or narrative movements.
+LAB 1 — Trace every “I am the LORD” statement.
 
-LAB 2 — KEY PASSAGES
-Choose five passages that carry disproportionate importance for the rest of Scripture and explain why.
+LAB 2 — Compare Passover in Exodus 12 with the Last Supper accounts.
 
-LAB 3 — CHARACTER OF GOD
-Collect the book’s major statements and demonstrations of God’s character. Distinguish what is explicitly stated from what you infer from events.
+LAB 3 — Group the Ten Commandments under worship, community, and desire.
 
-LAB 4 — CANONICAL CONNECTIONS
-Trace one theme from this book into at least three later biblical books, including the New Testament where appropriate.
+LAB 4 — Track Moses’ development from reluctant speaker to intercessor.
 
-LAB 5 — DIFFICULT TEXT
-Choose one ethically, historically, or theologically difficult passage. Identify the literary context, covenant setting, major interpretive questions, and what the passage does and does not authorize.
+LAB 5 — Read Exodus 34:6–7, then trace where later biblical books quote or echo it.
 
-[[MSG:DISCUSS]] [[MSG:SECTIONQUIZ]]
+LAB 6 — Draw the tabernacle layout and label what each area communicates about access, holiness, and presence.
 
 [[MSG:IDEAS]] [[MSG:ACTION]] [[MSG:QUIZ]]
