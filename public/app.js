@@ -15520,11 +15520,12 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 /* Feature block moved to /modules/reading/pacman-mode.js */
 
 // Line Sweep mode -----------------------------------------------------------
-// A lightweight teleprompter-style eye guide. It leaves the document layout
-// untouched and moves a short underline across each *rendered* text line at a
-// pace derived from WPM. Because the line geometry is measured fresh on every
-// step, it automatically follows font-size changes, responsive reflow, and the
-// Reader's virtualized word spans without changing the playback cursor model.
+// Teleprompter-style line sweep. The document stays fixed while the actual
+// rendered words are highlighted one-by-one across the current visual line.
+// Timing is derived from WPM, so the highlight itself is the eye guide rather
+// than a decorative underline. Geometry is measured fresh on every line so the
+// mode follows responsive reflow and font-size changes without altering the
+// Reader's playback cursor model.
 function getLineSweepStep(reader, startIndex) {
   if (!reader || startIndex >= state.words.length) return null;
 
@@ -15575,27 +15576,16 @@ function getLineSweepStep(reader, startIndex) {
     startIndex,
     nextIndex,
     wordCount: Math.max(1, nextIndex - startIndex),
+    lineWords,
     startX,
     endX,
     y
   };
 }
 
-function positionLineSweepMarker(reader, step, durationMs) {
-  const marker = reader?.querySelector('.line-sweep-marker');
-  if (!marker || !step) return;
-
-  const sweepWidth = Math.max(28, Math.min(54, (step.endX - step.startX) * 0.16));
-  const travel = Math.max(0, step.endX - step.startX - sweepWidth);
-  marker.style.width = `${sweepWidth}px`;
-  marker.style.transition = 'none';
-  marker.style.transform = `translate3d(${step.startX}px, ${step.y}px, 0)`;
-  marker.classList.add('visible');
-  // Force the start position to commit before enabling the linear sweep.
-  void marker.offsetWidth;
-  marker.style.transition = `transform ${Math.max(80, durationMs)}ms linear`;
-  requestAnimationFrame(() => {
-    marker.style.transform = `translate3d(${step.startX + travel}px, ${step.y}px, 0)`;
+function clearLineSweepHighlight(reader) {
+  reader?.querySelectorAll('.reader-word.line-sweep-active').forEach((word) => {
+    word.classList.remove('line-sweep-active');
   });
 }
 
@@ -15605,31 +15595,51 @@ function startLineSweepReader({ reader, speed }) {
   const sweepNextLine = () => {
     if (token !== state.runToken) return;
     if (state.index >= state.words.length) {
+      clearLineSweepHighlight(reader);
       pauseReader();
       updateReaderStatus('Finished.');
       return;
     }
 
-    const liveSpeed = currentPushTrainingWpm(speed, 'line-sweep');
     const step = getLineSweepStep(reader, state.index);
-    if (!step) {
+    if (!step || !step.lineWords?.length) {
+      clearLineSweepHighlight(reader);
       pauseReader();
       updateReaderStatus('Line Sweep could not locate the current text line.');
       return;
     }
 
     updateFocusAnchorOverlay();
-    const durationMs = Math.max(180, (60000 * step.wordCount) / Math.max(30, liveSpeed));
-    positionLineSweepMarker(reader, step, durationMs);
+    let cursor = 0;
 
-    state.interval = window.setTimeout(() => {
+    const advanceWord = () => {
       if (token !== state.runToken) return;
-      state.interval = null;
-      state.index = step.nextIndex;
-      state.viewportAnchorIndex = state.index;
+      clearLineSweepHighlight(reader);
+
+      if (cursor >= step.lineWords.length) {
+        state.index = step.nextIndex;
+        state.viewportAnchorIndex = state.index;
+        updateReaderStatus();
+        sweepNextLine();
+        return;
+      }
+
+      const current = step.lineWords[cursor];
+      current.word.classList.add('line-sweep-active');
+      state.index = current.index;
+      state.viewportAnchorIndex = current.index;
       updateReaderStatus();
-      sweepNextLine();
-    }, durationMs);
+
+      const liveSpeed = currentPushTrainingWpm(speed, 'line-sweep');
+      const wordDurationMs = Math.max(70, 60000 / Math.max(30, liveSpeed));
+      cursor += 1;
+      state.interval = window.setTimeout(() => {
+        state.interval = null;
+        advanceWord();
+      }, wordDurationMs);
+    };
+
+    advanceWord();
   };
 
   sweepNextLine();
