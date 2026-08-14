@@ -7798,7 +7798,12 @@ function positionReaderWritingOverlay(reader, element, item) {
   const anchorRect = anchor.getBoundingClientRect();
   const computed = getComputedStyle(reader);
   const lineHeight = parseFloat(computed.lineHeight) || anchorRect.height || 24;
-  const left = anchorRect.left - readerRect.left + reader.scrollLeft;
+  const rawLeft = anchorRect.left - readerRect.left + reader.scrollLeft;
+  // Keep the annotation box inside the visible reader width. The fixed minimum
+  // width prevents ordinary note text from collapsing into a vertical column.
+  const overlayWidth = Math.min(360, Math.max(180, reader.clientWidth * .28));
+  const maxLeft = Math.max(reader.scrollLeft, reader.scrollLeft + reader.clientWidth - overlayWidth - 12);
+  const left = Math.min(Math.max(reader.scrollLeft + 6, rawLeft), maxLeft);
   // Place the writing just above the selected line when room exists; otherwise
   // float it immediately below. It never changes document layout.
   const preferredTop = anchorRect.top - readerRect.top + reader.scrollTop - Math.max(16, lineHeight * .72);

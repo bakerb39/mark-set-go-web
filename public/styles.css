@@ -14701,8 +14701,10 @@ body.light .comprehension-count-control input,
 }
 .reader-written-annotation {
   position: absolute;
-  display: inline-block;
-  max-width: min(360px, 52vw);
+  display: block;
+  width: clamp(180px, 28vw, 360px);
+  max-width: min(360px, calc(100% - 24px));
+  min-width: 180px;
   padding: 1px 5px 2px;
   border-radius: 5px;
   color: var(--reader-writing-color, #C98900);
@@ -14713,8 +14715,9 @@ body.light .comprehension-count-control input,
   line-height: 1.18;
   letter-spacing: .01em;
   text-shadow: 0 1px 0 rgba(255,255,255,.5);
-  white-space: normal;
-  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
   pointer-events: none;
   transform: rotate(-.35deg);
 }
