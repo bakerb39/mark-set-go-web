@@ -14966,3 +14966,68 @@ body:not(.light) .reader-written-annotation {
   width:30px;
   padding:2px;
 }
+
+
+/* Reader markup v4: persistent inserted workspace --------------------------- */
+#reader.interactive-reader { position:relative; }
+.reader-drawing-layer { z-index:18; }
+.reader-inserted-workspace {
+  position:relative;
+  display:block;
+  box-sizing:border-box;
+  width:calc(100% - 18px);
+  min-height:280px;
+  margin:18px 9px;
+  padding:44px 12px 12px;
+  overflow:hidden;
+  border:2px dashed rgba(12,35,64,.22);
+  border-radius:12px;
+  background:#fffdf8;
+  color:#0c2340;
+  break-inside:avoid;
+  page-break-inside:avoid;
+  z-index:3;
+}
+.reader-inserted-workspace::before {
+  content:'Reader workspace'; position:absolute; left:12px; bottom:8px;
+  font:700 10px/1 Inter,system-ui,sans-serif; opacity:.35; pointer-events:none;
+}
+.reader-workspace-toolbar {
+  position:absolute; z-index:8; top:7px; left:8px; right:8px;
+  display:flex; align-items:center; flex-wrap:wrap; gap:5px;
+  padding:5px 6px; border:1px solid rgba(12,35,64,.12); border-radius:8px;
+  background:rgba(251,247,237,.96); box-shadow:0 4px 12px rgba(15,23,42,.08);
+  font:700 10px/1.2 Inter,system-ui,sans-serif;
+}
+.reader-workspace-toolbar button,.reader-workspace-toolbar select,.reader-workspace-toolbar input[type="color"] {
+  min-height:25px; border:1px solid rgba(12,35,64,.15); border-radius:5px; background:#fff; color:#0c2340;
+  font:700 10px Inter,system-ui,sans-serif;
+}
+.reader-workspace-toolbar button { padding:3px 7px; cursor:pointer; }
+.reader-workspace-toolbar button.active { background:#0c2340; color:#fff; }
+.reader-workspace-toolbar label { display:flex; align-items:center; gap:4px; }
+.reader-workspace-toolbar input[type="color"] { width:28px; padding:1px; }
+.reader-workspace-note {
+  position:relative; z-index:5; box-sizing:border-box; width:min(520px,70%); min-height:90px; resize:both;
+  padding:9px; border:1px solid rgba(12,35,64,.14); border-radius:8px; background:rgba(255,255,255,.76);
+  font:500 16px/1.45 Georgia,'Times New Roman',serif;
+}
+.reader-workspace-note[hidden] { display:none!important; }
+.reader-workspace-note-color { position:absolute; z-index:6; left:14px; bottom:11px; display:flex; align-items:center; gap:5px; font:700 10px Inter,system-ui,sans-serif; }
+.reader-workspace-note-color input { width:27px; height:22px; border:0; background:transparent; }
+.reader-workspace-photo { position:relative; z-index:4; display:inline-flex; flex-direction:column; gap:4px; max-width:55%; margin:8px; vertical-align:top; }
+.reader-workspace-photo img { display:block; max-width:100%; max-height:calc(100% - 60px); object-fit:contain; border-radius:7px; box-shadow:0 3px 14px rgba(15,23,42,.16); }
+.reader-workspace-photo button { align-self:flex-start; font-size:10px; }
+.reader-workspace-drawing-layer { position:absolute; z-index:4; inset:40px 0 0; width:100%; height:calc(100% - 40px); pointer-events:none; touch-action:none; overflow:visible; }
+.reader-inserted-workspace.workspace-drawing-active .reader-workspace-drawing-layer { z-index:7; pointer-events:auto; cursor:crosshair; }
+.reader.book-pages-layout .reader-inserted-workspace { width:calc(100% - 14px); margin:12px 7px; }
+.mark-selection-toolbar .reader-workspace-editor {
+  position:absolute; z-index:3; top:calc(100% + 7px); left:190px; display:grid; gap:8px;
+  width:min(250px,calc(100vw - 24px)); padding:10px; border:1px solid rgba(100,116,139,.28); border-radius:10px;
+  background:#fbf7ed; color:#0c2340; box-shadow:0 14px 34px rgba(15,23,42,.24); white-space:normal;
+  font:700 11px Inter,system-ui,sans-serif;
+}
+.mark-selection-toolbar .reader-workspace-editor[hidden] { display:none!important; }
+.mark-selection-toolbar .reader-workspace-editor label { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.mark-selection-toolbar .reader-workspace-editor>div { display:flex; justify-content:flex-end; gap:6px; }
+.mark-selection-toolbar .reader-workspace-editor select,.mark-selection-toolbar .reader-workspace-editor button { min-height:28px; border:1px solid rgba(12,35,64,.15); border-radius:6px; background:#fff; color:#0c2340; }

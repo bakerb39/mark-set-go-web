@@ -7522,6 +7522,7 @@ const READER_NOTES_CACHE_KEY = 'reader-annotations:notes:v1';
 const READER_HIGHLIGHTS_CACHE_KEY = 'reader-annotations:passage-highlights:v1';
 const READER_WRITING_CACHE_KEY = 'reader-annotations:written-overlays:v1';
 const READER_DRAWING_CACHE_KEY = 'reader-annotations:free-draw:v1';
+const READER_WORKSPACE_CACHE_KEY = 'reader-annotations:workspaces:v1';
 
 function readLegacyAnnotationArray(key) {
   try {
@@ -7537,6 +7538,7 @@ let readerNotesCache = readLegacyAnnotationArray(NOTE_STORAGE_KEY).slice(0, 1000
 let readerHighlightsCache = [];
 let readerWritingCache = [];
 let readerDrawingCache = [];
+let readerWorkspaceCache = [];
 let readerAnnotationHydrated = false;
 
 async function persistReaderAnnotationRecord(key, items) {
@@ -7555,12 +7557,13 @@ async function hydrateReaderAnnotationStores() {
   readerAnnotationHydrated = true;
 
   try {
-    const [definitionRecord, noteRecord, highlightRecord, writingRecord, drawingRecord] = await Promise.all([
+    const [definitionRecord, noteRecord, highlightRecord, writingRecord, drawingRecord, workspaceRecord] = await Promise.all([
       getCachedReadingBook(READER_DEFINITIONS_CACHE_KEY),
       getCachedReadingBook(READER_NOTES_CACHE_KEY),
       getCachedReadingBook(READER_HIGHLIGHTS_CACHE_KEY),
       getCachedReadingBook(READER_WRITING_CACHE_KEY),
-      getCachedReadingBook(READER_DRAWING_CACHE_KEY)
+      getCachedReadingBook(READER_DRAWING_CACHE_KEY),
+      getCachedReadingBook(READER_WORKSPACE_CACHE_KEY)
     ]);
 
     const indexedDefinitions = Array.isArray(definitionRecord?.items) ? definitionRecord.items : [];
@@ -7568,6 +7571,7 @@ async function hydrateReaderAnnotationStores() {
     const indexedHighlights = Array.isArray(highlightRecord?.items) ? highlightRecord.items : [];
     const indexedWriting = Array.isArray(writingRecord?.items) ? writingRecord.items : [];
     const indexedDrawing = Array.isArray(drawingRecord?.items) ? drawingRecord.items : [];
+    const indexedWorkspaces = Array.isArray(workspaceRecord?.items) ? workspaceRecord.items : [];
 
     // If IndexedDB already has data, it is authoritative. Otherwise migrate the
     // legacy localStorage arrays once.
@@ -7580,6 +7584,7 @@ async function hydrateReaderAnnotationStores() {
     readerHighlightsCache = indexedHighlights.slice(0, 5000);
     readerWritingCache = indexedWriting.slice(0, 3000);
     readerDrawingCache = indexedDrawing.slice(0, 5000);
+    readerWorkspaceCache = indexedWorkspaces.slice(0, 1000);
 
     // Remove the bulky legacy copies only after IndexedDB has had a chance to
     // receive them. This also gives localStorage quota back to the rest of app.
@@ -7592,6 +7597,7 @@ async function hydrateReaderAnnotationStores() {
       applySavedPassageHighlights();
       applySavedReaderWritingOverlays();
       applySavedReaderDrawings();
+      applySavedReaderWorkspaces();
     }
   } catch (error) {
     console.warn('Reader annotation migration could not complete.', error);
@@ -8052,6 +8058,7 @@ function applySavedReaderDrawings() {
   }
   layer.classList.toggle('drawing-active', state.readerDrawingMode === 'draw');
   layer.classList.toggle('erasing-active', state.readerDrawingMode === 'erase');
+  bindReaderDrawingSurface(reader);
 }
 
 function addSavedReaderDrawing(stroke) {
@@ -8191,10 +8198,12 @@ function clearReaderDrawingPreview(layer) {
 }
 
 function bindReaderDrawingSurface(reader) {
-  if (!reader || reader.dataset.readerDrawingBound === 'true') return;
-  reader.dataset.readerDrawingBound = 'true';
+  if (!reader) return;
   const layer = ensureReaderDrawingLayer(reader);
-  if (!layer) return;
+  if (!layer || layer.dataset.readerDrawingBound === 'true') return;
+  // The virtual Reader can replace this SVG layer. Bind the layer itself, not
+  // the long-lived Reader element, so a newly-created surface gets handlers.
+  layer.dataset.readerDrawingBound = 'true';
 
   const pointerDown = (event) => {
     if (!state.readerDrawingMode) return;
@@ -8265,6 +8274,224 @@ function bindReaderDrawingSurface(reader) {
   layer.addEventListener('pointermove', pointerMove);
   layer.addEventListener('pointerup', pointerUp);
   layer.addEventListener('pointercancel', pointerUp);
+}
+
+// Reader inserted workspaces --------------------------------------------------
+// A workspace is an annotation block anchored to a document word. It is inserted
+// into the Reader's normal flow, so it reserves real space without changing the
+// underlying book text. Removing it restores the original layout.
+function readerWorkspacesForCurrentDocument() {
+  if (!state.documentId) return [];
+  return readerWorkspaceCache.filter((item) => item.documentId === state.documentId);
+}
+
+function saveReaderWorkspaces(items) {
+  readerWorkspaceCache = (Array.isArray(items) ? items : []).slice(0, 1000);
+  void persistReaderAnnotationRecord(READER_WORKSPACE_CACHE_KEY, readerWorkspaceCache);
+  return true;
+}
+
+function normalizeReaderWorkspaceHeight(value) {
+  return Math.max(140, Math.min(720, Number(value) || 280));
+}
+
+function addSavedReaderWorkspace(selectionData, height = 280) {
+  if (!selectionData?.documentId) return false;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  readerWorkspaceCache.push({
+    id:`reader-workspace-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    documentId:selectionData.documentId,
+    title:state.title || '',
+    anchorIndex:endIndex - 1,
+    height:normalizeReaderWorkspaceHeight(height),
+    note:'',
+    noteColor:'#0C2340',
+    photoDataUrl:'',
+    photoName:'',
+    strokes:[],
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  });
+  saveReaderWorkspaces(readerWorkspaceCache);
+  applySavedReaderWorkspaces();
+  return true;
+}
+
+function updateSavedReaderWorkspace(id, patch) {
+  const item = readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
+  if (!item) return false;
+  Object.assign(item, patch || {}, {updatedAt:new Date().toISOString()});
+  if ('height' in (patch || {})) item.height = normalizeReaderWorkspaceHeight(item.height);
+  saveReaderWorkspaces(readerWorkspaceCache);
+  return true;
+}
+
+function deleteSavedReaderWorkspace(id) {
+  const before = readerWorkspaceCache.length;
+  saveReaderWorkspaces(readerWorkspaceCache.filter((item)=>String(item.id)!==String(id)));
+  applySavedReaderWorkspaces();
+  return readerWorkspaceCache.length !== before;
+}
+
+function readerWorkspaceAnchorElement(reader, item) {
+  const index = Number(item.anchorIndex);
+  if (!Number.isFinite(index)) return null;
+  // Prefer a word so the workspace follows the exact selection location. If the
+  // current renderer only exposes groups, fall back to the matching group.
+  const words = [...reader.querySelectorAll('.reader-word[data-index]')];
+  for (const element of words) {
+    const range = readerElementRange(element);
+    if (range && range.start <= index && range.end > index) return element;
+  }
+  for (const element of reader.querySelectorAll('.reader-group[data-start-index]')) {
+    const range = readerElementRange(element);
+    if (range && range.start <= index && range.end > index) return element;
+  }
+  return null;
+}
+
+function readerWorkspaceStrokePath(stroke, width, height) {
+  const points = Array.isArray(stroke?.points) ? stroke.points : [];
+  if (!points.length) return '';
+  const abs = points.map((point)=>({x:(Number(point.x)||0)*width, y:(Number(point.y)||0)*height}));
+  return readerDrawingPathData(abs);
+}
+
+function renderReaderWorkspaceStrokes(block, item) {
+  const svg = block.querySelector('[data-workspace-drawing-layer]');
+  if (!svg) return;
+  const rect = svg.getBoundingClientRect();
+  const width = Math.max(1, rect.width || block.clientWidth);
+  const height = Math.max(1, rect.height || block.clientHeight);
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.innerHTML = (Array.isArray(item.strokes) ? item.strokes : []).map((stroke)=>
+    `<path d="${escapeHtml(readerWorkspaceStrokePath(stroke,width,height))}" fill="none" stroke="${escapeHtml(normalizeReaderDrawingColor(stroke.color))}" stroke-width="${normalizeReaderDrawingThickness(stroke.thickness)}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>`
+  ).join('');
+}
+
+function bindReaderWorkspace(block, item) {
+  if (block.dataset.workspaceBound === 'true') return;
+  block.dataset.workspaceBound = 'true';
+  const id = item.id;
+  const note = block.querySelector('[data-workspace-note]');
+  const photoInput = block.querySelector('[data-workspace-photo-input]');
+  const drawLayer = block.querySelector('[data-workspace-drawing-layer]');
+  let drawMode = false;
+  let stroke = null;
+
+  block.querySelector('[data-workspace-text-toggle]')?.addEventListener('click',()=>{
+    note.hidden = !note.hidden;
+    if (!note.hidden) requestAnimationFrame(()=>note.focus());
+  });
+  note?.addEventListener('input',()=>updateSavedReaderWorkspace(id,{note:note.value}));
+  block.querySelector('[data-workspace-note-color]')?.addEventListener('input',(event)=>{
+    note.style.color = event.currentTarget.value;
+    updateSavedReaderWorkspace(id,{noteColor:event.currentTarget.value});
+  });
+  block.querySelector('[data-workspace-photo]')?.addEventListener('click',()=>photoInput?.click());
+  photoInput?.addEventListener('change',()=>{
+    const file = photoInput.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const readerFile = new FileReader();
+    readerFile.onload = ()=>{
+      updateSavedReaderWorkspace(id,{photoDataUrl:String(readerFile.result||''),photoName:file.name});
+      block.remove();
+      applySavedReaderWorkspaces();
+    };
+    readerFile.readAsDataURL(file);
+  });
+  block.querySelector('[data-workspace-remove-photo]')?.addEventListener('click',()=>{
+    updateSavedReaderWorkspace(id,{photoDataUrl:'',photoName:''});
+    block.remove();
+    applySavedReaderWorkspaces();
+  });
+  block.querySelector('[data-workspace-grow]')?.addEventListener('click',()=>{
+    const current=readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
+    const height=normalizeReaderWorkspaceHeight((current?.height||item.height||280)+80);
+    updateSavedReaderWorkspace(id,{height}); block.style.minHeight=`${height}px`; renderReaderWorkspaceStrokes(block,current||item);
+  });
+  block.querySelector('[data-workspace-shrink]')?.addEventListener('click',()=>{
+    const current=readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
+    const height=normalizeReaderWorkspaceHeight((current?.height||item.height||280)-80);
+    updateSavedReaderWorkspace(id,{height}); block.style.minHeight=`${height}px`; renderReaderWorkspaceStrokes(block,current||item);
+  });
+  block.querySelector('[data-workspace-delete]')?.addEventListener('click',()=>deleteSavedReaderWorkspace(id));
+  block.querySelector('[data-workspace-draw-toggle]')?.addEventListener('click',(event)=>{
+    drawMode = !drawMode;
+    block.classList.toggle('workspace-drawing-active',drawMode);
+    event.currentTarget.classList.toggle('active',drawMode);
+  });
+  block.querySelector('[data-workspace-clear-drawing]')?.addEventListener('click',()=>{
+    updateSavedReaderWorkspace(id,{strokes:[]});
+    const current = readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
+    if (current) renderReaderWorkspaceStrokes(block,current);
+  });
+
+  const pointFor = (event)=>{
+    const rect = drawLayer.getBoundingClientRect();
+    return {x:Math.max(0,Math.min(1,(event.clientX-rect.left)/Math.max(1,rect.width))), y:Math.max(0,Math.min(1,(event.clientY-rect.top)/Math.max(1,rect.height)))};
+  };
+  drawLayer?.addEventListener('pointerdown',(event)=>{
+    if (!drawMode) return;
+    event.preventDefault(); event.stopPropagation();
+    stroke={pointerId:event.pointerId,color:block.querySelector('[data-workspace-draw-color]')?.value||'#E9B949',thickness:block.querySelector('[data-workspace-draw-thickness]')?.value||4,points:[pointFor(event)]};
+    try { drawLayer.setPointerCapture(event.pointerId); } catch {}
+  });
+  drawLayer?.addEventListener('pointermove',(event)=>{
+    if (!stroke || stroke.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    const next=pointFor(event), last=stroke.points[stroke.points.length-1];
+    if (!last || Math.hypot(next.x-last.x,next.y-last.y)>.002) {
+      stroke.points.push(next);
+      const current = {...item, strokes:[...(item.strokes||[]), stroke]};
+      renderReaderWorkspaceStrokes(block,current);
+    }
+  });
+  const finishStroke=(event)=>{
+    if (!stroke || stroke.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    const current = readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
+    if (current) {
+      current.strokes = [...(current.strokes||[]), stroke];
+      updateSavedReaderWorkspace(id,{strokes:current.strokes});
+      renderReaderWorkspaceStrokes(block,current);
+    }
+    try { drawLayer.releasePointerCapture(event.pointerId); } catch {}
+    stroke=null;
+  };
+  drawLayer?.addEventListener('pointerup',finishStroke);
+  drawLayer?.addEventListener('pointercancel',finishStroke);
+}
+
+function applySavedReaderWorkspaces() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return;
+  const items = readerWorkspacesForCurrentDocument();
+  const liveIds = new Set(items.map((item)=>String(item.id)));
+  reader.querySelectorAll('[data-reader-workspace-id]').forEach((block)=>{
+    if (!liveIds.has(block.dataset.readerWorkspaceId)) block.remove();
+  });
+  for (const item of items) {
+    const anchor = readerWorkspaceAnchorElement(reader,item);
+    if (!anchor) continue;
+    let block = reader.querySelector(`[data-reader-workspace-id="${CSS.escape(String(item.id))}"]`);
+    const isNew = !block;
+    if (!block) {
+      block=document.createElement('section');
+      block.className='reader-inserted-workspace';
+      block.dataset.readerWorkspaceId=String(item.id);
+      block.innerHTML=`<div class="reader-workspace-toolbar"><strong>Workspace</strong><button type="button" data-workspace-text-toggle>Text</button><button type="button" data-workspace-draw-toggle>Draw</button><label class="reader-workspace-color">Color <input type="color" data-workspace-draw-color value="#E9B949"></label><label>Thickness <select data-workspace-draw-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><button type="button" data-workspace-photo>Photo</button><input type="file" accept="image/*" data-workspace-photo-input hidden><button type="button" data-workspace-shrink title="Make workspace shorter">−</button><button type="button" data-workspace-grow title="Make workspace taller">＋</button><button type="button" data-workspace-clear-drawing>Clear drawing</button><button type="button" data-workspace-delete>Delete</button></div><textarea class="reader-workspace-note" data-workspace-note placeholder="Write anything here…" style="color:${escapeHtml(item.noteColor||'#0C2340')}" ${item.note?'':'hidden'}>${escapeHtml(item.note||'')}</textarea>${item.photoDataUrl?`<figure class="reader-workspace-photo"><img src="${escapeHtml(item.photoDataUrl)}" alt="${escapeHtml(item.photoName||'Inserted image')}"><button type="button" data-workspace-remove-photo>Remove photo</button></figure>`:''}<label class="reader-workspace-note-color">Text color <input type="color" data-workspace-note-color value="${escapeHtml(item.noteColor||'#0C2340')}"></label><svg class="reader-workspace-drawing-layer" data-workspace-drawing-layer aria-label="Workspace drawing surface"></svg>`;
+    }
+    block.style.minHeight=`${normalizeReaderWorkspaceHeight(item.height)}px`;
+    // Insert after the closest group when possible. This avoids placing a block
+    // inside a word span and gives CSS/book-page flow a real block boundary.
+    const group = anchor.closest('.reader-group');
+    const insertionAnchor = group || anchor;
+    if (block.previousElementSibling !== insertionAnchor) insertionAnchor.insertAdjacentElement('afterend',block);
+    if (isNew) bindReaderWorkspace(block,item);
+    requestAnimationFrame(()=>renderReaderWorkspaceStrokes(block,item));
+  }
 }
 
 function finishPassageHighlightAction() {
@@ -11630,6 +11857,28 @@ function bindMarkCompanion(reader){
     startReaderDrawingMode({color, thickness});
   });
   toolbar.querySelector('[data-reader-drawing-cancel]')?.addEventListener('click',closeDrawingEditor);
+  const workspaceEditor = toolbar.querySelector('[data-reader-workspace-editor]');
+  const workspaceToggle = toolbar.querySelector('[data-reader-workspace-toggle]');
+  const closeWorkspaceEditor = () => {
+    if (workspaceEditor) workspaceEditor.hidden = true;
+    workspaceToggle?.setAttribute('aria-expanded','false');
+  };
+  workspaceToggle?.addEventListener('click',()=>{
+    if (!workspaceEditor) return;
+    closeHighlightPicker(); closeWritingEditor(); closeDrawingEditor();
+    workspaceEditor.hidden = !workspaceEditor.hidden;
+    workspaceToggle.setAttribute('aria-expanded',String(!workspaceEditor.hidden));
+  });
+  toolbar.querySelector('[data-reader-workspace-cancel]')?.addEventListener('click',closeWorkspaceEditor);
+  toolbar.querySelector('[data-reader-workspace-insert]')?.addEventListener('click',()=>{
+    const selected = state.markSelection ? {...state.markSelection} : null;
+    if (!selected) return;
+    const height = toolbar.querySelector('[data-reader-workspace-height]')?.value || 280;
+    if (!addSavedReaderWorkspace(selected,height)) return;
+    closeWorkspaceEditor();
+    finishPassageHighlightAction();
+    updateReaderStatus('Workspace inserted. Add text, draw, or insert a photo.');
+  });
   toolbar.querySelector('[data-passage-highlight-erase]')?.addEventListener('click',()=>{
     const selected = state.markSelection ? {...state.markSelection} : null;
     if (!selected) return;
@@ -11646,17 +11895,19 @@ function bindMarkCompanion(reader){
   // window changes. Ignore mutations generated inside the overlay layer itself.
   state.passageHighlightObserver?.disconnect?.();
   state.passageHighlightObserver = new MutationObserver((mutations)=>{
-    if (mutations.length && mutations.every((mutation)=>mutation.target instanceof Element && mutation.target.closest('[data-reader-writing-layer], [data-reader-drawing-layer]'))) return;
+    if (mutations.length && mutations.every((mutation)=>mutation.target instanceof Element && mutation.target.closest('[data-reader-writing-layer], [data-reader-drawing-layer], [data-reader-workspace-id]'))) return;
     requestAnimationFrame(()=>{
       applySavedPassageHighlights();
       applySavedReaderWritingOverlays();
       applySavedReaderDrawings();
+      applySavedReaderWorkspaces();
     });
   });
   state.passageHighlightObserver.observe(reader,{childList:true,subtree:true});
   applySavedPassageHighlights();
   applySavedReaderWritingOverlays();
   applySavedReaderDrawings();
+  applySavedReaderWorkspaces();
   bindReaderDrawingSurface(reader);
   let writingPositionFrame = 0;
   const scheduleWritingPosition = () => {
@@ -12695,7 +12946,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
 
       <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-reader-drawing-toggle aria-expanded="false">✐ Draw</button><div class="reader-drawing-editor" data-reader-drawing-editor hidden><div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div><label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-reader-drawing-toggle aria-expanded="false">✐ Draw</button><div class="reader-drawing-editor" data-reader-drawing-editor hidden><div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div><label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div></div><button type="button" data-reader-workspace-toggle aria-expanded="false">▣ Space</button><div class="reader-workspace-editor" data-reader-workspace-editor hidden><strong>Insert workspace</strong><label>Height <select data-reader-workspace-height><option value="180">Small</option><option value="280" selected>Medium</option><option value="420">Large</option><option value="600">Extra large</option></select></label><div><button type="button" data-reader-workspace-cancel>Cancel</button><button type="button" data-reader-workspace-insert>Insert</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
