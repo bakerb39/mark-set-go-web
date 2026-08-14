@@ -14587,3 +14587,40 @@ body.light .comprehension-count-control input,
   .comprehension-setup-card { max-width:96vw; }
   .comprehension-scope-option { padding:10px; }
 }
+
+
+/* v9.6.x Line Sweep reader mode
+   Teleprompter-style eye guide: a short gold underline travels across the
+   current rendered line. It is visual-only; the Reader's words and layout are
+   not altered. */
+.interactive-reader.line-sweep-mode {
+  position: relative;
+}
+.line-sweep-mode .reader-group,
+.line-sweep-mode .reader-word {
+  position: relative;
+  z-index: 1;
+}
+.line-sweep-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 4;
+  display: block;
+  width: 42px;
+  height: 3px;
+  border-radius: 999px;
+  background: #f4dc63;
+  box-shadow: 0 0 8px rgba(244, 220, 99, .72), 0 0 2px rgba(255,255,255,.7);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate3d(0,0,0);
+  will-change: transform;
+}
+.line-sweep-marker.visible { opacity: 1; }
+.reader.light .line-sweep-marker {
+  box-shadow: 0 0 7px rgba(167, 126, 0, .38);
+}
+@media (prefers-reduced-motion: reduce) {
+  .line-sweep-marker { transition-duration: 1ms !important; }
+}

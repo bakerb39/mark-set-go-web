@@ -6732,6 +6732,7 @@ function renderProgressDashboard() {
       'bold-focus':'Bold Focus',
       flash:'Flash',
       'smooth-glide':'Smooth Glide',
+      'line-sweep':'Line Sweep',
       marquee:'Marquee',
       'digital-sign':'Digital Sign',
       'auto-scroll':'Auto Scroll'
@@ -10632,7 +10633,7 @@ function bindMarkCompanion(reader){
     const clickedWord=event.target.closest?.('.reader-word[data-index]');
     const clickedGroup=event.target.closest?.('.reader-group[data-start-index]');
     const mode=getSelectedMode();
-    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','pointing-guide','marquee','auto-scroll']);
+    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','line-sweep','pointing-guide','marquee','auto-scroll']);
 
     // The click that clears an Ask Mark selection must still perform the user's
     // requested reader action. Previously a paused-before-selection state
@@ -10750,7 +10751,7 @@ function bindMarkCompanion(reader){
     const mode=getSelectedMode();
     if(mode==='two-column') return;
 
-    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','pointing-guide','marquee','auto-scroll']);
+    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','line-sweep','pointing-guide','marquee','auto-scroll']);
     const clickedIndex=Number(interaction?.downWordIndex);
 
     if(interaction?.downWasText && Number.isFinite(clickedIndex) && seekableModes.has(mode)){
@@ -11636,6 +11637,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <option value="highlight" selected>Highlight</option>
                 <option value="bold-focus">Bold Focus</option>
                 <option value="smooth-glide">Smooth Glide</option>
+                <option value="line-sweep">Line Sweep</option>
                 <option value="pointing-guide">Pointing Guide</option>
                 <option value="manual">Manual Pace</option>
                 <option value="marquee">Marquee</option>
@@ -11736,7 +11738,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <div class="fullscreen-options-grid fullscreen-options-grid-reading">
                   <label>Mode<select id="fs-mode-select">
                     <option value="highlight">Highlight</option>
-<option value="manual">Manual Pace</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
+<option value="manual">Manual Pace</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="line-sweep">Line Sweep</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
                     <option value="digital-sign">Digital Sign</option><option value="auto-scroll">Auto Scroll</option><option value="pacman">Pac-Man Chomp</option>
                   </select></label>
                   <label>Pointer<select id="fs-pointer-style">
@@ -12151,7 +12153,7 @@ document.addEventListener('keydown', state.spacebarHandler);
     const clickedWord = target.closest('.reader-word[data-index]');
     const clickedGroup = target.closest('.reader-group[data-start-index]');
     const mode = getSelectedMode();
-    const seekableModes = new Set(['highlight', 'manual', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'auto-scroll']);
+    const seekableModes = new Set(['highlight', 'manual', 'bold-focus', 'smooth-glide', 'line-sweep', 'pointing-guide', 'marquee', 'auto-scroll']);
 
     // In full-text modes, clicking visible text changes the reading position
     // instead of toggling pause. Support both individual word spans and grouped
@@ -13852,7 +13854,7 @@ function updateModeControls(mode) {
   const start = app.querySelector('#start-reader');
   const pause = app.querySelector('#pause-reader');
   const staticMode = mode === 'two-column';
-  const countUnused = mode === 'digital-sign' || mode === 'two-column' || mode === 'auto-scroll' || mode === 'pacman';
+  const countUnused = mode === 'digital-sign' || mode === 'two-column' || mode === 'auto-scroll' || mode === 'pacman' || mode === 'line-sweep';
   const meaningfulInput = app.querySelector('#meaningful-chunks');
   const meaningfulSupported = modeSupportsMeaningfulChunks(mode);
   const bookPagesInput = app.querySelector('#book-pages');
@@ -14968,7 +14970,7 @@ function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-cou
   if (mode === 'manual') mode = 'highlight';
   const reader = app.querySelector('#reader');
   if (!reader) return;
-  reader.classList.remove('flash', 'highlight-mode', 'bold-focus-mode', 'smooth-glide-mode', 'pointing-guide-mode', 'marquee-mode', 'digital-sign-mode', 'two-column-mode', 'auto-scroll-mode', 'pacman-mode', 'reading-guide-enabled', 'book-pages-layout', 'illustrated-reading');
+  reader.classList.remove('flash', 'highlight-mode', 'bold-focus-mode', 'smooth-glide-mode', 'line-sweep-mode', 'pointing-guide-mode', 'marquee-mode', 'digital-sign-mode', 'two-column-mode', 'auto-scroll-mode', 'pacman-mode', 'reading-guide-enabled', 'book-pages-layout', 'illustrated-reading');
   state.renderedMode = mode;
   updateFocusAnchorOverlay();
   state.bookPages = Boolean(app.querySelector('#book-pages')?.checked) && modeSupportsBookPages(mode);
@@ -15020,12 +15022,19 @@ function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-cou
   if (mode === 'highlight' || mode === 'manual') reader.classList.add('highlight-mode');
   else if (mode === 'bold-focus') reader.classList.add('bold-focus-mode');
   else if (mode === 'smooth-glide') reader.classList.add('smooth-glide-mode');
+  else if (mode === 'line-sweep') reader.classList.add('line-sweep-mode');
   else if (mode === 'pointing-guide') reader.classList.add('pointing-guide-mode', 'reading-guide-enabled');
   else reader.classList.add('marquee-mode');
   renderWordDocument(reader, mode, groupSize);
   if (mode === 'smooth-glide') {
     const marker = document.createElement('span');
     marker.className = 'smooth-focus-marker';
+    marker.setAttribute('aria-hidden', 'true');
+    reader.prepend(marker);
+  }
+  if (mode === 'line-sweep') {
+    const marker = document.createElement('span');
+    marker.className = 'line-sweep-marker';
     marker.setAttribute('aria-hidden', 'true');
     reader.prepend(marker);
   }
@@ -15510,6 +15519,122 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 
 /* Feature block moved to /modules/reading/pacman-mode.js */
 
+// Line Sweep mode -----------------------------------------------------------
+// A lightweight teleprompter-style eye guide. It leaves the document layout
+// untouched and moves a short underline across each *rendered* text line at a
+// pace derived from WPM. Because the line geometry is measured fresh on every
+// step, it automatically follows font-size changes, responsive reflow, and the
+// Reader's virtualized word spans without changing the playback cursor model.
+function getLineSweepStep(reader, startIndex) {
+  if (!reader || startIndex >= state.words.length) return null;
+
+  // Render enough words to cover the current visual line and the beginning of
+  // the next one. This stays within the existing virtual-renderer boundary.
+  ensureWordsRendered(reader, 'line-sweep', 1, Math.min(state.words.length, startIndex + 220));
+
+  let target = reader.querySelector(`.reader-word[data-index="${Number(startIndex)}"]`);
+  if (!target && state.virtualized) {
+    virtualRenderer.renderWindowAround(reader, 'line-sweep', 1, startIndex);
+    target = reader.querySelector(`.reader-word[data-index="${Number(startIndex)}"]`);
+  }
+  if (!target) return null;
+
+  const readerRect = reader.getBoundingClientRect();
+  let targetRect = target.getBoundingClientRect();
+  const topSafe = readerRect.top + 46;
+  const bottomSafe = readerRect.bottom - 54;
+  if (targetRect.top < topSafe || targetRect.bottom > bottomSafe) {
+    target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+    targetRect = target.getBoundingClientRect();
+  }
+
+  const lineTop = targetRect.top;
+  const tolerance = Math.max(2, targetRect.height * 0.18);
+  const candidates = Array.from(reader.querySelectorAll('.reader-word[data-index]'));
+  const lineWords = [];
+
+  for (const word of candidates) {
+    const index = Number(word.dataset.index);
+    if (!Number.isFinite(index) || index < startIndex) continue;
+    const rect = word.getBoundingClientRect();
+    if (Math.abs(rect.top - lineTop) <= tolerance) lineWords.push({ word, index, rect });
+    else if (lineWords.length && rect.top > lineTop + tolerance) break;
+  }
+
+  if (!lineWords.length) lineWords.push({ word: target, index:startIndex, rect:targetRect });
+  lineWords.sort((a,b) => a.index - b.index);
+
+  const first = lineWords[0];
+  const last = lineWords[lineWords.length - 1];
+  const startX = first.rect.left - readerRect.left + reader.scrollLeft;
+  const endX = Math.max(startX + 12, last.rect.right - readerRect.left + reader.scrollLeft);
+  const y = first.rect.bottom - readerRect.top + reader.scrollTop + Math.max(2, first.rect.height * 0.08);
+  const nextIndex = Math.min(state.words.length, last.index + 1);
+
+  return {
+    startIndex,
+    nextIndex,
+    wordCount: Math.max(1, nextIndex - startIndex),
+    startX,
+    endX,
+    y
+  };
+}
+
+function positionLineSweepMarker(reader, step, durationMs) {
+  const marker = reader?.querySelector('.line-sweep-marker');
+  if (!marker || !step) return;
+
+  const sweepWidth = Math.max(28, Math.min(54, (step.endX - step.startX) * 0.16));
+  const travel = Math.max(0, step.endX - step.startX - sweepWidth);
+  marker.style.width = `${sweepWidth}px`;
+  marker.style.transition = 'none';
+  marker.style.transform = `translate3d(${step.startX}px, ${step.y}px, 0)`;
+  marker.classList.add('visible');
+  // Force the start position to commit before enabling the linear sweep.
+  void marker.offsetWidth;
+  marker.style.transition = `transform ${Math.max(80, durationMs)}ms linear`;
+  requestAnimationFrame(() => {
+    marker.style.transform = `translate3d(${step.startX + travel}px, ${step.y}px, 0)`;
+  });
+}
+
+function startLineSweepReader({ reader, speed }) {
+  const token = ++state.runToken;
+
+  const sweepNextLine = () => {
+    if (token !== state.runToken) return;
+    if (state.index >= state.words.length) {
+      pauseReader();
+      updateReaderStatus('Finished.');
+      return;
+    }
+
+    const liveSpeed = currentPushTrainingWpm(speed, 'line-sweep');
+    const step = getLineSweepStep(reader, state.index);
+    if (!step) {
+      pauseReader();
+      updateReaderStatus('Line Sweep could not locate the current text line.');
+      return;
+    }
+
+    updateFocusAnchorOverlay();
+    const durationMs = Math.max(180, (60000 * step.wordCount) / Math.max(30, liveSpeed));
+    positionLineSweepMarker(reader, step, durationMs);
+
+    state.interval = window.setTimeout(() => {
+      if (token !== state.runToken) return;
+      state.interval = null;
+      state.index = step.nextIndex;
+      state.viewportAnchorIndex = state.index;
+      updateReaderStatus();
+      sweepNextLine();
+    }, durationMs);
+  };
+
+  sweepNextLine();
+}
+
 function startReader() {
   if(state.markPersistentSelection || state.markSelectionLocked) clearMarkSelectionForReadingResume();
   const selectedMode = getSelectedMode();
@@ -15539,7 +15664,7 @@ function startReader() {
   let speed = Math.min(900, Math.max(30, Number(speedInput.value) || 300));
   const pushActive = beginPushTrainingRuntime(mode);
   if (pushActive) speed = currentPushTrainingWpm(speed, mode);
-  const count = (mode === 'digital-sign' || mode === 'auto-scroll' || mode === 'pacman')
+  const count = (mode === 'digital-sign' || mode === 'auto-scroll' || mode === 'pacman' || mode === 'line-sweep')
     ? 1
     : Math.min(10, Math.max(1, Number(countInput.value) || 1));
   speedInput.value = speed;
@@ -15570,6 +15695,11 @@ function startReader() {
 
   if (mode === 'pacman') {
     startPacmanReader({ reader, speed, start, pause });
+    return;
+  }
+
+  if (mode === 'line-sweep') {
+    startLineSweepReader({ reader, speed, start, pause });
     return;
   }
 
@@ -15709,6 +15839,8 @@ function stopReader() {
   if (state.interval) window.clearTimeout(state.interval);
   state.interval = null;
   state.nextTickAt = 0;
+  const lineSweepMarker = app.querySelector('#reader .line-sweep-marker');
+  if (lineSweepMarker) lineSweepMarker.style.transition = 'none';
   if (state.tickerStatusTimer) {
     window.clearInterval(state.tickerStatusTimer);
     state.tickerStatusTimer = null;
@@ -15739,7 +15871,7 @@ function pauseReader() {
   const start = app.querySelector('#start-reader');
   const pause = app.querySelector('#pause-reader');
   if (speed) speed.disabled = false;
-  if (count) count.disabled = ['digital-sign', 'two-column', 'auto-scroll', 'pacman'].includes(state.renderedMode);
+  if (count) count.disabled = ['digital-sign', 'two-column', 'auto-scroll', 'pacman', 'line-sweep'].includes(state.renderedMode);
   if (speed) speed.disabled = state.renderedMode === 'two-column';
   if (start) {
     start.disabled = false;
