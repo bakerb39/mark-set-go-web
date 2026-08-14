@@ -18606,57 +18606,148 @@ async function loadPdfJs() {
   return pdfJsModulePromise;
 }
 
-function normalizePdfPageText(items) {
-  const lines = [];
-  let currentLine = '';
-  let previousY = null;
-  let previousEndX = null;
+function normalizePdfPageText(items, pageWidth = null) {
+  // PDF.js exposes enough geometry to distinguish ordinary wrapped lines from
+  // real section/paragraph gaps, but older imports discarded that information
+  // before the text reached the reader. Reconstruct visual lines first, then
+  // preserve meaningful vertical spacing as blank lines.
+  const visualLines = [];
+  let current = null;
+
+  const itemHeight = (item) => {
+    const direct = Number(item?.height) || 0;
+    if (direct > 0) return direct;
+    const t = item?.transform || [];
+    return Math.max(1, Math.hypot(Number(t[2]) || 0, Number(t[3]) || 0));
+  };
+
+  const flush = () => {
+    if (!current || !current.text.trim()) {
+      current = null;
+      return;
+    }
+    current.text = current.text.trim();
+    visualLines.push(current);
+    current = null;
+  };
 
   for (const item of items || []) {
     const value = String(item?.str || '').replace(/\s+/g, ' ').trim();
+    const transform = item?.transform || [];
+    const x = Number(transform[4]) || 0;
+    const y = Number(transform[5]) || 0;
+    const width = Number(item?.width) || 0;
+    const height = itemHeight(item);
+
     if (!value) {
-      if (item?.hasEOL && currentLine.trim()) {
-        lines.push(currentLine.trim());
-        currentLine = '';
-        previousY = null;
-        previousEndX = null;
-      }
+      if (item?.hasEOL) flush();
       continue;
     }
 
-    const transform = item.transform || [];
-    const x = Number(transform[4]) || 0;
-    const y = Number(transform[5]) || 0;
-    const width = Number(item.width) || 0;
-    const changedLine = previousY !== null && Math.abs(y - previousY) > 3;
-    const largeGap = previousEndX !== null && x - previousEndX > Math.max(8, (Number(item.height) || 10) * .8);
+    const changedLine = current
+      && Math.abs(y - current.y) > Math.max(2.5, Math.min(current.height, height) * 0.28);
+    if (changedLine) flush();
 
-    if (changedLine && currentLine.trim()) {
-      lines.push(currentLine.trim());
-      currentLine = '';
+    if (!current) {
+      current = {
+        text: '',
+        y,
+        minX: x,
+        maxX: x + width,
+        height,
+        itemCount: 0
+      };
     }
 
-    if (currentLine && (largeGap || !/[-–—/]$/.test(currentLine))) {
-      currentLine += ' ';
+    const gap = current.itemCount ? x - current.maxX : 0;
+    if (current.text && (gap > Math.max(3, height * 0.25) || !/[-–—/]$/.test(current.text))) {
+      current.text += ' ';
+    }
+    current.text += value;
+    current.minX = Math.min(current.minX, x);
+    current.maxX = Math.max(current.maxX, x + width);
+    current.height = Math.max(current.height, height);
+    current.itemCount += 1;
+
+    if (item?.hasEOL) flush();
+  }
+  flush();
+
+  if (!visualLines.length) return '';
+
+  const median = (values) => {
+    const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+    if (!sorted.length) return 0;
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+
+  const heights = visualLines.map((line) => line.height).filter((value) => value > 0);
+  const medianHeight = median(heights) || 10;
+  const normalSteps = [];
+  for (let i = 1; i < visualLines.length; i += 1) {
+    const prev = visualLines[i - 1];
+    const line = visualLines[i];
+    const step = Math.abs(line.y - prev.y);
+    // Exclude obvious section gaps when estimating ordinary line spacing.
+    if (step > medianHeight * 0.65 && step < medianHeight * 2.0) normalSteps.push(step);
+  }
+  const normalStep = median(normalSteps) || medianHeight * 1.25;
+  const effectivePageWidth = Number(pageWidth) || Math.max(...visualLines.map((line) => line.maxX), 0);
+
+  const isCentered = (line) => {
+    if (!effectivePageWidth || !line) return false;
+    const center = (line.minX + line.maxX) / 2;
+    return Math.abs(center - effectivePageWidth / 2) <= effectivePageWidth * 0.12;
+  };
+  const isShort = (line) => splitWords(line?.text || '').length <= 12 && String(line?.text || '').length <= 100;
+  const isEmphasized = (line) => line?.height >= medianHeight * 1.22;
+  const looksLikeHeading = (line) => Boolean(
+    line && (
+      isLikelyRealSectionHeading(line.text)
+      || (isShort(line) && isCentered(line) && isEmphasized(line))
+    )
+  );
+
+  const output = [];
+  for (let i = 0; i < visualLines.length; i += 1) {
+    const line = visualLines[i];
+    const prev = i > 0 ? visualLines[i - 1] : null;
+    const next = i + 1 < visualLines.length ? visualLines[i + 1] : null;
+
+    if (prev) {
+      const verticalStep = Math.abs(line.y - prev.y);
+      const largeVisualGap = verticalStep >= Math.max(normalStep * 1.55, medianHeight * 1.75);
+      const headingBoundary = looksLikeHeading(line) || looksLikeHeading(prev);
+      const subtitleBoundary = looksLikeHeading(prev)
+        && isShort(line)
+        && isCentered(line)
+        && (line.height >= medianHeight * 1.08 || (next && Math.abs(next.y - line.y) > normalStep * 1.35));
+
+      if ((largeVisualGap || headingBoundary || subtitleBoundary) && output.at(-1) !== '') {
+        output.push('');
+      }
     }
 
-    currentLine += value;
-    previousY = y;
-    previousEndX = x + width;
+    output.push(line.text);
 
-    if (item.hasEOL && currentLine.trim()) {
-      lines.push(currentLine.trim());
-      currentLine = '';
-      previousY = null;
-      previousEndX = null;
+    // Keep centered chapter subtitles isolated from the prose that follows.
+    if (next) {
+      const nextStep = Math.abs(next.y - line.y);
+      const chapterThenSubtitle = looksLikeHeading(prev)
+        && isShort(line)
+        && isCentered(line);
+      const centeredEmphasis = isShort(line) && isCentered(line) && isEmphasized(line);
+      if ((chapterThenSubtitle || centeredEmphasis || nextStep >= Math.max(normalStep * 1.55, medianHeight * 1.75))
+          && output.at(-1) !== '') {
+        output.push('');
+      }
     }
   }
 
-  if (currentLine.trim()) lines.push(currentLine.trim());
-
-  return lines
+  return output
     .join('\n')
-    .replace(/(\w)-\n(\w)/g, '$1$2')
+    .replace(/(\w)-\n(?!\n)(\w)/g, '$1$2')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
@@ -18728,7 +18819,7 @@ async function parsePdfFile(file, onProgress = () => {}) {
         includeMarkedContent: false,
         disableNormalization: false
       });
-      const pageText = normalizePdfPageText(content.items);
+      const pageText = normalizePdfPageText(content.items, page.view?.[2] || null);
       if (pageText.length >= 20) textPages += 1;
       extractedCharacters += pageText.length;
       pages.push({
