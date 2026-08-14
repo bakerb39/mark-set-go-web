@@ -1108,49 +1108,65 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       return;
     }
 
-    const readerFrame = document.querySelector('#app #reader-frame');
-    const reader = readerFrame?.querySelector('#reader');
-    if (!readerFrame || !reader) return;
+    const reader = document.querySelector('#app #reader');
+    if (!reader) return;
 
-    let wrap = existing;
+    // This action belongs to the article itself, not to the Reader chrome.
+    // Only show it when the beginning of the article is actually rendered so
+    // virtualization cannot make the button reappear in the middle of an article.
+    const firstIndexed = reader.querySelector(
+      '.reader-word[data-index], .reader-group[data-start-index]'
+    );
+    const firstIndex = firstIndexed
+      ? Number(firstIndexed.dataset.index ?? firstIndexed.dataset.startIndex)
+      : 0;
 
-    if (!wrap) {
-      wrap = document.createElement('div');
-      wrap.id = 'read-anything-article-summary-action';
-      wrap.className = 'read-anything-article-summary-action';
-      wrap.setAttribute('role', 'group');
-      wrap.setAttribute('aria-label', 'Article actions');
-      wrap.style.cssText = [
-        'display:flex',
-        'align-items:center',
-        'justify-content:flex-start',
-        'gap:10px',
-        'margin:0 0 14px 0',
-        'padding:10px 12px',
-        'border:1px solid rgba(128,128,128,.28)',
-        'border-radius:10px',
-        'background:rgba(127,127,127,.06)'
-      ].join(';');
-
-      const label = document.createElement('span');
-      label.className = 'article-summary-label';
-      label.textContent = 'Article';
-      label.style.cssText = 'font-size:.82rem;font-weight:700;opacity:.72;text-transform:uppercase;letter-spacing:.04em';
-
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'secondary';
-      button.dataset.action = 'summarize-whole-article';
-
-      wrap.append(label, button);
-      readerFrame.insertBefore(wrap, reader);
+    if (Number.isFinite(firstIndex) && firstIndex > 0) {
+      existing?.remove();
+      return;
     }
 
-    const button = wrap.querySelector('[data-action="summarize-whole-article"]');
-    if (!button) return;
+    let button = existing;
+
+    if (!button) {
+      button = document.createElement('button');
+      button.id = 'read-anything-article-summary-action';
+      button.type = 'button';
+      button.className = 'read-anything-inline-article-summary';
+      button.dataset.action = 'summarize-whole-article';
+      button.setAttribute('aria-label', 'Summarize this whole article');
+      button.style.cssText = [
+        'display:inline',
+        'width:auto',
+        'max-width:max-content',
+        'margin:0 0 .8em 0',
+        'padding:0',
+        'border:0',
+        'background:none',
+        'color:inherit',
+        'font:inherit',
+        'font-size:.78em',
+        'font-weight:600',
+        'line-height:1.2',
+        'text-decoration:underline',
+        'text-underline-offset:2px',
+        'opacity:.7',
+        'cursor:pointer',
+        'break-inside:avoid',
+        'page-break-inside:avoid',
+        'position:relative',
+        'z-index:2'
+      ].join(';');
+
+      // Put the actual button into the article text flow. In Book Pages this
+      // naturally places it at the top of the first page before article prose.
+      reader.prepend(button);
+    } else if (button.parentElement !== reader) {
+      reader.prepend(button);
+    }
 
     const showingSummary = activeImportedVersion.startsWith('summary');
-    button.textContent = showingSummary ? '← Back to full article' : 'Summarize this article';
+    button.textContent = showingSummary ? '← Back to article' : 'Summarize article';
     button.title = showingSummary
       ? 'Return to the complete article'
       : 'Summarize the entire article into its key points — no highlighting required.';
@@ -1184,6 +1200,28 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     };
   }
 
+  function observeInlineArticleSummary() {
+    const reader = document.querySelector('#app #reader');
+    if (!reader || reader.dataset.inlineArticleSummaryObserved === '1') return;
+    reader.dataset.inlineArticleSummaryObserved = '1';
+
+    let queued = false;
+    const observer = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      window.requestAnimationFrame(() => {
+        queued = false;
+        if (!reader.isConnected || !activeImportedDocument || !isWholeArticleDocument()) {
+          observer.disconnect();
+          return;
+        }
+        installArticleSummaryButton();
+      });
+    });
+
+    observer.observe(reader, { childList: true });
+  }
+
   function installDefaultArticleBookPages() {
     if (!activeImportedDocument || !isWholeArticleDocument()) return;
 
@@ -1203,6 +1241,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     [0, 100, 350, 800].forEach((delay) => window.setTimeout(() => {
       installDisplayFormatControl();
       installArticleSummaryButton();
+      observeInlineArticleSummary();
       installDefaultArticleBookPages();
     }, delay));
     return;
