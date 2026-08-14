@@ -389,7 +389,7 @@
   }
 
   function versionLabel(level) {
-    return ({ original: 'Original', clean: 'Readable', summaryQuick: 'Summary', summaryStudy: 'Study Summary', summaryDetailed: 'Detailed Summary', custom: 'Custom', graduate: 'Graduate', college: 'College', highschool: 'High School', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
+    return ({ original: 'Original', clean: 'Readable', format_all: 'Formatted', summaryQuick: 'Summary', summaryStudy: 'Study Summary', summaryDetailed: 'Detailed Summary', custom: 'Custom', graduate: 'Graduate', college: 'College', highschool: 'High School', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
   }
 
   function transformSourceText() {
@@ -422,7 +422,7 @@
     if (!text) return;
     activeImportedVersion = level;
     saveActiveFormatRecord();
-    app.classList.toggle('read-anything-paragraph-spacing', level === 'clean' || level.startsWith('summary') || level === 'custom');
+    app.classList.toggle('read-anything-paragraph-spacing', level === 'clean' || level === 'format_all' || level.startsWith('summary') || level === 'custom');
     const suffix = '';
     pendingImportedRender = true;
     window.renderReaderWithText(`${activeImportedDocument.baseTitle || activeImportedDocument.title}${suffix}`, text, {
@@ -1108,36 +1108,58 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       return;
     }
 
-    const titleCopy = document.querySelector('#app .reader-title-copy');
-    if (!titleCopy) return;
+    const readerFrame = document.querySelector('#app #reader-frame');
+    const reader = readerFrame?.querySelector('#reader');
+    if (!readerFrame || !reader) return;
 
-    const links = titleCopy.querySelector('.reader-title-links') || titleCopy;
     let wrap = existing;
 
     if (!wrap) {
-      wrap = document.createElement('span');
+      wrap = document.createElement('div');
       wrap.id = 'read-anything-article-summary-action';
       wrap.className = 'read-anything-article-summary-action';
+      wrap.setAttribute('role', 'group');
+      wrap.setAttribute('aria-label', 'Article actions');
+      wrap.style.cssText = [
+        'display:flex',
+        'align-items:center',
+        'justify-content:flex-start',
+        'gap:10px',
+        'margin:0 0 14px 0',
+        'padding:10px 12px',
+        'border:1px solid rgba(128,128,128,.28)',
+        'border-radius:10px',
+        'background:rgba(127,127,127,.06)'
+      ].join(';');
+
+      const label = document.createElement('span');
+      label.className = 'article-summary-label';
+      label.textContent = 'Article';
+      label.style.cssText = 'font-size:.82rem;font-weight:700;opacity:.72;text-transform:uppercase;letter-spacing:.04em';
 
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'secondary';
       button.dataset.action = 'summarize-whole-article';
-      wrap.appendChild(button);
-      links.appendChild(wrap);
+
+      wrap.append(label, button);
+      readerFrame.insertBefore(wrap, reader);
     }
 
     const button = wrap.querySelector('[data-action="summarize-whole-article"]');
     if (!button) return;
 
     const showingSummary = activeImportedVersion.startsWith('summary');
-    button.textContent = showingSummary ? '← Back to full article' : 'Summarize article';
+    button.textContent = showingSummary ? '← Back to full article' : 'Summarize this article';
     button.title = showingSummary
       ? 'Return to the complete article'
       : 'Summarize the entire article into its key points — no highlighting required.';
     button.disabled = false;
 
-    button.onclick = async () => {
+    button.onclick = async (event) => {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+
       if (activeImportedVersion.startsWith('summary')) {
         renderImportedVersion('original');
         return;
@@ -1162,12 +1184,26 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     };
   }
 
+  function installDefaultArticleBookPages() {
+    if (!activeImportedDocument || !isWholeArticleDocument()) return;
+
+    const bookPages = document.querySelector('#app #book-pages');
+    if (!bookPages || bookPages.disabled || bookPages.checked) return;
+
+    // Use the Reader's existing Book Pages change handler rather than changing
+    // Reader internals directly. This keeps layout, pagination, position, and
+    // persisted Reader state synchronized with the normal control.
+    bookPages.checked = true;
+    bookPages.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
   function scheduleFormatControlAttach() {
     document.querySelector('#read-anything-format-control')?.remove();
     document.dispatchEvent(new CustomEvent('marksetgo:transform-state', { detail: { version: activeImportedVersion, label: versionLabel(activeImportedVersion), active: Boolean(activeImportedDocument) } }));
     [0, 100, 350, 800].forEach((delay) => window.setTimeout(() => {
       installDisplayFormatControl();
       installArticleSummaryButton();
+      installDefaultArticleBookPages();
     }, delay));
     return;
     formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
@@ -1273,18 +1309,34 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     if (typeof window.renderReaderWithText !== 'function') throw new Error('The reader is not ready.');
     addHistory({ ...documentRecord, title, text });
     const readAnythingKey = importedDocumentKey({ ...documentRecord, title });
+    const sourceType = String(documentRecord?.source?.type || '').toLowerCase();
+    const autoFormatArticle = ['topic-feed', 'bookmarklet', 'website'].includes(sourceType);
+    const formattedArticle = autoFormatArticle ? smartFormatText(text, 'all') : '';
+
     activeImportedDocument = {
       ...documentRecord,
       title,
       baseTitle: title,
       author: documentRecord.author || documentRecord.source?.author || '',
-      source: { ...(documentRecord.source || {}), readAnything: true, readAnythingKey },
-      versions: { original: text, clean: cleanFormatText(text) },
+      source: {
+        ...(documentRecord.source || {}),
+        readAnything: true,
+        readAnythingKey,
+        autoFormattedArticle: autoFormatArticle
+      },
+      versions: {
+        original: text,
+        clean: cleanFormatText(text),
+        ...(autoFormatArticle && formattedArticle ? { format_all: formattedArticle } : {})
+      },
       originalText: text
     };
-    activeImportedVersion = 'original';
+
+    // Web/news articles open in the same "Format all" view the user can invoke
+    // manually, while the untouched original remains available at all times.
+    activeImportedVersion = autoFormatArticle && formattedArticle ? 'format_all' : 'original';
     saveActiveFormatRecord();
-    renderImportedVersion('original');
+    renderImportedVersion(activeImportedVersion);
   }
 
   function markdownToText(markdown) {

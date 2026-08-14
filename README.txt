@@ -1,25 +1,24 @@
-MARK, SET, GO! — CAPTURE OPEN FIX
+MARK, SET, GO! — ARTICLES DEFAULT TO BOOK PAGES
+
+This package is cumulative with:
+- Reader-ready Topic Feeds
+- article prefetch/cache
+- bookmarklet capture fix
+- inline "Summarize this article"
+- automatic Format All for articles
 
 Replace:
-ROOT:
-  server.js
-
 PUBLIC:
   public/read-anything.js
   public/index.html
 
-What was wrong:
-The new bookmarklet/capture flow fetched the capture token immediately, but
-read-anything.js intentionally waited through several startup retries before
-opening the Reader. The server deleted the capture on the first GET, so by the
-time the Reader was ready the token no longer had content.
+The ZIP also contains the current server.js and topic-feeds.js for completeness;
+they are unchanged by this specific adjustment.
 
-Fix:
-- The client now waits until window.renderReaderWithText exists BEFORE fetching
-  the token.
-- The server keeps the short-lived capture available for retry until its 10-minute TTL.
-- The capture hash is removed immediately after a successful Reader open.
-- Retry window increased to 10 seconds for slower Render/browser startup.
-
-This package is cumulative with the previous whole-article summary + Reader-ready
-Topic Feeds changes.
+NEW:
+- Topic Feed articles, bookmarklet articles, and normal website imports now
+  default to Book Pages mode when the active Reader mode supports Book Pages.
+- The implementation uses the Reader's existing #book-pages checkbox/change
+  handler, so normal pagination, position restoration, and saved Reader state
+  continue to work through the existing Reader architecture.
+- It does not force Book Pages if the current reading mode does not support it.
