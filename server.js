@@ -180,12 +180,30 @@ async function fetchFeedItems(source) {
       if (sourceUrl && /w3\.org|schema\.org|xmlns\.com|purl\.org/i.test(sourceUrl)) sourceUrl = '';
 
       let preferredHost = '';
-      try { preferredHost = sourceUrl ? new URL(sourceUrl).hostname : ''; } catch {}
+      try {
+        preferredHost = sourceUrl
+          ? new URL(sourceUrl).hostname
+          : new URL(source.feedUrl).hostname;
+      } catch {}
 
-      // IMPORTANT: inspect the raw RSS description before stripMarkup removes links.
-      // If Google embeds a direct publisher URL in the item content, use that URL
-      // instead of the opaque news.google.com wrapper.
-      const embeddedPublisherUrl = directUrlFromEmbeddedText(rawDescription, preferredHost);
+      // On a publisher's own RSS/Atom feed, <link> is the canonical article URL.
+      // Never replace a valid publisher link with URLs found inside the description
+      // (Google Tag Manager, analytics, schema resources, ads, etc.).
+      let embeddedPublisherUrl = '';
+      let primaryHost = '';
+      try { primaryHost = new URL(googleOrPrimaryLink).hostname.toLowerCase(); } catch {}
+
+      const primaryNeedsResolution =
+        primaryHost === 'news.google.com' || primaryHost.endsWith('.news.google.com') ||
+        primaryHost === 'w3.org' || primaryHost.endsWith('.w3.org') ||
+        primaryHost === 'schema.org' || primaryHost.endsWith('.schema.org') ||
+        primaryHost === 'purl.org' || primaryHost.endsWith('.purl.org') ||
+        primaryHost === 'xmlns.com' || primaryHost.endsWith('.xmlns.com');
+
+      if (primaryNeedsResolution) {
+        embeddedPublisherUrl = directUrlFromEmbeddedText(rawDescription, preferredHost);
+      }
+
       const link = embeddedPublisherUrl || googleOrPrimaryLink;
 
       const published =

@@ -1,23 +1,21 @@
-MARK, SET, GO! — VERIFIED PUBLISHER RSS PRIORITY
+MARK, SET, GO! — CANONICAL RSS LINK FIX
 
 Replace only the ROOT server.js.
 
-Verified official RSS feeds now take priority before any page crawling or Google News fallback:
+This fixes the exact CoinDesk failure where the article source became:
+https://www.googletagmanager.com/gtag/js?id=...
 
-CoinDesk
-https://www.coindesk.com/arc/outboundfeeds/rss/
+Cause:
+The verified CoinDesk RSS feed was being used correctly, but the parser then
+scanned the article description HTML and replaced CoinDesk's legitimate <link>
+with the first embedded URL it found (sometimes Google Tag Manager).
 
-U.S. SEC press releases
-https://www.sec.gov/news/pressreleases.rss
+Fix:
+- If RSS/Atom supplies a normal article <link>, that link is authoritative.
+- Embedded URL extraction is now used ONLY when the primary link itself is a
+  Google News wrapper or XML/schema metadata URL.
+- Analytics, GTM, ads, schema, and other resources inside descriptions cannot
+  replace a valid publisher article link.
 
-For other websites:
-1. Try advertised RSS/Atom feeds.
-2. Try common RSS/Atom paths.
-3. Try the publisher's own latest/news/article pages.
-4. Use Google News only as the final fallback.
-
-Bitcoin Magazine is NOT hardcoded because an official RSS URL was not verified.
-Its own article/news pages remain the preferred fallback before Google News.
-
-After deploy, refresh the Topic Feed so CoinDesk and SEC items are rebuilt from
-their official feeds rather than old cached Google News items.
+After Render deploys, click Refresh in Topic Feeds to replace the existing bad
+cached GTM URLs with the canonical URLs from CoinDesk's official RSS feed.
