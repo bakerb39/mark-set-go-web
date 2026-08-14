@@ -14511,3 +14511,36 @@ html[data-companion="beth"] [data-action="ask-mark"] img {
   width: 100%;
   height: .72em;
 }
+
+
+/* PDF structure v4: top-level part/book hierarchy and robust centering.
+   !important is intentional here because reader modes can add display/alignment
+   rules later in the cascade; structural alignment should remain authoritative. */
+.reader .reader-group.document-structure.structure-align-center {
+  display: block !important;
+  width: 100% !important;
+  max-width: none !important;
+  text-align: center !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+.reader .reader-group.structure-part {
+  margin: 1.9em 0 2.15em;
+  padding: 0;
+  border: 0;
+  text-align: center !important;
+  font-size: 1.38em;
+  font-weight: 800;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+.reader .reader-group.structure-book {
+  display: block !important;
+  width: 100% !important;
+  margin: 0 0 2.3em;
+  text-align: center !important;
+  font-size: 1.30em;
+  font-weight: 800;
+  line-height: 1.25;
+  text-transform: uppercase;
+}

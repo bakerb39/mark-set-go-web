@@ -8064,7 +8064,8 @@ function classifyStructureLine(line, wordCount) {
   const spelledNumber = '(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?)';
   if (new RegExp(`^${spelledNumber}\\s*[:.\u2013\u2014-]\\s+\\S`, 'i').test(clean)) return 'chapter';
 
-  if (/^(?:book|part)\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(clean)) return 'part';
+  if (/^part\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(clean)) return 'part';
+  if (/^book(?:\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten))?\s*[:.-]?\s*\S*/i.test(clean)) return 'book';
   if (/^(?:section|article)\s+(?:[ivxlcdm]+|\d+|[a-z])\b/i.test(clean)) return 'section';
   if (/^appendix(?:\s+[a-z0-9ivxlcdm]+)?\b/i.test(clean)) return 'appendix';
   if (/^(?:notes?|endnotes?|footnotes?)\s+(?:to|on|for)\b/i.test(clean)) return 'notes';
@@ -18749,6 +18750,10 @@ function normalizePdfPageText(items, pageWidth = null) {
 
   return output
     .join('\n')
+    // OCR/searchable-PDF layers sometimes collapse a structural label and its
+    // numeral into one token (PARTI, BOOKII, CHAPTER1). Repair only these
+    // well-known heading prefixes before word indexes are calculated.
+    .replace(/\b(PART|BOOK|CHAPTER)([IVXLCDM]+|\d+)\b/gi, '$1 $2')
     .replace(/(\w)-\n(?!\n)(\w)/g, '$1$2')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
@@ -18801,7 +18806,7 @@ function detectPdfDocumentStructure(text) {
         preferredToc: type !== 'subtitle',
         authoritative: true
       };
-      if (type === 'part') entry.align = 'center';
+      if (type === 'part' || type === 'book') entry.align = 'center';
       if (type === 'subtitle') entry.italic = true;
       structures.push(entry);
     }
