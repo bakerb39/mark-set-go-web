@@ -53,6 +53,91 @@ function stripMarkup(value) {
   return $('div').text().replace(/\s+/g, ' ').trim();
 }
 
+
+function directUrlFromEmbeddedText(value, preferredHost = '') {
+  const raw = String(value || '');
+  if (!raw) return '';
+
+  const normalized = raw
+    .replace(/\\u002f/gi, '/')
+    .replace(/\\u003a/gi, ':')
+    .replace(/\\\//g, '/')
+    .replace(/&amp;/gi, '&');
+
+  const candidates = new Set();
+
+  const addCandidate = (candidate) => {
+    if (!candidate) return;
+    let value = String(candidate)
+      .replace(/^[("'[\s]+/, '')
+      .replace(/[)"'\]>,;\s]+$/, '');
+    try { value = decodeURIComponent(value); } catch {}
+    if (/^https?:\/\//i.test(value)) candidates.add(value);
+  };
+
+  for (const match of normalized.matchAll(/https?:\/\/[^\s"'<>\\]+/gi)) addCandidate(match[0]);
+  for (const match of normalized.matchAll(/https?%3A%2F%2F[^\s"'<>\\]+/gi)) addCandidate(match[0]);
+
+  const preferred = String(preferredHost || '').toLowerCase().replace(/^www\./, '');
+  const blockedHosts = ['news.google.com', 'google.com', 'www.google.com', 'gstatic.com', 'googleusercontent.com'];
+
+  const ranked = [...candidates].map((url) => {
+    try {
+      const parsed = new URL(url);
+      const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+      if (blockedHosts.some((blocked) => host === blocked || host.endsWith(`.${blocked}`))) return null;
+      const preferredMatch = preferred && (host === preferred || host.endsWith(`.${preferred}`) || preferred.endsWith(`.${host}`));
+      const pathScore = parsed.pathname.split('/').filter(Boolean).length;
+      return { url: parsed.toString(), preferredMatch, pathScore };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+
+  ranked.sort((a, b) =>
+    Number(b.preferredMatch) - Number(a.preferredMatch) ||
+    b.pathScore - a.pathScore
+  );
+
+  return ranked[0]?.url || '';
+}
+
+async function directUrlFromGoogleNewsPage(rawUrl, publisherUrl = '') {
+  const googleUrl = await validatePublicUrl(rawUrl);
+  let preferredHost = '';
+  try { preferredHost = publisherUrl ? new URL(publisherUrl).hostname : ''; } catch {}
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 18000);
+  try {
+    const response = await fetch(googleUrl, {
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; MarkSetGoWeb/2.6; +google-news-resolver)',
+        Accept: 'text/html,application/xhtml+xml,*/*;q=0.1'
+      }
+    });
+    if (!response.ok) return '';
+
+    const html = await response.text();
+
+    // The Google News wrapper often carries the real publisher URL somewhere in
+    // its HTML/serialized page data even when the HTTP redirect itself stays on Google.
+    let direct = directUrlFromEmbeddedText(html, preferredHost);
+    if (direct) return direct;
+
+    const $ = cheerio.load(html);
+    const hrefs = $('a[href]').toArray().map((element) => $(element).attr('href')).filter(Boolean);
+    direct = directUrlFromEmbeddedText(hrefs.join('\n'), preferredHost);
+    return direct || '';
+  } catch {
+    return '';
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function fetchFeedItems(source) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
@@ -65,15 +150,43 @@ async function fetchFeedItems(source) {
     const xml = await response.text();
     const $ = cheerio.load(xml, { xmlMode: true });
     const nodes = $('item, entry').toArray().slice(0, 30);
+
     return nodes.map((node) => {
       const item = $(node);
       const atomLink = item.find('link[rel="alternate"]').attr('href') || item.find('link').attr('href');
       const rssLink = item.find('link').first().text().trim();
-      const link = atomLink || rssLink || item.find('guid').first().text().trim();
+      const googleOrPrimaryLink = atomLink || rssLink || item.find('guid').first().text().trim();
+
       const title = stripMarkup(item.find('title').first().text()) || 'Untitled article';
-      const description = item.find('description').first().text() || item.find('summary').first().text() || item.find('content\:encoded').first().text() || item.find('content').first().text();
-      const published = item.find('pubDate').first().text() || item.find('published').first().text() || item.find('updated').first().text();
-      return { title, link, summary: stripMarkup(description).slice(0, 1800), published };
+      const rawDescription =
+        item.find('description').first().text() ||
+        item.find('summary').first().text() ||
+        item.find('content\\:encoded').first().text() ||
+        item.find('content').first().text();
+
+      const sourceUrl = item.find('source').first().attr('url') || '';
+      let preferredHost = '';
+      try { preferredHost = sourceUrl ? new URL(sourceUrl).hostname : ''; } catch {}
+
+      // IMPORTANT: inspect the raw RSS description before stripMarkup removes links.
+      // If Google embeds a direct publisher URL in the item content, use that URL
+      // instead of the opaque news.google.com wrapper.
+      const embeddedPublisherUrl = directUrlFromEmbeddedText(rawDescription, preferredHost);
+      const link = embeddedPublisherUrl || googleOrPrimaryLink;
+
+      const published =
+        item.find('pubDate').first().text() ||
+        item.find('published').first().text() ||
+        item.find('updated').first().text();
+
+      return {
+        title,
+        link,
+        googleLink: embeddedPublisherUrl ? googleOrPrimaryLink : '',
+        sourceUrl,
+        summary: stripMarkup(rawDescription).slice(0, 1800),
+        published
+      };
     }).filter((item) => item.link && /^https?:\/\//i.test(item.link));
   } finally {
     clearTimeout(timeout);
@@ -3483,8 +3596,13 @@ app.post('/api/current/article', async (req, res) => {
   try {
     const host = new URL(originalUrl).hostname.toLowerCase();
     if (host === 'news.google.com' || host.endsWith('.news.google.com')) {
-      const resolved = await resolvePublisherArticleUrl(publisherUrl, title);
-      if (resolved) articleUrl = resolved;
+      const embedded = await directUrlFromGoogleNewsPage(originalUrl, publisherUrl);
+      if (embedded) {
+        articleUrl = embedded;
+      } else {
+        const resolved = await resolvePublisherArticleUrl(publisherUrl, title);
+        if (resolved) articleUrl = resolved;
+      }
     }
   } catch {}
 

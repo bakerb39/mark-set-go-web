@@ -1,18 +1,14 @@
-MARK, SET, GO! — GOOGLE NEWS ARTICLE RESOLVER
+MARK, SET, GO! — EMBEDDED PUBLISHER URL FIX
 
-Replace:
-server.js                      (ROOT)
-public/topic-feeds.js
-public/index.html
+Replace only the ROOT server.js.
 
-Why this is different:
-The feed may still come from Google News. Instead of relying on refresh-time feed
-discovery, clicking Read in Reader now sends the publisher website plus headline
-to the server. If the article URL is a news.google.com wrapper, the server searches
-the publisher's own Home/News/Latest/Articles pages for the matching headline,
-uses that direct publisher URL, and then imports the article.
+This version follows the approach Brian identified:
 
-This specifically handles the symptom where the Reader still showed:
-https://news.google.com/rss/articles/...
+1. BEFORE stripping the RSS item description to plain text, inspect its embedded
+   links/serialized URLs.
+2. If a direct non-Google publisher URL is present, use that as the article URL.
+3. If an existing item still has a news.google.com URL, fetch the Google wrapper
+   page and inspect its HTML/serialized page data for the embedded publisher URL.
+4. Only if that fails, fall back to the headline-matching publisher-page resolver.
 
-No Reader core files are changed.
+No public files and no Reader core files are changed.
