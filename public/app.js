@@ -3565,7 +3565,7 @@ function modeSupportsMeaningfulChunks(mode) {
 }
 
 function modeSupportsBookPages(mode) {
-  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee'].includes(mode);
+  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'line-sweep', 'pointing-guide', 'marquee'].includes(mode);
 }
 
 function chooseMeaningfulChunkEnd(startIndex, maximumEnd) {
@@ -3785,7 +3785,7 @@ function renderFocusAnchorPhrase(element, words) {
 }
 
 function modeSupportsFocusAnchorOverlay(mode) {
-  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
+  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'line-sweep', 'pointing-guide', 'marquee', 'flash'].includes(mode);
 }
 
 function refreshFocusAnchorStyle() {
@@ -5802,6 +5802,12 @@ function getSelectedMode() {
 function isReaderRunning() {
   if (state.renderedMode === 'digital-sign') {
     return Boolean(state.tickerFrame) && !state.tickerPaused;
+  }
+  // Line Sweep is animation-driven rather than timeout-driven. Treat its live
+  // Web Animation as active playback so the Reader's existing double-click
+  // pause/resume gesture behaves exactly like the other guided modes.
+  if (state.renderedMode === 'line-sweep') {
+    return Boolean(state.lineSweepAnimation) && state.lineSweepAnimation.playState === 'running';
   }
   return Boolean(state.interval);
 }
@@ -15210,7 +15216,7 @@ let lastViewerWpmText = '';
 const PUSH_TRAINING_KEY = 'markSetGoPushTrainingV1';
 
 function pushTrainingModeSupported(mode = getSelectedMode()) {
-  return ['flash', 'highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee'].includes(String(mode || ''));
+  return ['flash', 'highlight', 'bold-focus', 'smooth-glide', 'line-sweep', 'pointing-guide', 'marquee'].includes(String(mode || ''));
 }
 
 function loadPushTrainingConfig() {
