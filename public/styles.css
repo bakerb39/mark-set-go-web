@@ -14807,3 +14807,162 @@ body:not(.light) .reader-written-annotation {
   background:#0c2340;
   color:#fff;
 }
+
+/* Reader markup v3: writing size + free draw ---------------------------------- */
+.reader-written-annotation {
+  font-size: var(--reader-writing-font-size, 16px);
+}
+.mark-selection-toolbar .reader-writing-options {
+  display:flex;
+  align-items:center;
+  margin-top:7px;
+}
+.mark-selection-toolbar .reader-writing-options label,
+.mark-selection-toolbar .reader-drawing-thickness {
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:#334155;
+  font:700 11px/1.2 Inter,system-ui,sans-serif;
+}
+.mark-selection-toolbar .reader-writing-options select,
+.mark-selection-toolbar .reader-drawing-thickness select {
+  min-height:28px;
+  padding:3px 7px;
+  border:1px solid rgba(12,35,64,.2);
+  border-radius:6px;
+  background:#fffdf8;
+  color:#0c2340;
+  font:700 12px Inter,system-ui,sans-serif;
+}
+
+.reader-drawing-layer {
+  position:absolute;
+  z-index:9;
+  top:0;
+  left:0;
+  overflow:visible;
+  pointer-events:none;
+  touch-action:none;
+}
+.reader-drawing-layer.drawing-active,
+.reader-drawing-layer.erasing-active {
+  pointer-events:auto;
+  cursor:crosshair;
+}
+.reader-drawing-layer.erasing-active { cursor:not-allowed; }
+.reader-drawing-stroke {
+  vector-effect:non-scaling-stroke;
+  pointer-events:none;
+}
+.reader-drawing-preview { opacity:.9; }
+
+.mark-selection-toolbar .reader-drawing-editor {
+  position:absolute;
+  z-index:2;
+  top:calc(100% + 7px);
+  left:110px;
+  width:min(300px, calc(100vw - 24px));
+  padding:9px;
+  border:1px solid rgba(100,116,139,.28);
+  border-radius:10px;
+  background:#fbf7ed;
+  box-shadow:0 14px 34px rgba(15,23,42,.24);
+  white-space:normal;
+}
+.mark-selection-toolbar .reader-drawing-editor[hidden] { display:none !important; }
+.mark-selection-toolbar .reader-drawing-colors {
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:8px;
+}
+.mark-selection-toolbar .reader-drawing-color-choice,
+.mark-selection-toolbar .reader-drawing-custom-color {
+  width:24px;
+  min-width:24px;
+  height:24px;
+  min-height:24px;
+  padding:0;
+  border:1px solid rgba(12,35,64,.18);
+  border-radius:50%;
+  background:var(--drawing-swatch, #E9B949) !important;
+  cursor:pointer;
+}
+.mark-selection-toolbar .reader-drawing-color-choice.active {
+  box-shadow:0 0 0 2px #fbf7ed, 0 0 0 4px #0c2340;
+}
+.mark-selection-toolbar .reader-drawing-custom-color {
+  position:relative;
+  overflow:hidden;
+  background:conic-gradient(#c44747,#e9b949,#2f855a,#2b6cb0,#c44747) !important;
+}
+.mark-selection-toolbar .reader-drawing-custom-color input[type="color"] {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  opacity:0;
+  cursor:pointer;
+}
+.mark-selection-toolbar .reader-drawing-editor-actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:6px;
+  margin-top:9px;
+}
+.mark-selection-toolbar .reader-drawing-editor-actions button {
+  min-height:28px;
+  padding:4px 9px;
+  border:1px solid rgba(12,35,64,.16);
+  background:#fffdf8;
+}
+.mark-selection-toolbar .reader-drawing-editor-actions [data-reader-drawing-start] {
+  background:#0c2340;
+  color:#fff;
+}
+
+#reader-frame { position:relative; }
+.reader-drawing-floatbar {
+  position:absolute;
+  z-index:30;
+  top:54px;
+  right:18px;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+  max-width:min(620px, calc(100% - 36px));
+  padding:7px 8px;
+  border:1px solid rgba(12,35,64,.22);
+  border-radius:9px;
+  background:#fbf7ed;
+  color:#0c2340;
+  box-shadow:0 10px 28px rgba(15,23,42,.22);
+  font:700 11px/1.2 Inter,system-ui,sans-serif;
+}
+.reader-drawing-floatbar[hidden] { display:none !important; }
+.reader-drawing-floatbar button,
+.reader-drawing-floatbar select,
+.reader-drawing-floatbar input[type="color"] {
+  min-height:28px;
+  border:1px solid rgba(12,35,64,.18);
+  border-radius:6px;
+  background:#fffdf8;
+  color:#0c2340;
+  font:700 11px Inter,system-ui,sans-serif;
+}
+.reader-drawing-floatbar button { padding:4px 8px; cursor:pointer; }
+.reader-drawing-floatbar button.active {
+  background:#0c2340;
+  color:#fff;
+}
+.reader-drawing-floatbar label {
+  display:flex;
+  align-items:center;
+  gap:5px;
+}
+.reader-drawing-floatbar input[type="color"] {
+  width:30px;
+  padding:2px;
+}

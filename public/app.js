@@ -7521,6 +7521,7 @@ const READER_DEFINITIONS_CACHE_KEY = 'reader-annotations:definitions:v1';
 const READER_NOTES_CACHE_KEY = 'reader-annotations:notes:v1';
 const READER_HIGHLIGHTS_CACHE_KEY = 'reader-annotations:passage-highlights:v1';
 const READER_WRITING_CACHE_KEY = 'reader-annotations:written-overlays:v1';
+const READER_DRAWING_CACHE_KEY = 'reader-annotations:free-draw:v1';
 
 function readLegacyAnnotationArray(key) {
   try {
@@ -7535,6 +7536,7 @@ let savedDefinitionsCache = readLegacyAnnotationArray(SAVED_DEFINITIONS_KEY).sli
 let readerNotesCache = readLegacyAnnotationArray(NOTE_STORAGE_KEY).slice(0, 1000);
 let readerHighlightsCache = [];
 let readerWritingCache = [];
+let readerDrawingCache = [];
 let readerAnnotationHydrated = false;
 
 async function persistReaderAnnotationRecord(key, items) {
@@ -7553,17 +7555,19 @@ async function hydrateReaderAnnotationStores() {
   readerAnnotationHydrated = true;
 
   try {
-    const [definitionRecord, noteRecord, highlightRecord, writingRecord] = await Promise.all([
+    const [definitionRecord, noteRecord, highlightRecord, writingRecord, drawingRecord] = await Promise.all([
       getCachedReadingBook(READER_DEFINITIONS_CACHE_KEY),
       getCachedReadingBook(READER_NOTES_CACHE_KEY),
       getCachedReadingBook(READER_HIGHLIGHTS_CACHE_KEY),
-      getCachedReadingBook(READER_WRITING_CACHE_KEY)
+      getCachedReadingBook(READER_WRITING_CACHE_KEY),
+      getCachedReadingBook(READER_DRAWING_CACHE_KEY)
     ]);
 
     const indexedDefinitions = Array.isArray(definitionRecord?.items) ? definitionRecord.items : [];
     const indexedNotes = Array.isArray(noteRecord?.items) ? noteRecord.items : [];
     const indexedHighlights = Array.isArray(highlightRecord?.items) ? highlightRecord.items : [];
     const indexedWriting = Array.isArray(writingRecord?.items) ? writingRecord.items : [];
+    const indexedDrawing = Array.isArray(drawingRecord?.items) ? drawingRecord.items : [];
 
     // If IndexedDB already has data, it is authoritative. Otherwise migrate the
     // legacy localStorage arrays once.
@@ -7575,6 +7579,7 @@ async function hydrateReaderAnnotationStores() {
 
     readerHighlightsCache = indexedHighlights.slice(0, 5000);
     readerWritingCache = indexedWriting.slice(0, 3000);
+    readerDrawingCache = indexedDrawing.slice(0, 5000);
 
     // Remove the bulky legacy copies only after IndexedDB has had a chance to
     // receive them. This also gives localStorage quota back to the rest of app.
@@ -7586,6 +7591,7 @@ async function hydrateReaderAnnotationStores() {
       applySavedDefinitionHighlights();
       applySavedPassageHighlights();
       applySavedReaderWritingOverlays();
+      applySavedReaderDrawings();
     }
   } catch (error) {
     console.warn('Reader annotation migration could not complete.', error);
@@ -7737,6 +7743,11 @@ function eraseSavedPassageHighlight(selectionData) {
 }
 
 
+function normalizeReaderWritingFontSize(value) {
+  const size = Math.round(Number(value) || 16);
+  return Math.min(32, Math.max(12, size));
+}
+
 function normalizeReaderWritingColor(value) {
   const color = String(value || '').trim();
   return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : '#C98900';
@@ -7812,6 +7823,7 @@ function positionReaderWritingOverlay(reader, element, item) {
   element.style.left = `${Math.max(0,left)}px`;
   element.style.top = `${Math.max(0,top)}px`;
   element.style.setProperty('--reader-writing-color', normalizeReaderWritingColor(item.color));
+  element.style.setProperty('--reader-writing-font-size', `${normalizeReaderWritingFontSize(item.fontSize)}px`);
 }
 
 function applySavedReaderWritingOverlays() {
@@ -7846,7 +7858,7 @@ function applySavedReaderWritingOverlays() {
   }
 }
 
-function addSavedReaderWriting(selectionData, text, color) {
+function addSavedReaderWriting(selectionData, text, color, fontSize = 16) {
   if (!selectionData?.documentId) return false;
   const cleanText = String(text || '').trim();
   if (!cleanText) return false;
@@ -7862,6 +7874,7 @@ function addSavedReaderWriting(selectionData, text, color) {
     endIndex,
     text:cleanText.slice(0,500),
     color:normalizeReaderWritingColor(color),
+    fontSize:normalizeReaderWritingFontSize(fontSize),
     createdAt:new Date().toISOString(),
     updatedAt:new Date().toISOString()
   });
@@ -7889,8 +7902,369 @@ function eraseSavedReaderAnnotations(selectionData) {
   const beforeHighlights = JSON.stringify(readerHighlightsCache);
   eraseSavedPassageHighlight(selectionData);
   const writingRemoved = eraseSavedReaderWriting(selectionData);
+  const drawingRemoved = eraseSavedReaderDrawingsBySelection(selectionData);
   const highlightChanged = beforeHighlights !== JSON.stringify(readerHighlightsCache);
-  return { highlightChanged, writingRemoved };
+  return { highlightChanged, writingRemoved, drawingRemoved };
+}
+
+
+function normalizeReaderDrawingColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : '#E9B949';
+}
+
+function normalizeReaderDrawingThickness(value) {
+  const thickness = Number(value) || 4;
+  return Math.min(18, Math.max(1, thickness));
+}
+
+function readerDrawingsForCurrentDocument() {
+  if (!state.documentId) return [];
+  return readerDrawingCache.filter((item) => item.documentId === state.documentId);
+}
+
+function saveReaderDrawings(items) {
+  readerDrawingCache = (Array.isArray(items) ? items : []).slice(0, 5000);
+  void persistReaderAnnotationRecord(READER_DRAWING_CACHE_KEY, readerDrawingCache);
+  return true;
+}
+
+function readerContentPoint(reader, clientX, clientY) {
+  const rect = reader.getBoundingClientRect();
+  return {
+    x: clientX - rect.left + reader.scrollLeft,
+    y: clientY - rect.top + reader.scrollTop
+  };
+}
+
+function renderedReaderAnchors(reader) {
+  return [...reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]')];
+}
+
+function nearestReaderDrawingAnchor(reader, clientX, clientY) {
+  const anchors = renderedReaderAnchors(reader);
+  if (!anchors.length) return null;
+  let best = null;
+  let bestDistance = Infinity;
+  for (const element of anchors) {
+    const range = readerElementRange(element);
+    if (!range) continue;
+    const rect = element.getBoundingClientRect();
+    const dx = clientX < rect.left ? rect.left - clientX : clientX > rect.right ? clientX - rect.right : 0;
+    const dy = clientY < rect.top ? rect.top - clientY : clientY > rect.bottom ? clientY - rect.bottom : 0;
+    const distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = { element, index: range.start };
+    }
+  }
+  return best;
+}
+
+function ensureReaderDrawingLayer(reader) {
+  if (!reader) return null;
+  let layer = reader.querySelector(':scope > [data-reader-drawing-layer]');
+  if (!layer) {
+    layer = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    layer.classList.add('reader-drawing-layer');
+    layer.dataset.readerDrawingLayer = 'true';
+    layer.setAttribute('aria-label','Freehand annotations');
+    reader.appendChild(layer);
+  }
+  layer.setAttribute('width', String(Math.max(reader.clientWidth, reader.scrollWidth)));
+  layer.setAttribute('height', String(Math.max(reader.clientHeight, reader.scrollHeight)));
+  layer.setAttribute('viewBox', `0 0 ${Math.max(reader.clientWidth, reader.scrollWidth)} ${Math.max(reader.clientHeight, reader.scrollHeight)}`);
+  return layer;
+}
+
+function readerDrawingAnchorElement(reader, item) {
+  const index = Number(item.anchorIndex);
+  if (!Number.isFinite(index)) return null;
+  for (const element of renderedReaderAnchors(reader)) {
+    const range = readerElementRange(element);
+    if (range && range.start <= index && range.end > index) return element;
+  }
+  return null;
+}
+
+function readerDrawingAbsolutePoints(reader, item) {
+  const anchor = readerDrawingAnchorElement(reader, item);
+  if (!anchor) return null;
+  const readerRect = reader.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+  const anchorX = anchorRect.left - readerRect.left + reader.scrollLeft;
+  const anchorY = anchorRect.top - readerRect.top + reader.scrollTop;
+  const baseFontSize = Math.max(1, Number(item.baseFontSize) || 16);
+  const currentFontSize = Math.max(1, parseFloat(getComputedStyle(anchor).fontSize) || parseFloat(getComputedStyle(reader).fontSize) || baseFontSize);
+  const scale = Math.max(.55, Math.min(2.5, currentFontSize / baseFontSize));
+  return (Array.isArray(item.points) ? item.points : []).map((point) => ({
+    x: anchorX + (Number(point.dx) || 0) * scale,
+    y: anchorY + (Number(point.dy) || 0) * scale
+  }));
+}
+
+function readerDrawingPathData(points) {
+  if (!points?.length) return '';
+  if (points.length === 1) return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)} l .01 .01`;
+  let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  for (let i = 1; i < points.length; i += 1) d += ` L ${points[i].x.toFixed(2)} ${points[i].y.toFixed(2)}`;
+  return d;
+}
+
+function applySavedReaderDrawings() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return;
+  const items = readerDrawingsForCurrentDocument();
+  let layer = reader.querySelector(':scope > [data-reader-drawing-layer]');
+  if (!items.length && !state.readerDrawingMode) {
+    if (layer) {
+      layer.querySelectorAll('[data-reader-drawing-id], [data-reader-drawing-preview]').forEach((element)=>element.remove());
+      layer.classList.remove('drawing-active','erasing-active');
+    }
+    return;
+  }
+  layer = ensureReaderDrawingLayer(reader);
+  if (!layer) return;
+  const liveIds = new Set(items.map((item) => String(item.id)));
+  layer.querySelectorAll('[data-reader-drawing-id]').forEach((path) => {
+    if (!liveIds.has(path.dataset.readerDrawingId)) path.remove();
+  });
+  for (const item of items) {
+    let path = layer.querySelector(`[data-reader-drawing-id="${CSS.escape(String(item.id))}"]`);
+    if (!path) {
+      path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.classList.add('reader-drawing-stroke');
+      path.dataset.readerDrawingId = String(item.id);
+      layer.appendChild(path);
+    }
+    const points = readerDrawingAbsolutePoints(reader, item);
+    if (!points?.length) {
+      path.style.display = 'none';
+      continue;
+    }
+    path.style.display = '';
+    path.setAttribute('d', readerDrawingPathData(points));
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', normalizeReaderDrawingColor(item.color));
+    path.setAttribute('stroke-width', String(normalizeReaderDrawingThickness(item.thickness)));
+    path.setAttribute('stroke-linecap','round');
+    path.setAttribute('stroke-linejoin','round');
+  }
+  layer.classList.toggle('drawing-active', state.readerDrawingMode === 'draw');
+  layer.classList.toggle('erasing-active', state.readerDrawingMode === 'erase');
+}
+
+function addSavedReaderDrawing(stroke) {
+  if (!stroke?.documentId || !Array.isArray(stroke.points) || !stroke.points.length) return false;
+  readerDrawingCache.push({
+    id:`reader-drawing-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    documentId:stroke.documentId,
+    title:state.title || '',
+    anchorIndex:Number(stroke.anchorIndex) || 0,
+    baseFontSize:Number(stroke.baseFontSize) || 16,
+    color:normalizeReaderDrawingColor(stroke.color),
+    thickness:normalizeReaderDrawingThickness(stroke.thickness),
+    points:stroke.points.slice(0, 5000),
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  });
+  saveReaderDrawings(readerDrawingCache);
+  applySavedReaderDrawings();
+  return true;
+}
+
+function eraseSavedReaderDrawingById(id) {
+  const before = readerDrawingCache.length;
+  saveReaderDrawings(readerDrawingCache.filter((item) => String(item.id) !== String(id)));
+  applySavedReaderDrawings();
+  return before !== readerDrawingCache.length;
+}
+
+function eraseSavedReaderDrawingsBySelection(selectionData) {
+  if (!selectionData?.documentId) return 0;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  const before = readerDrawingCache.length;
+  saveReaderDrawings(readerDrawingCache.filter((item) => {
+    if (item.documentId !== selectionData.documentId) return true;
+    const anchorIndex = Math.max(0, Number(item.anchorIndex) || 0);
+    return anchorIndex < startIndex || anchorIndex >= endIndex;
+  }));
+  applySavedReaderDrawings();
+  return before - readerDrawingCache.length;
+}
+
+function hitTestReaderDrawing(reader, clientX, clientY, radius = 14) {
+  const point = readerContentPoint(reader, clientX, clientY);
+  let best = null;
+  let bestDistance = Infinity;
+  for (const item of readerDrawingsForCurrentDocument()) {
+    const points = readerDrawingAbsolutePoints(reader, item);
+    if (!points?.length) continue;
+    for (const candidate of points) {
+      const dx = candidate.x - point.x;
+      const dy = candidate.y - point.y;
+      const distance = Math.sqrt(dx*dx + dy*dy);
+      if (distance <= radius + normalizeReaderDrawingThickness(item.thickness) / 2 && distance < bestDistance) {
+        best = item;
+        bestDistance = distance;
+      }
+    }
+  }
+  return best;
+}
+
+function ensureReaderDrawingFloatbar(reader) {
+  const frame = reader.closest('#reader-frame') || reader.parentElement;
+  if (!frame) return null;
+  let bar = frame.querySelector(':scope > [data-reader-drawing-floatbar]');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = 'reader-drawing-floatbar';
+    bar.dataset.readerDrawingFloatbar = 'true';
+    bar.innerHTML = `<strong>Free Draw</strong><button type="button" data-drawing-tool="draw">✎ Draw</button><button type="button" data-drawing-tool="erase">⌫ Erase</button><label>Color <input type="color" data-drawing-float-color value="#E9B949"></label><label>Thickness <select data-drawing-float-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><button type="button" data-drawing-done>Done</button>`;
+    frame.appendChild(bar);
+    bar.querySelectorAll('[data-drawing-tool]').forEach((button)=>button.addEventListener('click',()=>{
+      state.readerDrawingMode = button.dataset.drawingTool;
+      bar.querySelectorAll('[data-drawing-tool]').forEach((choice)=>choice.classList.toggle('active', choice === button));
+      applySavedReaderDrawings();
+    }));
+    bar.querySelector('[data-drawing-float-color]')?.addEventListener('input',(event)=>{ state.readerDrawingColor = normalizeReaderDrawingColor(event.currentTarget.value); });
+    bar.querySelector('[data-drawing-float-thickness]')?.addEventListener('change',(event)=>{ state.readerDrawingThickness = normalizeReaderDrawingThickness(event.currentTarget.value); });
+    bar.querySelector('[data-drawing-done]')?.addEventListener('click',()=>stopReaderDrawingMode());
+  }
+  return bar;
+}
+
+function startReaderDrawingMode({ color = '#E9B949', thickness = 4 } = {}) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !state.documentId) return false;
+  if (isReaderRunning()) pauseReader();
+  state.readerDrawingMode = 'draw';
+  state.readerDrawingColor = normalizeReaderDrawingColor(color);
+  state.readerDrawingThickness = normalizeReaderDrawingThickness(thickness);
+  const bar = ensureReaderDrawingFloatbar(reader);
+  if (bar) {
+    bar.hidden = false;
+    const colorInput = bar.querySelector('[data-drawing-float-color]');
+    const thicknessInput = bar.querySelector('[data-drawing-float-thickness]');
+    if (colorInput) colorInput.value = state.readerDrawingColor;
+    if (thicknessInput) thicknessInput.value = String(state.readerDrawingThickness);
+    bar.querySelectorAll('[data-drawing-tool]').forEach((choice)=>choice.classList.toggle('active', choice.dataset.drawingTool === 'draw'));
+  }
+  applySavedReaderDrawings();
+  updateReaderStatus('Free Draw active. Draw with the mouse or touch. Choose Erase to remove strokes, then Done when finished.');
+  return true;
+}
+
+function stopReaderDrawingMode() {
+  state.readerDrawingMode = null;
+  state.readerDrawingStroke = null;
+  const reader = app.querySelector('#reader');
+  const frame = reader?.closest('#reader-frame') || reader?.parentElement;
+  const bar = frame?.querySelector(':scope > [data-reader-drawing-floatbar]');
+  if (bar) bar.hidden = true;
+  applySavedReaderDrawings();
+  updateReaderStatus('Free Draw finished.');
+}
+
+function updateReaderDrawingPreview(layer, stroke) {
+  if (!layer || !stroke) return;
+  let path = layer.querySelector('[data-reader-drawing-preview]');
+  if (!path) {
+    path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.dataset.readerDrawingPreview = 'true';
+    path.classList.add('reader-drawing-stroke','reader-drawing-preview');
+    layer.appendChild(path);
+  }
+  const points = stroke.points.map((point)=>({x:stroke.anchorX + point.dx, y:stroke.anchorY + point.dy}));
+  path.setAttribute('d', readerDrawingPathData(points));
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke', normalizeReaderDrawingColor(stroke.color));
+  path.setAttribute('stroke-width', String(normalizeReaderDrawingThickness(stroke.thickness)));
+  path.setAttribute('stroke-linecap','round');
+  path.setAttribute('stroke-linejoin','round');
+}
+
+function clearReaderDrawingPreview(layer) {
+  layer?.querySelector('[data-reader-drawing-preview]')?.remove();
+}
+
+function bindReaderDrawingSurface(reader) {
+  if (!reader || reader.dataset.readerDrawingBound === 'true') return;
+  reader.dataset.readerDrawingBound = 'true';
+  const layer = ensureReaderDrawingLayer(reader);
+  if (!layer) return;
+
+  const pointerDown = (event) => {
+    if (!state.readerDrawingMode) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (state.readerDrawingMode === 'erase') {
+      const hit = hitTestReaderDrawing(reader, event.clientX, event.clientY, 16);
+      if (hit) eraseSavedReaderDrawingById(hit.id);
+      return;
+    }
+    const anchor = nearestReaderDrawingAnchor(reader, event.clientX, event.clientY);
+    if (!anchor) return;
+    const readerRect = reader.getBoundingClientRect();
+    const anchorRect = anchor.element.getBoundingClientRect();
+    const anchorX = anchorRect.left - readerRect.left + reader.scrollLeft;
+    const anchorY = anchorRect.top - readerRect.top + reader.scrollTop;
+    const point = readerContentPoint(reader, event.clientX, event.clientY);
+    const baseFontSize = parseFloat(getComputedStyle(anchor.element).fontSize) || parseFloat(getComputedStyle(reader).fontSize) || 16;
+    state.readerDrawingStroke = {
+      pointerId:event.pointerId,
+      documentId:state.documentId,
+      anchorIndex:anchor.index,
+      baseFontSize,
+      color:state.readerDrawingColor || '#E9B949',
+      thickness:state.readerDrawingThickness || 4,
+      anchorX,
+      anchorY,
+      points:[{dx:point.x-anchorX, dy:point.y-anchorY}]
+    };
+    updateReaderDrawingPreview(layer, state.readerDrawingStroke);
+    try { layer.setPointerCapture(event.pointerId); } catch {}
+  };
+
+  const pointerMove = (event) => {
+    if (!state.readerDrawingMode) return;
+    if (state.readerDrawingMode === 'erase' && (event.buttons || event.pressure > 0)) {
+      event.preventDefault();
+      event.stopPropagation();
+      const hit = hitTestReaderDrawing(reader, event.clientX, event.clientY, 18);
+      if (hit) eraseSavedReaderDrawingById(hit.id);
+      return;
+    }
+    const stroke = state.readerDrawingStroke;
+    if (!stroke || stroke.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = readerContentPoint(reader, event.clientX, event.clientY);
+    const last = stroke.points[stroke.points.length - 1];
+    const next = {dx:point.x-stroke.anchorX, dy:point.y-stroke.anchorY};
+    if (!last || Math.hypot(next.dx-last.dx, next.dy-last.dy) >= 1.4) {
+      stroke.points.push(next);
+      updateReaderDrawingPreview(layer, stroke);
+    }
+  };
+
+  const pointerUp = (event) => {
+    const stroke = state.readerDrawingStroke;
+    if (!stroke || stroke.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    state.readerDrawingStroke = null;
+    clearReaderDrawingPreview(layer);
+    try { layer.releasePointerCapture(event.pointerId); } catch {}
+    addSavedReaderDrawing(stroke);
+  };
+
+  layer.addEventListener('pointerdown', pointerDown);
+  layer.addEventListener('pointermove', pointerMove);
+  layer.addEventListener('pointerup', pointerUp);
+  layer.addEventListener('pointercancel', pointerUp);
 }
 
 function finishPassageHighlightAction() {
@@ -11163,7 +11537,7 @@ function bindMarkCompanion(reader){
   toolbar.addEventListener('mousedown',(event)=>{
     // Keep the browser text range alive while using toolbar buttons. Native
     // color inputs need their default pointer behavior in order to open.
-    if (!event.target.closest('input[type="color"], textarea, input[type="text"]')) event.preventDefault();
+    if (!event.target.closest('input[type="color"], textarea, input[type="text"], select')) event.preventDefault();
   });
 
   const highlightPicker = toolbar.querySelector('[data-passage-highlight-picker]');
@@ -11197,6 +11571,7 @@ function bindMarkCompanion(reader){
   const writingToggle = toolbar.querySelector('[data-reader-writing-toggle]');
   const writingText = toolbar.querySelector('[data-reader-writing-text]');
   const writingColor = toolbar.querySelector('[data-reader-writing-color]');
+  const writingFontSize = toolbar.querySelector('[data-reader-writing-font-size]');
   const closeWritingEditor = () => {
     if (writingEditor) writingEditor.hidden = true;
     writingToggle?.setAttribute('aria-expanded','false');
@@ -11215,7 +11590,7 @@ function bindMarkCompanion(reader){
   toolbar.querySelector('[data-reader-writing-save]')?.addEventListener('click',()=>{
     const selected = state.markSelection ? {...state.markSelection} : null;
     if (!selected || !writingText) return;
-    if (!addSavedReaderWriting(selected, writingText.value, writingColor?.value)) {
+    if (!addSavedReaderWriting(selected, writingText.value, writingColor?.value, writingFontSize?.value)) {
       writingText.focus();
       return;
     }
@@ -11228,14 +11603,42 @@ function bindMarkCompanion(reader){
     if (writingText) writingText.value = '';
     closeWritingEditor();
   });
+  const drawingEditor = toolbar.querySelector('[data-reader-drawing-editor]');
+  const drawingToggle = toolbar.querySelector('[data-reader-drawing-toggle]');
+  const drawingColor = toolbar.querySelector('[data-reader-drawing-color]');
+  const drawingThickness = toolbar.querySelector('[data-reader-drawing-thickness]');
+  const closeDrawingEditor = () => {
+    if (drawingEditor) drawingEditor.hidden = true;
+    drawingToggle?.setAttribute('aria-expanded','false');
+  };
+  drawingToggle?.addEventListener('click',()=>{
+    if (!drawingEditor) return;
+    closeHighlightPicker();
+    closeWritingEditor();
+    drawingEditor.hidden = !drawingEditor.hidden;
+    drawingToggle.setAttribute('aria-expanded', String(!drawingEditor.hidden));
+  });
+  toolbar.querySelectorAll('[data-reader-drawing-color-choice]').forEach((button)=>button.addEventListener('click',()=>{
+    if (drawingColor) drawingColor.value = button.dataset.readerDrawingColorChoice || '#E9B949';
+    toolbar.querySelectorAll('[data-reader-drawing-color-choice]').forEach((choice)=>choice.classList.toggle('active', choice === button));
+  }));
+  toolbar.querySelector('[data-reader-drawing-start]')?.addEventListener('click',()=>{
+    const color = drawingColor?.value || '#E9B949';
+    const thickness = drawingThickness?.value || 4;
+    closeDrawingEditor();
+    finishPassageHighlightAction();
+    startReaderDrawingMode({color, thickness});
+  });
+  toolbar.querySelector('[data-reader-drawing-cancel]')?.addEventListener('click',closeDrawingEditor);
   toolbar.querySelector('[data-passage-highlight-erase]')?.addEventListener('click',()=>{
     const selected = state.markSelection ? {...state.markSelection} : null;
     if (!selected) return;
     const result = eraseSavedReaderAnnotations(selected);
     closeHighlightPicker();
     closeWritingEditor();
+    closeDrawingEditor();
     finishPassageHighlightAction();
-    updateReaderStatus(result.highlightChanged || result.writingRemoved ? 'Markup erased from selected passage.' : 'No saved markup found in the selected passage.');
+    updateReaderStatus(result.highlightChanged || result.writingRemoved || result.drawingRemoved ? 'Markup erased from selected passage.' : 'No saved markup found in the selected passage.');
   });
 
   // Virtualized reader windows replace word nodes as the reader moves. Repaint
@@ -11243,19 +11646,22 @@ function bindMarkCompanion(reader){
   // window changes. Ignore mutations generated inside the overlay layer itself.
   state.passageHighlightObserver?.disconnect?.();
   state.passageHighlightObserver = new MutationObserver((mutations)=>{
-    if (mutations.length && mutations.every((mutation)=>mutation.target instanceof Element && mutation.target.closest('[data-reader-writing-layer]'))) return;
+    if (mutations.length && mutations.every((mutation)=>mutation.target instanceof Element && mutation.target.closest('[data-reader-writing-layer], [data-reader-drawing-layer]'))) return;
     requestAnimationFrame(()=>{
       applySavedPassageHighlights();
       applySavedReaderWritingOverlays();
+      applySavedReaderDrawings();
     });
   });
   state.passageHighlightObserver.observe(reader,{childList:true,subtree:true});
   applySavedPassageHighlights();
   applySavedReaderWritingOverlays();
+  applySavedReaderDrawings();
+  bindReaderDrawingSurface(reader);
   let writingPositionFrame = 0;
   const scheduleWritingPosition = () => {
     cancelAnimationFrame(writingPositionFrame);
-    writingPositionFrame = requestAnimationFrame(applySavedReaderWritingOverlays);
+    writingPositionFrame = requestAnimationFrame(()=>{ applySavedReaderWritingOverlays(); applySavedReaderDrawings(); });
   };
   reader.addEventListener('scroll', scheduleWritingPosition, {passive:true});
   state.readerWritingResizeObserver?.disconnect?.();
@@ -12289,7 +12695,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
 
       <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-reader-drawing-toggle aria-expanded="false">✐ Draw</button><div class="reader-drawing-editor" data-reader-drawing-editor hidden><div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div><label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
