@@ -3399,25 +3399,112 @@ app.get('/api/gutenberg/books/:id/text', async (req, res) => {
 });
 
 
+
+async function resolvePublisherArticleUrl(publisherUrl, expectedTitle) {
+  if (!publisherUrl || !expectedTitle) return '';
+
+  const parsed = await validatePublicUrl(publisherUrl);
+  const origin = parsed.origin;
+  const candidates = [
+    parsed.toString(),
+    new URL('/news', origin).toString(),
+    new URL('/latest', origin).toString(),
+    new URL('/articles', origin).toString(),
+    new URL('/blog', origin).toString(),
+    new URL('/markets', origin).toString()
+  ];
+
+  let bestUrl = '';
+  let bestScore = 0;
+  const expectedWords = normalizedHeadlineWords(expectedTitle);
+
+  for (const pageUrl of [...new Set(candidates)]) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(await validatePublicUrl(pageUrl), {
+        redirect: 'follow',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; MarkSetGoWeb/2.5; +article resolver)',
+          Accept: 'text/html,application/xhtml+xml,*/*;q=0.1'
+        }
+      });
+      if (!response.ok) continue;
+
+      const html = await response.text();
+      const $ = cheerio.load(html);
+      const responseBase = response.url || pageUrl;
+
+      $('a[href]').each((_i, element) => {
+        const label = stripMarkup($(element).text()).replace(/\s+/g, ' ').trim();
+        if (label.length < 15) return;
+
+        const actualWords = normalizedHeadlineWords(label);
+        if (!expectedWords.size || !actualWords.size) return;
+
+        let matches = 0;
+        for (const word of expectedWords) if (actualWords.has(word)) matches += 1;
+        const score = matches / Math.max(expectedWords.size, actualWords.size);
+        if (matches < Math.min(3, Math.ceil(expectedWords.size * 0.45))) return;
+        if (score < bestScore) return;
+
+        let absolute;
+        try { absolute = new URL($(element).attr('href'), responseBase); } catch { return; }
+        if (!/^https?:$/.test(absolute.protocol)) return;
+        if (!samePublisherHost(absolute.hostname, parsed.hostname)) return;
+        if (!likelyArticlePath(absolute.pathname)) return;
+
+        bestScore = score;
+        bestUrl = absolute.toString().split('#')[0];
+      });
+
+      if (bestScore >= 0.8 && bestUrl) break;
+    } catch (_) {
+      // Continue through likely publisher listing pages.
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  return bestUrl;
+}
+
 app.post('/api/current/article', async (req, res) => {
-  const url = String(req.body?.url || '').trim();
+  const originalUrl = String(req.body?.url || '').trim();
   const title = String(req.body?.title || 'Article').trim();
   const summary = String(req.body?.summary || '').trim();
   const source = String(req.body?.source || 'Feed').trim();
-  if (!url) return res.status(400).json({ error: 'The article URL is missing.' });
+  const publisherUrl = String(req.body?.publisherUrl || '').trim();
+  if (!originalUrl) return res.status(400).json({ error: 'The article URL is missing.' });
+
+  let articleUrl = originalUrl;
+
   try {
-    const articleText = await fetchArticleForFeed(url, title);
+    const host = new URL(originalUrl).hostname.toLowerCase();
+    if (host === 'news.google.com' || host.endsWith('.news.google.com')) {
+      const resolved = await resolvePublisherArticleUrl(publisherUrl, title);
+      if (resolved) articleUrl = resolved;
+    }
+  } catch {}
+
+  try {
+    const articleText = await fetchArticleForFeed(articleUrl, title);
     return res.json({
       title,
       fullArticle: true,
-      text: `${title}\n\n${articleText}\n\nSource: ${source}\n${url}`
+      sourceUrl: articleUrl,
+      resolvedFromGoogleNews: articleUrl !== originalUrl,
+      text: `${title}\n\n${articleText}\n\nSource: ${source}\n${articleUrl}`
     });
   } catch (error) {
     if (summary) {
       return res.json({
         title,
         fullArticle: false,
-        text: `${title}\n\n${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${url}`,
+        sourceUrl: articleUrl,
+        resolvedFromGoogleNews: articleUrl !== originalUrl,
+        text: `${title}\n\n${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${articleUrl}`,
         warning: error?.message || 'The publisher did not expose readable article text.'
       });
     }

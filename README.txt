@@ -1,16 +1,18 @@
-MARK, SET, GO! — TOPIC FEEDS PUBLISHER PAGE FIX
+MARK, SET, GO! — GOOGLE NEWS ARTICLE RESOLVER
 
-Replace only the ROOT server.js.
+Replace:
+server.js                      (ROOT)
+public/topic-feeds.js
+public/index.html
 
-New source order for website feeds:
-1. Publisher RSS/Atom feed
-2. Publisher's own latest/news/article listing pages
-3. Google News only as a final fallback
+Why this is different:
+The feed may still come from Google News. Instead of relying on refresh-time feed
+discovery, clicking Read in Reader now sends the publisher website plus headline
+to the server. If the article URL is a news.google.com wrapper, the server searches
+the publisher's own Home/News/Latest/Articles pages for the matching headline,
+uses that direct publisher URL, and then imports the article.
 
-This specifically addresses sites such as Bitcoin Magazine where Google News RSS
-returns encoded news.google.com wrapper URLs instead of direct publisher links.
+This specifically handles the symptom where the Reader still showed:
+https://news.google.com/rss/articles/...
 
-After deploy, refresh the Topic Feed so old cached Google News URLs are replaced
-by newly discovered direct publisher URLs.
-
-No public files or Reader files are changed by this package.
+No Reader core files are changed.

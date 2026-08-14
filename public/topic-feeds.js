@@ -150,7 +150,8 @@
           url: article.url,
           title: article.title,
           summary: article.summary || '',
-          source: article.sourceName || 'Topic Feed'
+          source: article.sourceName || 'Topic Feed',
+          publisherUrl: article.sourceUrl || ''
         })
       });
       const payload = await response.json().catch(() => ({}));
@@ -167,7 +168,7 @@
         text: payload.text,
         source: {
           type: 'topic-feed',
-          url: article.url,
+          url: payload.sourceUrl || article.url,
           topic: topic?.name || '',
           feedSource: article.sourceName,
           fullArticle: payload.fullArticle !== false,
