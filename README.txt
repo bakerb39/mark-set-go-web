@@ -1,15 +1,23 @@
-MARK, SET, GO! — TOPIC FEEDS METADATA URL FIX
+MARK, SET, GO! — VERIFIED PUBLISHER RSS PRIORITY
 
 Replace only the ROOT server.js.
 
-What this fixes:
-- http://www.w3.org/XML/1998/namespace can no longer be treated as an article URL.
-- schema.org, purl.org and xmlns.com metadata URLs are also rejected.
-- When the app encounters one of those bad URLs, it uses the article headline
-  plus the configured publisher site (CoinDesk, Bitcoin Magazine, etc.) to find
-  the actual publisher article.
-- Embedded RSS links are accepted only when they match the known publisher host.
-- Existing cached Topic Feed items with the bad W3 URL can be retried; no feed
-  recreation is required.
+Verified official RSS feeds now take priority before any page crawling or Google News fallback:
 
-No public files and no Reader files changed.
+CoinDesk
+https://www.coindesk.com/arc/outboundfeeds/rss/
+
+U.S. SEC press releases
+https://www.sec.gov/news/pressreleases.rss
+
+For other websites:
+1. Try advertised RSS/Atom feeds.
+2. Try common RSS/Atom paths.
+3. Try the publisher's own latest/news/article pages.
+4. Use Google News only as the final fallback.
+
+Bitcoin Magazine is NOT hardcoded because an official RSS URL was not verified.
+Its own article/news pages remain the preferred fallback before Google News.
+
+After deploy, refresh the Topic Feed so CoinDesk and SEC items are rebuilt from
+their official feeds rather than old cached Google News items.

@@ -208,11 +208,35 @@ async function fetchFeedItems(source) {
 }
 
 
+
+const VERIFIED_PUBLISHER_FEEDS = Object.freeze({
+  'coindesk.com': 'https://www.coindesk.com/arc/outboundfeeds/rss/',
+  'sec.gov': 'https://www.sec.gov/news/pressreleases.rss'
+});
+
+function verifiedPublisherFeedForHost(hostname = '') {
+  const host = String(hostname || '').toLowerCase().replace(/^www\./, '');
+  for (const [publisherHost, feedUrl] of Object.entries(VERIFIED_PUBLISHER_FEEDS)) {
+    if (host === publisherHost || host.endsWith(`.${publisherHost}`)) return feedUrl;
+  }
+  return '';
+}
+
 async function discoverPublisherFeed(rawUrl) {
   const parsed = await validatePublicUrl(rawUrl);
   const origin = parsed.origin;
   const candidates = [];
   const seen = new Set();
+
+  const verifiedFeed = verifiedPublisherFeedForHost(parsed.hostname);
+  if (verifiedFeed) {
+    try {
+      const items = await fetchFeedItems({ feedUrl: verifiedFeed });
+      if (items.length) return { feedUrl: verifiedFeed, items, verified: true };
+    } catch (error) {
+      console.warn(`Verified publisher RSS failed for ${parsed.hostname}:`, error?.message || error);
+    }
+  }
 
   const add = (value) => {
     if (!value) return;
@@ -4783,7 +4807,7 @@ app.post('/api/topic-feeds/fetch', async (req, res) => {
         if (discoveredFeed?.items?.length) {
           feedUrl = discoveredFeed.feedUrl;
           items = discoveredFeed.items;
-          mode = 'publisher-feed';
+          mode = discoveredFeed.verified ? 'verified-publisher-feed' : 'publisher-feed';
         } else {
           const publisherItems = await discoverPublisherPageArticles(parsed.toString(), topic);
           if (publisherItems.length) {
