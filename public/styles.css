@@ -15123,16 +15123,3 @@ body:not(.light) .reader-written-annotation {
 .reader-inserted-workspace.workspace-resizing { user-select:none; }
 .reader-inserted-workspace.workspace-collapsed .reader-workspace-resize { display:none; }
 .reader-inserted-workspace:not(.workspace-collapsed) .reader-workspace-tab { display:none; }
-/* v9.2.6 — fix Reader Full screen / music control alignment */
-#app .read-anything-command-bar .viewer-fullscreen-button {
-  position: static !important;
-  inset: auto !important;
-  top: 40px;
-  right: auto !important;
-  bottom: auto !important;
-  left: auto !important;
-
-  flex: 0 0 auto;
-  margin-left: .45rem;
-  transform: none;
-}
