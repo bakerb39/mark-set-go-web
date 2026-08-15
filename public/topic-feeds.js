@@ -899,6 +899,7 @@
         article.read = true;
         saveState();
       }
+      preserveTopicReaderNavigation(article.id);
       openPreparedArticle(topic, article, payload);
     } catch (error) {
       if (status) { status.className = 'status error'; status.textContent = error.message; }
@@ -1586,6 +1587,7 @@
 
   let pendingTopicReaderScrollRestore = null;
   let topicReaderScrollRestoreTimer = 0;
+  let preservedTopicReaderNav = null;
 
   function captureTopicReaderScroll(articleId = '') {
     const pane = document.querySelector('#navigation-pane');
@@ -1596,6 +1598,58 @@
       articleId: String(articleId || ''),
       capturedAt: Date.now()
     };
+  }
+
+  function preserveTopicReaderNavigation(articleId = '') {
+    const pane = document.querySelector('#navigation-pane');
+    const nav = pane?.querySelector('.topic-reader-nav');
+    if (!pane || !nav) return false;
+
+    captureTopicReaderScroll(articleId);
+
+    // Keep the actual My Topics DOM alive while Read Anything rebuilds the
+    // surrounding Reader. This preserves expanded topics, Show all/Show fewer,
+    // focus state, and all existing article-button listeners.
+    preservedTopicReaderNav = {
+      node: nav,
+      scrollTop: Math.max(0, Number(pane.scrollTop) || 0),
+      articleId: String(articleId || ''),
+      capturedAt: Date.now()
+    };
+
+    nav.remove();
+    return true;
+  }
+
+  function restorePreservedTopicReaderNavigation() {
+    if (!preservedTopicReaderNav?.node) return false;
+
+    const pane = document.querySelector('#navigation-pane');
+    const view = pane?.querySelector('[data-reader-view="contents"]');
+    if (!pane || !view) return false;
+
+    // Use the NEW Reader's bookmark button because app.js binds that button to
+    // the newly rendered Reader. Everything else in My Topics can remain the
+    // exact same DOM nodes.
+    const nativeBookmarkButton = view.querySelector('#add-bookmark');
+    view.replaceChildren(preservedTopicReaderNav.node);
+
+    const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
+    if (nativeBookmarkButton && bookmarkSlot) {
+      nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
+      nativeBookmarkButton.textContent = '＋ Bookmark';
+      nativeBookmarkButton.title = 'Bookmark the current reading position';
+      bookmarkSlot.replaceChildren(nativeBookmarkButton);
+    }
+
+    pendingTopicReaderScrollRestore = {
+      scrollTop: preservedTopicReaderNav.scrollTop,
+      articleId: preservedTopicReaderNav.articleId,
+      capturedAt: preservedTopicReaderNav.capturedAt
+    };
+
+    preservedTopicReaderNav = null;
+    return true;
   }
 
   function restoreTopicReaderScroll() {
@@ -1699,20 +1753,25 @@
     bindTopicReaderPanePreference();
 
     if (!view.querySelector('.topic-reader-nav')) {
-      // IMPORTANT: renderNavigationPane() has already bound the Reader's
-      // #add-bookmark button to its native addBookmark() function. Keep that
-      // exact DOM node before replacing Contents so bookmarks continue to use
-      // the established Reader implementation.
-      const nativeBookmarkButton = view.querySelector('#add-bookmark');
+      // When another Topic Feed story opens, Read Anything rebuilds the Reader.
+      // Reattach the existing My Topics navigation instead of generating it
+      // again, so the left panel does not visibly refresh or lose UI state.
+      if (!restorePreservedTopicReaderNavigation()) {
+        // IMPORTANT: renderNavigationPane() has already bound the Reader's
+        // #add-bookmark button to its native addBookmark() function. Keep that
+        // exact DOM node before replacing Contents so bookmarks continue to use
+        // the established Reader implementation.
+        const nativeBookmarkButton = view.querySelector('#add-bookmark');
 
-      view.innerHTML = readerTopicListMarkup();
+        view.innerHTML = readerTopicListMarkup();
 
-      const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
-      if (nativeBookmarkButton && bookmarkSlot) {
-        nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
-        nativeBookmarkButton.textContent = '＋ Bookmark';
-        nativeBookmarkButton.title = 'Bookmark the current reading position';
-        bookmarkSlot.replaceChildren(nativeBookmarkButton);
+        const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
+        if (nativeBookmarkButton && bookmarkSlot) {
+          nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
+          nativeBookmarkButton.textContent = '＋ Bookmark';
+          nativeBookmarkButton.title = 'Bookmark the current reading position';
+          bookmarkSlot.replaceChildren(nativeBookmarkButton);
+        }
       }
     }
 
@@ -1727,7 +1786,9 @@
         const topic = state.topics.find((item) => item.id === button.dataset.readerTopicParent);
         const article = topic?.articles?.find((item) => item.id === button.dataset.readerTopicArticle);
         if (topic && article) {
-          captureTopicReaderScroll(article.id);
+          // Do not detach My Topics yet. openArticle first prepares/downloads the
+          // article; the panel is preserved only immediately before the Reader
+          // itself is replaced.
           openArticle(article, button, topic);
         }
       });
