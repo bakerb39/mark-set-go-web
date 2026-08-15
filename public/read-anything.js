@@ -1417,15 +1417,12 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
   function buildSocialPostArticleContext() {
     if (!activeImportedDocument) return null;
-
     const articleText = String(
       activeImportedDocument.versions?.original ||
       activeImportedDocument.originalText ||
       ''
     ).trim();
-
     if (articleText.length < 40) return null;
-
     return {
       title: activeImportedDocument.baseTitle || activeImportedDocument.title || 'Current article',
       sourceUrl: activeImportedDocument.source?.url || '',
@@ -1435,210 +1432,190 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   function socialPostPrompt(style = 'default', currentDraft = '') {
-    const styleInstructions = {
-      default: 'Create an engaging social-media post based on this article. Capture the most interesting or useful insight, stay faithful to the article, and write in a natural human voice. Do not invent facts. Keep it concise enough to work on most social platforms. Include the article link only if one is available in the context.',
-      shorter: 'Rewrite the current social-media draft to be substantially shorter and punchier while preserving its main insight and factual accuracy.',
-      professional: 'Rewrite the current social-media draft in a polished, professional tone suitable for LinkedIn while keeping it natural and not overly corporate.',
-      casual: 'Rewrite the current social-media draft in a more conversational, approachable tone while preserving the article’s meaning and factual accuracy.'
+    const instructions = {
+      default: 'Create an engaging social-media post based on this article. Capture the most interesting or useful insight, stay faithful to the article, and write in a natural human voice. Do not invent facts. Keep it concise enough to work on most social platforms. If a source URL is supplied, end with that URL on its own line.',
+      shorter: 'Rewrite the current social-media draft to be substantially shorter and punchier while preserving its main insight, factual accuracy, and any source URL already present.',
+      professional: 'Rewrite the current social-media draft in a polished, professional tone suitable for LinkedIn while keeping it natural, factual, and not overly corporate. Preserve any source URL already present.',
+      casual: 'Rewrite the current social-media draft in a more conversational, approachable tone while preserving the article meaning, factual accuracy, and any source URL already present.'
     };
-
-    const instruction = styleInstructions[style] || styleInstructions.default;
-    return currentDraft
-      ? `${instruction}\n\nCurrent draft:\n${currentDraft}`
-      : instruction;
+    const instruction = instructions[style] || instructions.default;
+    return currentDraft ? `${instruction}\n\nCurrent draft:\n${currentDraft}` : instruction;
   }
 
   function socialShareUrl(platform, text, sourceUrl = '') {
-    const encodedText = encodeURIComponent(String(text || '').trim());
+    const value = String(text || '').trim();
+    const encodedText = encodeURIComponent(value);
     const encodedUrl = encodeURIComponent(String(sourceUrl || '').trim());
-    const combined = encodeURIComponent(`${String(text || '').trim()}${sourceUrl ? `\n\n${sourceUrl}` : ''}`.trim());
-
     switch (platform) {
       case 'x':
-        return `https://twitter.com/intent/tweet?text=${encodedText}${sourceUrl ? `&url=${encodedUrl}` : ''}`;
+        return `https://twitter.com/intent/tweet?text=${encodedText}`;
       case 'linkedin':
-        return sourceUrl
-          ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`
-          : 'https://www.linkedin.com/feed/';
+        return sourceUrl ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}` : 'https://www.linkedin.com/feed/';
       case 'facebook':
-        return sourceUrl
-          ? `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`
-          : 'https://www.facebook.com/';
+        return sourceUrl ? `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}` : 'https://www.facebook.com/';
       case 'threads':
-        return `https://www.threads.net/intent/post?text=${combined}`;
+        return `https://www.threads.net/intent/post?text=${encodedText}`;
       case 'bluesky':
-        return `https://bsky.app/intent/compose?text=${combined}`;
+        return `https://bsky.app/intent/compose?text=${encodedText}`;
       default:
         return '';
     }
   }
 
-  async function copySocialPostText(text, button) {
-    const value = String(text || '').trim();
-    if (!value) return false;
+  function ensureSocialPostComposer() {
+    let modal = document.getElementById('msg-social-post-modal');
+    if (modal) return modal;
 
-    try {
-      await navigator.clipboard.writeText(value);
-    } catch {
-      const helper = document.createElement('textarea');
-      helper.value = value;
-      helper.setAttribute('readonly', '');
-      helper.style.position = 'fixed';
-      helper.style.opacity = '0';
-      document.body.appendChild(helper);
-      helper.select();
-      document.execCommand('copy');
-      helper.remove();
-    }
+    modal = document.createElement('div');
+    modal.id = 'msg-social-post-modal';
+    modal.hidden = true;
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-labelledby', 'msg-social-post-title');
+    modal.style.cssText = [
+      'position:fixed','inset:0','z-index:2147483000','background:rgba(5,18,38,.48)',
+      'display:flex','align-items:center','justify-content:center','padding:18px','box-sizing:border-box'
+    ].join(';');
 
-    if (button) {
-      const prior = button.textContent;
-      button.textContent = 'Copied!';
-      window.setTimeout(() => {
-        if (button.isConnected) button.textContent = prior;
-      }, 1400);
-    }
-    return true;
-  }
+    modal.innerHTML = `
+      <section style="width:min(680px,96vw);max-height:90vh;overflow:auto;background:#fff;color:#102a43;border:1px solid rgba(18,78,125,.18);border-radius:14px;box-shadow:0 22px 70px rgba(0,0,0,.26);padding:18px;box-sizing:border-box;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:10px;">
+          <div>
+            <div style="font-size:.76rem;text-transform:uppercase;letter-spacing:.08em;color:#53708a;font-weight:700;">Whole article</div>
+            <h2 id="msg-social-post-title" style="margin:.15rem 0 0;font-size:1.18rem;color:#0d3154;">Create Post</h2>
+          </div>
+          <button type="button" data-social-close aria-label="Close Create Post" title="Close" style="border:0;background:transparent;color:#0d3154;font-size:1.35rem;line-height:1;cursor:pointer;padding:4px 7px;">×</button>
+        </div>
+        <div data-social-article-title style="font-size:.9rem;font-weight:700;margin:0 0 10px;color:#385a76;"></div>
+        <div data-social-status style="font-size:.9rem;margin:0 0 10px;color:#53708a;"></div>
+        <textarea data-social-draft rows="9" aria-label="Editable social media post" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit;line-height:1.5;padding:11px 12px;border:1px solid #b7c9d8;border-radius:9px;background:#fff;color:#102a43;outline:none;"></textarea>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px;">
+          <button type="button" data-social-rewrite="default" class="msg-post-btn">Regenerate</button>
+          <button type="button" data-social-rewrite="shorter" class="msg-post-btn">Shorter</button>
+          <button type="button" data-social-rewrite="professional" class="msg-post-btn">Professional</button>
+          <button type="button" data-social-rewrite="casual" class="msg-post-btn">Casual</button>
+        </div>
+        <div style="font-size:.84rem;font-weight:800;margin-bottom:6px;color:#294e6b;">Post to</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+          <button type="button" data-social-platform="x" class="msg-post-btn">X</button>
+          <button type="button" data-social-platform="linkedin" class="msg-post-btn">LinkedIn</button>
+          <button type="button" data-social-platform="facebook" class="msg-post-btn">Facebook</button>
+          <button type="button" data-social-platform="threads" class="msg-post-btn">Threads</button>
+          <button type="button" data-social-platform="bluesky" class="msg-post-btn">Bluesky</button>
+          <button type="button" data-social-copy class="msg-post-btn msg-post-btn-primary">Copy</button>
+        </div>
+        <p style="margin:10px 0 0;font-size:.78rem;color:#607d94;line-height:1.4;">Edit anything you like before sharing. LinkedIn and Facebook may require you to paste the copied text after their share window opens.</p>
+      </section>`;
 
-  function compactSocialButton(label, attrs = '') {
-    return `<button type="button" ${attrs} style="display:inline-flex;align-items:center;justify-content:center;width:auto;min-width:0;min-height:0;height:26px;padding:2px 8px;margin:0;border:1px solid #1769aa;border-radius:5px;background:#1769aa;color:#fff;font:600 11px/1 inherit;letter-spacing:0;white-space:nowrap;cursor:pointer;box-shadow:none;">${label}</button>`;
-  }
+    const style = document.createElement('style');
+    style.textContent = `
+      #msg-social-post-modal[hidden]{display:none !important;}
+      #msg-social-post-modal .msg-post-btn{appearance:none;border:1px solid #1769aa;background:#eef6fd;color:#0d5f9d;border-radius:7px;padding:5px 9px;font:600 .8rem/1.2 inherit;cursor:pointer;min-height:28px;box-shadow:none;}
+      #msg-social-post-modal .msg-post-btn:hover{background:#dceefa;}
+      #msg-social-post-modal .msg-post-btn:focus-visible{outline:2px solid #1769aa;outline-offset:2px;}
+      #msg-social-post-modal .msg-post-btn:disabled{opacity:.55;cursor:wait;}
+      #msg-social-post-modal .msg-post-btn-primary{background:#1769aa;color:#fff;}
+      #msg-social-post-modal .msg-post-btn-primary:hover{background:#11568d;}
+    `;
+    document.head.appendChild(style);
+    document.body.appendChild(modal);
 
-  function bindSocialPostComposerButtons(panel) {
-    const composer = panel?.querySelector('[data-social-post-composer="1"]');
-    if (!composer) return;
+    const draft = modal.querySelector('[data-social-draft]');
+    const status = modal.querySelector('[data-social-status]');
 
-    const textarea = composer.querySelector('#msg-social-post-draft');
-
-    composer.querySelector('[data-social-copy]')?.addEventListener('click', (event) => {
-      event.preventDefault();
-      const text = String(textarea?.value || '').trim();
-      void copySocialPostText(text, event.currentTarget);
+    modal.querySelector('[data-social-close]')?.addEventListener('click', () => {
+      modal.hidden = true;
     });
 
-    composer.querySelectorAll('[data-social-platform]').forEach((button) => {
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        const text = String(textarea?.value || '').trim();
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) modal.hidden = true;
+    });
+
+    modal.querySelector('[data-social-copy]')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      const text = String(draft?.value || '').trim();
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        draft?.focus();
+        draft?.select();
+        document.execCommand('copy');
+      }
+      const old = button.textContent;
+      button.textContent = 'Copied';
+      window.setTimeout(() => { if (button.isConnected) button.textContent = old; }, 1100);
+    });
+
+    modal.querySelectorAll('[data-social-platform]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const text = String(draft?.value || '').trim();
         if (!text) return;
-
-        const platform = event.currentTarget.dataset.socialPlatform;
         const context = buildSocialPostArticleContext();
-        const sourceUrl = context?.sourceUrl || '';
-        const url = socialShareUrl(platform, text, sourceUrl);
+        const platform = button.dataset.socialPlatform;
+        const url = socialShareUrl(platform, text, context?.sourceUrl || '');
+        if (!url) return;
 
-        if (url) window.open(url, '_blank', 'noopener,noreferrer');
+        // Open synchronously inside the user gesture so popup blockers do not
+        // treat the share as an asynchronous popup.
+        window.open(url, '_blank', 'noopener,noreferrer');
+
+        // LinkedIn/Facebook generally do not accept arbitrary prefilled body text.
+        // Copy the edited draft without awaiting it so opening remains synchronous.
         if (platform === 'linkedin' || platform === 'facebook') {
-          void copySocialPostText(text, event.currentTarget);
+          navigator.clipboard?.writeText?.(text).catch(() => {});
+          if (status) status.textContent = 'Draft copied — paste it into the share window if needed.';
         }
       });
     });
 
-    composer.querySelectorAll('[data-social-rewrite]').forEach((button) => {
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        const clicked = event.currentTarget;
-        const style = clicked.dataset.socialRewrite || 'default';
-        const currentDraft = textarea?.value || '';
-        const oldText = clicked.textContent;
-        clicked.disabled = true;
-        clicked.textContent = 'Writing…';
-
-        void requestSocialPost(style, currentDraft, { preserveComposer: true })
-          .then((updated) => {
-            if (textarea?.isConnected && updated) textarea.value = updated;
-          })
-          .catch((rewriteError) => {
-            window.alert(rewriteError.message || 'The post could not be rewritten.');
-          })
-          .finally(() => {
-            if (clicked.isConnected) {
-              clicked.disabled = false;
-              clicked.textContent = oldText;
-            }
-          });
+    modal.querySelectorAll('[data-social-rewrite]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const current = String(draft?.value || '').trim();
+        if (!current) return;
+        const old = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Writing…';
+        if (status) status.textContent = 'Updating the draft…';
+        try {
+          const updated = await requestSocialPostDraft(button.dataset.socialRewrite || 'default', current);
+          if (draft) draft.value = updated;
+          if (status) status.textContent = 'Draft updated. You can edit it before sharing.';
+        } catch (error) {
+          if (status) status.textContent = error?.message || 'The draft could not be updated.';
+        } finally {
+          button.disabled = false;
+          button.textContent = old;
+        }
       });
     });
+
+    return modal;
   }
 
-  function renderSocialPostComposer(draft, { loading = false, error = '' } = {}) {
-    const panel = openAskMarkInvestorPanel();
-    if (!panel) return;
-
-    const context = buildSocialPostArticleContext();
-    const companion = context?.companion || activeArticleCompanionIdentity();
-    const title = context?.title || 'Current article';
-
-    if (loading) {
-      panel.innerHTML = `
-        <div class="mark-selection-card">
-          <span>Whole article · Create post</span>
-          <blockquote>${escapeHtml(title)}</blockquote>
-        </div>
-        <div id="mark-response" class="mark-response" data-social-post-composer="1">
-          <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Create social post</strong></div>
-          <p class="status">${escapeHtml(companion.name)} is drafting a social-media post from this article…</p>
-        </div>`;
-      notifyAskMarkPanelUpdated('response');
-      return;
-    }
-
-    if (error) {
-      panel.innerHTML = `
-        <div class="mark-selection-card">
-          <span>Whole article · Create post</span>
-          <blockquote>${escapeHtml(title)}</blockquote>
-        </div>
-        <div id="mark-response" class="mark-response" data-social-post-composer="1">
-          <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Create social post</strong></div>
-          <p class="status error">${escapeHtml(error)}</p>
-        </div>`;
-      notifyAskMarkPanelUpdated('response');
-      return;
-    }
-
-    panel.innerHTML = `
-      <div class="mark-selection-card">
-        <span>Whole article · Create post</span>
-        <blockquote>${escapeHtml(title)}</blockquote>
-      </div>
-      <div id="mark-response" class="mark-response" data-social-post-composer="1">
-        <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Social post</strong></div>
-        <label for="msg-social-post-draft" style="display:block;font-weight:700;margin:.2rem 0 .35rem;">Edit your post</label>
-        <textarea id="msg-social-post-draft" rows="7" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit;line-height:1.45;padding:.6rem;border:1px solid rgba(15,35,60,.22);border-radius:8px;">${escapeHtml(String(draft || '').trim())}</textarea>
-        <div class="msg-social-post-rewrite" style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin:8px 0;">
-          ${compactSocialButton('Regenerate', 'data-social-rewrite="default"')}
-          ${compactSocialButton('Shorter', 'data-social-rewrite="shorter"')}
-          ${compactSocialButton('Professional', 'data-social-rewrite="professional"')}
-          ${compactSocialButton('Casual', 'data-social-rewrite="casual"')}
-        </div>
-        <div style="margin-top:10px;font-size:12px;"><strong>Post to</strong></div>
-        <div class="msg-social-post-platforms" style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin:6px 0;">
-          ${compactSocialButton('X', 'data-social-platform="x"')}
-          ${compactSocialButton('LinkedIn', 'data-social-platform="linkedin"')}
-          ${compactSocialButton('Facebook', 'data-social-platform="facebook"')}
-          ${compactSocialButton('Threads', 'data-social-platform="threads"')}
-          ${compactSocialButton('Bluesky', 'data-social-platform="bluesky"')}
-          ${compactSocialButton('Copy', 'data-social-copy="1"')}
-        </div>
-        <p style="margin:5px 0 0;opacity:.68;font-size:11px;line-height:1.35;">Edit anything you want before sharing. LinkedIn and Facebook also copy the draft for easy pasting.</p>
-      </div>`;
-
-    bindSocialPostComposerButtons(panel);
-    notifyAskMarkPanelUpdated('response');
+  function showSocialPostComposer({ title = '', draft = '', statusText = '', busy = false } = {}) {
+    const modal = ensureSocialPostComposer();
+    const titleNode = modal.querySelector('[data-social-article-title]');
+    const draftNode = modal.querySelector('[data-social-draft]');
+    const statusNode = modal.querySelector('[data-social-status]');
+    if (titleNode) titleNode.textContent = title;
+    if (draftNode) draftNode.value = draft;
+    if (statusNode) statusNode.textContent = statusText;
+    modal.querySelectorAll('button[data-social-rewrite],button[data-social-platform],button[data-social-copy]').forEach((button) => {
+      button.disabled = Boolean(busy);
+    });
+    modal.hidden = false;
+    if (!busy) window.setTimeout(() => draftNode?.focus(), 0);
+    return modal;
   }
 
-  async function requestSocialPost(style = 'default', currentDraft = '', { preserveComposer = false } = {}) {
+  async function requestSocialPostDraft(style = 'default', currentDraft = '') {
     const context = buildSocialPostArticleContext();
     if (!context) throw new Error('The original article text is unavailable.');
 
-    if (!preserveComposer) renderSocialPostComposer('', { loading: true });
-
     const controller = new AbortController();
-    const clientTimeout = window.setTimeout(() => controller.abort(), 90000);
+    const timeout = window.setTimeout(() => controller.abort(), 90000);
     let response;
-
     try {
       response = await fetch('/api/read-anything/article-followup', {
         method: 'POST',
@@ -1654,34 +1631,47 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           question: socialPostPrompt(style, currentDraft)
         })
       });
-    } catch (requestError) {
-      if (requestError?.name === 'AbortError') {
-        const message = `${context.companion.name} took too long to create the post. Please try again.`;
-        if (!preserveComposer) renderSocialPostComposer('', { error: message });
-        throw new Error(message);
-      }
-      if (!preserveComposer) renderSocialPostComposer('', { error: requestError.message || 'The post could not be created.' });
-      throw requestError;
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new Error('Creating the post took too long. Please try again.');
+      throw error;
     } finally {
-      window.clearTimeout(clientTimeout);
+      window.clearTimeout(timeout);
     }
 
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const message = payload.detail || payload.error || `${context.companion.name} could not create the social-media post.`;
-      if (!preserveComposer) renderSocialPostComposer('', { error: message });
-      throw new Error(message);
-    }
-
+    if (!response.ok) throw new Error(payload.detail || payload.error || 'The post could not be created.');
     const draft = String(payload.result?.response || payload.result?.text || '').trim();
-    if (!draft) {
-      const message = 'The post response was empty. Please try again.';
-      if (!preserveComposer) renderSocialPostComposer('', { error: message });
-      throw new Error(message);
-    }
-
-    if (!preserveComposer) renderSocialPostComposer(draft);
+    if (!draft) throw new Error('The post response was empty. Please try again.');
     return draft;
+  }
+
+  async function createSocialPostFromArticle() {
+    const context = buildSocialPostArticleContext();
+    if (!context) throw new Error('The original article text is unavailable.');
+    showSocialPostComposer({
+      title: context.title,
+      draft: '',
+      statusText: `${context.companion.name} is drafting a post from this article…`,
+      busy: true
+    });
+    try {
+      const draft = await requestSocialPostDraft('default', '');
+      showSocialPostComposer({
+        title: context.title,
+        draft,
+        statusText: 'Draft ready. Edit it, rewrite it, copy it, or choose a social platform.',
+        busy: false
+      });
+      return draft;
+    } catch (error) {
+      showSocialPostComposer({
+        title: context.title,
+        draft: '',
+        statusText: error?.message || 'The post could not be created.',
+        busy: false
+      });
+      throw error;
+    }
   }
 
   function installArticleSummaryButton() {
@@ -1782,7 +1772,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       const createPostLink = makeArticleLink(
         'create-social-post',
         'Create Post',
-        'Create a social media post from this whole article'
+        'Create an editable social media post from this whole article'
       );
 
       actionRow.append(summaryLink, separator, investorLink, postSeparator, createPostLink);
@@ -1863,20 +1853,18 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     const createPostLink = actionRow.querySelector('[data-action="create-social-post"]');
     if (createPostLink) {
       createPostLink.textContent = 'Create Post';
-      createPostLink.setAttribute('aria-label', 'Create a social media post from this whole article');
-      createPostLink.title = 'Draft an editable social-media post from this article and choose where to share it.';
+      createPostLink.setAttribute('aria-label', 'Create an editable social media post from this whole article');
+      createPostLink.title = 'Draft an editable social post from the whole article.';
       createPostLink.onclick = async (event) => {
         event?.preventDefault?.();
         event?.stopPropagation?.();
-
         const originalLabel = createPostLink.textContent;
         createPostLink.disabled = true;
         createPostLink.textContent = 'Creating…';
-
         try {
-          await requestSocialPost();
+          await createSocialPostFromArticle();
         } catch (error) {
-          console.warn('Create social post failed:', error);
+          console.warn('Create Post failed:', error);
         } finally {
           if (createPostLink.isConnected) {
             createPostLink.disabled = false;

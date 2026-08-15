@@ -29,6 +29,7 @@
       #topic-pane-refresh{width:30px;height:30px;min-width:30px;padding:0;border:1px solid #1769aa;border-radius:7px;background:#1769aa;color:#fff;font-size:19px;line-height:1;cursor:pointer;display:inline-grid;place-items:center}
       #topic-pane-refresh:hover:not(:disabled){filter:brightness(.94)}
       #topic-pane-refresh:disabled{opacity:.55;cursor:default}
+      .topic-reader-article.is-current-story{box-shadow:inset 0 0 0 1px #1769aa;border-radius:6px}
     `;
     document.head.appendChild(style);
   }
@@ -1607,6 +1608,11 @@
       const topic = state.topics.find((item) => item.id === button.dataset.readerTopicParent);
       const article = topic?.articles?.find((item) => item.id === button.dataset.readerTopicArticle);
       if (article) button.classList.toggle('is-read', Boolean(article.read));
+
+      const isCurrentStory = button.dataset.readerTopicArticle === window.MSGTopicFeedReaderContext?.articleId;
+      button.classList.toggle('is-current-story', isCurrentStory);
+      if (isCurrentStory) button.setAttribute('aria-current', 'true');
+      else button.removeAttribute('aria-current');
     });
 
     nav.querySelectorAll('.topic-reader-group').forEach((details) => {
@@ -1695,7 +1701,7 @@
             return `<div class="topic-reader-source" data-reader-topic-source-block="${escapeHtml(source.id)}">
               <div class="topic-reader-source-head"><strong>${escapeHtml(source.name)}</strong><span>${sourceArticleCount(topic, source.id, true)} new</span></div>
               ${articles.length ? articles.map((article, index) => `<button type="button"
-                 class="topic-reader-article ${article.read ? 'is-read' : ''}"
+                 class="topic-reader-article ${article.read ? 'is-read' : ''} ${article.id === window.MSGTopicFeedReaderContext?.articleId ? 'is-current-story' : ''}"
                  ${index >= initialLimit ? 'hidden data-reader-topic-overflow="1"' : ''}
                  data-reader-topic-article="${escapeHtml(article.id)}"
                  data-reader-topic-parent="${escapeHtml(topic.id)}">
