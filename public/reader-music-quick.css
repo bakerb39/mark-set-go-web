@@ -393,3 +393,78 @@
     width:min(292px,calc(100vw - 1rem)) !important;
   }
 }
+
+
+/* v1.4.2 — real top-right utility stack.
+   Music and Full screen are laid out together in normal flow. No absolute
+   positioning, no overlaying the Reader, no collision between the controls. */
+
+.reader-pane-controls{
+  overflow:visible !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack{
+  position:static !important;
+  margin-left:auto !important;
+  display:grid !important;
+  grid-template-columns:auto !important;
+  grid-auto-flow:row !important;
+  justify-items:end !important;
+  align-items:center !important;
+  gap:10px !important;
+  flex:0 0 auto !important;
+  z-index:auto !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle{
+  position:static !important;
+  inset:auto !important;
+  right:auto !important;
+  bottom:auto !important;
+  z-index:auto !important;
+
+  width:28px !important;
+  min-width:28px !important;
+  height:28px !important;
+  min-height:28px !important;
+
+  margin:0 !important;
+  padding:0 !important;
+
+  justify-self:end !important;
+
+  border:1px solid rgba(38,78,111,.22) !important;
+  border-radius:7px !important;
+  background:#173f6d !important;
+  color:#fff !important;
+
+  box-shadow:0 2px 6px rgba(20,48,72,.16) !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle:hover,
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle:focus-visible,
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle[aria-expanded="true"]{
+  background:#245f91 !important;
+  border-color:rgba(36,95,145,.42) !important;
+  outline:none !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack > .viewer-fullscreen-button{
+  position:static !important;
+  inset:auto !important;
+  margin:0 !important;
+  justify-self:end !important;
+}
+
+/* Keep the stack visually separated from the reading surface. */
+.reader-pane-controls .reader-topright-media-stack{
+  padding-top:2px;
+  padding-bottom:2px;
+}
+
+/* On narrow screens keep both utilities compact and right aligned. */
+@media(max-width:680px){
+  .reader-pane-controls .reader-topright-media-stack{
+    gap:8px !important;
+  }
+}

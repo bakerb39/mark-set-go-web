@@ -1,35 +1,29 @@
-MARK, SET, GO! — MY MUSIC SAVE RELIABILITY FIX
+MARK, SET, GO! — CLEAN TOP-RIGHT READER CONTROLS
 
-Replace/add:
-  /public/music-save-reliability.js
-  /public/reader-music-quick.js
+Replace only:
+  /public/reader-music-quick.css
   /public/index.html
-
-BUG
-
-"Save to My Music" is rendered inside the Music & Focus page. That page is
-frequently rebuilt with innerHTML. The original app binds a click listener
-directly to #save-music-preferred after each render and silently swallows
-localStorage write failures.
 
 FIX
 
-A delegated document-level capture handler now owns "Save to My Music."
+The previous version positioned the music icon absolutely above Full screen.
+That meant the two controls were not actually in the same layout and could
+overlap each other or the Reader.
 
-It:
-- survives every Music-page re-render;
-- accepts Spotify and YouTube playlist/video links;
-- honors the optional custom playlist name;
-- writes directly to markSetGoPreferredMusic;
-- detects duplicates;
-- verifies the localStorage write actually succeeded;
-- shows a clear Saved / Already saved / Error status;
-- refreshes the Music page's "Your saved music" list after success;
-- dispatches marksetgo:preferred-music-changed after a verified save.
+This version removes the floating/absolute positioning entirely.
 
-The compact Reader "My saved playlists" menu listens for that event and
-refreshes immediately in the same browser tab.
+Music and Full screen now share one real vertical utility stack:
 
-No app.js replacement.
-No styles.css replacement.
-No Reader core / Book Pages / Topic Feed JS changes.
+        ♫
+
+  [ Full screen ]
+
+- both are right-aligned;
+- there is a consistent 10px gap;
+- both stay in normal layout flow;
+- neither can float over article text;
+- the existing Full screen button/handler is unchanged;
+- the existing music button/player behavior is unchanged.
+
+No JavaScript is changed.
+No app.js, Reader core, Topic Feed logic, Book Pages, or saved-playlist logic is changed.
