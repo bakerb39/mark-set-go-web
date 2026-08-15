@@ -15150,3 +15150,27 @@ body:not(.light) .reader-written-annotation {
   pointer-events: auto !important;
   z-index: 20002 !important;
 }
+
+
+/* v9.2.x — Founding Documents banner contrast fix.
+   Keep this section at the end of styles.css so generic Browse/theme typography
+   cannot make the dark Primary Sources card unreadable. */
+html body .browse-founding-documents-section .founding-browse-banner,
+html body .browse-founding-documents-section .founding-browse-banner h2,
+html body .browse-founding-documents-section .founding-browse-banner p,
+html body .browse-founding-documents-section .founding-browse-banner .founding-browse-pills span {
+  color: #ffffff !important;
+}
+
+html body .browse-founding-documents-section .founding-browse-banner p {
+  color: rgba(255, 255, 255, .88) !important;
+}
+
+html body .browse-founding-documents-section .founding-browse-banner .source-category {
+  color: #f3cf62 !important;
+  background: rgba(7, 28, 52, .42) !important;
+}
+
+html body .browse-founding-documents-section .founding-browse-banner .founding-browse-actions strong {
+  color: #f3cf62 !important;
+}
