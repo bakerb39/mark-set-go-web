@@ -1,28 +1,35 @@
-MARK, SET, GO! — READER TOOLS + ANALYZE RECONCILIATION
+MARK, SET, GO! — COMPANION PROFILE REPAIR
 
-This is a cumulative reconciliation package.
-
-Replace these files:
-  /public/app.js
-  /public/styles.css
-  /public/read-anything.js
-  /public/ask-mark-hub.js
+Replace:
+  /public/companion-persona-safe.js
+  /public/companion-persona-safe.css
+  /public/companion-chad.js
+  /public/companion-copy-sync.js
   /public/index.html
-  /server.js
 
-Restored:
-- Highlight popup: Highlight, Write, Draw, Space, Erase, Explain, Summarize, Simplify, Context, Compare, Save, Ask companion.
-- Persistent writing, drawing, and inserted Space/workspace annotations.
-- Workspace move/resize and Book Pages width bounds.
-- Reader double-click start/pause behavior from Reader annotations v8.
-- Alt+double-click paragraph selection remains intact.
+WHAT WAS WRONG
 
-Preserved:
-- Analyze follow-ups use the WHOLE ARTICLE when no real passage is highlighted.
-- A real highlighted passage overrides whole-article context.
-- Latest Summarize / Analyze restoration after refresh + Continue Reading.
-- Latest chat question-anchor scrolling.
-- Current companion / Chad / Topic Feeds / market functionality from the cumulative Analyze build.
+Two different scripts owned the Profile companion selector:
 
-Implementation note:
-/public/app.js is the Reader annotations v8 app.js with only the newer Analyze runMarkAction routing merged into it. The later readerFrame dblclick suppression handler that caused the regression is intentionally not included.
+1. companion-persona-safe.js still supported only Mark and Beth.
+2. companion-chad.js waited for a selector with a different class name, did not
+   recognize the safe selector, and created an emergency Mark/Beth/Chad fallback.
+
+That produced TWO "Choose your companion" panels.
+
+Then companion-copy-sync.js treated the old Mark/Beth cards as ordinary text and
+rewrote their standalone names to the active persona, which is why both lower
+cards appeared to say "Chad" while retaining Mark/Beth portraits.
+
+FIX
+
+There is now one canonical selector:
+  Mark | Beth | Chad
+
+companion-persona-safe.js owns all three personas.
+companion-chad.js no longer creates any fallback profile UI.
+companion-copy-sync.js explicitly excludes the profile choice cards from active
+persona text replacement.
+
+This repair is intentionally isolated to companion/profile UI. It does not
+replace app.js, Reader annotations, Analyze, article resume logic, or chat code.

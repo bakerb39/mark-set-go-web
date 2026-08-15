@@ -93,7 +93,10 @@
       '.global-notebook-entry-body',
       '.notebook-entry-body',
       '.saved-note-body',
-      '.companion-persona-options'
+      '.companion-persona-options',
+      '.companion-safe-grid',
+      '.companion-persona-settings-safe',
+      '[data-companion-choice]'
     ].join(',')));
   }
 
@@ -162,7 +165,8 @@
     root.querySelectorAll('*').forEach((element) => {
       if (element.closest(
         '#reader, .interactive-reader, blockquote, q, pre, code, textarea, ' +
-        '[contenteditable="true"], .companion-persona-options'
+        '[contenteditable="true"], .companion-persona-options, .companion-safe-grid, ' +
+        '.companion-persona-settings-safe, [data-companion-choice]'
       )) return;
 
       attributes.forEach((attribute) => {
