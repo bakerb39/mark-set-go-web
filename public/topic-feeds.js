@@ -1561,13 +1561,12 @@
     applyingTopicReaderPanePreference = true;
     try {
       // Let the Reader's own layout code perform the actual open/close.
-      // This runs inside the MutationObserver-scheduled animation frame, so the
-      // Topic Feed pane is restored before the browser paints the rebuilt Reader.
-      // Do not defer this with setTimeout: that creates a visible closed/open flash.
       toggle.click();
     } finally {
-      applyingTopicReaderPanePreference = false;
-      if (topicReaderPaneShouldBeOpen()) scheduleTopicBookPageGeometrySync();
+      window.setTimeout(() => {
+        applyingTopicReaderPanePreference = false;
+        if (topicReaderPaneShouldBeOpen()) scheduleTopicBookPageGeometrySync();
+      }, 0);
     }
   }
 
@@ -1602,36 +1601,6 @@
   let pendingTopicReaderScrollRestore = null;
   let topicReaderScrollRestoreTimer = 0;
 
-  function syncReaderTopicNavState(nav) {
-    if (!nav) return;
-
-    nav.querySelectorAll('[data-reader-topic-article]').forEach((button) => {
-      const topic = state.topics.find((item) => item.id === button.dataset.readerTopicParent);
-      const article = topic?.articles?.find((item) => item.id === button.dataset.readerTopicArticle);
-      if (article) button.classList.toggle('is-read', Boolean(article.read));
-
-      const isCurrentStory = button.dataset.readerTopicArticle === window.MSGTopicFeedReaderContext?.articleId;
-      button.classList.toggle('is-current-story', isCurrentStory);
-      if (isCurrentStory) button.setAttribute('aria-current', 'true');
-      else button.removeAttribute('aria-current');
-    });
-
-    nav.querySelectorAll('.topic-reader-group').forEach((details) => {
-      const articleButton = details.querySelector('[data-reader-topic-parent]');
-      const topicId = articleButton?.dataset.readerTopicParent || '';
-      const topic = state.topics.find((item) => item.id === topicId);
-      const unread = topic ? (topic.articles || []).filter((article) => !article.read).length : null;
-      const count = details.querySelector('summary span');
-      if (count && unread !== null) count.textContent = `${unread} unread`;
-
-      details.querySelectorAll('[data-reader-topic-source-block]').forEach((sourceBlock) => {
-        const sourceId = sourceBlock.dataset.readerTopicSourceBlock || '';
-        const sourceCount = sourceBlock.querySelector('.topic-reader-source-head span');
-        if (sourceCount && topic) sourceCount.textContent = `${sourceArticleCount(topic, sourceId, true)} new`;
-      });
-    });
-  }
-
   function captureTopicReaderScroll(articleId = '') {
     const pane = document.querySelector('#navigation-pane');
     if (!pane) return;
@@ -1639,7 +1608,6 @@
     pendingTopicReaderScrollRestore = {
       scrollTop: Math.max(0, Number(pane.scrollTop) || 0),
       articleId: String(articleId || ''),
-      navNode: pane.querySelector('.topic-reader-nav') || null,
       capturedAt: Date.now()
     };
   }
@@ -1866,44 +1834,32 @@
     bindTopicReaderPanePreference();
 
     if (!view.querySelector('.topic-reader-nav')) {
-      // Opening another Topic Feed story rebuilds the Reader shell. Reuse the
-      // exact existing My Topics DOM instead of redrawing it, so expanded topics,
-      // Show all state, focus, button bindings, and scroll position do not visibly
-      // refresh merely because the reader changed stories.
-      const preservedNav = pendingTopicReaderScrollRestore?.navNode;
-      if (preservedNav) {
-        syncReaderTopicNavState(preservedNav);
-        view.replaceChildren(preservedNav);
-      } else {
-        // IMPORTANT: renderNavigationPane() has already bound the Reader's
-        // #add-bookmark button to its native addBookmark() function. Keep that
-        // exact DOM node before replacing Contents so bookmarks continue to use
-        // the established Reader implementation.
-        const nativeBookmarkButton = view.querySelector('#add-bookmark');
+      // IMPORTANT: renderNavigationPane() has already bound the Reader's
+      // #add-bookmark button to its native addBookmark() function. Keep that
+      // exact DOM node before replacing Contents so bookmarks continue to use
+      // the established Reader implementation.
+      const nativeBookmarkButton = view.querySelector('#add-bookmark');
 
-        view.innerHTML = readerTopicListMarkup();
+      view.innerHTML = readerTopicListMarkup();
 
-        const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
-        if (nativeBookmarkButton && bookmarkSlot) {
-          nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
-          nativeBookmarkButton.textContent = '＋ Bookmark';
-          nativeBookmarkButton.title = 'Bookmark the current reading position';
-          bookmarkSlot.replaceChildren(nativeBookmarkButton);
-        }
+      const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
+      if (nativeBookmarkButton && bookmarkSlot) {
+        nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
+        nativeBookmarkButton.textContent = '＋ Bookmark';
+        nativeBookmarkButton.title = 'Bookmark the current reading position';
+        bookmarkSlot.replaceChildren(nativeBookmarkButton);
       }
-    } else {
-      syncReaderTopicNavState(view.querySelector('.topic-reader-nav'));
     }
+
+    view.querySelector('[data-reader-manage-topics]')?.addEventListener('click', () => {
+      render();
+    }, { once:true });
 
     const readerRefreshButton = view.querySelector('[data-reader-refresh-topics]');
     if (readerRefreshButton && readerRefreshButton.dataset.bound !== '1') {
       readerRefreshButton.dataset.bound = '1';
       readerRefreshButton.addEventListener('click', () => { void refreshReaderTopics(readerRefreshButton); });
     }
-
-    view.querySelector('[data-reader-manage-topics]')?.addEventListener('click', () => {
-      render();
-    }, { once:true });
 
     view.querySelectorAll('[data-reader-topic-article]').forEach((button) => {
       if (button.dataset.bound === '1') return;
@@ -1913,14 +1869,16 @@
         const article = topic?.articles?.find((item) => item.id === button.dataset.readerTopicArticle);
         if (topic && article) {
           captureTopicReaderScroll(article.id);
-          // Keep the My Topics pane visually stable. The story button is
-          // navigation, not a loading-status surface, so do not let openArticle()
-          // replace its title with “Opening…” or disable/re-enable the DOM node.
-          // This matches the keyboard-cycle path and lets only the thin current
-          // story frame change after the new article is active.
-          openArticle(article, null, topic);
+          openArticle(article, button, topic);
         }
       });
+    });
+
+    view.querySelectorAll('[data-reader-topic-article]').forEach((button) => {
+      const current = button.dataset.readerTopicArticle === window.MSGTopicFeedReaderContext?.articleId;
+      button.classList.toggle('is-current-story', current);
+      if (current) button.setAttribute('aria-current', 'true');
+      else button.removeAttribute('aria-current');
     });
 
     view.querySelectorAll('[data-reader-topic-more]').forEach((button) => {
@@ -1940,9 +1898,8 @@
     });
 
     // app.js starts Reader side panes closed when a Reader view is rebuilt.
-    // Restore My Topics immediately in this pre-paint animation frame. Delaying
-    // with setTimeout allows one closed frame to render and looks like a refresh.
-    applyTopicReaderPanePreference();
+    // Topic Feed articles restore the reader's explicit My Topics preference.
+    window.setTimeout(applyTopicReaderPanePreference, 0);
     scheduleTopicBookPageGeometrySync();
     window.setTimeout(ensureTopicBookDivider, 0);
     window.setTimeout(ensureTopicBookDivider, 160);
