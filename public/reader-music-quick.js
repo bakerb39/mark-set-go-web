@@ -335,9 +335,9 @@
       });
     }
 
-    // Keep Music above Full screen, right-aligned, with comfortable spacing.
-    // Enforce both DOM order and layout on every Reader render so stale CSS or
-    // previous renders cannot place the two controls side-by-side.
+    // Keep the media controls in one predictable top-right stack.
+    // Music is above Full screen, right edges aligned. The stack itself owns
+    // the positioning so older fullscreen/music CSS cannot pull either control away.
     if (stack.firstElementChild !== button) {
       stack.insertBefore(button, stack.firstElementChild);
     }
@@ -345,29 +345,24 @@
       stack.insertBefore(fullscreenButton, button.nextElementSibling);
     }
 
-    Object.assign(stack.style, {
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'flex-end',
-      gap: '12px'
-    });
+    stack.style.setProperty('position', 'absolute', 'important');
+    stack.style.setProperty('top', '.55rem', 'important');
+    stack.style.setProperty('right', '.65rem', 'important');
+    stack.style.setProperty('bottom', 'auto', 'important');
+    stack.style.setProperty('left', 'auto', 'important');
+    stack.style.setProperty('display', 'flex', 'important');
+    stack.style.setProperty('flex-direction', 'column', 'important');
+    stack.style.setProperty('align-items', 'flex-end', 'important');
+    stack.style.setProperty('gap', '12px', 'important');
+    stack.style.setProperty('z-index', '8', 'important');
 
-    // Force these over any older !important positioning rules left in CSS.
     button.style.setProperty('position', 'static', 'important');
     button.style.setProperty('inset', 'auto', 'important');
-    button.style.setProperty('top', 'auto', 'important');
-    button.style.setProperty('right', 'auto', 'important');
-    button.style.setProperty('bottom', 'auto', 'important');
-    button.style.setProperty('left', 'auto', 'important');
     button.style.setProperty('margin', '0', 'important');
     button.style.setProperty('transform', 'none', 'important');
 
     fullscreenButton.style.setProperty('position', 'static', 'important');
     fullscreenButton.style.setProperty('inset', 'auto', 'important');
-    fullscreenButton.style.setProperty('top', 'auto', 'important');
-    fullscreenButton.style.setProperty('right', 'auto', 'important');
-    fullscreenButton.style.setProperty('bottom', 'auto', 'important');
-    fullscreenButton.style.setProperty('left', 'auto', 'important');
     fullscreenButton.style.setProperty('margin', '0', 'important');
     fullscreenButton.style.setProperty('transform', 'none', 'important');
 
