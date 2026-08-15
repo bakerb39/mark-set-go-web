@@ -1,31 +1,49 @@
-MARK, SET, GO! — STICKY MY TOPICS READER PANEL
+MARK, SET, GO! — READER QUICK MUSIC
 
-Replace only:
-  /public/topic-feeds.js
-  /public/topic-feeds.css
+Replace/add only:
+  /public/reader-music-quick.js
+  /public/reader-music-quick.css
   /public/index.html
 
-CHANGES
+WHAT IT DOES
 
-1. MY TOPICS STAYS OPEN
-   - Topic Feed Reader articles open with the left My Topics panel visible by
-     default.
-   - Moving from story to story keeps the panel open.
-   - If the reader explicitly closes it with the My Topics toggle or × button,
-     that choice is remembered.
-   - Explicitly opening it again is remembered too.
+A small floating ♫ button now appears at the bottom-right ONLY while the Reader
+is open.
 
-2. ONLY ONE SCROLLBAR
-   - The Reader's existing navigation-pane is the scrolling container.
-   - The nested My Topics list no longer creates a second scrollbar.
+Clicking it opens a compact Reading Music panel with:
 
-3. CLEANER LABEL
-   - "Marks & My Topics" is removed.
-   - The panel header, Reader toggle, and Contents replacement all simply say:
-       My Topics
+  - Now Playing, when music is active
+  - Music attached to the current reading
+  - Saved / preferred music
+  - Quick Focus choices:
+      Lofi Study Radio
+      Sleepy Lofi
+      Classical Reading
+      Ambient Reading
+      Deep Focus
+      Rain & Focus
+      Anime Lofi
+      Classical Piano
+  - Manage Music & Focus, which opens the existing full Music page
 
-SCOPE
+IMPORTANT
 
-No app.js is replaced.
-No Reader engine, Book Pages, playback, annotation, Analyze, server/database,
-or companion files are changed.
+This does NOT create a second music system.
+
+It calls the existing app.js:
+  playMusic()
+  playPreferredMusic()
+  renderMusicLibrary()
+
+and uses the existing #music-dock Spotify/YouTube player.
+
+When the existing music player is open at bottom-right, the new ♫ launcher moves
+above it automatically instead of covering it.
+
+The quick panel is available on normal Reader pages and Topic Feed Reader pages.
+
+NO app.js replacement.
+NO styles.css replacement.
+NO Reader engine / Book Pages / playback / annotation / Analyze changes.
+NO Topic Feed logic changes.
+NO companion changes.
