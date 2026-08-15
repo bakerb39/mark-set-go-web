@@ -12861,6 +12861,25 @@ function bindModernGuideInlineActions(source = state?.source || {}) {
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.dataset.viewKey = 'reader';
+
+  // Topic Feed story handoff: preserve the existing left navigation pane as the
+  // exact same DOM node while the Reader shell is rebuilt. This branch is
+  // intentionally limited to Topic Feed -> Topic Feed navigation so ordinary
+  // books and every other Reader source keep the established render path.
+  const previousSourceType = String(state.source?.type || '');
+  const preserveTopicFeedNavigation = source?.type === 'topic-feed' && previousSourceType === 'topic-feed';
+  const preservedTopicFeedPane = preserveTopicFeedNavigation ? app.querySelector('#navigation-pane') : null;
+  const previousReaderLayout = preserveTopicFeedNavigation ? app.querySelector('#reader-layout') : null;
+  const preservedTopicFeedPaneOpen = Boolean(
+    preservedTopicFeedPane && previousReaderLayout && !previousReaderLayout.classList.contains('navigation-hidden')
+  );
+  const preservedTopicFeedPaneScrollTop = preservedTopicFeedPane
+    ? Math.max(0, Number(preservedTopicFeedPane.scrollTop) || 0)
+    : 0;
+
+  // Detaching before app.innerHTML prevents the browser from destroying the
+  // Topics pane and its existing listeners/state during the Reader rebuild.
+  if (preservedTopicFeedPane) preservedTopicFeedPane.remove();
   const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });
   const suppliedDocumentStructure = Array.isArray(source?.documentStructure) && source.documentStructure.length
     ? source.documentStructure
@@ -13242,6 +13261,16 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
     </section>`;
 
+  let topicFeedPaneWasPreserved = false;
+  if (preservedTopicFeedPane) {
+    const newPanePlaceholder = app.querySelector('#navigation-pane');
+    if (newPanePlaceholder) {
+      newPanePlaceholder.replaceWith(preservedTopicFeedPane);
+      preservedTopicFeedPane.scrollTop = preservedTopicFeedPaneScrollTop;
+      topicFeedPaneWasPreserved = true;
+    }
+  }
+
   const reader = app.querySelector('#reader');
   const readerFrame = app.querySelector('#reader-frame');
   const fullscreenButton = app.querySelector('#toggle-reader-fullscreen');
@@ -13251,10 +13280,26 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   bindReaderFullscreen(readerFrame, fullscreenButton);
   bindFullscreenOptions(readerFrame);
   bindReaderPaneControls();
+
+  // bindReaderPaneControls() intentionally starts a newly rendered Reader with
+  // side panes closed. For a preserved Topic Feed pane, restore its prior state
+  // synchronously in the same JavaScript task so there is no closed-frame paint.
+  if (topicFeedPaneWasPreserved) {
+    const layout = app.querySelector('#reader-layout');
+    const navigationButton = app.querySelector('#toggle-navigation-pane');
+    if (layout && navigationButton) {
+      layout.classList.toggle('navigation-hidden', !preservedTopicFeedPaneOpen);
+      navigationButton.setAttribute('aria-pressed', String(preservedTopicFeedPaneOpen));
+      navigationButton.classList.toggle('pane-closed', !preservedTopicFeedPaneOpen);
+      navigationButton.title = `${preservedTopicFeedPaneOpen ? 'Close' : 'Open'} marks and contents`;
+    }
+    preservedTopicFeedPane.scrollTop = preservedTopicFeedPaneScrollTop;
+  }
+
   bindMarkCompanion(reader);
   bindReaderResize(readerFrame, reader);
   observeBookPageReader();
-  renderNavigationPane();
+  if (!topicFeedPaneWasPreserved) renderNavigationPane();
   prepareReaderView('highlight');
   updateModeControls('highlight');
   bindVirtualSpacerGuard(reader);
