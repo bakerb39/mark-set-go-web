@@ -123,3 +123,25 @@
   .topic-feed-source-row{grid-template-columns:1fr}
   #topic-feed-recommendations{grid-template-columns:1fr}
 }
+
+
+/* v2.1.1 — My Topics is navigation, not a 3-story teaser. */
+.topic-reader-source{max-height:none}
+.topic-reader-source .topic-reader-article[hidden]{display:none !important}
+.topic-reader-show-more{
+  width:100%;
+  padding:6px 7px;
+  border:0;
+  background:transparent;
+  text-align:left;
+  font-size:.74rem;
+  font-weight:700;
+  color:#245f91;
+  cursor:pointer
+}
+.topic-reader-show-more:hover{text-decoration:underline}
+.topic-reader-nav{
+  max-height:min(68vh,720px);
+  overflow:auto;
+  padding-right:2px
+}

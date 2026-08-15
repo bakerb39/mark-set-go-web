@@ -766,12 +766,24 @@
         <details class="topic-reader-group" ${topic.id === window.MSGTopicFeedReaderContext?.topicId ? 'open' : ''}>
           <summary><strong>${escapeHtml(topic.name)}</strong><span>${(topic.articles || []).filter((a) => !a.read).length} unread</span></summary>
           ${(topic.sources || []).map((source) => {
-            const articles = (topic.articles || []).filter((article) => article.sourceClientId === source.id).slice(0, 3);
-            return `<div class="topic-reader-source">
+            const articles = (topic.articles || [])
+              .filter((article) => article.sourceClientId === source.id)
+              .sort((a, b) => new Date(b.publishedAt || b.fetchedAt || 0) - new Date(a.publishedAt || a.fetchedAt || 0));
+            const initialLimit = 10;
+            return `<div class="topic-reader-source" data-reader-topic-source-block="${escapeHtml(source.id)}">
               <div class="topic-reader-source-head"><strong>${escapeHtml(source.name)}</strong><span>${sourceArticleCount(topic, source.id, true)} new</span></div>
-              ${articles.length ? articles.map((article) => `<button type="button" class="topic-reader-article ${article.read ? 'is-read' : ''}"
-                 data-reader-topic-article="${escapeHtml(article.id)}" data-reader-topic-parent="${escapeHtml(topic.id)}">
+              ${articles.length ? articles.map((article, index) => `<button type="button"
+                 class="topic-reader-article ${article.read ? 'is-read' : ''}"
+                 ${index >= initialLimit ? 'hidden data-reader-topic-overflow="1"' : ''}
+                 data-reader-topic-article="${escapeHtml(article.id)}"
+                 data-reader-topic-parent="${escapeHtml(topic.id)}">
                  ${escapeHtml(article.title)}</button>`).join('') : '<small>No downloaded articles yet.</small>'}
+              ${articles.length > initialLimit ? `<button type="button"
+                 class="topic-reader-show-more"
+                 data-reader-topic-more
+                 aria-expanded="false">
+                 Show all ${articles.length} stories
+               </button>` : ''}
             </div>`;
           }).join('')}
         </details>`).join('') : '<p class="navigation-empty">No Topic Feeds yet.</p>'}
@@ -810,6 +822,22 @@
         const topic = state.topics.find((item) => item.id === button.dataset.readerTopicParent);
         const article = topic?.articles?.find((item) => item.id === button.dataset.readerTopicArticle);
         if (topic && article) openArticle(article, button, topic);
+      });
+    });
+
+    view.querySelectorAll('[data-reader-topic-more]').forEach((button) => {
+      if (button.dataset.bound === '1') return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', () => {
+        const sourceBlock = button.closest('.topic-reader-source');
+        if (!sourceBlock) return;
+        const expanded = button.getAttribute('aria-expanded') === 'true';
+        sourceBlock.querySelectorAll('[data-reader-topic-overflow="1"]').forEach((articleButton) => {
+          articleButton.hidden = expanded;
+        });
+        button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+        const total = sourceBlock.querySelectorAll('[data-reader-topic-article]').length;
+        button.textContent = expanded ? `Show all ${total} stories` : 'Show fewer';
       });
     });
   }
