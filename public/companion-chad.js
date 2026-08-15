@@ -396,11 +396,6 @@
       document.querySelector('#fullscreen-mark-toggle')
     ].filter(Boolean).forEach((root) => syncCompanionPortraits(root, identity));
 
-    const investorLink = document.querySelector('[data-action="investor-analysis"]');
-    if (investorLink && selected() === 'chad') {
-      investorLink.textContent = 'Ask Chad';
-      investorLink.title = 'Ask Chad for a whole-article investor analysis.';
-    }
   }
 
   function syncFrontPage(identity) {

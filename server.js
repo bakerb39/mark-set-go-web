@@ -4991,56 +4991,91 @@ app.post('/api/read-anything/summarize', async (req, res) => {
 
 app.post('/api/read-anything/investor-analysis', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
-  if (!apiKey) return res.status(503).json({ error: 'Investor analysis is not configured. Add OPENAI_API_KEY to the server environment.' });
 
-  const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
-  const text = String(req.body?.text || '').replace(/\r/g, '').trim();
-  const sourceUrl = String(req.body?.sourceUrl || '').trim().slice(0, 4000);
-  const topic = String(req.body?.topic || '').trim().slice(0, 200);
   const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
     ? String(req.body.companion).trim().toLowerCase()
     : 'mark';
   const analystName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
 
-  if (text.length < 40) return res.status(400).json({ error: 'There is not enough article text to analyze.' });
-  if (text.length > 120000) return res.status(413).json({ error: 'This article is too long to analyze in one request.' });
+  if (!apiKey) {
+    return res.status(503).json({
+      error: 'Investor analysis is not configured. Add OPENAI_API_KEY to the server environment.'
+    });
+  }
 
-  const model = process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
+  const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
+  const text = String(req.body?.text || '').replace(/\r/g, '').trim();
+  const sourceUrl = String(req.body?.sourceUrl || '').trim().slice(0, 4000);
+  const topic = String(req.body?.topic || '').trim().slice(0, 200);
+
+  if (text.length < 40) {
+    return res.status(400).json({ error: 'There is not enough article text to analyze.' });
+  }
+  if (text.length > 120000) {
+    return res.status(413).json({ error: 'This article is too long to analyze in one request.' });
+  }
+
+  const model = process.env.OPENAI_STUDY_MODEL ||
+    process.env.OPENAI_COMPREHENSION_MODEL ||
+    'gpt-5.6-luna';
+
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 110000);
+  const timeout = setTimeout(() => controller.abort(), 80000);
 
-  const schema = {
-    type: 'object',
-    additionalProperties: false,
-    required: ['heading', 'analysis', 'keyPoints', 'catalysts', 'risks', 'recommendation', 'cautions'],
-    properties: {
-      heading: { type: 'string' },
-      analysis: { type: 'string' },
-      keyPoints: { type: 'array', minItems: 2, maxItems: 6, items: { type: 'string' } },
-      catalysts: { type: 'array', minItems: 0, maxItems: 5, items: { type: 'string' } },
-      risks: { type: 'array', minItems: 0, maxItems: 5, items: { type: 'string' } },
-      recommendation: { type: 'string' },
-      cautions: { type: 'array', minItems: 1, maxItems: 4, items: { type: 'string' } }
+  const prompt = `You are ${analystName}, the active financial-news analyst inside a reading app.
+
+Analyze the WHOLE supplied article, from beginning to end. Do not base the analysis only on the first paragraphs, a summary, or a visible excerpt.
+
+Use only facts in the supplied article. Clearly distinguish article facts from inference. Do not silently add later events, current prices, or outside facts.
+
+Return concise professional investor analysis using EXACTLY these section labels:
+
+HEADING:
+One short descriptive heading
+
+ANALYSIS:
+A compact synthesis of the article's investment significance.
+
+KEY POINTS:
+- 2 to 6 bullets
+
+CATALYSTS:
+- 0 to 5 bullets, or "- None clearly identified"
+
+RISKS:
+- 0 to 5 bullets, or "- None clearly identified"
+
+RECOMMENDATION:
+A general investor posture based on this article alone. Do not give personalized portfolio allocation or guarantee returns.
+
+CAUTIONS:
+- 1 to 4 bullets
+
+If the article does not support a meaningful investment conclusion, say so.
+If you refer to yourself, use ${analystName} only.`;
+
+  function section(textValue, name, nextNames = []) {
+    const upper = String(textValue || '');
+    const start = upper.search(new RegExp(`(?:^|\\n)${name}:\\s*`, 'i'));
+    if (start < 0) return '';
+
+    const afterLabel = upper.slice(start).replace(new RegExp(`^(?:\\n)?${name}:\\s*`, 'i'), '');
+    let end = afterLabel.length;
+
+    for (const next of nextNames) {
+      const match = afterLabel.search(new RegExp(`\\n${next}:\\s*`, 'i'));
+      if (match >= 0 && match < end) end = match;
     }
-  };
+    return afterLabel.slice(0, end).trim();
+  }
 
-  const prompt = `You are ${analystName}, a careful financial-news analyst inside a reading app.
-Your active analyst/companion name is ${analystName}. If you refer to yourself in the analysis, use ${analystName} only and never identify yourself as a different companion.
-Analyze ONLY the supplied article. Treat the article as the source of facts; do not silently add current market prices, later events, or facts not contained in the supplied text.
-Provide professional-grade investor analysis while clearly distinguishing article facts from your inference.
-
-Cover:
-- the central investment thesis or market significance;
-- the most important facts and signals in the article;
-- plausible bullish and bearish implications;
-- catalysts or developments an investor should monitor next;
-- material risks, uncertainty, and what could invalidate the thesis;
-- a GENERAL investor posture/recommendation based on this article alone.
-
-The recommendation must be useful but not personalized. Do not tell a specific person to buy, sell, short, or allocate a percentage of a portfolio. Prefer general postures such as watch, research further, cautiously constructive, neutral, defensive, or avoid chasing until more evidence appears. If the article does not support a meaningful investment conclusion, say that explicitly rather than manufacturing one.
-Never promise returns or present speculation as certainty.
-If the article is not meaningfully investment-related, say that its investor implications are limited.
-Return only the requested structured result.`;
+  function bullets(value) {
+    return String(value || '')
+      .split(/\n+/)
+      .map((line) => line.replace(/^\s*[-•*]\s*/, '').trim())
+      .filter((line) => line && !/^none clearly identified$/i.test(line))
+      .slice(0, 6);
+  }
 
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
@@ -5052,37 +5087,69 @@ Return only the requested structured result.`;
       },
       body: JSON.stringify({
         model,
-        reasoning: { effort: 'medium' },
+        reasoning: { effort: 'low' },
         store: false,
         input: [
-          { role: 'developer', content: [{ type: 'input_text', text: prompt }] },
-          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, topic: topic || undefined, sourceUrl: sourceUrl || undefined, article: text }) }] }
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'ask_mark_investor_analysis',
-            strict: true,
-            schema
+          {
+            role: 'developer',
+            content: [{ type: 'input_text', text: prompt }]
+          },
+          {
+            role: 'user',
+            content: [{
+              type: 'input_text',
+              text: JSON.stringify({
+                title,
+                topic: topic || undefined,
+                sourceUrl: sourceUrl || undefined,
+                wholeArticle: text
+              })
+            }]
           }
-        }
+        ]
       })
     });
 
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload?.error?.message || `OpenAI returned HTTP ${response.status}.`);
+    if (!response.ok) {
+      throw new Error(payload?.error?.message || `OpenAI returned HTTP ${response.status}.`);
+    }
 
     const output = extractOpenAIOutputText(payload).trim();
     if (!output) throw new Error('No investor analysis was returned.');
 
-    return res.json({ title, result: JSON.parse(output), model, companion: { id: companion, name: analystName } });
+    const heading = section(output, 'HEADING', ['ANALYSIS']) || 'Investor analysis';
+    const analysis = section(output, 'ANALYSIS', ['KEY POINTS', 'CATALYSTS', 'RISKS', 'RECOMMENDATION', 'CAUTIONS']) || output;
+    const keyPoints = bullets(section(output, 'KEY POINTS', ['CATALYSTS', 'RISKS', 'RECOMMENDATION', 'CAUTIONS']));
+    const catalysts = bullets(section(output, 'CATALYSTS', ['RISKS', 'RECOMMENDATION', 'CAUTIONS']));
+    const risks = bullets(section(output, 'RISKS', ['RECOMMENDATION', 'CAUTIONS']));
+    const recommendation = section(output, 'RECOMMENDATION', ['CAUTIONS']) ||
+      'The article alone does not support a clear investment posture.';
+    const cautions = bullets(section(output, 'CAUTIONS', []));
+
+    return res.json({
+      title,
+      result: {
+        heading,
+        analysis,
+        keyPoints,
+        catalysts,
+        risks,
+        recommendation,
+        cautions
+      },
+      model,
+      companion: { id: companion, name: analystName }
+    });
   } catch (error) {
     console.error(`${analystName} investor analysis failed:`, error);
     return res.status(502).json({
       error: error?.name === 'AbortError'
         ? `${analystName}’s investor analysis took too long.`
         : `${analystName} could not complete the investor analysis.`,
-      detail: error?.message || 'Unknown investor analysis error.'
+      detail: error?.name === 'AbortError'
+        ? 'Please try Analyze again.'
+        : error?.message || 'Unknown investor analysis error.'
     });
   } finally {
     clearTimeout(timeout);

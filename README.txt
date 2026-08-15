@@ -1,24 +1,45 @@
-MARK, SET, GO! — HIGHLIGHT VS WHOLE-ARTICLE SCOPE FIX
+MARK, SET, GO! — ANALYZE LINK + ANALYSIS RELIABILITY FIX
 
 Replace:
-  /public/app.js
+  /server.js
   /public/read-anything.js
+  /public/companion-chad.js
   /public/index.html
 
-INTENDED BEHAVIOR
+WHAT WAS ACTUALLY WRONG
 
-If the reader HIGHLIGHTS text:
-  Ask companion questions are based on the highlighted passage.
+1. "ASK CHAD" KEPT COMING BACK
+   companion-chad.js still had explicit code that changed the article's
+   [data-action="investor-analysis"] link to "Ask Chad" every time the companion
+   UI synchronized.
 
-If there is NO real highlighted passage and the reader previously clicked Analyze:
-  Follow-up questions are based on the COMPLETE original article.
+   That override is removed. The article action is now always:
+     Summarize · Analyze
 
-Priority:
-  1. Real highlighted passage
-  2. Whole article Analyze context
-  3. Existing normal Ask-companion behavior
+2. ANALYSIS COULD STAY ON "CHAD IS ANALYZING..."
+   The initial investor-analysis route used a strict structured-output schema
+   with medium reasoning. It has been replaced with the same simpler/reliable
+   request pattern used by the working whole-article summarizer:
+   - low reasoning effort
+   - plain text response
+   - deterministic section parser on the server
+   - same structured object returned to the existing UI
+   - 80-second server timeout
+   - 90-second client timeout with a visible error instead of endless loading
 
-The synthetic context created by Analyze is now explicitly marked
-syntheticWholeArticle=true so it can never be mistaken for a real user highlight.
+3. WHOLE-ARTICLE CONTEXT BUG
+   primeInvestorFollowupContext() referenced originalText outside its scope.
+   That is fixed. The complete original article is now correctly stored in the
+   active Analyze conversation context.
 
-No Reader playback, pagination, Book Pages, or rendering logic changed.
+4. COMPANION IDENTITY
+   The initial Analyze request now explicitly sends the active companion id
+   instead of depending on a later fetch wrapper to inject it.
+
+SCOPE
+- Analyze = whole original article.
+- Follow-up with no real highlight = whole article.
+- If the user highlights a passage, that real highlight still wins and Ask
+  companion answers from the highlighted passage.
+
+No Reader playback, Book Pages, pagination, or reading-mode logic changed.

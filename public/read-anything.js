@@ -1186,6 +1186,12 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     const contextText = buildInvestorFollowupContext(result);
     if (!contextText) return false;
 
+    const originalText = String(
+      activeImportedDocument?.versions?.original ||
+      activeImportedDocument?.originalText ||
+      ''
+    ).trim();
+
     const companion = activeArticleCompanionIdentity();
     const selection = {
       text: contextText,
@@ -1361,16 +1367,34 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     renderInvestorAnalysisInAskMark(null, { loading: true });
 
-    const response = await fetch('/api/read-anything/investor-analysis', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: activeImportedDocument.baseTitle || activeImportedDocument.title,
-        text: originalText,
-        sourceUrl: activeImportedDocument.source?.url || '',
-        topic: activeImportedDocument.source?.topic || ''
-      })
-    });
+    const companion = activeArticleCompanionIdentity();
+    const controller = new AbortController();
+    const clientTimeout = window.setTimeout(() => controller.abort(), 90000);
+
+    let response;
+    try {
+      response = await fetch('/api/read-anything/investor-analysis', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: activeImportedDocument.baseTitle || activeImportedDocument.title,
+          text: originalText,
+          sourceUrl: activeImportedDocument.source?.url || '',
+          topic: activeImportedDocument.source?.topic || '',
+          companion: companion.id
+        })
+      });
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        const message = `${companion.name}’s analysis took too long. Please try Analyze again.`;
+        renderInvestorAnalysisInAskMark(null, { error: message });
+        throw new Error(message);
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(clientTimeout);
+    }
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
@@ -1538,6 +1562,10 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     const investorLink = actionRow.querySelector('[data-action="investor-analysis"]');
     if (investorLink) {
+      // This action is deliberately persona-neutral. Mark/Beth/Chad performs it,
+      // but the article itself simply says "Analyze".
+      investorLink.textContent = 'Analyze';
+      investorLink.setAttribute('aria-label', 'Analyze this whole article');
       {
         const companion = activeArticleCompanionIdentity();
         investorLink.title = 'Analyze the whole article and open the result in the active companion panel.';
