@@ -124,3 +124,13 @@ html[data-companion="chad"] .msg-walkthrough-mark-illustration {
     grid-template-columns: 1fr !important;
   }
 }
+
+
+/* v1.0.3: never show the emergency unified selector and the legacy
+   Mark/Beth selector at the same time. The screenshot confirmed both could
+   coexist after async Profile rendering. When our unified selector exists,
+   it is the authoritative companion chooser. */
+#app:has([data-chad-fallback-selector])
+.companion-persona-settings:not([data-chad-fallback-selector]) {
+  display: none !important;
+}

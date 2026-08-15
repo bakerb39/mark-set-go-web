@@ -1327,7 +1327,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
       const summaryLink = makeArticleLink(
         'summarize-whole-article',
-        'Summarize article',
+        'Summarize',
         'Summarize this whole article'
       );
       const separator = document.createElement('span');
@@ -1351,7 +1351,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     if (!link) return;
 
     const showingSummary = activeImportedVersion.startsWith('summary');
-    link.textContent = showingSummary ? '← Back to article' : 'Summarize article';
+    link.textContent = showingSummary ? '← Back to article' : 'Summarize';
     link.title = showingSummary
       ? 'Return to the complete article'
       : 'Summarize the entire article into its key points — no highlighting required.';
