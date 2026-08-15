@@ -860,6 +860,13 @@
         importedAt: new Date().toISOString()
       }
     });
+
+    // openDocument() rebuilds the Reader synchronously. Reattach the preserved
+    // My Topics DOM immediately, in the same JavaScript turn, rather than waiting
+    // for the MutationObserver/requestAnimationFrame navigation pass. Waiting
+    // even one frame is what makes the left panel visibly blank/repaint.
+    decorateReaderNavigation();
+
     topicFeedSourceCredit(topic, article, payload);
     scheduleReaderNavigation();
   }
