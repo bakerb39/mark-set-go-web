@@ -15,7 +15,7 @@
       id: 'beth',
       name: 'Beth',
       ask: 'Ask Beth',
-      avatar: '/assets/companions/beth/beth-avatar.png'
+      avatar: '/assets/companions/beth/beth-ui-avatar.png?v=9.6.9'
     }),
     chad: Object.freeze({
       id: 'chad',

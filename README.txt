@@ -1,36 +1,27 @@
-MARK, SET, GO! — PROFILE CHOICES RESTORE
+MARK, SET, GO! — BETH CORRECT COMPACT PHOTO
 
-Replace ONLY:
+Replace:
   /public/companion-persona-safe.js
+  /public/companion-chad.js
+  /public/companion-copy-sync.js
   /public/index.html
 
-ROOT CAUSE
+CORRECTION
 
-The last script tried to reinstall the companion choices on:
-  data-action="profile"
+The previous fix accidentally changed Beth's compact UI photo to:
+  /assets/companions/beth/beth-avatar.png
 
-But the actual app route is:
-  data-action="profile-preferences"
+The established prior working build used:
+  /assets/companions/beth/beth-ui-avatar.png?v=9.6.9
 
-Also, the Profile page is rendered dynamically after the companion script is
-already loaded, so DOMContentLoaded can happen before the Profile DOM exists.
+That is the tight-cropped Beth photo specifically prepared for:
+- Profile choice
+- Reader companion button
+- Help/chat avatar
+- Other compact companion UI
 
-FIX
+The homepage/front-page Beth artwork is NOT changed.
 
-- Watches #app for dynamic page renders.
-- When .profile-preferences-page appears, installs exactly ONE selector:
-    Mark | Beth | Chad
-- Also listens for the actual profile-preferences route.
-- Keeps the existing selected companion in sync.
-
-IMPORTANT
-
-This package DOES NOT:
-- change any image file;
-- change any companion avatar/icon path;
-- replace companion-chad.js;
-- replace app.js;
-- replace styles.css;
-- touch Reader, Analyze, annotations, chat, or article logic.
-
-It only restores the missing Profile choices.
+NO image files are included or replaced in this package.
+NO Mark or Chad image paths are changed.
+NO app.js, Reader, Analyze, annotation, article, or chat logic is changed.

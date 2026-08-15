@@ -50,7 +50,7 @@
           id: 'beth',
           name: 'Beth',
           ask: 'Ask Beth',
-          avatar: '/assets/companions/beth/beth-avatar.png'
+          avatar: '/assets/companions/beth/beth-ui-avatar.png?v=9.6.9'
         }
       : {
           id: 'mark',
@@ -190,7 +190,7 @@
           <span class="companion-check" aria-hidden="true">✓</span>
         </button>
         <button type="button" data-companion-choice="beth">
-          <img src="/assets/companions/beth/beth-avatar.png" alt="Beth">
+          <img src="/assets/companions/beth/beth-ui-avatar.png?v=9.6.9" alt="Beth">
           <span><strong>Beth</strong><small>A warm, encouraging reading companion</small></span>
           <span class="companion-check" aria-hidden="true">✓</span>
         </button>

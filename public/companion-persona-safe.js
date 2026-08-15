@@ -19,7 +19,7 @@
       id: 'beth',
       name: 'Beth',
       ask: 'Ask Beth',
-      avatar: '/assets/companions/beth/beth-avatar.png',
+      avatar: '/assets/companions/beth/beth-ui-avatar.png?v=9.6.9',
       description: 'A warm, encouraging reading companion'
     }),
     chad: Object.freeze({
