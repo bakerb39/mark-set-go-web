@@ -343,3 +343,52 @@
   overflow-wrap:anywhere;
   word-break:break-word;
 }
+
+
+/* v2.1.12 — Topic Feed story chrome is visually on page 1 but does NOT
+   participate in the multicolumn article flow. This prevents occasional
+   header-only/blank left pages in Book Pages. */
+#reader.topic-feed-story-header-managed{
+  position:relative;
+}
+#reader > .topic-feed-story-header-overlay{
+  position:absolute;
+  z-index:7;
+  box-sizing:border-box;
+  pointer-events:auto;
+}
+#reader > .topic-feed-story-header-spacer{
+  display:block;
+  width:0;
+  margin:0;
+  padding:0;
+  border:0;
+  pointer-events:none;
+  break-inside:auto !important;
+  page-break-inside:auto !important;
+}
+
+.topic-feed-story-header-overlay .topic-feed-reader-credit{
+  margin:0 !important;
+  padding-bottom:.48em;
+  border-bottom:1px solid rgba(77,101,124,.15);
+}
+.topic-feed-story-actions-slot{
+  min-height:1.35em;
+}
+.topic-feed-story-actions-slot #read-anything-article-summary-action{
+  display:block !important;
+  width:auto !important;
+  margin:.42em 0 0 !important;
+  padding:0 !important;
+  break-inside:auto !important;
+  page-break-inside:auto !important;
+}
+
+/* The old inline-source layout no longer needs to reserve a body-flow margin. */
+#reader.topic-feed-story-header-managed .topic-feed-reader-credit{
+  margin-bottom:0 !important;
+}
+
+/* Preserve one clean reading line between Summarize/Analyze and article text.
+   The measured spacer adds exactly one reader-font line after the overlay. */
