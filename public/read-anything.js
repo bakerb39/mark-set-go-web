@@ -1501,7 +1501,109 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     return true;
   }
 
+  function compactSocialButton(label, attrs = '') {
+    return `<button type="button" ${attrs} style="display:inline-flex;align-items:center;justify-content:center;width:auto;min-width:0;min-height:0;height:28px;padding:3px 9px;margin:0;border-radius:6px;font:600 12px/1.1 inherit;letter-spacing:0;white-space:nowrap;cursor:pointer;">${label}</button>`;
+  }
+
+  function closeAskMarkPanelFromHeader(event) {
+    const closeButton = event.target?.closest?.('#close-reader-controls');
+    if (!closeButton) return false;
+
+    const selectionTab = document.querySelector('#app [data-mark-tab="selection"]');
+    const socialComposer = document.querySelector('#app [data-social-post-composer="1"]');
+    if (!selectionTab?.classList.contains('active') && !socialComposer) return false;
+
+    // The app's normal close handler routes through the Reader Tools toggle. When
+    // Mark is the active tab, that can switch tabs instead of actually closing the
+    // companion. Close the right pane directly here and keep all toggle state in sync.
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation?.();
+
+    const layout = document.querySelector('#app #reader-layout');
+    layout?.classList.add('word-panel-hidden');
+
+    const markButton = document.querySelector('#app #toggle-mark-panel');
+    const toolsButton = document.querySelector('#app #toggle-word-panel');
+    [markButton, toolsButton].forEach((button) => {
+      button?.setAttribute('aria-pressed', 'false');
+      button?.classList.add('pane-closed');
+    });
+    return true;
+  }
+
+  function installSocialPostDelegatedHandlers() {
+    if (document.documentElement.dataset.msgSocialPostHandlers === '1') return;
+    document.documentElement.dataset.msgSocialPostHandlers = '1';
+
+    // Capture the close button before app.js can reinterpret it as "show Reader Tools".
+    document.addEventListener('click', (event) => {
+      closeAskMarkPanelFromHeader(event);
+    }, true);
+
+    // Delegate composer actions from the document so they survive any Ask Mark panel
+    // rerender or DOM replacement performed by the Reader.
+    document.addEventListener('click', (event) => {
+      const button = event.target?.closest?.(
+        '[data-social-copy],[data-social-rewrite],[data-social-platform]'
+      );
+      if (!button || !button.closest('[data-social-post-composer="1"]')) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const composer = button.closest('[data-social-post-composer="1"]');
+      const textarea = composer?.querySelector('#msg-social-post-draft');
+      const text = String(textarea?.value || '').trim();
+
+      if (button.matches('[data-social-copy]')) {
+        void copySocialPostText(text, button);
+        return;
+      }
+
+      if (button.matches('[data-social-platform]')) {
+        if (!text) return;
+        const platform = button.dataset.socialPlatform;
+        const context = buildSocialPostArticleContext();
+        const sourceUrl = context?.sourceUrl || '';
+
+        // Start clipboard work without awaiting it. Keeping window.open in the
+        // original click stack prevents popup blockers from treating it as unsolicited.
+        if (platform === 'linkedin' || platform === 'facebook') {
+          void copySocialPostText(text);
+        }
+        const url = socialShareUrl(platform, text, sourceUrl);
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
+        return;
+      }
+
+      if (button.matches('[data-social-rewrite]')) {
+        const style = button.dataset.socialRewrite || 'default';
+        const currentDraft = textarea?.value || '';
+        const oldText = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Writing…';
+
+        void requestSocialPost(style, currentDraft, { preserveComposer: true })
+          .then((updated) => {
+            const liveTextarea = document.querySelector('#app [data-social-post-composer="1"] #msg-social-post-draft');
+            if (liveTextarea && updated) liveTextarea.value = updated;
+          })
+          .catch((rewriteError) => {
+            window.alert(rewriteError.message || 'The post could not be rewritten.');
+          })
+          .finally(() => {
+            if (button.isConnected) {
+              button.disabled = false;
+              button.textContent = oldText;
+            }
+          });
+      }
+    });
+  }
+
   function renderSocialPostComposer(draft, { loading = false, error = '' } = {}) {
+    installSocialPostDelegatedHandlers();
     const panel = openAskMarkInvestorPanel();
     if (!panel) return;
 
@@ -1544,69 +1646,25 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       </div>
       <div id="mark-response" class="mark-response" data-social-post-composer="1">
         <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Social post</strong></div>
-        <label for="msg-social-post-draft" style="display:block;font-weight:700;margin:.2rem 0 .45rem;">Edit your post</label>
-        <textarea id="msg-social-post-draft" rows="9" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit;line-height:1.5;padding:.75rem;border:1px solid rgba(15,35,60,.22);border-radius:10px;">${escapeHtml(String(draft || '').trim())}</textarea>
-        <div class="msg-social-post-rewrite" style="display:flex;flex-wrap:wrap;gap:.45rem;margin:.7rem 0;">
-          <button type="button" class="secondary" data-social-rewrite="default">Regenerate</button>
-          <button type="button" class="secondary" data-social-rewrite="shorter">Shorter</button>
-          <button type="button" class="secondary" data-social-rewrite="professional">More professional</button>
-          <button type="button" class="secondary" data-social-rewrite="casual">More casual</button>
+        <label for="msg-social-post-draft" style="display:block;font-weight:700;margin:.2rem 0 .35rem;">Edit your post</label>
+        <textarea id="msg-social-post-draft" rows="7" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit;line-height:1.45;padding:.6rem;border:1px solid rgba(15,35,60,.22);border-radius:8px;">${escapeHtml(String(draft || '').trim())}</textarea>
+        <div class="msg-social-post-rewrite" style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin:8px 0;">
+          ${compactSocialButton('Regenerate', 'data-social-rewrite="default"')}
+          ${compactSocialButton('Shorter', 'data-social-rewrite="shorter"')}
+          ${compactSocialButton('Professional', 'data-social-rewrite="professional"')}
+          ${compactSocialButton('Casual', 'data-social-rewrite="casual"')}
         </div>
-        <div style="margin-top:.9rem;"><strong>Post to</strong></div>
-        <div class="msg-social-post-platforms" style="display:flex;flex-wrap:wrap;gap:.45rem;margin:.5rem 0;">
-          <button type="button" class="secondary" data-social-platform="x">X</button>
-          <button type="button" class="secondary" data-social-platform="linkedin">LinkedIn</button>
-          <button type="button" class="secondary" data-social-platform="facebook">Facebook</button>
-          <button type="button" class="secondary" data-social-platform="threads">Threads</button>
-          <button type="button" class="secondary" data-social-platform="bluesky">Bluesky</button>
-          <button type="button" class="primary" data-social-copy="1">Copy</button>
+        <div style="margin-top:10px;font-size:12px;"><strong>Post to</strong></div>
+        <div class="msg-social-post-platforms" style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin:6px 0;">
+          ${compactSocialButton('X', 'data-social-platform="x"')}
+          ${compactSocialButton('LinkedIn', 'data-social-platform="linkedin"')}
+          ${compactSocialButton('Facebook', 'data-social-platform="facebook"')}
+          ${compactSocialButton('Threads', 'data-social-platform="threads"')}
+          ${compactSocialButton('Bluesky', 'data-social-platform="bluesky"')}
+          ${compactSocialButton('Copy', 'data-social-copy="1"')}
         </div>
-        <p style="margin:.45rem 0 0;opacity:.72;"><small>You can edit the post before sharing. For platforms that do not allow websites to prefill post text, the draft is copied automatically before the platform opens.</small></p>
+        <p style="margin:5px 0 0;opacity:.68;font-size:11px;line-height:1.35;">Edit anything you want before sharing. LinkedIn and Facebook also copy the draft for easy pasting.</p>
       </div>`;
-
-    const textarea = panel.querySelector('#msg-social-post-draft');
-    const copyButton = panel.querySelector('[data-social-copy]');
-
-    copyButton?.addEventListener('click', () => copySocialPostText(textarea?.value || '', copyButton));
-
-    panel.querySelectorAll('[data-social-rewrite]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const style = button.dataset.socialRewrite || 'default';
-        const currentDraft = textarea?.value || '';
-        const oldText = button.textContent;
-        button.disabled = true;
-        button.textContent = 'Writing…';
-        try {
-          const updated = await requestSocialPost(style, currentDraft, { preserveComposer: true });
-          if (textarea && updated) textarea.value = updated;
-        } catch (rewriteError) {
-          window.alert(rewriteError.message || 'The post could not be rewritten.');
-        } finally {
-          if (button.isConnected) {
-            button.disabled = false;
-            button.textContent = oldText;
-          }
-        }
-      });
-    });
-
-    panel.querySelectorAll('[data-social-platform]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const text = String(textarea?.value || '').trim();
-        if (!text) return;
-        const platform = button.dataset.socialPlatform;
-        const sourceUrl = context?.sourceUrl || '';
-
-        // LinkedIn and Facebook commonly ignore prefilled body text from share URLs.
-        // Copy first so the edited draft is still immediately available to paste.
-        if (platform === 'linkedin' || platform === 'facebook') {
-          await copySocialPostText(text);
-        }
-
-        const url = socialShareUrl(platform, text, sourceUrl);
-        if (url) window.open(url, '_blank', 'noopener,noreferrer');
-      });
-    });
 
     notifyAskMarkPanelUpdated('response');
   }
