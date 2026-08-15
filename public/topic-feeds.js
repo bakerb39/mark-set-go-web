@@ -21,6 +21,43 @@
   let dailyAutoOpenAttempted = false;
   let navFrame = 0;
 
+  // New/Edit Topic is a transactional screen. Background cloud hydration,
+  // authentication refreshes, and in-flight feed refreshes must never replace
+  // it while the reader is typing.
+  let topicManagerOpen = false;
+  let deferredCloudState = null;
+
+  function topicManagerIsOpen() {
+    return Boolean(
+      topicManagerOpen &&
+      document.getElementById('topic-feed-form')
+    );
+  }
+
+  function applyDeferredCloudState() {
+    if (!deferredCloudState) return false;
+
+    state = deferredCloudState;
+    deferredCloudState = null;
+
+    if (!state.preferences.timezone) state.preferences.timezone = defaultTimezone;
+    if (!state.topics.some((topic) => topic.id === activeTopicId)) {
+      activeTopicId = state.topics[0]?.id || null;
+      activeSourceId = '';
+    }
+
+    saveLocalState();
+    return true;
+  }
+
+  function leaveTopicManager({ applyDeferred = false } = {}) {
+    topicManagerOpen = false;
+    clearTimeout(recommendationTimer);
+
+    if (applyDeferred) applyDeferredCloudState();
+    else deferredCloudState = null;
+  }
+
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[char]));
@@ -171,6 +208,14 @@
         });
         const imported = await importResponse.json().catch(() => ({}));
         if (importResponse.ok) remote = normalizeState(imported);
+      }
+
+      if (topicManagerIsOpen()) {
+        // Do not throw away unsaved form edits. Hold the newest cloud snapshot
+        // until the editor is explicitly cancelled. If the reader saves, their
+        // local form values intentionally win and are synced back to cloud.
+        deferredCloudState = remote;
+        return true;
       }
 
       state = remote;
@@ -895,8 +940,14 @@
       </article>`;
   }
 
-  function render() {
+  function render({ force = false } = {}) {
     if (!app) return;
+
+    // Background refresh/hydration code calls render() in several places.
+    // While New/Edit Topic is open, those calls should update data quietly but
+    // must not navigate away from the unsaved form.
+    if (!force && topicManagerIsOpen()) return;
+
     closeMenus();
     const topic = currentTopic();
     if (!topic) {
@@ -1003,6 +1054,9 @@
   }
 
   function showManager() {
+    topicManagerOpen = true;
+    deferredCloudState = null;
+
     const topic = currentTopic();
     app.innerHTML = `
       <section class="panel topic-feeds-page">
@@ -1042,7 +1096,12 @@
   }
 
   function bindManager(existing) {
-    document.getElementById('topic-cancel')?.addEventListener('click', render);
+    document.getElementById('topic-cancel')?.addEventListener('click', () => {
+      // Cancel means discard unsaved edits. If a newer cloud snapshot arrived
+      // while the form was open, it is now safe to apply it.
+      leaveTopicManager({ applyDeferred: true });
+      render({ force: true });
+    });
     document.getElementById('topic-add-source')?.addEventListener('click', () => {
       document.getElementById('topic-source-rows')?.insertAdjacentHTML('beforeend', sourceRow());
     });
@@ -1074,8 +1133,12 @@
       if (removedSourceIds.has(state.preferences.dailyOpenSourceId)) state.preferences.dailyOpenSourceId = '';
       activeTopicId = state.topics[0]?.id || null;
       activeSourceId = '';
+
+      // This user action wins over any cloud snapshot that arrived while the
+      // editor was open.
+      leaveTopicManager({ applyDeferred: false });
       saveState();
-      render();
+      render({ force: true });
     });
     document.getElementById('topic-feed-form')?.addEventListener('submit', (event) => {
       event.preventDefault();
@@ -1097,19 +1160,47 @@
       }
       state.preferences.timezone = defaultTimezone;
 
-      const record = existing || { id: uid(), articles: [], lastRefresh: null, lastErrors: [] };
-      Object.assign(record, {
+      const formValues = {
         name: document.getElementById('topic-name').value.trim(),
         cadence: document.getElementById('topic-cadence').value,
         maxRecommended: Number(document.getElementById('topic-max').value) || 8,
         preferences: document.getElementById('topic-preferences').value.trim(),
         sources
-      });
-      if (!existing) state.topics.push(record);
+      };
+
+      let record;
+      if (existing?.id) {
+        // A feed refresh may have replaced this topic object in state while the
+        // editor was open. Always merge the form into the CURRENT live record
+        // so refreshed articles are preserved and unsaved settings are not lost.
+        const liveIndex = state.topics.findIndex((item) => item.id === existing.id);
+        const live = liveIndex >= 0
+          ? state.topics[liveIndex]
+          : { ...existing };
+
+        record = { ...live, ...formValues, id: existing.id };
+
+        if (liveIndex >= 0) state.topics[liveIndex] = record;
+        else state.topics.push(record);
+      } else {
+        record = {
+          id: uid(),
+          articles: [],
+          lastRefresh: null,
+          lastErrors: [],
+          ...formValues
+        };
+        state.topics.push(record);
+      }
+
       activeTopicId = record.id;
       activeSourceId = '';
+
+      // Save means the form intentionally wins over any cloud snapshot received
+      // while editing. Push this saved state back to cloud, then refresh feeds.
+      leaveTopicManager({ applyDeferred: false });
       saveState();
-      render();
+      render({ force: true });
       refreshTopic();
     });
   }
@@ -1608,7 +1699,11 @@
     if (!target) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    render();
+
+    // Explicit top-level navigation is an intentional exit from an unsaved
+    // editor. Treat it like Cancel rather than a background rerender.
+    if (topicManagerIsOpen()) leaveTopicManager({ applyDeferred: true });
+    render({ force: true });
   }, true);
 
   window.addEventListener('DOMContentLoaded', () => {

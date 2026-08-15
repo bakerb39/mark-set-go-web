@@ -1,67 +1,63 @@
-MARK, SET, GO! — TOPIC FEED HEADER ORDER + GAP FIX
+MARK, SET, GO! — TOPIC FEEDS EDITOR LOCK
 
 Replace only:
   /public/topic-feeds.js
-  /public/topic-feeds.css
   /public/index.html
 
-ROOT CAUSE
+BUG
 
-Read Anything's installArticleSummaryButton() intentionally enforces:
+While New Topic / Edit Topic was open, a background cloud/auth hydration could
+finish and run:
 
-  #read-anything-article-summary-action.parentElement === #reader
+  if (document.querySelector('.topic-feeds-page')) render();
 
-If another script moves Summarize / Analyze somewhere else, Read Anything puts
-it back at the top of #reader.
+The editor itself also uses .topic-feeds-page, so that background render
+replaced the unsaved form with the normal My Topics list.
 
-The prior Topic Feed patch moved that node into a nested header overlay, so
-Read Anything later moved it back above the source row. The measured spacer was
-then reserving space for a header structure that no longer matched the visible
-DOM, which produced the large blank gap.
+An in-flight feed refresh could also call render() when it completed.
 
 FIX
 
-Do NOT move the action-row DOM node anymore.
+New/Edit Topic is now a transactional screen.
 
-Instead:
+While the editor is open:
+- cloud hydration may finish, but its state is held temporarily;
+- background feed refreshes may finish, but render() cannot replace the form;
+- auth/session refreshes cannot navigate away from the form.
 
-1. Source/share metadata stays in a small absolute overlay at the top of page 1.
-2. Summarize / Analyze remains a direct child of #reader exactly as Read
-   Anything requires.
-3. Topic Feeds absolutely positions that existing row immediately beneath the
-   source divider.
-4. One ordinary spacer reserves ONLY:
-     source row height
-     + a small source-to-actions gap
-     + actions height
-     + one article-text line
-5. Book Pages uses its existing resize/reflow path after that measured height
-   changes.
+Only explicit user actions can leave the editor:
 
-VISIBLE ORDER
+SAVE TOPIC
+- form values win;
+- any deferred cloud snapshot is discarded;
+- settings are merged into the CURRENT live topic record so refreshed articles
+  are preserved;
+- saved state syncs back to cloud;
+- then the topic refresh runs.
 
-  SOURCE · Publisher · Date · View original          [share icons]
-  ---------------------------------------------------------------
-  Summarize · Analyze
+CANCEL
+- unsaved form changes are discarded;
+- any newer cloud snapshot received during editing is applied;
+- returns to My Topics.
 
-  [one normal line]
+DELETE TOPIC
+- deletion wins;
+- deferred cloud state is discarded;
+- deletion syncs normally.
 
-  Article text...
-
-This removes the unexplained large blank area and makes the action order match
-the requested layout.
+Explicitly clicking Topic Feeds in the top navigation also acts like Cancel.
 
 PRESERVED
 
-- social share buttons
-- source credit
-- professional source/URL footer
-- My Topics sticky/open-close behavior
-- My Topics exact list scroll restoration
-- Bookmark preservation
-- centered Book Pages divider
-- music icon beneath the visible WPM stepper
+- recommended feeds while editing
+- manual feed rows
+- Daily start choice
+- refresh/download behavior
+- PostgreSQL sync
+- My Topics Reader navigation
+- source/share/header fixes
+- bookmarks
+- Book Pages fixes
+- top-right Reader music + My Playlists references
 
-No app.js is replaced.
-No read-anything.js is replaced.
-No protected Reader file is changed.
+No server.js, app.js, Reader core, CSS, database schema, or music JS is changed.
