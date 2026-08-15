@@ -1,36 +1,67 @@
-MARK, SET, GO! — VISIBLE READER MUSIC ICON
+MARK, SET, GO! — TOPIC FEED HEADER ORDER + GAP FIX
 
 Replace only:
-  /public/reader-music-quick.js
-  /public/reader-music-quick.css
+  /public/topic-feeds.js
+  /public/topic-feeds.css
   /public/index.html
 
-CORRECTION
+ROOT CAUSE
 
-The previous version inserted ♫ beneath the #speed field inside the Reader
-settings toolbar. That control can be inside a collapsed Reader Controls panel,
-so the icon was not readily visible.
+Read Anything's installArticleSummaryButton() intentionally enforces:
 
-The music icon now sits beneath the ALWAYS-VISIBLE Reader WPM stepper:
+  #read-anything-article-summary-action.parentElement === #reader
 
-      −   300 WPM   +
-              ♫
+If another script moves Summarize / Analyze somewhere else, Read Anything puts
+it back at the top of #reader.
 
-The existing .viewer-wpm-control DOM node is MOVED into a small wrapper, not
-recreated, so the existing WPM − / + event handlers remain attached.
+The prior Topic Feed patch moved that node into a nested header overlay, so
+Read Anything later moved it back above the source row. The measured spacer was
+then reserving space for a header structure that no longer matched the visible
+DOM, which produced the large blank gap.
 
-Clicking ♫ opens the existing Music & Focus chooser/player.
+FIX
 
-Playback still uses the existing:
-  #music-dock
-  #music-player
+Do NOT move the action-row DOM node anymore.
 
-directly.
+Instead:
 
-This package includes the JS and CSS again to guarantee the deployment has the
-music implementation, and uses the latest Topic Feed index shell so current
-Topic Feed fixes remain referenced.
+1. Source/share metadata stays in a small absolute overlay at the top of page 1.
+2. Summarize / Analyze remains a direct child of #reader exactly as Read
+   Anything requires.
+3. Topic Feeds absolutely positions that existing row immediately beneath the
+   source divider.
+4. One ordinary spacer reserves ONLY:
+     source row height
+     + a small source-to-actions gap
+     + actions height
+     + one article-text line
+5. Book Pages uses its existing resize/reflow path after that measured height
+   changes.
 
-NO app.js replacement.
-NO styles.css replacement.
-NO Reader core / Book Pages / Topic Feed JS changes.
+VISIBLE ORDER
+
+  SOURCE · Publisher · Date · View original          [share icons]
+  ---------------------------------------------------------------
+  Summarize · Analyze
+
+  [one normal line]
+
+  Article text...
+
+This removes the unexplained large blank area and makes the action order match
+the requested layout.
+
+PRESERVED
+
+- social share buttons
+- source credit
+- professional source/URL footer
+- My Topics sticky/open-close behavior
+- My Topics exact list scroll restoration
+- Bookmark preservation
+- centered Book Pages divider
+- music icon beneath the visible WPM stepper
+
+No app.js is replaced.
+No read-anything.js is replaced.
+No protected Reader file is changed.

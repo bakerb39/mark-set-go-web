@@ -392,3 +392,63 @@
 
 /* Preserve one clean reading line between Summarize/Analyze and article text.
    The measured spacer adds exactly one reader-font line after the overlay. */
+
+
+/* v2.1.13 — final Topic Feed page-1 header layout.
+   Read Anything owns #read-anything-article-summary-action as a DIRECT CHILD of
+   #reader and will re-prepend it there. Do not reparent it. Keep both source
+   metadata and actions out of multicolumn flow with absolute positioning, then
+   reserve only their measured height with one normal first-column spacer. */
+
+#reader.topic-feed-story-header-managed{
+  position:relative;
+}
+
+/* Retire the previous nested overlay if stale DOM/CSS survives a hot reload. */
+#reader > .topic-feed-story-header-overlay{
+  display:none !important;
+}
+
+#reader > .topic-feed-story-meta-overlay{
+  position:absolute;
+  z-index:9;
+  box-sizing:border-box;
+  pointer-events:auto;
+}
+
+#reader > .topic-feed-story-meta-overlay .topic-feed-reader-credit{
+  margin:0 !important;
+  padding:0 0 .46em !important;
+  border-bottom:1px solid rgba(77,101,124,.15);
+}
+
+/* Read Anything may repeatedly prepend this node. Its parent is intentionally
+   left as #reader; only the visual coordinates are changed by topic-feeds.js. */
+#reader.topic-feed-story-header-managed > #read-anything-article-summary-action{
+  display:block !important;
+  position:absolute !important;
+  margin:0 !important;
+  padding:0 !important;
+  break-inside:auto !important;
+  page-break-inside:auto !important;
+}
+
+/* This is the ONLY story-header element that participates in article flow. */
+#reader > .topic-feed-story-header-spacer{
+  display:block !important;
+  box-sizing:border-box;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  min-height:0;
+  pointer-events:none;
+  break-inside:auto !important;
+  page-break-inside:auto !important;
+  -webkit-column-break-inside:auto !important;
+}
+
+/* Cancel older credit spacing rules. The spacer now supplies the exact one-line
+   gap between Summarize/Analyze and the first article paragraph. */
+#reader.topic-feed-story-header-managed .topic-feed-reader-credit{
+  margin-bottom:0 !important;
+}

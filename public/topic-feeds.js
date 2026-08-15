@@ -399,9 +399,16 @@
   function topicFeedStoryHeaderParts(reader = document.querySelector('#reader')) {
     if (!reader) return {};
 
-    let overlay = reader.querySelector(':scope > [data-topic-feed-story-header]');
-    let spacer = reader.querySelector(':scope > [data-topic-feed-story-header-spacer]');
+    // Clean up the previous nested-overlay implementation if this script is
+    // hot-reloaded in a browser session. Preserve the existing action-row node.
+    const legacyOverlay = reader.querySelector(':scope > [data-topic-feed-story-header]');
+    if (legacyOverlay) {
+      const legacyAction = legacyOverlay.querySelector('#read-anything-article-summary-action');
+      if (legacyAction) reader.prepend(legacyAction);
+      legacyOverlay.remove();
+    }
 
+    let spacer = reader.querySelector(':scope > [data-topic-feed-story-header-spacer]');
     if (!spacer) {
       spacer = document.createElement('div');
       spacer.className = 'topic-feed-story-header-spacer';
@@ -410,24 +417,20 @@
       reader.prepend(spacer);
     }
 
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.className = 'topic-feed-story-header-overlay';
-      overlay.dataset.topicFeedStoryHeader = '1';
-      overlay.innerHTML = `
-        <div class="topic-feed-story-meta-slot" data-topic-feed-story-meta></div>
-        <div class="topic-feed-story-actions-slot" data-topic-feed-story-actions></div>
-      `;
-      reader.appendChild(overlay);
+    let meta = reader.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
+    if (!meta) {
+      meta = document.createElement('div');
+      meta.className = 'topic-feed-story-meta-overlay';
+      meta.dataset.topicFeedStoryMetaOverlay = '1';
+      reader.appendChild(meta);
     }
 
     reader.classList.add('topic-feed-story-header-managed');
 
     return {
-      overlay,
       spacer,
-      meta: overlay.querySelector('[data-topic-feed-story-meta]'),
-      actions: overlay.querySelector('[data-topic-feed-story-actions]')
+      meta,
+      actionRow: document.querySelector('#read-anything-article-summary-action')
     };
   }
 
@@ -437,13 +440,12 @@
       const reader = document.querySelector('#reader');
       if (!reader?.classList.contains('book-pages-layout')) return;
 
-      // app.js already owns the canonical Book Pages reflow. Its existing
-      // window-resize listener preserves the current word anchor and rebuilds
-      // column geometry. Trigger that path after the header spacer is stable.
+      // Use the Reader's own resize/reflow path after the reserved first-page
+      // header height changes.
       window.requestAnimationFrame(() => {
         window.dispatchEvent(new Event('resize'));
       });
-    }, 90);
+    }, 70);
   }
 
   function positionTopicFeedStoryHeader() {
@@ -452,33 +454,76 @@
     const reader = document.querySelector('#reader');
     if (!reader) return;
 
-    const { overlay, spacer } = topicFeedStoryHeaderParts(reader);
-    if (!overlay || !spacer) return;
+    const { spacer, meta } = topicFeedStoryHeaderParts(reader);
+    const actionRow = document.querySelector('#read-anything-article-summary-action');
+    if (!spacer || !meta) return;
 
     const styles = getComputedStyle(reader);
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
     const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
     const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
     const columnGap = Number.parseFloat(styles.columnGap) || 0;
+    const fontSize = Number.parseFloat(styles.fontSize) || 14;
     const usableWidth = Math.max(1, reader.clientWidth - paddingLeft - paddingRight);
 
     const headerWidth = reader.classList.contains('book-pages-layout')
       ? Math.max(1, (usableWidth - columnGap) / 2)
       : usableWidth;
 
-    overlay.style.left = `${paddingLeft}px`;
-    overlay.style.top = `${paddingTop}px`;
-    overlay.style.width = `${headerWidth}px`;
+    meta.style.left = `${paddingLeft}px`;
+    meta.style.top = `${paddingTop}px`;
+    meta.style.width = `${headerWidth}px`;
+
+    if (actionRow) {
+      // Read Anything deliberately requires this node to remain a direct child
+      // of #reader. Leave it there and change only its visual placement.
+      actionRow.style.setProperty('position', 'absolute', 'important');
+      actionRow.style.setProperty('left', `${paddingLeft}px`, 'important');
+      actionRow.style.setProperty('width', `${headerWidth}px`, 'important');
+      actionRow.style.setProperty('box-sizing', 'border-box', 'important');
+      actionRow.style.setProperty('margin', '0', 'important');
+      actionRow.style.setProperty('padding', '0', 'important');
+      actionRow.style.setProperty('break-inside', 'auto', 'important');
+      actionRow.style.setProperty('page-break-inside', 'auto', 'important');
+      actionRow.style.setProperty('z-index', '8', 'important');
+    }
 
     window.requestAnimationFrame(() => {
-      const fontSize = Number.parseFloat(getComputedStyle(reader).fontSize) || 14;
-      const requiredHeight = Math.ceil(overlay.getBoundingClientRect().height + fontSize);
-      const previousHeight = Number.parseFloat(spacer.style.height) || 0;
+      if (!reader.isConnected || !meta.isConnected) return;
 
-      if (Math.abs(requiredHeight - previousHeight) > 1) {
-        spacer.style.height = `${requiredHeight}px`;
-        scheduleTopicFeedStoryBookReflow();
+      const metaHeight = Math.ceil(meta.getBoundingClientRect().height || 0);
+      const actionGap = Math.max(5, Math.round(fontSize * 0.35));
+
+      if (actionRow?.isConnected) {
+        actionRow.style.setProperty(
+          'top',
+          `${paddingTop + metaHeight + actionGap}px`,
+          'important'
+        );
       }
+
+      window.requestAnimationFrame(() => {
+        if (!reader.isConnected || !spacer.isConnected) return;
+
+        const actionHeight = actionRow?.isConnected
+          ? Math.ceil(actionRow.getBoundingClientRect().height || 0)
+          : 0;
+
+        // Source/share + small gap + actions + exactly one body-text line.
+        const requiredHeight = Math.max(
+          fontSize * 2,
+          metaHeight + actionGap + actionHeight + fontSize
+        );
+        const previousHeight = Number.parseFloat(spacer.style.height) || 0;
+
+        spacer.style.width = '100%';
+        spacer.style.maxWidth = `${headerWidth}px`;
+
+        if (Math.abs(requiredHeight - previousHeight) > 1) {
+          spacer.style.height = `${Math.ceil(requiredHeight)}px`;
+          scheduleTopicFeedStoryBookReflow();
+        }
+      });
     });
   }
 
@@ -486,24 +531,17 @@
     if (!isTopicFeedReaderActive()) return;
 
     const reader = document.querySelector('#reader');
-    if (!reader) return;
+    const actionRow = document.querySelector('#read-anything-article-summary-action');
+    if (!reader || !actionRow) {
+      positionTopicFeedStoryHeader();
+      return;
+    }
 
-    const { actions } = topicFeedStoryHeaderParts(reader);
-    if (!actions) return;
-
-    const actionRow =
-      document.querySelector('#read-anything-article-summary-action');
-
-    if (actionRow && actionRow.parentElement !== actions) {
-      actions.replaceChildren(actionRow);
-
-      // Override the inline margins installed by Read Anything. The source row
-      // owns the separator line; actions sit directly beneath that line.
-      actionRow.style.setProperty('width', 'auto');
-      actionRow.style.setProperty('margin', '.42em 0 0 0');
-      actionRow.style.setProperty('padding', '0');
-      actionRow.style.setProperty('break-inside', 'auto');
-      actionRow.style.setProperty('page-break-inside', 'auto');
+    // Read Anything may re-prepend the row. That is expected and no longer a
+    // conflict: direct-child ownership is preserved, while CSS positioning puts
+    // it beneath the source/share divider.
+    if (actionRow.parentElement !== reader) {
+      reader.prepend(actionRow);
     }
 
     positionTopicFeedStoryHeader();
@@ -516,22 +554,11 @@
     topicFeedStoryHeaderObserver?.disconnect?.();
     topicFeedStoryHeaderReader = reader;
 
-    topicFeedStoryHeaderObserver = new MutationObserver((mutations) => {
+    topicFeedStoryHeaderObserver = new MutationObserver(() => {
       if (!isTopicFeedReaderActive()) return;
-
-      const actionMovedIntoReader = mutations.some((mutation) =>
-        Array.from(mutation.addedNodes || []).some((node) =>
-          node?.nodeType === Node.ELEMENT_NODE &&
-          (
-            node.id === 'read-anything-article-summary-action' ||
-            node.querySelector?.('#read-anything-article-summary-action')
-          )
-        )
-      );
-
-      if (actionMovedIntoReader) {
-        window.setTimeout(keepTopicFeedArticleActionsInHeader, 0);
-      }
+      window.requestAnimationFrame(() => {
+        keepTopicFeedArticleActionsInHeader();
+      });
     });
 
     topicFeedStoryHeaderObserver.observe(reader, { childList: true });
@@ -668,8 +695,8 @@
 
       meta.replaceChildren(credit);
 
-      // The same existing action-row DOM node is moved, not recreated, so its
-      // established Summarize/Analyze handlers stay attached.
+      // Read Anything keeps Summarize / Analyze as a direct child of #reader.
+      // We preserve that contract and position it visually below this source row.
       keepTopicFeedArticleActionsInHeader();
       observeTopicFeedStoryHeader();
       positionTopicFeedStoryHeader();
