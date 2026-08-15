@@ -1561,12 +1561,13 @@
     applyingTopicReaderPanePreference = true;
     try {
       // Let the Reader's own layout code perform the actual open/close.
+      // This runs inside the MutationObserver-scheduled animation frame, so the
+      // Topic Feed pane is restored before the browser paints the rebuilt Reader.
+      // Do not defer this with setTimeout: that creates a visible closed/open flash.
       toggle.click();
     } finally {
-      window.setTimeout(() => {
-        applyingTopicReaderPanePreference = false;
-        if (topicReaderPaneShouldBeOpen()) scheduleTopicBookPageGeometrySync();
-      }, 0);
+      applyingTopicReaderPanePreference = false;
+      if (topicReaderPaneShouldBeOpen()) scheduleTopicBookPageGeometrySync();
     }
   }
 
@@ -1939,8 +1940,9 @@
     });
 
     // app.js starts Reader side panes closed when a Reader view is rebuilt.
-    // Topic Feed articles restore the reader's explicit My Topics preference.
-    window.setTimeout(applyTopicReaderPanePreference, 0);
+    // Restore My Topics immediately in this pre-paint animation frame. Delaying
+    // with setTimeout allows one closed frame to render and looks like a refresh.
+    applyTopicReaderPanePreference();
     scheduleTopicBookPageGeometrySync();
     window.setTimeout(ensureTopicBookDivider, 0);
     window.setTimeout(ensureTopicBookDivider, 160);
