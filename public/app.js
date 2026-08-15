@@ -23053,15 +23053,19 @@ async function symposiumAskAi({person, mode, topic, context, transcript, userCon
   const readerDirective = userContribution ? `\n\nIMMEDIATE RESPONSE REQUIREMENT — THIS OVERRIDES THE NORMAL FLOW:\nThe reader has just contributed the following point:\n${userContribution}\n\nYou are the participant Athena selected to answer it. Do NOT merely continue the general discussion. Your response must directly engage this reader contribution before doing anything else. In your opening 1–2 sentences, identify the substance of the reader's point in your own words (without saying only “I agree” or “good point”). Then clearly state whether you agree, disagree, or qualify it, and explain why using argument and evidence appropriate to ${person.name}. If the reader asked a question, answer that question explicitly. If the reader supplied evidence, assess that evidence. If the reader challenged a claim, defend, revise, or concede the challenged claim. Only after this direct engagement may you reconnect the point to the broader Symposium topic. Do not ignore, sidestep, or replace the reader's point with a different issue.` : '';
   const prompt = `You are participating in Mark, Set, Go!'s Symposium as ${person.name}, representing ${person.field}. Use deep knowledge associated with ${person.name}'s work, historical context, methods, and characteristic intellectual concerns (${person.lens}). Do not claim private knowledge or fabricate quotations. When a modern topic postdates this thinker, reason from the thinker's documented ideas and clearly frame the response as an application rather than a literal historical statement. Remain cordial, charitable, concise, and substantive.\n\n${modeInstructions[mode] || modeInstructions.debate}\n\nTOPIC:\n${topic}\n\nREADING CONTEXT:\n${context || 'No reading passage supplied.'}\n\nRECENT TRANSCRIPT:\n${prior || 'No prior turns.'}${readerDirective}\n\nRespond as ${person.name} in about 120-220 words. Use reasons and evidence. Do not use stage directions.`;
 
+  // IMPORTANT: /api/mark-selection is selection-centered. When the reader has
+  // just spoken, make the reader's exact contribution the primary selection so
+  // the server/model cannot treat it as optional background behind the book text.
+  const primarySelection = String(userContribution || context || topic || '').trim();
   const response = await fetch('/api/mark-selection', {
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify({
-      text: context || topic,
-      selection: context || topic,
+      text: primarySelection,
+      selection: primarySelection,
       startIndex:0,
-      endIndex:Math.max(1, splitWords(context || topic).length),
-      chapter:'Symposium',
+      endIndex:Math.max(1, splitWords(primarySelection).length),
+      chapter:userContribution ? 'Symposium · Reader contribution' : 'Symposium',
       action:'ask',
       question:prompt
     })
@@ -23175,7 +23179,7 @@ function renderSymposium() {
   const readerButton = root.querySelector('#symposium-reader-submit');
   const startButton = root.querySelector('#symposium-start');
   const rosterEl = root.querySelector('#symposium-roster');
-  const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0 };
+  const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'' };
 
   const scrollTranscript = () => { transcriptEl.scrollTop = transcriptEl.scrollHeight; };
   const shouldSpeak = () => session.output === 'both' || session.output === 'speak';
@@ -23252,6 +23256,7 @@ function renderSymposium() {
     session.people = people;
     session.transcript = [];
     session.nextIndex = 0;
+    session.pendingReaderContribution = '';
     transcriptEl.innerHTML = '';
     appendTurn({ name:'Athena', monogram:'A', field:'Moderator', text:await moderatorOpening(), kind:'moderator', sourceLabel:'Moderator · decorum & evidence' }, true);
     nextButton.disabled = false; saveButton.disabled = false; readerButton.disabled = false;
@@ -23263,7 +23268,9 @@ function renderSymposium() {
     if (!session.active || !session.people.length) return;
     const person = session.people[session.nextIndex % session.people.length];
     session.nextIndex = (session.nextIndex + 1) % session.people.length;
-    await runSpeaker(person);
+    const pending = session.pendingReaderContribution;
+    session.pendingReaderContribution = '';
+    await runSpeaker(person, pending);
   });
 
   readerButton.addEventListener('click', async ()=>{
@@ -23274,10 +23281,13 @@ function renderSymposium() {
     const labels = { argument:'Reader argument', evidence:'Reader evidence', question:'Reader question', challenge:'Reader challenge' };
     appendTurn({ name:'You', monogram:'You', field:labels[kind] || 'Reader', text, kind:'user' }, false);
     input.value = '';
+    const readerContribution = `${labels[kind]}: ${text}`;
+    session.pendingReaderContribution = readerContribution;
     appendTurn({ name:'Athena', monogram:'A', field:'Moderator', text:`Thank you. The next participant will respond to your ${kind} before continuing the broader discussion: first restating the substance of your point, then saying where they agree, disagree, or qualify it, and why.`, kind:'moderator' }, shouldSpeak());
     const person = session.people[session.nextIndex % session.people.length];
     session.nextIndex = (session.nextIndex + 1) % session.people.length;
-    await runSpeaker(person, `${labels[kind]}: ${text}`);
+    session.pendingReaderContribution = '';
+    await runSpeaker(person, readerContribution);
   });
 
   root.querySelector('#symposium-reader-input').addEventListener('keydown',(event)=>{
