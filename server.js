@@ -6103,24 +6103,18 @@ app.post('/api/topic-feeds/fetch', async (req, res) => {
 });
 
 let server = null;
-let topicFeedMorningTimer = null;
 
 if (require.main === module) {
   server = app.listen(PORT, () => {
     console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`);
     if (databaseConfigured()) {
       ensureTopicFeedSchema().catch((error) => console.error('Topic Feed schema check failed:', error.message));
-      topicFeedMorningTimer = setInterval(() => {
-        refreshDueTopicFeeds().catch((error) => console.error('Topic Feed morning refresh failed:', error.message));
-      }, 30 * 60 * 1000);
-      topicFeedMorningTimer.unref?.();
     }
   });
 }
 
 async function shutdown(signal) {
   console.log(`${signal} received; shutting down.`);
-  if (topicFeedMorningTimer) clearInterval(topicFeedMorningTimer);
   if (!server) {
     await closeDatabase().catch((error) => console.error('Database shutdown error:', error.message));
     return;

@@ -20,16 +20,3 @@ services:
         value: gpt-5
       - key: GUTENBERG_MIRROR_BASES
         value: https://gutenberg.pglaf.org,https://mirrors.xmission.com/gutenberg
-
-  - type: cron
-    name: mark-set-go-topic-feeds-morning
-    runtime: node
-    plan: starter
-    schedule: "0 * * * *"
-    buildCommand: npm ci
-    startCommand: node scripts/topic-feeds-morning.js
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false

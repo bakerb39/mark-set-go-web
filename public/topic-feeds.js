@@ -507,7 +507,7 @@
         <section class="panel topic-feeds-page">
           <header class="topic-feeds-hero">
             <div><span class="source-category">My Topics</span><h1>Topic Feeds</h1>
-            <p>Create the subjects you care about. We’ll suggest useful feeds, prepare the morning edition, and keep it available across your signed-in devices.</p></div>
+            <p>Create the subjects you care about. We’ll suggest useful feeds, and Refresh downloads the latest Reader-ready articles to your signed-in account.</p></div>
           </header>
           <div class="topic-feeds-empty">
             <h2>Build your first topic</h2>
@@ -534,7 +534,7 @@
           <p>${topic.cadence === 'weekly' ? 'Weekly' : 'Daily'} edition · ${topic.sources.length} feed${topic.sources.length === 1 ? '' : 's'} · ${all.length} article${all.length === 1 ? '' : 's'}${topic.preparedAt ? ' · downloaded and Reader-ready' : ''}</p></div>
           <div class="topic-feeds-hero-actions">
             <button class="secondary" id="topic-manage" type="button">Manage</button>
-            <button class="primary" id="topic-refresh" type="button" ${(loading || preparing) ? 'disabled' : ''}>${preparing ? 'Downloading articles…' : loading ? 'Refreshing…' : 'Refresh now'}</button>
+            <button class="primary" id="topic-refresh" type="button" ${(loading || preparing) ? 'disabled' : ''}>${preparing ? 'Downloading articles…' : loading ? 'Refreshing…' : 'Refresh & download latest'}</button>
           </div>
         </header>
         <div class="topic-feeds-layout">
@@ -611,7 +611,7 @@
       <section class="panel topic-feeds-page">
         <header class="topic-feeds-hero">
           <div><span class="source-category">Topic Setup</span><h1>${topic ? 'Edit Topic' : 'New Topic'}</h1>
-          <p>Add your own feeds and choose from recommendations. One feed can also be your automatic daily Reader start.</p></div>
+          <p>Add your own feeds and choose from recommendations. One feed can also be your daily Reader start from the latest downloaded edition.</p></div>
         </header>
         <form id="topic-feed-form" class="topic-feed-form">
           <label>Topic name<input id="topic-name" required value="${escapeHtml(topic?.name || '')}" placeholder="Artificial Intelligence"></label>
@@ -626,14 +626,12 @@
           <label>What should be prioritized?<textarea id="topic-preferences" rows="3" placeholder="substantive analysis, policy changes, major product releases…">${escapeHtml(topic?.preferences || '')}</textarea></label>
           <section class="topic-feed-source-editor">
             <div class="topic-feed-sidebar-head"><strong>Your feeds</strong><button id="topic-add-source" type="button">+ Add your own</button></div>
-            <p class="topic-source-help">Select “Daily start” on one feed if you want its newest unread article to open automatically in the Reader once each day.</p>
+            <p class="topic-source-help">Select “Daily start” on one feed if you want its newest unread downloaded article to open automatically in the Reader once each day.</p>
             <div id="topic-source-rows">${(topic?.sources || []).map(sourceRow).join('')}</div>
           </section>
           <div class="topic-morning-settings">
-            <label>Morning download time
-              <select id="topic-morning-hour">${[4,5,6,7,8].map((hour) => `<option value="${hour}" ${Number(state.preferences.morningHour) === hour ? 'selected' : ''}>${hour}:00 AM</option>`).join('')}</select>
-            </label>
-            <span>Timezone: ${escapeHtml(state.preferences.timezone || defaultTimezone)}</span>
+            <strong>Refresh behavior</strong>
+            <span>Saving a topic refreshes it immediately. After that, use “Refresh &amp; download latest” to pull the newest feed items and store Reader-ready article text in your account.</span>
           </div>
           <div class="source-actions">
             <button class="primary" type="submit">Save Topic</button><button class="secondary" id="topic-cancel" type="button">Cancel</button>
@@ -701,7 +699,6 @@
         state.preferences.dailyOpenSourceId = '';
       }
       state.preferences.timezone = defaultTimezone;
-      state.preferences.morningHour = Number(document.getElementById('topic-morning-hour')?.value) || 5;
 
       const record = existing || { id: uid(), articles: [], lastRefresh: null, lastErrors: [] };
       Object.assign(record, {
