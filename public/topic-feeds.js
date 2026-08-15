@@ -339,14 +339,17 @@
     }
 
     const apply = () => {
-      const titleCopy = document.querySelector('.reader-title-copy');
-      if (!titleCopy) return false;
+      const reader =
+        document.querySelector('#reader') ||
+        document.querySelector('.reader, .interactive-reader');
+      if (!reader) return false;
 
-      titleCopy.querySelectorAll('[data-topic-feed-source-credit]').forEach((node) => node.remove());
+      reader.querySelectorAll('[data-topic-feed-source-credit]').forEach((node) => node.remove());
 
       const credit = document.createElement('div');
       credit.className = 'topic-feed-reader-credit';
       credit.dataset.topicFeedSourceCredit = '1';
+      credit.setAttribute('aria-label', `Source: ${sourceName}${dateLabel ? `, ${dateLabel}` : ''}`);
 
       const label = document.createElement('span');
       label.className = 'topic-feed-reader-credit-label';
@@ -384,18 +387,33 @@
         credit.append(separator, link);
       }
 
-      const title = titleCopy.querySelector('h1');
-      if (title?.nextSibling) title.parentNode.insertBefore(credit, title.nextSibling);
-      else if (title) title.insertAdjacentElement('afterend', credit);
-      else titleCopy.prepend(credit);
+      // Read Anything owns the Summarize · Analyze row. Put the source
+      // immediately after it so the credit is visible in Highlight, Book Pages,
+      // fullscreen/resume views, and other Reader layouts.
+      const actionRow = reader.querySelector('#read-anything-article-summary-action');
+      if (actionRow) {
+        actionRow.insertAdjacentElement('afterend', credit);
+      } else {
+        reader.prepend(credit);
+      }
 
       return true;
     };
 
-    // openDocument renders the Reader synchronously today, but the retries keep
-    // this additive integration safe if the Reader rendering becomes async.
-    if (apply()) return;
-    [0, 60, 180, 420].forEach((delay) => window.setTimeout(apply, delay));
+    // The article action row may be installed just after openDocument(), so
+    // retry long enough to place the credit beneath it rather than above it.
+    [0, 40, 100, 220, 480, 900].forEach((delay) => {
+      window.setTimeout(() => {
+        if (apply()) {
+          const reader = document.querySelector('#reader') || document.querySelector('.reader, .interactive-reader');
+          const credit = reader?.querySelector('[data-topic-feed-source-credit]');
+          const actionRow = reader?.querySelector('#read-anything-article-summary-action');
+          if (credit && actionRow && credit.previousElementSibling !== actionRow) {
+            actionRow.insertAdjacentElement('afterend', credit);
+          }
+        }
+      }, delay);
+    });
   }
 
   function openPreparedArticle(topic, article, payload) {

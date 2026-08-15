@@ -1,29 +1,42 @@
-MARK, SET, GO! — TOPIC FEED SOURCE CREDIT
+MARK, SET, GO! — INLINE TOPIC FEED SOURCE CREDIT FIX
 
 Replace only:
   /public/topic-feeds.js
   /public/topic-feeds.css
   /public/index.html
 
-WHAT CHANGES
+WHY THE PREVIOUS CREDIT WAS NOT VISIBLE
 
-Topic Feed articles now show a small professional source line immediately below
-the Reader article title:
+The previous version inserted the publisher/source credit under the Reader's
+page title header (.reader-title-copy).
 
-  SOURCE  Reuters · Aug 14, 2026 · View original ↗
+Book Pages and other immersive Reader views can show the article reading
+surface without that title header being visible. That is exactly what the
+screenshot exposed.
 
-The source name comes from the selected feed.
-The date is shown when the article supplies one.
-"View original" links to the original article.
+NEW PLACEMENT
 
-The credit is UI metadata, not part of the article text. It therefore does NOT:
-- affect Reader word count;
-- affect reading position;
-- affect highlighting;
-- become part of summaries or Analyze context;
-- alter imported article text.
+The source credit is now inserted in the visible article Reader surface:
 
-Normal books and non-Topic-Feed documents are unchanged.
+  Summarize · Analyze
+  SOURCE  CoinDesk · Aug 14, 2026 · View original ↗
+  [first article paragraph]
 
-No server/database files are changed.
-No app.js, Reader engine, annotations, playback, Analyze, or companion files are changed.
+It is placed immediately after:
+  #read-anything-article-summary-action
+
+That is the same visible surface already used by the Summarize / Analyze links.
+
+IMPORTANT
+
+The source credit remains UI metadata. It is NOT inserted into currentText, so
+it does not affect:
+- Reader word count
+- reading position
+- playback
+- highlights/annotations
+- summaries
+- Analyze article grounding
+
+Normal books remain unchanged.
+No app.js or protected Reader files are changed.
