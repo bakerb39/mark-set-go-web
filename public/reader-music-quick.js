@@ -335,36 +335,16 @@
       });
     }
 
-    // Keep Music above Full screen, right-aligned, with comfortable spacing.
-    // Enforce both DOM order and layout on every Reader render so stale CSS or
-    // previous renders cannot place the two controls side-by-side.
+    // IMPORTANT: enforce the DOM order on EVERY Reader render.
+    // Older versions could leave Full screen before Music. Merely changing CSS
+    // then preserved that stale child order. Always make Music the first child
+    // and Full screen the second child.
     if (stack.firstElementChild !== button) {
       stack.insertBefore(button, stack.firstElementChild);
     }
     if (button.nextElementSibling !== fullscreenButton) {
       stack.insertBefore(fullscreenButton, button.nextElementSibling);
     }
-
-    Object.assign(stack.style, {
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'flex-end',
-      gap: '12px'
-    });
-
-    Object.assign(button.style, {
-      position: 'static',
-      inset: 'auto',
-      margin: '0',
-      transform: 'none'
-    });
-
-    Object.assign(fullscreenButton.style, {
-      position: 'static',
-      inset: 'auto',
-      margin: '0',
-      transform: 'none'
-    });
 
     speedButton = button;
   }
