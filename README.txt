@@ -1,63 +1,50 @@
-MARK, SET, GO! — TOPIC FEEDS EDITOR LOCK
+MARK, SET, GO! — TOPIC FEED FORCED-COLUMN FIX
 
 Replace only:
-  /public/topic-feeds.js
+  /public/topic-feeds.css
   /public/index.html
 
-BUG
+ACTUAL ROOT CAUSE
 
-While New Topic / Edit Topic was open, a background cloud/auth hydration could
-finish and run:
+The Reader's normal Book Pages CSS contains a rule for structured books:
 
-  if (document.querySelector('.topic-feeds-page')) render();
+  .reader.book-pages-layout .reader-group.document-structure {
+    break-before: column;
+  }
 
-The editor itself also uses .topic-feeds-page, so that background render
-replaced the unsaved form with the normal My Topics list.
+That is useful for book chapters and major structural headings.
 
-An in-flight feed refresh could also call render() when it completed.
+But some Topic Feed stories are automatically detected as structured content.
+When the FIRST article line/headline receives .document-structure, Book Pages
+forces it to begin on the NEXT column.
+
+Result:
+- Source/share header appears on the left page.
+- Summarize / Analyze appears on the left page.
+- The article is forcibly moved to the right page.
+- The rest of the left page looks blank.
 
 FIX
 
-New/Edit Topic is now a transactional screen.
+For Topic Feed Book Pages ONLY:
 
-While the editor is open:
-- cloud hydration may finish, but its state is held temporarily;
-- background feed refreshes may finish, but render() cannot replace the form;
-- auth/session refreshes cannot navigate away from the form.
+  break-before: auto !important;
 
-Only explicit user actions can leave the editor:
+Detected article headings can now begin naturally beneath the Topic Feed header
+instead of being forced to the right page.
 
-SAVE TOPIC
-- form values win;
-- any deferred cloud snapshot is discarded;
-- settings are merged into the CURRENT live topic record so refreshed articles
-  are preserved;
-- saved state syncs back to cloud;
-- then the topic refresh runs.
-
-CANCEL
-- unsaved form changes are discarded;
-- any newer cloud snapshot received during editing is applied;
-- returns to My Topics.
-
-DELETE TOPIC
-- deletion wins;
-- deferred cloud state is discarded;
-- deletion syncs normally.
-
-Explicitly clicking Topic Feeds in the top navigation also acts like Cancel.
+NORMAL BOOKS KEEP THEIR EXISTING CHAPTER/PAGE-BREAK BEHAVIOR.
 
 PRESERVED
 
-- recommended feeds while editing
-- manual feed rows
-- Daily start choice
-- refresh/download behavior
-- PostgreSQL sync
-- My Topics Reader navigation
-- source/share/header fixes
+- Topic Feed editor lock
+- source/share header order
+- social sharing
+- professional source footer
+- My Topics panel behavior and scroll restoration
 - bookmarks
-- Book Pages fixes
-- top-right Reader music + My Playlists references
+- centered Book Pages divider
+- top-right Music / My Playlists references
 
-No server.js, app.js, Reader core, CSS, database schema, or music JS is changed.
+No app.js or protected Reader file is changed.
+No JavaScript is changed by this fix.

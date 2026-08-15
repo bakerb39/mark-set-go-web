@@ -452,3 +452,25 @@
 #reader.topic-feed-story-header-managed .topic-feed-reader-credit{
   margin-bottom:0 !important;
 }
+
+
+/* v2.1.15 — Topic Feed stories must not force detected headings to a new page.
+   The core Reader intentionally starts .document-structure blocks on a fresh
+   Book Pages column for books/chapters. News articles can also be auto-detected
+   as having a structural heading, which was pushing the first real article
+   content to the right page and leaving the left page almost empty.
+
+   Scope this override ONLY to Topic Feed Book Pages. */
+#reader.topic-feed-divider-managed.book-pages-layout
+  .reader-group.document-structure{
+  break-before:auto !important;
+  page-break-before:auto !important;
+  -webkit-column-break-before:auto !important;
+}
+
+/* Article headings may stay with the following text, but they should never
+   trigger a fresh Book Pages column simply because structure detection fired. */
+#reader.topic-feed-divider-managed.book-pages-layout
+  .reader-group.document-structure:first-of-type{
+  margin-top:.35em !important;
+}
