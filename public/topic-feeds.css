@@ -474,3 +474,57 @@
   .reader-group.document-structure:first-of-type{
   margin-top:.35em !important;
 }
+
+
+/* v2.1.16 — compact, professional My Topics header utilities. */
+.topic-reader-nav-head{
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center !important;
+  gap:6px !important;
+}
+
+.topic-reader-nav-head h2{
+  margin:0 !important;
+  min-width:0;
+  white-space:nowrap;
+  font-size:.94rem;
+  line-height:1.1;
+  font-weight:750;
+  letter-spacing:-.01em;
+}
+
+.topic-reader-nav-actions{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:4px;
+  flex-wrap:nowrap;
+}
+
+.topic-reader-nav-head button,
+.topic-reader-nav-head .topic-reader-bookmark-button{
+  min-height:24px !important;
+  height:24px;
+  margin:0 !important;
+  padding:2px 7px !important;
+  border:1px solid rgba(76,96,116,.22);
+  border-radius:6px;
+  background:#fff;
+  color:#40566b;
+  box-shadow:none;
+  white-space:nowrap;
+  font-size:.66rem !important;
+  font-weight:700;
+  line-height:1;
+}
+
+.topic-reader-nav-head button:hover,
+.topic-reader-nav-head button:focus-visible,
+.topic-reader-nav-head .topic-reader-bookmark-button:hover,
+.topic-reader-nav-head .topic-reader-bookmark-button:focus-visible{
+  border-color:rgba(36,95,145,.34);
+  background:#f4f8fb;
+  color:#245f91;
+  outline:none;
+}

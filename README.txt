@@ -1,50 +1,16 @@
-MARK, SET, GO! — TOPIC FEED FORCED-COLUMN FIX
+MARK, SET, GO! — COMPACT MY TOPICS HEADER
 
 Replace only:
   /public/topic-feeds.css
   /public/index.html
 
-ACTUAL ROOT CAUSE
+CHANGES
 
-The Reader's normal Book Pages CSS contains a rule for structured books:
+- My Topics stays on one line.
+- Bookmark and Manage are now small 24px utility buttons.
+- Reduced padding, font size, border weight, and spacing.
+- Keeps full text labels for clarity.
+- Hover/focus treatment remains subtle and professional.
 
-  .reader.book-pages-layout .reader-group.document-structure {
-    break-before: column;
-  }
-
-That is useful for book chapters and major structural headings.
-
-But some Topic Feed stories are automatically detected as structured content.
-When the FIRST article line/headline receives .document-structure, Book Pages
-forces it to begin on the NEXT column.
-
-Result:
-- Source/share header appears on the left page.
-- Summarize / Analyze appears on the left page.
-- The article is forcibly moved to the right page.
-- The rest of the left page looks blank.
-
-FIX
-
-For Topic Feed Book Pages ONLY:
-
-  break-before: auto !important;
-
-Detected article headings can now begin naturally beneath the Topic Feed header
-instead of being forced to the right page.
-
-NORMAL BOOKS KEEP THEIR EXISTING CHAPTER/PAGE-BREAK BEHAVIOR.
-
-PRESERVED
-
-- Topic Feed editor lock
-- source/share header order
-- social sharing
-- professional source footer
-- My Topics panel behavior and scroll restoration
-- bookmarks
-- centered Book Pages divider
-- top-right Music / My Playlists references
-
-No app.js or protected Reader file is changed.
-No JavaScript is changed by this fix.
+No JavaScript or Reader core files are changed.
+All current Topic Feed / Book Pages / editor-lock / music references remain.
