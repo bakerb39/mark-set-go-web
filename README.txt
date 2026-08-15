@@ -1,45 +1,43 @@
-MARK, SET, GO! — ANALYZE LINK + ANALYSIS RELIABILITY FIX
+MARK, SET, GO! — DIRECT ANALYZE FOLLOW-UP FIX
 
 Replace:
-  /server.js
-  /public/read-anything.js
-  /public/companion-chad.js
+  /public/ask-mark-hub.js
   /public/index.html
 
-WHAT WAS ACTUALLY WRONG
+ROOT CAUSE FOUND IN THE ACTUAL CHAT OWNER
 
-1. "ASK CHAD" KEPT COMING BACK
-   companion-chad.js still had explicit code that changed the article's
-   [data-action="investor-analysis"] link to "Ask Chad" every time the companion
-   UI synchronized.
+The premium threaded chat's send() function always did:
+  runSelectionAction('ask', value)
 
-   That override is removed. The article action is now always:
-     Summarize · Analyze
+And runSelectionAction() immediately requires highlighted selection text.
 
-2. ANALYSIS COULD STAY ON "CHAD IS ANALYZING..."
-   The initial investor-analysis route used a strict structured-output schema
-   with medium reasoning. It has been replaced with the same simpler/reliable
-   request pattern used by the working whole-article summarizer:
-   - low reasoning effort
-   - plain text response
-   - deterministic section parser on the server
-   - same structured object returned to the existing UI
-   - 80-second server timeout
-   - 90-second client timeout with a visible error instead of endless loading
+That is correct for normal Ask companion questions about highlighted passages,
+but it is wrong after the article-level Analyze action. Analyze creates a
+whole-article context, not a user-highlighted passage.
 
-3. WHOLE-ARTICLE CONTEXT BUG
-   primeInvestorFollowupContext() referenced originalText outside its scope.
-   That is fixed. The complete original article is now correctly stored in the
-   active Analyze conversation context.
+FIX
 
-4. COMPANION IDENTITY
-   The initial Analyze request now explicitly sends the active companion id
-   instead of depending on a later fetch wrapper to inject it.
+- ask-mark-hub.js now checks window.MSGInvestorArticleContext directly.
+- If Analyze is active and there is no real highlight override, the premium
+  threaded chat itself calls:
+      POST /api/read-anything/article-followup
+- It sends the COMPLETE article, initial analysis, recent conversation history,
+  active companion, and the follow-up question.
+- The answer is rendered directly into the same threaded chat bubble.
+- The three-dot thinking bubble is replaced on success or error.
+- No external chat interception/bridge is used anymore.
+- The old whole-article-chat-bridge script load is removed to prevent duplicate
+  requests.
 
-SCOPE
-- Analyze = whole original article.
-- Follow-up with no real highlight = whole article.
-- If the user highlights a passage, that real highlight still wins and Ask
-  companion answers from the highlighted passage.
+SCOPE PRIORITY
 
-No Reader playback, Book Pages, pagination, or reading-mode logic changed.
+1. Real highlighted passage -> existing passage Ask flow.
+2. Analyze active + no real highlight -> whole-article follow-up.
+3. Normal Ask companion behavior otherwise.
+
+Also:
+- Chad is now supported in ask-mark-hub.js's own fallback companion config.
+- The top Reader companion button uses the active companion instead of a
+  hard-coded Mark avatar/name.
+
+No Reader playback, Book Pages, pagination, or reading-mode code changed.

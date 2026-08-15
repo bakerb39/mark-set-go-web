@@ -13,14 +13,42 @@
     const live = window.MSGCompanion?.config;
     if (live?.id) return live;
     const selected = localStorage.getItem(COMPANION_STORAGE_KEY) || localStorage.getItem('msg_companion_persona_v1') || 'mark';
-    return selected === 'beth'
-      ? { id:'beth', name:'Beth', ask:'Ask Beth', notebook:"Beth's Notebook", avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9' }
-      : { id:'mark', name:'Mark', ask:'Ask Mark', notebook:"Mark's Notebook", avatar:'/assets/ask-mark/ask-mark-avatar.png' };
+
+    if (selected === 'chad') {
+      return {
+        id:'chad',
+        name:'Chad',
+        ask:'Ask Chad',
+        notebook:"Chad's Notebook",
+        avatar:'/assets/companions/chad/chad-avatar.png'
+      };
+    }
+
+    if (selected === 'beth') {
+      return {
+        id:'beth',
+        name:'Beth',
+        ask:'Ask Beth',
+        notebook:"Beth's Notebook",
+        avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9'
+      };
+    }
+
+    return {
+      id:'mark',
+      name:'Mark',
+      ask:'Ask Mark',
+      notebook:"Mark's Notebook",
+      avatar:'/assets/ask-mark/ask-mark-avatar.png'
+    };
   };
   const companionName = () => companionConfig().name;
   const companionAsk = () => companionConfig().ask;
   const companionAvatar = () => companionConfig().avatar;
-  const companionNotebook = () => companionConfig().id === 'beth' ? 'Beth’s Notebook' : 'Mark’s Notebook';
+  const companionNotebook = () => {
+    const config = companionConfig();
+    return config.notebook || `${config.name}’s Notebook`;
+  };
 
   let shell = null;
   let legacyHost = null;
@@ -370,6 +398,131 @@
     }
   }
 
+  function activeWholeArticleConversation() {
+    const context = window.MSGInvestorArticleContext;
+    if (!context?.articleText) return null;
+    if (String(context.articleText).trim().length < 40) return null;
+
+    // A real user highlight deliberately takes priority over Analyze mode.
+    if (context.highlightOverride) return null;
+
+    return context;
+  }
+
+  function responseParagraphsHtml(value = '') {
+    return String(value || '')
+      .trim()
+      .split(/\n{2,}/)
+      .filter(Boolean)
+      .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+      .join('');
+  }
+
+  function renderWholeArticleFollowup(thinking, result = {}) {
+    if (!thinking?.isConnected) return;
+
+    const companion = companionConfig();
+    const keyPoints = Array.isArray(result?.keyPoints) ? result.keyPoints : [];
+    const cautions = Array.isArray(result?.cautions) ? result.cautions : [];
+
+    thinking.classList.remove('is-thinking');
+    thinking.innerHTML = `
+      <img src="${escapeHtml(companion.avatar)}" alt="${escapeHtml(companion.name)}">
+      <div>
+        <span>${escapeHtml(companion.name)}</span>
+        <div class="askmark-rich-response">
+          <div class="mark-response-heading">
+            <span>${escapeHtml(companion.ask)}</span>
+            <strong>${escapeHtml(result?.heading || 'Whole-article answer')}</strong>
+          </div>
+          ${responseParagraphsHtml(result?.response || '')}
+          ${keyPoints.length ? `
+            <h4>Key points</h4>
+            <ul>${keyPoints.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+          ` : ''}
+          ${cautions.length ? `
+            <div class="mark-cautions">
+              ${cautions.map((item) => `<p>${escapeHtml(item)}</p>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      </div>`;
+
+    const conversation = $('[data-askmark-conversation]', shell);
+    if (conversation) conversation.scrollTop = conversation.scrollHeight;
+  }
+
+  async function runWholeArticleFollowup(question) {
+    const context = activeWholeArticleConversation();
+    if (!context || !question) return false;
+
+    addUserMessage(question);
+    const thinking = addThinkingMessage();
+    const companion = companionConfig();
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 90000);
+
+    try {
+      const history = Array.isArray(context.history)
+        ? context.history.slice(-8)
+        : [];
+
+      const response = await fetch('/api/read-anything/article-followup', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companion: companion.id,
+          title: context.title || getBookContext().title || 'Current article',
+          sourceUrl: context.sourceUrl || '',
+          articleText: context.articleText,
+          analysis: context.analysis || {},
+          history,
+          question
+        })
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          payload.detail ||
+          payload.error ||
+          `Request failed with HTTP ${response.status}.`
+        );
+      }
+
+      const result = payload.result || {};
+
+      context.history = Array.isArray(context.history) ? context.history : [];
+      context.history.push(
+        { role: 'user', text: question },
+        { role: 'assistant', text: String(result.response || '').trim() }
+      );
+      context.history = context.history.slice(-12);
+      context.updatedAt = new Date().toISOString();
+
+      renderWholeArticleFollowup(thinking, result);
+      return true;
+    } catch (error) {
+      if (thinking?.isConnected) {
+        thinking.classList.remove('is-thinking');
+        const message = error?.name === 'AbortError'
+          ? `${companion.name} took too long to answer. Please try again.`
+          : error?.message || `${companion.name} could not answer that follow-up.`;
+
+        const paragraph = thinking.querySelector('p');
+        if (paragraph) {
+          paragraph.className = 'status error';
+          paragraph.textContent = message;
+        }
+      }
+      return false;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
+
   function runSelectionAction(action, question = '') {
     const panel = getLegacySelectionPanel();
     const text = getSelectionText();
@@ -664,6 +817,16 @@
       if (!value) return;
       input.value = '';
       input.style.height = '';
+
+      // Analyze owns a whole-article conversation. Route follow-up questions
+      // directly from THIS threaded chat handler to the whole-article endpoint.
+      // If the reader highlighted a real passage, highlightOverride is true and
+      // the normal passage-selection Ask flow remains in control.
+      if (activeWholeArticleConversation()) {
+        void runWholeArticleFollowup(value);
+        return;
+      }
+
       runSelectionAction('ask', value);
     };
     $('[data-askmark-send]', shell)?.addEventListener('click', send);
@@ -728,8 +891,9 @@
       readerTools.innerHTML = '<span aria-hidden="true">⚙</span> Reader';
     }
     if (ask) {
+      const companion = companionConfig();
       ask.hidden = false;
-      ask.innerHTML = '<img src="/assets/ask-mark/ask-mark-avatar.png" alt=""> <span>Ask Mark</span>';
+      ask.innerHTML = `<img src="${escapeHtml(companion.avatar)}" alt=""> <span>${escapeHtml(companion.ask)}</span>`;
       ask.classList.add('ask-mark-primary-toggle');
     }
     $('#read-anything-format-control')?.remove();
