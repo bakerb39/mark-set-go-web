@@ -1,35 +1,23 @@
-MARK, SET, GO! — COMPANION PROFILE REPAIR
+MARK, SET, GO! — COMPANION LABEL + ICON ROLLBACK
 
-Replace:
+Replace ONLY:
   /public/companion-persona-safe.js
-  /public/companion-persona-safe.css
   /public/companion-chad.js
-  /public/companion-copy-sync.js
   /public/index.html
 
-WHAT WAS WRONG
+THIS FIX DOES NOT CHANGE ANY IMAGE ASSET FILES.
 
-Two different scripts owned the Profile companion selector:
+It restores the established companion icon mappings already used before:
+  Mark -> /assets/ask-mark/ask-mark-avatar.png
+  Beth -> /assets/companions/beth/beth-avatar.png
+  Chad -> /assets/companions/chad/chad-avatar.png
 
-1. companion-persona-safe.js still supported only Mark and Beth.
-2. companion-chad.js waited for a selector with a different class name, did not
-   recognize the safe selector, and created an emergency Mark/Beth/Chad fallback.
+Fixes:
+- removes the duplicated "Ask Beth Ask Beth" label
+- removes the bad temporary data-companion-label span
+- restores the previous companion button/icon synchronizer
+- keeps exactly one Mark/Beth/Chad Profile selector
+- disables Chad's emergency duplicate Profile selector
 
-That produced TWO "Choose your companion" panels.
-
-Then companion-copy-sync.js treated the old Mark/Beth cards as ordinary text and
-rewrote their standalone names to the active persona, which is why both lower
-cards appeared to say "Chad" while retaining Mark/Beth portraits.
-
-FIX
-
-There is now one canonical selector:
-  Mark | Beth | Chad
-
-companion-persona-safe.js owns all three personas.
-companion-chad.js no longer creates any fallback profile UI.
-companion-copy-sync.js explicitly excludes the profile choice cards from active
-persona text replacement.
-
-This repair is intentionally isolated to companion/profile UI. It does not
-replace app.js, Reader annotations, Analyze, article resume logic, or chat code.
+No app.js, styles.css, Reader, Analyze, annotation, article, or chat-scroll files
+are replaced by this package.
