@@ -1,27 +1,21 @@
-MARK, SET, GO! — BETH CORRECT COMPACT PHOTO
+MARK, SET, GO! — BETH FRONT-PAGE BADGE RESTORE
 
-Replace:
+Replace only:
   /public/companion-persona-safe.js
   /public/companion-chad.js
-  /public/companion-copy-sync.js
   /public/index.html
 
-CORRECTION
+BETH NOW USES TWO EXISTING ASSETS FOR TWO DIFFERENT PURPOSES:
 
-The previous fix accidentally changed Beth's compact UI photo to:
-  /assets/companions/beth/beth-avatar.png
-
-The established prior working build used:
+Compact UI (Profile, Reader button, chat/help):
   /assets/companions/beth/beth-ui-avatar.png?v=9.6.9
 
-That is the tight-cropped Beth photo specifically prepared for:
-- Profile choice
-- Reader companion button
-- Help/chat avatar
-- Other compact companion UI
+Front page / home companion card:
+  /assets/companions/beth/beth-frontpage-badge.png
 
-The homepage/front-page Beth artwork is NOT changed.
+The front-page asset is the established branded image that visibly says
+"ASK BETH".
 
-NO image files are included or replaced in this package.
-NO Mark or Chad image paths are changed.
-NO app.js, Reader, Analyze, annotation, article, or chat logic is changed.
+No image files are included or replaced.
+No Mark or Chad image paths are changed.
+No app.js, Reader, Analyze, annotation, article, or chat logic is changed.

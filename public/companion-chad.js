@@ -9,6 +9,7 @@
     name: 'Chad',
     ask: 'Ask Chad',
     avatar: '/assets/companions/chad/chad-avatar.png',
+    home: '/assets/companions/chad/chad-avatar.png',
     specialty: 'Financial analysis, investing, markets, business, and economics'
   });
 
@@ -50,13 +51,15 @@
           id: 'beth',
           name: 'Beth',
           ask: 'Ask Beth',
-          avatar: '/assets/companions/beth/beth-ui-avatar.png?v=9.6.9'
+          avatar: '/assets/companions/beth/beth-ui-avatar.png?v=9.6.9',
+          home: '/assets/companions/beth/beth-frontpage-badge.png'
         }
       : {
           id: 'mark',
           name: 'Mark',
           ask: 'Ask Mark',
-          avatar: '/assets/ask-mark/ask-mark-avatar.png'
+          avatar: '/assets/ask-mark/ask-mark-avatar.png',
+          home: '/assets/ask-mark/ask-mark-avatar.png'
         };
   }
 
@@ -415,7 +418,10 @@
   function syncFrontPage(identity) {
     const avatar = document.querySelector('.home-mark-avatar');
     if (avatar) {
-      setImage(avatar, identity.avatar, `${identity.name}, your reading companion.`);
+      // Compact Reader/profile/chat buttons use identity.avatar.
+      // The front page may use a dedicated branded badge instead.
+      const homeImage = identity.home || identity.avatar;
+      setImage(avatar, homeImage, `${identity.name}, your reading companion.`);
       const stage = avatar.closest('.home-mark-icon-stage');
       stage?.classList.toggle(
         'companion-frontpage-badge-mode',

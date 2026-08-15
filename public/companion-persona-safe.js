@@ -13,6 +13,7 @@
       name: 'Mark',
       ask: 'Ask Mark',
       avatar: '/assets/ask-mark/ask-mark-avatar.png',
+      home: '/assets/ask-mark/ask-mark-avatar.png',
       description: 'Your thoughtful general reading companion'
     }),
     beth: Object.freeze({
@@ -20,6 +21,7 @@
       name: 'Beth',
       ask: 'Ask Beth',
       avatar: '/assets/companions/beth/beth-ui-avatar.png?v=9.6.9',
+      home: '/assets/companions/beth/beth-frontpage-badge.png',
       description: 'A warm, encouraging reading companion'
     }),
     chad: Object.freeze({
@@ -27,6 +29,7 @@
       name: 'Chad',
       ask: 'Ask Chad',
       avatar: '/assets/companions/chad/chad-avatar.png',
+      home: '/assets/companions/chad/chad-avatar.png',
       description: 'Financial analysis, investing, markets & economics'
     })
   });
