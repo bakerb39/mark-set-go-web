@@ -1,5 +1,5 @@
 
-/* Reader Music v1.1.0 — small launcher directly below Speed/WPM. */
+/* Reader Music v1.2.0 — small launcher beneath the visible Reader WPM stepper. */
 .reader-wpm-music-toggle{
   justify-self:start;
   width:28px !important;
@@ -119,4 +119,40 @@
 }
 @media(max-width:680px){
   .music-dock.reader-music-chooser-open{width:calc(100vw - 1rem)}
+}
+
+
+/* v1.2.0 — keep the WPM stepper visible and place ♫ directly beneath it. */
+.reader-viewer-footer .reader-viewer-music-stack{
+  grid-column:3;
+  justify-self:end;
+  display:grid;
+  justify-items:end;
+  align-items:center;
+  gap:4px;
+  min-width:0
+}
+.reader-viewer-footer .reader-viewer-music-stack .viewer-wpm-control{
+  grid-column:auto !important;
+  grid-row:auto !important;
+  justify-self:end !important;
+}
+.reader-viewer-footer .reader-viewer-music-stack .reader-wpm-music-toggle{
+  width:24px !important;
+  min-width:24px !important;
+  height:24px;
+  min-height:24px;
+  margin:0 2px 0 0 !important;
+  border-radius:6px;
+}
+.reader-viewer-footer .reader-viewer-music-stack .reader-wpm-music-toggle span{
+  font-size:.82rem
+}
+
+@media(max-width:760px){
+  .reader-viewer-footer .reader-viewer-music-stack{
+    grid-column:2;
+    grid-row:2;
+    justify-self:end
+  }
 }

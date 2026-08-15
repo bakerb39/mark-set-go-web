@@ -251,15 +251,28 @@
     renderChooser();
   }
 
-  function insertButtonBelowWpm() {
-    const speed = document.querySelector('#app #speed');
-    const control = speed?.closest('.control');
-    if (!control) {
+  function insertButtonBelowViewerWpm() {
+    const footer = document.querySelector('#app .reader-viewer-footer');
+    const wpmControl = footer?.querySelector('.viewer-wpm-control');
+    if (!footer || !wpmControl) {
       speedButton = null;
       return;
     }
 
-    let button = control.querySelector('[data-reader-wpm-music-toggle]');
+    let stack = footer.querySelector('.reader-viewer-music-stack');
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.className = 'reader-viewer-music-stack';
+
+      // Move the existing WPM control into the stack rather than recreating it.
+      // Moving the node preserves app.js's existing − / + click handlers.
+      wpmControl.parentNode.insertBefore(stack, wpmControl);
+      stack.appendChild(wpmControl);
+    } else if (!stack.contains(wpmControl)) {
+      stack.prepend(wpmControl);
+    }
+
+    let button = stack.querySelector('[data-reader-wpm-music-toggle]');
     if (!button) {
       button = document.createElement('button');
       button.type = 'button';
@@ -271,9 +284,7 @@
       button.title = 'Reading music';
       button.innerHTML = '<span aria-hidden="true">♫</span>';
 
-      const suffix = control.querySelector('.input-suffix');
-      if (suffix) suffix.insertAdjacentElement('afterend', button);
-      else control.appendChild(button);
+      stack.appendChild(button);
 
       button.addEventListener('click', () => {
         ensureChooser();
@@ -281,6 +292,7 @@
         else openChooser();
       });
     }
+
     speedButton = button;
   }
 
@@ -291,7 +303,7 @@
       return;
     }
     ensureChooser();
-    insertButtonBelowWpm();
+    insertButtonBelowViewerWpm();
   }
 
   function init() {
