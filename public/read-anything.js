@@ -1502,108 +1502,67 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   function compactSocialButton(label, attrs = '') {
-    return `<button type="button" ${attrs} style="display:inline-flex;align-items:center;justify-content:center;width:auto;min-width:0;min-height:0;height:28px;padding:3px 9px;margin:0;border-radius:6px;font:600 12px/1.1 inherit;letter-spacing:0;white-space:nowrap;cursor:pointer;">${label}</button>`;
+    return `<button type="button" ${attrs} style="display:inline-flex;align-items:center;justify-content:center;width:auto;min-width:0;min-height:0;height:26px;padding:2px 8px;margin:0;border:1px solid #1769aa;border-radius:5px;background:#1769aa;color:#fff;font:600 11px/1 inherit;letter-spacing:0;white-space:nowrap;cursor:pointer;box-shadow:none;">${label}</button>`;
   }
 
-  function closeAskMarkPanelFromHeader(event) {
-    const closeButton = event.target?.closest?.('#close-reader-controls');
-    if (!closeButton) return false;
+  function bindSocialPostComposerButtons(panel) {
+    const composer = panel?.querySelector('[data-social-post-composer="1"]');
+    if (!composer) return;
 
-    const selectionTab = document.querySelector('#app [data-mark-tab="selection"]');
-    const socialComposer = document.querySelector('#app [data-social-post-composer="1"]');
-    if (!selectionTab?.classList.contains('active') && !socialComposer) return false;
+    const textarea = composer.querySelector('#msg-social-post-draft');
 
-    // The app's normal close handler routes through the Reader Tools toggle. When
-    // Mark is the active tab, that can switch tabs instead of actually closing the
-    // companion. Close the right pane directly here and keep all toggle state in sync.
-    event.preventDefault();
-    event.stopPropagation();
-    event.stopImmediatePropagation?.();
-
-    const layout = document.querySelector('#app #reader-layout');
-    layout?.classList.add('word-panel-hidden');
-
-    const markButton = document.querySelector('#app #toggle-mark-panel');
-    const toolsButton = document.querySelector('#app #toggle-word-panel');
-    [markButton, toolsButton].forEach((button) => {
-      button?.setAttribute('aria-pressed', 'false');
-      button?.classList.add('pane-closed');
-    });
-    return true;
-  }
-
-  function installSocialPostDelegatedHandlers() {
-    if (document.documentElement.dataset.msgSocialPostHandlers === '1') return;
-    document.documentElement.dataset.msgSocialPostHandlers = '1';
-
-    // Capture the close button before app.js can reinterpret it as "show Reader Tools".
-    document.addEventListener('click', (event) => {
-      closeAskMarkPanelFromHeader(event);
-    }, true);
-
-    // Delegate composer actions from the document so they survive any Ask Mark panel
-    // rerender or DOM replacement performed by the Reader.
-    document.addEventListener('click', (event) => {
-      const button = event.target?.closest?.(
-        '[data-social-copy],[data-social-rewrite],[data-social-platform]'
-      );
-      if (!button || !button.closest('[data-social-post-composer="1"]')) return;
-
+    composer.querySelector('[data-social-copy]')?.addEventListener('click', (event) => {
       event.preventDefault();
-      event.stopPropagation();
-
-      const composer = button.closest('[data-social-post-composer="1"]');
-      const textarea = composer?.querySelector('#msg-social-post-draft');
       const text = String(textarea?.value || '').trim();
+      void copySocialPostText(text, event.currentTarget);
+    });
 
-      if (button.matches('[data-social-copy]')) {
-        void copySocialPostText(text, button);
-        return;
-      }
-
-      if (button.matches('[data-social-platform]')) {
+    composer.querySelectorAll('[data-social-platform]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        const text = String(textarea?.value || '').trim();
         if (!text) return;
-        const platform = button.dataset.socialPlatform;
+
+        const platform = event.currentTarget.dataset.socialPlatform;
         const context = buildSocialPostArticleContext();
         const sourceUrl = context?.sourceUrl || '';
-
-        // Start clipboard work without awaiting it. Keeping window.open in the
-        // original click stack prevents popup blockers from treating it as unsolicited.
-        if (platform === 'linkedin' || platform === 'facebook') {
-          void copySocialPostText(text);
-        }
         const url = socialShareUrl(platform, text, sourceUrl);
-        if (url) window.open(url, '_blank', 'noopener,noreferrer');
-        return;
-      }
 
-      if (button.matches('[data-social-rewrite]')) {
-        const style = button.dataset.socialRewrite || 'default';
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
+        if (platform === 'linkedin' || platform === 'facebook') {
+          void copySocialPostText(text, event.currentTarget);
+        }
+      });
+    });
+
+    composer.querySelectorAll('[data-social-rewrite]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        const clicked = event.currentTarget;
+        const style = clicked.dataset.socialRewrite || 'default';
         const currentDraft = textarea?.value || '';
-        const oldText = button.textContent;
-        button.disabled = true;
-        button.textContent = 'Writing…';
+        const oldText = clicked.textContent;
+        clicked.disabled = true;
+        clicked.textContent = 'Writing…';
 
         void requestSocialPost(style, currentDraft, { preserveComposer: true })
           .then((updated) => {
-            const liveTextarea = document.querySelector('#app [data-social-post-composer="1"] #msg-social-post-draft');
-            if (liveTextarea && updated) liveTextarea.value = updated;
+            if (textarea?.isConnected && updated) textarea.value = updated;
           })
           .catch((rewriteError) => {
             window.alert(rewriteError.message || 'The post could not be rewritten.');
           })
           .finally(() => {
-            if (button.isConnected) {
-              button.disabled = false;
-              button.textContent = oldText;
+            if (clicked.isConnected) {
+              clicked.disabled = false;
+              clicked.textContent = oldText;
             }
           });
-      }
+      });
     });
   }
 
   function renderSocialPostComposer(draft, { loading = false, error = '' } = {}) {
-    installSocialPostDelegatedHandlers();
     const panel = openAskMarkInvestorPanel();
     if (!panel) return;
 
@@ -1666,6 +1625,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         <p style="margin:5px 0 0;opacity:.68;font-size:11px;line-height:1.35;">Edit anything you want before sharing. LinkedIn and Facebook also copy the draft for easy pasting.</p>
       </div>`;
 
+    bindSocialPostComposerButtons(panel);
     notifyAskMarkPanelUpdated('response');
   }
 
