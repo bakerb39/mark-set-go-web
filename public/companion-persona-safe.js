@@ -150,17 +150,63 @@
 
   window.MSGCompanion = api;
 
-  const schedule = () => window.setTimeout(api.apply, 0);
+  let applyTimer = 0;
+  const schedule = (delay = 0) => {
+    window.clearTimeout(applyTimer);
+    applyTimer = window.setTimeout(() => api.apply(), delay);
+  };
 
-  document.addEventListener('DOMContentLoaded', schedule, { once: true });
+  function observeAppRenders() {
+    const app = document.getElementById('app');
+    if (!app || app.dataset.companionProfileObserver === '1') return;
+
+    app.dataset.companionProfileObserver = '1';
+
+    const observer = new MutationObserver((mutations) => {
+      // The app replaces #app contents when navigating. As soon as the
+      // dynamically rendered Profile page appears, install/sync the one
+      // Mark | Beth | Chad selector.
+      const profileIsPresent = Boolean(
+        app.querySelector('.profile-preferences-page')
+      );
+      if (!profileIsPresent) return;
+
+      const needsControl = !app.querySelector(
+        '.profile-preferences-page .companion-persona-settings-safe'
+      );
+
+      if (
+        needsControl ||
+        mutations.some((mutation) => mutation.type === 'childList')
+      ) {
+        schedule(0);
+      }
+    });
+
+    observer.observe(app, { childList: true, subtree: true });
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    observeAppRenders();
+    schedule(0);
+  }, { once: true });
+
+  // The actual Profile route in app.js is "profile-preferences".
   document.addEventListener('click', (event) => {
-    if (event.target.closest?.('[data-action="profile"], .profile-preferences-page')) {
-      window.setTimeout(api.apply, 100);
+    if (
+      event.target.closest?.('[data-action="profile-preferences"]') ||
+      event.target.closest?.('.profile-preferences-page')
+    ) {
+      schedule(0);
+      schedule(100);
     }
-  });
+  }, true);
+
   window.addEventListener('storage', (event) => {
-    if (event.key === STORAGE_KEY || event.key === LEGACY_KEY) schedule();
+    if (event.key === STORAGE_KEY || event.key === LEGACY_KEY) schedule(0);
   });
 
+  // Also cover scripts that load after DOMContentLoaded.
+  observeAppRenders();
   api.apply();
 })();

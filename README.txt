@@ -1,23 +1,36 @@
-MARK, SET, GO! — COMPANION LABEL + ICON ROLLBACK
+MARK, SET, GO! — PROFILE CHOICES RESTORE
 
 Replace ONLY:
   /public/companion-persona-safe.js
-  /public/companion-chad.js
   /public/index.html
 
-THIS FIX DOES NOT CHANGE ANY IMAGE ASSET FILES.
+ROOT CAUSE
 
-It restores the established companion icon mappings already used before:
-  Mark -> /assets/ask-mark/ask-mark-avatar.png
-  Beth -> /assets/companions/beth/beth-avatar.png
-  Chad -> /assets/companions/chad/chad-avatar.png
+The last script tried to reinstall the companion choices on:
+  data-action="profile"
 
-Fixes:
-- removes the duplicated "Ask Beth Ask Beth" label
-- removes the bad temporary data-companion-label span
-- restores the previous companion button/icon synchronizer
-- keeps exactly one Mark/Beth/Chad Profile selector
-- disables Chad's emergency duplicate Profile selector
+But the actual app route is:
+  data-action="profile-preferences"
 
-No app.js, styles.css, Reader, Analyze, annotation, article, or chat-scroll files
-are replaced by this package.
+Also, the Profile page is rendered dynamically after the companion script is
+already loaded, so DOMContentLoaded can happen before the Profile DOM exists.
+
+FIX
+
+- Watches #app for dynamic page renders.
+- When .profile-preferences-page appears, installs exactly ONE selector:
+    Mark | Beth | Chad
+- Also listens for the actual profile-preferences route.
+- Keeps the existing selected companion in sync.
+
+IMPORTANT
+
+This package DOES NOT:
+- change any image file;
+- change any companion avatar/icon path;
+- replace companion-chad.js;
+- replace app.js;
+- replace styles.css;
+- touch Reader, Analyze, annotations, chat, or article logic.
+
+It only restores the missing Profile choices.
