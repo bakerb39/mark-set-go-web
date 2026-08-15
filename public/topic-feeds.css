@@ -219,3 +219,21 @@
   white-space:nowrap;
   font-size:.75rem
 }
+
+
+/* v2.1.7 — keep Topic Feed Book Pages divider centered on the visible Reader. */
+#reader.topic-feed-divider-managed.book-pages-layout{
+  column-rule-color:transparent !important;
+  background-image:none !important;
+}
+#reader-frame{
+  position:relative;
+}
+#reader-frame .topic-feed-book-divider-overlay{
+  position:absolute;
+  width:1px;
+  transform:translateX(-.5px);
+  background:color-mix(in srgb, currentColor 13%, transparent);
+  pointer-events:none;
+  z-index:6;
+}

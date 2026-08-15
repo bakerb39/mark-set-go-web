@@ -892,6 +892,92 @@
   }
 
   let topicBookPageGeometryTimer = 0;
+  let topicBookDividerResizeObserver = null;
+  let topicBookDividerClassObserver = null;
+  let topicBookDividerFrame = null;
+
+  function removeTopicBookDivider() {
+    topicBookDividerResizeObserver?.disconnect?.();
+    topicBookDividerResizeObserver = null;
+    topicBookDividerClassObserver?.disconnect?.();
+    topicBookDividerClassObserver = null;
+
+    const frame = topicBookDividerFrame || document.querySelector('#reader-frame');
+    frame?.querySelectorAll('[data-topic-feed-book-divider]').forEach((node) => node.remove());
+    document.querySelector('#reader')?.classList.remove('topic-feed-divider-managed');
+    topicBookDividerFrame = null;
+  }
+
+  function positionTopicBookDivider() {
+    if (!isTopicFeedReaderActive()) {
+      removeTopicBookDivider();
+      return;
+    }
+
+    const frame = document.querySelector('#reader-frame');
+    const reader = document.querySelector('#reader');
+    if (!frame || !reader) return;
+
+    if (!reader.classList.contains('book-pages-layout')) {
+      frame.querySelectorAll('[data-topic-feed-book-divider]').forEach((node) => node.remove());
+      reader.classList.remove('topic-feed-divider-managed');
+      return;
+    }
+
+    reader.classList.add('topic-feed-divider-managed');
+
+    let divider = frame.querySelector('[data-topic-feed-book-divider]');
+    if (!divider) {
+      divider = document.createElement('div');
+      divider.className = 'topic-feed-book-divider-overlay';
+      divider.dataset.topicFeedBookDivider = '1';
+      divider.setAttribute('aria-hidden', 'true');
+      frame.appendChild(divider);
+    }
+
+    const frameRect = frame.getBoundingClientRect();
+    const readerRect = reader.getBoundingClientRect();
+    const left = (readerRect.left - frameRect.left) + (readerRect.width / 2);
+    const top = readerRect.top - frameRect.top;
+
+    divider.style.left = `${Math.round(left)}px`;
+    divider.style.top = `${Math.round(top)}px`;
+    divider.style.height = `${Math.round(readerRect.height)}px`;
+  }
+
+  function ensureTopicBookDivider() {
+    if (!isTopicFeedReaderActive()) {
+      removeTopicBookDivider();
+      return;
+    }
+
+    const frame = document.querySelector('#reader-frame');
+    const reader = document.querySelector('#reader');
+    if (!frame || !reader) return;
+
+    if (topicBookDividerFrame !== frame) {
+      removeTopicBookDivider();
+      topicBookDividerFrame = frame;
+
+      if (typeof ResizeObserver === 'function') {
+        topicBookDividerResizeObserver = new ResizeObserver(() => {
+          window.requestAnimationFrame(positionTopicBookDivider);
+        });
+        topicBookDividerResizeObserver.observe(frame);
+        topicBookDividerResizeObserver.observe(reader);
+      }
+
+      topicBookDividerClassObserver = new MutationObserver(() => {
+        window.requestAnimationFrame(positionTopicBookDivider);
+      });
+      topicBookDividerClassObserver.observe(reader, {
+        attributes: true,
+        attributeFilter: ['class', 'style']
+      });
+    }
+
+    positionTopicBookDivider();
+  }
 
   function scheduleTopicBookPageGeometrySync() {
     window.clearTimeout(topicBookPageGeometryTimer);
@@ -944,6 +1030,7 @@
           layout.style.removeProperty('--navigation-width');
         }
         window.dispatchEvent(new Event('resize'));
+        window.requestAnimationFrame(ensureTopicBookDivider);
       });
     };
 
@@ -1125,6 +1212,9 @@
     // Topic Feed articles restore the reader's explicit My Topics preference.
     window.setTimeout(applyTopicReaderPanePreference, 0);
     scheduleTopicBookPageGeometrySync();
+    window.setTimeout(ensureTopicBookDivider, 0);
+    window.setTimeout(ensureTopicBookDivider, 160);
+    window.setTimeout(ensureTopicBookDivider, 420);
   }
 
   function scheduleReaderNavigation() {
@@ -1158,6 +1248,12 @@
       if (window.MarkSetGoAuth?.session?.authenticated) void hydrateCloudState();
     }, 800);
   }, { once:true });
+
+  window.addEventListener('resize', () => {
+    if (isTopicFeedReaderActive()) {
+      window.requestAnimationFrame(ensureTopicBookDivider);
+    }
+  });
 
   window.MarkSetGoTopicFeeds = Object.freeze({
     render,
