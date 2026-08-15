@@ -528,3 +528,81 @@
   color:#245f91;
   outline:none;
 }
+
+
+/* v2.1.17 — clean two-tier My Topics header.
+   The narrow navigation panel should not force the title and utility actions
+   into one crowded row. */
+.topic-reader-nav-head{
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:stretch !important;
+  gap:3px !important;
+  margin:0 0 6px !important;
+  padding:0 0 5px !important;
+  border-bottom:1px solid rgba(76,96,116,.10);
+}
+
+.topic-reader-nav-head h2{
+  display:block !important;
+  width:100%;
+  margin:0 !important;
+  padding:0 !important;
+  white-space:nowrap !important;
+  color:#173f6d;
+  font-size:.96rem !important;
+  line-height:1.15 !important;
+  font-weight:800 !important;
+  letter-spacing:-.012em !important;
+}
+
+.topic-reader-nav-actions{
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:10px !important;
+  min-height:18px;
+  margin:0 !important;
+  padding:0 !important;
+}
+
+.topic-reader-nav-actions [data-reader-bookmark-slot]{
+  display:contents !important;
+}
+
+/* Bookmark and Manage are utilities, not primary buttons. */
+.topic-reader-nav-head button,
+.topic-reader-nav-head .topic-reader-bookmark-button{
+  width:auto !important;
+  min-width:0 !important;
+  min-height:18px !important;
+  height:auto !important;
+  margin:0 !important;
+  padding:1px 0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  color:#567087 !important;
+  box-shadow:none !important;
+  font-size:.63rem !important;
+  font-weight:700 !important;
+  line-height:1.2 !important;
+  white-space:nowrap !important;
+  cursor:pointer;
+}
+
+.topic-reader-nav-head button:hover,
+.topic-reader-nav-head button:focus-visible,
+.topic-reader-nav-head .topic-reader-bookmark-button:hover,
+.topic-reader-nav-head .topic-reader-bookmark-button:focus-visible{
+  background:transparent !important;
+  color:#1769aa !important;
+  text-decoration:underline;
+  text-underline-offset:2px;
+  outline:none !important;
+}
+
+/* Keep the existing topic cards visually separate from the quieter header. */
+.topic-reader-nav-head + .topic-reader-topic{
+  margin-top:2px;
+}
