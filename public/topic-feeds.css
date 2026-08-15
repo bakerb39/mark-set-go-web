@@ -141,9 +141,9 @@
 }
 .topic-reader-show-more:hover{text-decoration:underline}
 .topic-reader-nav{
-  max-height:min(68vh,720px);
-  overflow:auto;
-  padding-right:2px
+  max-height:none;
+  overflow:visible;
+  padding-right:0
 }
 
 
@@ -192,4 +192,12 @@
 .topic-feed-reader-credit a:focus{
   text-decoration:underline;
   text-underline-offset:2px
+}
+
+
+/* v2.1.4 — Topic Feed Reader panel behavior.
+   The outer .navigation-pane owns the only vertical scrollbar. */
+#navigation-pane .topic-reader-nav{
+  max-height:none !important;
+  overflow:visible !important
 }

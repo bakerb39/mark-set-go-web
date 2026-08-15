@@ -1,42 +1,31 @@
-MARK, SET, GO! — INLINE TOPIC FEED SOURCE CREDIT FIX
+MARK, SET, GO! — STICKY MY TOPICS READER PANEL
 
 Replace only:
   /public/topic-feeds.js
   /public/topic-feeds.css
   /public/index.html
 
-WHY THE PREVIOUS CREDIT WAS NOT VISIBLE
+CHANGES
 
-The previous version inserted the publisher/source credit under the Reader's
-page title header (.reader-title-copy).
+1. MY TOPICS STAYS OPEN
+   - Topic Feed Reader articles open with the left My Topics panel visible by
+     default.
+   - Moving from story to story keeps the panel open.
+   - If the reader explicitly closes it with the My Topics toggle or × button,
+     that choice is remembered.
+   - Explicitly opening it again is remembered too.
 
-Book Pages and other immersive Reader views can show the article reading
-surface without that title header being visible. That is exactly what the
-screenshot exposed.
+2. ONLY ONE SCROLLBAR
+   - The Reader's existing navigation-pane is the scrolling container.
+   - The nested My Topics list no longer creates a second scrollbar.
 
-NEW PLACEMENT
+3. CLEANER LABEL
+   - "Marks & My Topics" is removed.
+   - The panel header, Reader toggle, and Contents replacement all simply say:
+       My Topics
 
-The source credit is now inserted in the visible article Reader surface:
+SCOPE
 
-  Summarize · Analyze
-  SOURCE  CoinDesk · Aug 14, 2026 · View original ↗
-  [first article paragraph]
-
-It is placed immediately after:
-  #read-anything-article-summary-action
-
-That is the same visible surface already used by the Summarize / Analyze links.
-
-IMPORTANT
-
-The source credit remains UI metadata. It is NOT inserted into currentText, so
-it does not affect:
-- Reader word count
-- reading position
-- playback
-- highlights/annotations
-- summaries
-- Analyze article grounding
-
-Normal books remain unchanged.
-No app.js or protected Reader files are changed.
+No app.js is replaced.
+No Reader engine, Book Pages, playback, annotation, Analyze, server/database,
+or companion files are changed.

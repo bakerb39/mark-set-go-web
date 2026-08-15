@@ -847,12 +847,73 @@
     }));
   }
 
+  const TOPIC_READER_PANE_PREF_KEY = 'msg-topic-feeds-left-pane-open';
+  let applyingTopicReaderPanePreference = false;
+
+  function topicReaderPaneShouldBeOpen() {
+    try {
+      const saved = localStorage.getItem(TOPIC_READER_PANE_PREF_KEY);
+      if (saved === '0') return false;
+      if (saved === '1') return true;
+    } catch {}
+    // Topic Feed reading uses My Topics as primary navigation.
+    // Open it by default until the reader explicitly closes it.
+    return true;
+  }
+
+  function saveTopicReaderPanePreference(open) {
+    try {
+      localStorage.setItem(TOPIC_READER_PANE_PREF_KEY, open ? '1' : '0');
+    } catch {}
+  }
+
   function isTopicFeedReaderActive() {
     try {
       const doc = window.MarkSetGoCurrentReaderDocument?.get?.();
       if (doc?.source) return doc.source.type === 'topic-feed';
     } catch {}
     return Boolean(window.MSGTopicFeedReaderContext);
+  }
+
+  function applyTopicReaderPanePreference() {
+    if (!isTopicFeedReaderActive()) return;
+
+    const layout = document.querySelector('#reader-layout');
+    const toggle = document.querySelector('#toggle-navigation-pane');
+    if (!layout || !toggle || applyingTopicReaderPanePreference) return;
+
+    const shouldOpen = topicReaderPaneShouldBeOpen();
+    const isOpen = !layout.classList.contains('navigation-hidden');
+    if (shouldOpen === isOpen) return;
+
+    applyingTopicReaderPanePreference = true;
+    try {
+      // Let the Reader's own layout code perform the actual open/close so
+      // Book Pages and the center reading column reflow exactly as before.
+      toggle.click();
+    } finally {
+      window.setTimeout(() => {
+        applyingTopicReaderPanePreference = false;
+      }, 0);
+    }
+  }
+
+  function bindTopicReaderPanePreference() {
+    const toggle = document.querySelector('#toggle-navigation-pane');
+    if (!toggle || toggle.dataset.topicFeedStickyBound === '1') return;
+
+    toggle.dataset.topicFeedStickyBound = '1';
+    toggle.addEventListener('click', () => {
+      if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
+
+      // The Reader's click handler updates the layout class during this click.
+      // Read the final state on the next tick and remember the user's choice.
+      window.setTimeout(() => {
+        const layout = document.querySelector('#reader-layout');
+        if (!layout || !isTopicFeedReaderActive()) return;
+        saveTopicReaderPanePreference(!layout.classList.contains('navigation-hidden'));
+      }, 0);
+    });
   }
 
   function readerTopicListMarkup() {
@@ -896,14 +957,21 @@
 
     tab.textContent = 'My Topics';
     const heading = pane.querySelector('.reader-library-header strong');
-    if (heading) heading.textContent = 'Marks & My Topics';
+    if (heading) heading.textContent = 'My Topics';
 
     const toggle = document.querySelector('#toggle-navigation-pane');
     if (toggle && !toggle.dataset.topicFeedLabel) {
       const icon = toggle.querySelector('span[aria-hidden="true"]')?.outerHTML || '<span aria-hidden="true">☰</span>';
-      toggle.innerHTML = `${icon} Marks &amp; My Topics`;
+      toggle.innerHTML = `${icon} My Topics`;
+      toggle.setAttribute('aria-label', 'Open or close My Topics');
       toggle.dataset.topicFeedLabel = '1';
     }
+
+    pane.setAttribute('aria-label', 'My Topics');
+    const closeButton = pane.querySelector('#close-navigation-pane');
+    if (closeButton) closeButton.setAttribute('aria-label', 'Close My Topics');
+
+    bindTopicReaderPanePreference();
 
     if (!view.querySelector('.topic-reader-nav')) view.innerHTML = readerTopicListMarkup();
 
@@ -936,6 +1004,10 @@
         button.textContent = expanded ? `Show all ${total} stories` : 'Show fewer';
       });
     });
+
+    // app.js starts Reader side panes closed when a Reader view is rebuilt.
+    // Topic Feed articles restore the reader's explicit My Topics preference.
+    window.setTimeout(applyTopicReaderPanePreference, 0);
   }
 
   function scheduleReaderNavigation() {
