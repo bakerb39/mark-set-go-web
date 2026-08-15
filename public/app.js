@@ -22910,6 +22910,408 @@ function renderMyLinks(selectedId = '') {
   }));
 }
 
+
+/* ==========================================================================
+   Symposium prototype — isolated learning page
+   --------------------------------------------------------------------------
+   This feature intentionally does not modify reader rendering, playback,
+   pagination, highlighting, or continuity behavior. It only reads bounded
+   current-reading context when the user chooses to bring it into a session.
+   ========================================================================== */
+const SYMPOSIUM_STORAGE_KEY = 'markSetGoSymposiumSessionsV1';
+
+const SYMPOSIUM_PARTICIPANTS = [
+  { id:'socrates', name:'Socrates', field:'Philosophy', era:'Classical Greece', monogram:'S', lens:'Socratic questioning, definitions, assumptions, and examination of reasons' },
+  { id:'plato', name:'Plato', field:'Philosophy', era:'Classical Greece', monogram:'P', lens:'forms, justice, education, political philosophy, metaphysics, and dialectic' },
+  { id:'aristotle', name:'Aristotle', field:'Philosophy & Science', era:'Classical Greece', monogram:'A', lens:'logic, causes, virtue, politics, biology, classification, and empirical observation' },
+  { id:'aquinas', name:'Thomas Aquinas', field:'Theology & Philosophy', era:'Medieval', monogram:'TA', lens:'natural law, scholastic argument, metaphysics, ethics, theology, objections and replies' },
+  { id:'bacon', name:'Francis Bacon', field:'Science & Philosophy', era:'Early Modern', monogram:'FB', lens:'induction, experiment, idols of the mind, scientific method, and useful knowledge' },
+  { id:'newton', name:'Isaac Newton', field:'Mathematics & Physics', era:'Scientific Revolution', monogram:'N', lens:'mechanics, gravitation, optics, calculus, mathematical modeling, and disciplined inference' },
+  { id:'darwin', name:'Charles Darwin', field:'Biology', era:'19th century', monogram:'D', lens:'natural selection, variation, evidence, comparative biology, gradual change, and explanatory mechanisms' },
+  { id:'curie', name:'Marie Curie', field:'Physics & Chemistry', era:'Modern Science', monogram:'MC', lens:'radioactivity, experimental rigor, measurement, scientific perseverance, and evidence' },
+  { id:'einstein', name:'Albert Einstein', field:'Physics', era:'Modern Physics', monogram:'E', lens:'relativity, thought experiments, invariance, physical intuition, and conceptual simplicity' },
+  { id:'lovelace', name:'Ada Lovelace', field:'Mathematics & Computing', era:'19th century', monogram:'AL', lens:'symbolic computation, algorithms, mathematical imagination, and the possibilities and limits of machines' },
+  { id:'turing', name:'Alan Turing', field:'Mathematics & Computing', era:'20th century', monogram:'T', lens:'computation, algorithms, machine intelligence, formal reasoning, and cryptanalysis' },
+  { id:'shakespeare', name:'William Shakespeare', field:'Literature', era:'Renaissance', monogram:'WS', lens:'character, rhetoric, tragedy, comedy, ambition, power, motive, language, and dramatic irony' },
+  { id:'austen', name:'Jane Austen', field:'Literature', era:'Regency', monogram:'JA', lens:'character, social convention, moral judgment, irony, class, courtship, and self-knowledge' },
+  { id:'bach', name:'J. S. Bach', field:'Music', era:'Baroque', monogram:'JSB', lens:'counterpoint, harmony, form, sacred music, structure, variation, and disciplined musical craft' },
+  { id:'beethoven', name:'L. van Beethoven', field:'Music', era:'Classical / Romantic', monogram:'LvB', lens:'motivic development, form, expressive architecture, struggle, transformation, and musical innovation' },
+  { id:'herodotus', name:'Herodotus', field:'History', era:'Classical Greece', monogram:'H', lens:'historical inquiry, competing accounts, culture, causation, memory, and the limits of testimony' },
+  { id:'gibbon', name:'Edward Gibbon', field:'History', era:'Enlightenment', monogram:'EG', lens:'long-run historical causation, institutions, religion, civic life, sources, and decline' },
+  { id:'dubois', name:'W. E. B. Du Bois', field:'History & Sociology', era:'Modern', monogram:'WEB', lens:'history, sociology, political economy, culture, evidence, institutions, and lived experience' }
+];
+
+function symposiumEscape(value) { return escapeHtml(String(value ?? '')); }
+
+function ensureSymposiumStyles() {
+  if (document.getElementById('symposium-prototype-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'symposium-prototype-styles';
+  style.textContent = `
+    .symposium-page{max-width:1500px;margin:0 auto;padding:26px 24px 60px;color:#10233f}
+    .symposium-hero{display:flex;gap:22px;align-items:flex-start;justify-content:space-between;margin-bottom:22px;padding:28px;border:1px solid rgba(36,78,124,.16);border-radius:24px;background:linear-gradient(135deg,#f7fbff,#fffaf0);box-shadow:0 16px 42px rgba(30,58,92,.08)}
+    .symposium-kicker{display:inline-flex;align-items:center;gap:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:.75rem;color:#8a6500}
+    .symposium-hero h1{font-family:Georgia,serif;font-size:clamp(2rem,4vw,3.35rem);line-height:1.02;margin:.45rem 0 .65rem;color:#0c2340}
+    .symposium-hero p{max-width:820px;margin:0;color:#53657a;line-height:1.65}
+    .symposium-badge{min-width:230px;padding:16px 18px;border-radius:18px;background:#0c2340;color:white}.symposium-badge strong{display:block;color:#f0c85a;font-size:1.05rem}.symposium-badge small{display:block;margin-top:6px;line-height:1.45;color:#d7e1ee}
+    .symposium-layout{display:grid;grid-template-columns:minmax(300px,390px) minmax(0,1fr);gap:22px;align-items:start}
+    .symposium-panel{border:1px solid rgba(36,78,124,.16);border-radius:22px;background:white;box-shadow:0 12px 34px rgba(30,58,92,.06);overflow:hidden}
+    .symposium-panel-head{padding:20px 22px 14px;border-bottom:1px solid rgba(36,78,124,.1);background:#f8fbff}.symposium-panel-head h2{margin:0 0 4px;font-size:1.15rem;color:#0c2340}.symposium-panel-head p{margin:0;color:#65758a;font-size:.9rem;line-height:1.45}
+    .symposium-setup{padding:18px 20px 22px;display:grid;gap:16px}.symposium-setup label{display:grid;gap:7px;font-weight:700;font-size:.88rem}.symposium-setup input,.symposium-setup textarea,.symposium-setup select{width:100%;border:1px solid #cbd7e5;border-radius:11px;padding:10px 12px;background:white;color:#10233f;font:inherit;box-sizing:border-box}.symposium-setup textarea{min-height:105px;resize:vertical;line-height:1.45}
+    .symposium-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.symposium-mode{position:relative}.symposium-mode input{position:absolute;opacity:0;pointer-events:none}.symposium-mode span{display:block;padding:11px 12px;border:1px solid #d3deea;border-radius:12px;background:#fbfdff;cursor:pointer;font-weight:800}.symposium-mode small{display:block;margin-top:3px;font-weight:500;color:#6b7c90}.symposium-mode input:checked+span{border-color:#c79a22;background:#fff8e6;box-shadow:inset 0 0 0 1px #e0b94d}
+    .symposium-context-choice{display:flex;gap:8px;flex-wrap:wrap}.symposium-context-choice button,.symposium-mini-button{border:1px solid #cbd7e5;border-radius:999px;background:white;padding:7px 10px;font-weight:700;color:#24476e;cursor:pointer}.symposium-context-choice button:hover,.symposium-mini-button:hover{background:#f2f7fc}
+    .symposium-roster{max-height:355px;overflow:auto;padding-right:4px;display:grid;gap:8px}.symposium-person{display:grid;grid-template-columns:auto 42px 1fr;gap:9px;align-items:center;padding:9px;border:1px solid #e0e8f1;border-radius:12px;background:#fff;cursor:pointer}.symposium-person:has(input:checked){border-color:#c99f37;background:#fffaf0}.symposium-person input{width:auto}.symposium-avatar{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#173c66,#0c2340);color:#f2cc68;border:2px solid #e2bd52;font-family:Georgia,serif;font-size:.78rem;font-weight:800;box-shadow:0 4px 12px rgba(12,35,64,.15)}.symposium-person strong{display:block;font-size:.9rem}.symposium-person small{display:block;color:#718095;font-size:.76rem;margin-top:2px}
+    .symposium-custom-row{display:grid;grid-template-columns:1fr auto;gap:8px}.symposium-custom-row button,.symposium-start{border:0;border-radius:11px;background:#0c2340;color:white;font-weight:800;padding:10px 14px;cursor:pointer}.symposium-start{width:100%;padding:13px 16px;color:#f3cc67}.symposium-start:disabled{opacity:.55;cursor:wait}
+    .symposium-stage{min-height:720px;display:flex;flex-direction:column}.symposium-stage-toolbar{padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #e3eaf2;background:#fbfdff;flex-wrap:wrap}.symposium-stage-status{font-weight:800;color:#395a7d}.symposium-stage-actions{display:flex;gap:8px;flex-wrap:wrap}.symposium-stage-actions button{border:1px solid #cbd7e5;background:white;color:#24476e;border-radius:9px;padding:7px 10px;cursor:pointer;font-weight:700}
+    .symposium-transcript{padding:20px;display:flex;flex-direction:column;gap:14px;min-height:430px;max-height:680px;overflow:auto;background:linear-gradient(180deg,#fff,#fbfdff)}
+    .symposium-empty{margin:auto;text-align:center;max-width:520px;color:#718095;padding:44px}.symposium-empty .symposium-empty-icon{font-size:3rem;display:block;margin-bottom:12px}.symposium-empty h2{color:#0c2340;margin:.25rem 0 .5rem;font-family:Georgia,serif}
+    .symposium-turn{display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px;align-items:start}.symposium-turn.user{grid-template-columns:minmax(0,1fr) 48px}.symposium-turn.user .symposium-turn-body{order:1;background:#eef5fc}.symposium-turn.user .symposium-avatar{order:2;background:#405c7a}.symposium-turn.moderator .symposium-avatar{background:linear-gradient(145deg,#80631a,#513d0d);color:white}.symposium-turn-body{border:1px solid #dde6ef;border-radius:16px;padding:13px 15px;background:white;box-shadow:0 5px 16px rgba(38,67,98,.05)}.symposium-turn-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}.symposium-turn-head strong{color:#0c2340}.symposium-turn-head span{font-size:.76rem;color:#7a899b}.symposium-turn-body p{margin:0;line-height:1.58;color:#30465f;white-space:pre-wrap}.symposium-turn-tools{margin-top:8px;display:flex;gap:6px}.symposium-turn-tools button{border:0;background:transparent;color:#315d8b;font-size:.78rem;cursor:pointer;padding:2px 0}
+    .symposium-participate{margin-top:auto;border-top:1px solid #e1e8f0;padding:16px 18px;background:#f8fbff}.symposium-participate label{font-size:.8rem;font-weight:800;color:#435b75}.symposium-user-grid{display:grid;grid-template-columns:150px 1fr auto;gap:9px;margin-top:7px}.symposium-user-grid select,.symposium-user-grid textarea{border:1px solid #cbd7e5;border-radius:10px;padding:9px 10px;font:inherit;background:white}.symposium-user-grid textarea{resize:vertical;min-height:52px}.symposium-user-grid button{border:0;border-radius:10px;background:#0c2340;color:#f2ca60;padding:10px 14px;font-weight:800;cursor:pointer}.symposium-hint{font-size:.76rem;color:#758498;margin:7px 0 0}
+    .symposium-source-pill{display:inline-flex;align-items:center;border-radius:999px;background:#edf4fb;color:#365b81;padding:4px 8px;font-size:.72rem;font-weight:800;margin-top:8px}
+    .symposium-loading{display:inline-flex;gap:5px;align-items:center}.symposium-loading i{width:6px;height:6px;border-radius:50%;background:#8da1b6;animation:sympPulse 1.1s infinite alternate}.symposium-loading i:nth-child(2){animation-delay:.2s}.symposium-loading i:nth-child(3){animation-delay:.4s}@keyframes sympPulse{to{opacity:.25;transform:translateY(-2px)}}
+    .symposium-nav-link{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:.55rem .7rem;border-radius:8px}.symposium-nav-link:hover{background:rgba(255,255,255,.08)}
+    @media(max-width:900px){.symposium-layout{grid-template-columns:1fr}.symposium-stage{min-height:620px}.symposium-roster{max-height:260px}.symposium-hero{flex-direction:column}.symposium-user-grid{grid-template-columns:1fr}.symposium-mode-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:560px){.symposium-page{padding:14px 10px 40px}.symposium-hero{padding:20px}.symposium-mode-grid{grid-template-columns:1fr}.symposium-turn{grid-template-columns:40px minmax(0,1fr)}.symposium-turn.user{grid-template-columns:minmax(0,1fr) 40px}.symposium-avatar{width:36px;height:36px}.symposium-badge{min-width:0;width:100%;box-sizing:border-box}}
+  `;
+  document.head.appendChild(style);
+}
+
+function ensureSymposiumNavigationItem() {
+  ensureSymposiumStyles();
+  if (document.querySelector('[data-action="symposium"]')) return true;
+  const nav = document.querySelector('.site-header nav');
+  if (!nav) return false;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.action = 'symposium';
+  button.className = 'symposium-nav-link';
+  button.innerHTML = '<span aria-hidden="true">◉</span><span>Symposium</span>';
+  button.title = 'Open Symposium';
+  nav.appendChild(button);
+  return true;
+}
+
+function currentSymposiumReadingContext() {
+  const selection = String(state?.markSelection?.text || '').trim();
+  if (selection) return { label:'Highlighted passage', text:selection.slice(0,9000) };
+  const words = Array.isArray(state?.words) ? state.words : [];
+  if (words.length) {
+    const index = Math.max(0, Number(state.index) || 0);
+    const start = Math.max(0, index - 500);
+    const end = Math.min(words.length, index + 900);
+    return { label:`Current reading · ${state.title || 'Untitled'}`, text:words.slice(start,end).map((item)=>typeof item === 'string' ? item : (item?.text || '')).join(' ').slice(0,12000) };
+  }
+  return { label:'No active reading', text:'' };
+}
+
+function symposiumSelectedPeople(root) {
+  return [...root.querySelectorAll('[data-symposium-person]:checked')]
+    .map((input)=>SYMPOSIUM_PARTICIPANTS.find((person)=>person.id===input.value))
+    .filter(Boolean);
+}
+
+function symposiumTurnHtml({name, monogram='?', field='', text='', kind='participant', sourceLabel=''}) {
+  const safeKind = kind === 'user' ? 'user' : (kind === 'moderator' ? 'moderator' : 'participant');
+  return `<article class="symposium-turn ${safeKind}">
+    <div class="symposium-avatar" aria-hidden="true">${symposiumEscape(monogram)}</div>
+    <div class="symposium-turn-body">
+      <div class="symposium-turn-head"><strong>${symposiumEscape(name)}</strong><span>${symposiumEscape(field)}</span></div>
+      <p>${symposiumEscape(text)}</p>
+      ${sourceLabel ? `<span class="symposium-source-pill">${symposiumEscape(sourceLabel)}</span>` : ''}
+      ${safeKind !== 'user' ? `<div class="symposium-turn-tools"><button type="button" data-symposium-speak-last>🔊 Speak</button></div>` : ''}
+    </div>
+  </article>`;
+}
+
+function symposiumSpeak(text, name='Speaker') {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(String(text || ''));
+  utterance.rate = 0.96;
+  utterance.pitch = 1;
+  const voices = window.speechSynthesis.getVoices?.() || [];
+  const english = voices.find((voice)=>/^en[-_]/i.test(voice.lang || ''));
+  if (english) utterance.voice = english;
+  utterance.datasetSpeaker = name;
+  window.speechSynthesis.speak(utterance);
+}
+
+function symposiumResultText(payload) {
+  const result = payload?.result ?? payload;
+  if (typeof result === 'string') return result.trim();
+  return String(result?.response || result?.answer || result?.explanation || result?.summary || result?.text || payload?.response || payload?.answer || '').trim();
+}
+
+async function symposiumAskAi({person, mode, topic, context, transcript, userContribution=''}) {
+  const modeInstructions = {
+    debate:'This is a cordial roundtable debate. State a clear position, engage the strongest prior argument, distinguish fact from inference, and identify at least one point of agreement.',
+    interview:'This is an interview. Answer the moderator or reader directly in a vivid but intellectually serious way, then offer one useful question the interviewer might ask next.',
+    court:'This is a court-style examination of an idea. Treat claims as propositions to be tested. Identify evidence, assumptions, counterevidence, and the standard by which the claim should be judged. Do not pretend to give legal advice.',
+    explain:'This is a collaborative explanation. Clarify the idea from your discipline, use an illuminating example or analogy, and note where another field might see it differently.'
+  };
+  const prior = transcript.slice(-6).map((turn)=>`${turn.name}: ${turn.text}`).join('\n');
+  const prompt = `You are participating in Mark, Set, Go!'s Symposium as ${person.name}, representing ${person.field}. Use deep knowledge associated with ${person.name}'s work, historical context, methods, and characteristic intellectual concerns (${person.lens}). Do not claim private knowledge or fabricate quotations. When a modern topic postdates this thinker, reason from the thinker's documented ideas and clearly frame the response as an application rather than a literal historical statement. Remain cordial, charitable, concise, and substantive.\n\n${modeInstructions[mode] || modeInstructions.debate}\n\nTOPIC:\n${topic}\n\nREADING CONTEXT:\n${context || 'No reading passage supplied.'}\n\nRECENT TRANSCRIPT:\n${prior || 'No prior turns.'}${userContribution ? `\n\nREADER CONTRIBUTION:\n${userContribution}` : ''}\n\nRespond as ${person.name} in about 120-220 words. Use reasons and evidence. Do not use stage directions.`;
+
+  const response = await fetch('/api/mark-selection', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      text: context || topic,
+      selection: context || topic,
+      startIndex:0,
+      endIndex:Math.max(1, splitWords(context || topic).length),
+      chapter:'Symposium',
+      action:'ask',
+      question:prompt
+    })
+  });
+  const payload = await response.json().catch(()=>({}));
+  if (!response.ok) throw new Error(payload.error || payload.detail || `HTTP ${response.status}`);
+  const text = symposiumResultText(payload);
+  if (!text) throw new Error('The AI response was empty.');
+  return text;
+}
+
+function saveSymposiumSession(session) {
+  try {
+    const existing = JSON.parse(localStorage.getItem(SYMPOSIUM_STORAGE_KEY) || '[]');
+    const sessions = Array.isArray(existing) ? existing : [];
+    sessions.unshift({ ...session, savedAt:new Date().toISOString() });
+    localStorage.setItem(SYMPOSIUM_STORAGE_KEY, JSON.stringify(sessions.slice(0,20)));
+  } catch (error) { console.warn('Symposium session could not be saved.', error); }
+}
+
+function renderSymposium() {
+  stopReader();
+  ensureSymposiumStyles();
+  app.dataset.viewKey = 'symposium';
+  const readingContext = currentSymposiumReadingContext();
+  const defaultTopic = state?.title ? `Explore the central ideas in ${state.title}` : '';
+  const defaultChecked = new Set(['socrates','aristotle','einstein','lovelace']);
+
+  app.innerHTML = `
+    <section class="symposium-page">
+      <header class="symposium-hero">
+        <div>
+          <span class="symposium-kicker">◉ The Symposium · Prototype</span>
+          <h1>Put great minds around the same table.</h1>
+          <p>Explore what you are reading through friendly debate, interview, explanation, or a court-style examination of a claim. AI participants represent the methods and ideas of major thinkers while the moderator keeps the exchange charitable, evidence-based, and on topic.</p>
+        </div>
+        <aside class="symposium-badge"><strong>Reader participates</strong><small>Listen, read, question, challenge, supply evidence, or enter your own argument at any point.</small></aside>
+      </header>
+
+      <div class="symposium-layout">
+        <aside class="symposium-panel">
+          <div class="symposium-panel-head"><h2>Set the table</h2><p>Choose a format, topic, context, and participants.</p></div>
+          <div class="symposium-setup">
+            <div>
+              <label>Format</label>
+              <div class="symposium-mode-grid">
+                <label class="symposium-mode"><input type="radio" name="symposium-mode" value="debate" checked><span>Roundtable<small>Cordial debate</small></span></label>
+                <label class="symposium-mode"><input type="radio" name="symposium-mode" value="interview"><span>Interview<small>Question a thinker</small></span></label>
+                <label class="symposium-mode"><input type="radio" name="symposium-mode" value="court"><span>Court<small>Put a claim on trial</small></span></label>
+                <label class="symposium-mode"><input type="radio" name="symposium-mode" value="explain"><span>Explain<small>Teach from many lenses</small></span></label>
+              </div>
+            </div>
+
+            <label>Topic or question
+              <textarea id="symposium-topic" placeholder="Example: Is technological progress making us wiser?">${symposiumEscape(defaultTopic)}</textarea>
+            </label>
+
+            <div>
+              <label>Reading context</label>
+              <div class="symposium-context-choice">
+                <button type="button" data-symposium-context="reading" ${readingContext.text ? '' : 'disabled'}>Use current reading</button>
+                <button type="button" data-symposium-context="none">Topic only</button>
+              </div>
+              <input id="symposium-context" type="hidden" value="${symposiumEscape(readingContext.text)}">
+              <p class="symposium-hint" id="symposium-context-label">${symposiumEscape(readingContext.label)}${readingContext.text ? ` · ${splitWords(readingContext.text).length.toLocaleString()} words available` : ''}</p>
+            </div>
+
+            <label>Output
+              <select id="symposium-output"><option value="write">Write</option><option value="both">Speak + write</option><option value="speak">Speak (transcript remains visible)</option></select>
+            </label>
+
+            <div>
+              <label>Participants <span style="font-weight:500;color:#718095">(choose 1–6)</span></label>
+              <div class="symposium-roster" id="symposium-roster">
+                ${SYMPOSIUM_PARTICIPANTS.map((person)=>`<label class="symposium-person"><input type="checkbox" data-symposium-person value="${person.id}" ${defaultChecked.has(person.id)?'checked':''}><span class="symposium-avatar">${symposiumEscape(person.monogram)}</span><span><strong>${symposiumEscape(person.name)}</strong><small>${symposiumEscape(person.field)} · ${symposiumEscape(person.era)}</small></span></label>`).join('')}
+              </div>
+            </div>
+
+            <div>
+              <label>Add a participant</label>
+              <div class="symposium-custom-row"><input id="symposium-custom-person" placeholder="e.g., Hannah Arendt"><button type="button" id="symposium-add-person">Add</button></div>
+              <p class="symposium-hint">Custom participants join this session as an AI representation of their published ideas.</p>
+            </div>
+
+            <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
+          </div>
+        </aside>
+
+        <main class="symposium-panel symposium-stage">
+          <div class="symposium-stage-toolbar">
+            <span class="symposium-stage-status" id="symposium-stage-status">Ready to convene</span>
+            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
+          </div>
+          <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
+            <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
+          </div>
+          <div class="symposium-participate">
+            <label for="symposium-reader-input">Join the discussion</label>
+            <div class="symposium-user-grid"><select id="symposium-reader-kind"><option value="argument">My argument</option><option value="evidence">Add evidence</option><option value="question">Question</option><option value="challenge">Challenge</option></select><textarea id="symposium-reader-input" placeholder="Add your opinion, reasoning, evidence, or question…"></textarea><button type="button" id="symposium-reader-submit" disabled>Enter</button></div>
+            <p class="symposium-hint">The moderator will invite the panel to address your contribution directly.</p>
+          </div>
+        </main>
+      </div>
+    </section>`;
+
+  const root = app.querySelector('.symposium-page');
+  const transcriptEl = root.querySelector('#symposium-transcript');
+  const statusEl = root.querySelector('#symposium-stage-status');
+  const nextButton = root.querySelector('#symposium-next');
+  const saveButton = root.querySelector('#symposium-save');
+  const readerButton = root.querySelector('#symposium-reader-submit');
+  const startButton = root.querySelector('#symposium-start');
+  const rosterEl = root.querySelector('#symposium-roster');
+  const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0 };
+
+  const scrollTranscript = () => { transcriptEl.scrollTop = transcriptEl.scrollHeight; };
+  const shouldSpeak = () => session.output === 'both' || session.output === 'speak';
+  const appendTurn = (turn, speak=false) => {
+    if (transcriptEl.querySelector('.symposium-empty')) transcriptEl.innerHTML = '';
+    session.transcript.push(turn);
+    transcriptEl.insertAdjacentHTML('beforeend', symposiumTurnHtml(turn));
+    scrollTranscript();
+    if (speak && shouldSpeak()) symposiumSpeak(turn.text, turn.name);
+  };
+  const setBusy = (busy, label='') => {
+    startButton.disabled = busy;
+    nextButton.disabled = busy || !session.active;
+    readerButton.disabled = busy || !session.active;
+    if (label) statusEl.innerHTML = busy ? `${symposiumEscape(label)} <span class="symposium-loading"><i></i><i></i><i></i></span>` : symposiumEscape(label);
+  };
+
+  root.querySelectorAll('[data-symposium-context]').forEach((button)=>button.addEventListener('click',()=>{
+    if (button.dataset.symposiumContext === 'reading') {
+      root.querySelector('#symposium-context').value = readingContext.text;
+      root.querySelector('#symposium-context-label').textContent = `${readingContext.label} · ${splitWords(readingContext.text).length.toLocaleString()} words available`;
+    } else {
+      root.querySelector('#symposium-context').value = '';
+      root.querySelector('#symposium-context-label').textContent = 'Topic only · no reading passage supplied';
+    }
+  }));
+
+  rosterEl.addEventListener('change', (event)=>{
+    if (!event.target.matches('[data-symposium-person]')) return;
+    const checked = symposiumSelectedPeople(root);
+    if (checked.length > 6) { event.target.checked = false; window.alert('Choose up to six participants for a readable discussion.'); }
+  });
+
+  root.querySelector('#symposium-add-person').addEventListener('click',()=>{
+    const input = root.querySelector('#symposium-custom-person');
+    const name = input.value.trim();
+    if (!name) return;
+    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+    const monogram = name.split(/\s+/).slice(0,2).map((part)=>part[0]?.toUpperCase() || '').join('');
+    const person = { id, name, field:'Guest thinker', era:'Custom', monogram:monogram || '?', lens:`the published work, arguments, methods, and intellectual context of ${name}` };
+    SYMPOSIUM_PARTICIPANTS.push(person);
+    rosterEl.insertAdjacentHTML('afterbegin', `<label class="symposium-person"><input type="checkbox" data-symposium-person value="${symposiumEscape(id)}" checked><span class="symposium-avatar">${symposiumEscape(person.monogram)}</span><span><strong>${symposiumEscape(name)}</strong><small>Guest thinker · Custom</small></span></label>`);
+    input.value = '';
+  });
+
+  async function moderatorOpening() {
+    const names = session.people.map((person)=>person.name).join(', ');
+    const modeName = {debate:'roundtable debate', interview:'interview', court:'court-style examination', explain:'collaborative explanation'}[session.mode];
+    return `Welcome. Our subject is “${session.topic}.” We will conduct this as a ${modeName}. Joining us are ${names}. I ask each participant to interpret opposing views charitably, separate evidence from assumption, avoid invented quotations, and respond to the strongest version of an argument. Reader, you may enter your own argument, evidence, question, or challenge at any time.`;
+  }
+
+  async function runSpeaker(person, userContribution='') {
+    setBusy(true, `${person.name} is considering the question`);
+    try {
+      const text = await symposiumAskAi({ person, mode:session.mode, topic:session.topic, context:session.context, transcript:session.transcript, userContribution });
+      appendTurn({ name:person.name, monogram:person.monogram, field:person.field, text, kind:'participant', sourceLabel:`AI representation · ${person.field}` }, true);
+      statusEl.textContent = `${person.name} has finished · ${session.transcript.length} turns`;
+    } catch (error) {
+      appendTurn({ name:person.name, monogram:person.monogram, field:person.field, text:`I could not join this turn because the AI request failed: ${error.message}`, kind:'participant' }, false);
+      statusEl.textContent = 'A speaker request failed';
+    } finally { setBusy(false); }
+  }
+
+  startButton.addEventListener('click', async ()=>{
+    const topic = root.querySelector('#symposium-topic').value.trim();
+    const people = symposiumSelectedPeople(root);
+    if (!topic) { root.querySelector('#symposium-topic').focus(); return window.alert('Enter a topic or question for the Symposium.'); }
+    if (!people.length) return window.alert('Choose at least one participant.');
+    session.active = true;
+    session.mode = root.querySelector('[name="symposium-mode"]:checked')?.value || 'debate';
+    session.topic = topic;
+    session.context = root.querySelector('#symposium-context').value || '';
+    session.output = root.querySelector('#symposium-output').value || 'write';
+    session.people = people;
+    session.transcript = [];
+    session.nextIndex = 0;
+    transcriptEl.innerHTML = '';
+    appendTurn({ name:'Athena', monogram:'A', field:'Moderator', text:await moderatorOpening(), kind:'moderator', sourceLabel:'Moderator · decorum & evidence' }, true);
+    nextButton.disabled = false; saveButton.disabled = false; readerButton.disabled = false;
+    await runSpeaker(session.people[0]);
+    session.nextIndex = session.people.length > 1 ? 1 : 0;
+  });
+
+  nextButton.addEventListener('click', async ()=>{
+    if (!session.active || !session.people.length) return;
+    const person = session.people[session.nextIndex % session.people.length];
+    session.nextIndex = (session.nextIndex + 1) % session.people.length;
+    await runSpeaker(person);
+  });
+
+  readerButton.addEventListener('click', async ()=>{
+    const input = root.querySelector('#symposium-reader-input');
+    const text = input.value.trim();
+    if (!text || !session.active) return;
+    const kind = root.querySelector('#symposium-reader-kind').value;
+    const labels = { argument:'Reader argument', evidence:'Reader evidence', question:'Reader question', challenge:'Reader challenge' };
+    appendTurn({ name:'You', monogram:'You', field:labels[kind] || 'Reader', text, kind:'user' }, false);
+    input.value = '';
+    appendTurn({ name:'Athena', monogram:'A', field:'Moderator', text:`Thank you. I’ll ask the next participant to address your ${kind} directly and distinguish agreement, disagreement, and the evidence that would decide the issue.`, kind:'moderator' }, shouldSpeak());
+    const person = session.people[session.nextIndex % session.people.length];
+    session.nextIndex = (session.nextIndex + 1) % session.people.length;
+    await runSpeaker(person, `${labels[kind]}: ${text}`);
+  });
+
+  root.querySelector('#symposium-reader-input').addEventListener('keydown',(event)=>{
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') readerButton.click();
+  });
+
+  transcriptEl.addEventListener('click',(event)=>{
+    const button = event.target.closest('[data-symposium-speak-last]');
+    if (!button) return;
+    const body = button.closest('.symposium-turn-body');
+    symposiumSpeak(body?.querySelector('p')?.textContent || '', body?.querySelector('strong')?.textContent || 'Speaker');
+  });
+
+  root.querySelector('#symposium-stop-speech').addEventListener('click',()=>window.speechSynthesis?.cancel?.());
+  root.querySelector('#symposium-clear').addEventListener('click',()=>{ window.speechSynthesis?.cancel?.(); renderSymposium(); });
+  saveButton.addEventListener('click',()=>{
+    if (!session.transcript.length) return;
+    saveSymposiumSession({ mode:session.mode, topic:session.topic, participants:session.people.map((p)=>p.name), transcript:session.transcript });
+    const original = saveButton.textContent; saveButton.textContent = 'Saved ✓'; window.setTimeout(()=>saveButton.textContent=original,1300);
+  });
+}
+
+function installSymposiumPrototype() {
+  if (ensureSymposiumNavigationItem()) return;
+  let attempts = 0;
+  const timer = window.setInterval(()=>{
+    attempts += 1;
+    if (ensureSymposiumNavigationItem() || attempts > 30) window.clearInterval(timer);
+  }, 250);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installSymposiumPrototype, { once:true });
+else installSymposiumPrototype();
+
+
 document.addEventListener('click', (event) => {
   const test = event.target.closest('[data-test]');
   const read = event.target.closest('[data-read]');
@@ -22964,6 +23366,7 @@ document.addEventListener('click', (event) => {
   if (actionName === 'browse') renderBrowseHub();
   if (actionName === 'drm-free-books') renderDrmFreeBookFinder();
   if (actionName === 'my-links') renderMyLinks();
+  if (actionName === 'symposium') renderSymposium();
   if (actionName === 'my-library') renderMyLibraryHub();
   if (actionName === 'profile-preferences') renderProfilePreferences();
   if (actionName === 'ai-center') renderAiCenter();
