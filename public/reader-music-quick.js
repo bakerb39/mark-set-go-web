@@ -156,83 +156,84 @@
 
   function renderChooser() {
     if (!chooser) return;
+
     const attached = attachedMusic();
     const preferred = preferredMusic();
+    const playing = hasPlayback();
+
+    const preferredOptions = preferred.length
+      ? `<option value="">Choose a saved playlist…</option>${
+          preferred.slice(0, 50).map((item) =>
+            `<option value="${esc(item.id)}">${esc(item.title)}</option>`
+          ).join('')
+        }`
+      : `<option value="" selected disabled>No saved playlists yet</option>`;
+
+    const attachedOptions = attached.length
+      ? `<option value="">Choose music for this reading…</option>${
+          attached.map((item) =>
+            `<option value="${esc(item.id)}">${esc(item.title)}</option>`
+          ).join('')
+        }`
+      : '';
 
     chooser.innerHTML = `
-      <div class="reader-wpm-music-head">
-        <div><span>Reader</span><strong>My Playlists</strong></div>
-        <button type="button" data-wpm-music-close aria-label="Close music choices">×</button>
-      </div>
+      <div class="reader-music-compact">
+        ${playing ? `
+          <div class="reader-music-compact-now">
+            <span>Now playing</span>
+            <strong>${esc(document.querySelector('#music-now-title')?.textContent || 'Music')}</strong>
+          </div>` : ''}
 
-      ${hasPlayback() ? `
-        <div class="reader-wpm-music-now">
-          <span>Now playing</span>
-          <strong>${esc(document.querySelector('#music-now-title')?.textContent || 'Music')}</strong>
-          <small>${esc(document.querySelector('#music-now-source')?.textContent || '')}</small>
-        </div>` : ''}
-
-      <div class="reader-wpm-music-scroll">
-        <section class="reader-wpm-music-personal">
-          <div class="reader-wpm-music-section-title">
-            <strong>My saved playlists</strong><span>${preferred.length}</span>
-          </div>
-          ${preferred.length ? `
-            <div class="reader-wpm-music-list">
-              ${preferred.slice(0, 20).map((item) => `
-                <button type="button" data-wpm-music-preferred="${esc(item.id)}">
-                  <span aria-hidden="true">▶</span>
-                  <span>
-                    <strong>${esc(item.title)}</strong>
-                    <small>${esc(item.source || (item.provider === 'spotify' ? 'Spotify' : 'Saved playlist'))}</small>
-                  </span>
-                </button>`).join('')}
-            </div>
-          ` : `
-            <p class="reader-wpm-music-empty">
-              No personal playlists saved yet. Use Manage Music &amp; Focus to save Spotify or YouTube playlists here.
-            </p>
-          `}
-        </section>
+        <label class="reader-music-compact-field">
+          <span>My saved playlists</span>
+          <select data-wpm-music-preferred-select ${preferred.length ? '' : 'disabled'}>
+            ${preferredOptions}
+          </select>
+        </label>
 
         ${attached.length ? `
-          <section>
-            <div class="reader-wpm-music-section-title"><strong>For this reading</strong><span>${attached.length}</span></div>
-            <div class="reader-wpm-music-list">
-              ${attached.map((item) => `
-                <button type="button" data-wpm-music-preferred="${esc(item.id)}">
-                  <span aria-hidden="true">▶</span>
-                  <span><strong>${esc(item.title)}</strong><small>${esc(item.source || 'Attached to this reading')}</small></span>
-                </button>`).join('')}
-            </div>
-          </section>` : ''}
+          <label class="reader-music-compact-field">
+            <span>For this reading</span>
+            <select data-wpm-music-attached-select>
+              ${attachedOptions}
+            </select>
+          </label>` : ''}
 
-        <section>
-          <div class="reader-wpm-music-section-title"><strong>Quick focus</strong></div>
-          <div class="reader-wpm-music-chips">
-            ${QUICK_CHOICES.map((item) => `
-              <button type="button" data-wpm-music-quick="${esc(item.id)}">${esc(item.title)}</button>
-            `).join('')}
-          </div>
-        </section>
-      </div>
+        <label class="reader-music-compact-field">
+          <span>Quick focus</span>
+          <select data-wpm-music-quick-select>
+            <option value="">Choose focus music…</option>
+            ${QUICK_CHOICES.map((item) =>
+              `<option value="${esc(item.id)}">${esc(item.title)}</option>`
+            ).join('')}
+          </select>
+        </label>
 
-      <div class="reader-wpm-music-foot">
-        <button type="button" data-wpm-music-manage>Manage Music &amp; Focus</button>
+        <button type="button" class="reader-music-compact-manage" data-wpm-music-manage>
+          Manage Music &amp; Focus
+        </button>
       </div>`;
 
-    chooser.querySelector('[data-wpm-music-close]')?.addEventListener('click', () => closeChooser());
-
-    chooser.querySelectorAll('[data-wpm-music-quick]').forEach((button) => {
-      button.addEventListener('click', () => {
-        playQuick(QUICK_CHOICES.find((item) => item.id === button.dataset.wpmMusicQuick));
-      });
+    chooser.querySelector('[data-wpm-music-preferred-select]')?.addEventListener('change', (event) => {
+      const id = event.target.value;
+      if (!id) return;
+      playPreferred(preferredMusic().find((item) => item.id === id));
+      event.target.value = '';
     });
 
-    chooser.querySelectorAll('[data-wpm-music-preferred]').forEach((button) => {
-      button.addEventListener('click', () => {
-        playPreferred(preferredMusic().find((item) => item.id === button.dataset.wpmMusicPreferred));
-      });
+    chooser.querySelector('[data-wpm-music-attached-select]')?.addEventListener('change', (event) => {
+      const id = event.target.value;
+      if (!id) return;
+      playPreferred(preferredMusic().find((item) => item.id === id));
+      event.target.value = '';
+    });
+
+    chooser.querySelector('[data-wpm-music-quick-select]')?.addEventListener('change', (event) => {
+      const id = event.target.value;
+      if (!id) return;
+      playQuick(QUICK_CHOICES.find((item) => item.id === id));
+      event.target.value = '';
     });
 
     chooser.querySelector('[data-wpm-music-manage]')?.addEventListener('click', () => {
@@ -254,7 +255,7 @@
       if (parts.wrap) parts.wrap.hidden = true;
       if (parts.minimize) parts.minimize.hidden = true;
       if (parts.title) parts.title.textContent = 'My Playlists';
-      if (parts.source) parts.source.textContent = 'Choose saved music or a focus playlist';
+      if (parts.source) parts.source.textContent = 'Reading music';
     }
 
     speedButton?.setAttribute('aria-expanded', 'true');

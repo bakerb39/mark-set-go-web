@@ -1,49 +1,49 @@
-MARK, SET, GO! — TOP-RIGHT MUSIC ONLY
+MARK, SET, GO! — COMPACT TOP-RIGHT READER MUSIC
 
-Replace all three:
+Replace only:
   /public/reader-music-quick.js
   /public/reader-music-quick.css
   /public/index.html
 
-WHY THE OLD MUSIC BUTTON WAS STILL UNDER WPM
+WHAT CHANGED
 
-Some later Topic Feed packages carried forward the NEW v1.3 music asset URL in
-index.html, but did not themselves include reader-music-quick.js/css.
+1. MUSIC ICON PLACEMENT
+   The music button is anchored directly to the existing Full screen control.
 
-If the actual music files on the server were still from v1.2, the old
-under-WPM button continued to be created even though the index referenced v1.3.
+   It is:
+   - right-aligned with Full screen;
+   - 10px above Full screen;
+   - z-indexed above the Reader so it cannot disappear behind the reading area.
 
-This package includes the actual music JS and CSS again and makes the cleanup
-defensive.
+2. MUCH SMALLER MUSIC SELECTOR
+   The existing music-dock header is now the only header.
 
-NEW RULE
+   The bulky second "Reader / My Playlists" header and large chip/list layout
+   are removed.
 
-There is exactly ONE Reader music launcher:
+   The selector is a compact utility menu with dropdowns:
 
-      ♫
-  [ Full screen ]
+     My saved playlists   [ dropdown ]
+     For this reading     [ dropdown ]  (only when applicable)
+     Quick focus          [ dropdown ]
 
-at the top-right of the Reader.
+     Manage Music & Focus
 
-On EVERY Reader render the script now removes:
-- the old button below the visible WPM stepper;
-- the old .reader-viewer-music-stack wrapper;
-- the even older button beneath the hidden #speed field.
+3. PERSONAL PLAYLISTS
+   My saved playlists still comes from the app's existing
+   markSetGoPreferredMusic collection, including saved Spotify/YouTube items.
 
-CSS also forcibly hides those legacy placements if stale DOM somehow survives.
+4. PLAYBACK
+   Selecting an item immediately loads it into the existing #music-dock /
+   #music-player. No second playback system is created.
 
-MY PLAYLISTS
+PRESERVED
 
-The top-right ♫ still opens:
-- My saved playlists / preferred music first;
-- music attached to the current reading;
-- Quick Focus choices;
-- Manage Music & Focus.
+- existing Full screen DOM node and handler
+- current Topic Feed editor lock
+- compact My Topics header
+- Book Pages fixes
+- sharing/source metadata
+- Reader core
 
-The existing Full screen DOM node and handler are preserved.
-
-This package uses the latest current index shell, so the existing Topic Feed
-editor lock, compact My Topics header, Book Pages fixes, sharing, source
-metadata, and other current references remain intact.
-
-No app.js, styles.css, Reader core, or Topic Feed JS is changed.
+No app.js, styles.css, or Topic Feed JS is changed.

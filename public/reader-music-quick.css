@@ -225,3 +225,171 @@
 .reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle{
   display:grid !important;
 }
+
+
+/* v1.4.0 — compact selector + music launcher visibly anchored above Full screen. */
+
+.reader-pane-controls{
+  position:relative !important;
+  overflow:visible !important;
+  z-index:30 !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack{
+  position:relative !important;
+  z-index:40 !important;
+  display:block !important;
+  margin-left:auto !important;
+  overflow:visible !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack .viewer-fullscreen-button{
+  position:static !important;
+  margin:0 !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle{
+  position:absolute !important;
+  right:0 !important;
+  bottom:calc(100% + 10px) !important;
+  z-index:60 !important;
+  display:grid !important;
+  width:28px !important;
+  height:28px !important;
+  min-width:28px !important;
+  min-height:28px !important;
+  margin:0 !important;
+  border:1px solid rgba(255,255,255,.22) !important;
+  border-radius:7px !important;
+  background:#123552 !important;
+  color:#fff !important;
+  box-shadow:0 3px 10px rgba(19,45,69,.24) !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle:hover,
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle:focus-visible,
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle[aria-expanded="true"]{
+  background:#1d527d !important;
+  border-color:rgba(255,255,255,.42) !important;
+  outline:none !important;
+}
+
+/* Compact music chooser: the existing music-dock bar is the header. */
+.music-dock.reader-music-chooser-open{
+  width:min(292px,calc(100vw - 1rem)) !important;
+}
+
+.music-dock.reader-music-chooser-open .music-dock-bar{
+  min-height:38px !important;
+  padding:6px 8px 6px 10px !important;
+}
+
+.music-dock.reader-music-chooser-open .music-dock-bar strong{
+  font-size:.82rem !important;
+}
+
+.music-dock.reader-music-chooser-open .music-dock-bar span{
+  font-size:.61rem !important;
+}
+
+.reader-wpm-music-chooser{
+  background:#111820 !important;
+  border-top:1px solid rgba(255,255,255,.08) !important;
+}
+
+.reader-music-compact{
+  display:grid;
+  gap:8px;
+  padding:10px;
+}
+
+.reader-music-compact-now{
+  display:grid;
+  gap:1px;
+  min-width:0;
+  padding:0 0 7px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+
+.reader-music-compact-now span{
+  color:#91a6b9;
+  font-size:.58rem;
+  font-weight:800;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+
+.reader-music-compact-now strong{
+  overflow:hidden;
+  color:#f3f7fb;
+  font-size:.72rem;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.reader-music-compact-field{
+  display:grid;
+  gap:4px;
+}
+
+.reader-music-compact-field > span{
+  color:#bdcbd7;
+  font-size:.63rem;
+  font-weight:750;
+}
+
+.reader-music-compact-field select{
+  width:100%;
+  min-height:30px;
+  padding:4px 28px 4px 8px;
+  border:1px solid #344d64;
+  border-radius:7px;
+  background:#18232e;
+  color:#eef5fb;
+  font-size:.68rem;
+  cursor:pointer;
+}
+
+.reader-music-compact-field select:focus{
+  border-color:#5a88ad;
+  outline:none;
+}
+
+.reader-music-compact-field select:disabled{
+  color:#8fa1b0;
+  cursor:default;
+  opacity:.78;
+}
+
+.reader-music-compact-manage{
+  justify-self:start;
+  padding:2px 0;
+  border:0;
+  background:transparent;
+  color:#a9cceb;
+  font-size:.62rem;
+  font-weight:750;
+  cursor:pointer;
+}
+
+.reader-music-compact-manage:hover,
+.reader-music-compact-manage:focus-visible{
+  color:#d8edff;
+  text-decoration:underline;
+  text-underline-offset:2px;
+  outline:none;
+}
+
+/* Retire all older bulky chooser internals if cached styling remains. */
+.reader-wpm-music-head,
+.reader-wpm-music-scroll,
+.reader-wpm-music-foot,
+.reader-wpm-music-now{
+  display:none;
+}
+
+@media(max-width:680px){
+  .music-dock.reader-music-chooser-open{
+    width:min(292px,calc(100vw - 1rem)) !important;
+  }
+}
