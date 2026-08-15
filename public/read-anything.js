@@ -1196,7 +1196,8 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       chapter: 'Whole article · Investor analysis',
       documentId: '',
       startIndex: 0,
-      endIndex: Math.max(1, contextText.split(/\s+/).length)
+      endIndex: Math.max(1, contextText.split(/\s+/).length),
+      syntheticWholeArticle: true
     };
 
     let connected = false;

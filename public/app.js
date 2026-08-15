@@ -9426,14 +9426,27 @@ function openComparisonWorkspace(){
 
 async function runMarkAction(action,question=''){
   const articleContext=window.MSGInvestorArticleContext;
+  const currentSelection=state.markSelection;
+  const hasRealHighlightedPassage=Boolean(
+    currentSelection?.text &&
+    !currentSelection?.syntheticWholeArticle
+  );
+
+  // Scope priority:
+  // 1. A real user highlight always wins and uses the passage-selection route.
+  // 2. Otherwise, an active Analyze conversation uses the complete article.
   const useWholeArticle=Boolean(
     action==='ask' &&
     String(question||'').trim() &&
+    !hasRealHighlightedPassage &&
     articleContext?.articleText &&
     String(articleContext.articleText).trim().length>=40
   );
 
-  const selected=state.markSelection || (useWholeArticle ? articleContext.selection : null);
+  const selected=hasRealHighlightedPassage
+    ? currentSelection
+    : (useWholeArticle ? articleContext.selection : currentSelection);
+
   if(!selected && !useWholeArticle) return;
 
   if(action==='save'){saveMarkInsight({action:'selection'});return;}
@@ -9497,6 +9510,7 @@ async function runMarkAction(action,question=''){
       selection:useWholeArticle ? 'Whole article' : (selected?.text||''),
       startIndex:useWholeArticle ? 0 : (selected?.startIndex||0),
       chapter:useWholeArticle ? 'Whole article · Investor analysis' : (selected?.chapter||''),
+      scope:useWholeArticle ? 'whole-article' : 'highlighted-passage',
       action,
       question,
       result:payload.result,
