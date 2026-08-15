@@ -3,97 +3,30 @@
 (() => {
   const PREFERRED_KEY = 'markSetGoPreferredMusic';
   const BOOK_MUSIC_KEY = 'markSetGoBookMusicV1';
-  const PANEL_OPEN_KEY = 'markSetGoReaderMusicQuickOpen';
 
-  // Mirrors the existing app.js music catalog so this add-on can use the same
-  // existing playMusic() player without modifying app.js or Reader core.
   const QUICK_CHOICES = [
-    {
-      id: 'lofi-study',
-      category: 'Reading moods',
-      title: 'Lofi Study Radio',
-      description: 'Steady instrumental beats for reading and concentration.',
-      type: 'video',
-      youtubeId: 'jfKfPfyJRdk',
-      searchQuery: 'Lofi Girl lofi hip hop radio beats to relax study to'
-    },
-    {
-      id: 'sleepy-lofi',
-      category: 'Reading moods',
-      title: 'Sleepy Lofi',
-      description: 'Slower, softer lofi for calm evening reading.',
-      type: 'video',
-      youtubeId: 'rUxyKA_-grg',
-      searchQuery: 'Lofi Girl beats to sleep chill to'
-    },
-    {
-      id: 'classical-reading',
-      category: 'Reading moods',
-      title: 'Classical Reading',
-      description: 'A long classical playlist for books and study.',
-      type: 'playlist',
-      youtubeId: 'PLe4JMT6isxp-rx1IRUeEo0puoloL2N9NQ'
-    },
-    {
-      id: 'ambient-reading',
-      category: 'Reading moods',
-      title: 'Ambient Reading',
-      description: 'Relaxing ambient instrumentals for concentration.',
-      type: 'playlist',
-      youtubeId: 'OLAK5uy_nCi20x1Eo0ZW2q_cfufw06g2Bvn8a4u-c'
-    },
-    {
-      id: 'deep-focus',
-      category: 'Focus',
-      title: 'Deep Focus',
-      description: 'Low-distraction ambient music for sustained focus.',
-      type: 'playlist',
-      youtubeId: 'PLUrnxvhuvpSU0b2YvM4Gf1V3bHnLAcvBj'
-    },
-    {
-      id: 'rain-focus',
-      category: 'Focus',
-      title: 'Rain & Focus',
-      description: 'Rain and nature sounds for quiet reading.',
-      type: 'playlist',
-      youtubeId: 'OLAK5uy_lN5SVZjZwWb3XM5BIKUreV5wRCD0VLsqQ'
-    },
-    {
-      id: 'anime-lofi',
-      category: 'Lofi',
-      title: 'Anime Lofi',
-      description: 'Relaxed anime-inspired lofi beats.',
-      type: 'playlist',
-      youtubeId: 'PLApjonMF-0Y8uSA_-6ZbX1DIr-muc2nDg'
-    },
-    {
-      id: 'classical-piano',
-      category: 'Classical',
-      title: 'Classical Piano',
-      description: 'Familiar piano and orchestral selections.',
-      type: 'playlist',
-      youtubeId: 'PLgW6PU42e5RLa6NENfz5kusVilq58Cojm'
-    }
+    { id:'lofi-study', category:'Reading moods', title:'Lofi Study Radio', type:'video', youtubeId:'jfKfPfyJRdk' },
+    { id:'sleepy-lofi', category:'Reading moods', title:'Sleepy Lofi', type:'video', youtubeId:'rUxyKA_-grg' },
+    { id:'classical-reading', category:'Reading moods', title:'Classical Reading', type:'playlist', youtubeId:'PLe4JMT6isxp-rx1IRUeEo0puoloL2N9NQ' },
+    { id:'ambient-reading', category:'Reading moods', title:'Ambient Reading', type:'playlist', youtubeId:'OLAK5uy_nCi20x1Eo0ZW2q_cfufw06g2Bvn8a4u-c' },
+    { id:'deep-focus', category:'Focus', title:'Deep Focus', type:'playlist', youtubeId:'PLUrnxvhuvpSU0b2YvM4Gf1V3bHnLAcvBj' },
+    { id:'rain-focus', category:'Focus', title:'Rain & Focus', type:'playlist', youtubeId:'OLAK5uy_lN5SVZjZwWb3XM5BIKUreV5wRCD0VLsqQ' },
+    { id:'anime-lofi', category:'Lofi', title:'Anime Lofi', type:'playlist', youtubeId:'PLApjonMF-0Y8uSA_-6ZbX1DIr-muc2nDg' },
+    { id:'classical-piano', category:'Classical', title:'Classical Piano', type:'playlist', youtubeId:'PLgW6PU42e5RLa6NENfz5kusVilq58Cojm' }
   ];
 
-  let launcher = null;
-  let panel = null;
-  let appObserver = null;
-  let dockObserver = null;
-  let resizeTimer = 0;
+  let chooser = null;
+  let speedButton = null;
 
-  function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }[char]));
-  }
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
 
-  function readerIsVisible() {
-    return Boolean(document.querySelector('#app #reader'));
+  function preferredMusic() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(PREFERRED_KEY) || '[]');
+      return Array.isArray(saved) ? saved.filter((item) => item && item.id && item.title) : [];
+    } catch { return []; }
   }
 
   function currentReaderTitle() {
@@ -101,357 +34,290 @@
       const doc = window.MarkSetGoCurrentReaderDocument?.get?.();
       if (doc?.title) return String(doc.title).trim();
     } catch {}
-
-    return String(
-      document.querySelector('.reader-title-copy h1')?.textContent || ''
-    ).trim();
+    return String(document.querySelector('.reader-title-copy h1')?.textContent || '').trim();
   }
 
-  function musicKeyForTitle(title) {
-    return String(title || '')
-      .trim()
-      .toLocaleLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 120);
+  function musicKey(title) {
+    return String(title || '').trim().toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
   }
 
-  function preferredMusic() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(PREFERRED_KEY) || '[]');
-      return Array.isArray(saved)
-        ? saved.filter((item) => item && item.id && item.title)
-        : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function bookMusicMap() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(BOOK_MUSIC_KEY) || '{}');
-      return saved && typeof saved === 'object' && !Array.isArray(saved)
-        ? saved
-        : {};
-    } catch {
-      return {};
-    }
-  }
-
-  function musicForCurrentReading() {
+  function attachedMusic() {
     const preferred = preferredMusic();
-    const key = musicKeyForTitle(currentReaderTitle());
+    const key = musicKey(currentReaderTitle());
     if (!key) return [];
-
-    const ids = Array.isArray(bookMusicMap()[key]) ? bookMusicMap()[key] : [];
-    return ids.map((id) => preferred.find((item) => item.id === id)).filter(Boolean);
+    try {
+      const map = JSON.parse(localStorage.getItem(BOOK_MUSIC_KEY) || '{}');
+      const ids = Array.isArray(map?.[key]) ? map[key] : [];
+      return ids.map((id) => preferred.find((item) => item.id === id)).filter(Boolean);
+    } catch { return []; }
   }
 
-  function nowPlaying() {
-    const dock = document.querySelector('#music-dock');
-    const iframe = document.querySelector('#music-player');
-    const src = String(iframe?.getAttribute('src') || '').trim();
-    if (!dock || dock.hidden || !src) return null;
-
+  function playerParts() {
     return {
-      title: String(document.querySelector('#music-now-title')?.textContent || 'Music').trim(),
-      source: String(document.querySelector('#music-now-source')?.textContent || '').trim(),
-      minimized: dock.classList.contains('minimized')
+      dock: document.querySelector('#music-dock'),
+      title: document.querySelector('#music-now-title'),
+      source: document.querySelector('#music-now-source'),
+      iframe: document.querySelector('#music-player'),
+      wrap: document.querySelector('#music-player-wrap'),
+      minimize: document.querySelector('#music-minimize'),
+      next: document.querySelector('#music-next')
     };
   }
 
-  function setPanelOpen(open, { persist = true } = {}) {
-    if (!panel || !launcher) return;
-    panel.hidden = !open;
-    launcher.setAttribute('aria-expanded', open ? 'true' : 'false');
-    launcher.classList.toggle('is-open', open);
-    if (persist) {
-      try { localStorage.setItem(PANEL_OPEN_KEY, open ? '1' : '0'); } catch {}
+  function hasPlayback() {
+    const { dock, iframe } = playerParts();
+    return Boolean(dock && !dock.hidden && String(iframe?.getAttribute('src') || '').trim());
+  }
+
+  function youtubeEmbed(choice) {
+    return choice.type === 'playlist'
+      ? `https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(choice.youtubeId)}&playsinline=1&rel=0`
+      : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(choice.youtubeId)}?playsinline=1&rel=0`;
+  }
+
+  function closeChooser({ keepDock = false } = {}) {
+    const parts = playerParts();
+    if (chooser) chooser.hidden = true;
+    parts.dock?.classList.remove('reader-music-chooser-open');
+    speedButton?.setAttribute('aria-expanded', 'false');
+    if (!keepDock && parts.dock && !hasPlayback()) parts.dock.hidden = true;
+  }
+
+  function playInDock({ title, source, provider = '', src }) {
+    const parts = playerParts();
+    if (!parts.dock || !parts.iframe || !src) return;
+
+    if (parts.title) parts.title.textContent = title || 'Music';
+    if (parts.source) parts.source.textContent = source || 'Reading music';
+    parts.iframe.src = src;
+    parts.dock.hidden = false;
+    parts.dock.classList.remove('minimized');
+    if (parts.wrap) parts.wrap.hidden = false;
+    if (parts.minimize) {
+      parts.minimize.hidden = false;
+      parts.minimize.textContent = '—';
+      parts.minimize.setAttribute('aria-label', 'Minimize music player');
     }
-    if (open) renderPanel();
-    updateDockOffset();
+    if (parts.next) parts.next.hidden = true;
+
+    try {
+      localStorage.setItem('markSetGoMusic', JSON.stringify({
+        title: title || 'Music', source: source || 'Reading music', provider, src
+      }));
+    } catch {}
+
+    closeChooser({ keepDock: true });
   }
 
-  function savedPanelPreference() {
-    try { return localStorage.getItem(PANEL_OPEN_KEY) === '1'; }
-    catch { return false; }
-  }
-
-  function createUi() {
-    if (launcher && panel) return;
-
-    launcher = document.createElement('button');
-    launcher.id = 'reader-music-quick-toggle';
-    launcher.className = 'reader-music-quick-toggle';
-    launcher.type = 'button';
-    launcher.hidden = true;
-    launcher.setAttribute('aria-label', 'Open reading music');
-    launcher.setAttribute('aria-controls', 'reader-music-quick-panel');
-    launcher.setAttribute('aria-expanded', 'false');
-    launcher.innerHTML = '<span aria-hidden="true">♫</span>';
-
-    panel = document.createElement('aside');
-    panel.id = 'reader-music-quick-panel';
-    panel.className = 'reader-music-quick-panel';
-    panel.hidden = true;
-    panel.setAttribute('aria-label', 'Reading music');
-
-    launcher.addEventListener('click', () => {
-      setPanelOpen(panel.hidden);
-    });
-
-    document.body.append(panel, launcher);
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && panel && !panel.hidden) {
-        setPanelOpen(false);
-        launcher?.focus();
-      }
+  function playQuick(choice) {
+    if (!choice) return;
+    playInDock({
+      title: choice.title,
+      source: choice.category,
+      provider: 'youtube',
+      src: youtubeEmbed(choice)
     });
   }
 
-  function itemButton(item, action, meta = '') {
-    return `
-      <button class="reader-music-quick-item" type="button"
-        data-reader-music-action="${escapeHtml(action)}"
-        data-reader-music-id="${escapeHtml(item.id)}">
-        <span class="reader-music-quick-item-icon" aria-hidden="true">▶</span>
-        <span class="reader-music-quick-item-copy">
-          <strong>${escapeHtml(item.title)}</strong>
-          <small>${escapeHtml(meta || item.source || item.category || '')}</small>
-        </span>
-      </button>`;
+  function playPreferred(item) {
+    if (!item) return;
+    if (item.choiceId) {
+      const choice = QUICK_CHOICES.find((candidate) => candidate.id === item.choiceId);
+      if (choice) return playQuick(choice);
+    }
+    if (item.src) {
+      playInDock({
+        title: item.title,
+        source: item.source || 'Saved music',
+        provider: item.provider || '',
+        src: item.src
+      });
+    }
   }
 
-  function renderPanel() {
-    if (!panel) return;
+  function ensureChooser() {
+    const parts = playerParts();
+    if (!parts.dock) return null;
 
-    const attached = musicForCurrentReading();
+    chooser = document.querySelector('#reader-music-wpm-chooser');
+    if (!chooser) {
+      chooser = document.createElement('div');
+      chooser.id = 'reader-music-wpm-chooser';
+      chooser.className = 'reader-wpm-music-chooser';
+      chooser.hidden = true;
+
+      const bar = parts.dock.querySelector('.music-dock-bar');
+      if (bar?.nextSibling) parts.dock.insertBefore(chooser, bar.nextSibling);
+      else parts.dock.appendChild(chooser);
+    }
+    return chooser;
+  }
+
+  function renderChooser() {
+    if (!chooser) return;
+    const attached = attachedMusic();
     const preferred = preferredMusic();
-    const playing = nowPlaying();
 
-    panel.innerHTML = `
-      <div class="reader-music-quick-header">
-        <div>
-          <span class="reader-music-quick-kicker">Reader</span>
-          <strong>Reading Music</strong>
-        </div>
-        <button class="reader-music-quick-close" type="button"
-          data-reader-music-close aria-label="Close Reading Music">×</button>
+    chooser.innerHTML = `
+      <div class="reader-wpm-music-head">
+        <div><span>Reader</span><strong>Reading Music</strong></div>
+        <button type="button" data-wpm-music-close aria-label="Close music choices">×</button>
       </div>
 
-      ${playing ? `
-        <section class="reader-music-now" aria-label="Now playing">
+      ${hasPlayback() ? `
+        <div class="reader-wpm-music-now">
           <span>Now playing</span>
-          <strong>${escapeHtml(playing.title)}</strong>
-          <small>${escapeHtml(playing.source)}</small>
-          <button type="button" class="reader-music-player-control"
-            data-reader-music-player>
-            ${playing.minimized ? 'Show player' : 'Minimize player'}
-          </button>
-        </section>` : ''}
+          <strong>${esc(document.querySelector('#music-now-title')?.textContent || 'Music')}</strong>
+          <small>${esc(document.querySelector('#music-now-source')?.textContent || '')}</small>
+        </div>` : ''}
 
-      <div class="reader-music-quick-scroll">
-        <section class="reader-music-quick-section">
-          <div class="reader-music-quick-section-title">
-            <strong>For this reading</strong>
-            <span>${attached.length}</span>
-          </div>
-          ${attached.length
-            ? `<div class="reader-music-quick-list">${
-                attached.map((item) => itemButton(item, 'preferred', item.source || 'Saved for this reading')).join('')
-              }</div>`
-            : `<p class="reader-music-quick-empty">No music has been attached to this reading yet.</p>`}
-        </section>
+      <div class="reader-wpm-music-scroll">
+        ${attached.length ? `
+          <section>
+            <div class="reader-wpm-music-section-title"><strong>For this reading</strong><span>${attached.length}</span></div>
+            <div class="reader-wpm-music-list">
+              ${attached.map((item) => `
+                <button type="button" data-wpm-music-preferred="${esc(item.id)}">
+                  <span aria-hidden="true">▶</span>
+                  <span><strong>${esc(item.title)}</strong><small>${esc(item.source || 'Saved for this reading')}</small></span>
+                </button>`).join('')}
+            </div>
+          </section>` : ''}
 
-        <section class="reader-music-quick-section">
-          <div class="reader-music-quick-section-title">
-            <strong>Saved music</strong>
-            <span>${preferred.length}</span>
-          </div>
-          ${preferred.length
-            ? `<div class="reader-music-quick-list">${
-                preferred.slice(0, 8).map((item) => itemButton(item, 'preferred', item.source || 'Preferred music')).join('')
-              }</div>`
-            : `<p class="reader-music-quick-empty">Your saved music will appear here.</p>`}
-        </section>
+        ${preferred.length ? `
+          <section>
+            <div class="reader-wpm-music-section-title"><strong>Saved music</strong><span>${preferred.length}</span></div>
+            <div class="reader-wpm-music-list">
+              ${preferred.slice(0, 10).map((item) => `
+                <button type="button" data-wpm-music-preferred="${esc(item.id)}">
+                  <span aria-hidden="true">▶</span>
+                  <span><strong>${esc(item.title)}</strong><small>${esc(item.source || 'Preferred music')}</small></span>
+                </button>`).join('')}
+            </div>
+          </section>` : ''}
 
-        <section class="reader-music-quick-section">
-          <div class="reader-music-quick-section-title">
-            <strong>Quick focus</strong>
-          </div>
-          <div class="reader-music-quick-chips">
+        <section>
+          <div class="reader-wpm-music-section-title"><strong>Quick focus</strong></div>
+          <div class="reader-wpm-music-chips">
             ${QUICK_CHOICES.map((item) => `
-              <button type="button"
-                data-reader-music-action="quick"
-                data-reader-music-id="${escapeHtml(item.id)}">
-                ${escapeHtml(item.title)}
-              </button>`).join('')}
+              <button type="button" data-wpm-music-quick="${esc(item.id)}">${esc(item.title)}</button>
+            `).join('')}
           </div>
         </section>
       </div>
 
-      <div class="reader-music-quick-footer">
-        <button type="button" class="reader-music-library-link"
-          data-reader-music-library>Manage Music &amp; Focus</button>
+      <div class="reader-wpm-music-foot">
+        <button type="button" data-wpm-music-manage>Manage Music &amp; Focus</button>
       </div>`;
 
-    panel.querySelector('[data-reader-music-close]')?.addEventListener('click', () => {
-      setPanelOpen(false);
-      launcher?.focus();
-    });
+    chooser.querySelector('[data-wpm-music-close]')?.addEventListener('click', () => closeChooser());
 
-    panel.querySelectorAll('[data-reader-music-action]').forEach((button) => {
+    chooser.querySelectorAll('[data-wpm-music-quick]').forEach((button) => {
       button.addEventListener('click', () => {
-        const id = button.dataset.readerMusicId;
-        const action = button.dataset.readerMusicAction;
-
-        if (action === 'quick') {
-          const choice = QUICK_CHOICES.find((item) => item.id === id);
-          if (choice && typeof window.playMusic === 'function') {
-            window.playMusic(choice);
-          }
-        } else if (action === 'preferred') {
-          if (typeof window.playPreferredMusic === 'function') {
-            window.playPreferredMusic(id);
-          } else {
-            const item = preferredMusic().find((candidate) => candidate.id === id);
-            if (item?.choiceId) {
-              const choice = QUICK_CHOICES.find((candidate) => candidate.id === item.choiceId);
-              if (choice && typeof window.playMusic === 'function') window.playMusic(choice);
-            } else if (item?.src && typeof window.playMusic === 'function') {
-              window.playMusic({
-                title: item.title,
-                source: item.source || 'Preferred music',
-                provider: item.provider,
-                src: item.src
-              });
-            }
-          }
-        }
-
-        // Playback uses the existing dock. Keep the quick selector available,
-        // but close its list so it never covers the player.
-        setPanelOpen(false);
-        window.setTimeout(updateDockOffset, 0);
-        window.setTimeout(updateDockOffset, 80);
+        playQuick(QUICK_CHOICES.find((item) => item.id === button.dataset.wpmMusicQuick));
       });
     });
 
-    panel.querySelector('[data-reader-music-player]')?.addEventListener('click', () => {
-      const dock = document.querySelector('#music-dock');
-      const minimize = document.querySelector('#music-minimize');
-      if (!dock || dock.hidden || !minimize) return;
-      minimize.click();
-      window.setTimeout(() => {
-        renderPanel();
-        updateDockOffset();
-      }, 0);
+    chooser.querySelectorAll('[data-wpm-music-preferred]').forEach((button) => {
+      button.addEventListener('click', () => {
+        playPreferred(preferredMusic().find((item) => item.id === button.dataset.wpmMusicPreferred));
+      });
     });
 
-    panel.querySelector('[data-reader-music-library]')?.addEventListener('click', () => {
-      setPanelOpen(false);
-      if (typeof window.renderMusicLibrary === 'function') {
-        window.renderMusicLibrary();
-        return;
-      }
+    chooser.querySelector('[data-wpm-music-manage]')?.addEventListener('click', () => {
+      closeChooser();
       document.querySelector('[data-action="music"]')?.click();
     });
   }
 
-  function updateDockOffset() {
-    if (!launcher || !panel) return;
+  function openChooser() {
+    const parts = playerParts();
+    if (!parts.dock) return;
 
-    const dock = document.querySelector('#music-dock');
-    let offset = 16;
+    ensureChooser();
+    chooser.hidden = false;
+    parts.dock.hidden = false;
+    parts.dock.classList.add('reader-music-chooser-open');
 
-    if (dock && !dock.hidden) {
-      const rect = dock.getBoundingClientRect();
-      if (rect.height > 0) offset += rect.height + 12;
+    if (!hasPlayback()) {
+      if (parts.wrap) parts.wrap.hidden = true;
+      if (parts.minimize) parts.minimize.hidden = true;
+      if (parts.title) parts.title.textContent = 'Reading Music';
+      if (parts.source) parts.source.textContent = 'Choose a playlist';
     }
 
-    launcher.style.setProperty('--reader-music-bottom', `${offset}px`);
-    panel.style.setProperty('--reader-music-bottom', `${offset + 58}px`);
+    speedButton?.setAttribute('aria-expanded', 'true');
+    renderChooser();
   }
 
-  function syncReaderState() {
-    createUi();
-
-    const visible = readerIsVisible();
-    launcher.hidden = !visible;
-
-    if (!visible) {
-      panel.hidden = true;
-      launcher.setAttribute('aria-expanded', 'false');
-      launcher.classList.remove('is-open');
+  function insertButtonBelowWpm() {
+    const speed = document.querySelector('#app #speed');
+    const control = speed?.closest('.control');
+    if (!control) {
+      speedButton = null;
       return;
     }
 
-    updateDockOffset();
+    let button = control.querySelector('[data-reader-wpm-music-toggle]');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'reader-wpm-music-toggle';
+      button.dataset.readerWpmMusicToggle = '1';
+      button.setAttribute('aria-label', 'Open reading music');
+      button.setAttribute('aria-controls', 'reader-music-wpm-chooser');
+      button.setAttribute('aria-expanded', 'false');
+      button.title = 'Reading music';
+      button.innerHTML = '<span aria-hidden="true">♫</span>';
 
-    if (savedPanelPreference() && panel.hidden) {
-      setPanelOpen(true, { persist: false });
-    } else if (!panel.hidden) {
-      renderPanel();
+      const suffix = control.querySelector('.input-suffix');
+      if (suffix) suffix.insertAdjacentElement('afterend', button);
+      else control.appendChild(button);
+
+      button.addEventListener('click', () => {
+        ensureChooser();
+        if (chooser && !chooser.hidden) closeChooser();
+        else openChooser();
+      });
     }
+    speedButton = button;
   }
 
-  function observeDock() {
-    const dock = document.querySelector('#music-dock');
-    if (!dock || dock.dataset.readerMusicQuickObserved === '1') return;
-
-    dock.dataset.readerMusicQuickObserved = '1';
-    dockObserver = new MutationObserver(() => {
-      window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(() => {
-        updateDockOffset();
-        if (panel && !panel.hidden) renderPanel();
-      }, 0);
-    });
-    dockObserver.observe(dock, {
-      attributes: true,
-      attributeFilter: ['class', 'hidden']
-    });
+  function sync() {
+    if (!document.querySelector('#app #reader')) {
+      speedButton = null;
+      closeChooser();
+      return;
+    }
+    ensureChooser();
+    insertButtonBelowWpm();
   }
 
   function init() {
-    createUi();
+    document.querySelectorAll(
+      'body > .reader-music-quick-toggle, body > .reader-music-quick-panel'
+    ).forEach((node) => node.remove());
+
+    ensureChooser();
+    sync();
 
     const app = document.querySelector('#app');
     if (app) {
-      appObserver = new MutationObserver(syncReaderState);
-      appObserver.observe(app, { childList: true, subtree: true });
+      new MutationObserver(() => window.setTimeout(sync, 0))
+        .observe(app, { childList:true, subtree:true });
     }
 
-    observeDock();
-    syncReaderState();
-
-    document.addEventListener('marksetgo:document-available', () => {
-      window.setTimeout(syncReaderState, 0);
-    });
-
-    window.addEventListener('resize', updateDockOffset);
-    window.addEventListener('storage', (event) => {
-      if ([PREFERRED_KEY, BOOK_MUSIC_KEY, 'markSetGoMusic'].includes(event.key)) {
-        if (panel && !panel.hidden) renderPanel();
-        updateDockOffset();
-      }
-    });
+    document.addEventListener('marksetgo:document-available', () => window.setTimeout(sync, 0));
 
     document.querySelector('#music-close')?.addEventListener('click', () => {
-      window.setTimeout(() => {
-        updateDockOffset();
-        if (panel && !panel.hidden) renderPanel();
-      }, 0);
-    });
-
-    document.querySelector('#music-minimize')?.addEventListener('click', () => {
-      window.setTimeout(updateDockOffset, 0);
+      if (chooser) chooser.hidden = true;
+      speedButton?.setAttribute('aria-expanded', 'false');
     });
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init, { once: true });
+    document.addEventListener('DOMContentLoaded', init, { once:true });
   } else {
     init();
   }

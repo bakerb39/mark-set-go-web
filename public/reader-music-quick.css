@@ -1,258 +1,122 @@
 
-/* Reader Quick Music — additive access to the existing Music & Focus player. */
-
-.reader-music-quick-toggle{
-  --reader-music-bottom:16px;
-  position:fixed;
-  right:18px;
-  bottom:var(--reader-music-bottom);
-  z-index:10001;
-  width:46px;
-  height:46px;
-  padding:0;
-  border:1px solid rgba(23,63,109,.24);
-  border-radius:50%;
-  display:grid;
+/* Reader Music v1.1.0 — small launcher directly below Speed/WPM. */
+.reader-wpm-music-toggle{
+  justify-self:start;
+  width:28px !important;
+  min-width:28px !important;
+  height:28px;
+  min-height:28px;
+  margin-top:4px !important;
+  padding:0 !important;
+  display:grid !important;
   place-items:center;
-  background:#173f6d;
-  color:#fff;
-  box-shadow:0 10px 28px rgba(18,47,78,.24);
-  cursor:pointer;
-  transition:transform .16s ease, box-shadow .16s ease, background .16s ease, bottom .18s ease
+  border:1px solid rgba(42,92,135,.22);
+  border-radius:7px;
+  background:#f7fafc;
+  color:#245f91;
+  box-shadow:none;
+  cursor:pointer
 }
-.reader-music-quick-toggle[hidden]{display:none !important}
-.reader-music-quick-toggle:hover,
-.reader-music-quick-toggle:focus-visible{
-  transform:translateY(-1px);
-  box-shadow:0 13px 34px rgba(18,47,78,.3);
+.reader-wpm-music-toggle span{font-size:.95rem;line-height:1}
+.reader-wpm-music-toggle:hover,
+.reader-wpm-music-toggle:focus-visible,
+.reader-wpm-music-toggle[aria-expanded="true"]{
+  border-color:rgba(36,95,145,.42);
+  background:#eaf3fa;
   outline:none
 }
-.reader-music-quick-toggle.is-open{background:#245f91}
-.reader-music-quick-toggle span{
-  font-size:1.3rem;
-  line-height:1;
-  transform:translateY(-1px)
-}
 
-.reader-music-quick-panel{
-  --reader-music-bottom:74px;
-  position:fixed;
-  right:18px;
-  bottom:var(--reader-music-bottom);
-  z-index:10002;
-  width:min(350px,calc(100vw - 36px));
-  max-height:min(610px,72vh);
-  border:1px solid rgba(23,63,109,.18);
-  border-radius:15px;
-  overflow:hidden;
-  background:#fff;
-  color:#17324d;
-  box-shadow:0 18px 52px rgba(20,45,70,.24);
-  transition:bottom .18s ease
+.reader-wpm-music-chooser{
+  border-top:1px solid rgba(255,255,255,.12);
+  background:#111820;
+  color:#eef5fb
 }
-.reader-music-quick-panel[hidden]{display:none !important}
+.reader-wpm-music-chooser[hidden]{display:none !important}
 
-.reader-music-quick-header{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-  padding:13px 14px 11px;
-  border-bottom:1px solid rgba(80,101,122,.13);
-  background:#f8fbfe
+.reader-wpm-music-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 11px 8px
 }
-.reader-music-quick-header > div{display:grid;gap:1px}
-.reader-music-quick-kicker{
-  color:#718397;
-  font-size:.65rem;
-  font-weight:800;
-  letter-spacing:.11em;
-  text-transform:uppercase
+.reader-wpm-music-head > div{display:grid;gap:1px;min-width:0}
+.reader-wpm-music-head > div > span{
+  color:#9dafbe;font-size:.61rem;font-weight:800;letter-spacing:.11em;text-transform:uppercase
 }
-.reader-music-quick-header strong{font-size:.98rem;color:#173f6d}
-.reader-music-quick-close{
-  width:30px;
-  height:30px;
-  border:0;
-  border-radius:8px;
-  background:transparent;
-  color:#496177;
-  font-size:1.18rem;
-  cursor:pointer
+.reader-wpm-music-head strong{color:#fff;font-size:.88rem}
+.reader-wpm-music-head > button{
+  width:28px;height:28px;padding:0;border:0;border-radius:7px;
+  background:#273443;color:#fff;font-size:1rem;cursor:pointer
 }
-.reader-music-quick-close:hover{background:#edf3f8}
+.reader-wpm-music-now{
+  display:grid;gap:1px;padding:8px 11px;
+  border-top:1px solid rgba(255,255,255,.08);
+  border-bottom:1px solid rgba(255,255,255,.08);
+  background:#17212c
+}
+.reader-wpm-music-now > span{
+  color:#91a6b9;font-size:.61rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase
+}
+.reader-wpm-music-now strong,.reader-wpm-music-now small{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+}
+.reader-wpm-music-now strong{font-size:.79rem}
+.reader-wpm-music-now small{color:#a5b5c2;font-size:.66rem}
 
-.reader-music-now{
-  display:grid;
-  grid-template-columns:minmax(0,1fr) auto;
-  gap:2px 10px;
-  align-items:center;
-  padding:10px 14px;
-  border-bottom:1px solid rgba(80,101,122,.12);
-  background:#f2f7fb
-}
-.reader-music-now > span{
-  grid-column:1;
-  color:#758799;
-  font-size:.66rem;
-  font-weight:800;
-  letter-spacing:.08em;
-  text-transform:uppercase
-}
-.reader-music-now > strong{
-  grid-column:1;
-  overflow:hidden;
-  color:#173f6d;
-  font-size:.86rem;
-  text-overflow:ellipsis;
-  white-space:nowrap
-}
-.reader-music-now > small{
-  grid-column:1;
-  color:#718397;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap
-}
-.reader-music-player-control{
-  grid-column:2;
-  grid-row:1 / span 3;
-  align-self:center;
-  padding:6px 8px;
-  border:1px solid rgba(36,95,145,.2);
-  border-radius:8px;
-  background:#fff;
-  color:#245f91;
-  font-size:.72rem;
-  font-weight:700;
-  cursor:pointer
-}
-
-.reader-music-quick-scroll{
-  max-height:min(460px,55vh);
+.reader-wpm-music-scroll{
+  max-height:min(360px,48vh);
   overflow:auto;
   overscroll-behavior:contain
 }
-.reader-music-quick-section{
-  padding:12px 13px;
-  border-bottom:1px solid rgba(80,101,122,.1)
+.reader-wpm-music-scroll section{
+  padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.07)
 }
-.reader-music-quick-section:last-child{border-bottom:0}
-.reader-music-quick-section-title{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:8px;
-  margin-bottom:8px
+.reader-wpm-music-scroll section:last-child{border-bottom:0}
+.reader-wpm-music-section-title{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px
 }
-.reader-music-quick-section-title strong{
-  color:#324e69;
-  font-size:.78rem;
-  letter-spacing:.01em
+.reader-wpm-music-section-title strong{color:#cbd7e2;font-size:.7rem}
+.reader-wpm-music-section-title span{color:#90a5b8;font-size:.62rem}
+.reader-wpm-music-list{display:grid;gap:4px}
+.reader-wpm-music-list > button{
+  width:100%;display:grid;grid-template-columns:22px minmax(0,1fr);
+  align-items:center;gap:7px;padding:6px 7px;border:1px solid transparent;
+  border-radius:8px;background:#18232e;color:#edf5fb;text-align:left;cursor:pointer
 }
-.reader-music-quick-section-title span{
-  min-width:22px;
-  padding:2px 6px;
-  border-radius:999px;
-  background:#edf3f8;
-  color:#667b8e;
-  font-size:.66rem;
-  text-align:center
+.reader-wpm-music-list > button:hover,
+.reader-wpm-music-list > button:focus-visible{
+  border-color:#3c668a;background:#1e2e3d;outline:none
 }
-.reader-music-quick-list{display:grid;gap:5px}
-.reader-music-quick-item{
-  width:100%;
-  display:grid;
-  grid-template-columns:25px minmax(0,1fr);
-  gap:8px;
-  align-items:center;
-  padding:7px 8px;
-  border:1px solid transparent;
-  border-radius:9px;
-  background:#f7fafc;
-  color:#17324d;
-  text-align:left;
-  cursor:pointer
+.reader-wpm-music-list > button > span:first-child{
+  display:grid;place-items:center;width:22px;height:22px;border-radius:50%;
+  background:#245f91;font-size:.58rem
 }
-.reader-music-quick-item:hover,
-.reader-music-quick-item:focus-visible{
-  border-color:rgba(36,95,145,.2);
-  background:#eef5fb;
-  outline:none
+.reader-wpm-music-list > button > span:last-child{display:grid;min-width:0;gap:1px}
+.reader-wpm-music-list strong,.reader-wpm-music-list small{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap
 }
-.reader-music-quick-item-icon{
-  display:grid;
-  place-items:center;
-  width:25px;
-  height:25px;
-  border-radius:50%;
-  background:#173f6d;
-  color:#fff;
-  font-size:.64rem
+.reader-wpm-music-list strong{font-size:.72rem}
+.reader-wpm-music-list small{color:#9fb1c0;font-size:.61rem}
+.reader-wpm-music-chips{display:flex;flex-wrap:wrap;gap:5px}
+.reader-wpm-music-chips button{
+  padding:5px 7px;border:1px solid #344d64;border-radius:999px;
+  background:#18232e;color:#dce9f3;font-size:.64rem;font-weight:700;cursor:pointer
 }
-.reader-music-quick-item-copy{
-  display:grid;
-  min-width:0;
-  gap:1px
+.reader-wpm-music-chips button:hover,
+.reader-wpm-music-chips button:focus-visible{
+  border-color:#4d7ba1;background:#203344;outline:none
 }
-.reader-music-quick-item-copy strong,
-.reader-music-quick-item-copy small{
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap
+.reader-wpm-music-foot{
+  padding:8px 10px 9px;border-top:1px solid rgba(255,255,255,.09)
 }
-.reader-music-quick-item-copy strong{font-size:.79rem}
-.reader-music-quick-item-copy small{color:#718397;font-size:.67rem}
-.reader-music-quick-empty{
-  margin:0;
-  color:#7a8b9b;
-  font-size:.72rem;
-  line-height:1.45
+.reader-wpm-music-foot button{
+  width:100%;padding:6px 8px;border:0;background:transparent;
+  color:#a9cceb;font-size:.66rem;font-weight:800;cursor:pointer
 }
-
-.reader-music-quick-chips{
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px
+.reader-wpm-music-foot button:hover{
+  color:#d6ebfc;text-decoration:underline;text-underline-offset:2px
 }
-.reader-music-quick-chips button{
-  padding:6px 9px;
-  border:1px solid rgba(36,95,145,.18);
-  border-radius:999px;
-  background:#fff;
-  color:#245f91;
-  font-size:.71rem;
-  font-weight:700;
-  cursor:pointer
+.music-dock.reader-music-chooser-open{
+  width:min(360px,calc(100vw - 2rem))
 }
-.reader-music-quick-chips button:hover,
-.reader-music-quick-chips button:focus-visible{
-  background:#eef6fd;
-  outline:none
-}
-
-.reader-music-quick-footer{
-  padding:10px 13px;
-  border-top:1px solid rgba(80,101,122,.12);
-  background:#fafcfe
-}
-.reader-music-library-link{
-  width:100%;
-  padding:7px 10px;
-  border:0;
-  background:transparent;
-  color:#245f91;
-  font-size:.74rem;
-  font-weight:800;
-  cursor:pointer
-}
-.reader-music-library-link:hover{text-decoration:underline;text-underline-offset:2px}
-
 @media(max-width:680px){
-  .reader-music-quick-toggle{right:10px}
-  .reader-music-quick-panel{
-    right:10px;
-    width:min(350px,calc(100vw - 20px));
-    max-height:68vh
-  }
+  .music-dock.reader-music-chooser-open{width:calc(100vw - 1rem)}
 }
