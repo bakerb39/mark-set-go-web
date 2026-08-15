@@ -369,6 +369,13 @@
 
     document.addEventListener('marksetgo:document-available', () => window.setTimeout(sync, 0));
 
+    // Same-tab localStorage writes do not fire a storage event. The delegated
+    // Music-page saver dispatches this event after a verified save so an open
+    // Reader playlist menu can refresh immediately.
+    document.addEventListener('marksetgo:preferred-music-changed', () => {
+      if (chooser && !chooser.hidden) renderChooser();
+    });
+
     document.querySelector('#music-close')?.addEventListener('click', () => {
       if (chooser) chooser.hidden = true;
       speedButton?.setAttribute('aria-expanded', 'false');
