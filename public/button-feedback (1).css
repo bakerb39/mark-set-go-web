@@ -1,0 +1,55 @@
+/* v8.6.7 — consistent click and tap feedback without changing button identities. */
+button,
+[role="button"],
+a.button-link,
+label.read-anything-file-button {
+  transition: transform 80ms ease, filter 80ms ease, box-shadow 80ms ease, opacity 80ms ease;
+  -webkit-tap-highlight-color: rgba(49, 150, 88, .18);
+}
+
+button:not(:disabled):active,
+button.msg-button-pressed,
+[role="button"]:not([aria-disabled="true"]):active,
+[role="button"].msg-button-pressed,
+a.button-link:active,
+a.button-link.msg-button-pressed,
+label.read-anything-file-button:active,
+label.read-anything-file-button.msg-button-pressed {
+  transform: translateY(1px) scale(.985);
+  filter: brightness(.84) saturate(.88);
+  box-shadow: inset 0 2px 5px rgba(15, 23, 42, .24);
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button,
+  [role="button"],
+  a.button-link,
+  label.read-anything-file-button {
+    transition: none;
+  }
+}
+
+/* Reader top-right controls:
+   music above Full screen, with matching right edge and comfortable spacing. */
+#app .reader-topright-music-toggle {
+  position: absolute !important;
+  top: .65rem !important;
+  right: .65rem !important;
+  bottom: auto !important;
+  left: auto !important;
+  margin: 0 !important;
+  z-index: 7 !important;
+}
+
+#app .viewer-fullscreen-button {
+  top: 3.65rem !important;
+  right: .65rem !important;
+  bottom: auto !important;
+  left: auto !important;
+}
