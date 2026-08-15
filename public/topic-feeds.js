@@ -875,6 +875,65 @@
     return Boolean(window.MSGTopicFeedReaderContext);
   }
 
+  let topicBookPageGeometryTimer = 0;
+
+  function scheduleTopicBookPageGeometrySync() {
+    window.clearTimeout(topicBookPageGeometryTimer);
+
+    const attempt = (number = 0) => {
+      if (!isTopicFeedReaderActive()) return;
+
+      const layout = document.querySelector('#reader-layout');
+      const pane = document.querySelector('#navigation-pane');
+      const reader = document.querySelector('#reader');
+
+      if (!layout || !pane || !reader) return;
+
+      // Wait until My Topics is actually open and Book Pages has been restored.
+      // The first Reader render can reach this point before the saved Book Pages
+      // preference has finished applying.
+      const paneIsOpen = !layout.classList.contains('navigation-hidden');
+      const bookPagesActive = reader.classList.contains('book-pages-layout');
+
+      if (!paneIsOpen || !bookPagesActive) {
+        if (number < 7) {
+          topicBookPageGeometryTimer = window.setTimeout(
+            () => attempt(number + 1),
+            90 + (number * 55)
+          );
+        }
+        return;
+      }
+
+      const readerWidth = Math.round(reader.getBoundingClientRect().width || 0);
+      const paneWidth = Math.round(pane.getBoundingClientRect().width || 0);
+      const signature = `${readerWidth}:${paneWidth}`;
+
+      // One sync per final geometry for this Reader DOM.
+      if (reader.dataset.topicFeedGeometrySynced === signature) return;
+      reader.dataset.topicFeedGeometrySynced = signature;
+
+      // app.js already has the correct Book Pages reflow logic and a
+      // ResizeObserver on #reader. A temporary 4px navigation-width nudge makes
+      // that existing observer see the final panel geometry after state.bookPages
+      // is active. The property is restored immediately on the next frame.
+      const previousInline = layout.style.getPropertyValue('--navigation-width');
+      const computedPaneWidth = Math.max(260, paneWidth || 300);
+
+      layout.style.setProperty('--navigation-width', `${computedPaneWidth + 4}px`);
+      window.requestAnimationFrame(() => {
+        if (previousInline) {
+          layout.style.setProperty('--navigation-width', previousInline);
+        } else {
+          layout.style.removeProperty('--navigation-width');
+        }
+        window.dispatchEvent(new Event('resize'));
+      });
+    };
+
+    topicBookPageGeometryTimer = window.setTimeout(() => attempt(0), 70);
+  }
+
   function applyTopicReaderPanePreference() {
     if (!isTopicFeedReaderActive()) return;
 
@@ -884,16 +943,20 @@
 
     const shouldOpen = topicReaderPaneShouldBeOpen();
     const isOpen = !layout.classList.contains('navigation-hidden');
-    if (shouldOpen === isOpen) return;
+
+    if (shouldOpen === isOpen) {
+      if (shouldOpen) scheduleTopicBookPageGeometrySync();
+      return;
+    }
 
     applyingTopicReaderPanePreference = true;
     try {
-      // Let the Reader's own layout code perform the actual open/close so
-      // Book Pages and the center reading column reflow exactly as before.
+      // Let the Reader's own layout code perform the actual open/close.
       toggle.click();
     } finally {
       window.setTimeout(() => {
         applyingTopicReaderPanePreference = false;
+        if (topicReaderPaneShouldBeOpen()) scheduleTopicBookPageGeometrySync();
       }, 0);
     }
   }
@@ -911,14 +974,22 @@
       window.setTimeout(() => {
         const layout = document.querySelector('#reader-layout');
         if (!layout || !isTopicFeedReaderActive()) return;
-        saveTopicReaderPanePreference(!layout.classList.contains('navigation-hidden'));
+        const open = !layout.classList.contains('navigation-hidden');
+        saveTopicReaderPanePreference(open);
+        if (open) scheduleTopicBookPageGeometrySync();
       }, 0);
     });
   }
 
   function readerTopicListMarkup() {
     return `<div class="topic-reader-nav">
-      <div class="topic-reader-nav-head"><h2>My Topics</h2><button type="button" data-reader-manage-topics>Manage</button></div>
+      <div class="topic-reader-nav-head">
+        <h2>My Topics</h2>
+        <div class="topic-reader-nav-actions">
+          <span data-reader-bookmark-slot></span>
+          <button type="button" data-reader-manage-topics>Manage</button>
+        </div>
+      </div>
       ${state.topics.length ? state.topics.map((topic) => `
         <details class="topic-reader-group" ${topic.id === window.MSGTopicFeedReaderContext?.topicId ? 'open' : ''}>
           <summary><strong>${escapeHtml(topic.name)}</strong><span>${(topic.articles || []).filter((a) => !a.read).length} unread</span></summary>
@@ -973,7 +1044,23 @@
 
     bindTopicReaderPanePreference();
 
-    if (!view.querySelector('.topic-reader-nav')) view.innerHTML = readerTopicListMarkup();
+    if (!view.querySelector('.topic-reader-nav')) {
+      // IMPORTANT: renderNavigationPane() has already bound the Reader's
+      // #add-bookmark button to its native addBookmark() function. Keep that
+      // exact DOM node before replacing Contents so bookmarks continue to use
+      // the established Reader implementation.
+      const nativeBookmarkButton = view.querySelector('#add-bookmark');
+
+      view.innerHTML = readerTopicListMarkup();
+
+      const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
+      if (nativeBookmarkButton && bookmarkSlot) {
+        nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
+        nativeBookmarkButton.textContent = '＋ Bookmark';
+        nativeBookmarkButton.title = 'Bookmark the current reading position';
+        bookmarkSlot.replaceChildren(nativeBookmarkButton);
+      }
+    }
 
     view.querySelector('[data-reader-manage-topics]')?.addEventListener('click', () => {
       render();
@@ -1008,6 +1095,7 @@
     // app.js starts Reader side panes closed when a Reader view is rebuilt.
     // Topic Feed articles restore the reader's explicit My Topics preference.
     window.setTimeout(applyTopicReaderPanePreference, 0);
+    scheduleTopicBookPageGeometrySync();
   }
 
   function scheduleReaderNavigation() {

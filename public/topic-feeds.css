@@ -201,3 +201,21 @@
   max-height:none !important;
   overflow:visible !important
 }
+
+
+/* v2.1.5 — preserve native Reader bookmark action inside My Topics. */
+.topic-reader-nav-actions{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  flex:0 0 auto
+}
+.topic-reader-nav-actions [data-reader-bookmark-slot]{
+  display:contents
+}
+.topic-reader-nav-head .topic-reader-bookmark-button{
+  margin:0;
+  padding:5px 8px;
+  white-space:nowrap;
+  font-size:.75rem
+}

@@ -1,49 +1,57 @@
-MARK, SET, GO! — READER QUICK MUSIC
+MARK, SET, GO! — MY TOPICS BOOK-PAGES + BOOKMARK FIX
 
-Replace/add only:
-  /public/reader-music-quick.js
-  /public/reader-music-quick.css
+Replace only:
+  /public/topic-feeds.js
+  /public/topic-feeds.css
   /public/index.html
 
-WHAT IT DOES
+FIX 1 — FIRST BOOK PAGES SPREAD / DIVIDER GEOMETRY
 
-A small floating ♫ button now appears at the bottom-right ONLY while the Reader
-is open.
+The Topic Feed Reader starts with the normal Reader side panes closed.
+My Topics then restores the reader's preferred open state.
 
-Clicking it opens a compact Reading Music panel with:
+In Book Pages, that could happen before the saved Book Pages state had finished
+applying. The initial two-page column geometry was therefore calculated at the
+old center width. The next story/page caused a later reflow, which is why the
+divider suddenly corrected itself.
 
-  - Now Playing, when music is active
-  - Music attached to the current reading
-  - Saved / preferred music
-  - Quick Focus choices:
-      Lofi Study Radio
-      Sleepy Lofi
-      Classical Reading
-      Ambient Reading
-      Deep Focus
-      Rain & Focus
-      Anime Lofi
-      Classical Piano
-  - Manage Music & Focus, which opens the existing full Music page
+The fix waits until:
+  - My Topics is visibly open, AND
+  - Book Pages is actually active,
 
-IMPORTANT
+then causes the EXISTING app.js #reader ResizeObserver to perform its canonical
+Book Pages reflow at the final panel width.
 
-This does NOT create a second music system.
+It does NOT replace or duplicate Book Pages calculations.
 
-It calls the existing app.js:
-  playMusic()
-  playPreferredMusic()
-  renderMusicLibrary()
 
-and uses the existing #music-dock Spotify/YouTube player.
+FIX 2 — BOOKMARK BUTTON
 
-When the existing music player is open at bottom-right, the new ♫ launcher moves
-above it automatically instead of covering it.
+The original Reader Contents view owns:
+  #add-bookmark
 
-The quick panel is available on normal Reader pages and Topic Feed Reader pages.
+and app.js binds the established addBookmark() handler directly to that button.
 
-NO app.js replacement.
-NO styles.css replacement.
-NO Reader engine / Book Pages / playback / annotation / Analyze changes.
-NO Topic Feed logic changes.
-NO companion changes.
+The previous My Topics implementation replaced Contents with innerHTML, which
+destroyed that already-bound button.
+
+The fix now:
+  - captures the original #add-bookmark DOM node;
+  - builds My Topics;
+  - moves that SAME button into the My Topics header next to Manage.
+
+Because it is the same DOM node, the original app.js bookmark listener remains
+attached. Bookmark storage, positions, bookmark tab counts, and restore logic
+continue through the existing Reader implementation.
+
+
+SCOPE
+
+No app.js is replaced.
+No protected Reader files are changed.
+No Book Pages formulas are changed.
+No bookmark storage code is rewritten.
+No Read Anything, Analyze, playback, annotation, companion, database, or music
+code is changed.
+
+The latest Reader Quick Music script/css referenced by index.html are preserved.
