@@ -1,50 +1,97 @@
-/* Ask Chad — financial analysis companion */
-.companion-persona-options {
+/* Ask Chad — clean integration with the existing Mark/Beth companion system */
+
+html[data-companion="chad"] {
+  --msg-chad-navy: #071d36;
+  --msg-chad-gold: #d9ae35;
+}
+
+/* The canonical chooser is now one Mark / Beth / Chad selector, never two. */
+#app .companion-persona-options {
   grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
 }
 
-.companion-chad-choice img {
+#app .companion-persona-options button {
+  min-width: 0;
+}
+
+#app .companion-chad-choice img,
+#app [data-companion-choice="chad"] img {
   object-fit: contain !important;
   background: #071d36;
 }
 
-html[data-companion="chad"] .home-mark-icon-stage.companion-frontpage-badge-mode {
+/* Emergency fallback only appears when the old Mark/Beth injector genuinely
+   does not render. It is removed as soon as the canonical selector appears. */
+#app [data-chad-fallback-selector] {
+  margin-top: 14px !important;
+  margin-bottom: 14px !important;
+}
+
+/* Chad uses the approved circular finance badge on the home screen. */
+html[data-companion="chad"]
+.home-mark-icon-stage.companion-frontpage-badge-mode {
   background: transparent !important;
 }
 
-html[data-companion="chad"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-avatar {
+html[data-companion="chad"]
+.home-mark-icon-stage.companion-frontpage-badge-mode
+.home-mark-portrait-wrap::before {
+  display: none !important;
+}
+
+html[data-companion="chad"]
+.home-mark-icon-stage.companion-frontpage-badge-mode
+.home-mark-avatar {
   width: min(100%, 540px) !important;
   max-width: 540px !important;
   height: auto !important;
-  aspect-ratio: 1 / 1 !important;
+  aspect-ratio: auto !important;
   object-fit: contain !important;
   object-position: center !important;
   border-radius: 0 !important;
   box-shadow: none !important;
 }
 
-html[data-companion="chad"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-stage-caption {
+html[data-companion="chad"]
+.home-mark-icon-stage.companion-frontpage-badge-mode
+.home-mark-stage-caption {
   display: none !important;
 }
 
-html[data-companion="chad"] #toggle-mark-panel img,
-html[data-companion="chad"] .reader-pane-buttons .mark-pane-button img,
-html[data-companion="chad"] .ask-mark-button img,
-html[data-companion="chad"] [data-action="ask-mark"] img {
-  width: 30px !important;
-  height: 30px !important;
-  flex: 0 0 30px !important;
+/* Critical duplicate-avatar guard.
+   If a button already has a real portrait <img>, suppress the old ::before
+   fallback portrait even if another legacy script re-adds the fallback class. */
+#toggle-mark-panel.msg-companion-avatar-fallback:has(img)::before,
+#fullscreen-mark-toggle.msg-companion-avatar-fallback:has(img)::before,
+.reader-pane-buttons .mark-pane-button.msg-companion-avatar-fallback:has(img)::before,
+.ask-mark-button.msg-companion-avatar-fallback:has(img)::before,
+[data-action="ask-mark"].msg-companion-avatar-fallback:has(img)::before {
+  display: none !important;
+  content: none !important;
+}
+
+/* Keep real companion portraits consistent in buttons. */
+#toggle-mark-panel img,
+#fullscreen-mark-toggle img,
+.reader-pane-buttons .mark-pane-button img,
+.ask-mark-button img,
+[data-action="ask-mark"] img {
+  width: 28px !important;
+  height: 28px !important;
+  flex: 0 0 28px !important;
   object-fit: cover !important;
   object-position: center !important;
   border-radius: 50% !important;
   border: 1px solid #d9ae35 !important;
 }
 
+/* Chad drawer/walkthrough treatment. */
 html[data-companion="chad"] .msg-walkthrough-mark-figure {
   border-radius: 50% !important;
   overflow: hidden !important;
   border: 4px solid #e2bd46 !important;
   background: #071d36 !important;
+  box-shadow: 0 12px 28px rgba(0,0,0,.3) !important;
 }
 
 html[data-companion="chad"] .msg-walkthrough-mark-figure::after {
@@ -72,32 +119,8 @@ html[data-companion="chad"] .msg-walkthrough-mark-illustration {
   object-position: center !important;
 }
 
-@media (max-width: 850px) {
-  .companion-persona-options {
-    grid-template-columns: 1fr !important;
-  }
-}
-
-
-/* v1.0.1: Chad profile chooser fallback.
-   The current Profile renderer itself does not contain a companion selector,
-   so this layer can create the whole Mark/Beth/Chad chooser when the older
-   companion script has not already injected one. */
-.profile-preferences-page [data-chad-fallback-selector] {
-  margin-top: 14px !important;
-  margin-bottom: 14px !important;
-}
-
-.profile-preferences-page .companion-persona-options {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-}
-
-.profile-preferences-page .companion-persona-options button {
-  min-width: 0;
-}
-
 @media (max-width: 900px) {
-  .profile-preferences-page .companion-persona-options {
+  #app .companion-persona-options {
     grid-template-columns: 1fr !important;
   }
 }
