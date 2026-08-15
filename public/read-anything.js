@@ -1504,7 +1504,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           <button type="button" data-social-platform="bluesky" class="msg-post-btn">Bluesky</button>
           <button type="button" data-social-copy class="msg-post-btn msg-post-btn-primary">Copy</button>
         </div>
-        <p style="margin:10px 0 0;font-size:.78rem;color:#607d94;line-height:1.4;">Edit anything you like before sharing. LinkedIn and Facebook may require you to paste the copied text after their share window opens.</p>
+        <p style="margin:10px 0 0;font-size:.78rem;color:#607d94;line-height:1.4;">Edit anything you like before sharing. LinkedIn and Facebook copy the complete draft first; paste it into their post box so your text appears above the article link.</p>
       </section>`;
 
     const style = document.createElement('style');
@@ -1556,16 +1556,28 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         const url = socialShareUrl(platform, text, context?.sourceUrl || '');
         if (!url) return;
 
+        // LinkedIn's public share URL can carry the article URL, but it does not
+        // prefill arbitrary commentary. Copy the complete edited draft BEFORE
+        // opening LinkedIn so the reader can paste the text above the link in one step.
+        if (platform === 'linkedin') {
+          try {
+            navigator.clipboard?.writeText?.(text).catch(() => {});
+          } catch {}
+          if (status) status.textContent = 'LinkedIn draft copied — paste it into the post box (Ctrl+V).';
+        }
+
+        // Facebook has the same public-share limitation, so preserve the helpful
+        // copy behavior there too.
+        if (platform === 'facebook') {
+          try {
+            navigator.clipboard?.writeText?.(text).catch(() => {});
+          } catch {}
+          if (status) status.textContent = 'Facebook draft copied — paste it into the share box (Ctrl+V).';
+        }
+
         // Open synchronously inside the user gesture so popup blockers do not
         // treat the share as an asynchronous popup.
         window.open(url, '_blank', 'noopener,noreferrer');
-
-        // LinkedIn/Facebook generally do not accept arbitrary prefilled body text.
-        // Copy the edited draft without awaiting it so opening remains synchronous.
-        if (platform === 'linkedin' || platform === 'facebook') {
-          navigator.clipboard?.writeText?.(text).catch(() => {});
-          if (status) status.textContent = 'Draft copied — paste it into the share window if needed.';
-        }
       });
     });
 
