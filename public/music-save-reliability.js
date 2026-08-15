@@ -1,21 +1,35 @@
 'use strict';
 
 (() => {
-  const PREFERRED_KEY = 'markSetGoPreferredMusic';
+  const LEGACY_KEY = 'markSetGoPreferredMusic';
+  const BOOK_KEY = 'markSetGoBookMusicV1';
+  const DB_NAME = 'mark-set-go-music';
+  const DB_VERSION = 1;
+  const STORE_NAME = 'preferred-music';
 
-  function readPreferred() {
-    try {
-      const saved = JSON.parse(localStorage.getItem(PREFERRED_KEY) || '[]');
-      return Array.isArray(saved)
-        ? saved.filter((item) => item && item.id && item.title)
-        : [];
-    } catch {
-      return [];
-    }
+  let dbPromise = null;
+  let cache = [];
+  let readyResolve;
+  const ready = new Promise((resolve) => { readyResolve = resolve; });
+
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[char]));
   }
 
   function preferredId(item) {
-    const source = item.choiceId || item.src || item.originalUrl || item.title || String(Date.now());
+    const source =
+      item.choiceId ||
+      item.src ||
+      item.originalUrl ||
+      item.title ||
+      String(Date.now());
+
     let hash = 0;
     for (const char of String(source)) {
       hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
@@ -23,17 +37,163 @@
     return `preferred-${Math.abs(hash)}`;
   }
 
-  function writePreferred(items) {
-    const limited = items.slice(0, 100);
-    localStorage.setItem(PREFERRED_KEY, JSON.stringify(limited));
+  function normalize(item) {
+    if (!item?.title) return null;
+    return {
+      ...item,
+      id: item.id || preferredId(item),
+      title: String(item.title).trim(),
+      source: String(item.source || '').trim(),
+      provider: String(item.provider || '').trim(),
+      src: String(item.src || '').trim(),
+      originalUrl: String(item.originalUrl || '').trim(),
+      choiceId: String(item.choiceId || '').trim(),
+      savedAt: item.savedAt || new Date().toISOString()
+    };
+  }
 
-    // Verify the browser actually accepted the write. The old app helper
-    // silently swallowed localStorage failures.
-    const verify = readPreferred();
-    if (verify.length !== limited.length) {
-      throw new Error('The playlist could not be saved in this browser.');
+  function openDb() {
+    if (dbPromise) return dbPromise;
+
+    dbPromise = new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+        }
+      };
+
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('Music storage could not be opened.'));
+    });
+
+    return dbPromise;
+  }
+
+  async function getAllFromDb() {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readonly');
+      const request = transaction.objectStore(STORE_NAME).getAll();
+      request.onsuccess = () => resolve(
+        Array.isArray(request.result)
+          ? request.result.map(normalize).filter(Boolean)
+          : []
+      );
+      request.onerror = () => reject(request.error || new Error('Saved music could not be read.'));
+    });
+  }
+
+  async function putItem(item) {
+    const next = normalize(item);
+    if (!next) throw new Error('A playlist title is required.');
+
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      transaction.objectStore(STORE_NAME).put(next);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('The playlist could not be saved.'));
+      transaction.onabort = () => reject(transaction.error || new Error('The playlist save was interrupted.'));
+    });
+
+    return next;
+  }
+
+  async function deleteItem(id) {
+    const db = await openDb();
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction(STORE_NAME, 'readwrite');
+      transaction.objectStore(STORE_NAME).delete(id);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error || new Error('The playlist could not be deleted.'));
+    });
+  }
+
+  function legacyItems() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(LEGACY_KEY) || '[]');
+      return Array.isArray(raw) ? raw.map(normalize).filter(Boolean) : [];
+    } catch {
+      return [];
     }
-    return verify;
+  }
+
+  async function migrateLegacy() {
+    const legacy = legacyItems();
+    if (!legacy.length) return;
+
+    const existing = await getAllFromDb();
+    const seen = new Set(existing.map((item) => item.id));
+
+    for (const item of legacy) {
+      if (!seen.has(item.id)) await putItem(item);
+    }
+
+    // This is the important quota relief: once migration succeeds, My Music no
+    // longer consumes the small localStorage bucket.
+    try { localStorage.removeItem(LEGACY_KEY); } catch {}
+  }
+
+  async function refreshCache() {
+    cache = await getAllFromDb();
+    cache.sort((a, b) => String(a.title).localeCompare(String(b.title)));
+    return cache.slice();
+  }
+
+  function findDuplicate(item) {
+    const next = normalize(item);
+    return cache.find((saved) =>
+      saved.id === next.id ||
+      (next.choiceId && saved.choiceId === next.choiceId) ||
+      (next.src && saved.src === next.src) ||
+      (next.originalUrl && saved.originalUrl === next.originalUrl)
+    );
+  }
+
+  async function add(item) {
+    await ready;
+    const next = normalize(item);
+    if (!next) throw new Error('A playlist title is required.');
+
+    const duplicate = findDuplicate(next);
+    if (duplicate) return { item: duplicate, duplicate: true };
+
+    const saved = await putItem(next);
+    await refreshCache();
+
+    document.dispatchEvent(new CustomEvent('marksetgo:preferred-music-changed', {
+      detail: { item: saved, duplicate: false, count: cache.length }
+    }));
+
+    renderSavedList();
+    return { item: saved, duplicate: false };
+  }
+
+  async function remove(id) {
+    await ready;
+    await deleteItem(id);
+    await refreshCache();
+
+    // Clean stale per-book links if possible. If localStorage itself is full,
+    // removal still succeeds because the authoritative My Music record is IDB.
+    try {
+      const map = JSON.parse(localStorage.getItem(BOOK_KEY) || '{}');
+      if (map && typeof map === 'object') {
+        Object.keys(map).forEach((key) => {
+          map[key] = (Array.isArray(map[key]) ? map[key] : []).filter((itemId) => itemId !== id);
+        });
+        localStorage.setItem(BOOK_KEY, JSON.stringify(map));
+      }
+    } catch {}
+
+    document.dispatchEvent(new CustomEvent('marksetgo:preferred-music-changed', {
+      detail: { removedId: id, count: cache.length }
+    }));
+
+    renderSavedList();
   }
 
   function parseSpotify(raw) {
@@ -47,10 +207,10 @@
     const offset = parts[0]?.startsWith('intl-') ? 1 : 0;
     const type = parts[offset];
     const id = parts[offset + 1];
-
     const allowed = new Set(['playlist', 'album', 'track', 'artist', 'show', 'episode']);
+
     if (!allowed.has(type) || !id || !/^[A-Za-z0-9]+$/.test(id)) {
-      throw new Error('That Spotify link is not a supported playlist, album, track, artist, show, or episode.');
+      throw new Error('That Spotify link is not supported.');
     }
 
     const labels = {
@@ -90,17 +250,12 @@
       };
     }
 
-    let videoId =
-      host === 'youtu.be'
-        ? url.pathname.split('/').filter(Boolean)[0]
-        : url.searchParams.get('v');
+    let videoId = host === 'youtu.be'
+      ? url.pathname.split('/').filter(Boolean)[0]
+      : url.searchParams.get('v');
 
-    if (!videoId && url.pathname.startsWith('/shorts/')) {
-      videoId = url.pathname.split('/')[2];
-    }
-    if (!videoId && url.pathname.startsWith('/embed/')) {
-      videoId = url.pathname.split('/')[2];
-    }
+    if (!videoId && url.pathname.startsWith('/shorts/')) videoId = url.pathname.split('/')[2];
+    if (!videoId && url.pathname.startsWith('/embed/')) videoId = url.pathname.split('/')[2];
 
     if (!videoId || !/^[\w-]{6,20}$/.test(videoId)) {
       throw new Error('That link does not contain a recognizable YouTube video or playlist.');
@@ -115,108 +270,239 @@
     };
   }
 
-  function parseForm() {
+  function parseFormMusic() {
     const raw = String(document.querySelector('#music-service-url')?.value || '').trim();
     if (!raw) throw new Error('Paste a Spotify or YouTube link first.');
 
     let url;
-    try {
-      url = new URL(raw);
-    } catch {
-      throw new Error('Enter a valid Spotify or YouTube URL.');
-    }
+    try { url = new URL(raw); }
+    catch { throw new Error('Enter a valid Spotify or YouTube URL.'); }
 
-    const host = url.hostname.toLowerCase();
-    const parsed = host.includes('spotify.com')
+    const parsed = url.hostname.toLowerCase().includes('spotify.com')
       ? parseSpotify(raw)
       : parseYouTube(raw);
 
-    const customName = String(
-      document.querySelector('#music-service-name')?.value || ''
-    ).trim();
-
+    const customName = String(document.querySelector('#music-service-name')?.value || '').trim();
     if (customName) parsed.title = customName;
     return parsed;
   }
 
-  function saveToMyMusic() {
+  function playItem(item) {
+    if (!item) return;
+
+    const dock = document.querySelector('#music-dock');
+    const iframe = document.querySelector('#music-player');
+    if (!dock || !iframe) return;
+
+    let src = item.src;
+
+    // Built-in focus choices store only choiceId. The Reader quick-music script
+    // knows those exact choices and can handle them through its normal path.
+    if (!src && item.choiceId) {
+      document.dispatchEvent(new CustomEvent('marksetgo:play-saved-focus-music', {
+        detail: { choiceId: item.choiceId }
+      }));
+      return;
+    }
+
+    if (!src) return;
+
+    const title = document.querySelector('#music-now-title');
+    const source = document.querySelector('#music-now-source');
+    const wrap = document.querySelector('#music-player-wrap');
+    const minimize = document.querySelector('#music-minimize');
+
+    if (title) title.textContent = item.title || 'Music';
+    if (source) source.textContent = item.source || (item.provider === 'spotify' ? 'Spotify' : 'YouTube');
+    iframe.src = src;
+    dock.hidden = false;
+    dock.classList.remove('minimized');
+    if (wrap) wrap.hidden = false;
+    if (minimize) minimize.hidden = false;
+  }
+
+  function currentBookIds() {
+    try {
+      const title = String(
+        window.MarkSetGoCurrentReaderDocument?.get?.()?.title ||
+        document.querySelector('.reader-title-copy h1')?.textContent ||
+        ''
+      ).trim();
+
+      if (!title) return [];
+
+      const key = title.toLocaleLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 120);
+
+      const map = JSON.parse(localStorage.getItem(BOOK_KEY) || '{}');
+      return Array.isArray(map?.[key]) ? map[key] : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function renderSavedList() {
+    const list = document.querySelector('#preferred-music-list');
+    if (!list) return;
+
+    const bookIds = currentBookIds();
+
+    list.innerHTML = cache.length
+      ? cache.map((item) => `
+          <article class="preferred-music-item music-saved-item" data-idb-music-item="${esc(item.id)}">
+            <div class="music-saved-info">
+              <span class="music-provider-badge">${esc(item.provider === 'spotify' ? 'Spotify' : 'YouTube')}</span>
+              <strong>${esc(item.title)}</strong>
+              ${bookIds.includes(item.id) ? '<small>Saved for this book</small>' : ''}
+            </div>
+            <div class="preferred-music-actions">
+              <button class="primary" type="button" data-idb-play-preferred="${esc(item.id)}">Play</button>
+              <button class="text-button danger-text" type="button" data-idb-remove-preferred="${esc(item.id)}">Delete</button>
+            </div>
+          </article>
+        `).join('')
+      : '<div class="music-empty-state"><strong>No saved music yet</strong><span>Paste a Spotify or YouTube link above, then choose “Save to My Music.”</span></div>';
+  }
+
+  async function saveFormToMyMusic() {
     const status = document.querySelector('#music-service-status');
     const button = document.querySelector('#save-music-preferred');
 
     try {
-      const parsed = parseForm();
-      const current = readPreferred();
-      const next = {
-        ...parsed,
-        id: preferredId(parsed)
-      };
-
-      const duplicate = current.find((item) =>
-        item.id === next.id ||
-        (item.src && next.src && item.src === next.src) ||
-        (item.originalUrl && next.originalUrl && item.originalUrl === next.originalUrl)
-      );
-
-      let savedItem = duplicate;
-
-      if (!duplicate) {
-        const updated = writePreferred([...current, next]);
-        savedItem = updated.find((item) => item.id === next.id);
-        if (!savedItem) {
-          throw new Error('The playlist could not be verified after saving.');
-        }
-      }
+      const parsed = parseFormMusic();
+      const result = await add(parsed);
 
       if (status) {
         status.className = 'status';
-        status.textContent = duplicate
-          ? `“${next.title}” is already in My Music.`
-          : `Saved “${next.title}” to My Music.`;
+        status.textContent = result.duplicate
+          ? `“${parsed.title}” is already in My Music.`
+          : `Saved “${parsed.title}” to My Music.`;
       }
 
       if (button) {
-        const original = button.dataset.originalLabel || button.textContent || 'Save to My Music';
-        button.dataset.originalLabel = original;
-        button.textContent = duplicate ? 'Already saved ✓' : 'Saved ✓';
-        button.disabled = true;
+        button.textContent = result.duplicate ? 'Already saved ✓' : 'Saved ✓';
+        window.setTimeout(() => {
+          if (button.isConnected) button.textContent = 'Save to My Music';
+        }, 1200);
       }
-
-      document.dispatchEvent(new CustomEvent('marksetgo:preferred-music-changed', {
-        detail: {
-          item: savedItem || next,
-          duplicate: Boolean(duplicate),
-          count: readPreferred().length
-        }
-      }));
-
-      // Re-render the Music page through its existing top-level navigation
-      // after the success message has been visible briefly. This refreshes the
-      // "Your saved music" list without depending on app.js private functions.
-      window.setTimeout(() => {
-        const musicNav = document.querySelector('[data-action="music"]');
-        if (musicNav && document.querySelector('.music-library')) {
-          musicNav.click();
-        }
-      }, 550);
-
     } catch (error) {
       if (status) {
         status.className = 'status error';
         status.textContent = error?.message || 'The playlist could not be saved.';
       }
-      if (button) button.disabled = false;
     }
   }
 
-  // Capture phase deliberately wins over the old per-render button listener.
-  // Because this listener lives on document, it survives every Music-page
-  // innerHTML replacement.
-  document.addEventListener('click', (event) => {
-    const button = event.target.closest?.('#save-music-preferred');
-    if (!button) return;
+  function installDelegatedUi() {
+    // Capture phase prevents the old localStorage handlers in app.js from
+    // running for the same buttons.
+    document.addEventListener('click', (event) => {
+      const saveFormButton = event.target.closest?.('#save-music-preferred');
+      if (saveFormButton) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void saveFormToMyMusic();
+        return;
+      }
 
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    saveToMyMusic();
-  }, true);
+      const builtInSave = event.target.closest?.('[data-save-music]');
+      if (builtInSave) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+
+        const choiceId = builtInSave.dataset.saveMusic;
+        const article = builtInSave.closest('article');
+        const title = String(article?.querySelector('strong')?.textContent || 'Focus music').trim();
+
+        void add({
+          title,
+          source: 'Focus music',
+          provider: 'youtube',
+          choiceId
+        }).then(({ duplicate }) => {
+          builtInSave.textContent = duplicate ? 'Saved' : 'Saved ✓';
+          builtInSave.disabled = true;
+        }).catch(() => {});
+        return;
+      }
+
+      const play = event.target.closest?.('[data-idb-play-preferred], [data-play-preferred]');
+      if (play) {
+        const id = play.dataset.idbPlayPreferred || play.dataset.playPreferred;
+        const item = cache.find((saved) => saved.id === id);
+        if (item) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          playItem(item);
+        }
+        return;
+      }
+
+      const removeButton = event.target.closest?.('[data-idb-remove-preferred], [data-remove-preferred]');
+      if (removeButton) {
+        const id = removeButton.dataset.idbRemovePreferred || removeButton.dataset.removePreferred;
+        const item = cache.find((saved) => saved.id === id);
+        if (item) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          void remove(id);
+        }
+      }
+    }, true);
+
+    const app = document.querySelector('#app');
+    if (app) {
+      new MutationObserver(() => {
+        if (document.querySelector('#preferred-music-list')) {
+          window.setTimeout(renderSavedList, 0);
+        }
+      }).observe(app, { childList: true, subtree: true });
+    }
+  }
+
+  window.MSGMusicStore = Object.freeze({
+    ready,
+    getCached: () => cache.slice(),
+    getAll: async () => {
+      await ready;
+      return cache.slice();
+    },
+    add,
+    remove,
+    refresh: async () => {
+      await refreshCache();
+      renderSavedList();
+      return cache.slice();
+    }
+  });
+
+  async function init() {
+    try {
+      await openDb();
+      await migrateLegacy();
+      await refreshCache();
+
+      // Ensure the failed legacy key is gone even if it contained malformed data.
+      try { localStorage.removeItem(LEGACY_KEY); } catch {}
+
+      installDelegatedUi();
+      renderSavedList();
+
+      document.dispatchEvent(new CustomEvent('marksetgo:music-store-ready', {
+        detail: { count: cache.length }
+      }));
+    } catch (error) {
+      console.error('IndexedDB music store could not initialize:', error);
+    } finally {
+      readyResolve();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init, { once: true });
+  } else {
+    init();
+  }
 })();

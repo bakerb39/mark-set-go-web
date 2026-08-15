@@ -23,6 +23,10 @@
   }[c]));
 
   function preferredMusic() {
+    const storeItems = window.MSGMusicStore?.getCached?.();
+    if (Array.isArray(storeItems)) return storeItems;
+
+    // Legacy fallback only while the IndexedDB store is still initializing.
     try {
       const saved = JSON.parse(localStorage.getItem(PREFERRED_KEY) || '[]');
       return Array.isArray(saved) ? saved.filter((item) => item && item.id && item.title) : [];
@@ -369,11 +373,17 @@
 
     document.addEventListener('marksetgo:document-available', () => window.setTimeout(sync, 0));
 
-    // Same-tab localStorage writes do not fire a storage event. The delegated
-    // Music-page saver dispatches this event after a verified save so an open
-    // Reader playlist menu can refresh immediately.
+    document.addEventListener('marksetgo:music-store-ready', () => {
+      if (chooser && !chooser.hidden) renderChooser();
+    });
+
     document.addEventListener('marksetgo:preferred-music-changed', () => {
       if (chooser && !chooser.hidden) renderChooser();
+    });
+
+    document.addEventListener('marksetgo:play-saved-focus-music', (event) => {
+      const choice = QUICK_CHOICES.find((item) => item.id === event.detail?.choiceId);
+      if (choice) playQuick(choice);
     });
 
     document.querySelector('#music-close')?.addEventListener('click', () => {
