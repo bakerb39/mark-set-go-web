@@ -1,47 +1,42 @@
-MARK, SET, GO! — TOPIC FEED SOCIAL SHARING
+MARK, SET, GO! — TOPIC FEED BOOK PAGES FLOW FIX
 
 Replace only:
-  /public/topic-feeds.js
   /public/topic-feeds.css
   /public/index.html
 
-WHAT IT ADDS
+WHY A LEFT PAGE COULD LOOK BLANK
 
-Every Topic Feed story now gets a small professional share cluster at the
-top-right of the story header.
+The Reader's normal Book Pages CSS uses:
 
-Icons:
-  X
-  Facebook
-  LinkedIn
-  Reddit
-  Email
+  .reader.book-pages-layout .reader-group {
+    break-inside: avoid;
+  }
 
-Each share action uses:
-  - the original article URL
-  - the article headline
+That is useful for some structured Reader content, but Topic Feed articles now
+also have the small article controls/source/share header at the top.
 
-The email action opens a pre-addressed email draft with the headline and link.
+For some stories, the first article group no longer fit in the remaining space
+on page 1. Because the group was forbidden from splitting, the browser moved
+the entire group to page 2, leaving almost all of page 1 blank.
 
-The share controls are UI metadata only. They are NOT inserted into article
-currentText, so they do not affect:
-  - Reader word count
-  - playback
-  - highlighting / annotations
-  - summaries
-  - Analyze
-  - reading position
+FIX
 
-The controls are added only to Topic Feed articles.
+For Topic Feed articles in Book Pages only:
 
-PRESERVED
+  break-inside: auto
 
-- My Topics sticky panel
-- close-race fix
-- exact left-panel scroll position
-- Bookmark button preservation
-- centered Book Pages divider
+Article text can now continue naturally from the left page to the right page
+instead of moving an entire paragraph/group to the next column.
+
+NORMAL BOOKS ARE UNCHANGED.
+
+PRESERVED:
+- social/share icons
 - source credit
+- centered Book Pages divider
+- My Topics sticky/open-close behavior
+- My Topics scroll-position restoration
+- Bookmark preservation
 - music-under-WPM references
 
 No app.js or protected Reader file is changed.
