@@ -468,3 +468,43 @@
     gap:8px !important;
   }
 }
+
+
+/* v1.4.3 — deterministic vertical Reader utility stack.
+   Flex column prevents inherited/grid Reader layout rules from ever placing
+   Music beside Full screen. */
+.reader-pane-controls .reader-topright-media-stack{
+  position:static !important;
+  margin-left:auto !important;
+  display:flex !important;
+  flex-direction:column !important;
+  flex-wrap:nowrap !important;
+  align-items:flex-end !important;
+  justify-content:flex-start !important;
+  gap:14px !important;
+  width:max-content !important;
+  min-width:0 !important;
+  padding:0 !important;
+  overflow:visible !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle{
+  position:static !important;
+  inset:auto !important;
+  flex:0 0 28px !important;
+  align-self:flex-end !important;
+  margin:0 !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack > .viewer-fullscreen-button{
+  position:static !important;
+  inset:auto !important;
+  flex:0 0 auto !important;
+  align-self:flex-end !important;
+  margin:0 !important;
+}
+
+/* Keep the right edges visually aligned. */
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle{
+  margin-right:0 !important;
+}

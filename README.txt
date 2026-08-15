@@ -1,29 +1,21 @@
-MARK, SET, GO! — CLEAN TOP-RIGHT READER CONTROLS
+MARK, SET, GO! — VERTICAL TOP-RIGHT READER CONTROLS
 
 Replace only:
   /public/reader-music-quick.css
   /public/index.html
 
-FIX
-
-The previous version positioned the music icon absolutely above Full screen.
-That meant the two controls were not actually in the same layout and could
-overlap each other or the Reader.
-
-This version removes the floating/absolute positioning entirely.
-
-Music and Full screen now share one real vertical utility stack:
+FINAL LAYOUT
 
         ♫
 
   [ Full screen ]
 
-- both are right-aligned;
-- there is a consistent 10px gap;
-- both stay in normal layout flow;
-- neither can float over article text;
-- the existing Full screen button/handler is unchanged;
-- the existing music button/player behavior is unchanged.
+- Music is always ABOVE Full screen.
+- Both controls are right-aligned.
+- 14px of vertical breathing room separates them.
+- The stack uses a simple flex column, so surrounding Reader grid/flex rules
+  cannot place the controls beside each other.
+- Neither control is absolutely positioned over article text.
 
 No JavaScript is changed.
-No app.js, Reader core, Topic Feed logic, Book Pages, or saved-playlist logic is changed.
+Music interactions, saved playlists, and the existing fullscreen handler remain.
