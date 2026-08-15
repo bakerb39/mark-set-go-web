@@ -15127,7 +15127,7 @@ body:not(.light) .reader-written-annotation {
 #app .read-anything-command-bar .viewer-fullscreen-button {
   position: static !important;
   inset: auto !important;
-  top: auto !important;
+  top: 40px !important;
   right: auto !important;
   bottom: auto !important;
   left: auto !important;
