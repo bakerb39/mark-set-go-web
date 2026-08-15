@@ -219,12 +219,36 @@
       </div>`;
   }
 
+  function scrollConversationToMessage(message, { smooth = true } = {}) {
+    const conversation = $('[data-askmark-conversation]', shell);
+    if (!conversation || !message) return;
+
+    const top = Math.max(0, message.offsetTop - 12);
+
+    // Place the reader's question at the top of the chat viewport so the
+    // response grows beneath it instead of forcing the reader to scroll down.
+    conversation.scrollTo({
+      top,
+      behavior: smooth ? 'smooth' : 'auto'
+    });
+  }
+
+  function latestUserMessage() {
+    const messages = $$('[data-askmark-conversation] .askmark-message.user-message', shell);
+    return messages[messages.length - 1] || null;
+  }
+
   function addUserMessage(text) {
     const conversation = $('[data-askmark-conversation]', shell);
-    if (!conversation || !text) return;
+    if (!conversation || !text) return null;
+
+    const id = `askmark-user-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
     conversation.insertAdjacentHTML('beforeend', `
-      <article class="askmark-message user-message"><div><span>You</span><p>${escapeHtml(text)}</p></div></article>`);
-    conversation.scrollTop = conversation.scrollHeight;
+      <article class="askmark-message user-message" id="${id}"><div><span>You</span><p>${escapeHtml(text)}</p></div></article>`);
+
+    const message = document.getElementById(id);
+    scrollConversationToMessage(message, { smooth: true });
+    return message;
   }
 
   const MARK_PROGRESS_SEEN_KEY='markSetGoMarkProgressSeenV1';
@@ -302,8 +326,17 @@
         <img src="${companionAvatar()}" alt="${companionName()}">
         <div><span>${companionName()}</span><p><i></i><i></i><i></i></p></div>
       </article>`);
-    conversation.scrollTop = conversation.scrollHeight;
-    return document.getElementById(id);
+    const thinking = document.getElementById(id);
+
+    // Keep the user's question anchored near the top while the answer is
+    // being prepared. Do not jump the chat to the bottom just because the
+    // typing indicator was appended.
+    const userMessage = latestUserMessage();
+    if (userMessage) {
+      window.requestAnimationFrame(() => scrollConversationToMessage(userMessage, { smooth: false }));
+    }
+
+    return thinking;
   }
 
   function syncLegacyResponse() {
@@ -343,8 +376,15 @@
     }
 
     response.hidden = true;
-    const conversation = $('[data-askmark-conversation]', shell);
-    if (conversation) conversation.scrollTop = conversation.scrollHeight;
+
+    // Keep the reader's latest question at the top after a normal highlighted-
+    // passage answer is converted into the premium threaded chat.
+    const userMessage = latestUserMessage();
+    if (userMessage) {
+      window.requestAnimationFrame(() => {
+        scrollConversationToMessage(userMessage, { smooth: true });
+      });
+    }
   }
 
 
@@ -448,8 +488,14 @@
         </div>
       </div>`;
 
-    const conversation = $('[data-askmark-conversation]', shell);
-    if (conversation) conversation.scrollTop = conversation.scrollHeight;
+    const userMessage = latestUserMessage();
+    if (userMessage) {
+      // Re-anchor after the response bubble expands. This keeps the question
+      // visible at the top and lets the answer continue directly underneath.
+      window.requestAnimationFrame(() => {
+        scrollConversationToMessage(userMessage, { smooth: true });
+      });
+    }
   }
 
   async function runWholeArticleFollowup(question) {
