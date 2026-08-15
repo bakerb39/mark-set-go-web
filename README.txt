@@ -1,23 +1,34 @@
-MARK, SET, GO! — CHAT QUESTION ANCHOR SCROLL
+MARK, SET, GO! — SUMMARIZE / ANALYZE ON CONTINUE READING
 
 Replace:
-  /public/ask-mark-hub.js
+  /public/read-anything.js
   /public/index.html
 
-WHAT CHANGED
+ROOT CAUSE
 
-When a reader sends a question, the premium companion chat now scrolls so the
-reader's question sits near the TOP of the chat viewport.
+The article action installer explicitly checked the first rendered Reader word.
 
-The answer then grows directly beneath the question.
+If the first rendered word had an index greater than 0, it removed the
+Summarize / Analyze row.
 
-This applies to:
-- normal Ask companion questions based on highlighted text;
-- whole-article follow-ups after Analyze;
-- the typing/thinking state while the response is processing.
+That meant:
+- opening a new article at the beginning -> controls appeared;
+- going Home and choosing Continue Reading -> Reader resumed later in the article;
+- refreshing and restoring a later reading position -> first visible index > 0;
+- the code deliberately removed the controls.
 
-The previous behavior always scrolled to the bottom after appending the user
-message, typing bubble, and response. That forced the reader to manually scroll
-up to find the beginning of a longer answer.
+FIX
 
-No Reader playback, pagination, Book Pages, or reading-mode logic changed.
+Summarize and Analyze are now treated as ARTICLE-LEVEL controls rather than
+"first page only" controls.
+
+They remain above the first visible line whenever a supported article is:
+- opened normally;
+- resumed through Continue Reading;
+- restored after refresh;
+- rerendered in Book Pages.
+
+The document-restoration event also explicitly reinstalls the article controls
+after Read Anything restores the article metadata.
+
+No Reader playback, pagination, Book Pages, or reading-mode logic was changed.

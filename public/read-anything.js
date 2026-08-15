@@ -1427,18 +1427,10 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     // Keep the action inside the Reader, but visually separate from article prose.
     // It belongs above the first line rather than participating in the text flow.
-    const firstIndexed = reader.querySelector(
-      '.reader-word[data-index], .reader-group[data-start-index]'
-    );
-    const firstIndex = firstIndexed
-      ? Number(firstIndexed.dataset.index ?? firstIndexed.dataset.startIndex)
-      : 0;
-
-    if (Number.isFinite(firstIndex) && firstIndex > 0) {
-      existing?.remove();
-      return;
-    }
-
+    // These are article-level controls, not article prose. They should remain
+    // available whenever the article is reopened or resumed, even if Continue
+    // Reading starts at word/page index > 0. Keep them above the first VISIBLE
+    // line of the current Reader view instead of restricting them to index 0.
     let actionRow = existing;
 
     if (!actionRow) {
@@ -2031,7 +2023,13 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       scheduleFormatControlAttach();
       return;
     }
-    restoreImportedFormatRecord(documentId, event?.detail?.title || '');
+    const restored = restoreImportedFormatRecord(documentId, event?.detail?.title || '');
+    if (restored) {
+      window.setTimeout(() => {
+        installArticleSummaryButton();
+        observeInlineArticleSummary();
+      }, 120);
+    }
   });
 
   document.addEventListener('click', (event) => {
