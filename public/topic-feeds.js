@@ -1952,6 +1952,66 @@
   const appObserver = app ? new MutationObserver(() => scheduleReaderNavigation()) : null;
   if (appObserver && app) appObserver.observe(app, { childList:true, subtree:true });
 
+  // Topic Feed story keyboard navigation. The Reader already owns Left/Right
+  // Arrow for manual pacing, so use single-key N/P shortcuts instead of
+  // intercepting those established Reader controls.
+  let topicStoryKeyboardOpening = false;
+
+  function orderedArticlesForCurrentTopicFeed() {
+    const context = window.MSGTopicFeedReaderContext;
+    if (!context?.topicId) return { topic: null, articles: [] };
+
+    const topic = state.topics.find((item) => item.id === context.topicId);
+    if (!topic) return { topic: null, articles: [] };
+
+    const sourceId = String(context.sourceId || '');
+    const articles = (topic.articles || [])
+      .filter((article) => !sourceId || String(article.sourceClientId || '') === sourceId)
+      .slice()
+      .sort((a, b) => new Date(b.publishedAt || b.published || b.fetchedAt || 0) - new Date(a.publishedAt || a.published || a.fetchedAt || 0));
+
+    return { topic, articles };
+  }
+
+  async function cycleTopicStory(direction) {
+    if (topicStoryKeyboardOpening || !isTopicFeedReaderActive()) return;
+
+    const context = window.MSGTopicFeedReaderContext;
+    const { topic, articles } = orderedArticlesForCurrentTopicFeed();
+    if (!topic || articles.length < 2) return;
+
+    const currentIndex = articles.findIndex((article) => article.id === context?.articleId);
+    if (currentIndex < 0) return;
+
+    const nextIndex = (currentIndex + direction + articles.length) % articles.length;
+    const article = articles[nextIndex];
+    if (!article || article.id === context?.articleId) return;
+
+    topicStoryKeyboardOpening = true;
+    try {
+      captureTopicReaderScroll(article.id);
+      await openArticle(article, null, topic);
+    } finally {
+      topicStoryKeyboardOpening = false;
+    }
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (!isTopicFeedReaderActive() || event.defaultPrevented || event.repeat) return;
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+    const target = event.target;
+    const tag = String(target?.tagName || '').toLowerCase();
+    if (target?.isContentEditable || ['input', 'textarea', 'select'].includes(tag)) return;
+
+    const key = String(event.key || '');
+    if (key !== ',' && key !== '.') return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    void cycleTopicStory(key === '.' ? 1 : -1);
+  });
+
   document.addEventListener('marksetgo:auth-changed', (event) => {
     if (event.detail?.authenticated) void hydrateCloudState();
     else cloudAuthenticated = false;
