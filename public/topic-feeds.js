@@ -1600,6 +1600,31 @@
   let pendingTopicReaderScrollRestore = null;
   let topicReaderScrollRestoreTimer = 0;
 
+  function syncReaderTopicNavState(nav) {
+    if (!nav) return;
+
+    nav.querySelectorAll('[data-reader-topic-article]').forEach((button) => {
+      const topic = state.topics.find((item) => item.id === button.dataset.readerTopicParent);
+      const article = topic?.articles?.find((item) => item.id === button.dataset.readerTopicArticle);
+      if (article) button.classList.toggle('is-read', Boolean(article.read));
+    });
+
+    nav.querySelectorAll('.topic-reader-group').forEach((details) => {
+      const articleButton = details.querySelector('[data-reader-topic-parent]');
+      const topicId = articleButton?.dataset.readerTopicParent || '';
+      const topic = state.topics.find((item) => item.id === topicId);
+      const unread = topic ? (topic.articles || []).filter((article) => !article.read).length : null;
+      const count = details.querySelector('summary span');
+      if (count && unread !== null) count.textContent = `${unread} unread`;
+
+      details.querySelectorAll('[data-reader-topic-source-block]').forEach((sourceBlock) => {
+        const sourceId = sourceBlock.dataset.readerTopicSourceBlock || '';
+        const sourceCount = sourceBlock.querySelector('.topic-reader-source-head span');
+        if (sourceCount && topic) sourceCount.textContent = `${sourceArticleCount(topic, sourceId, true)} new`;
+      });
+    });
+  }
+
   function captureTopicReaderScroll(articleId = '') {
     const pane = document.querySelector('#navigation-pane');
     if (!pane) return;
@@ -1607,6 +1632,7 @@
     pendingTopicReaderScrollRestore = {
       scrollTop: Math.max(0, Number(pane.scrollTop) || 0),
       articleId: String(articleId || ''),
+      navNode: pane.querySelector('.topic-reader-nav') || null,
       capturedAt: Date.now()
     };
   }
@@ -1833,21 +1859,33 @@
     bindTopicReaderPanePreference();
 
     if (!view.querySelector('.topic-reader-nav')) {
-      // IMPORTANT: renderNavigationPane() has already bound the Reader's
-      // #add-bookmark button to its native addBookmark() function. Keep that
-      // exact DOM node before replacing Contents so bookmarks continue to use
-      // the established Reader implementation.
-      const nativeBookmarkButton = view.querySelector('#add-bookmark');
+      // Opening another Topic Feed story rebuilds the Reader shell. Reuse the
+      // exact existing My Topics DOM instead of redrawing it, so expanded topics,
+      // Show all state, focus, button bindings, and scroll position do not visibly
+      // refresh merely because the reader changed stories.
+      const preservedNav = pendingTopicReaderScrollRestore?.navNode;
+      if (preservedNav) {
+        syncReaderTopicNavState(preservedNav);
+        view.replaceChildren(preservedNav);
+      } else {
+        // IMPORTANT: renderNavigationPane() has already bound the Reader's
+        // #add-bookmark button to its native addBookmark() function. Keep that
+        // exact DOM node before replacing Contents so bookmarks continue to use
+        // the established Reader implementation.
+        const nativeBookmarkButton = view.querySelector('#add-bookmark');
 
-      view.innerHTML = readerTopicListMarkup();
+        view.innerHTML = readerTopicListMarkup();
 
-      const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
-      if (nativeBookmarkButton && bookmarkSlot) {
-        nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
-        nativeBookmarkButton.textContent = '＋ Bookmark';
-        nativeBookmarkButton.title = 'Bookmark the current reading position';
-        bookmarkSlot.replaceChildren(nativeBookmarkButton);
+        const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
+        if (nativeBookmarkButton && bookmarkSlot) {
+          nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
+          nativeBookmarkButton.textContent = '＋ Bookmark';
+          nativeBookmarkButton.title = 'Bookmark the current reading position';
+          bookmarkSlot.replaceChildren(nativeBookmarkButton);
+        }
       }
+    } else {
+      syncReaderTopicNavState(view.querySelector('.topic-reader-nav'));
     }
 
     const readerRefreshButton = view.querySelector('[data-reader-refresh-topics]');
