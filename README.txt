@@ -1,18 +1,23 @@
-MARK, SET, GO! — PROFILE DUPLICATE + SUMMARIZE LABEL FIX
+MARK, SET, GO! — ASK CHAD READER AVATAR SYNC FIX
+
+The latest screenshot showed the identity text changing to Chad while both
+Reader-drawer portraits were still Mark.
 
 Replace:
-  /public/read-anything.js
+  /public/companion-chad.js
   /public/companion-chad.css
   /public/index.html
 
-Changes:
-1. The article action now says simply:
-     Summarize
-   instead of:
-     Summarize article
+Fixes:
+- Chad now replaces every known Mark/Beth companion portrait inside the Reader
+  side panel and fullscreen companion drawer.
+- Covers both <img> portraits and inline background-image portraits.
+- The Chad proxy is now reinstalled if the older Mark/Beth script replaces
+  window.MSGCompanion after Chad loads.
+- The fallback avatar CSS variable also follows Chad.
+- MutationObserver synchronization remains active, so portraits recreated by
+  Reader rerenders are corrected again automatically.
+- No Reader engine/core architecture changed.
 
-2. The screenshot showed both the new Mark/Beth/Chad selector and the old
-   Mark/Beth selector at the same time. If the unified three-person selector
-   exists, the legacy duplicate companion selector is now hidden.
-
-No Reader engine/core architecture was changed.
+The previous shorter "Summarize" article link and single-profile-selector fixes
+remain included in this cumulative package.

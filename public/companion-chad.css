@@ -134,3 +134,26 @@ html[data-companion="chad"] .msg-walkthrough-mark-illustration {
 .companion-persona-settings:not([data-chad-fallback-selector]) {
   display: none !important;
 }
+
+
+/* v1.0.4: Chad portrait sync.
+   The legacy companion layer can recreate Mark/Beth portrait <img> elements
+   after Chad is selected. Chad's JS replaces those sources, while these rules
+   keep the resulting portraits sized consistently in both Reader drawers. */
+html[data-companion="chad"] #word-panel .reader-control-header img,
+html[data-companion="chad"] #word-panel .mark-panel-view img,
+html[data-companion="chad"] #word-panel .mark-response img,
+html[data-companion="chad"] #fullscreen-mark-drawer img {
+  object-fit: cover !important;
+  object-position: center !important;
+  border-radius: 50% !important;
+  border-color: #d9ae35 !important;
+}
+
+html[data-companion="chad"] #word-panel {
+  --msg-companion-button-avatar: url("/assets/companions/chad/chad-avatar.png");
+}
+
+html[data-companion="chad"] #fullscreen-mark-drawer {
+  --msg-companion-button-avatar: url("/assets/companions/chad/chad-avatar.png");
+}

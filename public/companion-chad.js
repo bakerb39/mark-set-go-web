@@ -63,22 +63,34 @@
   // The app's own currentCompanionIdentity() reads window.MSGCompanion.config.
   // Expose Chad through THAT existing contract rather than creating a second
   // competing companion system.
-  function installCompanionProxy() {
-    if (window.__MSG_CHAD_COMPANION_PROXY__) return;
+  let activeCompanionProxy = null;
+  let activeCompanionTarget = null;
 
-    const original = window.MSGCompanion || {};
-    const proxy = new Proxy(original, {
-      get(target, property, receiver) {
+  function installCompanionProxy() {
+    // The legacy Mark/Beth script can replace window.MSGCompanion after Chad has
+    // already loaded. Re-wrap the live object whenever that happens instead of
+    // assuming a one-time proxy remains installed forever.
+    if (activeCompanionProxy && window.MSGCompanion === activeCompanionProxy) return;
+
+    const live = window.MSGCompanion || {};
+    const target = live === activeCompanionProxy
+      ? (activeCompanionTarget || {})
+      : live;
+
+    const proxy = new Proxy(target, {
+      get(targetObject, property, receiver) {
         if (property === 'config' && selected() === 'chad') return CHAD;
-        const value = Reflect.get(target, property, receiver);
-        return typeof value === 'function' ? value.bind(target) : value;
+        const value = Reflect.get(targetObject, property, receiver);
+        return typeof value === 'function' ? value.bind(targetObject) : value;
       }
     });
 
     try {
+      activeCompanionTarget = target;
+      activeCompanionProxy = proxy;
       window.MSGCompanion = proxy;
       window.__MSG_CHAD_COMPANION_PROXY__ = true;
-      window.__MSG_CHAD_ORIGINAL_COMPANION__ = original;
+      window.__MSG_CHAD_ORIGINAL_COMPANION__ = target;
     } catch (error) {
       console.warn('Ask Chad could not wrap the existing companion API.', error);
     }
@@ -276,6 +288,57 @@
     }
   }
 
+  function isKnownCompanionPortrait(img) {
+    if (!img) return false;
+
+    const src = String(img.getAttribute('src') || '').toLowerCase();
+    const alt = String(img.getAttribute('alt') || '').toLowerCase();
+
+    return (
+      src.includes('/assets/ask-mark/') ||
+      src.includes('/assets/companions/beth/') ||
+      src.includes('/assets/companions/chad/') ||
+      src.includes('ask-mark-avatar') ||
+      src.includes('beth-avatar') ||
+      src.includes('beth-universal') ||
+      src.includes('chad-avatar') ||
+      /^(mark|beth|chad)$/.test(alt.trim())
+    );
+  }
+
+  function syncCompanionPortraits(root, identity) {
+    if (!root || !identity) return;
+
+    root.querySelectorAll('img').forEach((img) => {
+      const inCompanionChrome = Boolean(img.closest(
+        '.reader-control-header, ' +
+        '.fullscreen-mark-header, ' +
+        '.mark-selection-card, ' +
+        '.mark-response, ' +
+        '.mark-empty, ' +
+        '.mark-panel-view, ' +
+        '.fullscreen-mark-selection-card, ' +
+        '.fullscreen-mark-drawer'
+      ));
+
+      if (isKnownCompanionPortrait(img) || inCompanionChrome) {
+        setImage(img, identity.avatar, identity.name);
+      }
+    });
+
+    // Some companion surfaces use an inline background-image instead of <img>.
+    root.querySelectorAll('[style*="background-image"]').forEach((element) => {
+      const value = String(element.style.backgroundImage || '').toLowerCase();
+      if (
+        value.includes('ask-mark') ||
+        value.includes('companions/beth') ||
+        value.includes('companions/chad')
+      ) {
+        element.style.backgroundImage = `url("${identity.avatar}")`;
+      }
+    });
+  }
+
   function syncReaderButtons(identity) {
     const buttons = [
       document.querySelector('#toggle-mark-panel'),
@@ -318,13 +381,20 @@
 
     roots.forEach((root) => replaceCompanionText(root, identity));
 
-    document.querySelectorAll(
-      '#word-panel .msg-beth-photo, ' +
-      '#word-panel .companion-avatar, ' +
-      '#word-panel .mark-companion-avatar, ' +
-      '#fullscreen-mark-drawer .msg-beth-photo, ' +
-      '#fullscreen-mark-drawer .companion-avatar'
-    ).forEach((img) => setImage(img, identity.avatar, identity.name));
+    // The legacy companion code uses more than one avatar class depending on
+    // which Reader surface is rendered. Synchronize every known companion
+    // portrait inside the Reader drawer rather than relying on one class name.
+    [
+      document.querySelector('#word-panel'),
+      document.querySelector('#fullscreen-mark-drawer')
+    ].filter(Boolean).forEach((root) => syncCompanionPortraits(root, identity));
+
+    // Also cover the main Reader companion buttons after their legacy script
+    // has added a real <img> portrait.
+    [
+      document.querySelector('#toggle-mark-panel'),
+      document.querySelector('#fullscreen-mark-toggle')
+    ].filter(Boolean).forEach((root) => syncCompanionPortraits(root, identity));
 
     const investorLink = document.querySelector('[data-action="investor-analysis"]');
     if (investorLink && selected() === 'chad') {
@@ -411,6 +481,10 @@
       document.documentElement.classList.toggle(
         'msg-chad-active',
         selected() === 'chad'
+      );
+      document.documentElement.style.setProperty(
+        '--msg-companion-button-avatar',
+        `url("${identity.avatar}")`
       );
 
       syncProfileSelection();
