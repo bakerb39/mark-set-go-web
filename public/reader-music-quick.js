@@ -328,14 +328,22 @@
       button.title = 'My reading playlists';
       button.innerHTML = '<span aria-hidden="true">♫</span>';
 
-      // Music sits above Full screen.
-      stack.insertBefore(button, fullscreenButton);
-
       button.addEventListener('click', () => {
         ensureChooser();
         if (chooser && !chooser.hidden) closeChooser();
         else openChooser();
       });
+    }
+
+    // IMPORTANT: enforce the DOM order on EVERY Reader render.
+    // Older versions could leave Full screen before Music. Merely changing CSS
+    // then preserved that stale child order. Always make Music the first child
+    // and Full screen the second child.
+    if (stack.firstElementChild !== button) {
+      stack.insertBefore(button, stack.firstElementChild);
+    }
+    if (button.nextElementSibling !== fullscreenButton) {
+      stack.insertBefore(fullscreenButton, button.nextElementSibling);
     }
 
     speedButton = button;

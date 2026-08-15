@@ -1,43 +1,52 @@
-MARK, SET, GO! — LIBRARY MENU CLICK FIX
+MARK, SET, GO! — FINAL READER MUSIC / FULL SCREEN ORDER FIX
 
-Replace only:
-  /public/topic-feeds.js
+Replace all three:
+  /public/reader-music-quick.js
+  /public/reader-music-quick.css
   /public/index.html
 
-SCOPE
+ACTUAL BUG
 
-My Reading was confirmed to still work, so this patch does NOT touch it.
+The earlier script only placed Music before Full screen when the Music button
+was first created.
 
-TOPIC FEEDS
+If an older Reader render had already produced the controls in this order:
 
-The Topic Feeds navigation hook previously ran in capture phase and called:
+  Full screen
+  Music
 
-  event.stopImmediatePropagation()
+then subsequent versions found the existing Music button and did not reorder
+the DOM. The later flex-column CSS correctly stacked the controls — but in the
+stale, wrong child order.
 
-That was unnecessarily aggressive inside the shared My Library menu.
+FIX
 
-It now runs as a normal click handler:
-- app.js still performs its normal navigation/menu cleanup;
-- Topic Feeds renders its own page afterward;
-- no other Library navigation handler is suppressed.
+On EVERY Reader render, JavaScript now explicitly enforces:
 
-BROWSE
+  1. Music
+  2. Full screen
 
-Browse is a nested <details> submenu.
+CSS also independently enforces:
+  Music order: 1
+  Full screen order: 2
 
-This patch explicitly toggles only:
-  .library-browse-submenu > summary
+There is now an 18px vertical gap for clear breathing room.
 
-so clicking Browse reliably opens/closes the nested choices even with the
-surrounding document-level Library navigation handlers.
+EXPECTED RESULT
+
+        ♫
+
+
+  [ Full screen ]
+
+Both controls remain right-aligned.
 
 PRESERVED
 
-- My Reading navigation
-- Topic Feeds editor lock
-- all current Topic Feed Reader fixes
-- IndexedDB My Music storage
-- compact music selector
-- current music/fullscreen control references
+- IndexedDB My Music storage / quota fix
+- compact playlist selector
+- current Library menu click fix
+- Topic Feed fixes
+- fullscreen button's original app.js handler
 
-No app.js, styles.css, Reader core, or database files are changed.
+No app.js or Reader core files are changed.

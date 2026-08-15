@@ -508,3 +508,23 @@
 .reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle{
   margin-right:0 !important;
 }
+
+
+/* v1.4.5 — final top-right control order.
+   JS enforces DOM order; CSS order is the independent backstop. */
+.reader-pane-controls .reader-topright-media-stack{
+  display:flex !important;
+  flex-direction:column !important;
+  align-items:flex-end !important;
+  gap:18px !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle{
+  order:1 !important;
+  align-self:flex-end !important;
+}
+
+.reader-pane-controls .reader-topright-media-stack > .viewer-fullscreen-button{
+  order:2 !important;
+  align-self:flex-end !important;
+}
