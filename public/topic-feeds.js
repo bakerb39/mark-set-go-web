@@ -1912,7 +1912,12 @@
         const article = topic?.articles?.find((item) => item.id === button.dataset.readerTopicArticle);
         if (topic && article) {
           captureTopicReaderScroll(article.id);
-          openArticle(article, button, topic);
+          // Keep the My Topics pane visually stable. The story button is
+          // navigation, not a loading-status surface, so do not let openArticle()
+          // replace its title with “Opening…” or disable/re-enable the DOM node.
+          // This matches the keyboard-cycle path and lets only the thin current
+          // story frame change after the new article is active.
+          openArticle(article, null, topic);
         }
       });
     });
@@ -1959,7 +1964,7 @@
   if (appObserver && app) appObserver.observe(app, { childList:true, subtree:true });
 
   // Topic Feed story keyboard navigation. The Reader already owns Left/Right
-  // Arrow for manual pacing, so use single-key N/P shortcuts instead of
+  // Arrow for manual pacing, so use comma/period shortcuts instead of
   // intercepting those established Reader controls.
   let topicStoryKeyboardOpening = false;
 
