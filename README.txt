@@ -1,52 +1,76 @@
-MARK, SET, GO! — FINAL READER MUSIC / FULL SCREEN ORDER FIX
+MARK, SET, GO! — TOPIC FEED SOURCE DELETE / REFRESH RACE FIX
 
-Replace all three:
-  /public/reader-music-quick.js
-  /public/reader-music-quick.css
+Replace only:
+  /public/topic-feeds.js
   /public/index.html
 
-ACTUAL BUG
+BUG REPRODUCED
 
-The earlier script only placed Music before Full screen when the Music button
-was first created.
+1. Open Manage on an existing topic.
+2. Remove a source such as Associated Press.
+3. Save Topic.
+4. The source disappears.
+5. A few seconds later it reappears.
 
-If an older Reader render had already produced the controls in this order:
+ROOT CAUSE
 
-  Full screen
-  Music
+Save Topic used:
 
-then subsequent versions found the existing Music button and did not reorder
-the DOM. The later flex-column CSS correctly stacked the controls — but in the
-stale, wrong child order.
+  saveState();
+  render();
+  refreshTopic();
+
+saveState() intentionally debounces the database write by ~450ms.
+
+But authenticated refreshTopic() immediately calls:
+
+  POST /api/topic-feeds/refresh { topicId }
+
+The server refreshes from the source list already stored in PostgreSQL.
+
+So Refresh could run BEFORE the source deletion reached the database. The
+server still saw Associated Press, refreshed it, and returned a topic containing
+Associated Press. The client then replaced the newly edited topic with that
+stale server topic.
 
 FIX
 
-On EVERY Reader render, JavaScript now explicitly enforces:
+SAVE TOPIC NOW DOES THIS IN ORDER:
 
-  1. Music
-  2. Full screen
+  1. Save edited source list locally.
+  2. Immediately PUT the new topic configuration to the database.
+  3. Wait for that PUT to finish.
+  4. Only then refresh the topic feeds.
 
-CSS also independently enforces:
-  Music order: 1
-  Full screen order: 2
+If the immediate database write cannot complete, the app does NOT ask the
+server to refresh its stale source list. It uses the newly edited client source
+list for that refresh and keeps the normal database retry scheduled.
 
-There is now an 18px vertical gap for clear breathing room.
+SECOND SAFETY LAYER
 
-EXPECTED RESULT
+A cloud refresh response is no longer allowed to overwrite:
+  - topic name
+  - cadence
+  - recommended count
+  - topic preferences
+  - SOURCE LIST
 
-        ♫
+Refresh owns downloaded article data only.
 
+Even a stale refresh response therefore cannot resurrect a deleted feed.
 
-  [ Full screen ]
+REMOVED FEED ARTICLES
 
-Both controls remain right-aligned.
+When a source is removed and Save Topic is clicked, old downloaded articles
+belonging to that source are removed from the topic as well.
 
 PRESERVED
 
-- IndexedDB My Music storage / quota fix
-- compact playlist selector
-- current Library menu click fix
-- Topic Feed fixes
-- fullscreen button's original app.js handler
+- Topic Feeds editor lock
+- Library menu click fix
+- all Reader / Book Pages / sharing fixes
+- compact My Topics header
+- IndexedDB My Music quota fix
+- final Music -> Full screen control ordering
 
-No app.js or Reader core files are changed.
+No server.js, app.js, Reader core, or database schema changes.

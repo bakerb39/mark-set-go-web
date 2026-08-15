@@ -252,6 +252,51 @@
     try { return new URL(url).href; } catch { return ''; }
   }
 
+  function sourceMatchKey(source) {
+    return {
+      id: String(source?.id || '').trim(),
+      name: String(source?.name || '').trim().toLowerCase(),
+      url: String(source?.url || '').trim().replace(/\/+$/, '').toLowerCase()
+    };
+  }
+
+  function articleBelongsToSources(article, sources) {
+    const allowed = (Array.isArray(sources) ? sources : []).map(sourceMatchKey);
+
+    const articleId = String(article?.sourceClientId || '').trim();
+    const articleName = String(article?.sourceName || '').trim().toLowerCase();
+    const articleUrl = String(article?.sourceUrl || '').trim().replace(/\/+$/, '').toLowerCase();
+
+    return allowed.some((source) => Boolean(
+      (articleId && source.id && articleId === source.id) ||
+      (articleUrl && source.url && articleUrl === source.url) ||
+      (articleName && source.name && articleName === source.name)
+    ));
+  }
+
+  function filterArticlesForSources(articles, sources) {
+    const list = Array.isArray(articles) ? articles : [];
+    if (!Array.isArray(sources) || !sources.length) return [];
+    return list.filter((article) => articleBelongsToSources(article, sources));
+  }
+
+  async function syncTopicConfigurationBeforeRefresh() {
+    if (!cloudAuthenticated) return true;
+
+    // A normal saveState() intentionally batches writes. Topic configuration
+    // is different: Refresh reads the server's saved source list, so the source
+    // edit must reach the database BEFORE Refresh can start.
+    clearTimeout(cloudSaveTimer);
+
+    const synced = await syncCloudNow();
+    if (!synced) {
+      // Keep the normal retry path alive, but tell the caller not to use the
+      // stale server-side refresh until that retry succeeds.
+      scheduleCloudSave();
+    }
+    return synced;
+  }
+
   function textTokens(value) {
     return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((word) => word.length > 3);
   }
@@ -315,13 +360,13 @@
     return request;
   }
 
-  async function refreshTopic() {
+  async function refreshTopic({ forceLocal = false } = {}) {
     const topic = currentTopic();
     if (!topic || loading || !topic.sources.length) return;
     loading = true;
     render();
     try {
-      if (cloudAuthenticated) {
+      if (cloudAuthenticated && !forceLocal) {
         preparing = true;
         render();
         const response = await fetch('/api/topic-feeds/refresh', {
@@ -332,8 +377,33 @@
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || 'Unable to refresh topic feeds.');
+
         const index = state.topics.findIndex((item) => item.id === topic.id);
-        if (index >= 0 && payload.topic) state.topics[index] = payload.topic;
+        if (index >= 0 && payload.topic) {
+          const live = state.topics[index];
+
+          // Refresh owns downloaded article data, but it must NEVER own the
+          // reader's source configuration. A stale server response therefore
+          // cannot resurrect a feed that was just removed.
+          const refreshedArticles = filterArticlesForSources(
+            payload.topic.articles,
+            live.sources
+          );
+
+          state.topics[index] = {
+            ...payload.topic,
+            id: live.id,
+            name: live.name,
+            cadence: live.cadence,
+            maxRecommended: live.maxRecommended,
+            preferences: live.preferences,
+            sources: live.sources,
+            articles: refreshedArticles,
+            lastErrors: Array.isArray(payload.topic.lastErrors)
+              ? payload.topic.lastErrors
+              : (live.lastErrors || [])
+          };
+        }
         saveState({ cloud: false });
       } else {
         const response = await fetch('/api/topic-feeds/fetch', {
@@ -1140,7 +1210,7 @@
       saveState();
       render({ force: true });
     });
-    document.getElementById('topic-feed-form')?.addEventListener('submit', (event) => {
+    document.getElementById('topic-feed-form')?.addEventListener('submit', async (event) => {
       event.preventDefault();
       const rows = [...document.querySelectorAll('.topic-feed-source-row')];
       const sources = rows.map((row) => ({
@@ -1178,7 +1248,16 @@
           ? state.topics[liveIndex]
           : { ...existing };
 
-        record = { ...live, ...formValues, id: existing.id };
+        record = {
+          ...live,
+          ...formValues,
+          id: existing.id,
+
+          // Removing a feed means removing that feed's old downloaded stories
+          // from this topic as well. Otherwise stale articles can keep making a
+          // deleted source look alive after the source itself is gone.
+          articles: filterArticlesForSources(live.articles, sources)
+        };
 
         if (liveIndex >= 0) state.topics[liveIndex] = record;
         else state.topics.push(record);
@@ -1197,11 +1276,21 @@
       activeSourceId = '';
 
       // Save means the form intentionally wins over any cloud snapshot received
-      // while editing. Push this saved state back to cloud, then refresh feeds.
+      // while editing.
       leaveTopicManager({ applyDeferred: false });
-      saveState();
+
+      // Save the local view immediately, but do NOT start the old delayed cloud
+      // write + server refresh race.
+      saveLocalState();
+      scheduleReaderNavigation();
       render({ force: true });
-      refreshTopic();
+
+      // The database source list must be current before /refresh reads it.
+      const cloudReady = await syncTopicConfigurationBeforeRefresh();
+
+      // If the immediate DB sync failed, refresh directly from the source list
+      // we just saved instead of asking the server to refresh stale sources.
+      await refreshTopic({ forceLocal: cloudAuthenticated && !cloudReady });
     });
   }
 
@@ -1218,7 +1307,7 @@
     });
     document.getElementById('topic-crypto-starter')?.addEventListener('click', starterCryptoTopic);
     document.getElementById('topic-manage')?.addEventListener('click', showManager);
-    document.getElementById('topic-refresh')?.addEventListener('click', refreshTopic);
+    document.getElementById('topic-refresh')?.addEventListener('click', () => { void refreshTopic(); });
     document.getElementById('topic-clear-source')?.addEventListener('click', () => { activeSourceId = ''; render(); });
 
     document.querySelectorAll('[data-topic-id]').forEach((button) => button.addEventListener('click', () => {
