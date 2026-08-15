@@ -21,6 +21,18 @@
   let dailyAutoOpenAttempted = false;
   let navFrame = 0;
 
+  if (!document.getElementById('topic-feed-pane-refresh-style')) {
+    const style = document.createElement('style');
+    style.id = 'topic-feed-pane-refresh-style';
+    style.textContent = `
+      .topic-feed-sidebar-actions{display:inline-flex;align-items:center;gap:.35rem}
+      #topic-pane-refresh{width:30px;height:30px;min-width:30px;padding:0;border:1px solid #1769aa;border-radius:7px;background:#1769aa;color:#fff;font-size:19px;line-height:1;cursor:pointer;display:inline-grid;place-items:center}
+      #topic-pane-refresh:hover:not(:disabled){filter:brightness(.94)}
+      #topic-pane-refresh:disabled{opacity:.55;cursor:default}
+    `;
+    document.head.appendChild(style);
+  }
+
   // New/Edit Topic is a transactional screen. Background cloud hydration,
   // authentication refreshes, and in-flight feed refreshes must never replace
   // it while the reader is typing.
@@ -860,13 +872,6 @@
         importedAt: new Date().toISOString()
       }
     });
-
-    // openDocument() rebuilds the Reader synchronously. Reattach the preserved
-    // My Topics DOM immediately, in the same JavaScript turn, rather than waiting
-    // for the MutationObserver/requestAnimationFrame navigation pass. Waiting
-    // even one frame is what makes the left panel visibly blank/repaint.
-    decorateReaderNavigation();
-
     topicFeedSourceCredit(topic, article, payload);
     scheduleReaderNavigation();
   }
@@ -906,7 +911,6 @@
         article.read = true;
         saveState();
       }
-      preserveTopicReaderNavigation(article.id);
       openPreparedArticle(topic, article, payload);
     } catch (error) {
       if (status) { status.className = 'status error'; status.textContent = error.message; }
@@ -1065,7 +1069,7 @@
         </header>
         <div class="topic-feeds-layout">
           <aside class="topic-feeds-sidebar">
-            <div class="topic-feed-sidebar-head"><strong>Topics &amp; feeds</strong><button id="topic-new" type="button" aria-label="New topic">+</button></div>
+            <div class="topic-feed-sidebar-head"><strong>Topics &amp; feeds</strong><span class="topic-feed-sidebar-actions"><button id="topic-pane-refresh" type="button" aria-label="Refresh latest stories" title="Refresh latest stories" ${(loading || preparing) ? 'disabled' : ''}>↻</button><button id="topic-new" type="button" aria-label="New topic">+</button></span></div>
             ${sidebarMarkup(topic)}
           </aside>
           <div class="topic-feeds-content">
@@ -1316,6 +1320,7 @@
     document.getElementById('topic-crypto-starter')?.addEventListener('click', starterCryptoTopic);
     document.getElementById('topic-manage')?.addEventListener('click', showManager);
     document.getElementById('topic-refresh')?.addEventListener('click', () => { void refreshTopic(); });
+    document.getElementById('topic-pane-refresh')?.addEventListener('click', () => { void refreshTopic(); });
     document.getElementById('topic-clear-source')?.addEventListener('click', () => { activeSourceId = ''; render(); });
 
     document.querySelectorAll('[data-topic-id]').forEach((button) => button.addEventListener('click', () => {
@@ -1594,7 +1599,6 @@
 
   let pendingTopicReaderScrollRestore = null;
   let topicReaderScrollRestoreTimer = 0;
-  let preservedTopicReaderNav = null;
 
   function captureTopicReaderScroll(articleId = '') {
     const pane = document.querySelector('#navigation-pane');
@@ -1605,58 +1609,6 @@
       articleId: String(articleId || ''),
       capturedAt: Date.now()
     };
-  }
-
-  function preserveTopicReaderNavigation(articleId = '') {
-    const pane = document.querySelector('#navigation-pane');
-    const nav = pane?.querySelector('.topic-reader-nav');
-    if (!pane || !nav) return false;
-
-    captureTopicReaderScroll(articleId);
-
-    // Keep the actual My Topics DOM alive while Read Anything rebuilds the
-    // surrounding Reader. This preserves expanded topics, Show all/Show fewer,
-    // focus state, and all existing article-button listeners.
-    preservedTopicReaderNav = {
-      node: nav,
-      scrollTop: Math.max(0, Number(pane.scrollTop) || 0),
-      articleId: String(articleId || ''),
-      capturedAt: Date.now()
-    };
-
-    nav.remove();
-    return true;
-  }
-
-  function restorePreservedTopicReaderNavigation() {
-    if (!preservedTopicReaderNav?.node) return false;
-
-    const pane = document.querySelector('#navigation-pane');
-    const view = pane?.querySelector('[data-reader-view="contents"]');
-    if (!pane || !view) return false;
-
-    // Use the NEW Reader's bookmark button because app.js binds that button to
-    // the newly rendered Reader. Everything else in My Topics can remain the
-    // exact same DOM nodes.
-    const nativeBookmarkButton = view.querySelector('#add-bookmark');
-    view.replaceChildren(preservedTopicReaderNav.node);
-
-    const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
-    if (nativeBookmarkButton && bookmarkSlot) {
-      nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
-      nativeBookmarkButton.textContent = '＋ Bookmark';
-      nativeBookmarkButton.title = 'Bookmark the current reading position';
-      bookmarkSlot.replaceChildren(nativeBookmarkButton);
-    }
-
-    pendingTopicReaderScrollRestore = {
-      scrollTop: preservedTopicReaderNav.scrollTop,
-      articleId: preservedTopicReaderNav.articleId,
-      capturedAt: preservedTopicReaderNav.capturedAt
-    };
-
-    preservedTopicReaderNav = null;
-    return true;
   }
 
   function restoreTopicReaderScroll() {
@@ -1760,25 +1712,20 @@
     bindTopicReaderPanePreference();
 
     if (!view.querySelector('.topic-reader-nav')) {
-      // When another Topic Feed story opens, Read Anything rebuilds the Reader.
-      // Reattach the existing My Topics navigation instead of generating it
-      // again, so the left panel does not visibly refresh or lose UI state.
-      if (!restorePreservedTopicReaderNavigation()) {
-        // IMPORTANT: renderNavigationPane() has already bound the Reader's
-        // #add-bookmark button to its native addBookmark() function. Keep that
-        // exact DOM node before replacing Contents so bookmarks continue to use
-        // the established Reader implementation.
-        const nativeBookmarkButton = view.querySelector('#add-bookmark');
+      // IMPORTANT: renderNavigationPane() has already bound the Reader's
+      // #add-bookmark button to its native addBookmark() function. Keep that
+      // exact DOM node before replacing Contents so bookmarks continue to use
+      // the established Reader implementation.
+      const nativeBookmarkButton = view.querySelector('#add-bookmark');
 
-        view.innerHTML = readerTopicListMarkup();
+      view.innerHTML = readerTopicListMarkup();
 
-        const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
-        if (nativeBookmarkButton && bookmarkSlot) {
-          nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
-          nativeBookmarkButton.textContent = '＋ Bookmark';
-          nativeBookmarkButton.title = 'Bookmark the current reading position';
-          bookmarkSlot.replaceChildren(nativeBookmarkButton);
-        }
+      const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
+      if (nativeBookmarkButton && bookmarkSlot) {
+        nativeBookmarkButton.classList.add('topic-reader-bookmark-button');
+        nativeBookmarkButton.textContent = '＋ Bookmark';
+        nativeBookmarkButton.title = 'Bookmark the current reading position';
+        bookmarkSlot.replaceChildren(nativeBookmarkButton);
       }
     }
 
@@ -1793,9 +1740,7 @@
         const topic = state.topics.find((item) => item.id === button.dataset.readerTopicParent);
         const article = topic?.articles?.find((item) => item.id === button.dataset.readerTopicArticle);
         if (topic && article) {
-          // Do not detach My Topics yet. openArticle first prepares/downloads the
-          // article; the panel is preserved only immediately before the Reader
-          // itself is replaced.
+          captureTopicReaderScroll(article.id);
           openArticle(article, button, topic);
         }
       });
