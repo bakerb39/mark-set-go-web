@@ -1991,12 +1991,17 @@ Do not provide answer keys in the exercise text.`;
 
 
 app.post('/api/mark-selection', async (req, res) => {
+  const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
+    ? String(req.body.companion).trim().toLowerCase()
+    : 'mark';
+  const companionName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
+
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
-  if (!apiKey) return res.status(503).json({ error: 'Mark is not configured. Add OPENAI_API_KEY to the server environment.' });
+  if (!apiKey) return res.status(503).json({ error: `${companionName} is not configured. Add OPENAI_API_KEY to the server environment.` });
 
   const action = String(req.body?.action || 'explain').trim();
   const allowed = new Set(['explain','summarize','analyze','simplify','context','related','ask','translate']);
-  if (!allowed.has(action)) return res.status(400).json({ error: 'Unsupported Mark action.' });
+  if (!allowed.has(action)) return res.status(400).json({ error: `Unsupported ${companionName} action.` });
 
   const selection = String(req.body?.selection || '').replace(/\s+/g,' ').trim().slice(0,12000);
   const before = String(req.body?.before || '').replace(/\s+/g,' ').trim().slice(-5000);
@@ -2005,10 +2010,6 @@ app.post('/api/mark-selection', async (req, res) => {
   const title = String(req.body?.title || 'Untitled').trim().slice(0,300);
   const chapter = String(req.body?.chapter || '').trim().slice(0,300);
   const targetLanguage = String(req.body?.targetLanguage || '').trim().slice(0,80);
-  const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
-    ? String(req.body.companion).trim().toLowerCase()
-    : 'mark';
-  const companionName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
   if (!selection || selection.split(/\s+/).length > 1800) return res.status(400).json({ error: 'Select between 1 and 1,800 words.' });
 
   const actionInstructions = {
@@ -2034,7 +2035,8 @@ app.post('/api/mark-selection', async (req, res) => {
       : `You are Mark, a careful reading companion inside an e-reader.`;
 
   const prompt=`${personaInstruction} ${actionInstructions[action]}
-Use the surrounding text only to disambiguate the selection. Never summarize or reveal later plot beyond the supplied context. Do not invent facts, allusions, authorial intentions, financial facts, or quotations. State uncertainty plainly. Keep the response useful and proportionate to the selection.`;
+Use the surrounding text only to disambiguate the selection. Never summarize or reveal later plot beyond the supplied context. Do not invent facts, allusions, authorial intentions, financial facts, or quotations. State uncertainty plainly. Keep the response useful and proportionate to the selection.
+Your active companion name is ${companionName}. If you refer to yourself anywhere in the response, use ${companionName} only. Never identify yourself as Mark, Beth, or Chad unless that is the active companion name. Do not mention the existence of alternate companions unless the reader explicitly asks about that feature.`;
   try {
     const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({
       model:COMPREHENSION_MODEL,reasoning:{effort:action==='analyze'||action==='related'?'medium':'low'},store:false,
@@ -2042,10 +2044,10 @@ Use the surrounding text only to disambiguate the selection. Never summarize or 
       text:{format:{type:'json_schema',name:'mark_selection_response',strict:true,schema}}
     })});
     const payload=await response.json().catch(()=>({}));
-    if(!response.ok) return res.status(502).json({error:'Mark could not complete the request.',detail:payload?.error?.message||`HTTP ${response.status}`});
+    if(!response.ok) return res.status(502).json({error:`${companionName} could not complete the request.`,detail:payload?.error?.message||`HTTP ${response.status}`});
     const outputText=extractOpenAIOutputText(payload); if(!outputText) throw new Error('No response text.');
-    res.json({model:COMPREHENSION_MODEL,action,result:JSON.parse(outputText)});
-  } catch(error){ console.error('Mark selection failed:',error); res.status(502).json({error:'Mark could not complete the request.'}); }
+    res.json({model:COMPREHENSION_MODEL,action,companion:{id:companion,name:companionName},result:JSON.parse(outputText)});
+  } catch(error){ console.error(`${companionName} selection failed:`,error); res.status(502).json({error:`${companionName} could not complete the request.`}); }
 });
 
 
@@ -2076,6 +2078,7 @@ app.post('/api/app-help', async (req, res) => {
 Your ONLY job in this mode is to answer questions about how to use the CURRENT APP PAGE, the controls/features described for that page, or closely related navigation needed to complete a task from that page.
 Use the supplied STORED PAGE HELP as the primary authority and GLOBAL APP HELP only for supporting navigation/context.
 Do not answer general knowledge, book-content questions, personal advice, current events, coding, or unrelated questions.
+Your active companion name is ${companionName}. If you refer to yourself in the answer, use ${companionName} only; never call yourself another companion.
 Do not discuss highlighted reading text in this mode.
 Do not invent controls, behavior, storage guarantees, or features that are not supported by the supplied help knowledge.
 When the user asks how to accomplish something, give short concrete steps and name the actual control/page when the knowledge supplies one.
@@ -5022,6 +5025,7 @@ app.post('/api/read-anything/investor-analysis', async (req, res) => {
   };
 
   const prompt = `You are ${analystName}, a careful financial-news analyst inside a reading app.
+Your active analyst/companion name is ${analystName}. If you refer to yourself in the analysis, use ${analystName} only and never identify yourself as a different companion.
 Analyze ONLY the supplied article. Treat the article as the source of facts; do not silently add current market prices, later events, or facts not contained in the supplied text.
 Provide professional-grade investor analysis while clearly distinguishing article facts from your inference.
 
@@ -5071,13 +5075,13 @@ Return only the requested structured result.`;
     const output = extractOpenAIOutputText(payload).trim();
     if (!output) throw new Error('No investor analysis was returned.');
 
-    return res.json({ title, result: JSON.parse(output), model });
+    return res.json({ title, result: JSON.parse(output), model, companion: { id: companion, name: analystName } });
   } catch (error) {
     console.error(`${analystName} investor analysis failed:`, error);
     return res.status(502).json({
       error: error?.name === 'AbortError'
-        ? 'Mark’s investor analysis took too long.'
-        : 'Mark could not complete the investor analysis.',
+        ? `${analystName}’s investor analysis took too long.`
+        : `${analystName} could not complete the investor analysis.`,
       detail: error?.message || 'Unknown investor analysis error.'
     });
   } finally {

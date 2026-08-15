@@ -1100,6 +1100,142 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     return ['topic-feed', 'bookmarklet', 'website'].includes(type);
   }
 
+  function activeArticleCompanionIdentity() {
+    const live = window.MSGCompanion?.config;
+    if (live?.id && live?.name) {
+      return {
+        id: live.id,
+        name: live.name,
+        ask: live.ask || `Ask ${live.name}`,
+        avatar: live.avatar || ''
+      };
+    }
+
+    let id = 'mark';
+    try {
+      id = String(
+        localStorage.getItem('msg_companion_persona_v2') ||
+        localStorage.getItem('msg_companion_persona_v1') ||
+        'mark'
+      ).toLowerCase();
+    } catch {}
+
+    if (id === 'chad') {
+      return {
+        id: 'chad',
+        name: 'Chad',
+        ask: 'Ask Chad',
+        avatar: '/assets/companions/chad/chad-avatar.png'
+      };
+    }
+
+    if (id === 'beth') {
+      return {
+        id: 'beth',
+        name: 'Beth',
+        ask: 'Ask Beth',
+        avatar: '/assets/companions/beth/beth-avatar.png'
+      };
+    }
+
+    return {
+      id: 'mark',
+      name: 'Mark',
+      ask: 'Ask Mark',
+      avatar: '/assets/ask-mark/ask-mark-avatar.png'
+    };
+  }
+
+  function buildInvestorFollowupContext(result = {}) {
+    const originalText = String(
+      activeImportedDocument?.versions?.original ||
+      activeImportedDocument?.originalText ||
+      ''
+    ).trim();
+
+    const lines = [
+      `Article: ${activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article'}`,
+      '',
+      'Initial investor analysis:',
+      String(result?.analysis || '').trim(),
+      Array.isArray(result?.keyPoints) && result.keyPoints.length
+        ? `Key investor takeaways:\n${result.keyPoints.map((item) => `- ${item}`).join('\n')}`
+        : '',
+      Array.isArray(result?.catalysts) && result.catalysts.length
+        ? `What to watch:\n${result.catalysts.map((item) => `- ${item}`).join('\n')}`
+        : '',
+      Array.isArray(result?.risks) && result.risks.length
+        ? `Risks:\n${result.risks.map((item) => `- ${item}`).join('\n')}`
+        : '',
+      result?.recommendation
+        ? `General investor posture:\n${result.recommendation}`
+        : '',
+      '',
+      'Article text:',
+      originalText
+    ].filter(Boolean);
+
+    // /api/mark-selection accepts at most 1,800 words and 12,000 characters.
+    // Stay below both ceilings so the normal Ask-companion chat can use this
+    // context without creating a new parallel chat system.
+    const byChars = lines.join('\n\n').slice(0, 11500);
+    return byChars.split(/\s+/).slice(0, 1700).join(' ').trim();
+  }
+
+  function primeInvestorFollowupContext(result = {}) {
+    const contextText = buildInvestorFollowupContext(result);
+    if (!contextText) return false;
+
+    const companion = activeArticleCompanionIdentity();
+    const selection = {
+      text: contextText,
+      selection: contextText,
+      before: '',
+      after: '',
+      title: activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article',
+      chapter: 'Whole article · Investor analysis',
+      documentId: '',
+      startIndex: 0,
+      endIndex: Math.max(1, contextText.split(/\s+/).length)
+    };
+
+    let connected = false;
+
+    // app.js and read-anything.js are classic deferred scripts. The Reader's
+    // existing global lexical state is therefore available here without
+    // changing Reader architecture. Setting only markSelection gives the
+    // existing text-chat runMarkAction() the context it requires.
+    try {
+      if (typeof state !== 'undefined' && state) {
+        selection.documentId = state.documentId || '';
+        selection.startIndex = Math.max(0, Number(state.index) || 0);
+        selection.endIndex = selection.startIndex + Math.max(1, contextText.split(/\s+/).length);
+        state.markSelection = selection;
+        connected = true;
+      }
+    } catch (error) {
+      console.warn('Investor follow-up context could not attach to Reader state.', error);
+    }
+
+    window.MSGInvestorArticleContext = {
+      companion,
+      selection,
+      analysis: result,
+      sourceUrl: activeImportedDocument?.source?.url || '',
+      updatedAt: new Date().toISOString()
+    };
+
+    document.dispatchEvent(new CustomEvent('marksetgo:investor-context-ready', {
+      detail: {
+        companion: companion.id,
+        title: selection.title,
+        connected
+      }
+    }));
+
+    return connected;
+  }
+
   function notifyAskMarkPanelUpdated(kind = 'response') {
     document.dispatchEvent(new CustomEvent('marksetgo:askmark-legacy-updated', {
       detail: { kind }
@@ -1138,6 +1274,8 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     const panel = openAskMarkInvestorPanel();
     if (!panel) return;
 
+    const companion = activeArticleCompanionIdentity();
+
     if (loading) {
       panel.innerHTML = `
         <div class="mark-selection-card">
@@ -1145,8 +1283,8 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           <blockquote>${escapeHtml(activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article')}</blockquote>
         </div>
         <div id="mark-response" class="mark-response">
-          <div class="mark-response-heading"><span>Ask Mark</span><strong>Investor analysis</strong></div>
-          <p class="status">Mark is analyzing the full article from an investor perspective…</p>
+          <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Investor analysis</strong></div>
+          <p class="status">${escapeHtml(companion.name)} is analyzing the full article from an investor perspective…</p>
         </div>`;
       notifyAskMarkPanelUpdated('response');
       return;
@@ -1159,7 +1297,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           <blockquote>${escapeHtml(activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article')}</blockquote>
         </div>
         <div id="mark-response" class="mark-response">
-          <div class="mark-response-heading"><span>Ask Mark</span><strong>Investor analysis</strong></div>
+          <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Investor analysis</strong></div>
           <p class="status error">${escapeHtml(error)}</p>
         </div>`;
       notifyAskMarkPanelUpdated('response');
@@ -1177,7 +1315,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         <blockquote>${escapeHtml(activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article')}</blockquote>
       </div>
       <div id="mark-response" class="mark-response" data-investor-analysis="1">
-        <div class="mark-response-heading"><span>Ask Mark</span><strong>${escapeHtml(result?.heading || 'Investor analysis')}</strong></div>
+        <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>${escapeHtml(result?.heading || 'Investor analysis')}</strong></div>
         <p>${escapeHtml(result?.analysis || '')}</p>
         ${keyPoints.length ? `<h4>Key investor takeaways</h4><ul>${keyPoints.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
         ${catalysts.length ? `<h4>What to watch</h4><ul>${catalysts.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
@@ -1188,6 +1326,9 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         <p><small>General market analysis based on this article, not personalized financial advice.</small></p>
       </div>`;
 
+    // Give the existing Ask-companion text chat a whole-article context so
+    // follow-up questions work immediately after this analysis.
+    primeInvestorFollowupContext(result || {});
     notifyAskMarkPanelUpdated('response');
   }
 
@@ -1197,6 +1338,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     const cached = activeImportedDocument.source?.investorAnalysis;
     if (cached?.analysis && cached?.recommendation) {
       renderInvestorAnalysisInAskMark(cached);
+      primeInvestorFollowupContext(cached);
       return cached;
     }
 
@@ -1223,7 +1365,8 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const message = payload.detail || payload.error || 'Mark could not complete the investor analysis.';
+      const companion = activeArticleCompanionIdentity();
+      const message = payload.detail || payload.error || `${companion.name} could not complete the investor analysis.`;
       renderInvestorAnalysisInAskMark(null, { error: message });
       throw new Error(message);
     }
@@ -1338,7 +1481,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       const investorLink = makeArticleLink(
         'investor-analysis',
         'Investor analysis',
-        'Ask Mark for investor analysis of this article'
+        'Ask the active companion for investor analysis of this article'
       );
 
       actionRow.append(summaryLink, separator, investorLink);
@@ -1386,7 +1529,10 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     const investorLink = actionRow.querySelector('[data-action="investor-analysis"]');
     if (investorLink) {
-      investorLink.title = 'Open Ask Mark for a whole-article investor analysis and general investor posture.';
+      {
+        const companion = activeArticleCompanionIdentity();
+        investorLink.title = `Open ${companion.ask} for a whole-article investor analysis and general investor posture.`;
+      }
       investorLink.onclick = async (event) => {
         event?.preventDefault?.();
         event?.stopPropagation?.();
