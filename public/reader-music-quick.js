@@ -272,11 +272,13 @@
     // every time the Reader DOM is rebuilt so only the top-right control exists.
 
     document.querySelectorAll('#app .reader-viewer-footer [data-reader-wpm-music-toggle]').forEach((button) => {
-      if (!button.closest('.reader-topright-media-stack')) button.remove();
+      if (!button.classList.contains('reader-topright-music-toggle') &&
+          !button.closest('.reader-topright-media-stack')) button.remove();
     });
 
     document.querySelectorAll('#app .control [data-reader-wpm-music-toggle]').forEach((button) => {
-      if (!button.closest('.reader-topright-media-stack')) button.remove();
+      if (!button.classList.contains('reader-topright-music-toggle') &&
+          !button.closest('.reader-topright-media-stack')) button.remove();
     });
 
     document.querySelectorAll('#app .reader-viewer-music-stack').forEach((stack) => {
@@ -311,9 +313,10 @@
       oldStack.remove();
     }
 
-    // Remove stale duplicates from prior renders.
+    // Keep one standalone top-right music button and remove only duplicates.
+    let button = document.querySelector('#app .reader-topright-music-toggle[data-reader-wpm-music-toggle]');
     document.querySelectorAll('#app [data-reader-wpm-music-toggle]').forEach((node) => {
-      if (node !== speedButton) node.remove();
+      if (node !== button && !node.closest('.reader-topright-media-stack')) node.remove();
     });
 
     const host = fullscreenButton.offsetParent || fullscreenButton.parentElement;
@@ -322,23 +325,27 @@
       return;
     }
 
-    let button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'reader-topright-music-toggle';
-    button.dataset.readerWpmMusicToggle = '1';
-    button.setAttribute('aria-label', 'Open my reading playlists');
-    button.setAttribute('aria-controls', 'reader-music-wpm-chooser');
-    button.setAttribute('aria-expanded', 'false');
-    button.title = 'My reading playlists';
-    button.innerHTML = '<span aria-hidden="true">♫</span>';
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'reader-topright-music-toggle';
+      button.dataset.readerWpmMusicToggle = '1';
+      button.setAttribute('aria-label', 'Open my reading playlists');
+      button.setAttribute('aria-controls', 'reader-music-wpm-chooser');
+      button.setAttribute('aria-expanded', 'false');
+      button.title = 'My reading playlists';
+      button.innerHTML = '<span aria-hidden="true">♫</span>';
 
-    button.addEventListener('click', () => {
-      ensureChooser();
-      if (chooser && !chooser.hidden) closeChooser();
-      else openChooser();
-    });
+      button.addEventListener('click', () => {
+        ensureChooser();
+        if (chooser && !chooser.hidden) closeChooser();
+        else openChooser();
+      });
 
-    host.appendChild(button);
+      host.appendChild(button);
+    } else if (button.parentNode !== host) {
+      host.appendChild(button);
+    }
 
     const placeButton = () => {
       if (!button.isConnected || !fullscreenButton.isConnected) return;
