@@ -95,47 +95,6 @@
     try { localStorage.setItem(FORMAT_DOCUMENT_INDEX_KEY, JSON.stringify(index)); } catch {}
   }
 
-  function pruneFormatRecordCache({ protectKey = '', maxRecords = 8, maxBytes = 2500000 } = {}) {
-    const records = [];
-
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const storageKey = localStorage.key(index) || '';
-      if (!storageKey.startsWith(FORMAT_RECORD_PREFIX)) continue;
-
-      const value = localStorage.getItem(storageKey) || '';
-      let updatedAt = 0;
-      try {
-        updatedAt = Date.parse(JSON.parse(value)?.updatedAt || '') || 0;
-      } catch {}
-
-      records.push({
-        storageKey,
-        key: storageKey.slice(FORMAT_RECORD_PREFIX.length),
-        value,
-        updatedAt,
-        bytes: (storageKey.length + value.length) * 2
-      });
-    }
-
-    records.sort((a, b) => b.updatedAt - a.updatedAt);
-
-    let totalBytes = records.reduce((sum, item) => sum + item.bytes, 0);
-    let remaining = records.length;
-
-    // Remove the oldest cached format records first. Never remove the record
-    // currently being saved unless storage is still full and the save itself fails.
-    for (let index = records.length - 1; index >= 0; index -= 1) {
-      if (remaining <= maxRecords && totalBytes <= maxBytes) break;
-
-      const item = records[index];
-      if (item.key === protectKey) continue;
-
-      localStorage.removeItem(item.storageKey);
-      totalBytes -= item.bytes;
-      remaining -= 1;
-    }
-  }
-
   function saveActiveFormatRecord() {
     if (!activeImportedDocument) return;
     const key = activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument);
@@ -150,27 +109,8 @@
       selectedVersion: activeImportedVersion || 'original',
       updatedAt: new Date().toISOString()
     };
-
-    const storageKey = formatRecordStorageKey(key);
-    const serialized = JSON.stringify(record);
-
-    // Format records can be hundreds of KB each. Keep this optional cache bounded
-    // so it cannot consume the browser's entire localStorage quota and break
-    // bookmarks, reading progress, menus, or other unrelated Reader features.
-    try {
-      pruneFormatRecordCache({ protectKey: key, maxRecords: 8, maxBytes: 2500000 });
-      localStorage.setItem(storageKey, serialized);
-      pruneFormatRecordCache({ protectKey: key, maxRecords: 8, maxBytes: 2500000 });
-    } catch (error) {
-      // If the browser is already near quota, free more cache space and retry once.
-      try {
-        pruneFormatRecordCache({ protectKey: key, maxRecords: 4, maxBytes: 1500000 });
-        localStorage.setItem(storageKey, serialized);
-      } catch (retryError) {
-        // Formatting history is optional. A failed cache write must not cascade
-        // into failures in Bookmark or the rest of the Reader.
-        console.warn('Imported formatting versions could not be stored.', retryError || error);
-      }
+    try { localStorage.setItem(formatRecordStorageKey(key), JSON.stringify(record)); } catch (error) {
+      console.warn('Imported formatting versions could not be stored.', error);
     }
   }
 
@@ -1474,6 +1414,258 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     return result;
   }
 
+
+  function buildSocialPostArticleContext() {
+    if (!activeImportedDocument) return null;
+
+    const articleText = String(
+      activeImportedDocument.versions?.original ||
+      activeImportedDocument.originalText ||
+      ''
+    ).trim();
+
+    if (articleText.length < 40) return null;
+
+    return {
+      title: activeImportedDocument.baseTitle || activeImportedDocument.title || 'Current article',
+      sourceUrl: activeImportedDocument.source?.url || '',
+      articleText,
+      companion: activeArticleCompanionIdentity()
+    };
+  }
+
+  function socialPostPrompt(style = 'default', currentDraft = '') {
+    const styleInstructions = {
+      default: 'Create an engaging social-media post based on this article. Capture the most interesting or useful insight, stay faithful to the article, and write in a natural human voice. Do not invent facts. Keep it concise enough to work on most social platforms. Include the article link only if one is available in the context.',
+      shorter: 'Rewrite the current social-media draft to be substantially shorter and punchier while preserving its main insight and factual accuracy.',
+      professional: 'Rewrite the current social-media draft in a polished, professional tone suitable for LinkedIn while keeping it natural and not overly corporate.',
+      casual: 'Rewrite the current social-media draft in a more conversational, approachable tone while preserving the article’s meaning and factual accuracy.'
+    };
+
+    const instruction = styleInstructions[style] || styleInstructions.default;
+    return currentDraft
+      ? `${instruction}\n\nCurrent draft:\n${currentDraft}`
+      : instruction;
+  }
+
+  function socialShareUrl(platform, text, sourceUrl = '') {
+    const encodedText = encodeURIComponent(String(text || '').trim());
+    const encodedUrl = encodeURIComponent(String(sourceUrl || '').trim());
+    const combined = encodeURIComponent(`${String(text || '').trim()}${sourceUrl ? `\n\n${sourceUrl}` : ''}`.trim());
+
+    switch (platform) {
+      case 'x':
+        return `https://twitter.com/intent/tweet?text=${encodedText}${sourceUrl ? `&url=${encodedUrl}` : ''}`;
+      case 'linkedin':
+        return sourceUrl
+          ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`
+          : 'https://www.linkedin.com/feed/';
+      case 'facebook':
+        return sourceUrl
+          ? `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`
+          : 'https://www.facebook.com/';
+      case 'threads':
+        return `https://www.threads.net/intent/post?text=${combined}`;
+      case 'bluesky':
+        return `https://bsky.app/intent/compose?text=${combined}`;
+      default:
+        return '';
+    }
+  }
+
+  async function copySocialPostText(text, button) {
+    const value = String(text || '').trim();
+    if (!value) return false;
+
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const helper = document.createElement('textarea');
+      helper.value = value;
+      helper.setAttribute('readonly', '');
+      helper.style.position = 'fixed';
+      helper.style.opacity = '0';
+      document.body.appendChild(helper);
+      helper.select();
+      document.execCommand('copy');
+      helper.remove();
+    }
+
+    if (button) {
+      const prior = button.textContent;
+      button.textContent = 'Copied!';
+      window.setTimeout(() => {
+        if (button.isConnected) button.textContent = prior;
+      }, 1400);
+    }
+    return true;
+  }
+
+  function renderSocialPostComposer(draft, { loading = false, error = '' } = {}) {
+    const panel = openAskMarkInvestorPanel();
+    if (!panel) return;
+
+    const context = buildSocialPostArticleContext();
+    const companion = context?.companion || activeArticleCompanionIdentity();
+    const title = context?.title || 'Current article';
+
+    if (loading) {
+      panel.innerHTML = `
+        <div class="mark-selection-card">
+          <span>Whole article · Create post</span>
+          <blockquote>${escapeHtml(title)}</blockquote>
+        </div>
+        <div id="mark-response" class="mark-response" data-social-post-composer="1">
+          <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Create social post</strong></div>
+          <p class="status">${escapeHtml(companion.name)} is drafting a social-media post from this article…</p>
+        </div>`;
+      notifyAskMarkPanelUpdated('response');
+      return;
+    }
+
+    if (error) {
+      panel.innerHTML = `
+        <div class="mark-selection-card">
+          <span>Whole article · Create post</span>
+          <blockquote>${escapeHtml(title)}</blockquote>
+        </div>
+        <div id="mark-response" class="mark-response" data-social-post-composer="1">
+          <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Create social post</strong></div>
+          <p class="status error">${escapeHtml(error)}</p>
+        </div>`;
+      notifyAskMarkPanelUpdated('response');
+      return;
+    }
+
+    panel.innerHTML = `
+      <div class="mark-selection-card">
+        <span>Whole article · Create post</span>
+        <blockquote>${escapeHtml(title)}</blockquote>
+      </div>
+      <div id="mark-response" class="mark-response" data-social-post-composer="1">
+        <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Social post</strong></div>
+        <label for="msg-social-post-draft" style="display:block;font-weight:700;margin:.2rem 0 .45rem;">Edit your post</label>
+        <textarea id="msg-social-post-draft" rows="9" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit;line-height:1.5;padding:.75rem;border:1px solid rgba(15,35,60,.22);border-radius:10px;">${escapeHtml(String(draft || '').trim())}</textarea>
+        <div class="msg-social-post-rewrite" style="display:flex;flex-wrap:wrap;gap:.45rem;margin:.7rem 0;">
+          <button type="button" class="secondary" data-social-rewrite="default">Regenerate</button>
+          <button type="button" class="secondary" data-social-rewrite="shorter">Shorter</button>
+          <button type="button" class="secondary" data-social-rewrite="professional">More professional</button>
+          <button type="button" class="secondary" data-social-rewrite="casual">More casual</button>
+        </div>
+        <div style="margin-top:.9rem;"><strong>Post to</strong></div>
+        <div class="msg-social-post-platforms" style="display:flex;flex-wrap:wrap;gap:.45rem;margin:.5rem 0;">
+          <button type="button" class="secondary" data-social-platform="x">X</button>
+          <button type="button" class="secondary" data-social-platform="linkedin">LinkedIn</button>
+          <button type="button" class="secondary" data-social-platform="facebook">Facebook</button>
+          <button type="button" class="secondary" data-social-platform="threads">Threads</button>
+          <button type="button" class="secondary" data-social-platform="bluesky">Bluesky</button>
+          <button type="button" class="primary" data-social-copy="1">Copy</button>
+        </div>
+        <p style="margin:.45rem 0 0;opacity:.72;"><small>You can edit the post before sharing. For platforms that do not allow websites to prefill post text, the draft is copied automatically before the platform opens.</small></p>
+      </div>`;
+
+    const textarea = panel.querySelector('#msg-social-post-draft');
+    const copyButton = panel.querySelector('[data-social-copy]');
+
+    copyButton?.addEventListener('click', () => copySocialPostText(textarea?.value || '', copyButton));
+
+    panel.querySelectorAll('[data-social-rewrite]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const style = button.dataset.socialRewrite || 'default';
+        const currentDraft = textarea?.value || '';
+        const oldText = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Writing…';
+        try {
+          const updated = await requestSocialPost(style, currentDraft, { preserveComposer: true });
+          if (textarea && updated) textarea.value = updated;
+        } catch (rewriteError) {
+          window.alert(rewriteError.message || 'The post could not be rewritten.');
+        } finally {
+          if (button.isConnected) {
+            button.disabled = false;
+            button.textContent = oldText;
+          }
+        }
+      });
+    });
+
+    panel.querySelectorAll('[data-social-platform]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const text = String(textarea?.value || '').trim();
+        if (!text) return;
+        const platform = button.dataset.socialPlatform;
+        const sourceUrl = context?.sourceUrl || '';
+
+        // LinkedIn and Facebook commonly ignore prefilled body text from share URLs.
+        // Copy first so the edited draft is still immediately available to paste.
+        if (platform === 'linkedin' || platform === 'facebook') {
+          await copySocialPostText(text);
+        }
+
+        const url = socialShareUrl(platform, text, sourceUrl);
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      });
+    });
+
+    notifyAskMarkPanelUpdated('response');
+  }
+
+  async function requestSocialPost(style = 'default', currentDraft = '', { preserveComposer = false } = {}) {
+    const context = buildSocialPostArticleContext();
+    if (!context) throw new Error('The original article text is unavailable.');
+
+    if (!preserveComposer) renderSocialPostComposer('', { loading: true });
+
+    const controller = new AbortController();
+    const clientTimeout = window.setTimeout(() => controller.abort(), 90000);
+    let response;
+
+    try {
+      response = await fetch('/api/read-anything/article-followup', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companion: context.companion.id,
+          title: context.title,
+          sourceUrl: context.sourceUrl,
+          articleText: context.articleText,
+          analysis: {},
+          history: [],
+          question: socialPostPrompt(style, currentDraft)
+        })
+      });
+    } catch (requestError) {
+      if (requestError?.name === 'AbortError') {
+        const message = `${context.companion.name} took too long to create the post. Please try again.`;
+        if (!preserveComposer) renderSocialPostComposer('', { error: message });
+        throw new Error(message);
+      }
+      if (!preserveComposer) renderSocialPostComposer('', { error: requestError.message || 'The post could not be created.' });
+      throw requestError;
+    } finally {
+      window.clearTimeout(clientTimeout);
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = payload.detail || payload.error || `${context.companion.name} could not create the social-media post.`;
+      if (!preserveComposer) renderSocialPostComposer('', { error: message });
+      throw new Error(message);
+    }
+
+    const draft = String(payload.result?.response || payload.result?.text || '').trim();
+    if (!draft) {
+      const message = 'The post response was empty. Please try again.';
+      if (!preserveComposer) renderSocialPostComposer('', { error: message });
+      throw new Error(message);
+    }
+
+    if (!preserveComposer) renderSocialPostComposer(draft);
+    return draft;
+  }
+
   function installArticleSummaryButton() {
     const existing = document.querySelector('#read-anything-article-summary-action');
 
@@ -1568,8 +1760,14 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         'Analyze',
         'Analyze this whole article'
       );
+      const postSeparator = separator.cloneNode(true);
+      const createPostLink = makeArticleLink(
+        'create-social-post',
+        'Create Post',
+        'Create a social media post from this whole article'
+      );
 
-      actionRow.append(summaryLink, separator, investorLink);
+      actionRow.append(summaryLink, separator, investorLink, postSeparator, createPostLink);
       reader.prepend(actionRow);
     } else if (actionRow.parentElement !== reader) {
       reader.prepend(actionRow);
@@ -1639,6 +1837,32 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           if (investorLink.isConnected) {
             investorLink.disabled = false;
             investorLink.textContent = originalLabel;
+          }
+        }
+      };
+    }
+
+    const createPostLink = actionRow.querySelector('[data-action="create-social-post"]');
+    if (createPostLink) {
+      createPostLink.textContent = 'Create Post';
+      createPostLink.setAttribute('aria-label', 'Create a social media post from this whole article');
+      createPostLink.title = 'Draft an editable social-media post from this article and choose where to share it.';
+      createPostLink.onclick = async (event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+
+        const originalLabel = createPostLink.textContent;
+        createPostLink.disabled = true;
+        createPostLink.textContent = 'Creating…';
+
+        try {
+          await requestSocialPost();
+        } catch (error) {
+          console.warn('Create social post failed:', error);
+        } finally {
+          if (createPostLink.isConnected) {
+            createPostLink.disabled = false;
+            createPostLink.textContent = originalLabel;
           }
         }
       };
