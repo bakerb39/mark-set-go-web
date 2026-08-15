@@ -2011,25 +2011,67 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     }
   }
 
+  function restoreArticleControlsAfterResume(documentId = '', title = '') {
+    const expectedId = String(documentId || '');
+    const delays = [0, 80, 220, 500, 1000, 1800, 3000];
+    let complete = false;
+
+    delays.forEach((delay) => {
+      window.setTimeout(() => {
+        if (complete) return;
+
+        const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+        const currentId = String(current?.documentId || '');
+
+        // If navigation changed documents while this retry sequence was waiting,
+        // do not attach article controls to the wrong Reader document.
+        if (expectedId && currentId && currentId !== expectedId) return;
+
+        // First try the saved Read Anything metadata for the resumed document.
+        // Continue Reading can fire document-available before that record is
+        // fully usable, so this is intentionally retried.
+        if (!activeImportedDocument && expectedId) {
+          restoreImportedFormatRecord(expectedId, title);
+        }
+
+        // The live Reader is the final source of truth. This fallback is what
+        // makes refresh + Continue Reading reliable even when the formatter
+        // record was unavailable during the first event tick.
+        const ready = ensureActiveReaderDocument();
+        if (!ready) return;
+
+        scheduleFormatControlAttach();
+        installArticleSummaryButton();
+        observeInlineArticleSummary();
+
+        if (activeImportedDocument && isWholeArticleDocument()) {
+          complete = true;
+        }
+      }, delay);
+    });
+  }
+
   document.addEventListener('marksetgo:document-available', (event) => {
     const documentId = event?.detail?.documentId;
     if (!documentId) return;
+
     if (pendingImportedRender && activeImportedDocument) {
       pendingImportedRender = false;
       const key = activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument);
-      activeImportedDocument.source = { ...(activeImportedDocument.source || {}), readerDocumentId: String(documentId) };
+      activeImportedDocument.source = {
+        ...(activeImportedDocument.source || {}),
+        readerDocumentId: String(documentId)
+      };
       rememberFormatDocument(documentId, key);
       saveActiveFormatRecord();
       scheduleFormatControlAttach();
       return;
     }
-    const restored = restoreImportedFormatRecord(documentId, event?.detail?.title || '');
-    if (restored) {
-      window.setTimeout(() => {
-        installArticleSummaryButton();
-        observeInlineArticleSummary();
-      }, 120);
-    }
+
+    restoreArticleControlsAfterResume(
+      documentId,
+      event?.detail?.title || ''
+    );
   });
 
   document.addEventListener('click', (event) => {
