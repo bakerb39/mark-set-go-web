@@ -95,6 +95,47 @@
     try { localStorage.setItem(FORMAT_DOCUMENT_INDEX_KEY, JSON.stringify(index)); } catch {}
   }
 
+  function pruneFormatRecordCache({ protectKey = '', maxRecords = 8, maxBytes = 2500000 } = {}) {
+    const records = [];
+
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const storageKey = localStorage.key(index) || '';
+      if (!storageKey.startsWith(FORMAT_RECORD_PREFIX)) continue;
+
+      const value = localStorage.getItem(storageKey) || '';
+      let updatedAt = 0;
+      try {
+        updatedAt = Date.parse(JSON.parse(value)?.updatedAt || '') || 0;
+      } catch {}
+
+      records.push({
+        storageKey,
+        key: storageKey.slice(FORMAT_RECORD_PREFIX.length),
+        value,
+        updatedAt,
+        bytes: (storageKey.length + value.length) * 2
+      });
+    }
+
+    records.sort((a, b) => b.updatedAt - a.updatedAt);
+
+    let totalBytes = records.reduce((sum, item) => sum + item.bytes, 0);
+    let remaining = records.length;
+
+    // Remove the oldest cached format records first. Never remove the record
+    // currently being saved unless storage is still full and the save itself fails.
+    for (let index = records.length - 1; index >= 0; index -= 1) {
+      if (remaining <= maxRecords && totalBytes <= maxBytes) break;
+
+      const item = records[index];
+      if (item.key === protectKey) continue;
+
+      localStorage.removeItem(item.storageKey);
+      totalBytes -= item.bytes;
+      remaining -= 1;
+    }
+  }
+
   function saveActiveFormatRecord() {
     if (!activeImportedDocument) return;
     const key = activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument);
@@ -109,8 +150,27 @@
       selectedVersion: activeImportedVersion || 'original',
       updatedAt: new Date().toISOString()
     };
-    try { localStorage.setItem(formatRecordStorageKey(key), JSON.stringify(record)); } catch (error) {
-      console.warn('Imported formatting versions could not be stored.', error);
+
+    const storageKey = formatRecordStorageKey(key);
+    const serialized = JSON.stringify(record);
+
+    // Format records can be hundreds of KB each. Keep this optional cache bounded
+    // so it cannot consume the browser's entire localStorage quota and break
+    // bookmarks, reading progress, menus, or other unrelated Reader features.
+    try {
+      pruneFormatRecordCache({ protectKey: key, maxRecords: 8, maxBytes: 2500000 });
+      localStorage.setItem(storageKey, serialized);
+      pruneFormatRecordCache({ protectKey: key, maxRecords: 8, maxBytes: 2500000 });
+    } catch (error) {
+      // If the browser is already near quota, free more cache space and retry once.
+      try {
+        pruneFormatRecordCache({ protectKey: key, maxRecords: 4, maxBytes: 1500000 });
+        localStorage.setItem(storageKey, serialized);
+      } catch (retryError) {
+        // Formatting history is optional. A failed cache write must not cascade
+        // into failures in Bookmark or the rest of the Reader.
+        console.warn('Imported formatting versions could not be stored.', retryError || error);
+      }
     }
   }
 
