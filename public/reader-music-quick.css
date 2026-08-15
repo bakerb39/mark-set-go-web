@@ -156,3 +156,72 @@
     justify-self:end
   }
 }
+
+
+/* v1.3.0 — Music belongs with the Reader's top-right utility controls.
+   The existing fullscreen button is moved into this stack without recreating it. */
+.reader-pane-controls .reader-topright-media-stack{
+  margin-left:auto;
+  display:grid;
+  justify-items:end;
+  align-items:center;
+  gap:5px;
+  flex:0 0 auto
+}
+.reader-pane-controls .reader-topright-media-stack .viewer-fullscreen-button{
+  margin:0 !important;
+  position:static !important
+}
+.reader-topright-music-toggle{
+  width:27px;
+  height:27px;
+  min-width:27px;
+  min-height:27px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:1px solid rgba(42,92,135,.22);
+  border-radius:7px;
+  background:#f7fafc;
+  color:#245f91;
+  box-shadow:0 1px 3px rgba(22,52,78,.08);
+  cursor:pointer
+}
+.reader-topright-music-toggle span{
+  font-size:.9rem;
+  line-height:1
+}
+.reader-topright-music-toggle:hover,
+.reader-topright-music-toggle:focus-visible,
+.reader-topright-music-toggle[aria-expanded="true"]{
+  border-color:rgba(36,95,145,.42);
+  background:#eaf3fa;
+  outline:none
+}
+
+/* Retire the previous visible-WPM placement if cached DOM survives. */
+.reader-viewer-footer .reader-viewer-music-stack > .reader-wpm-music-toggle{
+  display:none !important
+}
+.reader-wpm-music-empty{
+  margin:0;
+  color:#9fb1c0;
+  font-size:.65rem;
+  line-height:1.45
+}
+.reader-wpm-music-personal{
+  background:rgba(36,95,145,.055)
+}
+
+
+/* v1.3.1 — hard retirement of every legacy under-WPM music launcher. */
+.reader-viewer-footer > [data-reader-wpm-music-toggle],
+.reader-viewer-footer .reader-viewer-music-stack > [data-reader-wpm-music-toggle],
+.control:has(#speed) > [data-reader-wpm-music-toggle]{
+  display:none !important;
+}
+
+/* The ONLY active Reader music launcher is the top-right button. */
+.reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle{
+  display:grid !important;
+}

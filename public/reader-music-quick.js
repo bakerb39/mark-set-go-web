@@ -161,7 +161,7 @@
 
     chooser.innerHTML = `
       <div class="reader-wpm-music-head">
-        <div><span>Reader</span><strong>Reading Music</strong></div>
+        <div><span>Reader</span><strong>My Playlists</strong></div>
         <button type="button" data-wpm-music-close aria-label="Close music choices">×</button>
       </div>
 
@@ -173,6 +173,28 @@
         </div>` : ''}
 
       <div class="reader-wpm-music-scroll">
+        <section class="reader-wpm-music-personal">
+          <div class="reader-wpm-music-section-title">
+            <strong>My saved playlists</strong><span>${preferred.length}</span>
+          </div>
+          ${preferred.length ? `
+            <div class="reader-wpm-music-list">
+              ${preferred.slice(0, 20).map((item) => `
+                <button type="button" data-wpm-music-preferred="${esc(item.id)}">
+                  <span aria-hidden="true">▶</span>
+                  <span>
+                    <strong>${esc(item.title)}</strong>
+                    <small>${esc(item.source || (item.provider === 'spotify' ? 'Spotify' : 'Saved playlist'))}</small>
+                  </span>
+                </button>`).join('')}
+            </div>
+          ` : `
+            <p class="reader-wpm-music-empty">
+              No personal playlists saved yet. Use Manage Music &amp; Focus to save Spotify or YouTube playlists here.
+            </p>
+          `}
+        </section>
+
         ${attached.length ? `
           <section>
             <div class="reader-wpm-music-section-title"><strong>For this reading</strong><span>${attached.length}</span></div>
@@ -180,19 +202,7 @@
               ${attached.map((item) => `
                 <button type="button" data-wpm-music-preferred="${esc(item.id)}">
                   <span aria-hidden="true">▶</span>
-                  <span><strong>${esc(item.title)}</strong><small>${esc(item.source || 'Saved for this reading')}</small></span>
-                </button>`).join('')}
-            </div>
-          </section>` : ''}
-
-        ${preferred.length ? `
-          <section>
-            <div class="reader-wpm-music-section-title"><strong>Saved music</strong><span>${preferred.length}</span></div>
-            <div class="reader-wpm-music-list">
-              ${preferred.slice(0, 10).map((item) => `
-                <button type="button" data-wpm-music-preferred="${esc(item.id)}">
-                  <span aria-hidden="true">▶</span>
-                  <span><strong>${esc(item.title)}</strong><small>${esc(item.source || 'Preferred music')}</small></span>
+                  <span><strong>${esc(item.title)}</strong><small>${esc(item.source || 'Attached to this reading')}</small></span>
                 </button>`).join('')}
             </div>
           </section>` : ''}
@@ -243,48 +253,78 @@
     if (!hasPlayback()) {
       if (parts.wrap) parts.wrap.hidden = true;
       if (parts.minimize) parts.minimize.hidden = true;
-      if (parts.title) parts.title.textContent = 'Reading Music';
-      if (parts.source) parts.source.textContent = 'Choose a playlist';
+      if (parts.title) parts.title.textContent = 'My Playlists';
+      if (parts.source) parts.source.textContent = 'Choose saved music or a focus playlist';
     }
 
     speedButton?.setAttribute('aria-expanded', 'true');
     renderChooser();
   }
 
-  function insertButtonBelowViewerWpm() {
-    const footer = document.querySelector('#app .reader-viewer-footer');
-    const wpmControl = footer?.querySelector('.viewer-wpm-control');
-    if (!footer || !wpmControl) {
+  function removeLegacyWpmMusicControls() {
+    // Previous releases placed the music button under the visible WPM stepper
+    // and, even earlier, beneath the hidden #speed field. Remove either shape
+    // every time the Reader DOM is rebuilt so only the top-right control exists.
+
+    document.querySelectorAll('#app .reader-viewer-footer [data-reader-wpm-music-toggle]').forEach((button) => {
+      if (!button.closest('.reader-topright-media-stack')) button.remove();
+    });
+
+    document.querySelectorAll('#app .control [data-reader-wpm-music-toggle]').forEach((button) => {
+      if (!button.closest('.reader-topright-media-stack')) button.remove();
+    });
+
+    document.querySelectorAll('#app .reader-viewer-music-stack').forEach((stack) => {
+      const wpm = stack.querySelector('.viewer-wpm-control');
+      if (wpm && stack.parentNode) {
+        stack.parentNode.insertBefore(wpm, stack);
+      }
+      stack.remove();
+    });
+
+    document.querySelectorAll(
+      '#app .reader-wpm-music-toggle:not(.reader-topright-music-toggle)'
+    ).forEach((button) => {
+      if (!button.closest('.reader-topright-media-stack')) button.remove();
+    });
+  }
+
+  function insertTopRightMusicButton() {
+    const paneControls = document.querySelector('#app .reader-pane-controls');
+    const fullscreenButton = paneControls?.querySelector('#toggle-reader-fullscreen');
+    if (!paneControls || !fullscreenButton) {
       speedButton = null;
       return;
     }
 
-    let stack = footer.querySelector('.reader-viewer-music-stack');
+    let stack = paneControls.querySelector('.reader-topright-media-stack');
     if (!stack) {
       stack = document.createElement('div');
-      stack.className = 'reader-viewer-music-stack';
+      stack.className = 'reader-topright-media-stack';
+      stack.setAttribute('aria-label', 'Reader media and fullscreen controls');
 
-      // Move the existing WPM control into the stack rather than recreating it.
-      // Moving the node preserves app.js's existing − / + click handlers.
-      wpmControl.parentNode.insertBefore(stack, wpmControl);
-      stack.appendChild(wpmControl);
-    } else if (!stack.contains(wpmControl)) {
-      stack.prepend(wpmControl);
+      // Move the existing fullscreen DOM node into this wrapper. Moving the node
+      // preserves app.js's already-bound fullscreen click handler.
+      fullscreenButton.parentNode.insertBefore(stack, fullscreenButton);
+      stack.appendChild(fullscreenButton);
+    } else if (!stack.contains(fullscreenButton)) {
+      stack.appendChild(fullscreenButton);
     }
 
     let button = stack.querySelector('[data-reader-wpm-music-toggle]');
     if (!button) {
       button = document.createElement('button');
       button.type = 'button';
-      button.className = 'reader-wpm-music-toggle';
+      button.className = 'reader-topright-music-toggle';
       button.dataset.readerWpmMusicToggle = '1';
-      button.setAttribute('aria-label', 'Open reading music');
+      button.setAttribute('aria-label', 'Open my reading playlists');
       button.setAttribute('aria-controls', 'reader-music-wpm-chooser');
       button.setAttribute('aria-expanded', 'false');
-      button.title = 'Reading music';
+      button.title = 'My reading playlists';
       button.innerHTML = '<span aria-hidden="true">♫</span>';
 
-      stack.appendChild(button);
+      // Music sits above Full screen.
+      stack.insertBefore(button, fullscreenButton);
 
       button.addEventListener('click', () => {
         ensureChooser();
@@ -302,14 +342,20 @@
       closeChooser();
       return;
     }
+
+    removeLegacyWpmMusicControls();
     ensureChooser();
-    insertButtonBelowViewerWpm();
+    insertTopRightMusicButton();
   }
 
   function init() {
     document.querySelectorAll(
       'body > .reader-music-quick-toggle, body > .reader-music-quick-panel'
     ).forEach((node) => node.remove());
+
+    // Clean up every prior Reader-music placement before creating the current
+    // top-right control.
+    removeLegacyWpmMusicControls();
 
     ensureChooser();
     sync();
