@@ -1,53 +1,64 @@
-MARK, SET, GO! — ASK CHAD INVESTOR FOLLOW-UP CHAT FIX
+MARK, SET, GO! — WHOLE-ARTICLE ANALYSIS FOLLOW-UP FIX
 
 This package is cumulative with the current Topic Feeds / Ask Chad /
-active-companion text-sync build.
+active-companion build.
 
 Replace:
+  /server.js
+  /public/app.js
   /public/read-anything.js
   /public/index.html
 
-WHAT THE SCREENSHOT REVEALED
+WHAT CHANGED
 
-The article Investor Analysis was being inserted into the Ask-companion panel,
-but it did NOT create the Reader selection/context that the existing text-chat
-path requires.
+1. ARTICLE LINK
+   The article action now says:
+     Summarize · Analyze
+   instead of showing "Ask Chad", "Ask Mark", or "Investor analysis".
 
-The app's normal runMarkAction() returns immediately when state.markSelection
-is empty. The Ask companion chat could therefore add the user's message and
-typing dots, but there was no article context for the legacy action to send.
+   The active companion still performs the analysis; the link itself is neutral.
 
-FIX
+2. FOLLOW-UP CHAT NOW USES THE WHOLE ARTICLE
+   The prior bridge tried to squeeze article context into the Reader's legacy
+   passage-selection route. That route was designed for highlighted passages,
+   not an ongoing whole-article conversation.
 
-1. After Investor Analysis completes, Read Anything now builds a compact
-   whole-article context containing:
-   - article title
-   - initial investor analysis
-   - key investor takeaways
-   - catalysts / what to watch
-   - risks
-   - general investor posture
-   - as much original article text as safely fits
+   This fix adds a dedicated:
+     POST /api/read-anything/article-followup
 
-2. That context is attached to the Reader's existing state.markSelection.
-   This deliberately reuses the app's EXISTING text-chat / runMarkAction flow
-   instead of creating a second chat system.
+   Every follow-up after Analyze sends:
+   - the COMPLETE imported original article;
+   - the initial investor analysis;
+   - the user's new question;
+   - the recent follow-up conversation;
+   - the active companion identity.
 
-3. The context stays below the existing /api/mark-selection limits
-   (1,800 words / 12,000 characters).
+   The prompt explicitly requires the answer to synthesize the WHOLE ARTICLE,
+   not the current paragraph, highlighted selection, visible page, or summary.
 
-4. Cached investor analyses also restore this follow-up context.
+3. WHY THE TYPING DOTS COULD HANG
+   The Reader's actual runMarkAction() previously began with:
+     const selected = state.markSelection;
+     if (!selected) return;
 
-5. The Investor Analysis loading/status copy now uses the ACTIVE companion at
-   the source:
-       Chad is analyzing...
-       Beth is analyzing...
-       Mark is analyzing...
-   instead of hard-coding "Mark" and relying on a later DOM replacement.
+   So the companion UI could add the user's bubble and its typing animation,
+   while the underlying Reader action silently returned before making an API
+   request.
 
-6. The existing active-companion server/chat identity protections remain in
-   the package, so follow-up answers identify themselves as Chad when Chad is
-   selected.
+   runMarkAction() now recognizes an active whole-article analysis context and
+   calls the dedicated follow-up endpoint instead.
 
-No Reader engine, playback, pagination, virtual renderer, or Book Pages
-architecture was changed.
+4. CONVERSATION CONTINUITY
+   Recent article-analysis follow-ups are retained in memory for that article
+   so questions such as:
+     "What's the bottom line?"
+     "What would change your view?"
+     "What risk matters most?"
+   are understood as part of the same whole-article conversation.
+
+5. CONTEXT SAFETY
+   Opening another document clears the previous whole-article conversation,
+   preventing a follow-up from accidentally using the wrong article.
+
+No Reader playback, pagination, Book Pages, rendering, or reading-mode logic
+was changed. The only core change is the Ask-companion request router.

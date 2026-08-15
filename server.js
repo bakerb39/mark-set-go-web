@@ -5090,6 +5090,160 @@ Return only the requested structured result.`;
 });
 
 
+app.post('/api/read-anything/article-followup', async (req, res) => {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+
+  const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
+    ? String(req.body.companion).trim().toLowerCase()
+    : 'mark';
+  const companionName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
+
+  if (!apiKey) {
+    return res.status(503).json({
+      error: `${companionName} is not configured. Add OPENAI_API_KEY to the server environment.`
+    });
+  }
+
+  const title = String(req.body?.title || 'Current article').trim().slice(0, 300);
+  const sourceUrl = String(req.body?.sourceUrl || '').trim().slice(0, 4000);
+  const articleText = String(req.body?.articleText || '').replace(/\r/g, '').trim();
+  const question = String(req.body?.question || '').trim().slice(0, 1800);
+  const initialAnalysis = req.body?.analysis && typeof req.body.analysis === 'object'
+    ? req.body.analysis
+    : {};
+  const history = Array.isArray(req.body?.history)
+    ? req.body.history.slice(-8).map((item) => ({
+        role: item?.role === 'assistant' ? 'assistant' : 'user',
+        text: String(item?.text || '').trim().slice(0, 3000)
+      })).filter((item) => item.text)
+    : [];
+
+  if (articleText.length < 40) {
+    return res.status(400).json({ error: 'The whole article is not available for this follow-up.' });
+  }
+  if (articleText.length > 120000) {
+    return res.status(413).json({ error: 'This article is too long for a single whole-article follow-up.' });
+  }
+  if (!question) {
+    return res.status(400).json({ error: 'Enter a follow-up question.' });
+  }
+
+  const model = process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 110000);
+
+  const schema = {
+    type: 'object',
+    additionalProperties: false,
+    required: ['heading', 'response', 'keyPoints', 'cautions'],
+    properties: {
+      heading: { type: 'string' },
+      response: { type: 'string' },
+      keyPoints: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 5,
+        items: { type: 'string' }
+      },
+      cautions: {
+        type: 'array',
+        minItems: 0,
+        maxItems: 4,
+        items: { type: 'string' }
+      }
+    }
+  };
+
+  const developerPrompt = `You are ${companionName}, the active reading companion.
+This is a FOLLOW-UP conversation about a financial/news article that has already been analyzed.
+
+CRITICAL SCOPE RULE:
+Answer the user's question from the WHOLE supplied article, not merely a highlighted passage, visible paragraph, summary, excerpt, or the initial analysis. The full article is the authoritative source. The initial analysis and prior conversation are secondary context only.
+
+If the question asks for a bottom line, recommendation, implication, risk, catalyst, thesis, or investor takeaway, synthesize across the entire article.
+Clearly distinguish:
+- facts stated by the article;
+- reasonable inference;
+- uncertainty or missing information.
+
+Do not silently add later events, current prices, or outside facts that are not in the supplied article.
+Do not give personalized financial advice, portfolio allocations, or guarantees.
+If the article does not support the requested conclusion, say so directly.
+If you refer to yourself, use ${companionName} only.
+Return only the requested structured result.`;
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        reasoning: { effort: 'medium' },
+        store: false,
+        input: [
+          {
+            role: 'developer',
+            content: [{ type: 'input_text', text: developerPrompt }]
+          },
+          {
+            role: 'user',
+            content: [{
+              type: 'input_text',
+              text: JSON.stringify({
+                title,
+                sourceUrl: sourceUrl || undefined,
+                initialAnalysis,
+                priorConversation: history,
+                question,
+                wholeArticle: articleText
+              })
+            }]
+          }
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'whole_article_followup',
+            strict: true,
+            schema
+          }
+        }
+      })
+    });
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload?.error?.message || `OpenAI returned HTTP ${response.status}.`);
+    }
+
+    const output = extractOpenAIOutputText(payload).trim();
+    if (!output) throw new Error('No follow-up answer was returned.');
+
+    return res.json({
+      title,
+      result: JSON.parse(output),
+      model,
+      companion: { id: companion, name: companionName }
+    });
+  } catch (error) {
+    console.error(`${companionName} whole-article follow-up failed:`, error);
+    return res.status(502).json({
+      error: error?.name === 'AbortError'
+        ? `${companionName} took too long to answer.`
+        : `${companionName} could not answer that follow-up.`,
+      detail: error?.message || 'Unknown whole-article follow-up error.'
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+});
+
+
+
 app.post('/api/read-anything/transform', async (req, res) => {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) return res.status(503).json({ error: 'Custom transformation is not configured. Add OPENAI_API_KEY to the server environment.' });

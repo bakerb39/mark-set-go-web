@@ -1221,7 +1221,15 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       companion,
       selection,
       analysis: result,
+      // Follow-up chat is intentionally grounded in the WHOLE imported article.
+      // Keep the complete original text in memory; do not reduce it to the
+      // 1,700-word legacy selection bridge.
+      articleText: originalText,
+      title: activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article',
       sourceUrl: activeImportedDocument?.source?.url || '',
+      history: Array.isArray(window.MSGInvestorArticleContext?.history)
+        ? window.MSGInvestorArticleContext.history
+        : [],
       updatedAt: new Date().toISOString()
     };
 
@@ -1480,8 +1488,8 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
       const investorLink = makeArticleLink(
         'investor-analysis',
-        'Investor analysis',
-        'Ask the active companion for investor analysis of this article'
+        'Analyze',
+        'Analyze this whole article'
       );
 
       actionRow.append(summaryLink, separator, investorLink);
@@ -1531,7 +1539,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     if (investorLink) {
       {
         const companion = activeArticleCompanionIdentity();
-        investorLink.title = `Open ${companion.ask} for a whole-article investor analysis and general investor posture.`;
+        investorLink.title = 'Analyze the whole article and open the result in the active companion panel.';
       }
       investorLink.onclick = async (event) => {
         event?.preventDefault?.();
@@ -1698,6 +1706,9 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   function openDocument(documentRecord) {
+    // A whole-article analysis conversation belongs only to the article that
+    // created it. Never let a later document inherit that context.
+    window.MSGInvestorArticleContext = null;
     const title = cleanImportedTitle(documentRecord?.title || 'Untitled');
     const text = String(documentRecord?.text || '').trim();
     if (!text) throw new Error('No readable text was found.');
