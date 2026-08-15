@@ -1697,14 +1697,33 @@
   document.addEventListener('click', (event) => {
     const target = event.target.closest?.('[data-action="topic-feeds"]');
     if (!target) return;
-    event.preventDefault();
-    event.stopImmediatePropagation();
 
-    // Explicit top-level navigation is an intentional exit from an unsaved
-    // editor. Treat it like Cancel rather than a background rerender.
+    // Do not use capture + stopImmediatePropagation here. The main app's
+    // navigation listener still needs to close the Library menu and save normal
+    // navigation continuity. Topic Feeds simply supplies the destination that
+    // app.js intentionally does not render itself.
+    event.preventDefault();
+
     if (topicManagerIsOpen()) leaveTopicManager({ applyDeferred: true });
     render({ force: true });
-  }, true);
+
+    if (app) app.dataset.viewKey = 'topic-feeds';
+  });
+
+  // Browse is a nested <details> inside My Library. Native summary toggling is
+  // normally sufficient, but multiple document-level navigation handlers can
+  // make the interaction unreliable. Own only this summary's toggle explicitly
+  // without blocking the rest of the Library menu.
+  document.addEventListener('click', (event) => {
+    const summary = event.target.closest?.('.library-browse-submenu > summary');
+    if (!summary) return;
+
+    const details = summary.closest('.library-browse-submenu');
+    if (!details) return;
+
+    event.preventDefault();
+    details.open = !details.open;
+  });
 
   window.addEventListener('DOMContentLoaded', () => {
     if (window.MarkSetGoAuth?.session?.authenticated) void hydrateCloudState();
