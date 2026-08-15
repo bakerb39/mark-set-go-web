@@ -387,6 +387,66 @@
         credit.append(separator, link);
       }
 
+      const shareUrl = originalUrl;
+      const shareTitle = String(payload?.title || article?.title || document.title || 'Article').trim();
+
+      if (shareUrl) {
+        const share = document.createElement('div');
+        share.className = 'topic-feed-reader-share';
+        share.setAttribute('aria-label', 'Share this story');
+
+        const encodedUrl = encodeURIComponent(shareUrl);
+        const encodedTitle = encodeURIComponent(shareTitle);
+        const encodedText = encodeURIComponent(`${shareTitle} — ${shareUrl}`);
+
+        const shareItems = [
+          {
+            id: 'x',
+            label: 'Share on X',
+            href: `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`,
+            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.24 2H21l-6.03 6.9L22.06 22h-5.55l-4.35-5.69L7.19 22H4.42l6.45-7.37L4.07 2h5.69l3.93 5.2L18.24 2Zm-.97 17.7h1.53L8.92 4.18H7.28L17.27 19.7Z"/></svg>`
+          },
+          {
+            id: 'facebook',
+            label: 'Share on Facebook',
+            href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-9h3l.45-3.5H13.7V7.26c0-1.01.28-1.7 1.74-1.7h1.86V2.43A24.8 24.8 0 0 0 14.59 2c-2.68 0-4.52 1.64-4.52 4.65V9.5H7v3.5h3.07v9h3.63Z"/></svg>`
+          },
+          {
+            id: 'linkedin',
+            label: 'Share on LinkedIn',
+            href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.34 3.5A2.34 2.34 0 1 1 5.34 8.18a2.34 2.34 0 0 1 0-4.68ZM3.32 9.75h4.04V22H3.32V9.75Zm6.43 0h3.87v1.67h.05c.54-1.02 1.86-2.1 3.82-2.1 4.09 0 4.84 2.69 4.84 6.19V22h-4.03v-5.75c0-1.37-.03-3.13-1.91-3.13-1.91 0-2.2 1.49-2.2 3.03V22H9.75V9.75Z"/></svg>`
+          },
+          {
+            id: 'reddit',
+            label: 'Share on Reddit',
+            href: `https://www.reddit.com/submit?url=${encodedUrl}&title=${encodedTitle}`,
+            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.9 11.25a2.3 2.3 0 0 0-3.9-1.65 11.2 11.2 0 0 0-4.32-1.37l.73-3.42 2.39.51a1.76 1.76 0 1 0 .19-.91l-2.84-.6a.46.46 0 0 0-.55.35l-.86 4.02A11.3 11.3 0 0 0 7 9.62a2.3 2.3 0 1 0-2.53 3.73 4.17 4.17 0 0 0-.08.8c0 3.26 3.39 5.9 7.57 5.9s7.57-2.64 7.57-5.9c0-.28-.03-.55-.08-.82a2.3 2.3 0 0 0 1.45-2.08Zm-13.2 2.14a1.24 1.24 0 1 1 0-2.48 1.24 1.24 0 0 1 0 2.48Zm7.62 3.1c-.95.95-2.75 1.02-3.28 1.02-.54 0-2.35-.07-3.3-1.02a.48.48 0 0 1 .68-.68c.6.6 1.94.73 2.62.73.68 0 2.02-.13 2.61-.73a.48.48 0 1 1 .67.68Zm.98-3.1a1.24 1.24 0 1 1 0-2.48 1.24 1.24 0 0 1 0 2.48Z"/></svg>`
+          },
+          {
+            id: 'email',
+            label: 'Share by email',
+            href: `mailto:?subject=${encodedTitle}&body=${encodedText}`,
+            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm9 7.1L20.2 7H3.8L12 12.1Zm0 2.2L3 8.72V17h18V8.72l-9 5.58Z"/></svg>`
+          }
+        ];
+
+        share.innerHTML = shareItems.map((item) => `
+          <a class="topic-feed-share-button topic-feed-share-${item.id}"
+             href="${item.href}"
+             ${item.id === 'email' ? '' : 'target="_blank" rel="noopener noreferrer"'}
+             aria-label="${item.label}"
+             title="${item.label}">
+            ${item.icon}
+          </a>
+        `).join('');
+
+        // Keep the share cluster visually at the top-right of the visible story
+        // header, aligned with the source credit rather than inside article text.
+        credit.appendChild(share);
+      }
+
       // Read Anything owns the Summarize · Analyze row. Put the source
       // immediately after it so the credit is visible in Highlight, Book Pages,
       // fullscreen/resume views, and other Reader layouts.
@@ -1097,6 +1157,57 @@
     }
   }
 
+  let pendingTopicReaderScrollRestore = null;
+  let topicReaderScrollRestoreTimer = 0;
+
+  function captureTopicReaderScroll(articleId = '') {
+    const pane = document.querySelector('#navigation-pane');
+    if (!pane) return;
+
+    pendingTopicReaderScrollRestore = {
+      scrollTop: Math.max(0, Number(pane.scrollTop) || 0),
+      articleId: String(articleId || ''),
+      capturedAt: Date.now()
+    };
+  }
+
+  function restoreTopicReaderScroll() {
+    if (!pendingTopicReaderScrollRestore) return;
+
+    const pane = document.querySelector('#navigation-pane');
+    if (!pane || !isTopicFeedReaderActive()) return;
+
+    const targetTop = Math.max(0, Number(pendingTopicReaderScrollRestore.scrollTop) || 0);
+    pane.scrollTop = targetTop;
+
+    // If the rebuilt list is still finishing layout, keep the selected story in
+    // view as a fallback rather than letting the panel jump all the way to top.
+    const articleId = pendingTopicReaderScrollRestore.articleId;
+    if (articleId && Math.abs((Number(pane.scrollTop) || 0) - targetTop) > 6) {
+      const button = pane.querySelector(
+        `[data-reader-topic-article="${CSS.escape(articleId)}"]`
+      );
+      button?.scrollIntoView?.({ block: 'nearest' });
+    }
+  }
+
+  function scheduleTopicReaderScrollRestore() {
+    if (!pendingTopicReaderScrollRestore) return;
+
+    window.clearTimeout(topicReaderScrollRestoreTimer);
+
+    const delays = [0, 50, 130, 260, 520];
+    delays.forEach((delay, index) => {
+      window.setTimeout(() => {
+        restoreTopicReaderScroll();
+
+        if (index === delays.length - 1) {
+          pendingTopicReaderScrollRestore = null;
+        }
+      }, delay);
+    });
+  }
+
   function readerTopicListMarkup() {
     return `<div class="topic-reader-nav">
       <div class="topic-reader-nav-head">
@@ -1188,7 +1299,10 @@
       button.addEventListener('click', () => {
         const topic = state.topics.find((item) => item.id === button.dataset.readerTopicParent);
         const article = topic?.articles?.find((item) => item.id === button.dataset.readerTopicArticle);
-        if (topic && article) openArticle(article, button, topic);
+        if (topic && article) {
+          captureTopicReaderScroll(article.id);
+          openArticle(article, button, topic);
+        }
       });
     });
 
@@ -1215,6 +1329,10 @@
     window.setTimeout(ensureTopicBookDivider, 0);
     window.setTimeout(ensureTopicBookDivider, 160);
     window.setTimeout(ensureTopicBookDivider, 420);
+
+    // Opening another story rebuilds the Reader DOM. Put My Topics back at the
+    // exact place the reader was browsing instead of resetting to the top.
+    scheduleTopicReaderScrollRestore();
   }
 
   function scheduleReaderNavigation() {

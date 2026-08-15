@@ -237,3 +237,57 @@
   pointer-events:none;
   z-index:6;
 }
+
+
+/* v2.1.9 — compact social sharing controls for Topic Feed stories. */
+.topic-feed-reader-credit{
+  position:relative;
+  padding-right:154px;
+  min-height:24px
+}
+.topic-feed-reader-share{
+  position:absolute;
+  top:-3px;
+  right:0;
+  display:flex;
+  align-items:center;
+  gap:4px
+}
+.topic-feed-reader-share .topic-feed-share-button{
+  width:24px;
+  height:24px;
+  display:grid;
+  place-items:center;
+  border:1px solid rgba(58,83,108,.16);
+  border-radius:6px;
+  background:rgba(255,255,255,.86);
+  color:#53697d;
+  text-decoration:none;
+  box-shadow:0 1px 2px rgba(24,45,65,.04);
+  transition:background .14s ease,border-color .14s ease,color .14s ease,transform .14s ease
+}
+.topic-feed-reader-share .topic-feed-share-button:hover,
+.topic-feed-reader-share .topic-feed-share-button:focus-visible{
+  transform:translateY(-1px);
+  border-color:rgba(36,95,145,.34);
+  background:#f3f8fc;
+  color:#245f91;
+  outline:none
+}
+.topic-feed-reader-share svg{
+  width:13px;
+  height:13px;
+  fill:currentColor;
+  pointer-events:none
+}
+@media(max-width:760px){
+  .topic-feed-reader-credit{
+    padding-right:0;
+    padding-top:30px
+  }
+  .topic-feed-reader-share{
+    top:0;
+    left:0;
+    right:auto
+  }
+}
