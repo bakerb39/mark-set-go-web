@@ -295,76 +295,77 @@
   }
 
   function insertTopRightMusicButton() {
-    const paneControls = document.querySelector('#app .reader-pane-controls');
-    const fullscreenButton = paneControls?.querySelector('#toggle-reader-fullscreen');
-    if (!paneControls || !fullscreenButton) {
+    const fullscreenButton = document.querySelector('#app #toggle-reader-fullscreen');
+    if (!fullscreenButton) {
       speedButton = null;
       return;
     }
 
-    let stack = paneControls.querySelector('.reader-topright-media-stack');
-    if (!stack) {
-      stack = document.createElement('div');
-      stack.className = 'reader-topright-media-stack';
-      stack.setAttribute('aria-label', 'Reader media and fullscreen controls');
-
-      // Move the existing fullscreen DOM node into this wrapper. Moving the node
-      // preserves app.js's already-bound fullscreen click handler.
-      fullscreenButton.parentNode.insertBefore(stack, fullscreenButton);
-      stack.appendChild(fullscreenButton);
-    } else if (!stack.contains(fullscreenButton)) {
-      stack.appendChild(fullscreenButton);
+    // Undo the older wrapper approach if it exists. Full screen must stay exactly
+    // where the Reader itself placed it.
+    const oldStack = fullscreenButton.closest('.reader-topright-media-stack');
+    if (oldStack) {
+      const parent = oldStack.parentNode;
+      if (parent) parent.insertBefore(fullscreenButton, oldStack);
+      oldStack.querySelectorAll('[data-reader-wpm-music-toggle]').forEach((node) => node.remove());
+      oldStack.remove();
     }
 
-    let button = stack.querySelector('[data-reader-wpm-music-toggle]');
-    if (!button) {
-      button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'reader-topright-music-toggle';
-      button.dataset.readerWpmMusicToggle = '1';
-      button.setAttribute('aria-label', 'Open my reading playlists');
-      button.setAttribute('aria-controls', 'reader-music-wpm-chooser');
-      button.setAttribute('aria-expanded', 'false');
-      button.title = 'My reading playlists';
-      button.innerHTML = '<span aria-hidden="true">♫</span>';
+    // Remove stale duplicates from prior renders.
+    document.querySelectorAll('#app [data-reader-wpm-music-toggle]').forEach((node) => {
+      if (node !== speedButton) node.remove();
+    });
 
-      button.addEventListener('click', () => {
-        ensureChooser();
-        if (chooser && !chooser.hidden) closeChooser();
-        else openChooser();
-      });
+    const host = fullscreenButton.offsetParent || fullscreenButton.parentElement;
+    if (!host) {
+      speedButton = null;
+      return;
     }
 
-    // Keep the media controls in one predictable top-right stack.
-    // Music is above Full screen, right edges aligned. The stack itself owns
-    // the positioning so older fullscreen/music CSS cannot pull either control away.
-    if (stack.firstElementChild !== button) {
-      stack.insertBefore(button, stack.firstElementChild);
-    }
-    if (button.nextElementSibling !== fullscreenButton) {
-      stack.insertBefore(fullscreenButton, button.nextElementSibling);
-    }
+    let button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'reader-topright-music-toggle';
+    button.dataset.readerWpmMusicToggle = '1';
+    button.setAttribute('aria-label', 'Open my reading playlists');
+    button.setAttribute('aria-controls', 'reader-music-wpm-chooser');
+    button.setAttribute('aria-expanded', 'false');
+    button.title = 'My reading playlists';
+    button.innerHTML = '<span aria-hidden="true">♫</span>';
 
-    stack.style.setProperty('position', 'absolute', 'important');
-    stack.style.setProperty('top', '.55rem', 'important');
-    stack.style.setProperty('right', '.65rem', 'important');
-    stack.style.setProperty('bottom', 'auto', 'important');
-    stack.style.setProperty('left', 'auto', 'important');
-    stack.style.setProperty('display', 'flex', 'important');
-    stack.style.setProperty('flex-direction', 'column', 'important');
-    stack.style.setProperty('align-items', 'flex-end', 'important');
-    stack.style.setProperty('gap', '12px', 'important');
-    stack.style.setProperty('z-index', '8', 'important');
+    button.addEventListener('click', () => {
+      ensureChooser();
+      if (chooser && !chooser.hidden) closeChooser();
+      else openChooser();
+    });
 
-    button.style.setProperty('position', 'static', 'important');
-    button.style.setProperty('inset', 'auto', 'important');
-    button.style.setProperty('margin', '0', 'important');
-    button.style.setProperty('transform', 'none', 'important');
+    host.appendChild(button);
 
-    fullscreenButton.style.setProperty('position', 'static', 'important');
-    fullscreenButton.style.setProperty('inset', 'auto', 'important');
-    fullscreenButton.style.setProperty('margin', '0', 'important');
-    fullscreenButton.style.setProperty('transform', 'none', 'important');
+    const placeButton = () => {
+      if (!button.isConnected || !fullscreenButton.isConnected) return;
+
+      // Position Music from Full screen's *actual* rendered location.
+      // This never changes Full screen's own styles or DOM position.
+      button.style.setProperty('position', 'absolute', 'important');
+      button.style.setProperty('margin', '0', 'important');
+      button.style.setProperty('z-index', '9', 'important');
+      button.style.setProperty('left', 'auto', 'important');
+      button.style.setProperty('bottom', 'auto', 'important');
+      button.style.setProperty('transform', 'none', 'important');
+
+      const hostRect = host.getBoundingClientRect();
+      const fullRect = fullscreenButton.getBoundingClientRect();
+      const buttonRect = button.getBoundingClientRect();
+
+      const right = Math.max(0, hostRect.right - fullRect.right);
+      const top = fullRect.top - hostRect.top - buttonRect.height - 12;
+
+      button.style.setProperty('right', `${right}px`, 'important');
+      button.style.setProperty('top', `${top}px`, 'important');
+    };
+
+    placeButton();
+    window.requestAnimationFrame(placeButton);
+    window.setTimeout(placeButton, 50);
 
     speedButton = button;
   }
