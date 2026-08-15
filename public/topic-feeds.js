@@ -849,6 +849,22 @@
 
   const TOPIC_READER_PANE_PREF_KEY = 'msg-topic-feeds-left-pane-open';
   let applyingTopicReaderPanePreference = false;
+  let topicPaneUserIntentUntil = 0;
+
+  function markTopicPaneUserIntent(open) {
+    // Save the user's intent BEFORE app.js changes the layout. The My Topics
+    // MutationObserver can run during the same click; without this guard it can
+    // see the old "open" preference and immediately reopen a panel the user
+    // just closed.
+    saveTopicReaderPanePreference(open);
+    topicPaneUserIntentUntil = Date.now() + 220;
+
+    if (!open) {
+      window.clearTimeout(topicBookPageGeometryTimer);
+    } else {
+      window.setTimeout(scheduleTopicBookPageGeometrySync, 240);
+    }
+  }
 
   function topicReaderPaneShouldBeOpen() {
     try {
@@ -937,6 +953,11 @@
   function applyTopicReaderPanePreference() {
     if (!isTopicFeedReaderActive()) return;
 
+    // A real user click always wins over automatic restoration. This prevents
+    // the close/open flicker caused by decorateReaderNavigation() running from
+    // MutationObserver changes during the same interaction.
+    if (Date.now() < topicPaneUserIntentUntil) return;
+
     const layout = document.querySelector('#reader-layout');
     const toggle = document.querySelector('#toggle-navigation-pane');
     if (!layout || !toggle || applyingTopicReaderPanePreference) return;
@@ -963,22 +984,30 @@
 
   function bindTopicReaderPanePreference() {
     const toggle = document.querySelector('#toggle-navigation-pane');
-    if (!toggle || toggle.dataset.topicFeedStickyBound === '1') return;
+    const close = document.querySelector('#close-navigation-pane');
 
-    toggle.dataset.topicFeedStickyBound = '1';
-    toggle.addEventListener('click', () => {
-      if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
+    if (toggle && toggle.dataset.topicFeedStickyBound !== '1') {
+      toggle.dataset.topicFeedStickyBound = '1';
 
-      // The Reader's click handler updates the layout class during this click.
-      // Read the final state on the next tick and remember the user's choice.
-      window.setTimeout(() => {
+      // Capture phase is deliberate: persist the desired state before app.js's
+      // own click handler changes classes and triggers MutationObserver work.
+      toggle.addEventListener('click', () => {
+        if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
+
         const layout = document.querySelector('#reader-layout');
-        if (!layout || !isTopicFeedReaderActive()) return;
-        const open = !layout.classList.contains('navigation-hidden');
-        saveTopicReaderPanePreference(open);
-        if (open) scheduleTopicBookPageGeometrySync();
-      }, 0);
-    });
+        if (!layout) return;
+        const currentlyOpen = !layout.classList.contains('navigation-hidden');
+        markTopicPaneUserIntent(!currentlyOpen);
+      }, true);
+    }
+
+    if (close && close.dataset.topicFeedStickyBound !== '1') {
+      close.dataset.topicFeedStickyBound = '1';
+      close.addEventListener('click', () => {
+        if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
+        markTopicPaneUserIntent(false);
+      }, true);
+    }
   }
 
   function readerTopicListMarkup() {
