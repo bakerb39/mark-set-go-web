@@ -321,6 +321,83 @@
     }
   }
 
+  function topicFeedSourceCredit(topic, article, payload) {
+    const sourceName = String(article?.sourceName || 'Topic Feed').trim();
+    const originalUrl = String(payload?.sourceUrl || article?.url || '').trim();
+    const rawDate = article?.published || article?.publishedAt || '';
+    let dateLabel = '';
+
+    if (rawDate) {
+      const published = new Date(rawDate);
+      if (!Number.isNaN(published.getTime())) {
+        dateLabel = published.toLocaleDateString(undefined, {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      }
+    }
+
+    const apply = () => {
+      const titleCopy = document.querySelector('.reader-title-copy');
+      if (!titleCopy) return false;
+
+      titleCopy.querySelectorAll('[data-topic-feed-source-credit]').forEach((node) => node.remove());
+
+      const credit = document.createElement('div');
+      credit.className = 'topic-feed-reader-credit';
+      credit.dataset.topicFeedSourceCredit = '1';
+
+      const label = document.createElement('span');
+      label.className = 'topic-feed-reader-credit-label';
+      label.textContent = 'Source';
+
+      const source = document.createElement('strong');
+      source.textContent = sourceName;
+
+      credit.append(label, source);
+
+      if (dateLabel) {
+        const separator = document.createElement('span');
+        separator.className = 'topic-feed-reader-credit-separator';
+        separator.setAttribute('aria-hidden', 'true');
+        separator.textContent = '·';
+
+        const date = document.createElement('span');
+        date.textContent = dateLabel;
+
+        credit.append(separator, date);
+      }
+
+      if (originalUrl) {
+        const separator = document.createElement('span');
+        separator.className = 'topic-feed-reader-credit-separator';
+        separator.setAttribute('aria-hidden', 'true');
+        separator.textContent = '·';
+
+        const link = document.createElement('a');
+        link.href = originalUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'View original ↗';
+
+        credit.append(separator, link);
+      }
+
+      const title = titleCopy.querySelector('h1');
+      if (title?.nextSibling) title.parentNode.insertBefore(credit, title.nextSibling);
+      else if (title) title.insertAdjacentElement('afterend', credit);
+      else titleCopy.prepend(credit);
+
+      return true;
+    };
+
+    // openDocument renders the Reader synchronously today, but the retries keep
+    // this additive integration safe if the Reader rendering becomes async.
+    if (apply()) return;
+    [0, 60, 180, 420].forEach((delay) => window.setTimeout(apply, delay));
+  }
+
   function openPreparedArticle(topic, article, payload) {
     if (!window.MarkSetGoReadAnything?.openDocument) throw new Error('The Reader importer is not ready.');
     window.MSGTopicFeedReaderContext = {
@@ -349,6 +426,7 @@
         importedAt: new Date().toISOString()
       }
     });
+    topicFeedSourceCredit(topic, article, payload);
     scheduleReaderNavigation();
   }
 

@@ -145,3 +145,41 @@
   overflow:auto;
   padding-right:2px
 }
+
+
+/* v2.1.2 — understated publisher/source credit for Topic Feed articles. */
+.topic-feed-reader-credit{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:6px;
+  margin-top:5px;
+  color:#66788a;
+  font-size:.76rem;
+  line-height:1.35;
+  letter-spacing:.01em
+}
+.topic-feed-reader-credit-label{
+  color:#8292a2;
+  font-size:.66rem;
+  font-weight:800;
+  letter-spacing:.09em;
+  text-transform:uppercase
+}
+.topic-feed-reader-credit strong{
+  color:#40566b;
+  font-weight:700
+}
+.topic-feed-reader-credit-separator{
+  color:#a0acb7
+}
+.topic-feed-reader-credit a{
+  color:#356f9f;
+  font-weight:650;
+  text-decoration:none
+}
+.topic-feed-reader-credit a:hover,
+.topic-feed-reader-credit a:focus{
+  text-decoration:underline;
+  text-underline-offset:2px
+}

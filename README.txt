@@ -1,27 +1,29 @@
-MARK, SET, GO! — MY TOPICS READER LIST FIX
+MARK, SET, GO! — TOPIC FEED SOURCE CREDIT
 
 Replace only:
   /public/topic-feeds.js
   /public/topic-feeds.css
   /public/index.html
 
-WHY YOU ONLY SAW 3 STORIES
+WHAT CHANGES
 
-The Reader-side My Topics code had an explicit:
-  .slice(0, 3)
+Topic Feed articles now show a small professional source line immediately below
+the Reader article title:
 
-That made the My Topics panel act like a preview instead of real feed navigation.
+  SOURCE  Reuters · Aug 14, 2026 · View original ↗
 
-NEW BEHAVIOR
+The source name comes from the selected feed.
+The date is shown when the article supplies one.
+"View original" links to the original article.
 
-- Shows the 10 newest downloaded stories for each feed immediately.
-- Sorts them newest-first.
-- If a feed has more than 10 downloaded stories, shows:
-    Show all N stories
-- Clicking that reveals the rest in the same Reader side panel.
-- "Show fewer" collapses it back to 10.
-- The My Topics panel itself scrolls so a large feed list does not stretch the
-  Reader layout.
+The credit is UI metadata, not part of the article text. It therefore does NOT:
+- affect Reader word count;
+- affect reading position;
+- affect highlighting;
+- become part of summaries or Analyze context;
+- alter imported article text.
 
-No server/database changes are required for this fix.
-No app.js, Reader engine, annotation, playback, Analyze, or companion files are changed.
+Normal books and non-Topic-Feed documents are unchanged.
+
+No server/database files are changed.
+No app.js, Reader engine, annotations, playback, Analyze, or companion files are changed.
