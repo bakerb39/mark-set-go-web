@@ -23126,6 +23126,9 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 renderHome();
 
 // Keep top navigation popovers over the page rather than in document flow.
+// The top-level menu summaries are controlled explicitly instead of relying on
+// browser-native <details> timing. This prevents Reader/global click handlers
+// from causing a menu to open and immediately close.
 (function initializeOverlayNavigation() {
   const header = document.querySelector('.site-header');
   const topMenus = Array.from(document.querySelectorAll('.site-header nav > details'));
@@ -23134,23 +23137,47 @@ renderHome();
   const updateMenuTop = () => {
     document.documentElement.style.setProperty('--mobile-menu-top', `${Math.ceil(header.getBoundingClientRect().bottom + 4)}px`);
   };
+
+  const closeOthers = (except = null) => {
+    topMenus.forEach((menu) => {
+      if (menu !== except) menu.removeAttribute('open');
+    });
+  };
+
   updateMenuTop();
   window.addEventListener('resize', updateMenuTop, { passive: true });
 
   topMenus.forEach((menu) => {
+    const summary = menu.querySelector(':scope > summary');
+
+    if (summary) {
+      summary.addEventListener('click', (event) => {
+        // Own the toggle so no other delegated click handler can reverse it.
+        event.preventDefault();
+        event.stopPropagation();
+
+        const shouldOpen = !menu.hasAttribute('open');
+        closeOthers(menu);
+
+        if (shouldOpen) {
+          menu.setAttribute('open', '');
+          updateMenuTop();
+        } else {
+          menu.removeAttribute('open');
+        }
+      });
+    }
+
     menu.addEventListener('toggle', () => {
       if (!menu.open) return;
       updateMenuTop();
-      topMenus.forEach((other) => {
-        if (other !== menu) other.removeAttribute('open');
-      });
+      closeOthers(menu);
     });
   });
 
+  // Close only when the pointer is genuinely outside the entire top navigation.
   document.addEventListener('pointerdown', (event) => {
-    if (!event.target.closest('.site-header nav')) {
-      topMenus.forEach((menu) => menu.removeAttribute('open'));
-    }
+    if (!event.target.closest('.site-header nav')) closeOthers();
   });
 })();
 

@@ -15123,3 +15123,30 @@ body:not(.light) .reader-written-annotation {
 .reader-inserted-workspace.workspace-resizing { user-select:none; }
 .reader-inserted-workspace.workspace-collapsed .reader-workspace-resize { display:none; }
 .reader-inserted-workspace:not(.workspace-collapsed) .reader-workspace-tab { display:none; }
+
+
+/* v9.2.x — stable top navigation overlay.
+   Keep header dropdowns above the Reader and make an opened menu explicitly
+   interactive. This intentionally affects only top-level site navigation. */
+.site-header {
+  overflow: visible !important;
+  z-index: 20000 !important;
+}
+.site-header nav,
+.site-header nav > details {
+  overflow: visible !important;
+}
+.site-header nav > details {
+  position: relative !important;
+}
+.site-header nav > details[open] {
+  z-index: 20001 !important;
+}
+.site-header nav > details[open] > .menu-popover,
+.site-header nav > details[open] > .professional-library-menu {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 20002 !important;
+}
