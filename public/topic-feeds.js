@@ -321,6 +321,77 @@
     }
   }
 
+  function decorateTopicFeedArticleFooter() {
+    if (!isTopicFeedReaderActive()) return;
+
+    const reader = document.querySelector('#reader');
+    if (!reader) return;
+
+    reader.querySelectorAll(
+      '.topic-feed-article-footer, .topic-feed-article-footer-source, .topic-feed-article-footer-url'
+    ).forEach((node) => {
+      node.classList.remove(
+        'topic-feed-article-footer',
+        'topic-feed-article-footer-source',
+        'topic-feed-article-footer-url'
+      );
+    });
+    reader.querySelectorAll('.topic-feed-article-footer-break').forEach((node) => {
+      node.classList.remove('topic-feed-article-footer-break');
+    });
+
+    const words = Array.from(reader.querySelectorAll('.reader-word[data-index]'));
+    if (!words.length) return;
+
+    // Publisher imports often end with:
+    //   Source: TechCrunch
+    //   https://...
+    // Find only a Source marker near the end so ordinary uses of the word
+    // "source" inside an article are never restyled.
+    const tail = words.slice(Math.max(0, words.length - 80));
+    let sourceWord = null;
+    for (let index = tail.length - 1; index >= 0; index -= 1) {
+      const text = String(tail[index].textContent || '').trim();
+      if (/^source:?$/i.test(text)) {
+        sourceWord = tail[index];
+        break;
+      }
+    }
+    if (!sourceWord) return;
+
+    const sourceIndex = Number(sourceWord.dataset.index);
+    if (!Number.isFinite(sourceIndex)) return;
+
+    const sourceGroup = sourceWord.closest('.reader-group[data-start-index]');
+    if (!sourceGroup) return;
+
+    const previous = sourceGroup.previousElementSibling;
+    if (previous?.classList.contains('reader-paragraph-break')) {
+      previous.classList.add('topic-feed-article-footer-break');
+    }
+
+    const groups = Array.from(reader.querySelectorAll('.reader-group[data-start-index]'));
+    groups.forEach((group) => {
+      const start = Number(group.dataset.startIndex);
+      const end = Number(group.dataset.endIndex);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= sourceIndex) return;
+
+      group.classList.add('topic-feed-article-footer');
+      if (start <= sourceIndex && end > sourceIndex) {
+        group.classList.add('topic-feed-article-footer-source');
+      }
+    });
+
+    words.forEach((word) => {
+      const index = Number(word.dataset.index);
+      if (!Number.isFinite(index) || index < sourceIndex) return;
+      const text = String(word.textContent || '').trim();
+      if (/^https?:\/\//i.test(text)) {
+        word.classList.add('topic-feed-article-footer-url');
+      }
+    });
+  }
+
   function topicFeedSourceCredit(topic, article, payload) {
     const sourceName = String(article?.sourceName || 'Topic Feed').trim();
     const originalUrl = String(payload?.sourceUrl || article?.url || '').trim();
@@ -471,6 +542,7 @@
           if (credit && actionRow && credit.previousElementSibling !== actionRow) {
             actionRow.insertAdjacentElement('afterend', credit);
           }
+          decorateTopicFeedArticleFooter();
         }
       }, delay);
     });
@@ -1333,6 +1405,10 @@
     // Opening another story rebuilds the Reader DOM. Put My Topics back at the
     // exact place the reader was browsing instead of resetting to the top.
     scheduleTopicReaderScrollRestore();
+
+    // Reader mode/word-count changes rebuild .reader-group elements. Reapply
+    // the small provenance footer treatment without altering currentText.
+    decorateTopicFeedArticleFooter();
   }
 
   function scheduleReaderNavigation() {

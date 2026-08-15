@@ -303,3 +303,43 @@
   page-break-inside:auto !important;
   -webkit-column-break-inside:auto !important;
 }
+
+
+/* v2.1.11 — cleaner article spacing + understated publisher footer. */
+.topic-feed-reader-credit{
+  /* One clear reading-line of breathing room before the article begins. */
+  margin-bottom:1.15em !important;
+}
+
+/* The imported source/URL at the end stays in currentText for provenance,
+   but reads visually as metadata rather than article body copy. */
+#reader .reader-paragraph-break.topic-feed-article-footer-break{
+  height:1.05em;
+  position:relative;
+}
+#reader .reader-paragraph-break.topic-feed-article-footer-break::after{
+  content:"";
+  position:absolute;
+  left:0;
+  right:62%;
+  bottom:.25em;
+  height:1px;
+  background:rgba(71,91,109,.13);
+}
+#reader .reader-group.topic-feed-article-footer{
+  font-size:.76em;
+  line-height:1.45;
+  color:#71808e;
+  letter-spacing:.006em;
+}
+#reader .reader-group.topic-feed-article-footer-source{
+  color:#5f7080;
+  font-weight:600;
+}
+#reader .reader-word.topic-feed-article-footer-url{
+  font-size:.9em;
+  color:#8795a1;
+  font-weight:400;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+}

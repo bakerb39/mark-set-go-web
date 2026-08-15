@@ -1,39 +1,33 @@
-MARK, SET, GO! — TOPIC FEED BOOK PAGES FLOW FIX
+MARK, SET, GO! — TOPIC FEED ARTICLE SPACING + FOOTER POLISH
 
 Replace only:
+  /public/topic-feeds.js
   /public/topic-feeds.css
   /public/index.html
 
-WHY A LEFT PAGE COULD LOOK BLANK
+CHANGES
 
-The Reader's normal Book Pages CSS uses:
+1. ARTICLE START SPACING
+   Adds one clean reading-line of space between the top source/share header and
+   the first article paragraph.
 
-  .reader.book-pages-layout .reader-group {
-    break-inside: avoid;
-  }
+2. END-OF-ARTICLE SOURCE + URL
+   Keeps the imported provenance in the Reader text, but styles it as compact
+   metadata:
+   - subtle separator
+   - smaller muted source line
+   - slightly smaller/lighter raw URL
+   - long URLs wrap cleanly
 
-That is useful for some structured Reader content, but Topic Feed articles now
-also have the small article controls/source/share header at the top.
+The footer remains part of the imported article text, so no content is silently
+removed. The styling is reapplied when Reader mode/word-count changes rebuild
+reader groups.
 
-For some stories, the first article group no longer fit in the remaining space
-on page 1. Because the group was forbidden from splitting, the browser moved
-the entire group to page 2, leaving almost all of page 1 blank.
-
-FIX
-
-For Topic Feed articles in Book Pages only:
-
-  break-inside: auto
-
-Article text can now continue naturally from the left page to the right page
-instead of moving an entire paragraph/group to the next column.
-
-NORMAL BOOKS ARE UNCHANGED.
-
-PRESERVED:
-- social/share icons
-- source credit
-- centered Book Pages divider
+PRESERVED
+- social share icons
+- top source credit / View original
+- Topic Feed Book Pages flow fix
+- centered divider
 - My Topics sticky/open-close behavior
 - My Topics scroll-position restoration
 - Bookmark preservation
