@@ -1654,6 +1654,7 @@
         <h2>My Topics</h2>
         <div class="topic-reader-nav-actions">
           <span data-reader-bookmark-slot></span>
+          <button type="button" data-reader-refresh-topics title="Refresh all topics with the latest stories">↻ Refresh</button>
           <button type="button" data-reader-manage-topics>Manage</button>
         </div>
       </div>
@@ -1683,6 +1684,126 @@
           }).join('')}
         </details>`).join('') : '<p class="navigation-empty">No Topic Feeds yet.</p>'}
     </div>`;
+  }
+
+  let readerTopicsRefreshing = false;
+
+  function rebuildReaderTopicListPreservingControls() {
+    const pane = document.querySelector('#navigation-pane');
+    const view = pane?.querySelector('[data-reader-view="contents"]');
+    const existingNav = view?.querySelector('.topic-reader-nav');
+    if (!view || !existingNav) return;
+
+    const scrollTop = Math.max(0, Number(pane.scrollTop) || 0);
+    const openTopicIds = new Set(
+      Array.from(existingNav.querySelectorAll('.topic-reader-group[open]'))
+        .map((details) => details.querySelector('[data-reader-topic-parent]')?.dataset.readerTopicParent || details.querySelector('summary strong')?.textContent || '')
+        .filter(Boolean)
+    );
+    const nativeBookmarkButton = existingNav.querySelector('#add-bookmark');
+
+    const holder = document.createElement('div');
+    holder.innerHTML = readerTopicListMarkup();
+    const freshNav = holder.firstElementChild;
+    if (!freshNav) return;
+
+    if (nativeBookmarkButton) {
+      const bookmarkSlot = freshNav.querySelector('[data-reader-bookmark-slot]');
+      bookmarkSlot?.replaceChildren(nativeBookmarkButton);
+    }
+
+    // Preserve which topic cards were expanded. Prefer IDs from article buttons,
+    // and fall back to matching the visible topic name when a topic has no stories.
+    freshNav.querySelectorAll('.topic-reader-group').forEach((details) => {
+      const articleButton = details.querySelector('[data-reader-topic-parent]');
+      const key = articleButton?.dataset.readerTopicParent || details.querySelector('summary strong')?.textContent || '';
+      if (openTopicIds.has(key)) details.open = true;
+    });
+
+    existingNav.replaceWith(freshNav);
+    pane.scrollTop = scrollTop;
+  }
+
+  async function refreshReaderTopics(trigger) {
+    if (readerTopicsRefreshing) return;
+    const topics = state.topics.filter((topic) => Array.isArray(topic.sources) && topic.sources.length);
+    if (!topics.length) return;
+
+    readerTopicsRefreshing = true;
+    const originalLabel = trigger?.textContent || '↻ Refresh';
+    if (trigger) {
+      trigger.disabled = true;
+      trigger.textContent = 'Refreshing…';
+    }
+
+    try {
+      for (const topic of topics) {
+        if (cloudAuthenticated) {
+          const response = await fetch('/api/topic-feeds/refresh', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topicId: topic.id })
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(payload.error || `Unable to refresh ${topic.name}.`);
+
+          const index = state.topics.findIndex((item) => item.id === topic.id);
+          if (index >= 0 && payload.topic) {
+            const live = state.topics[index];
+            state.topics[index] = {
+              ...payload.topic,
+              id: live.id,
+              name: live.name,
+              cadence: live.cadence,
+              maxRecommended: live.maxRecommended,
+              preferences: live.preferences,
+              sources: live.sources,
+              articles: filterArticlesForSources(payload.topic.articles, live.sources),
+              lastErrors: Array.isArray(payload.topic.lastErrors) ? payload.topic.lastErrors : (live.lastErrors || [])
+            };
+          }
+        } else {
+          const response = await fetch('/api/topic-feeds/fetch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topic: topic.name, sources: topic.sources })
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(payload.error || `Unable to refresh ${topic.name}.`);
+
+          const existingRead = new Set((topic.articles || []).filter((article) => article.read).map((article) => article.url));
+          topic.articles = (payload.articles || []).map((article) => ({ ...article, read: existingRead.has(article.url) }));
+          topic.lastErrors = payload.sources?.filter?.((source) => !source.ok).map((source) => source.error) || [];
+          topic.lastRefresh = new Date().toISOString();
+          curate(topic);
+          const selected = [...topic.articles].sort((a,b) => Number(b.recommended)-Number(a.recommended)).slice(0,60);
+          await prefetchArticles(selected, { wait: true }).catch(() => null);
+          topic.preparedAt = new Date().toISOString();
+        }
+      }
+
+      saveState({ cloud: false });
+      rebuildReaderTopicListPreservingControls();
+      scheduleReaderNavigation();
+    } catch (error) {
+      console.warn('Reader topic refresh failed:', error);
+      if (trigger) {
+        trigger.textContent = 'Refresh failed';
+        trigger.title = error?.message || 'Unable to refresh topics.';
+        window.setTimeout(() => {
+          if (!trigger.isConnected) return;
+          trigger.textContent = originalLabel;
+          trigger.title = 'Refresh all topics with the latest stories';
+        }, 2200);
+      }
+    } finally {
+      readerTopicsRefreshing = false;
+      if (trigger?.isConnected) {
+        trigger.disabled = false;
+        if (trigger.textContent === 'Refreshing…') trigger.textContent = originalLabel;
+      }
+    }
   }
 
   function decorateReaderNavigation() {
@@ -1727,6 +1848,12 @@
         nativeBookmarkButton.title = 'Bookmark the current reading position';
         bookmarkSlot.replaceChildren(nativeBookmarkButton);
       }
+    }
+
+    const readerRefreshButton = view.querySelector('[data-reader-refresh-topics]');
+    if (readerRefreshButton && readerRefreshButton.dataset.bound !== '1') {
+      readerRefreshButton.dataset.bound = '1';
+      readerRefreshButton.addEventListener('click', () => { void refreshReaderTopics(readerRefreshButton); });
     }
 
     view.querySelector('[data-reader-manage-topics]')?.addEventListener('click', () => {
