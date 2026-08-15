@@ -41,3 +41,85 @@
   .topic-feed-article-actions { flex-direction:row; align-self:stretch; }
   .topic-feed-form-row, .topic-feed-source-row { grid-template-columns:1fr; }
 }
+
+/* Topic Feeds v2 ------------------------------------------------------- */
+.topic-feed-topic-group{display:grid;gap:4px}
+.topic-feed-source-list{display:grid;gap:3px;padding:0 0 4px 10px}
+.topic-feed-source-nav{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px;align-items:center}
+.topic-feed-source-nav>button:first-child{
+  min-width:0;display:flex;justify-content:space-between;gap:8px;align-items:center;
+  padding:7px 8px;border:1px solid transparent;border-radius:8px;background:transparent;text-align:left
+}
+.topic-feed-source-nav>button:first-child:hover,.topic-feed-source-nav.active>button:first-child{
+  border-color:rgba(36,95,145,.26);background:rgba(36,95,145,.07)
+}
+.topic-feed-source-nav>button:first-child span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topic-feed-source-nav small{opacity:.65;white-space:nowrap}
+.topic-daily-choice{
+  padding:5px 7px!important;min-width:0!important;border-radius:999px!important;
+  font-size:.72rem!important;background:transparent!important
+}
+.topic-daily-choice.active{border-color:var(--accent-gold,#c9a227)!important;background:rgba(201,162,39,.12)!important;font-weight:800}
+.topic-feed-downloaded{
+  border:1px solid rgba(36,95,145,.28);border-radius:999px;padding:2px 7px;font-weight:700;
+  color:#245f91;background:rgba(36,95,145,.06)
+}
+.topic-feed-clear-source{
+  margin:0 0 12px;padding:5px 0;border:0;background:transparent;color:#245f91;font-weight:700;text-align:left
+}
+.topic-feed-recommendation-box{
+  border:1px solid var(--border-color,#d6dbe5);border-radius:14px;padding:14px;background:rgba(36,95,145,.025)
+}
+#topic-feed-recommendations{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:9px}
+.topic-feed-recommendation{
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;
+  border:1px solid rgba(100,116,139,.17);border-radius:11px;padding:11px;background:#fff
+}
+.topic-feed-recommendation p{margin:3px 0 0;font-size:.82rem;font-weight:400;line-height:1.35;color:#607287}
+.topic-feed-recommendation button{min-width:54px}
+.topic-recommendation-note{grid-column:1/-1;margin:4px 0;color:#607287;font-weight:500}
+.topic-source-help{margin:0 0 8px;color:#607287;font-size:.86rem}
+.topic-feed-source-row{
+  grid-template-columns:1fr .62fr 1.45fr auto auto;
+}
+.topic-source-daily{
+  display:flex!important;grid-template-columns:auto 1fr!important;align-items:center;gap:6px!important;
+  white-space:nowrap;font-size:.78rem;font-weight:700!important;padding:0 5px
+}
+.topic-source-daily input{margin:0}
+.topic-morning-settings{
+  display:flex;align-items:end;gap:16px;flex-wrap:wrap;padding:12px 14px;
+  border:1px solid rgba(100,116,139,.16);border-radius:12px;background:rgba(248,251,254,.78)
+}
+.topic-morning-settings label{min-width:180px}
+.topic-morning-settings span{padding-bottom:8px;color:#607287;font-size:.86rem}
+
+/* Reader-side My Topics replacement for feed articles. */
+.topic-reader-nav{display:grid;gap:9px}
+.topic-reader-nav-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.topic-reader-nav-head h2{margin:0}
+.topic-reader-nav-head button{padding:5px 8px;font-size:.78rem}
+.topic-reader-group{
+  border:1px solid rgba(100,116,139,.16);border-radius:10px;overflow:hidden;background:rgba(255,255,255,.55)
+}
+.topic-reader-group>summary{
+  cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px 10px;list-style:none
+}
+.topic-reader-group>summary::-webkit-details-marker{display:none}
+.topic-reader-group>summary span{font-size:.72rem;opacity:.68}
+.topic-reader-source{display:grid;gap:5px;padding:8px 10px;border-top:1px solid rgba(100,116,139,.12)}
+.topic-reader-source-head{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:.78rem}
+.topic-reader-source-head span{opacity:.65}
+.topic-reader-article{
+  display:block;width:100%;padding:6px 7px;border:0;border-radius:7px;background:rgba(36,95,145,.055);
+  text-align:left;font-size:.78rem;line-height:1.3;color:inherit
+}
+.topic-reader-article:hover{background:rgba(36,95,145,.11)}
+.topic-reader-article.is-read{opacity:.62}
+.topic-reader-source>small{opacity:.62}
+
+@media(max-width:850px){
+  .topic-feed-source-list{padding-left:0}
+  .topic-feed-source-row{grid-template-columns:1fr}
+  #topic-feed-recommendations{grid-template-columns:1fr}
+}

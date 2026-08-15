@@ -59,6 +59,32 @@ const CURRENT_READING_SOURCES = [
   { id: 'books', category: 'interests', name: 'Books & Literary Culture', description: 'Books, authors, criticism, and literary culture.', feedUrl: 'https://news.google.com/rss/search?q=books+literary+criticism+authors&hl=en-US&gl=US&ceid=US:en', siteUrl: 'https://news.google.com/search?q=books%20literary%20criticism' }
 ];
 
+
+const TOPIC_FEED_RECOMMENDED_SOURCES = Object.freeze([
+  { key:'reuters', name:'Reuters', type:'website', url:'https://www.reuters.com/', description:'Broad international, business, markets, politics, technology, and breaking-news coverage.', tags:['news','world','international','business','markets','economy','economics','politics','technology','energy','health'] },
+  { key:'ap', name:'Associated Press', type:'website', url:'https://apnews.com/', description:'Straightforward breaking news and broad national/international reporting.', tags:['news','world','us','politics','government','elections','business','science','health','sports'] },
+  { key:'bbc', name:'BBC News', type:'website', url:'https://www.bbc.com/news', description:'International news, politics, business, science, technology, and culture.', tags:['news','world','international','politics','business','science','technology','culture','health'] },
+  { key:'npr', name:'NPR', type:'website', url:'https://www.npr.org/', description:'News, culture, science, health, economics, books, and public affairs.', tags:['news','culture','science','health','economics','books','politics','education'] },
+  { key:'coindesk', name:'CoinDesk', type:'website', url:'https://www.coindesk.com/', description:'Cryptocurrency, digital assets, markets, regulation, and blockchain business.', tags:['crypto','cryptocurrency','bitcoin','ethereum','blockchain','digital assets','markets','investing','regulation'] },
+  { key:'bitcoin-magazine', name:'Bitcoin Magazine', type:'website', url:'https://bitcoinmagazine.com/', description:'Bitcoin-focused news, mining, policy, markets, and ecosystem coverage.', tags:['bitcoin','crypto','cryptocurrency','mining','lightning','blockchain','markets'] },
+  { key:'sec', name:'U.S. Securities and Exchange Commission', type:'website', url:'https://www.sec.gov/', description:'Official U.S. securities regulation, enforcement, filings, speeches, and releases.', tags:['sec','securities','investing','markets','regulation','finance','stocks','etf','crypto','enforcement'] },
+  { key:'fed', name:'Federal Reserve', type:'website', url:'https://www.federalreserve.gov/', description:'Official monetary policy, interest-rate decisions, economic research, and financial-system releases.', tags:['federal reserve','fed','interest rates','inflation','economy','economics','monetary policy','banking','markets'] },
+  { key:'bls', name:'Bureau of Labor Statistics', type:'website', url:'https://www.bls.gov/', description:'Official inflation, employment, wages, productivity, and labor-market data.', tags:['inflation','jobs','employment','unemployment','wages','economy','cpi','labor'] },
+  { key:'ars', name:'Ars Technica', type:'website', url:'https://arstechnica.com/', description:'Technology, computing, AI, science, cybersecurity, and digital policy.', tags:['technology','tech','ai','artificial intelligence','computing','cybersecurity','science','software','internet'] },
+  { key:'verge', name:'The Verge', type:'website', url:'https://www.theverge.com/', description:'Consumer technology, AI, software, platforms, gadgets, and media.', tags:['technology','tech','ai','artificial intelligence','software','gadgets','internet','media'] },
+  { key:'techcrunch', name:'TechCrunch', type:'website', url:'https://techcrunch.com/', description:'Technology companies, startups, venture capital, AI, and product news.', tags:['technology','tech','startups','venture capital','ai','artificial intelligence','software','business'] },
+  { key:'mit-tech', name:'MIT Technology Review', type:'website', url:'https://www.technologyreview.com/', description:'Emerging technology, artificial intelligence, biotechnology, climate, and computing.', tags:['technology','ai','artificial intelligence','science','biotechnology','climate','computing','innovation'] },
+  { key:'nature', name:'Nature', type:'website', url:'https://www.nature.com/', description:'Research news and commentary across science, medicine, climate, and technology.', tags:['science','research','medicine','health','biology','physics','climate','technology'] },
+  { key:'nasa', name:'NASA', type:'website', url:'https://www.nasa.gov/', description:'Official space exploration, astronomy, Earth science, missions, and discoveries.', tags:['space','nasa','astronomy','science','moon','mars','rocket','earth science'] },
+  { key:'nih', name:'National Institutes of Health', type:'website', url:'https://www.nih.gov/', description:'Official biomedical research, health science, and medical research news.', tags:['health','medicine','medical','research','biomedical','disease','science'] },
+  { key:'cdc', name:'CDC', type:'website', url:'https://www.cdc.gov/', description:'Official public-health guidance, surveillance, outbreaks, and health data.', tags:['health','public health','disease','outbreak','medicine','epidemiology','cdc'] },
+  { key:'stat', name:'STAT', type:'website', url:'https://www.statnews.com/', description:'Medicine, biotechnology, health policy, pharmaceuticals, and life-science business.', tags:['health','medicine','biotech','pharma','health policy','science','business'] },
+  { key:'smithsonian', name:'Smithsonian Magazine', type:'website', url:'https://www.smithsonianmag.com/', description:'History, archaeology, science, culture, and discovery reporting.', tags:['history','archaeology','science','culture','museum','discovery'] },
+  { key:'archaeology', name:'Archaeology Magazine', type:'website', url:'https://www.archaeology.org/', description:'Archaeological discoveries, ancient history, sites, and field research.', tags:['archaeology','ancient history','history','artifacts','excavation'] },
+  { key:'lithub', name:'Literary Hub', type:'website', url:'https://lithub.com/', description:'Books, authors, criticism, publishing, essays, and literary culture.', tags:['books','literature','authors','publishing','reading','writing','culture'] },
+  { key:'espn', name:'ESPN', type:'website', url:'https://www.espn.com/', description:'Major U.S. and international sports news, analysis, teams, and leagues.', tags:['sports','football','basketball','baseball','hockey','soccer','tennis','golf'] }
+]);
+
 function stripMarkup(value) {
   const $ = cheerio.load(`<div>${String(value || '')}</div>`);
   return $('div').text().replace(/\s+/g, ' ').trim();
@@ -4008,6 +4034,453 @@ app.post('/api/current/article', async (req, res) => {
   }
 });
 
+
+/* Topic Feeds v2: recommendations + cloud persistence + prepared mornings. */
+let topicFeedSchemaPromise = null;
+
+async function ensureTopicFeedSchema() {
+  if (!databaseConfigured()) return false;
+  if (!topicFeedSchemaPromise) {
+    topicFeedSchemaPromise = query(`
+      create table if not exists topic_feed_accounts (
+        user_id uuid primary key references app_users(id) on delete cascade,
+        state jsonb not null default '{"topics":[]}'::jsonb,
+        preferences jsonb not null default '{}'::jsonb,
+        last_morning_refresh_date date,
+        last_daily_open_date date,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      );
+      create table if not exists topic_feed_prepared_articles (
+        user_id uuid not null references app_users(id) on delete cascade,
+        article_id text not null,
+        topic_id text not null,
+        source_id text not null,
+        url text not null,
+        title text not null,
+        prepared_text text not null,
+        prepared_metadata jsonb not null default '{}'::jsonb,
+        prepared_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        primary key(user_id, article_id)
+      );
+      create index if not exists topic_feed_prepared_articles_source_idx
+        on topic_feed_prepared_articles(user_id, source_id, prepared_at desc);
+    `).then(() => true).catch((error) => {
+      topicFeedSchemaPromise = null;
+      throw error;
+    });
+  }
+  return topicFeedSchemaPromise;
+}
+
+function topicFeedTokens(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((word) => word.length > 2);
+}
+
+function topicFeedSourceScore(source, topic) {
+  const phrase = String(topic || '').toLowerCase();
+  const tokens = new Set(topicFeedTokens(topic));
+  const haystack = `${source.name} ${source.description} ${(source.tags || []).join(' ')}`.toLowerCase();
+  let score = ['reuters','ap','bbc','npr'].includes(source.key) ? 1 : 0;
+  for (const tag of source.tags || []) {
+    const lower = String(tag).toLowerCase();
+    if (phrase.includes(lower) || lower.includes(phrase)) score += 16;
+    topicFeedTokens(lower).forEach((token) => { if (tokens.has(token)) score += 6; });
+  }
+  tokens.forEach((token) => { if (haystack.includes(token)) score += 2; });
+  return score;
+}
+
+function recommendTopicFeedSources(topic, limit = 8) {
+  const ranked = TOPIC_FEED_RECOMMENDED_SOURCES
+    .map((source) => ({ ...source, score: topicFeedSourceScore(source, topic) }))
+    .sort((a,b) => b.score - a.score || a.name.localeCompare(b.name));
+  const relevant = ranked.filter((item) => item.score > 1);
+  const fallback = ranked.filter((item) => ['reuters','ap','bbc','npr'].includes(item.key));
+  const merged = [...relevant];
+  fallback.forEach((item) => { if (!merged.some((x) => x.key === item.key)) merged.push(item); });
+  return merged.slice(0, Math.max(1, Math.min(12, Number(limit) || 8))).map(({tags,score,...item}) => item);
+}
+
+function topicFeedTitleSimilarity(a, b) {
+  const left = new Set(topicFeedTokens(a)), right = new Set(topicFeedTokens(b));
+  if (!left.size || !right.size) return 0;
+  let overlap = 0;
+  left.forEach((word) => { if (right.has(word)) overlap += 1; });
+  return overlap / Math.min(left.size, right.size);
+}
+
+function curateTopicFeedArticles(articles, topic) {
+  const topicTerms = topicFeedTokens(topic?.name || '');
+  const prefTerms = topicFeedTokens(topic?.preferences || '');
+  const ranked = [...articles].map((article) => {
+    const body = `${article.title || ''} ${article.summary || ''}`.toLowerCase();
+    let score = Math.max(0, 8 - (Number(article.sourceRank) || 0));
+    topicTerms.forEach((term) => { if (body.includes(term)) score += 8; });
+    prefTerms.forEach((term) => { if (body.includes(term)) score += 3; });
+    const published = Date.parse(article.published || '');
+    if (Number.isFinite(published) && published > 0) {
+      const ageHours = Math.max(0, (Date.now() - published) / 3600000);
+      score += Math.max(0, 14 - ageHours / 8);
+    }
+    return { ...article, score };
+  }).sort((a,b) => b.score - a.score);
+
+  const picks = [];
+  for (const article of ranked) {
+    if (picks.some((item) => topicFeedTitleSimilarity(item.title, article.title) >= .66)) continue;
+    picks.push(article);
+    if (picks.length >= Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8))) break;
+  }
+  const ids = new Set(picks.map((item) => item.id));
+  return ranked.map((item) => ({ ...item, recommended: ids.has(item.id) }));
+}
+
+function sanitizeTopicFeedState(raw) {
+  const topics = (Array.isArray(raw?.topics) ? raw.topics : []).slice(0, 60).map((topic) => ({
+    id: cleanText(topic?.id, 200),
+    name: cleanText(topic?.name, 200),
+    cadence: topic?.cadence === 'weekly' ? 'weekly' : 'daily',
+    maxRecommended: Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8)),
+    preferences: cleanText(topic?.preferences, 4000),
+    sources: (Array.isArray(topic?.sources) ? topic.sources : []).slice(0, 30).map((source) => ({
+      id: cleanText(source?.id, 200),
+      name: cleanText(source?.name, 200),
+      type: source?.type === 'rss' ? 'rss' : 'website',
+      url: cleanText(source?.url, 2000),
+      origin: source?.origin === 'recommended' ? 'recommended' : 'manual',
+      recommendationKey: cleanText(source?.recommendationKey, 120)
+    })).filter((source) => source.id && source.name && source.url),
+    articles: (Array.isArray(topic?.articles) ? topic.articles : []).slice(0, 300).map((article) => ({
+      id: cleanText(article?.id, 200),
+      cloudId: cleanText(article?.cloudId, 100),
+      title: cleanText(article?.title, 1200),
+      url: cleanText(article?.url, 4000),
+      summary: cleanText(article?.summary, 8000),
+      published: article?.published || '',
+      author: cleanText(article?.author, 500),
+      sourceName: cleanText(article?.sourceName, 200),
+      sourceUrl: cleanText(article?.sourceUrl, 2000),
+      sourceType: article?.sourceType === 'rss' ? 'rss' : 'website',
+      sourceClientId: cleanText(article?.sourceClientId, 200),
+      feedMode: cleanText(article?.feedMode, 120),
+      sourceRank: clampInteger(article?.sourceRank, 0, 1000),
+      recommended: Boolean(article?.recommended),
+      prepared: Boolean(article?.prepared),
+      read: Boolean(article?.read)
+    })).filter((article) => article.id && article.title && article.url),
+    lastRefresh: topic?.lastRefresh || null,
+    preparedAt: topic?.preparedAt || null,
+    lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : []).slice(0, 30).map((value) => cleanText(value, 1000))
+  })).filter((topic) => topic.id && topic.name);
+  return { topics };
+}
+
+function sanitizeTopicFeedPreferences(raw) {
+  return {
+    timezone: cleanText(raw?.timezone, 100) || 'America/New_York',
+    morningHour: clampInteger(raw?.morningHour ?? 5, 0, 23),
+    dailyOpenSourceId: cleanText(raw?.dailyOpenSourceId, 200)
+  };
+}
+
+async function getTopicFeedAccount(userId) {
+  await ensureTopicFeedSchema();
+  const result = await query(`select state, preferences, last_morning_refresh_date, last_daily_open_date
+                              from topic_feed_accounts where user_id=$1`, [userId]);
+  const row = result.rows[0];
+  return {
+    state: sanitizeTopicFeedState(row?.state || { topics:[] }),
+    preferences: sanitizeTopicFeedPreferences(row?.preferences || {}),
+    lastMorningRefreshDate: row?.last_morning_refresh_date || null,
+    lastDailyOpenDate: row?.last_daily_open_date || null
+  };
+}
+
+async function saveTopicFeedAccount(userId, state, preferences, extra = {}) {
+  await ensureTopicFeedSchema();
+  const cleanState = sanitizeTopicFeedState(state);
+  const cleanPrefs = sanitizeTopicFeedPreferences(preferences);
+  await query(`
+    insert into topic_feed_accounts(user_id,state,preferences,last_morning_refresh_date,last_daily_open_date,updated_at)
+    values($1,$2::jsonb,$3::jsonb,$4::date,$5::date,now())
+    on conflict(user_id) do update set
+      state=excluded.state,
+      preferences=excluded.preferences,
+      last_morning_refresh_date=coalesce(excluded.last_morning_refresh_date,topic_feed_accounts.last_morning_refresh_date),
+      last_daily_open_date=coalesce(excluded.last_daily_open_date,topic_feed_accounts.last_daily_open_date),
+      updated_at=now()
+  `, [
+    userId, JSON.stringify(cleanState), JSON.stringify(cleanPrefs),
+    extra.lastMorningRefreshDate || null, extra.lastDailyOpenDate || null
+  ]);
+  return { state:cleanState, preferences:cleanPrefs };
+}
+
+async function fetchTopicFeedEdition(topic, requestedSources) {
+  const cleanTopic = cleanText(topic, 200);
+  const sources = Array.isArray(requestedSources) ? requestedSources.slice(0, 30) : [];
+  if (!cleanTopic) throw new Error('A topic is required.');
+  if (!sources.length) throw new Error('Add at least one source.');
+
+  const articles = [];
+  const sourceResults = [];
+  for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex += 1) {
+    const rawSource = sources[sourceIndex] || {};
+    const type = rawSource?.type === 'rss' ? 'rss' : 'website';
+    const rawUrl = cleanText(rawSource?.url, 2000);
+    const name = cleanText(rawSource?.name, 200) || rawUrl;
+    const sourceClientId = cleanText(rawSource?.id, 200);
+    if (!rawUrl) continue;
+    try {
+      const parsed = await validatePublicUrl(rawUrl);
+      let feedUrl = parsed.toString(), items = [], mode = 'rss';
+      if (type === 'website') {
+        const discoveredFeed = await discoverPublisherFeed(parsed.toString());
+        if (discoveredFeed?.items?.length) {
+          feedUrl = discoveredFeed.feedUrl;
+          items = discoveredFeed.items;
+          mode = discoveredFeed.verified ? 'verified-publisher-feed' : 'publisher-feed';
+        } else {
+          const publisherItems = await discoverPublisherPageArticles(parsed.toString(), cleanTopic);
+          if (publisherItems.length) {
+            items = publisherItems; feedUrl = parsed.toString(); mode = 'publisher-page';
+          } else {
+            feedUrl = topicFeedGoogleNewsUrl(cleanTopic, parsed.hostname);
+            items = await fetchFeedItems({ feedUrl });
+            mode = 'google-news-fallback';
+          }
+        }
+      } else {
+        items = await fetchFeedItems({ feedUrl });
+      }
+      for (const item of items) {
+        articles.push({
+          id: crypto.createHash('sha1').update(`${sourceClientId || name}|${item.link}|${item.title}`).digest('hex'),
+          title:item.title, url:item.link, summary:item.summary || '', published:item.published || '',
+          author:item.author || '', sourceName:name, sourceUrl:rawUrl, sourceType:type,
+          sourceClientId, sourceRank:sourceIndex, feedMode:mode
+        });
+      }
+      sourceResults.push({ id:sourceClientId, name, url:rawUrl, ok:true, count:items.length, feedUrl, mode });
+    } catch (error) {
+      sourceResults.push({ id:sourceClientId, name, url:rawUrl, ok:false, count:0, error:error?.message || 'The source could not be refreshed.' });
+    }
+  }
+  const seen = new Set();
+  const deduped = articles.filter((article) => {
+    const key = String(article.url || '').toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key); return true;
+  }).sort((a,b) => (Date.parse(b.published || '') || 0) - (Date.parse(a.published || '') || 0)).slice(0,300);
+  return { topic:cleanTopic, articles:deduped, sources:sourceResults };
+}
+
+async function prepareAndStoreTopicArticle(userId, topic, article) {
+  const cached = await query(`select prepared_text, prepared_metadata from topic_feed_prepared_articles
+                              where user_id=$1 and article_id=$2`, [userId, article.id]);
+  if (cached.rows[0]?.prepared_text) {
+    return { text:cached.rows[0].prepared_text, ...(cached.rows[0].prepared_metadata || {}) };
+  }
+  const payload = await prepareTopicArticle({
+    originalUrl:article.url, title:article.title, summary:article.summary || '',
+    source:article.sourceName || 'Topic Feed', publisherUrl:article.sourceUrl || ''
+  });
+  const metadata = {
+    title:payload.title || article.title, fullArticle:payload.fullArticle !== false,
+    sourceUrl:payload.sourceUrl || article.url, repairedUrl:Boolean(payload.repairedUrl),
+    warning:payload.warning || '', documentToc:Array.isArray(payload.documentToc) ? payload.documentToc : []
+  };
+  await query(`
+    insert into topic_feed_prepared_articles
+      (user_id,article_id,topic_id,source_id,url,title,prepared_text,prepared_metadata,prepared_at,updated_at)
+    values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,now(),now())
+    on conflict(user_id,article_id) do update set
+      topic_id=excluded.topic_id, source_id=excluded.source_id, url=excluded.url, title=excluded.title,
+      prepared_text=excluded.prepared_text, prepared_metadata=excluded.prepared_metadata,
+      prepared_at=now(), updated_at=now()
+  `, [userId, article.id, topic.id, article.sourceClientId || '', article.url, article.title, String(payload.text || ''), JSON.stringify(metadata)]);
+  return { text:String(payload.text || ''), ...metadata };
+}
+
+async function refreshTopicFeedForAccount(userId, topicId, { prepare = true } = {}) {
+  const account = await getTopicFeedAccount(userId);
+  const topic = account.state.topics.find((item) => item.id === topicId);
+  if (!topic) throw new Error('Topic not found.');
+  const edition = await fetchTopicFeedEdition(topic.name, topic.sources);
+  const oldRead = new Set((topic.articles || []).filter((article) => article.read).map((article) => article.url));
+  topic.articles = curateTopicFeedArticles(edition.articles, topic).map((article) => ({
+    ...article, read:oldRead.has(article.url), prepared:false
+  }));
+  topic.lastErrors = edition.sources.filter((source) => !source.ok).map((source) => source.error || `${source.name} could not be loaded.`);
+  topic.lastRefresh = new Date().toISOString();
+
+  if (prepare) {
+    const selected = [...topic.articles]
+      .sort((a,b) => Number(b.recommended) - Number(a.recommended) || (Date.parse(b.published || '') || 0) - (Date.parse(a.published || '') || 0))
+      .slice(0,60);
+    let cursor = 0;
+    const workers = Math.min(5, selected.length);
+    async function worker() {
+      while (cursor < selected.length) {
+        const article = selected[cursor++];
+        try {
+          await prepareAndStoreTopicArticle(userId, topic, article);
+          article.prepared = true;
+        } catch {}
+      }
+    }
+    await Promise.all(Array.from({length:workers}, () => worker()));
+    topic.preparedAt = new Date().toISOString();
+  }
+  await saveTopicFeedAccount(userId, account.state, account.preferences);
+  return topic;
+}
+
+function localTopicFeedDate(timezone, date = new Date()) {
+  let formatter;
+  try {
+    formatter = new Intl.DateTimeFormat('en-CA',{timeZone:timezone || 'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'});
+  } catch {
+    formatter = new Intl.DateTimeFormat('en-CA',{timeZone:'UTC',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'});
+  }
+  const parts = Object.fromEntries(formatter.formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type,part.value]));
+  return { date:`${parts.year}-${parts.month}-${parts.day}`, hour:Number(parts.hour) || 0 };
+}
+
+async function refreshDueTopicFeeds({ now = new Date(), userLimit = 200 } = {}) {
+  if (!databaseConfigured()) return { usersChecked:0, usersRefreshed:0, topicsRefreshed:0 };
+  await ensureTopicFeedSchema();
+  const rows = await query(`select user_id,state,preferences,last_morning_refresh_date from topic_feed_accounts
+                            where jsonb_array_length(coalesce(state->'topics','[]'::jsonb)) > 0
+                            order by updated_at desc limit $1`, [Math.max(1,Math.min(1000,Number(userLimit)||200))]);
+  let usersRefreshed = 0, topicsRefreshed = 0;
+  for (const row of rows.rows) {
+    const prefs = sanitizeTopicFeedPreferences(row.preferences || {});
+    const local = localTopicFeedDate(prefs.timezone, now);
+    if (local.hour < prefs.morningHour || String(row.last_morning_refresh_date || '') === local.date) continue;
+    const state = sanitizeTopicFeedState(row.state || {});
+    let userDidRefresh = false;
+    for (const topic of state.topics) {
+      const last = topic.lastRefresh ? Date.parse(topic.lastRefresh) : 0;
+      if (topic.cadence === 'weekly' && last && Date.now() - last < 6.5 * 86400000) continue;
+      try {
+        await refreshTopicFeedForAccount(row.user_id, topic.id, {prepare:true});
+        topicsRefreshed += 1; userDidRefresh = true;
+      } catch (error) {
+        console.error(`Topic Feed morning refresh failed for ${topic.name}:`, error.message);
+      }
+    }
+    const account = await getTopicFeedAccount(row.user_id);
+    await saveTopicFeedAccount(row.user_id, account.state, account.preferences, {lastMorningRefreshDate:local.date});
+    if (userDidRefresh) usersRefreshed += 1;
+  }
+  return { usersChecked:rows.rows.length, usersRefreshed, topicsRefreshed };
+}
+
+app.get('/api/topic-feeds/recommend', (req,res) => {
+  const topic = cleanText(req.query?.topic,200);
+  res.json({ topic, sources:topic ? recommendTopicFeedSources(topic,8) : [] });
+});
+
+app.get('/api/topic-feeds/state', async (req,res) => {
+  try {
+    const user = await requireAccountUser(req,res); if (!user) return;
+    const account = await getTopicFeedAccount(user.id);
+    res.json({ ...account.state, preferences:account.preferences, lastMorningRefreshDate:account.lastMorningRefreshDate, lastDailyOpenDate:account.lastDailyOpenDate });
+  } catch (error) {
+    console.error('Topic Feed state load failed:', error);
+    res.status(500).json({error:'Unable to load Topic Feeds.'});
+  }
+});
+
+app.put('/api/topic-feeds/state', async (req,res) => {
+  try {
+    const user = await requireAccountUser(req,res); if (!user) return;
+    const saved = await saveTopicFeedAccount(user.id, req.body || {}, req.body?.preferences || {});
+    res.json({ ...saved.state, preferences:saved.preferences });
+  } catch (error) {
+    console.error('Topic Feed state save failed:', error);
+    res.status(500).json({error:'Unable to save Topic Feeds.'});
+  }
+});
+
+app.post('/api/topic-feeds/import', async (req,res) => {
+  try {
+    const user = await requireAccountUser(req,res); if (!user) return;
+    const current = await getTopicFeedAccount(user.id);
+    if (!current.state.topics.length) {
+      const saved = await saveTopicFeedAccount(user.id, req.body || {}, req.body?.preferences || {});
+      return res.json({ ...saved.state, preferences:saved.preferences, imported:true });
+    }
+    res.json({ ...current.state, preferences:current.preferences, imported:false });
+  } catch (error) {
+    console.error('Topic Feed import failed:', error);
+    res.status(500).json({error:'Unable to migrate Topic Feeds to your account.'});
+  }
+});
+
+app.post('/api/topic-feeds/refresh', async (req,res) => {
+  try {
+    const user = await requireAccountUser(req,res); if (!user) return;
+    const topic = await refreshTopicFeedForAccount(user.id, cleanText(req.body?.topicId,200), {prepare:true});
+    res.json({topic});
+  } catch (error) {
+    console.error('Topic Feed refresh failed:', error);
+    res.status(502).json({error:error?.message || 'Unable to refresh Topic Feed.'});
+  }
+});
+
+app.post('/api/topic-feeds/open', async (req,res) => {
+  try {
+    const user = await requireAccountUser(req,res); if (!user) return;
+    const articleId = cleanText(req.body?.articleId,200);
+    const account = await getTopicFeedAccount(user.id);
+    let topic = null, article = null;
+    for (const candidate of account.state.topics) {
+      const found = candidate.articles.find((item) => item.id === articleId);
+      if (found) { topic = candidate; article = found; break; }
+    }
+    if (!topic || !article) return res.status(404).json({error:'Article not found.'});
+    const payload = await prepareAndStoreTopicArticle(user.id, topic, article);
+    article.read = true; article.prepared = true;
+    await saveTopicFeedAccount(user.id, account.state, account.preferences);
+    res.json({article,payload,topic:{id:topic.id,name:topic.name}});
+  } catch (error) {
+    console.error('Topic Feed article open failed:', error);
+    res.status(502).json({error:error?.message || 'The prepared article could not be opened.'});
+  }
+});
+
+app.post('/api/topic-feeds/daily-open', async (req,res) => {
+  try {
+    const user = await requireAccountUser(req,res); if (!user) return;
+    const account = await getTopicFeedAccount(user.id);
+    const sourceId = account.preferences.dailyOpenSourceId;
+    if (!sourceId) return res.json({article:null,reason:'no-daily-source'});
+    const local = localTopicFeedDate(account.preferences.timezone,new Date());
+    if (String(account.lastDailyOpenDate || '') === local.date) return res.json({article:null,reason:'already-opened-today'});
+    let topic = null;
+    let candidates = [];
+    for (const item of account.state.topics) {
+      const matches = item.articles.filter((article) => article.sourceClientId === sourceId);
+      if (matches.length) { topic = item; candidates = matches; break; }
+    }
+    if (!topic || !candidates.length) return res.json({article:null,reason:'no-article'});
+    candidates.sort((a,b) => Number(a.read)-Number(b.read) || (Date.parse(b.published || '')||0)-(Date.parse(a.published || '')||0));
+    const article = candidates[0];
+    const payload = await prepareAndStoreTopicArticle(user.id,topic,article);
+    article.read = true; article.prepared = true;
+    await saveTopicFeedAccount(user.id,account.state,account.preferences,{lastDailyOpenDate:local.date});
+    res.json({article,payload,topic:{id:topic.id,name:topic.name},autoOpened:true});
+  } catch (error) {
+    console.error('Daily Topic Feed open failed:', error);
+    res.status(502).json({error:error?.message || 'Daily reading could not be opened.'});
+  }
+});
+
+
 app.post('/api/topic-feeds/prefetch', async (req, res) => {
   const articles = Array.isArray(req.body?.articles) ? req.body.articles.slice(0, 60) : [];
   if (!articles.length) return res.json({ prepared: 0, failed: 0 });
@@ -5620,108 +6093,45 @@ app.get('/api/crypto-ticker', async (_req, res) => {
 
 
 app.post('/api/topic-feeds/fetch', async (req, res) => {
-  const topic = cleanText(req.body?.topic, 200);
-  const requestedSources = Array.isArray(req.body?.sources) ? req.body.sources.slice(0, 30) : [];
-  if (!topic) return res.status(400).json({ error: 'A topic is required.' });
-  if (!requestedSources.length) return res.status(400).json({ error: 'Add at least one source.' });
-
-  const articles = [];
-  const sourceResults = [];
-
-  for (const rawSource of requestedSources) {
-    const type = rawSource?.type === 'rss' ? 'rss' : 'website';
-    const rawUrl = cleanText(rawSource?.url, 2000);
-    const name = cleanText(rawSource?.name, 200) || rawUrl;
-    if (!rawUrl) continue;
-
-    try {
-      const parsed = await validatePublicUrl(rawUrl);
-      let feedUrl = parsed.toString();
-      let items = [];
-      let mode = 'rss';
-
-      if (type === 'website') {
-        const discoveredFeed = await discoverPublisherFeed(parsed.toString());
-
-        if (discoveredFeed?.items?.length) {
-          feedUrl = discoveredFeed.feedUrl;
-          items = discoveredFeed.items;
-          mode = discoveredFeed.verified ? 'verified-publisher-feed' : 'publisher-feed';
-        } else {
-          const publisherItems = await discoverPublisherPageArticles(parsed.toString(), topic);
-          if (publisherItems.length) {
-            items = publisherItems;
-            feedUrl = parsed.toString();
-            mode = 'publisher-page';
-          } else {
-            feedUrl = topicFeedGoogleNewsUrl(topic, parsed.hostname);
-            items = await fetchFeedItems({ feedUrl });
-            mode = 'google-news-fallback';
-          }
-        }
-      } else {
-        items = await fetchFeedItems({ feedUrl });
-      }
-
-      for (const item of items) {
-        articles.push({
-          id: crypto.createHash('sha1').update(`${name}|${item.link}|${item.title}`).digest('hex'),
-          title: item.title,
-          url: item.link,
-          summary: item.summary || '',
-          published: item.published || '',
-          sourceName: name,
-          sourceUrl: rawUrl,
-          sourceType: type,
-          feedMode: mode
-        });
-      }
-
-      sourceResults.push({
-        name,
-        url: rawUrl,
-        ok: true,
-        count: items.length,
-        feedUrl,
-        mode
-      });
-    } catch (error) {
-      sourceResults.push({
-        name,
-        url: rawUrl,
-        ok: false,
-        count: 0,
-        error: error?.message || 'The source could not be refreshed.'
-      });
-    }
+  try {
+    const edition = await fetchTopicFeedEdition(cleanText(req.body?.topic,200), Array.isArray(req.body?.sources) ? req.body.sources : []);
+    res.json(edition);
+  } catch (error) {
+    res.status(/required|at least one source/i.test(error?.message || '') ? 400 : 502)
+      .json({error:error?.message || 'Unable to refresh topic feeds.'});
   }
-
-  const seen = new Set();
-  const deduped = articles
-    .filter((article) => {
-      const key = String(article.url || '').trim().toLowerCase();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .sort((a, b) => {
-      const at = Date.parse(a.published || '') || 0;
-      const bt = Date.parse(b.published || '') || 0;
-      return bt - at;
-    })
-    .slice(0, 300);
-
-  res.json({ topic, articles: deduped, sources: sourceResults });
 });
 
-const server = app.listen(PORT, () => console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`));
+let server = null;
+let topicFeedMorningTimer = null;
+
+if (require.main === module) {
+  server = app.listen(PORT, () => {
+    console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`);
+    if (databaseConfigured()) {
+      ensureTopicFeedSchema().catch((error) => console.error('Topic Feed schema check failed:', error.message));
+      topicFeedMorningTimer = setInterval(() => {
+        refreshDueTopicFeeds().catch((error) => console.error('Topic Feed morning refresh failed:', error.message));
+      }, 30 * 60 * 1000);
+      topicFeedMorningTimer.unref?.();
+    }
+  });
+}
 
 async function shutdown(signal) {
   console.log(`${signal} received; shutting down.`);
+  if (topicFeedMorningTimer) clearInterval(topicFeedMorningTimer);
+  if (!server) {
+    await closeDatabase().catch((error) => console.error('Database shutdown error:', error.message));
+    return;
+  }
   server.close(async () => {
     await closeDatabase().catch((error) => console.error('Database shutdown error:', error.message));
     process.exit(0);
   });
 }
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
+if (require.main === module) {
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}
+module.exports = { app, ensureTopicFeedSchema, refreshDueTopicFeeds };
