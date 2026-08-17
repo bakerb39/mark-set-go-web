@@ -486,6 +486,12 @@ html.msg-workspace-pane-document body{
   background:#fff !important;
   overflow-x:hidden;
 }
+html.msg-workspace-pane-document:not(.msg-workspace-pane-ready) body{
+  visibility:hidden !important;
+}
+html.msg-workspace-pane-document.msg-workspace-pane-ready body{
+  visibility:visible !important;
+}
 html.msg-workspace-pane-document .site-header,
 html.msg-workspace-pane-document #msg-shared-bottom{
   display:none !important;

@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.3.5
+ * Mark, Set, Go! Workspace Experiment v0.3.6
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -77,8 +77,54 @@
 
   function initializeWorkspacePaneDocument() {
     document.documentElement.classList.add('msg-workspace-pane-document');
+    window.MSGWorkspacePane = true;
+    window.__MSG_WORKSPACE_PANE__ = true;
     const mode = PARAMS.get('msgWorkspaceMode') || 'action';
     const value = PARAMS.get('msgWorkspaceValue') || 'home';
+
+    function renderRequestedPageDirectly() {
+      if (mode !== 'action') return false;
+
+      // Use the app's actual renderer directly when one exists. This avoids
+      // replaying the full top-navigation pipeline inside a workspace pane,
+      // which can invoke Reader continuity/navigation behavior that belongs to
+      // the outer app rather than this secondary view.
+      try {
+        switch (value) {
+          case 'home': if (typeof renderHome === 'function') { renderHome(); return true; } break;
+          case 'browse': if (typeof renderBrowseHub === 'function') { renderBrowseHub(); return true; } break;
+          case 'my-library': if (typeof renderMyLibraryHub === 'function') { renderMyLibraryHub(); return true; } break;
+          case 'profile-preferences': if (typeof renderProfilePreferences === 'function') { renderProfilePreferences(); return true; } break;
+          case 'my-links': if (typeof renderMyLinks === 'function') { renderMyLinks(); return true; } break;
+          case 'mark-notebook': if (typeof renderGlobalNotebook === 'function') { renderGlobalNotebook(); return true; } break;
+          case 'music': if (typeof renderMusicLibrary === 'function') { renderMusicLibrary(); return true; } break;
+          case 'about': if (typeof renderAbout === 'function') { renderAbout(); return true; } break;
+          case 'contact': if (typeof renderContact === 'function') { renderContact(); return true; } break;
+          case 'privacy': if (typeof renderPrivacy === 'function') { renderPrivacy(); return true; } break;
+          case 'terms': if (typeof renderTerms === 'function') { renderTerms(); return true; } break;
+          case 'help': if (typeof renderHelp === 'function') { renderHelp(); return true; } break;
+          case 'my-reading':
+          case 'reading-list': if (typeof renderReadingList === 'function') { renderReadingList(); return true; } break;
+          case 'progress-dashboard':
+          case 'progress-awards': if (typeof renderProgressDashboard === 'function') { renderProgressDashboard(); return true; } break;
+          case 'action-center': if (typeof renderActionCenter === 'function') { renderActionCenter(); return true; } break;
+          case 'vocabulary-builder': if (typeof renderVocabularyBuilder === 'function') { renderVocabularyBuilder(); return true; } break;
+          case 'reading-skills': if (typeof renderReadingSkillsHub === 'function') { renderReadingSkillsHub(); return true; } break;
+          case 'comprehension-library': if (typeof renderComprehensionLibrary === 'function') { renderComprehensionLibrary(); return true; } break;
+          case 'mnemonics': if (typeof renderMnemonicsPage === 'function') { renderMnemonicsPage(); return true; } break;
+          case 'language-learning': if (typeof renderLanguageLearningPage === 'function') { renderLanguageLearningPage(); return true; } break;
+          case 'learning-courses': if (typeof renderLearningCoursesPage === 'function') { renderLearningCoursesPage(); return true; } break;
+          case 'library-bookmarks': if (typeof renderLibraryRecords === 'function') { renderLibraryRecords('bookmarks'); return true; } break;
+          case 'library-notes': if (typeof renderLibraryRecords === 'function') { renderLibraryRecords('notes'); return true; } break;
+          case 'drm-free-books': if (typeof renderDrmFreeBookFinder === 'function') { renderDrmFreeBookFinder(); return true; } break;
+          case 'ai-center': if (typeof renderAiCenter === 'function') { renderAiCenter(); return true; } break;
+          case 'knowledge-graph': if (typeof renderKnowledgeGraph === 'function') { renderKnowledgeGraph(); return true; } break;
+        }
+      } catch (error) {
+        console.warn('Workspace direct renderer failed; using normal page routing.', error);
+      }
+      return false;
+    }
 
     // A workspace page is a secondary view, not a fresh app launch. Topic Feeds
     // normally checks the server for its once-daily auto-open during startup; if
@@ -117,23 +163,46 @@
       } catch {}
     }, true);
 
+    // A page inside the workspace should never create a second Reader when its
+    // own Back/Return-to-Reader control is used. Hand that request to the outer
+    // workspace instead, which simply closes the secondary pane.
+    document.addEventListener('click', (event) => {
+      const returnReader = event.target.closest?.('[data-action="reader"]');
+      if (!returnReader) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      try {
+        window.parent?.postMessage?.({ type:'msg-workspace-return-reader' }, window.location.origin);
+      } catch {}
+    }, true);
+
     const openRequestedPage = () => {
-      // Let every deferred app/module script finish installing its delegated
-      // navigation handlers before firing the synthetic navigation request.
+      // Let every deferred app/module script finish installing before opening the
+      // requested secondary page. Prefer its renderer directly; only pages owned
+      // by independent modules fall back to the app's existing click route.
       window.setTimeout(() => {
-        const trigger = document.createElement('button');
-        trigger.type = 'button';
-        trigger.hidden = true;
-        if (mode === 'read') trigger.dataset.read = value;
-        else if (mode === 'test') trigger.dataset.test = value;
-        else trigger.dataset.action = value;
-        document.body.appendChild(trigger);
-        trigger.click();
-        trigger.remove();
+        const renderedDirectly = renderRequestedPageDirectly();
+        if (!renderedDirectly) {
+          const trigger = document.createElement('button');
+          trigger.type = 'button';
+          trigger.hidden = true;
+          if (mode === 'read') trigger.dataset.read = value;
+          else if (mode === 'test') trigger.dataset.test = value;
+          else trigger.dataset.action = value;
+          document.body.appendChild(trigger);
+          trigger.click();
+          trigger.remove();
+        }
+
         if (mode === 'action' && value === 'profile-preferences') {
           window.setTimeout(() => installProfileWorkspaceToggle(document), 0);
         }
-        document.documentElement.classList.add('msg-workspace-pane-ready');
+
+        // Reveal only after the requested page has had a paint. The app's Home
+        // bootstrap never flashes in the right pane.
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+          document.documentElement.classList.add('msg-workspace-pane-ready');
+        }));
       }, 0);
     };
 
@@ -239,6 +308,10 @@
     if (event.origin !== window.location.origin) return;
     if (event.data?.type === 'msg-workspace-topic-feed-key') {
       handleTopicFeedStoryShortcut(String(event.data.key || ''));
+      return;
+    }
+    if (event.data?.type === 'msg-workspace-return-reader') {
+      closeWorkspacePanel();
       return;
     }
     if (event.data?.type === 'msg-workspace-preference') {
