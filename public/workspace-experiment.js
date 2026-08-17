@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.4.2
+ * Mark, Set, Go! Workspace Experiment v0.4.3
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -225,6 +225,64 @@
   const PANEL_ORDER = [];
   let activePanelKey = '';
   let secondaryWidth = Math.max(420, Math.min(760, Math.round(window.innerWidth * 0.42)));
+  let workspaceWpmHomeMarker = null;
+
+  function dockReaderTopControlsForWorkspace() {
+    const shell = workspaceShell();
+    if (!shell || shell.classList.contains('is-closed')) return;
+
+    const paneControls = shell.querySelector('.msg-workspace-primary .reader-pane-controls');
+    if (!paneControls) return;
+
+    let stack = paneControls.querySelector('.reader-topright-media-stack');
+    const fullscreen = paneControls.querySelector('#toggle-reader-fullscreen');
+    if (!fullscreen) return;
+
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.className = 'reader-topright-media-stack';
+      stack.setAttribute('aria-label', 'Reader speed, media, and fullscreen controls');
+      fullscreen.parentNode.insertBefore(stack, fullscreen);
+      stack.appendChild(fullscreen);
+    }
+
+    const wpm = shell.querySelector('.msg-workspace-primary .viewer-wpm-control');
+    if (wpm && !stack.contains(wpm)) {
+      const marker = document.createElement('span');
+      marker.hidden = true;
+      marker.dataset.msgWorkspaceWpmHome = '1';
+      wpm.parentNode?.insertBefore(marker, wpm);
+      workspaceWpmHomeMarker = marker;
+      wpm.dataset.msgWorkspaceDocked = '1';
+      stack.insertBefore(wpm, stack.firstChild);
+    }
+
+    // Keep one predictable order at the Reader's right edge. Moving existing
+    // nodes preserves every listener already installed by app.js/music code.
+    const liveWpm = stack.querySelector('.viewer-wpm-control');
+    const liveMusic = stack.querySelector('[data-reader-wpm-music-toggle]');
+    if (liveWpm && stack.firstElementChild !== liveWpm) stack.insertBefore(liveWpm, stack.firstElementChild);
+    if (liveMusic) {
+      if (liveWpm) stack.insertBefore(liveMusic, liveWpm.nextSibling);
+      else if (stack.firstElementChild !== liveMusic) stack.insertBefore(liveMusic, stack.firstElementChild);
+    }
+    if (fullscreen && stack.lastElementChild !== fullscreen) stack.appendChild(fullscreen);
+  }
+
+  function restoreReaderTopControlsAfterWorkspace() {
+    const shell = workspaceShell();
+    const wpm = shell?.querySelector('.msg-workspace-primary [data-msg-workspace-docked="1"]');
+    const marker = workspaceWpmHomeMarker?.isConnected
+      ? workspaceWpmHomeMarker
+      : shell?.querySelector('.msg-workspace-primary [data-msg-workspace-wpm-home="1"]');
+    if (wpm && marker?.parentNode) {
+      marker.parentNode.insertBefore(wpm, marker);
+      marker.remove();
+      delete wpm.dataset.msgWorkspaceDocked;
+    }
+    workspaceWpmHomeMarker = null;
+  }
+
 
   async function workspaceClerkToken() {
     const candidates = [
@@ -523,6 +581,7 @@
       const proposed = Math.round(rect.right - event.clientX);
       secondaryWidth = Math.max(minSecondary, Math.min(proposed, Math.max(minSecondary, rect.width - minPrimary - 8)));
       shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
+      dockReaderTopControlsForWorkspace();
     };
 
     const finish = (event) => {
@@ -577,6 +636,7 @@
     if (!shell) return;
     detachActivePanel();
     activePanelKey = '';
+    restoreReaderTopControlsAfterWorkspace();
     shell.classList.add('is-closed');
     renderWorkspaceTabs(shell);
     window.speechSynthesis?.cancel?.();
@@ -594,6 +654,7 @@
     activePanelKey = key;
     shell.classList.remove('is-closed');
     shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
+    window.requestAnimationFrame(dockReaderTopControlsForWorkspace);
     if (!record.node.isConnected) body.appendChild(record.node);
     renderWorkspaceTabs(shell);
     return true;
@@ -908,6 +969,10 @@
   }, 250);
   [1200, 3000, 6000].forEach((delay) => window.setTimeout(ensureWorkspaceControls, delay));
   window.addEventListener('pageshow', ensureWorkspaceControls);
+
+  document.addEventListener('marksetgo:document-available', () => {
+    window.setTimeout(dockReaderTopControlsForWorkspace, 0);
+  });
 
   window.MSGWorkspaceExperiment = Object.freeze({
     open: showWorkspacePanel,

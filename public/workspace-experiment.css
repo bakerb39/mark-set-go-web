@@ -1,4 +1,4 @@
-/* Mark, Set, Go! Workspace Experiment v0.4.1 */
+/* Mark, Set, Go! Workspace Experiment v0.4.3 */
 /* Mark, Set, Go! workspace experiment */
 .msg-workspace-shell{
   --msg-secondary-width: 520px;
@@ -627,4 +627,43 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
 .msg-workspace-pane-document .msg-workspace-profile-copy small{font-size:.68rem}
 @media(max-width:560px){
   .msg-workspace-profile-toggle{align-items:flex-start;gap:.85rem}
+}
+
+
+/* v0.4.3 — keep the speed/music/fullscreen cluster attached to the Reader
+   while the workspace divider changes Reader width. This intentionally beats
+   older absolute-position !important rules from button-feedback.css. */
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-pane-controls{
+  align-items:center !important;
+}
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack{
+  position:static !important;
+  inset:auto !important;
+  margin-left:auto !important;
+  display:inline-flex !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  width:auto !important;
+  transform:none !important;
+}
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .viewer-wpm-control,
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .reader-topright-music-toggle,
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .viewer-fullscreen-button{
+  position:static !important;
+  inset:auto !important;
+  top:auto !important;
+  right:auto !important;
+  bottom:auto !important;
+  left:auto !important;
+  margin:0 !important;
+  transform:none !important;
+  flex:0 0 auto !important;
+}
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .viewer-wpm-control{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  grid-column:auto !important;
 }
