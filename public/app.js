@@ -23354,6 +23354,21 @@ function ensureSymposiumStyles() {
     .symposium-custom-row{display:grid;grid-template-columns:1fr auto;gap:8px}.symposium-custom-row button,.symposium-start{border:0;border-radius:11px;background:#0c2340;color:white;font-weight:800;padding:10px 14px;cursor:pointer}.symposium-start{width:100%;padding:13px 16px;color:#f3cc67}.symposium-start:disabled{opacity:.55;cursor:wait}
     .symposium-stage{min-height:720px;display:flex;flex-direction:column}.symposium-stage-toolbar{padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #e3eaf2;background:#fbfdff;flex-wrap:wrap}.symposium-stage-status{font-weight:800;color:#395a7d}.symposium-stage-actions{display:flex;gap:8px;flex-wrap:wrap}.symposium-stage-actions button{border:1px solid #cbd7e5;background:white;color:#24476e;border-radius:9px;padding:7px 10px;cursor:pointer;font-weight:700}
     .symposium-transcript{padding:20px;display:flex;flex-direction:column;gap:14px;min-height:430px;max-height:680px;overflow:auto;background:linear-gradient(180deg,#fff,#fbfdff)}
+    .symposium-transcript,.symposium-turn-body p{user-select:text;-webkit-user-select:text}
+    .symposium-transcript ::selection{background:#f2ca60;color:#10233d}
+    .symposium-selection-toolbar{
+      position:fixed;z-index:10050;display:flex;align-items:center;gap:6px;
+      padding:6px;border:1px solid #c7d2df;border-radius:10px;background:#fff;
+      box-shadow:0 8px 24px rgba(12,35,64,.18)
+    }
+    .symposium-selection-toolbar[hidden]{display:none!important}
+    .symposium-selection-toolbar button{
+      border:0;border-radius:8px;padding:7px 10px;font:inherit;font-size:.78rem;
+      font-weight:800;cursor:pointer;white-space:nowrap
+    }
+    .symposium-selection-toolbar [data-symposium-copy-selection]{background:#eaf0f6;color:#17304e}
+    .symposium-selection-toolbar [data-symposium-save-selection]{background:#0c2340;color:#f2ca60}
+
     .symposium-empty{margin:auto;text-align:center;max-width:520px;color:#718095;padding:44px}.symposium-empty .symposium-empty-icon{font-size:3rem;display:block;margin-bottom:12px}.symposium-empty h2{color:#0c2340;margin:.25rem 0 .5rem;font-family:Georgia,serif}
     .symposium-turn{display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px;align-items:start}.symposium-turn.user{grid-template-columns:minmax(0,1fr) 48px}.symposium-turn.user .symposium-turn-body{order:1;background:#eef5fc}.symposium-turn.user .symposium-avatar{order:2;background:#405c7a}.symposium-turn.moderator .symposium-avatar{background:linear-gradient(145deg,#80631a,#513d0d);color:white}.symposium-turn-body{border:1px solid #dde6ef;border-radius:16px;padding:13px 15px;background:white;box-shadow:0 5px 16px rgba(38,67,98,.05)}.symposium-turn-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}.symposium-turn-head strong{color:#0c2340}.symposium-turn-head span{font-size:.76rem;color:#7a899b}.symposium-turn-body p{margin:0;line-height:1.58;color:#30465f;white-space:pre-wrap}.symposium-turn-tools{margin-top:8px;display:flex;gap:6px}.symposium-turn-tools button{border:0;background:transparent;color:#315d8b;font-size:.78rem;cursor:pointer;padding:2px 0}
     .symposium-participate{margin-top:auto;border-top:1px solid #e1e8f0;padding:16px 18px;background:#f8fbff}.symposium-participate label{font-size:.8rem;font-weight:800;color:#435b75}.symposium-user-grid{display:grid;grid-template-columns:150px 1fr auto;gap:9px;margin-top:7px}.symposium-user-grid select,.symposium-user-grid textarea{border:1px solid #cbd7e5;border-radius:10px;padding:9px 10px;font:inherit;background:white}.symposium-user-grid textarea{resize:vertical;min-height:52px}.symposium-user-grid button{border:0;border-radius:10px;background:#0c2340;color:#f2ca60;padding:10px 14px;font-weight:800;cursor:pointer}.symposium-hint{font-size:.76rem;color:#758498;margin:7px 0 0}
@@ -23594,6 +23609,10 @@ function renderSymposium() {
           <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
             <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
           </div>
+          <div class="symposium-selection-toolbar" id="symposium-selection-toolbar" hidden role="toolbar" aria-label="Selected Symposium text actions">
+            <button type="button" data-symposium-copy-selection>Copy</button>
+            <button type="button" data-symposium-save-selection>Save to Notebook</button>
+          </div>
           <div class="symposium-participate">
             <label for="symposium-reader-input">Join the discussion</label>
             <div class="symposium-user-grid"><select id="symposium-reader-kind"><option value="argument">My argument</option><option value="evidence">Add evidence</option><option value="question">Question</option><option value="challenge">Challenge</option></select><textarea id="symposium-reader-input" placeholder="Add your opinion, reasoning, evidence, or question…"></textarea><button type="button" id="symposium-reader-submit" disabled>Enter</button></div>
@@ -23605,6 +23624,7 @@ function renderSymposium() {
 
   const root = app.querySelector('.symposium-page');
   const transcriptEl = root.querySelector('#symposium-transcript');
+  const selectionToolbar = root.querySelector('#symposium-selection-toolbar');
   const statusEl = root.querySelector('#symposium-stage-status');
   const nextButton = root.querySelector('#symposium-next');
   const saveButton = root.querySelector('#symposium-save');
@@ -23614,7 +23634,162 @@ function renderSymposium() {
   const personSearchEl = root.querySelector('#symposium-person-search');
   const categoryFilterEl = root.querySelector('#symposium-category-filter');
   const rosterCountEl = root.querySelector('#symposium-roster-count');
-  const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'' };
+  const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'', startedAt:'' };
+
+  let symposiumSelection = null;
+
+  const hideSymposiumSelectionToolbar = ({ clearSelection = false } = {}) => {
+    if (selectionToolbar) selectionToolbar.hidden = true;
+    if (clearSelection) {
+      const selection = window.getSelection?.();
+      if (selection && selection.rangeCount) selection.removeAllRanges();
+    }
+  };
+
+  const selectedSymposiumSpeaker = (range) => {
+    const elementForNode = (node) => (
+      node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement
+    );
+    const startTurn = elementForNode(range.startContainer)?.closest?.('.symposium-turn');
+    const endTurn = elementForNode(range.endContainer)?.closest?.('.symposium-turn');
+    if (!startTurn || startTurn !== endTurn) return 'Multiple speakers';
+    return startTurn.querySelector('.symposium-turn-head strong')?.textContent?.trim() || 'Symposium';
+  };
+
+  const captureSymposiumSelection = () => {
+    const selection = window.getSelection?.();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      symposiumSelection = null;
+      hideSymposiumSelectionToolbar();
+      return null;
+    }
+
+    const range = selection.getRangeAt(0);
+    const containsNode = (node) => {
+      const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+      return Boolean(element && transcriptEl.contains(element));
+    };
+    if (!containsNode(range.startContainer) || !containsNode(range.endContainer)) {
+      symposiumSelection = null;
+      hideSymposiumSelectionToolbar();
+      return null;
+    }
+
+    const text = selection.toString().replace(/\s+/g, ' ').trim();
+    if (!text) {
+      symposiumSelection = null;
+      hideSymposiumSelectionToolbar();
+      return null;
+    }
+
+    const topic = String(session.topic || root.querySelector('#symposium-topic')?.value || 'Symposium discussion').trim();
+    symposiumSelection = {
+      text,
+      speaker: selectedSymposiumSpeaker(range),
+      topic,
+      rect: range.getBoundingClientRect()
+    };
+    return symposiumSelection;
+  };
+
+  const positionSymposiumSelectionToolbar = (rect) => {
+    if (!selectionToolbar || !rect) return;
+    selectionToolbar.hidden = false;
+    const width = selectionToolbar.offsetWidth || 230;
+    const height = selectionToolbar.offsetHeight || 42;
+    const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + rect.width / 2 - width / 2));
+    let top = rect.bottom + 8;
+    if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 8);
+    selectionToolbar.style.left = `${left}px`;
+    selectionToolbar.style.top = `${top}px`;
+  };
+
+  const showSymposiumSelectionToolbar = () => {
+    const selected = captureSymposiumSelection();
+    if (!selected) return;
+    positionSymposiumSelectionToolbar(selected.rect);
+  };
+
+  const copySymposiumSelection = async () => {
+    const text = String(symposiumSelection?.text || '').trim();
+    if (!text) return false;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {}
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch {}
+    textarea.remove();
+    return copied;
+  };
+
+  const saveSymposiumSelectionToNotebook = () => {
+    const selected = symposiumSelection;
+    if (!selected?.text) return { ok:false, error:'Select Symposium text first.' };
+
+    return saveMarkInsight({
+      recordType:'symposium-excerpt',
+      selection:selected.text,
+      documentId:state.documentId || `symposium-${session.startedAt || Date.now()}`,
+      title:`Symposium · ${selected.topic || 'Discussion'}`,
+      chapter:selected.speaker && selected.speaker !== 'Multiple speakers'
+        ? `${selected.speaker} · Symposium`
+        : 'Symposium transcript',
+      pageContext:'Symposium',
+      symposiumTopic:selected.topic || '',
+      symposiumSpeaker:selected.speaker || ''
+    });
+  };
+
+  // Prevent toolbar clicks from collapsing the browser selection before the
+  // action can use it.
+  selectionToolbar?.addEventListener('pointerdown', (event) => event.preventDefault());
+
+  selectionToolbar?.querySelector('[data-symposium-copy-selection]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const copied = await copySymposiumSelection();
+    const original = 'Copy';
+    button.textContent = copied ? 'Copied' : 'Copy failed';
+    if (copied) statusEl.textContent = 'Selected Symposium text copied.';
+    window.setTimeout(() => { if (button.isConnected) button.textContent = original; }, 1400);
+  });
+
+  selectionToolbar?.querySelector('[data-symposium-save-selection]')?.addEventListener('click', (event) => {
+    const button = event.currentTarget;
+    const saved = saveSymposiumSelectionToNotebook();
+    if (saved?.ok) {
+      button.textContent = 'Saved';
+      statusEl.textContent = 'Selected Symposium text saved to Notebook.';
+      window.setTimeout(() => { if (button.isConnected) button.textContent = 'Save to Notebook'; }, 1600);
+    } else {
+      button.textContent = 'Save failed';
+      statusEl.textContent = saved?.error || 'The selected text could not be saved.';
+      window.setTimeout(() => { if (button.isConnected) button.textContent = 'Save to Notebook'; }, 1800);
+    }
+  });
+
+  transcriptEl.addEventListener('pointerup', () => {
+    window.setTimeout(showSymposiumSelectionToolbar, 0);
+  });
+  transcriptEl.addEventListener('keyup', () => {
+    window.setTimeout(showSymposiumSelectionToolbar, 0);
+  });
+  transcriptEl.addEventListener('scroll', () => hideSymposiumSelectionToolbar());
+
+  root.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('#symposium-selection-toolbar')) return;
+    if (event.target.closest('#symposium-transcript')) return;
+    hideSymposiumSelectionToolbar();
+  });
 
   const filterSymposiumRoster = () => {
     const query = String(personSearchEl?.value || '').trim().toLocaleLowerCase();
@@ -23645,7 +23820,16 @@ function renderSymposium() {
     if (transcriptEl.querySelector('.symposium-empty')) transcriptEl.innerHTML = '';
     session.transcript.push(turn);
     transcriptEl.insertAdjacentHTML('beforeend', symposiumTurnHtml(turn));
-    scrollTranscript();
+    const liveSelection = window.getSelection?.();
+    const hasTranscriptSelection = Boolean(
+      liveSelection && !liveSelection.isCollapsed && liveSelection.rangeCount
+      && transcriptEl.contains(
+        liveSelection.getRangeAt(0).commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+          ? liveSelection.getRangeAt(0).commonAncestorContainer
+          : liveSelection.getRangeAt(0).commonAncestorContainer.parentElement
+      )
+    );
+    if (!hasTranscriptSelection) scrollTranscript();
     if (speak && shouldSpeak()) symposiumSpeak(turn.text, turn.name);
   };
   const setBusy = (busy, label='') => {
@@ -23751,6 +23935,8 @@ function renderSymposium() {
     if (!topic) { root.querySelector('#symposium-topic').focus(); return window.alert('Enter a topic or question for the Symposium.'); }
     if (!people.length) return window.alert('Choose at least one participant.');
     session.active = true;
+    session.startedAt = new Date().toISOString();
+    hideSymposiumSelectionToolbar({ clearSelection:true });
     session.mode = root.querySelector('[name="symposium-mode"]:checked')?.value || 'debate';
     session.topic = topic;
     session.context = root.querySelector('#symposium-context').value || '';
