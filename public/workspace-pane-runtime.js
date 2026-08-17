@@ -199,6 +199,17 @@
     sendParent('msg-workspace-return-reader');
   }, true);
 
+  // Companion state is stored on the same origin, but the selector runs inside
+  // this iframe. Mirror a workspace selection into the outer app immediately so
+  // Reader/Notebook companion surfaces update without waiting for a reload.
+  window.addEventListener('msg:companion-changed', (event) => {
+    const next=String(event.detail?.id || event.detail?.companion || '').toLowerCase();
+    if (!next) return;
+    try {
+      if (parent?.MSGCompanion?.id !== next) parent?.MSGCompanion?.set?.(next);
+    } catch {}
+  });
+
   // Forward Topic Feed comma/period navigation to the outer Reader while focus
   // happens to be inside this pane.
   document.addEventListener('keydown', (event) => {

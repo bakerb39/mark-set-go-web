@@ -5195,6 +5195,24 @@ function renderProfilePreferences() {
         <p id="profile-save-status" class="status profile-save-status" role="status" aria-live="polite"></p>
       </section>
 
+      <section class="profile-preset-card visual-theme-profile-card">
+        <div class="section-heading visual-theme-heading">
+          <div><span class="source-category">Appearance</span><h2>Choose an experience style</h2><p>Change the atmosphere of the app without changing your reader settings or enabled features.</p></div>
+        </div>
+        <div class="visual-theme-grid" role="group" aria-label="Experience style">
+          ${Object.entries(EXPERIENCE_APPEARANCES).map(([key,appearance])=>`
+            <button class="profile-preset-option visual-theme-option ${key==='explorer'?'visual-theme-option-explorer':''} ${current.appearance===key?'active':''}" type="button" data-profile-appearance="${escapeHtml(key)}" aria-pressed="${current.appearance===key}">
+              <span class="profile-preset-check" aria-hidden="true">${current.appearance===key?'✓':''}</span>
+              ${key==='explorer'
+                ? '<span class="visual-theme-preview visual-theme-preview-explorer" aria-hidden="true"><span class="visual-theme-compass">✦</span></span>'
+                : '<span class="visual-theme-preview visual-theme-preview-default" aria-hidden="true"><span></span><span></span><span></span></span>'}
+              <strong>${escapeHtml(appearance.label)}</strong>
+              <small>${escapeHtml(appearance.description)}</small>
+            </button>`).join('')}
+        </div>
+        <p class="visual-theme-note">Explorer styles the surrounding application. The reading canvas itself stays optimized for readability.</p>
+      </section>
+
       <section class="profile-feature-card">
         <div class="section-heading">
           <div><span class="source-category">Interface</span><h2>Choose what appears</h2><p>These choices control navigation and feature visibility across the app.</p></div>
@@ -5228,6 +5246,16 @@ function renderProfilePreferences() {
     });
   };
 
+  const reflectAppearanceControls=(selectedKey='default')=>{
+    app.querySelectorAll('[data-profile-appearance]').forEach((button)=>{
+      const active=button.dataset.profileAppearance===selectedKey;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',String(active));
+      const check=button.querySelector('.profile-preset-check');
+      if(check) check.textContent=active ? '✓' : '';
+    });
+  };
+
   const reflectFeatureControls=(profile)=>{
     app.querySelectorAll('[data-profile-feature]').forEach((input)=>{
       input.checked=profile.features?.[input.dataset.profileFeature]!==false;
@@ -5248,7 +5276,7 @@ function renderProfilePreferences() {
       features[input.dataset.profileFeature]=Boolean(input.checked);
     });
 
-    const saved=saveExperienceProfile({preset:'custom',features});
+    const saved=saveExperienceProfile({preset:'custom',appearance:current.appearance,features});
     current=normalizeExperienceProfile(saved);
     reflectPresetSelection('');
     announceSave(saved,'Custom experience');
@@ -5267,6 +5295,7 @@ function renderProfilePreferences() {
 
       const saved=saveExperienceProfile({
         preset:key,
+        appearance:current.appearance,
         features:{...preset.features}
       });
 
@@ -5277,10 +5306,30 @@ function renderProfilePreferences() {
     });
   });
 
+  app.querySelectorAll('[data-profile-appearance]').forEach((button)=>{
+    button.addEventListener('click',(event)=>{
+      event.preventDefault();
+      const key=button.dataset.profileAppearance;
+      const appearance=EXPERIENCE_APPEARANCES[key];
+      if(!appearance) return;
+
+      const saved=saveExperienceProfile({
+        preset:current.preset,
+        appearance:key,
+        features:{...current.features}
+      });
+
+      current=normalizeExperienceProfile(saved);
+      reflectAppearanceControls(current.appearance);
+      announceSave(saved,`${appearance.label} appearance`);
+    });
+  });
+
   // Keep the page synchronized if the profile is changed by another app control.
   const onProfileChange=(event)=>{
     current=normalizeExperienceProfile(event.detail?.profile || getExperienceProfile());
     reflectPresetSelection(current.preset === 'custom' ? '' : current.preset);
+    reflectAppearanceControls(current.appearance);
     reflectFeatureControls(current);
   };
   document.addEventListener('marksetgo:experience-profile-changed',onProfileChange,{once:true});
@@ -5858,6 +5907,17 @@ const LEARNING_ACTIVITY_KEY = 'markSetGoLearningActivityV1';
 
 const PROFILE_EXPERIENCE_KEY = 'markSetGoExperienceProfileV1';
 
+const EXPERIENCE_APPEARANCES = Object.freeze({
+  default:{
+    label:'Default',
+    description:'The current Mark, Set, Go! navy, blue, and white presentation.'
+  },
+  explorer:{
+    label:'Explorer / Discovery',
+    description:'Sage green, parchment, brass, maps, mountains, and waterfall scenery.'
+  }
+});
+
 const EXPERIENCE_PRESETS = Object.freeze({
   simple:{
     label:'Simple Reader',
@@ -5933,9 +5993,12 @@ function normalizeExperienceProfile(value = {}) {
   const requestedPreset=String(value?.preset || '').trim();
   const presetKey=EXPERIENCE_PRESETS[requestedPreset] ? requestedPreset : (requestedPreset === 'custom' ? 'custom' : 'full');
   const basePreset=presetKey === 'custom' ? EXPERIENCE_PRESETS.full : EXPERIENCE_PRESETS[presetKey];
+  const requestedAppearance=String(value?.appearance || '').trim();
+  const appearanceKey=EXPERIENCE_APPEARANCES[requestedAppearance] ? requestedAppearance : 'default';
 
   return {
     preset:presetKey,
+    appearance:appearanceKey,
     features:{
       ...basePreset.features,
       ...(value.features && typeof value.features === 'object' ? value.features : {})
@@ -5979,6 +6042,17 @@ function saveExperienceProfile(profile) {
     detail:{ profile:normalized, persisted }
   }));
 
+  // The workspace pane shares storage with the outer app, but DOM/custom events
+  // do not cross document boundaries. Apply the same saved profile to the real
+  // parent app immediately so Appearance changes are visible on both sides.
+  if (window.__MSG_WORKSPACE_PANE__ && window.parent && window.parent !== window) {
+    try {
+      const parentProfile=window.parent.MarkSetGoExperienceProfile;
+      if (typeof parentProfile?.save === 'function') parentProfile.save(normalized);
+      else parentProfile?.apply?.(normalized);
+    } catch {}
+  }
+
   return { ...normalized, persisted };
 }
 
@@ -5992,6 +6066,13 @@ function applyExperienceProfile(profile = getExperienceProfile()) {
 
   const rootEl=document.documentElement;
   const features=normalized.features || {};
+
+  rootEl.dataset.experienceAppearance=normalized.appearance || 'default';
+  if(normalized.appearance && normalized.appearance !== 'default') {
+    rootEl.dataset.msgExperienceTheme=normalized.appearance;
+  } else {
+    delete rootEl.dataset.msgExperienceTheme;
+  }
 
   Object.entries(features).forEach(([key,enabled]) => {
     rootEl.dataset[`feature${key.charAt(0).toUpperCase()}${key.slice(1)}`]=enabled ? 'on' : 'off';
@@ -6012,6 +6093,7 @@ window.MarkSetGoExperienceProfile = Object.freeze({
   save:saveExperienceProfile,
   enabled:experienceFeatureEnabled,
   presets:EXPERIENCE_PRESETS,
+  appearances:EXPERIENCE_APPEARANCES,
   apply:applyExperienceProfile
 });
 
