@@ -647,7 +647,7 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
   gap:8px !important;
   width:auto !important;
   /* Move the one shared three-control div upward together. */
-  transform:translateY(-16px) !important;
+  transform:translateY(calc(-100% - 22px)) !important;
   flex:0 0 auto !important;
 }
 #app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .reader-topright-font-control,

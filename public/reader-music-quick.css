@@ -528,3 +528,49 @@
   order:2 !important;
   align-self:flex-end !important;
 }
+
+
+/* v1.5.1 — restore reading-aware suggestions in the compact top-right chooser. */
+.reader-music-compact-suggestions{
+  display:grid;
+  gap:4px;
+  padding:8px;
+  border:1px solid #30485d;
+  border-radius:8px;
+  background:#16232f;
+}
+.reader-music-compact-suggestions > span{
+  color:#bdcbd7;
+  font-size:.63rem;
+  font-weight:800;
+}
+.reader-music-compact-suggestions > small{
+  overflow:hidden;
+  color:#91a6b9;
+  font-size:.6rem;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.reader-music-compact-suggestions > div{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:6px;
+  margin-top:2px;
+}
+.reader-music-compact-suggestions button{
+  min-height:30px;
+  padding:5px 7px;
+  border:1px solid #3c668a;
+  border-radius:7px;
+  background:#1b3042;
+  color:#eef5fb;
+  font-size:.63rem;
+  font-weight:800;
+  cursor:pointer;
+}
+.reader-music-compact-suggestions button:hover,
+.reader-music-compact-suggestions button:focus-visible{
+  background:#24506f;
+  border-color:#5b88aa;
+  outline:none;
+}

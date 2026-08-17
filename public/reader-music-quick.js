@@ -43,6 +43,57 @@
     return String(document.querySelector('.reader-title-copy h1')?.textContent || '').trim();
   }
 
+
+  function currentReaderDocument() {
+    try {
+      const doc = window.MarkSetGoCurrentReaderDocument?.get?.();
+      if (doc?.title) {
+        return {
+          title: String(doc.title || '').trim(),
+          text: String(doc.text || ''),
+          source: doc.source && typeof doc.source === 'object' ? { ...doc.source } : {}
+        };
+      }
+    } catch {}
+    const title = currentReaderTitle();
+    return title ? { title, text: '', source: {} } : null;
+  }
+
+  function currentReadingMusicSuggestions() {
+    const doc = currentReaderDocument();
+    if (!doc?.title) return null;
+
+    // Prefer the app's long-standing recommendation engine when it is available.
+    try {
+      const recommend = window.recommendedPlayerChoice;
+      if (typeof recommend === 'function') {
+        const result = recommend(doc.title, doc.text);
+        if (result?.scoreQuery || result?.moodQuery) {
+          return {
+            title: doc.title,
+            suggestedQuery: String(result.scoreQuery || `${doc.title} instrumental reading music`).trim(),
+            moodQuery: String(result.moodQuery || `${doc.title} atmospheric instrumental reading music`).trim()
+          };
+        }
+      }
+    } catch {}
+
+    // Safe fallback if the main recommendation helper is not exposed globally.
+    const sample = `${doc.title} ${doc.text.slice(0, 10000)}`.toLowerCase();
+    let moodQuery = `${doc.title} atmospheric instrumental reading music`;
+    if (/mystery|detective|murder|crime|suspense|noir|sherlock|gothic|horror/.test(sample)) moodQuery = 'dark Victorian mystery ambience instrumental reading music';
+    else if (/romance|courtship|love|regency|austen|bronte/.test(sample)) moodQuery = 'romantic period drama classical instrumental reading music';
+    else if (/adventure|voyage|expedition|pirate|treasure|island|jungle/.test(sample)) moodQuery = 'cinematic adventure ambience instrumental reading music';
+    else if (/war|battle|revolution|empire|army|soldier/.test(sample)) moodQuery = 'historical epic orchestral ambience reading music';
+    else if (/philosoph|theology|ethics|history|science|politic|essay|treatise/.test(sample)) moodQuery = 'quiet scholarly classical instrumental deep reading music';
+
+    return {
+      title: doc.title,
+      suggestedQuery: `${doc.title} soundtrack instrumental score`,
+      moodQuery
+    };
+  }
+
   function musicKey(title) {
     return String(title || '').trim().toLowerCase()
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
@@ -86,6 +137,7 @@
     const parts = playerParts();
     if (chooser) chooser.hidden = true;
     parts.dock?.classList.remove('reader-music-chooser-open');
+    resetChooserDockPosition();
     speedButton?.setAttribute('aria-expanded', 'false');
     if (!keepDock && parts.dock && !hasPlayback()) parts.dock.hidden = true;
   }
@@ -163,6 +215,8 @@
 
     // React immediately to the click. Even if the server lookup fails, the user
     // should never be left with a link that appears dead.
+    if (chooser && !chooser.hidden) closeChooser({ keepDock: true });
+    else resetChooserDockPosition();
     controllerSearchState = null;
     if (parts.title) parts.title.textContent = String(title || 'Suggested music');
     if (parts.source) parts.source.textContent = 'Searching YouTube…';
@@ -280,6 +334,27 @@
     }
   }
 
+  function resetChooserDockPosition() {
+    const dock = playerParts().dock;
+    if (!dock || dock.dataset.readerChooserPositioned !== '1') return;
+    delete dock.dataset.readerChooserPositioned;
+    ['top','right','bottom','left'].forEach((name) => dock.style.removeProperty(name));
+  }
+
+  function positionChooserDock() {
+    const dock = playerParts().dock;
+    if (!dock || !speedButton) return;
+    const rect = speedButton.getBoundingClientRect();
+    const width = Math.min(292, Math.max(240, window.innerWidth - 16));
+    const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.right - width));
+    const top = Math.max(8, rect.bottom + 8);
+    dock.dataset.readerChooserPositioned = '1';
+    dock.style.setProperty('left', `${Math.round(left)}px`, 'important');
+    dock.style.setProperty('right', 'auto', 'important');
+    dock.style.setProperty('top', `${Math.round(top)}px`, 'important');
+    dock.style.setProperty('bottom', 'auto', 'important');
+  }
+
   function ensureChooser() {
     const parts = playerParts();
     if (!parts.dock) return null;
@@ -304,6 +379,7 @@
     const attached = attachedMusic();
     const preferred = preferredMusic();
     const playing = hasPlayback();
+    const readingSuggestions = currentReadingMusicSuggestions();
 
     const preferredOptions = preferred.length
       ? `<option value="">Choose a saved playlist…</option>${
@@ -344,6 +420,16 @@
             </select>
           </label>` : ''}
 
+        ${readingSuggestions ? `
+          <div class="reader-music-compact-suggestions">
+            <span>Suggested for this reading</span>
+            <small>${esc(readingSuggestions.title)}</small>
+            <div>
+              <button type="button" data-wpm-music-suggested>♫ Suggested music</button>
+              <button type="button" data-wpm-music-mood>♫ Reading mood</button>
+            </div>
+          </div>` : ''}
+
         <label class="reader-music-compact-field">
           <span>Quick focus</span>
           <select data-wpm-music-quick-select>
@@ -371,6 +457,18 @@
       if (!id) return;
       playPreferred(preferredMusic().find((item) => item.id === id));
       event.target.value = '';
+    });
+
+    chooser.querySelector('[data-wpm-music-suggested]')?.addEventListener('click', () => {
+      if (!readingSuggestions?.suggestedQuery) return;
+      closeChooser({ keepDock: true });
+      void searchYouTubeInMainPlayer(readingSuggestions.suggestedQuery, `${readingSuggestions.title} — suggested music`);
+    });
+
+    chooser.querySelector('[data-wpm-music-mood]')?.addEventListener('click', () => {
+      if (!readingSuggestions?.moodQuery) return;
+      closeChooser({ keepDock: true });
+      void searchYouTubeInMainPlayer(readingSuggestions.moodQuery, `${readingSuggestions.title} — reading mood`);
     });
 
     chooser.querySelector('[data-wpm-music-quick-select]')?.addEventListener('change', (event) => {
@@ -404,6 +502,7 @@
 
     speedButton?.setAttribute('aria-expanded', 'true');
     renderChooser();
+    positionChooserDock();
   }
 
   function removeLegacyWpmMusicControls() {
@@ -514,6 +613,9 @@
     [80, 250, 700, 1500].forEach((delay) => window.setTimeout(sync, delay));
     document.addEventListener('marksetgo:document-available', () => window.setTimeout(sync, 0));
     window.addEventListener('pageshow', () => window.setTimeout(sync, 0));
+    window.addEventListener('resize', () => {
+      if (chooser && !chooser.hidden) positionChooserDock();
+    });
 
     document.addEventListener('click', (event) => {
       const suggestion = suggestedMusicLink(event);
