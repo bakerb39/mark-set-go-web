@@ -1,17 +1,73 @@
 /*
- * Mark, Set, Go! Workspace Experiment
- * Reader remains mounted while Symposium or Web opens in a resizable side pane.
+ * Mark, Set, Go! Workspace Experiment v0.3.3
+ * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
+ * open in a compact, resizable side pane. Generic app pages run in a same-origin
+ * sandboxed app frame so their renderers cannot destroy the outer Reader.
  * No MutationObserver is used by this experiment.
  */
 (() => {
   'use strict';
 
+  const PARAMS = new URLSearchParams(window.location.search);
+  const IS_WORKSPACE_PANE = PARAMS.get('msgWorkspacePane') === '1';
+
+  function initializeWorkspacePaneDocument() {
+    document.documentElement.classList.add('msg-workspace-pane-document');
+    const mode = PARAMS.get('msgWorkspaceMode') || 'action';
+    const value = PARAMS.get('msgWorkspaceValue') || 'home';
+
+    // Keyboard focus lives inside this iframe while a workspace page is active.
+    // Forward only the Topic Feed story shortcuts to the outer Reader; ordinary
+    // typing keeps comma/period untouched.
+    document.addEventListener('keydown', (event) => {
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.key !== ',' && event.key !== '.') return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest?.('input, textarea, select, [contenteditable="true"], [role="textbox"]')) return;
+      try {
+        window.parent?.postMessage?.({
+          type: 'msg-workspace-topic-feed-key',
+          key: event.key
+        }, window.location.origin);
+      } catch {}
+    }, true);
+
+    const openRequestedPage = () => {
+      // Let every deferred app/module script finish installing its delegated
+      // navigation handlers before firing the synthetic navigation request.
+      window.setTimeout(() => {
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.hidden = true;
+        if (mode === 'read') trigger.dataset.read = value;
+        else if (mode === 'test') trigger.dataset.test = value;
+        else trigger.dataset.action = value;
+        document.body.appendChild(trigger);
+        trigger.click();
+        trigger.remove();
+        document.documentElement.classList.add('msg-workspace-pane-ready');
+      }, 0);
+    };
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', openRequestedPage, { once: true });
+    } else {
+      openRequestedPage();
+    }
+  }
+
+  if (IS_WORKSPACE_PANE) {
+    initializeWorkspacePaneDocument();
+    return;
+  }
+
   const APP = document.querySelector('#app');
   if (!APP) return;
 
-  const PANEL_CACHE = new Map();
-  let activePanelKind = '';
-  let secondaryWidth = Math.max(380, Math.min(640, Math.round(window.innerWidth * 0.40)));
+  const PANELS = new Map();
+  const PANEL_ORDER = [];
+  let activePanelKey = '';
+  let secondaryWidth = Math.max(420, Math.min(760, Math.round(window.innerWidth * 0.42)));
 
   const escapeWorkspaceHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -26,6 +82,99 @@
 
   function workspaceShell() {
     return APP.querySelector(':scope > .msg-workspace-shell');
+  }
+
+  function workspaceCheckbox() {
+    return document.querySelector('#msg-workspace-optin');
+  }
+
+  function workspaceEnabled() {
+    return Boolean(workspaceCheckbox()?.checked);
+  }
+
+  function isTopicFeedReaderActive() {
+    try {
+      const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+      if (current?.source) return current.source.type === 'topic-feed';
+    } catch {}
+    return Boolean(window.MSGTopicFeedReaderContext);
+  }
+
+  function advanceTopicFeedStory(direction) {
+    if (!isTopicFeedReaderActive()) return false;
+
+    const pane = APP.querySelector('#navigation-pane');
+    if (!pane) return false;
+
+    const context = window.MSGTopicFeedReaderContext || {};
+    const topicId = String(context.topicId || '');
+    const articleId = String(context.articleId || '');
+
+    let buttons = [...pane.querySelectorAll('[data-reader-topic-article]')];
+    if (topicId) {
+      const sameTopic = buttons.filter((button) => String(button.dataset.readerTopicParent || '') === topicId);
+      if (sameTopic.length) buttons = sameTopic;
+    }
+    if (!buttons.length) return false;
+
+    let index = buttons.findIndex((button) => String(button.dataset.readerTopicArticle || '') === articleId);
+    if (index < 0) index = direction > 0 ? -1 : 0;
+    const nextIndex = (index + direction + buttons.length) % buttons.length;
+    const target = buttons[nextIndex];
+    if (!target) return false;
+
+    // If the next story is in the collapsed overflow, use the Topic Feed's own
+    // Show all control so the selected story remains visible in My Topics.
+    if (target.hidden) {
+      const sourceBlock = target.closest('.topic-reader-source');
+      const more = sourceBlock?.querySelector?.('[data-reader-topic-more]');
+      if (more?.getAttribute('aria-expanded') === 'false') more.click();
+    }
+
+    target.click();
+    return true;
+  }
+
+  function handleTopicFeedStoryShortcut(eventOrKey) {
+    const key = typeof eventOrKey === 'string' ? eventOrKey : eventOrKey?.key;
+    if (key !== ',' && key !== '.') return false;
+    return advanceTopicFeedStory(key === '.' ? 1 : -1);
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key !== ',' && event.key !== '.') return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest?.('input, textarea, select, [contenteditable="true"], [role="textbox"]')) return;
+    if (!handleTopicFeedStoryShortcut(event)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (event.data?.type !== 'msg-workspace-topic-feed-key') return;
+    handleTopicFeedStoryShortcut(String(event.data.key || ''));
+  });
+
+  function humanize(value) {
+    return String(value || '')
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())
+      .trim() || 'Page';
+  }
+
+  function navigationLabel(element, fallback = '') {
+    const strong = element?.querySelector?.('strong')?.textContent?.trim();
+    if (strong) return strong;
+    const spans = [...(element?.querySelectorAll?.('span') || [])]
+      .map((span) => span.textContent.trim())
+      .filter(Boolean)
+      .filter((text) => text.length > 1);
+    if (spans.length) return spans[spans.length - 1];
+    const direct = element?.textContent?.replace(/\s+/g, ' ')?.trim();
+    if (direct && direct.length < 45) return direct;
+    return humanize(fallback);
   }
 
   function ensureWorkspaceShell() {
@@ -51,11 +200,8 @@
     secondary.setAttribute('aria-label', 'Workspace side panel');
     secondary.innerHTML = `
       <header class="msg-workspace-panel-head">
-        <nav class="msg-workspace-panel-tabs" aria-label="Workspace panels">
-          <button type="button" data-msg-workspace-switch="symposium">◉ Symposium</button>
-          <button type="button" data-msg-workspace-switch="browser">🌐 Web</button>
-        </nav>
-        <button class="msg-workspace-close" type="button" data-msg-workspace-close aria-label="Close side panel">×</button>
+        <nav class="msg-workspace-panel-tabs" aria-label="Open workspace pages"></nav>
+        <button class="msg-workspace-close" type="button" data-msg-workspace-close aria-label="Close workspace">×</button>
       </header>
       <div class="msg-workspace-panel-body"></div>`;
 
@@ -65,6 +211,7 @@
     APP.appendChild(shell);
 
     installDivider(divider, shell);
+    renderWorkspaceTabs(shell);
     return shell;
   }
 
@@ -74,8 +221,8 @@
     const move = (event) => {
       if (pointerId == null || event.pointerId !== pointerId) return;
       const rect = shell.getBoundingClientRect();
-      const minSecondary = 340;
-      const minPrimary = 420;
+      const minSecondary = 360;
+      const minPrimary = 520;
       const proposed = Math.round(rect.right - event.clientX);
       secondaryWidth = Math.max(minSecondary, Math.min(proposed, Math.max(minSecondary, rect.width - minPrimary - 8)));
       shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
@@ -104,68 +251,118 @@
     return shell?.querySelector('.msg-workspace-panel-body') || null;
   }
 
-  function cacheCurrentPanel() {
-    const body = panelBody();
-    const node = body?.firstElementChild;
-    if (node && activePanelKind) {
-      PANEL_CACHE.set(activePanelKind, node);
-      node.remove();
-    }
+  function activePanelRecord() {
+    return PANELS.get(activePanelKey) || null;
   }
 
-  function setActiveTab(kind, shell = workspaceShell()) {
-    shell?.querySelectorAll('[data-msg-workspace-switch]').forEach((button) => {
-      button.classList.toggle('active', button.dataset.msgWorkspaceSwitch === kind);
-      button.setAttribute('aria-pressed', button.dataset.msgWorkspaceSwitch === kind ? 'true' : 'false');
-    });
+  function detachActivePanel() {
+    const record = activePanelRecord();
+    if (record?.node?.isConnected) record.node.remove();
+  }
+
+  function renderWorkspaceTabs(shell = workspaceShell()) {
+    const tabs = shell?.querySelector('.msg-workspace-panel-tabs');
+    if (!tabs) return;
+    tabs.innerHTML = PANEL_ORDER
+      .filter((key) => PANELS.has(key))
+      .map((key) => {
+        const record = PANELS.get(key);
+        const active = key === activePanelKey;
+        return `<span class="msg-workspace-tab ${active ? 'active' : ''}">
+          <button type="button" class="msg-workspace-tab-main" data-msg-workspace-tab="${escapeWorkspaceHtml(key)}" aria-pressed="${active ? 'true' : 'false'}">${escapeWorkspaceHtml(record.label)}</button>
+          <button type="button" class="msg-workspace-tab-x" data-msg-workspace-tab-close="${escapeWorkspaceHtml(key)}" aria-label="Close ${escapeWorkspaceHtml(record.label)}">×</button>
+        </span>`;
+      }).join('');
   }
 
   function closeWorkspacePanel() {
     const shell = workspaceShell();
     if (!shell) return;
-    cacheCurrentPanel();
-    activePanelKind = '';
+    detachActivePanel();
+    activePanelKey = '';
     shell.classList.add('is-closed');
-    setActiveTab('', shell);
+    renderWorkspaceTabs(shell);
     window.speechSynthesis?.cancel?.();
   }
 
-  function showWorkspacePanel(kind) {
-    if (!hasReader()) return false;
+  function activatePanel(key) {
+    const record = PANELS.get(key);
+    if (!record || !hasReader()) return false;
+
     const shell = ensureWorkspaceShell();
     const body = panelBody(shell);
     if (!body) return false;
 
-    if (activePanelKind === kind && body.firstElementChild) {
-      shell.classList.remove('is-closed');
-      setActiveTab(kind, shell);
-      return true;
-    }
-
-    cacheCurrentPanel();
-    activePanelKind = kind;
+    if (activePanelKey !== key) detachActivePanel();
+    activePanelKey = key;
     shell.classList.remove('is-closed');
     shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
-
-    let node = PANEL_CACHE.get(kind);
-    if (!node) {
-      node = document.createElement('div');
-      node.className = `msg-workspace-panel msg-workspace-${kind}`;
-      if (kind === 'symposium') {
-        renderSymposiumWorkspace(node);
-      } else if (kind === 'browser') {
-        renderBrowserWorkspace(node);
-      }
-      PANEL_CACHE.set(kind, node);
-    }
-    body.appendChild(node);
-    setActiveTab(kind, shell);
+    if (!record.node.isConnected) body.appendChild(record.node);
+    renderWorkspaceTabs(shell);
     return true;
   }
 
-  function looksLikeUrl(value) {
-    const text = String(value || '').trim();
-    return /^https?:\/\//i.test(text) || /^[\w.-]+\.[a-z]{2,}(?:[\/:?#]|$)/i.test(text);
+  function registerPanel(key, label, node) {
+    if (!PANELS.has(key)) PANEL_ORDER.push(key);
+    PANELS.set(key, { key, label, node });
+    return activatePanel(key);
+  }
+
+  function closeWorkspaceTab(key) {
+    const index = PANEL_ORDER.indexOf(key);
+    const wasActive = key === activePanelKey;
+    const record = PANELS.get(key);
+    if (record?.node?.isConnected) record.node.remove();
+    PANELS.delete(key);
+    if (index >= 0) PANEL_ORDER.splice(index, 1);
+
+    if (!wasActive) {
+      renderWorkspaceTabs();
+      return;
+    }
+
+    activePanelKey = '';
+    const replacement = PANEL_ORDER[Math.min(index, PANEL_ORDER.length - 1)] || PANEL_ORDER[PANEL_ORDER.length - 1] || '';
+    if (replacement) activatePanel(replacement);
+    else closeWorkspacePanel();
+  }
+
+  function panelUrl(mode, value) {
+    const url = new URL(window.location.href);
+    url.hash = '';
+    url.searchParams.set('msgWorkspacePane', '1');
+    url.searchParams.set('msgWorkspaceMode', mode);
+    url.searchParams.set('msgWorkspaceValue', value);
+    return url.toString();
+  }
+
+  function createAppPagePanel(mode, value, label) {
+    const node = document.createElement('div');
+    node.className = 'msg-workspace-panel msg-workspace-app-page';
+    node.innerHTML = `<iframe class="msg-workspace-page-frame" title="${escapeWorkspaceHtml(label)}" src="${escapeWorkspaceHtml(panelUrl(mode, value))}" loading="eager"></iframe>`;
+    return node;
+  }
+
+  function openAppPage(mode, value, label = '') {
+    if (!hasReader()) return false;
+    const key = `page:${mode}:${value}`;
+    if (PANELS.has(key)) return activatePanel(key);
+    return registerPanel(key, label || humanize(value), createAppPagePanel(mode, value, label || humanize(value)));
+  }
+
+  function showWorkspacePanel(kind) {
+    if (!hasReader()) return false;
+    const key = `tool:${kind}`;
+    if (PANELS.has(key)) return activatePanel(key);
+
+    const node = document.createElement('div');
+    node.className = `msg-workspace-panel msg-workspace-${kind}`;
+    if (kind === 'symposium') renderSymposiumWorkspace(node);
+    else if (kind === 'browser') renderBrowserWorkspace(node);
+    else return false;
+
+    const label = kind === 'browser' ? 'Web' : 'Symposium';
+    return registerPanel(key, label, node);
   }
 
   function normalizeDirectUrl(value) {
@@ -269,10 +466,13 @@
         if (!String(payload.text || '').trim()) throw new Error('No readable article text was found.');
         if (typeof window.MarkSetGoReadAnything?.openDocument !== 'function') throw new Error('Read Anything is not ready.');
 
-        const preservedPanel = root;
-        const oldShell = workspaceShell();
-        if (preservedPanel.isConnected) preservedPanel.remove();
-        activePanelKind = '';
+        // Detach the entire workspace shell before the existing Reader renderer
+        // replaces #app. The secondary panels survive and are reattached after
+        // the new Reader document is mounted.
+        const records = PANEL_ORDER.map((key) => PANELS.get(key)).filter(Boolean);
+        records.forEach((record) => record.node.remove());
+        const previousActive = activePanelKey;
+        activePanelKey = '';
 
         const parsed = new URL(direct);
         window.MarkSetGoReadAnything.openDocument({
@@ -282,15 +482,11 @@
           source: { type: 'website', url: direct, site: parsed.hostname, importedAt: new Date().toISOString() }
         });
 
-        PANEL_CACHE.set('browser', preservedPanel);
         window.requestAnimationFrame(() => {
           if (!hasReader()) return;
-          const shell = ensureWorkspaceShell();
-          const body = panelBody(shell);
-          activePanelKind = 'browser';
-          shell.classList.remove('is-closed');
-          body.appendChild(preservedPanel);
-          setActiveTab('browser', shell);
+          ensureWorkspaceShell();
+          const restoreKey = PANELS.has(previousActive) ? previousActive : 'tool:browser';
+          if (PANELS.has(restoreKey)) activatePanel(restoreKey);
           status.className = 'msg-browser-status success';
           status.textContent = `Opened “${payload.title || parsed.hostname}” in Reader.`;
           importButton.disabled = false;
@@ -303,23 +499,81 @@
     });
   }
 
-  function ensureBrowserNavigationItem() {
-    if (document.querySelector('[data-msg-workspace-open="browser"]')) return true;
-    const symposium = document.querySelector('[data-action="symposium"]');
-    const nav = symposium?.parentElement || document.querySelector('.site-header nav');
+  function ensureWorkspaceControls() {
+    const nav = document.querySelector('.site-header nav');
     if (!nav) return false;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.dataset.msgWorkspaceOpen = 'browser';
-    button.className = 'symposium-nav-link msg-browser-nav-link';
-    button.innerHTML = '<span aria-hidden="true">🌐</span><span>Web</span>';
-    button.title = 'Open Web beside Reader';
-    if (symposium?.nextSibling) nav.insertBefore(button, symposium.nextSibling);
-    else nav.appendChild(button);
-    return true;
+    const symposium = document.querySelector('[data-action="symposium"]');
+
+    // v0.3.3: the opt-in lives permanently inside the existing My Library
+    // dropdown. Do not depend on squeezing a dynamically-created label into the
+    // crowded top-level header. Keep this fallback only for older index.html files.
+    let control = document.querySelector('.msg-workspace-menu-option');
+    if (!control) {
+      const popover = document.querySelector('.library-menu-root .menu-popover');
+      if (popover) {
+        control = document.createElement('label');
+        control.className = 'msg-workspace-optin msg-workspace-menu-option';
+        control.title = 'Keep the Reader open while other sections open beside it.';
+        control.innerHTML = '<input id="msg-workspace-optin" type="checkbox" aria-label="Open pages in workspace"><span class="msg-workspace-menu-copy"><strong>Open pages in workspace</strong><small>Keep Reader open while opening other sections</small></span>';
+        const firstSection = popover.querySelector('.menu-section-label');
+        if (firstSection?.nextSibling) popover.insertBefore(control, firstSection.nextSibling);
+        else popover.prepend(control);
+      }
+    }
+
+    const checkbox = control?.querySelector?.('#msg-workspace-optin');
+    if (checkbox && checkbox.dataset.workspaceInitialized !== '1') {
+      checkbox.dataset.workspaceInitialized = '1';
+      try { checkbox.checked = localStorage.getItem('msg-workspace-optin-v1') === '1'; } catch {}
+    }
+
+    let button = document.querySelector('[data-msg-workspace-open="browser"]');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.msgWorkspaceOpen = 'browser';
+      button.className = 'symposium-nav-link msg-browser-nav-link';
+      button.innerHTML = '<span aria-hidden="true">🌐</span><span>Web</span>';
+      button.title = 'Open Web beside Reader';
+      nav.appendChild(button);
+    }
+
+    // Keep Web next to Symposium. The opt-in stays inside My Library.
+    if (symposium && symposium.nextSibling !== button) nav.insertBefore(button, symposium.nextSibling);
+    return Boolean(symposium && control?.isConnected && button.isConnected);
   }
 
+  function navigationDescriptor(element) {
+    if (!element) return null;
+    if (element.dataset.action) return { mode: 'action', value: element.dataset.action };
+    if (element.dataset.read) return { mode: 'read', value: element.dataset.read };
+    if (element.dataset.test) return { mode: 'test', value: element.dataset.test };
+    return null;
+  }
+
+  function isTopLevelNavigation(element) {
+    return Boolean(element?.closest?.('.site-header, .site-footer'));
+  }
+
+  document.addEventListener('change', (event) => {
+    if (!event.target.matches?.('#msg-workspace-optin')) return;
+    try { localStorage.setItem('msg-workspace-optin-v1', event.target.checked ? '1' : '0'); } catch {}
+    if (!event.target.checked) closeWorkspacePanel();
+  }, true);
+
   document.addEventListener('click', (event) => {
+    const optinControl = event.target.closest?.('.msg-workspace-optin');
+    if (optinControl && !event.target.matches?.('#msg-workspace-optin')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const checkbox = optinControl.querySelector('#msg-workspace-optin');
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event('change', { bubbles:true }));
+      }
+      return;
+    }
+
     const close = event.target.closest?.('[data-msg-workspace-close]');
     if (close) {
       event.preventDefault();
@@ -327,10 +581,19 @@
       return;
     }
 
-    const switcher = event.target.closest?.('[data-msg-workspace-switch]');
-    if (switcher) {
+    const tabClose = event.target.closest?.('[data-msg-workspace-tab-close]');
+    if (tabClose) {
       event.preventDefault();
-      showWorkspacePanel(switcher.dataset.msgWorkspaceSwitch);
+      event.stopImmediatePropagation();
+      closeWorkspaceTab(tabClose.dataset.msgWorkspaceTabClose);
+      return;
+    }
+
+    const tab = event.target.closest?.('[data-msg-workspace-tab]');
+    if (tab) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      activatePanel(tab.dataset.msgWorkspaceTab);
       return;
     }
 
@@ -340,34 +603,61 @@
       event.stopImmediatePropagation();
       try { closeMenus?.(); } catch {}
       if (!hasReader()) {
-        window.alert('Open something in the Reader first for this workspace experiment.');
+        window.alert('Open something in the Reader first to use Web in the workspace.');
         return;
       }
+      if (workspaceCheckbox()) workspaceCheckbox().checked = true;
       showWorkspacePanel('browser');
       return;
     }
 
-    const symposium = event.target.closest?.('[data-action="symposium"]');
-    if (symposium && hasReader()) {
+    const navTarget = event.target.closest?.('[data-action], [data-read], [data-test]');
+    if (!navTarget || !isTopLevelNavigation(navTarget)) return;
+
+    const descriptor = navigationDescriptor(navTarget);
+    if (!descriptor) return;
+
+    // Reader means "return focus to Reader" when a workspace is already open.
+    if (descriptor.mode === 'action' && descriptor.value === 'reader' && workspaceShell() && !workspaceShell().classList.contains('is-closed')) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      try { closeMenus?.(); } catch {}
-      showWorkspacePanel('symposium');
+      closeWorkspacePanel();
+      return;
     }
+
+    if (!workspaceEnabled() || !hasReader()) return;
+
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    try { closeMenus?.(); } catch {}
+
+    if (descriptor.mode === 'action' && descriptor.value === 'symposium') {
+      showWorkspacePanel('symposium');
+      return;
+    }
+
+    openAppPage(descriptor.mode, descriptor.value, navigationLabel(navTarget, descriptor.value));
   }, true);
 
-  // Symposium is injected by app.js shortly after startup; add Web beside it once available.
+  // Symposium is injected shortly after startup. Polling keeps this experiment
+  // isolated and avoids a MutationObserver. Also retry at a few later points in
+  // case another startup script finishes arranging the header after our first pass.
+  ensureWorkspaceControls();
   let navAttempts = 0;
   const navTimer = window.setInterval(() => {
     navAttempts += 1;
-    if (ensureBrowserNavigationItem() || navAttempts > 40) window.clearInterval(navTimer);
+    if (ensureWorkspaceControls() || navAttempts > 40) window.clearInterval(navTimer);
   }, 250);
+  [1200, 3000, 6000].forEach((delay) => window.setTimeout(ensureWorkspaceControls, delay));
+  window.addEventListener('pageshow', ensureWorkspaceControls);
 
   window.MSGWorkspaceExperiment = Object.freeze({
     open: showWorkspacePanel,
+    openPage: openAppPage,
     close: closeWorkspacePanel,
     browser: () => showWorkspacePanel('browser'),
-    symposium: () => showWorkspacePanel('symposium')
+    symposium: () => showWorkspacePanel('symposium'),
+    enabled: workspaceEnabled
   });
 
 function renderSymposiumWorkspace(rootHost) {

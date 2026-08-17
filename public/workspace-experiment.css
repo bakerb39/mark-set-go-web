@@ -368,3 +368,195 @@ body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
     grid-template-columns:1fr !important;
   }
 }
+
+/* v0.3.3 — opt-in all-page workspace tabs */
+.site-header nav > .msg-workspace-optin,
+.msg-workspace-optin{
+  display:inline-flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  width:auto !important;
+  height:auto !important;
+  position:static !important;
+  flex:0 0 auto !important;
+  align-items:center;
+  gap:5px;
+  padding:3px 7px;
+  margin:0 2px;
+  border:1px solid rgba(255,255,255,.34);
+  border-radius:7px;
+  color:inherit;
+  font-size:.72rem;
+  font-weight:700;
+  line-height:1;
+  white-space:nowrap;
+  cursor:pointer;
+  user-select:none;
+}
+.msg-workspace-optin:hover{background:rgba(255,255,255,.08)}
+.msg-workspace-optin input{
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  appearance:auto !important;
+  -webkit-appearance:checkbox !important;
+  width:13px !important;
+  min-width:13px !important;
+  height:13px !important;
+  margin:0 !important;
+  padding:0 !important;
+  accent-color:#d9a514;
+  cursor:pointer;
+}
+.msg-workspace-optin:has(input:checked){
+  background:rgba(255,255,255,.10);
+  border-color:#f4c542;
+  color:#ffe27a;
+}
+
+.msg-workspace-panel-tabs{
+  flex:1 1 auto;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+  align-items:center;
+  padding-bottom:1px;
+}
+.msg-workspace-tab{
+  display:inline-flex;
+  align-items:stretch;
+  flex:0 0 auto;
+  border:1px solid #cbd5e1;
+  border-radius:7px;
+  overflow:hidden;
+  background:#fff;
+}
+.msg-workspace-tab button{
+  min-height:29px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  color:#17365d !important;
+  padding:4px 7px !important;
+  font-size:.76rem !important;
+}
+.msg-workspace-tab .msg-workspace-tab-main{
+  max-width:150px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.msg-workspace-tab .msg-workspace-tab-x{
+  width:25px;
+  padding:0 !important;
+  border-left:1px solid #d7dee7 !important;
+  font-size:15px !important;
+  line-height:1 !important;
+}
+.msg-workspace-tab.active{
+  background:#17365d;
+  border-color:#17365d;
+}
+.msg-workspace-tab.active button{color:#fff !important}
+.msg-workspace-tab.active .msg-workspace-tab-x{border-left-color:rgba(255,255,255,.25) !important}
+.msg-workspace-tab button:hover{background:rgba(23,54,93,.07) !important}
+.msg-workspace-tab.active button:hover{background:rgba(255,255,255,.10) !important}
+
+.msg-workspace-panel-body{overflow:hidden}
+.msg-workspace-app-page{height:100%;min-height:0;background:#fff}
+.msg-workspace-page-frame{
+  display:block;
+  width:100%;
+  height:100%;
+  min-height:640px;
+  border:0;
+  background:#fff;
+}
+
+/* A generic app page loaded as a workspace pane gets its own compact app
+   viewport. The outer Reader is a separate document and is not restyled. */
+html.msg-workspace-pane-document{
+  font-size:14px;
+  min-width:0;
+  background:#fff;
+}
+html.msg-workspace-pane-document body{
+  min-width:0 !important;
+  margin:0 !important;
+  background:#fff !important;
+  overflow-x:hidden;
+}
+html.msg-workspace-pane-document .site-header,
+html.msg-workspace-pane-document #msg-shared-bottom{
+  display:none !important;
+}
+html.msg-workspace-pane-document #app.app-shell{
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+  margin:0 !important;
+  padding:10px !important;
+  box-sizing:border-box !important;
+}
+html.msg-workspace-pane-document #app.app-shell > *{
+  max-width:100% !important;
+  min-width:0 !important;
+}
+html.msg-workspace-pane-document .panel,
+html.msg-workspace-pane-document .page-shell,
+html.msg-workspace-pane-document .library-page,
+html.msg-workspace-pane-document .browse-page{
+  margin-top:0 !important;
+}
+html.msg-workspace-pane-document h1{font-size:1.55rem}
+html.msg-workspace-pane-document h2{font-size:1.18rem}
+html.msg-workspace-pane-document h3{font-size:1rem}
+html.msg-workspace-pane-document button,
+html.msg-workspace-pane-document input,
+html.msg-workspace-pane-document select,
+html.msg-workspace-pane-document textarea{font-size:.9rem}
+
+@media(max-width:1180px){
+  .msg-workspace-optin span{display:none}
+  .msg-workspace-optin{padding:4px}
+}
+
+/* v0.3.3: permanent checkbox row inside My Library menu. */
+.library-menu-root .menu-popover .msg-workspace-menu-option{
+  display:flex !important;
+  width:calc(100% - 16px) !important;
+  box-sizing:border-box !important;
+  align-items:center !important;
+  gap:10px !important;
+  margin:6px 8px 9px !important;
+  padding:9px 10px !important;
+  border:1px solid #c9d5e2 !important;
+  border-radius:9px !important;
+  background:#f7fafc !important;
+  color:#0b2d4f !important;
+  line-height:1.2 !important;
+  cursor:pointer !important;
+}
+.library-menu-root .menu-popover .msg-workspace-menu-option:hover{background:#eef5fb !important}
+.library-menu-root .menu-popover .msg-workspace-menu-option:has(input:checked){
+  background:#fff8df !important;
+  border-color:#d9a514 !important;
+  color:#0b2d4f !important;
+}
+.library-menu-root .menu-popover .msg-workspace-menu-option input{
+  display:block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  flex:0 0 auto !important;
+  width:15px !important;
+  height:15px !important;
+  margin:0 !important;
+}
+.library-menu-root .menu-popover .msg-workspace-menu-copy{
+  display:grid !important;
+  gap:2px !important;
+  min-width:0 !important;
+  color:inherit !important;
+}
+.library-menu-root .menu-popover .msg-workspace-menu-copy strong{font-size:.78rem !important;font-weight:800 !important}
+.library-menu-root .menu-popover .msg-workspace-menu-copy small{display:block !important;font-size:.67rem !important;font-weight:500 !important;color:#64748b !important}

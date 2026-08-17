@@ -8,7 +8,7 @@
 <title>Mark, Set, Go!</title>
 <link href="/styles.css?v=reader-annotations-v8-reconciled" rel="stylesheet"/>
 <link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
-<link href="/workspace-experiment.css?v=0.2.0" rel="stylesheet"/>
+<link href="/workspace-experiment.css?v=0.3.3" rel="stylesheet"/>
 <link href="/ask-mark-hub.css?v=9.2.87-reader-tools-scroll-format" rel="stylesheet"/>
 <link href="/mobile-simple.css?v=8.5.9" rel="stylesheet"/>
 <link rel="stylesheet" href="/button-feedback.css?v=8.6.6">
@@ -40,7 +40,7 @@
   <script defer src="/cloud-productivity.js?v=9.2.18-cloud-remove-unified"></script>
   <script defer src="/document-manager.js?v=9.2.18-cloud-remove-unified"></script>
   <script defer src="/read-anything.js?v=20260814-article-actions-resume-reconciled"></script>
-  <script defer src="/workspace-experiment.js?v=0.2.0"></script>
+  <script defer src="/workspace-experiment.js?v=0.3.3"></script>
   <script defer src="/ask-mark-hub.js?v=9.6.6-question-anchor-scroll-reconciled"></script>
   <script defer src="/app-walkthrough.js?v=9.4.6-right-click-restore"></script>
     <script defer src="/topic-feeds.js?v=2.1.15-menu-click-fix"></script>
@@ -66,6 +66,12 @@
 <summary><span class="nav-icon" aria-hidden="true">▥</span> My Library</summary>
 <div class="menu-popover library-nav-popover professional-library-menu" role="menu">
   <div class="menu-section-label">Library</div>
+
+  <label class="msg-workspace-optin msg-workspace-menu-option" title="Keep the Reader open while other sections open beside it.">
+    <input id="msg-workspace-optin" type="checkbox" aria-label="Open pages in workspace">
+    <span class="msg-workspace-menu-copy"><strong>Open pages in workspace</strong><small>Keep Reader open while opening other sections</small></span>
+  </label>
+
 
   <button data-action="my-library" type="button" role="menuitem">
     <span class="menu-icon icon-home">⌂</span>
