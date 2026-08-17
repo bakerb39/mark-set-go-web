@@ -13261,8 +13261,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                   <button id="fs-start" class="primary" type="button">Start</button>
                   <button id="fs-pause" class="secondary" type="button">Pause</button>
                   <button id="fs-reset" class="secondary" type="button">Reset</button>
-                  <label class="compact-toggle fullscreen-reader-click-controls-toggle"
-                         title="When unchecked, clicking or tapping Reader text cannot control playback.">
+                  <label class="fullscreen-reader-click-controls-toggle"
+                         title="When unchecked, clicking or tapping Reader text cannot control playback."
+                         style="display:inline-flex;align-items:center;gap:.35rem;width:max-content;white-space:nowrap;">
                     <input id="fs-reader-click-controls" type="checkbox" ${readerClickControlsEnabled ? 'checked' : ''}>
                     <span>Reader click controls</span>
                   </label>
@@ -13397,18 +13398,20 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
       <dialog id="comprehension-dialog" class="comprehension-dialog" aria-label="Comprehension check"></dialog>
 
-      <div class="controls playback-controls">
+      <div class="controls playback-controls"
+           style="display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:.45rem;margin:.55rem 0;">
         <button id="start-reader" class="primary">Start</button>
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
-        <label class="compact-toggle reader-click-controls-toggle"
+        <label class="reader-click-controls-toggle"
                title="When unchecked, clicking or tapping the Reader text cannot start, resume, pause, or seek playback."
-               style="flex:0 0 auto;min-height:2.08rem;display:inline-flex;align-items:center;gap:.4rem;padding:.34rem .68rem;white-space:nowrap;">
-          <input id="reader-click-controls" type="checkbox" ${readerClickControlsEnabled ? 'checked' : ''}>
-          <span>Reader click controls</span>
+               style="display:inline-flex!important;align-items:center;justify-content:flex-start;gap:.35rem;flex:0 0 auto!important;width:max-content!important;max-width:max-content!important;min-height:2.08rem;padding:0 .35rem!important;margin:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;white-space:nowrap;">
+          <input id="reader-click-controls" type="checkbox" ${readerClickControlsEnabled ? 'checked' : ''}
+                 style="width:auto!important;height:auto!important;margin:0!important;flex:0 0 auto!important;">
+          <span style="display:inline!important;width:auto!important;white-space:nowrap;">Reader click controls</span>
         </label>
         <span id="reader-status" class="status"
-              style="flex:0 0 100%;width:100%;margin:.15rem 0 0;">
+              style="flex:0 0 100%;width:100%;margin:.05rem 0 0;min-height:1.2rem;">
           ${state.words.length.toLocaleString()} words loaded. ${readerClickControlsEnabled ? 'Click a word to move the reading position.' : 'Reader clicks are off. Read, scroll, and select text normally; use Start, Pause, or Reset only when wanted.'}
         </span>
       </div>
