@@ -30,7 +30,7 @@
         name:'Scott',
         ask:'Ask Scott',
         notebook:'Scott’s Notebook',
-        avatar:'/assets/companions/scott/scott-avatar.png?v=20260816-scott-integrated'
+        avatar:'/assets/companions/scott/scott-avatar.png?v=20260817'
       };
     }
 
@@ -802,27 +802,41 @@
     });
   }
 
+  function closeAskMarkPanel(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    const layout = document.getElementById('reader-layout');
+    if (!layout) return false;
+
+    // Use the Reader's canonical right-pane state directly. This is the same
+    // state used by #toggle-mark-panel in app.js.
+    layout.classList.add('word-panel-hidden');
+
+    const markButton = document.getElementById('toggle-mark-panel');
+    const toolsButton = document.getElementById('toggle-word-panel');
+    markButton?.setAttribute('aria-pressed', 'false');
+    toolsButton?.setAttribute('aria-pressed', 'false');
+    markButton?.classList.add('pane-closed');
+    toolsButton?.classList.add('pane-closed');
+    return true;
+  }
+
   function bindPremiumEvents() {
     installAskMarkScrollIsolation();
-    $('[data-askmark-close]', shell)?.addEventListener('click', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
 
-      const layout = document.getElementById('reader-layout');
-      if (!layout) return;
-
-      // Close Ask Mark directly instead of routing through the toolbar toggle.
-      // This avoids toggle-state mismatches that can make the X appear unresponsive.
-      layout.classList.add('word-panel-hidden');
-
-      const markButton = document.getElementById('toggle-mark-panel');
-      const toolsButton = document.getElementById('toggle-word-panel');
-
-      markButton?.setAttribute('aria-pressed', 'false');
-      toolsButton?.setAttribute('aria-pressed', 'false');
-      markButton?.classList.add('pane-closed');
-      toolsButton?.classList.add('pane-closed');
-    });
+    // Bind once to the stable shell, not to the X button itself. The premium
+    // header can be rebuilt while the Reader is alive; delegation keeps the X
+    // working after those rebuilds without observing the DOM. Capture phase
+    // ensures older target-level handlers cannot swallow the close click first.
+    if (shell && shell.dataset.askmarkCloseBound !== '1') {
+      shell.dataset.askmarkCloseBound = '1';
+      shell.addEventListener('click', (event) => {
+        const closeButton = event.target.closest?.('[data-askmark-close]');
+        if (!closeButton || !shell.contains(closeButton)) return;
+        closeAskMarkPanel(event);
+      }, true);
+    }
     $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
     $$('[data-askmark-view]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView(button.dataset.askmarkView)));
     $$('[data-askmark-back]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView('chat')));
