@@ -386,8 +386,9 @@
       return;
     }
 
-    // Remove older toolbar wrappers but preserve the native Full screen button.
-    paneControls.querySelectorAll('.reader-compact-toolbar, .reader-topright-media-stack, .reader-quick-tools')
+    // Remove only legacy wrappers. The current compact toolbar must be reused,
+    // not destroyed/recreated on every MutationObserver sync.
+    paneControls.querySelectorAll('.reader-topright-media-stack, .reader-quick-tools')
       .forEach((node) => {
         if (node.contains(fullscreenButton)) {
           node.parentNode?.insertBefore(fullscreenButton, node);
@@ -430,20 +431,23 @@
       ['border', '0']
     ].forEach(([property, value]) => musicButton.style.setProperty(property, value, 'important'));
 
-    // Build the visible toolbar once.
-    const toolbar = document.createElement('div');
-    toolbar.className = 'reader-compact-toolbar';
-    toolbar.setAttribute('aria-label', 'Reader quick controls');
-    toolbar.innerHTML = `
-      <span class="reader-font-group" aria-label="Reader font size">
-        <span class="reader-toolbar-action" data-reader-font-decrease role="button" tabindex="0" aria-label="Decrease reader font size" title="Smaller text">−</span>
-        <span class="reader-font-separator" aria-hidden="true"></span>
-        <span class="reader-toolbar-action" data-reader-font-increase role="button" tabindex="0" aria-label="Increase reader font size" title="Larger text">+</span>
-      </span>
-      <span class="reader-toolbar-separator" aria-hidden="true"></span>
-      <span class="reader-toolbar-action reader-toolbar-music" data-reader-music-proxy role="button" tabindex="0" aria-label="Open reading music" title="Reading music">♫</span>
-    `;
-    paneControls.appendChild(toolbar);
+    // Build the visible toolbar once, then reuse the same DOM node.
+    let toolbar = paneControls.querySelector(':scope > .reader-compact-toolbar');
+    if (!toolbar) {
+      toolbar = document.createElement('div');
+      toolbar.className = 'reader-compact-toolbar';
+      toolbar.setAttribute('aria-label', 'Reader quick controls');
+      toolbar.innerHTML = `
+        <span class="reader-font-group" aria-label="Reader font size">
+          <span class="reader-toolbar-action" data-reader-font-decrease role="button" tabindex="0" aria-label="Decrease reader font size" title="Smaller text">−</span>
+          <span class="reader-font-separator" aria-hidden="true"></span>
+          <span class="reader-toolbar-action" data-reader-font-increase role="button" tabindex="0" aria-label="Increase reader font size" title="Larger text">+</span>
+        </span>
+        <span class="reader-toolbar-separator" aria-hidden="true"></span>
+        <span class="reader-toolbar-action reader-toolbar-music" data-reader-music-proxy role="button" tabindex="0" aria-label="Open reading music" title="Reading music">♫</span>
+      `;
+      paneControls.appendChild(toolbar);
+    }
 
     bindKeyboardActivation(toolbar.querySelector('[data-reader-font-decrease]'), () => changeReaderFont(-1));
     bindKeyboardActivation(toolbar.querySelector('[data-reader-font-increase]'), () => changeReaderFont(1));
@@ -507,7 +511,7 @@
     innerSeparator.style.setProperty('width', '1px', 'important');
     innerSeparator.style.setProperty('height', '16px', 'important');
     innerSeparator.style.setProperty('margin', '0 8px', 'important');
-    innerSeparator.style.setProperty('background', 'rgba(255,255,255,.42)', 'important');
+    innerSeparator.style.setProperty('background', 'rgba(255,255,255,.62)', 'important');
     innerSeparator.style.setProperty('flex', '0 0 1px', 'important');
     innerSeparator.style.setProperty('pointer-events', 'none', 'important');
 
@@ -517,7 +521,7 @@
     outerSeparator.style.setProperty('width', '1px', 'important');
     outerSeparator.style.setProperty('height', '18px', 'important');
     outerSeparator.style.setProperty('margin', '0 14px', 'important');
-    outerSeparator.style.setProperty('background', '#8a96a3', 'important');
+    outerSeparator.style.setProperty('background', '#9aa3ad', 'important');
     outerSeparator.style.setProperty('flex', '0 0 1px', 'important');
     outerSeparator.style.setProperty('pointer-events', 'none', 'important');
 
@@ -531,8 +535,8 @@
     musicProxy.style.setProperty('margin', '0', 'important');
     musicProxy.style.setProperty('border', '0', 'important');
     musicProxy.style.setProperty('background', 'transparent', 'important');
-    musicProxy.style.setProperty('color', '#173f67', 'important');
-    musicProxy.style.setProperty('-webkit-text-fill-color', '#173f67', 'important');
+    musicProxy.style.setProperty('color', '#0b2e4f', 'important');
+    musicProxy.style.setProperty('-webkit-text-fill-color', '#0b2e4f', 'important');
     musicProxy.style.setProperty('font-size', '15px', 'important');
     musicProxy.style.setProperty('font-weight', '600', 'important');
     musicProxy.style.setProperty('line-height', '1', 'important');
@@ -590,8 +594,34 @@
 
     const app = document.querySelector('#app');
     if (app) {
-      new MutationObserver(() => window.setTimeout(sync, 0))
-        .observe(app, { childList:true, subtree:true });
+      let syncQueued = false;
+      const queueSync = () => {
+        if (syncQueued) return;
+        syncQueued = true;
+        window.requestAnimationFrame(() => {
+          syncQueued = false;
+          sync();
+        });
+      };
+
+      new MutationObserver((mutations) => {
+        const relevant = mutations.some((mutation) => {
+          const target = mutation.target?.nodeType === 1 ? mutation.target : mutation.target?.parentElement;
+          if (!target) return true;
+
+          if (
+            target.closest?.('.reader-compact-toolbar') ||
+            target.closest?.('#reader-music-wpm-chooser') ||
+            target.closest?.('#music-dock')
+          ) {
+            return false;
+          }
+
+          return true;
+        });
+
+        if (relevant) queueSync();
+      }).observe(app, { childList:true, subtree:true });
     }
 
     document.addEventListener('marksetgo:document-available', () => window.setTimeout(sync, 0));
