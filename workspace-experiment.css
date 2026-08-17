@@ -1,0 +1,508 @@
+/* Mark, Set, Go! workspace experiment */
+.msg-workspace-shell{
+  --msg-secondary-width: 520px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 8px minmax(340px,var(--msg-secondary-width));
+  width:100%;
+  min-width:0;
+  align-items:stretch;
+}
+.msg-workspace-primary{min-width:0;overflow:visible}
+.msg-workspace-divider{
+  position:relative;
+  cursor:col-resize;
+  touch-action:none;
+  background:transparent;
+  z-index:4;
+}
+.msg-workspace-divider::before{
+  content:"";
+  position:absolute;
+  top:8px;bottom:8px;left:3px;width:2px;
+  border-radius:2px;
+  background:#d7dee8;
+}
+.msg-workspace-divider:hover::before,
+body.msg-workspace-resizing .msg-workspace-divider::before{background:#17365d}
+body.msg-workspace-resizing{cursor:col-resize!important;user-select:none!important}
+.msg-workspace-secondary{
+  min-width:0;
+  min-height:640px;
+  background:#fff;
+  border:1px solid #dbe2ea;
+  border-radius:12px;
+  overflow:hidden;
+  box-shadow:0 8px 26px rgba(17,40,70,.10);
+  display:flex;
+  flex-direction:column;
+  position:sticky;
+  top:8px;
+  align-self:start;
+  height:calc(100vh - 24px);
+}
+.msg-workspace-shell.is-closed{grid-template-columns:minmax(0,1fr) 0 0}
+.msg-workspace-shell.is-closed .msg-workspace-divider,
+.msg-workspace-shell.is-closed .msg-workspace-secondary{display:none}
+.msg-workspace-panel-head{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:8px 10px;
+  border-bottom:1px solid #e1e6ed;
+  background:#f8fafc;
+}
+.msg-workspace-panel-tabs{display:flex;gap:6px;min-width:0}
+.msg-workspace-panel-tabs button,
+.msg-workspace-close,
+.msg-browser-toolbar button{
+  border:1px solid #cbd5e1;
+  background:#fff;
+  color:#17365d;
+  border-radius:8px;
+  min-height:34px;
+  padding:6px 10px;
+  font:inherit;
+  cursor:pointer;
+}
+.msg-workspace-panel-tabs button.active{
+  background:#17365d;
+  border-color:#17365d;
+  color:#fff;
+}
+.msg-workspace-close{font-size:22px;line-height:1;width:36px;padding:0}
+.msg-workspace-panel-body{flex:1 1 auto;min-height:0;overflow:auto}
+.msg-workspace-panel{min-height:100%;background:#fff}
+
+/* Make the existing Symposium usable in a side pane without changing its logic. */
+.msg-workspace-symposium .symposium-page{padding:12px!important}
+.msg-workspace-symposium .symposium-hero{grid-template-columns:1fr!important;padding:18px!important;gap:12px!important}
+.msg-workspace-symposium .symposium-hero h1{font-size:clamp(1.45rem,2vw,2rem)!important}
+.msg-workspace-symposium .symposium-badge{min-width:0!important;width:auto!important}
+.msg-workspace-symposium .symposium-layout{grid-template-columns:1fr!important;gap:12px!important}
+.msg-workspace-symposium .symposium-panel{min-width:0!important}
+.msg-workspace-symposium .symposium-stage{min-height:560px}
+.msg-workspace-symposium .symposium-mode-grid{grid-template-columns:1fr 1fr!important}
+
+.msg-browser{display:flex;flex-direction:column;min-height:100%;height:100%}
+.msg-browser-toolbar{flex:0 0 auto;padding:10px;border-bottom:1px solid #e1e6ed;background:#fff}
+.msg-browser-address-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px}
+.msg-browser-address{
+  width:100%;min-width:0;box-sizing:border-box;
+  border:1px solid #bfc9d5;border-radius:8px;
+  min-height:38px;padding:7px 10px;font:inherit;color:#172b4d;background:#fff;
+}
+.msg-browser-address:focus{outline:2px solid rgba(23,54,93,.18);border-color:#17365d}
+.msg-browser-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.msg-browser-actions [data-msg-browser-import]{background:#17365d;color:#fff;border-color:#17365d}
+.msg-browser-actions button:disabled{opacity:.45;cursor:not-allowed}
+.msg-browser-status{flex:0 0 auto;padding:8px 12px;font-size:.86rem;color:#526173;background:#f8fafc;border-bottom:1px solid #e6ebf0}
+.msg-browser-status.error{color:#8a1c1c;background:#fff5f5}
+.msg-browser-status.success{color:#244e2e;background:#f3fbf4}
+.msg-browser-frame-wrap{position:relative;flex:1 1 auto;min-height:0;background:#f1f4f8}
+.msg-browser-frame{width:100%;height:100%;min-height:560px;border:0;background:#fff;display:block}
+.msg-browser-frame[hidden]{display:none}
+.msg-browser-start{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:36px;color:#526173}
+.msg-browser-start[hidden]{display:none}
+.msg-browser-start>span{font-size:42px}.msg-browser-start h2{margin:8px 0 4px;color:#17365d}.msg-browser-start p{max-width:430px;margin:0;line-height:1.5}
+
+@media(max-width:900px){
+  .msg-workspace-shell:not(.is-closed){grid-template-columns:1fr;grid-template-rows:auto 0 minmax(360px,48vh)}
+  .msg-workspace-shell:not(.is-closed) .msg-workspace-divider{display:none}
+  .msg-workspace-secondary{position:relative;top:auto;height:48vh;min-height:360px;border-radius:10px;margin-top:10px}
+  .msg-workspace-symposium .symposium-mode-grid{grid-template-columns:1fr!important}
+}
+
+/* v0.2 — wide multi-pane workspace + compact secondary UI
+   When a second tool is open, use the browser real estate instead of the
+   normal single-page app width. Reader typography itself is left alone. */
+body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
+  width:min(1880px, calc(100vw - 24px)) !important;
+  max-width:none !important;
+  margin-left:auto !important;
+  margin-right:auto !important;
+}
+
+.msg-workspace-shell:not(.is-closed){
+  grid-template-columns:minmax(640px,1fr) 8px minmax(420px,var(--msg-secondary-width));
+}
+
+/* Compact workspace chrome */
+.msg-workspace-panel-head{padding:6px 8px}
+.msg-workspace-panel-tabs{gap:5px}
+.msg-workspace-panel-tabs button,
+.msg-workspace-close,
+.msg-browser-toolbar button{
+  min-height:30px;
+  padding:4px 8px;
+  border-radius:7px;
+  font-size:.82rem;
+}
+.msg-workspace-close{width:32px;padding:0;font-size:19px}
+
+/* Symposium: intentionally denser when it shares the screen with Reader. */
+.msg-workspace-symposium .symposium-page{
+  padding:10px !important;
+  font-size:13px;
+}
+.msg-workspace-symposium .symposium-hero{
+  display:grid !important;
+  grid-template-columns:minmax(0,1.45fr) minmax(165px,.75fr) !important;
+  align-items:start !important;
+  gap:12px !important;
+  margin-bottom:10px !important;
+  padding:14px 15px !important;
+  border-radius:16px !important;
+}
+.msg-workspace-symposium .symposium-kicker{font-size:.65rem !important}
+.msg-workspace-symposium .symposium-hero h1{
+  font-size:clamp(1.35rem,1.6vw,1.75rem) !important;
+  line-height:1.03 !important;
+  margin:.3rem 0 .45rem !important;
+}
+.msg-workspace-symposium .symposium-hero p{
+  font-size:.80rem !important;
+  line-height:1.45 !important;
+}
+.msg-workspace-symposium .symposium-badge{
+  min-width:0 !important;
+  width:auto !important;
+  padding:10px 11px !important;
+  border-radius:13px !important;
+}
+.msg-workspace-symposium .symposium-badge strong{font-size:.88rem !important}
+.msg-workspace-symposium .symposium-badge small{
+  margin-top:4px !important;
+  font-size:.72rem !important;
+  line-height:1.38 !important;
+}
+.msg-workspace-symposium .symposium-layout{gap:10px !important}
+.msg-workspace-symposium .symposium-panel{border-radius:14px !important}
+.msg-workspace-symposium .symposium-panel-head{
+  padding:11px 13px 8px !important;
+}
+.msg-workspace-symposium .symposium-panel-head h2{
+  margin-bottom:2px !important;
+  font-size:1rem !important;
+}
+.msg-workspace-symposium .symposium-panel-head p{
+  font-size:.75rem !important;
+  line-height:1.35 !important;
+}
+.msg-workspace-symposium .symposium-setup{
+  padding:10px 12px 13px !important;
+  gap:10px !important;
+}
+.msg-workspace-symposium .symposium-setup label{
+  gap:5px !important;
+  font-size:.76rem !important;
+}
+.msg-workspace-symposium .symposium-setup input,
+.msg-workspace-symposium .symposium-setup textarea,
+.msg-workspace-symposium .symposium-setup select{
+  padding:7px 9px !important;
+  border-radius:8px !important;
+  font-size:.79rem !important;
+}
+.msg-workspace-symposium .symposium-setup textarea{
+  min-height:70px !important;
+  line-height:1.35 !important;
+}
+.msg-workspace-symposium .symposium-mode-grid{gap:6px !important}
+.msg-workspace-symposium .symposium-mode span{
+  padding:7px 9px !important;
+  border-radius:9px !important;
+  font-size:.78rem !important;
+}
+.msg-workspace-symposium .symposium-mode small{
+  margin-top:2px !important;
+  font-size:.69rem !important;
+}
+.msg-workspace-symposium .symposium-context-choice{gap:5px !important}
+.msg-workspace-symposium .symposium-context-choice button,
+.msg-workspace-symposium .symposium-mini-button{
+  padding:5px 8px !important;
+  font-size:.72rem !important;
+}
+.msg-workspace-symposium .symposium-roster{
+  max-height:260px !important;
+  gap:5px !important;
+}
+.msg-workspace-symposium .symposium-person{
+  grid-template-columns:auto 32px 1fr !important;
+  gap:6px !important;
+  padding:6px !important;
+  border-radius:9px !important;
+}
+.msg-workspace-symposium .symposium-avatar{
+  width:30px !important;
+  height:30px !important;
+  font-size:.66rem !important;
+  border-width:1px !important;
+}
+.msg-workspace-symposium .symposium-person strong{font-size:.78rem !important}
+.msg-workspace-symposium .symposium-person small{
+  margin-top:1px !important;
+  font-size:.66rem !important;
+}
+.msg-workspace-symposium .symposium-custom-row{gap:5px !important}
+.msg-workspace-symposium .symposium-custom-row button,
+.msg-workspace-symposium .symposium-start{
+  padding:7px 10px !important;
+  border-radius:8px !important;
+  font-size:.78rem !important;
+}
+.msg-workspace-symposium .symposium-start{padding:9px 11px !important}
+.msg-workspace-symposium .symposium-stage{min-height:500px !important}
+.msg-workspace-symposium .symposium-stage-toolbar{
+  padding:8px 10px !important;
+  gap:7px !important;
+}
+.msg-workspace-symposium .symposium-stage-status{font-size:.76rem !important}
+.msg-workspace-symposium .symposium-stage-actions{gap:5px !important}
+.msg-workspace-symposium .symposium-stage-actions button{
+  padding:5px 7px !important;
+  border-radius:7px !important;
+  font-size:.70rem !important;
+}
+.msg-workspace-symposium .symposium-transcript{
+  padding:10px !important;
+  gap:8px !important;
+  min-height:300px !important;
+  max-height:610px !important;
+}
+.msg-workspace-symposium .symposium-empty{
+  padding:24px !important;
+  font-size:.78rem !important;
+}
+.msg-workspace-symposium .symposium-empty .symposium-empty-icon{
+  font-size:2rem !important;
+  margin-bottom:7px !important;
+}
+.msg-workspace-symposium .symposium-empty h2{font-size:1.1rem !important}
+.msg-workspace-symposium .symposium-turn{
+  grid-template-columns:32px minmax(0,1fr) !important;
+  gap:7px !important;
+}
+.msg-workspace-symposium .symposium-turn.user{
+  grid-template-columns:minmax(0,1fr) 32px !important;
+}
+.msg-workspace-symposium .symposium-turn-body{
+  padding:8px 9px !important;
+  border-radius:10px !important;
+}
+.msg-workspace-symposium .symposium-turn-head{margin-bottom:4px !important}
+.msg-workspace-symposium .symposium-turn-head strong{font-size:.78rem !important}
+.msg-workspace-symposium .symposium-turn-head span{font-size:.66rem !important}
+.msg-workspace-symposium .symposium-turn-body p{
+  font-size:.78rem !important;
+  line-height:1.45 !important;
+}
+.msg-workspace-symposium .symposium-turn-tools{margin-top:5px !important}
+.msg-workspace-symposium .symposium-turn-tools button{font-size:.68rem !important}
+.msg-workspace-symposium .symposium-participate{
+  padding:9px 10px !important;
+}
+.msg-workspace-symposium .symposium-participate label{font-size:.70rem !important}
+.msg-workspace-symposium .symposium-user-grid{
+  grid-template-columns:110px 1fr auto !important;
+  gap:6px !important;
+  margin-top:5px !important;
+}
+.msg-workspace-symposium .symposium-user-grid select,
+.msg-workspace-symposium .symposium-user-grid textarea{
+  padding:6px 8px !important;
+  border-radius:7px !important;
+  font-size:.76rem !important;
+}
+.msg-workspace-symposium .symposium-user-grid textarea{min-height:42px !important}
+.msg-workspace-symposium .symposium-user-grid button{
+  padding:7px 9px !important;
+  border-radius:7px !important;
+  font-size:.76rem !important;
+}
+.msg-workspace-symposium .symposium-hint{
+  margin-top:4px !important;
+  font-size:.66rem !important;
+}
+.msg-workspace-symposium .symposium-source-pill{
+  margin-top:5px !important;
+  padding:3px 6px !important;
+  font-size:.63rem !important;
+}
+
+/* Browser side pane uses the same denser scale. */
+.msg-workspace-browser{font-size:13px}
+.msg-browser-toolbar{padding:8px}
+.msg-browser-address-form{gap:5px}
+.msg-browser-address{
+  min-height:33px;
+  padding:5px 8px;
+  border-radius:7px;
+  font-size:.80rem;
+}
+.msg-browser-actions{gap:5px;margin-top:6px}
+.msg-browser-status{padding:6px 9px;font-size:.74rem}
+.msg-browser-start{padding:24px;font-size:.80rem}
+.msg-browser-start>span{font-size:32px}
+.msg-browser-start h2{font-size:1.1rem}
+
+@media(max-width:1100px){
+  body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
+    width:calc(100vw - 16px) !important;
+  }
+  .msg-workspace-shell:not(.is-closed){
+    grid-template-columns:minmax(500px,1fr) 8px minmax(380px,var(--msg-secondary-width));
+  }
+}
+
+@media(max-width:900px){
+  body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
+    width:auto !important;
+  }
+  .msg-workspace-symposium .symposium-hero{
+    grid-template-columns:1fr !important;
+  }
+  .msg-workspace-symposium .symposium-user-grid{
+    grid-template-columns:1fr !important;
+  }
+}
+
+/* v0.3 — opt-in all-page workspace tabs */
+.msg-workspace-optin{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:3px 7px;
+  margin:0 2px;
+  border:1px solid rgba(255,255,255,.34);
+  border-radius:7px;
+  color:inherit;
+  font-size:.72rem;
+  font-weight:700;
+  line-height:1;
+  white-space:nowrap;
+  cursor:pointer;
+  user-select:none;
+}
+.msg-workspace-optin:hover{background:rgba(255,255,255,.08)}
+.msg-workspace-optin input{
+  width:13px;
+  height:13px;
+  margin:0;
+  accent-color:#d9a514;
+  cursor:pointer;
+}
+.msg-workspace-optin:has(input:checked){
+  background:rgba(255,255,255,.10);
+  border-color:#f4c542;
+  color:#ffe27a;
+}
+
+.msg-workspace-panel-tabs{
+  flex:1 1 auto;
+  overflow-x:auto;
+  overflow-y:hidden;
+  scrollbar-width:thin;
+  align-items:center;
+  padding-bottom:1px;
+}
+.msg-workspace-tab{
+  display:inline-flex;
+  align-items:stretch;
+  flex:0 0 auto;
+  border:1px solid #cbd5e1;
+  border-radius:7px;
+  overflow:hidden;
+  background:#fff;
+}
+.msg-workspace-tab button{
+  min-height:29px !important;
+  border:0 !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  color:#17365d !important;
+  padding:4px 7px !important;
+  font-size:.76rem !important;
+}
+.msg-workspace-tab .msg-workspace-tab-main{
+  max-width:150px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.msg-workspace-tab .msg-workspace-tab-x{
+  width:25px;
+  padding:0 !important;
+  border-left:1px solid #d7dee7 !important;
+  font-size:15px !important;
+  line-height:1 !important;
+}
+.msg-workspace-tab.active{
+  background:#17365d;
+  border-color:#17365d;
+}
+.msg-workspace-tab.active button{color:#fff !important}
+.msg-workspace-tab.active .msg-workspace-tab-x{border-left-color:rgba(255,255,255,.25) !important}
+.msg-workspace-tab button:hover{background:rgba(23,54,93,.07) !important}
+.msg-workspace-tab.active button:hover{background:rgba(255,255,255,.10) !important}
+
+.msg-workspace-panel-body{overflow:hidden}
+.msg-workspace-app-page{height:100%;min-height:0;background:#fff}
+.msg-workspace-page-frame{
+  display:block;
+  width:100%;
+  height:100%;
+  min-height:640px;
+  border:0;
+  background:#fff;
+}
+
+/* A generic app page loaded as a workspace pane gets its own compact app
+   viewport. The outer Reader is a separate document and is not restyled. */
+html.msg-workspace-pane-document{
+  font-size:14px;
+  min-width:0;
+  background:#fff;
+}
+html.msg-workspace-pane-document body{
+  min-width:0 !important;
+  margin:0 !important;
+  background:#fff !important;
+  overflow-x:hidden;
+}
+html.msg-workspace-pane-document .site-header,
+html.msg-workspace-pane-document #msg-shared-bottom{
+  display:none !important;
+}
+html.msg-workspace-pane-document #app.app-shell{
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+  margin:0 !important;
+  padding:10px !important;
+  box-sizing:border-box !important;
+}
+html.msg-workspace-pane-document #app.app-shell > *{
+  max-width:100% !important;
+  min-width:0 !important;
+}
+html.msg-workspace-pane-document .panel,
+html.msg-workspace-pane-document .page-shell,
+html.msg-workspace-pane-document .library-page,
+html.msg-workspace-pane-document .browse-page{
+  margin-top:0 !important;
+}
+html.msg-workspace-pane-document h1{font-size:1.55rem}
+html.msg-workspace-pane-document h2{font-size:1.18rem}
+html.msg-workspace-pane-document h3{font-size:1rem}
+html.msg-workspace-pane-document button,
+html.msg-workspace-pane-document input,
+html.msg-workspace-pane-document select,
+html.msg-workspace-pane-document textarea{font-size:.9rem}
+
+@media(max-width:1180px){
+  .msg-workspace-optin span{display:none}
+  .msg-workspace-optin{padding:4px}
+}
