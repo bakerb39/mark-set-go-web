@@ -438,11 +438,13 @@
     tools.id = 'reader-flat-quick-tools';
     tools.setAttribute('aria-label', 'Reader quick controls');
     tools.innerHTML = `
-      <span id="reader-font-minus" role="button" tabindex="0" aria-label="Decrease reader font size" title="Smaller text">−</span>
-      <span id="reader-font-inner-divider" aria-hidden="true"></span>
-      <span id="reader-font-plus" role="button" tabindex="0" aria-label="Increase reader font size" title="Larger text">+</span>
+      <span id="reader-font-group" aria-label="Reader font size">
+        <span id="reader-font-minus" role="button" tabindex="0" aria-label="Decrease reader font size" title="Smaller text">−</span>
+        <span id="reader-font-inner-divider" aria-hidden="true"></span>
+        <span id="reader-font-plus" role="button" tabindex="0" aria-label="Increase reader font size" title="Larger text">+</span>
+      </span>
       <span id="reader-font-outer-divider" aria-hidden="true"></span>
-      <span id="reader-music-flat-trigger" role="button" tabindex="0" aria-label="Open reading music" title="Reading music">♫</span>
+      <span id="reader-music-flat-trigger" role="button" tabindex="0" aria-label="Open reading media" title="Reading media">▶</span>
     `;
     paneControls.appendChild(tools);
 
@@ -476,6 +478,17 @@
     tools.style.setProperty('z-index', '40', 'important');
     tools.style.setProperty('white-space', 'nowrap', 'important');
 
+    const fontGroup = tools.querySelector('#reader-font-group');
+    fontGroup.style.setProperty('display', 'inline-flex', 'important');
+    fontGroup.style.setProperty('align-items', 'center', 'important');
+    fontGroup.style.setProperty('height', '34px', 'important');
+    fontGroup.style.setProperty('padding', '0 10px', 'important');
+    fontGroup.style.setProperty('margin', '0', 'important');
+    fontGroup.style.setProperty('background', '#0b2e4f', 'important');
+    fontGroup.style.setProperty('border', '1px solid rgba(255,255,255,.08)', 'important');
+    fontGroup.style.setProperty('border-radius', '8px', 'important');
+    fontGroup.style.setProperty('box-shadow', '0 2px 7px rgba(10,30,50,.18)', 'important');
+
     const minus = tools.querySelector('#reader-font-minus');
     const plus = tools.querySelector('#reader-font-plus');
 
@@ -493,8 +506,8 @@
       item.style.setProperty('box-shadow', 'none', 'important');
 
       // Deliberately dark neutral ink, not blue/white-on-blue.
-      item.style.setProperty('color', '#1f2937', 'important');
-      item.style.setProperty('-webkit-text-fill-color', '#1f2937', 'important');
+      item.style.setProperty('color', '#ffffff', 'important');
+      item.style.setProperty('-webkit-text-fill-color', '#ffffff', 'important');
       item.style.setProperty('font-family', 'Arial, sans-serif', 'important');
       item.style.setProperty('font-size', '15px', 'important');
       item.style.setProperty('font-weight', '600', 'important');
@@ -511,14 +524,14 @@
     innerDivider.style.setProperty('width', '1px', 'important');
     innerDivider.style.setProperty('height', '16px', 'important');
     innerDivider.style.setProperty('margin', '0 8px', 'important');
-    innerDivider.style.setProperty('background', '#9ca3af', 'important');
+    innerDivider.style.setProperty('background', 'rgba(255,255,255,.55)', 'important');
     innerDivider.style.setProperty('flex', '0 0 1px', 'important');
 
     const outerDivider = tools.querySelector('#reader-font-outer-divider');
     outerDivider.style.setProperty('display', 'block', 'important');
     outerDivider.style.setProperty('width', '1px', 'important');
     outerDivider.style.setProperty('height', '18px', 'important');
-    outerDivider.style.setProperty('margin', '0 16px', 'important');
+    outerDivider.style.setProperty('margin', '0 14px', 'important');
     outerDivider.style.setProperty('background', '#9ca3af', 'important');
     outerDivider.style.setProperty('flex', '0 0 1px', 'important');
 
@@ -533,9 +546,9 @@
     musicProxy.style.setProperty('background', 'transparent', 'important');
     musicProxy.style.setProperty('border', '0', 'important');
     musicProxy.style.setProperty('box-shadow', 'none', 'important');
-    musicProxy.style.setProperty('color', '#1f2937', 'important');
-    musicProxy.style.setProperty('-webkit-text-fill-color', '#1f2937', 'important');
-    musicProxy.style.setProperty('font-size', '15px', 'important');
+    musicProxy.style.setProperty('color', '#0b2e4f', 'important');
+    musicProxy.style.setProperty('-webkit-text-fill-color', '#0b2e4f', 'important');
+    musicProxy.style.setProperty('font-size', '14px', 'important');
     musicProxy.style.setProperty('font-weight', '600', 'important');
     musicProxy.style.setProperty('cursor', 'pointer', 'important');
     musicProxy.style.setProperty('user-select', 'none', 'important');
