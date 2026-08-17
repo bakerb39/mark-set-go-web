@@ -1321,6 +1321,23 @@ function parseYouTubeInput(rawValue) {
 async function playYouTubeSearch(query, title = 'YouTube search') {
   const cleanQuery = String(query || '').trim();
   if (!cleanQuery) return;
+  if (window.__MSG_WORKSPACE_PANE__ && window.parent && window.parent !== window) {
+    try {
+      const direct = window.parent?.MSGMusicController?.search || window.parent?.MSGWorkspaceExperiment?.musicSearch;
+      if (typeof direct === 'function') {
+        direct(cleanQuery, String(title || 'YouTube search'));
+        return;
+      }
+    } catch {}
+    try {
+      window.parent.postMessage({
+        type: 'msg-workspace-music-search',
+        query: cleanQuery,
+        title: String(title || 'YouTube search')
+      }, window.location.origin);
+    } catch {}
+    return;
+  }
   musicNowTitle.textContent = title;
   musicNowSource.textContent = 'Searching YouTube…';
   musicDock.hidden = false;
@@ -1364,6 +1381,15 @@ function playMusicSearchCandidate(index) {
 }
 
 function playMusic(choiceOrParsed) {
+  if (window.__MSG_WORKSPACE_PANE__ && window.parent && window.parent !== window) {
+    try {
+      window.parent.postMessage({
+        type: 'msg-workspace-music-play',
+        choice: choiceOrParsed || null
+      }, window.location.origin);
+    } catch {}
+    return;
+  }
   musicSearchState = choiceOrParsed?.search || null;
   if (musicNextButton) musicNextButton.hidden = !musicSearchState?.videoIds?.length;
   const isChoice = Boolean(choiceOrParsed?.youtubeId);
@@ -6015,6 +6041,17 @@ function saveExperienceProfile(profile) {
   document.dispatchEvent(new CustomEvent('marksetgo:experience-profile-changed', {
     detail:{ profile:normalized, persisted }
   }));
+
+  // The workspace pane shares storage with the outer app, but DOM/custom events
+  // do not cross document boundaries. Apply the same saved profile to the real
+  // parent app immediately so Appearance changes are visible on both sides.
+  if (window.__MSG_WORKSPACE_PANE__ && window.parent && window.parent !== window) {
+    try {
+      const parentProfile=window.parent.MarkSetGoExperienceProfile;
+      if (typeof parentProfile?.save === 'function') parentProfile.save(normalized);
+      else parentProfile?.apply?.(normalized);
+    } catch {}
+  }
 
   return { ...normalized, persisted };
 }
@@ -11768,18 +11805,6 @@ function selectReaderParagraphFromEvent(event){
     openMarkPanel('selection');
   }
 }
-
-function readerClickControlsAreEnabled() {
-  const checkbox = app.querySelector('#reader-click-controls');
-  if (checkbox && checkbox.type === 'checkbox') return Boolean(checkbox.checked);
-
-  try {
-    return localStorage.getItem('msg_reader_click_controls_v1') !== 'off';
-  } catch {
-    return readerClickControlsAreEnabled();
-  }
-}
-
 function bindMarkCompanion(reader){
   const toolbar=app.querySelector('#mark-selection-toolbar');
   if(!reader||!toolbar)return;
@@ -11872,7 +11897,7 @@ function bindMarkCompanion(reader){
         state.markSuppressNextReaderClick=false;
         interaction.selecting=false;
         interaction.moved=false;
-        if(readerClickControlsAreEnabled() && interaction.wasRunning && !isReaderRunning()) startReader();
+        if(interaction.wasRunning && !isReaderRunning()) startReader();
       });
     });
   };
@@ -11893,11 +11918,6 @@ function bindMarkCompanion(reader){
 
     event.preventDefault();
     event.stopImmediatePropagation();
-
-    if(!readerClickControlsAreEnabled()){
-      updateReaderStatus('Reader click controls are off.');
-      return;
-    }
 
     const clickedWord=event.target.closest?.('.reader-word[data-index]');
     const clickedGroup=event.target.closest?.('.reader-group[data-start-index]');
@@ -11945,7 +11965,7 @@ function bindMarkCompanion(reader){
     // temporary highlight. Playback resumes only if it had been running before
     // the selection began; the click itself is handled in the capture listener.
     if(state.markSelectionLocked){
-      const shouldResume=readerClickControlsAreEnabled() && Boolean(state.markSelectionWasRunning);
+      const shouldResume=Boolean(state.markSelectionWasRunning);
       clearMarkSelectionForReadingResume();
       state.markSelectionWasRunning=false;
       state.markResumeOnNextReaderClick={shouldResume};
@@ -12017,7 +12037,6 @@ function bindMarkCompanion(reader){
   document.addEventListener('selectionchange',state.markSelectionChangeHandler);
 
   const performStableReaderPointerAction=(interaction)=>{
-    if(!readerClickControlsAreEnabled()) return;
     const mode=getSelectedMode();
     if(mode==='two-column') return;
 
@@ -12049,13 +12068,6 @@ function bindMarkCompanion(reader){
     // or replaces the clicked word before the browser dispatches `click`.
     if(interaction?.active && !interaction.selecting && !interaction.moved){
       interaction.active=false;
-
-      if(!readerClickControlsAreEnabled()){
-        // Passive reading: consume no playback action. Leave the browser's
-        // normal click available for non-playback UI/selection semantics.
-        return;
-      }
-
       performStableReaderPointerAction(interaction);
 
       state.readerSuppressSyntheticClick=true;
@@ -12071,7 +12083,7 @@ function bindMarkCompanion(reader){
     const interaction=state.markSelectionInteraction;
     if(!interaction) return;
     interaction.active=false;
-    if(readerClickControlsAreEnabled() && interaction.paused && !state.markSelectionLocked && interaction.wasRunning && !isReaderRunning()){
+    if(interaction.paused && !state.markSelectionLocked && interaction.wasRunning && !isReaderRunning()){
       state.markSuppressNextReaderClick=false;
       startReader();
     }
@@ -12089,13 +12101,6 @@ function bindMarkCompanion(reader){
 
   // This capture listener runs before the reader's normal click handler.
   reader.addEventListener('click',(event)=>{
-    if(!readerClickControlsAreEnabled() && state.markResumeOnNextReaderClick!==null){
-      state.markResumeOnNextReaderClick=null;
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      updateReaderStatus('Reader click controls are off.');
-      return;
-    }
     if(state.markResumeOnNextReaderClick!==null){
       resumeAfterLockedSelectionClick(event);
       return;
@@ -12121,7 +12126,6 @@ function bindMarkCompanion(reader){
       return;
     }
     if(event.ctrlKey || event.metaKey) return;
-    if(!readerClickControlsAreEnabled()) return;
 
     const target=event.target instanceof Element ? event.target : null;
     if(!target) return;
@@ -12955,111 +12959,8 @@ function bindModernGuideInlineActions(source = state?.source || {}) {
   }, true);
 }
 
-
-function normalizeTopicFeedHeadingWord(value) {
-  return String(value || '')
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu, '');
-}
-
-function realignTopicFeedDocumentToc(text, toc) {
-  const entries = Array.isArray(toc) ? toc : [];
-  if (!entries.length) return [];
-
-  const words = splitWords(String(text || ''));
-  const normalizedWords = words.map(normalizeTopicFeedHeadingWord);
-  if (!normalizedWords.length) return [];
-
-  let previousIndex = -1;
-
-  const exactMatches = (headingWords, start, end) => {
-    const matches = [];
-    const safeStart = Math.max(0, start);
-    const safeEnd = Math.min(normalizedWords.length - headingWords.length, end);
-    for (let index = safeStart; index <= safeEnd; index += 1) {
-      let matched = true;
-      for (let offset = 0; offset < headingWords.length; offset += 1) {
-        if (normalizedWords[index + offset] !== headingWords[offset]) {
-          matched = false;
-          break;
-        }
-      }
-      if (matched) matches.push(index);
-    }
-    return matches;
-  };
-
-  const nearest = (matches, approximate) => {
-    const ordered = matches.filter((index) => index > previousIndex);
-    const pool = ordered.length ? ordered : matches;
-    if (!pool.length) return null;
-    return pool.reduce((best, index) => (
-      best === null || Math.abs(index - approximate) < Math.abs(best - approximate)
-        ? index
-        : best
-    ), null);
-  };
-
-  const aligned = [];
-  for (const entry of entries) {
-    const title = String(entry?.title || '').replace(/\s+/g, ' ').trim();
-    if (!title) continue;
-
-    const headingWords = splitWords(title)
-      .map(normalizeTopicFeedHeadingWord)
-      .filter(Boolean);
-    if (!headingWords.length) continue;
-
-    const approximate = Number.isFinite(Number(entry?.index))
-      ? Math.max(0, Number(entry.index))
-      : Math.max(0, previousIndex + 1);
-
-    // First search near the server-provided position. If the publisher/server
-    // counted words differently, the real heading is normally only a short
-    // distance away.
-    let matches = exactMatches(
-      headingWords,
-      Math.max(previousIndex + 1, approximate - 120),
-      approximate + 120
-    );
-
-    // If needed, search the complete article. This is still exact heading-text
-    // matching, so ordinary body words cannot become headings just because a
-    // numeric index drifted.
-    if (!matches.length) {
-      matches = exactMatches(
-        headingWords,
-        Math.max(0, previousIndex + 1),
-        normalizedWords.length - headingWords.length
-      );
-    }
-
-    const resolved = nearest(matches, approximate);
-    if (resolved === null) {
-      // Do not use an unverified numeric index for Topic Feed styling. A bad
-      // index is what caused fragments such as "Gates," and "sector. A little"
-      // to become bold instead of the actual following heading.
-      continue;
-    }
-
-    previousIndex = resolved;
-    aligned.push({ ...entry, index: resolved });
-  }
-
-  return aligned;
-}
-
 function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.dataset.viewKey = 'reader';
-
-  const READER_CLICK_CONTROLS_KEY = 'msg_reader_click_controls_v1';
-  let readerClickControlsEnabled = true;
-  try {
-    readerClickControlsEnabled = localStorage.getItem(READER_CLICK_CONTROLS_KEY) !== 'off';
-  } catch {}
-  state.readerClickControlsEnabled = readerClickControlsEnabled;
 
   // Topic Feed story handoff: preserve the existing left navigation pane as the
   // exact same DOM node while the Reader shell is rebuilt. This branch is
@@ -13090,10 +12991,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   // EPUBs carry an authoritative navigation document. Prefer that TOC over
   // heuristic heading detection, while still keeping detected structure for
   // reader formatting and illustration placement.
-  const rawAuthoritativeToc = Array.isArray(source?.documentToc) ? source.documentToc : null;
-  const authoritativeToc = source?.type === 'topic-feed' && rawAuthoritativeToc
-    ? realignTopicFeedDocumentToc(text, rawAuthoritativeToc)
-    : rawAuthoritativeToc;
+  const authoritativeToc = Array.isArray(source?.documentToc) ? source.documentToc : null;
   const suppliedToc = Array.isArray(authoritativeToc)
     ? authoritativeToc
     : Array.isArray(source?.epubToc)
@@ -13324,12 +13222,6 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                   <button id="fs-start" class="primary" type="button">Start</button>
                   <button id="fs-pause" class="secondary" type="button">Pause</button>
                   <button id="fs-reset" class="secondary" type="button">Reset</button>
-                  <label class="fullscreen-reader-click-controls-toggle"
-                         title="When unchecked, clicking or tapping Reader text cannot control playback."
-                         style="display:inline-flex;align-items:center;gap:.35rem;width:max-content;white-space:nowrap;">
-                    <input id="fs-reader-click-controls" type="checkbox" ${readerClickControlsEnabled ? 'checked' : ''}>
-                    <span>Reader click controls</span>
-                  </label>
                   <button id="fs-check-comprehension" class="secondary" type="button">Check comprehension</button>
                 </div>
               </details>
@@ -13384,7 +13276,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 </div>
               </details>
 
-              <p class="fullscreen-options-hint">Use “Reader click controls” to choose whether text clicks control playback. Press <kbd>Space</kbd> for keyboard pause/resume. Press <kbd>O</kbd> to restore hidden controls.</p>
+              <p class="fullscreen-options-hint">Click text or press <kbd>Space</kbd> to pause/resume. Press <kbd>O</kbd> to restore hidden controls.</p>
             </section>
           </div>
           <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
@@ -13461,22 +13353,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
       <dialog id="comprehension-dialog" class="comprehension-dialog" aria-label="Comprehension check"></dialog>
 
-      <div class="controls playback-controls"
-           style="display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:.45rem;margin:.55rem 0;">
+      <div class="controls playback-controls">
         <button id="start-reader" class="primary">Start</button>
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
-        <label class="reader-click-controls-toggle"
-               title="When unchecked, clicking or tapping the Reader text cannot start, resume, pause, or seek playback."
-               style="display:inline-flex!important;align-items:center;justify-content:flex-start;gap:.35rem;flex:0 0 auto!important;width:max-content!important;max-width:max-content!important;min-height:2.08rem;padding:0 .35rem!important;margin:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;white-space:nowrap;">
-          <input id="reader-click-controls" type="checkbox" ${readerClickControlsEnabled ? 'checked' : ''}
-                 style="width:auto!important;height:auto!important;margin:0!important;flex:0 0 auto!important;">
-          <span style="display:inline!important;width:auto!important;white-space:nowrap;">Reader click controls</span>
-        </label>
-        <span id="reader-status" class="status"
-              style="flex:0 0 100%;width:100%;margin:.05rem 0 0;min-height:1.2rem;">
-          ${state.words.length.toLocaleString()} words loaded. ${readerClickControlsEnabled ? 'Click a word to move the reading position.' : 'Reader clicks are off. Read, scroll, and select text normally; use Start, Pause, or Reset only when wanted.'}
-        </span>
+        <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. Click a word to continue from there; click empty space or press Space to pause or resume.</span>
       </div>
     </section>`;
 
@@ -13755,11 +13636,6 @@ document.addEventListener('keydown', state.spacebarHandler);
       return;
     }
 
-    // Passive reading mode: clicks/taps on the Reader text cannot start,
-    // resume, pause, or seek playback. Scrolling, selection, annotations,
-    // translation lookup, and explicit buttons remain available.
-    if (!readerClickControlsAreEnabled()) return;
-
     const clickedWord = target.closest('.reader-word[data-index]');
     const clickedGroup = target.closest('.reader-group[data-start-index]');
     const mode = getSelectedMode();
@@ -13802,39 +13678,6 @@ document.addEventListener('keydown', state.spacebarHandler);
   });
   app.querySelector('#pause-reader').addEventListener('click', () => { pauseReader(); persistReaderSession(); });
   app.querySelector('#reset-reader').addEventListener('click', () => { resetReader(); persistReaderSession(); });
-
-  const syncReaderClickControlCheckboxes = (enabled) => {
-    readerClickControlsEnabled = Boolean(enabled);
-    state.readerClickControlsEnabled = readerClickControlsEnabled;
-
-    const mainCheckbox = app.querySelector('#reader-click-controls');
-    const fullscreenCheckbox = app.querySelector('#fs-reader-click-controls');
-    if (mainCheckbox) mainCheckbox.checked = readerClickControlsEnabled;
-    if (fullscreenCheckbox) fullscreenCheckbox.checked = readerClickControlsEnabled;
-  };
-
-  const setReaderClickControls = (enabled, { announce = true } = {}) => {
-    syncReaderClickControlCheckboxes(enabled);
-    try {
-      localStorage.setItem(READER_CLICK_CONTROLS_KEY, enabled ? 'on' : 'off');
-    } catch {}
-
-    if (announce) {
-      updateReaderStatus(
-        enabled
-          ? 'Reader click controls are on.'
-          : 'Reader click controls are off. Clicking or tapping Reader text will not start, resume, pause, or seek playback.'
-      );
-    }
-  };
-
-  app.querySelector('#reader-click-controls')?.addEventListener('change', (event) => {
-    setReaderClickControls(Boolean(event.currentTarget.checked));
-  });
-  app.querySelector('#fs-reader-click-controls')?.addEventListener('change', (event) => {
-    setReaderClickControls(Boolean(event.currentTarget.checked));
-  });
-  syncReaderClickControlCheckboxes(readerClickControlsEnabled);
   app.querySelector('#check-comprehension')?.addEventListener('click', startComprehensionCheck);
   app.querySelector('#fs-check-comprehension')?.addEventListener('click', startComprehensionCheck);
   app.querySelector('#bionic-reading').addEventListener('change', (event) => {
@@ -23173,216 +23016,27 @@ function renderMyLinks(selectedId = '') {
    current-reading context when the user chooses to bring it into a session.
    ========================================================================== */
 const SYMPOSIUM_STORAGE_KEY = 'markSetGoSymposiumSessionsV1';
-const SYMPOSIUM_CUSTOM_PEOPLE_KEY = 'markSetGoSymposiumCustomPeopleV1';
-
-function loadSymposiumCustomPeople() {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(SYMPOSIUM_CUSTOM_PEOPLE_KEY) || '[]');
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .filter((person)=>person && typeof person.name === 'string' && person.name.trim())
-      .map((person)=>({
-        id:String(person.id || `custom-${Date.now()}-${Math.random().toString(36).slice(2,8)}`),
-        name:String(person.name || '').trim().slice(0,100),
-        field:String(person.field || 'Guest thinker').trim().slice(0,120),
-        era:'Custom',
-        monogram:String(person.monogram || '').trim().slice(0,4) || '?',
-        category:'My personalities',
-        lens:String(person.lens || `the published work, arguments, methods, and intellectual context of ${person.name}`).trim().slice(0,1000),
-        custom:true
-      }));
-  } catch {
-    return [];
-  }
-}
-
-function saveSymposiumCustomPeople() {
-  try {
-    const customPeople = SYMPOSIUM_PARTICIPANTS
-      .filter((person)=>person.custom)
-      .map(({id,name,field,monogram,lens})=>({id,name,field,monogram,lens}));
-    localStorage.setItem(SYMPOSIUM_CUSTOM_PEOPLE_KEY, JSON.stringify(customPeople.slice(0,100)));
-  } catch (error) {
-    console.warn('Custom Symposium personalities could not be saved.', error);
-  }
-}
 
 const SYMPOSIUM_PARTICIPANTS = [
-  { id:'socrates', name:'Socrates', field:'Philosophy', era:'Classical Greece', monogram:'S', category:'Philosophy', lens:'Socratic questioning, definitions, assumptions, and examination of reasons' },
-  { id:'plato', name:'Plato', field:'Philosophy', era:'Classical Greece', monogram:'P', category:'Philosophy', lens:'forms, justice, education, political philosophy, metaphysics, and dialectic' },
-  { id:'aristotle', name:'Aristotle', field:'Philosophy & Science', era:'Classical Greece', monogram:'A', category:'Philosophy', lens:'logic, causes, virtue, politics, biology, classification, and empirical observation' },
-  { id:'confucius', name:'Confucius', field:'Ethics & Political Thought', era:'Ancient China', monogram:'C', category:'Philosophy', lens:'virtue, ritual, education, humane government, family duty, moral cultivation, and social harmony' },
-  { id:'laozi', name:'Laozi', field:'Philosophy', era:'Ancient China', monogram:'LZ', category:'Philosophy', lens:'the Dao, non-forcing, simplicity, paradox, naturalness, humility, and limits of deliberate control' },
-  { id:'epictetus', name:'Epictetus', field:'Stoic Philosophy', era:'Roman era', monogram:'EPI', category:'Philosophy', lens:'control and responsibility, judgment, discipline, freedom, resilience, and Stoic practice' },
-  { id:'marcus-aurelius', name:'Marcus Aurelius', field:'Stoic Philosophy', era:'Roman era', monogram:'MA', category:'Philosophy', lens:'self-command, duty, impermanence, rational perspective, civic responsibility, and Stoic ethics' },
-  { id:'augustine', name:'Augustine of Hippo', field:'Theology & Philosophy', era:'Late Antiquity', monogram:'AU', category:'Religion & Theology', lens:'will, memory, time, grace, moral psychology, faith and reason, and the nature of evil' },
-  { id:'aquinas', name:'Thomas Aquinas', field:'Theology & Philosophy', era:'Medieval', monogram:'TA', category:'Religion & Theology', lens:'natural law, scholastic argument, metaphysics, ethics, theology, objections and replies' },
-  { id:'maimonides', name:'Maimonides', field:'Philosophy & Theology', era:'Medieval', monogram:'MM', category:'Religion & Theology', lens:'reason and revelation, negative theology, law, ethics, medicine, and disciplined interpretation' },
-  { id:'pascal', name:'Blaise Pascal', field:'Mathematics & Philosophy', era:'17th century', monogram:'BP', category:'Philosophy', lens:'reason and its limits, probability, faith, human grandeur and misery, rhetoric, and decision under uncertainty' },
-  { id:'descartes', name:'René Descartes', field:'Philosophy & Mathematics', era:'17th century', monogram:'RD', category:'Philosophy', lens:'methodic doubt, rationalism, mind and body, certainty, analytic method, and foundations of knowledge' },
-  { id:'spinoza', name:'Baruch Spinoza', field:'Philosophy', era:'17th century', monogram:'BS', category:'Philosophy', lens:'substance, necessity, emotion, freedom through understanding, ethics, and rational analysis' },
-  { id:'locke', name:'John Locke', field:'Philosophy & Political Thought', era:'17th century', monogram:'JL', category:'Political Thought', lens:'natural rights, consent, property, toleration, empiricism, education, and limited government' },
-  { id:'hume', name:'David Hume', field:'Philosophy & History', era:'18th century', monogram:'DH', category:'Philosophy', lens:'empiricism, causation, skepticism, habit, sentiment, probability, and criticism of unwarranted inference' },
-  { id:'rousseau', name:'Jean-Jacques Rousseau', field:'Political Philosophy', era:'18th century', monogram:'JR', category:'Political Thought', lens:'freedom, inequality, education, civic life, the general will, authenticity, and corruption by social convention' },
-  { id:'kant', name:'Immanuel Kant', field:'Philosophy', era:'Enlightenment', monogram:'IK', category:'Philosophy', lens:'duty, autonomy, categories of understanding, limits of reason, universal principles, and human dignity' },
-  { id:'hegel', name:'G. W. F. Hegel', field:'Philosophy', era:'19th century', monogram:'GH', category:'Philosophy', lens:'dialectical development, history, recognition, freedom, institutions, and the evolution of ideas' },
-  { id:'kierkegaard', name:'Søren Kierkegaard', field:'Philosophy & Theology', era:'19th century', monogram:'SK', category:'Philosophy', lens:'choice, anxiety, faith, individuality, inwardness, responsibility, and critiques of crowd thinking' },
-  { id:'nietzsche', name:'Friedrich Nietzsche', field:'Philosophy', era:'19th century', monogram:'FN', category:'Philosophy', lens:'genealogy, values, perspectivism, ressentiment, self-overcoming, culture, and critique of conventional morality' },
-  { id:'mill', name:'John Stuart Mill', field:'Philosophy & Political Economy', era:'19th century', monogram:'JSM', category:'Political Thought', lens:'liberty, utilitarianism, individuality, free speech, representative government, and social reform' },
-  { id:'james', name:'William James', field:'Philosophy & Psychology', era:'19th–20th century', monogram:'WJ', category:'Psychology', lens:'pragmatism, attention, habit, experience, belief, consciousness, and practical consequences' },
-  { id:'russell', name:'Bertrand Russell', field:'Philosophy & Logic', era:'20th century', monogram:'BR', category:'Philosophy', lens:'logic, analytic clarity, skepticism, language, mathematics, education, and criticism of dogma' },
-  { id:'wittgenstein', name:'Ludwig Wittgenstein', field:'Philosophy', era:'20th century', monogram:'LW', category:'Philosophy', lens:'language games, meaning in use, conceptual confusion, logic, ordinary language, and limits of expression' },
-  { id:'popper', name:'Karl Popper', field:'Philosophy of Science', era:'20th century', monogram:'KP', category:'Philosophy', lens:'falsifiability, conjecture and refutation, open society, piecemeal reform, and criticism of historicism' },
-  { id:'arendt', name:'Hannah Arendt', field:'Political Theory', era:'20th century', monogram:'HA', category:'Political Thought', lens:'totalitarianism, power, authority, judgment, public life, responsibility, and the human condition' },
-  { id:'beauvoir', name:'Simone de Beauvoir', field:'Philosophy & Literature', era:'20th century', monogram:'SB', category:'Philosophy', lens:'freedom, ambiguity, ethics, gender, social construction, responsibility, and lived experience' },
-  { id:'bacon', name:'Francis Bacon', field:'Science & Philosophy', era:'Early Modern', monogram:'FB', category:'Science', lens:'induction, experiment, idols of the mind, scientific method, and useful knowledge' },
-  { id:'copernicus', name:'Nicolaus Copernicus', field:'Astronomy', era:'Renaissance', monogram:'NC', category:'Science', lens:'heliocentrism, mathematical astronomy, model comparison, and rethinking inherited cosmology' },
-  { id:'galileo', name:'Galileo Galilei', field:'Physics & Astronomy', era:'Scientific Revolution', monogram:'GG', category:'Science', lens:'experiment, measurement, telescopic evidence, motion, mathematical description, and scientific controversy' },
-  { id:'kepler', name:'Johannes Kepler', field:'Astronomy & Mathematics', era:'Scientific Revolution', monogram:'JK', category:'Science', lens:'planetary motion, mathematical patterns, empirical correction, geometry, and physical astronomy' },
-  { id:'newton', name:'Isaac Newton', field:'Mathematics & Physics', era:'Scientific Revolution', monogram:'N', category:'Science', lens:'mechanics, gravitation, optics, calculus, mathematical modeling, and disciplined inference' },
-  { id:'faraday', name:'Michael Faraday', field:'Physics & Chemistry', era:'19th century', monogram:'MF', category:'Science', lens:'electromagnetism, experimental demonstration, fields, induction, and physical intuition' },
-  { id:'maxwell', name:'James Clerk Maxwell', field:'Physics & Mathematics', era:'19th century', monogram:'JCM', category:'Science', lens:'electromagnetism, field theory, mathematical unification, statistical reasoning, and physical modeling' },
-  { id:'darwin', name:'Charles Darwin', field:'Biology', era:'19th century', monogram:'D', category:'Science', lens:'natural selection, variation, evidence, comparative biology, gradual change, and explanatory mechanisms' },
-  { id:'mendel', name:'Gregor Mendel', field:'Genetics', era:'19th century', monogram:'GM', category:'Science', lens:'inheritance, controlled experiment, quantitative patterns, traits, and probabilistic biological reasoning' },
-  { id:'pasteur', name:'Louis Pasteur', field:'Chemistry & Microbiology', era:'19th century', monogram:'LP', category:'Science', lens:'germ theory, experiment, vaccination, fermentation, laboratory method, and applied science' },
-  { id:'curie', name:'Marie Curie', field:'Physics & Chemistry', era:'Modern Science', monogram:'MC', category:'Science', lens:'radioactivity, experimental rigor, measurement, scientific perseverance, and evidence' },
-  { id:'einstein', name:'Albert Einstein', field:'Physics', era:'Modern Physics', monogram:'E', category:'Science', lens:'relativity, thought experiments, invariance, physical intuition, and conceptual simplicity' },
-  { id:'bohr', name:'Niels Bohr', field:'Physics', era:'20th century', monogram:'NB', category:'Science', lens:'quantum theory, complementarity, measurement, conceptual models, and limits of classical description' },
-  { id:'schrodinger', name:'Erwin Schrödinger', field:'Physics', era:'20th century', monogram:'ES', category:'Science', lens:'wave mechanics, quantum states, thought experiments, physical interpretation, and conceptual paradox' },
-  { id:'heisenberg', name:'Werner Heisenberg', field:'Physics', era:'20th century', monogram:'WH', category:'Science', lens:'quantum mechanics, uncertainty, observables, mathematical formalism, and limits of measurement' },
-  { id:'feynman', name:'Richard Feynman', field:'Physics', era:'20th century', monogram:'RF', category:'Science', lens:'first-principles reasoning, quantum electrodynamics, models, explanatory clarity, skepticism, and scientific playfulness' },
-  { id:'carson', name:'Rachel Carson', field:'Biology & Environmental Science', era:'20th century', monogram:'RC', category:'Science', lens:'ecology, environmental evidence, unintended consequences, public science, and precaution' },
-  { id:'mcclintock', name:'Barbara McClintock', field:'Genetics', era:'20th century', monogram:'BM', category:'Science', lens:'chromosome behavior, transposable elements, careful observation, biological complexity, and patient experimentation' },
-  { id:'sagan', name:'Carl Sagan', field:'Astronomy & Science Communication', era:'20th century', monogram:'CS', category:'Science', lens:'cosmic perspective, skepticism, planetary science, evidence, public understanding of science, and scientific wonder' },
-  { id:'euclid', name:'Euclid', field:'Mathematics', era:'Ancient Greece', monogram:'EU', category:'Mathematics & Computing', lens:'axioms, proof, geometry, deductive structure, definitions, and rigorous mathematical construction' },
-  { id:'archimedes', name:'Archimedes', field:'Mathematics & Engineering', era:'Ancient Greece', monogram:'AR', category:'Mathematics & Computing', lens:'geometry, mechanics, approximation, leverage, buoyancy, and inventive mathematical problem-solving' },
-  { id:'hypatia', name:'Hypatia', field:'Mathematics & Philosophy', era:'Late Antiquity', monogram:'HY', category:'Mathematics & Computing', lens:'mathematical teaching, astronomy, geometry, philosophical inquiry, and preservation of mathematical traditions' },
-  { id:'euler', name:'Leonhard Euler', field:'Mathematics', era:'18th century', monogram:'LE', category:'Mathematics & Computing', lens:'analysis, graph theory, mechanics, notation, mathematical generalization, and prolific problem-solving' },
-  { id:'gauss', name:'Carl Friedrich Gauss', field:'Mathematics', era:'18th–19th century', monogram:'CFG', category:'Mathematics & Computing', lens:'number theory, statistics, geometry, astronomy, precision, and mathematical elegance' },
-  { id:'noether', name:'Emmy Noether', field:'Mathematics & Physics', era:'20th century', monogram:'EN', category:'Mathematics & Computing', lens:'abstract algebra, symmetry, invariants, conservation laws, and structural mathematical reasoning' },
-  { id:'ramanujan', name:'Srinivasa Ramanujan', field:'Mathematics', era:'20th century', monogram:'SR', category:'Mathematics & Computing', lens:'number theory, infinite series, partitions, intuition, identities, and pattern discovery' },
-  { id:'lovelace', name:'Ada Lovelace', field:'Mathematics & Computing', era:'19th century', monogram:'AL', category:'Mathematics & Computing', lens:'symbolic computation, algorithms, mathematical imagination, and the possibilities and limits of machines' },
-  { id:'turing', name:'Alan Turing', field:'Mathematics & Computing', era:'20th century', monogram:'T', category:'Mathematics & Computing', lens:'computation, algorithms, machine intelligence, formal reasoning, and cryptanalysis' },
-  { id:'von-neumann', name:'John von Neumann', field:'Mathematics & Computing', era:'20th century', monogram:'JVN', category:'Mathematics & Computing', lens:'game theory, computing architecture, quantum theory, numerical methods, strategy, and formal modeling' },
-  { id:'shannon', name:'Claude Shannon', field:'Information Theory', era:'20th century', monogram:'CSH', category:'Mathematics & Computing', lens:'information, entropy, coding, communication, Boolean logic, probability, and abstraction' },
-  { id:'hopper', name:'Grace Hopper', field:'Computing', era:'20th century', monogram:'GH', category:'Mathematics & Computing', lens:'programming languages, compilers, debugging, practical computing, standards, and making computers accessible' },
-  { id:'herodotus', name:'Herodotus', field:'History', era:'Classical Greece', monogram:'H', category:'History', lens:'historical inquiry, competing accounts, culture, causation, memory, and the limits of testimony' },
-  { id:'thucydides', name:'Thucydides', field:'History & Political Thought', era:'Classical Greece', monogram:'TH', category:'History', lens:'war, power, fear, interest, rhetoric, evidence, political decision-making, and human nature' },
-  { id:'plutarch', name:'Plutarch', field:'History & Biography', era:'Greco-Roman', monogram:'PL', category:'History', lens:'character, moral biography, leadership, comparison, civic virtue, and the relationship between personality and public action' },
-  { id:'ibn-khaldun', name:'Ibn Khaldun', field:'History & Social Theory', era:'Medieval', monogram:'IKH', category:'History', lens:'dynastic cycles, social cohesion, institutions, economic life, state formation, and historical causation' },
-  { id:'machiavelli', name:'Niccolò Machiavelli', field:'Political Thought & History', era:'Renaissance', monogram:'NM', category:'Strategy & Leadership', lens:'power, statecraft, republican institutions, fortune, necessity, military affairs, and political realism' },
-  { id:'sun-tzu', name:'Sun Tzu', field:'Strategy', era:'Ancient China', monogram:'ST', category:'Strategy & Leadership', lens:'strategy, deception, intelligence, terrain, adaptation, economy of force, and winning without unnecessary conflict' },
-  { id:'clausewitz', name:'Carl von Clausewitz', field:'Military Theory', era:'19th century', monogram:'CvC', category:'Strategy & Leadership', lens:'war and politics, friction, uncertainty, centers of gravity, escalation, and strategic judgment' },
-  { id:'gibbon', name:'Edward Gibbon', field:'History', era:'Enlightenment', monogram:'EG', category:'History', lens:'long-run historical causation, institutions, religion, civic life, sources, and decline' },
-  { id:'tocqueville', name:'Alexis de Tocqueville', field:'Political Thought & Sociology', era:'19th century', monogram:'AT', category:'Political Thought', lens:'democracy, equality, associations, local government, majority power, civic habits, and social change' },
-  { id:'lincoln', name:'Abraham Lincoln', field:'Politics & Leadership', era:'19th century', monogram:'ALN', category:'Strategy & Leadership', lens:'union, constitutional government, slavery, democratic persuasion, wartime leadership, and moral argument' },
-  { id:'douglass', name:'Frederick Douglass', field:'Politics & Literature', era:'19th century', monogram:'FD', category:'Political Thought', lens:'freedom, slavery, constitutional argument, rhetoric, human dignity, education, and civic equality' },
-  { id:'dubois', name:'W. E. B. Du Bois', field:'History & Sociology', era:'Modern', monogram:'WEB', category:'History', lens:'history, sociology, political economy, culture, evidence, institutions, and lived experience' },
-  { id:'churchill', name:'Winston Churchill', field:'Politics & History', era:'20th century', monogram:'WC', category:'Strategy & Leadership', lens:'wartime leadership, rhetoric, grand strategy, democratic resolve, historical analogy, and political judgment' },
-  { id:'adam-smith', name:'Adam Smith', field:'Economics & Moral Philosophy', era:'18th century', monogram:'AS', category:'Economics & Society', lens:'markets, specialization, moral sentiments, institutions, incentives, sympathy, and unintended coordination' },
-  { id:'marx', name:'Karl Marx', field:'Political Economy & Philosophy', era:'19th century', monogram:'KM', category:'Economics & Society', lens:'class, capital, labor, ideology, historical development, alienation, and political economy' },
-  { id:'weber', name:'Max Weber', field:'Sociology', era:'19th–20th century', monogram:'MW', category:'Economics & Society', lens:'bureaucracy, authority, rationalization, institutions, culture, vocation, and social explanation' },
-  { id:'durkheim', name:'Émile Durkheim', field:'Sociology', era:'19th–20th century', monogram:'ED', category:'Economics & Society', lens:'social facts, solidarity, institutions, norms, collective life, and empirical sociology' },
-  { id:'keynes', name:'John Maynard Keynes', field:'Economics', era:'20th century', monogram:'JMK', category:'Economics & Society', lens:'aggregate demand, uncertainty, investment, employment, expectations, macroeconomic policy, and practical economic judgment' },
-  { id:'hayek', name:'F. A. Hayek', field:'Economics & Political Thought', era:'20th century', monogram:'FAH', category:'Economics & Society', lens:'distributed knowledge, prices, spontaneous order, institutions, limits of central planning, and rule of law' },
-  { id:'schumpeter', name:'Joseph Schumpeter', field:'Economics', era:'20th century', monogram:'JS', category:'Economics & Society', lens:'entrepreneurship, innovation, creative destruction, capitalism, business cycles, and institutional change' },
-  { id:'freud', name:'Sigmund Freud', field:'Psychology', era:'19th–20th century', monogram:'SF', category:'Psychology', lens:'unconscious motives, conflict, defense, dreams, development, repression, and psychoanalytic interpretation' },
-  { id:'jung', name:'Carl Jung', field:'Psychology', era:'20th century', monogram:'CJ', category:'Psychology', lens:'archetypes, individuation, symbols, personality, dreams, myth, and the collective unconscious' },
-  { id:'pavlov', name:'Ivan Pavlov', field:'Physiology & Psychology', era:'19th–20th century', monogram:'IP', category:'Psychology', lens:'conditioning, experimental control, reflexes, learning, prediction, and behavioral physiology' },
-  { id:'skinner', name:'B. F. Skinner', field:'Psychology', era:'20th century', monogram:'BFS', category:'Psychology', lens:'operant conditioning, reinforcement, behavior, environment, experimental analysis, and learning' },
-  { id:'piaget', name:'Jean Piaget', field:'Developmental Psychology', era:'20th century', monogram:'JP', category:'Psychology', lens:'cognitive development, schemas, stages, adaptation, learning, and how children construct knowledge' },
-  { id:'vygotsky', name:'Lev Vygotsky', field:'Psychology & Education', era:'20th century', monogram:'LV', category:'Psychology', lens:'social learning, language, cultural tools, scaffolding, development, and the zone of proximal development' },
-  { id:'frankl', name:'Viktor Frankl', field:'Psychiatry & Psychology', era:'20th century', monogram:'VF', category:'Psychology', lens:'meaning, responsibility, suffering, freedom of attitude, logotherapy, and existential resilience' },
-  { id:'homer', name:'Homer', field:'Epic Poetry', era:'Ancient Greece', monogram:'HO', category:'Literature', lens:'heroism, fate, honor, war, homecoming, hospitality, character, and oral epic structure' },
-  { id:'dante', name:'Dante Alighieri', field:'Poetry & Theology', era:'Medieval', monogram:'DA', category:'Literature', lens:'moral order, political exile, spiritual journey, poetic architecture, symbolism, and judgment' },
-  { id:'shakespeare', name:'William Shakespeare', field:'Literature', era:'Renaissance', monogram:'WS', category:'Literature', lens:'character, rhetoric, tragedy, comedy, ambition, power, motive, language, and dramatic irony' },
-  { id:'cervantes', name:'Miguel de Cervantes', field:'Literature', era:'Early Modern', monogram:'MCV', category:'Literature', lens:'idealism and reality, narration, identity, parody, social class, imagination, and self-deception' },
-  { id:'milton', name:'John Milton', field:'Poetry & Political Thought', era:'17th century', monogram:'JM', category:'Literature', lens:'liberty, authority, conscience, epic form, temptation, obedience, rebellion, and religious imagination' },
-  { id:'goethe', name:'Johann Wolfgang von Goethe', field:'Literature & Science', era:'18th–19th century', monogram:'JG', category:'Literature', lens:'formation, striving, art, science, nature, desire, responsibility, and European humanism' },
-  { id:'austen', name:'Jane Austen', field:'Literature', era:'Regency', monogram:'JA', category:'Literature', lens:'character, social convention, moral judgment, irony, class, courtship, and self-knowledge' },
-  { id:'dickens', name:'Charles Dickens', field:'Literature', era:'19th century', monogram:'CD', category:'Literature', lens:'social class, institutions, poverty, character, moral sentiment, satire, and urban modernity' },
-  { id:'tolstoy', name:'Leo Tolstoy', field:'Literature & Moral Thought', era:'19th century', monogram:'LT', category:'Literature', lens:'history, family, war, moral responsibility, spiritual searching, ordinary life, and social institutions' },
-  { id:'dostoevsky', name:'Fyodor Dostoevsky', field:'Literature & Psychology', era:'19th century', monogram:'FDOS', category:'Literature', lens:'freedom, guilt, faith, nihilism, moral psychology, suffering, responsibility, and ideological conflict' },
-  { id:'twain', name:'Mark Twain', field:'Literature & Satire', era:'19th–20th century', monogram:'MT', category:'Literature', lens:'satire, hypocrisy, race, American identity, vernacular voice, moral convention, and social criticism' },
-  { id:'woolf', name:'Virginia Woolf', field:'Literature', era:'20th century', monogram:'VW', category:'Literature', lens:'consciousness, time, gender, perception, interior life, modernism, and literary form' },
-  { id:'orwell', name:'George Orwell', field:'Literature & Political Essay', era:'20th century', monogram:'GO', category:'Literature', lens:'language and politics, propaganda, totalitarianism, class, truth, clarity, and democratic socialism' },
-  { id:'borges', name:'Jorge Luis Borges', field:'Literature', era:'20th century', monogram:'JLB', category:'Literature', lens:'infinity, identity, libraries, labyrinths, memory, interpretation, metaphysics, and literary paradox' },
-  { id:'morrison', name:'Toni Morrison', field:'Literature', era:'20th–21st century', monogram:'TM', category:'Literature', lens:'memory, race, identity, history, language, community, trauma, and moral imagination' },
-  { id:'bach', name:'J. S. Bach', field:'Music', era:'Baroque', monogram:'JSB', category:'Music & Arts', lens:'counterpoint, harmony, form, sacred music, structure, variation, and disciplined musical craft' },
-  { id:'handel', name:'George Frideric Handel', field:'Music', era:'Baroque', monogram:'GFH', category:'Music & Arts', lens:'oratorio, opera, melody, dramatic pacing, large-form structure, adaptation, and public musical communication' },
-  { id:'vivaldi', name:'Antonio Vivaldi', field:'Music', era:'Baroque', monogram:'AV', category:'Music & Arts', lens:'concerto form, rhythm, instrumental color, sequence, contrast, and programmatic musical imagery' },
-  { id:'mozart', name:'Wolfgang Amadeus Mozart', field:'Music', era:'Classical', monogram:'WAM', category:'Music & Arts', lens:'clarity, balance, opera, characterization, formal proportion, melodic invention, and dramatic musical dialogue' },
-  { id:'beethoven', name:'L. van Beethoven', field:'Music', era:'Classical / Romantic', monogram:'LvB', category:'Music & Arts', lens:'motivic development, form, expressive architecture, struggle, transformation, and musical innovation' },
-  { id:'chopin', name:'Frédéric Chopin', field:'Music', era:'Romantic', monogram:'FC', category:'Music & Arts', lens:'piano idiom, lyricism, harmony, rubato, miniature forms, national style, and expressive nuance' },
-  { id:'debussy', name:'Claude Debussy', field:'Music', era:'Modern', monogram:'CDb', category:'Music & Arts', lens:'timbre, harmony, atmosphere, ambiguity, orchestral color, musical suggestion, and formal freedom' },
-  { id:'stravinsky', name:'Igor Stravinsky', field:'Music', era:'20th century', monogram:'IS', category:'Music & Arts', lens:'rhythm, orchestration, form, reinvention, primitivism, neoclassicism, and musical structure' },
-  { id:'ellington', name:'Duke Ellington', field:'Music', era:'20th century', monogram:'DE', category:'Music & Arts', lens:'jazz composition, orchestration, ensemble voice, swing, musical portraiture, improvisation, and American musical culture' },
-  { id:'bernstein', name:'Leonard Bernstein', field:'Music & Education', era:'20th century', monogram:'LB', category:'Music & Arts', lens:'conducting, musical analysis, theater, rhythm, public education, interpretation, and connections across musical traditions' },
-  { id:'leonardo', name:'Leonardo da Vinci', field:'Art, Engineering & Science', era:'Renaissance', monogram:'LDV', category:'Music & Arts', lens:'observation, anatomy, mechanics, drawing, design, proportion, curiosity, and integration of art and science' },
-  { id:'michelangelo', name:'Michelangelo', field:'Art & Architecture', era:'Renaissance', monogram:'MB', category:'Music & Arts', lens:'form, anatomy, sculpture, monumental design, artistic discipline, patronage, and expressive human figure' },
-  { id:'van-gogh', name:'Vincent van Gogh', field:'Art', era:'19th century', monogram:'VVG', category:'Music & Arts', lens:'color, perception, emotion, landscape, portraiture, artistic persistence, and expressive brushwork' },
-  { id:'hinton', name:'Geoffrey Hinton', field:'Computer Science & AI', era:'Contemporary', monogram:'GH', category:'AI & Technology', lens:'neural networks, representation learning, deep learning, machine intelligence, learning systems, and the risks and possibilities of advanced AI' },
-  { id:'lecun', name:'Yann LeCun', field:'Computer Science & AI', era:'Contemporary', monogram:'YL', category:'AI & Technology', lens:'machine learning, convolutional networks, self-supervised learning, world models, open scientific debate, and the architecture of intelligent systems' },
-  { id:'fei-fei-li', name:'Fei-Fei Li', field:'Computer Science & AI', era:'Contemporary', monogram:'FFL', category:'AI & Technology', lens:'computer vision, human-centered AI, large-scale visual learning, responsible AI, scientific collaboration, and the relationship between perception and intelligence' },
-  { id:'andrew-ng', name:'Andrew Ng', field:'Computer Science & AI', era:'Contemporary', monogram:'ANG', category:'AI & Technology', lens:'machine learning engineering, practical AI adoption, education, data-centric development, product deployment, and making AI useful in organizations' },
-  { id:'hassabis', name:'Demis Hassabis', field:'AI & Computational Science', era:'Contemporary', monogram:'DHAS', category:'AI & Technology', lens:'artificial intelligence, reinforcement learning, scientific discovery, computational biology, general-purpose learning systems, and AI as a tool for understanding complex problems' },
-  { id:'kurzweil', name:'Ray Kurzweil', field:'Technology & Futurism', era:'Contemporary', monogram:'RK', category:'AI & Technology', lens:'technological acceleration, computing trends, artificial intelligence, human-machine integration, forecasting, and long-run technological change' },
-  { id:'pearl', name:'Judea Pearl', field:'Computer Science & Statistics', era:'Contemporary', monogram:'JP', category:'AI & Technology', lens:'causal inference, Bayesian networks, counterfactual reasoning, probability, graphical models, and distinguishing correlation from causation' },
-  { id:'berners-lee', name:'Tim Berners-Lee', field:'Computer Science & Web', era:'Contemporary', monogram:'TBL', category:'AI & Technology', lens:'the World Wide Web, open standards, decentralization, interoperability, data ownership, public-interest technology, and the social architecture of the internet' },
-  { id:'goodall', name:'Jane Goodall', field:'Primatology & Conservation', era:'Contemporary', monogram:'JG', category:'Science', lens:'animal behavior, long-term observation, chimpanzee societies, conservation, empathy grounded in evidence, and human responsibilities toward nature' },
-  { id:'brian-greene', name:'Brian Greene', field:'Physics', era:'Contemporary', monogram:'BG', category:'Science', lens:'string theory, cosmology, spacetime, quantum physics, mathematical unification, and clear explanation of difficult physical ideas' },
-  { id:'tyson', name:'Neil deGrasse Tyson', field:'Astrophysics & Science Communication', era:'Contemporary', monogram:'NDT', category:'Science', lens:'astrophysics, scientific literacy, cosmic perspective, evidence, public science communication, and connecting science with culture' },
-  { id:'dawkins', name:'Richard Dawkins', field:'Evolutionary Biology', era:'Contemporary', monogram:'RDW', category:'Science', lens:'evolution, natural selection, genes, adaptation, scientific explanation, skepticism, and communication of evolutionary ideas' },
-  { id:'sean-carroll', name:'Sean Carroll', field:'Physics & Philosophy of Science', era:'Contemporary', monogram:'SC', category:'Science', lens:'cosmology, quantum mechanics, entropy, emergence, scientific naturalism, philosophy of physics, and explanatory models' },
-  { id:'randall', name:'Lisa Randall', field:'Physics', era:'Contemporary', monogram:'LR', category:'Science', lens:'particle physics, cosmology, extra dimensions, dark matter, model building, evidence, and the relationship between theory and experiment' },
-  { id:'kip-thorne', name:'Kip Thorne', field:'Physics', era:'Contemporary', monogram:'KT', category:'Science', lens:'general relativity, black holes, gravitational waves, theoretical prediction, experimental confirmation, and collaboration between theory and observation' },
-  { id:'pinker', name:'Steven Pinker', field:'Psychology & Cognitive Science', era:'Contemporary', monogram:'SP', category:'Psychology', lens:'language, cognition, human nature, violence, progress, statistical reasoning, and explaining behavioral patterns with evidence' },
-  { id:'haidt', name:'Jonathan Haidt', field:'Social Psychology', era:'Contemporary', monogram:'JH', category:'Psychology', lens:'moral psychology, intuition and reasoning, political psychology, social media effects, institutions, group dynamics, and viewpoint diversity' },
-  { id:'sapolsky', name:'Robert Sapolsky', field:'Neuroscience & Biology', era:'Contemporary', monogram:'RS', category:'Psychology', lens:'stress, behavior, neurobiology, hormones, environment, biological constraints, human aggression, and the interaction of biology and context' },
-  { id:'dweck', name:'Carol Dweck', field:'Psychology', era:'Contemporary', monogram:'CDW', category:'Psychology', lens:'motivation, mindset, learning, feedback, achievement, resilience, and how beliefs about ability shape behavior' },
-  { id:'duckworth', name:'Angela Duckworth', field:'Psychology', era:'Contemporary', monogram:'AD', category:'Psychology', lens:'grit, deliberate practice, perseverance, achievement, motivation, measurement, and the limits and uses of character traits' },
-  { id:'acemoglu', name:'Daron Acemoglu', field:'Economics', era:'Contemporary', monogram:'DA', category:'Economics & Society', lens:'institutions, political economy, growth, technology, inequality, labor markets, state capacity, and how rules shape prosperity' },
-  { id:'duflo', name:'Esther Duflo', field:'Economics', era:'Contemporary', monogram:'EDU', category:'Economics & Society', lens:'development economics, randomized evaluation, poverty policy, empirical field research, human behavior, and evidence-based intervention' },
-  { id:'krugman', name:'Paul Krugman', field:'Economics', era:'Contemporary', monogram:'PK', category:'Economics & Society', lens:'macroeconomics, trade, economic geography, recessions, policy analysis, models, and communicating economic arguments to the public' },
-  { id:'sowell', name:'Thomas Sowell', field:'Economics & Social Theory', era:'Contemporary', monogram:'TS', category:'Economics & Society', lens:'incentives, tradeoffs, institutions, dispersed knowledge, economic history, social policy, and comparing intended goals with actual consequences' },
-  { id:'taleb', name:'Nassim Nicholas Taleb', field:'Risk & Decision Theory', era:'Contemporary', monogram:'NNT', category:'Economics & Society', lens:'uncertainty, fat tails, antifragility, optionality, forecasting limits, skin in the game, and decision-making under extreme risk' },
-  { id:'amartya-sen', name:'Amartya Sen', field:'Economics & Philosophy', era:'Contemporary', monogram:'ASEN', category:'Economics & Society', lens:'capabilities, welfare, development, famine, justice, freedom, social choice, and evaluating well-being beyond income' },
-  { id:'nussbaum', name:'Martha Nussbaum', field:'Philosophy', era:'Contemporary', monogram:'MN', category:'Philosophy', lens:'ethics, capabilities, emotion, justice, human dignity, classical philosophy, education, and the moral importance of literature' },
-  { id:'peter-singer', name:'Peter Singer', field:'Philosophy & Ethics', era:'Contemporary', monogram:'PS', category:'Philosophy', lens:'utilitarian ethics, animal welfare, global poverty, effective altruism, moral consistency, and extending ethical consideration' },
-  { id:'sandel', name:'Michael Sandel', field:'Political Philosophy', era:'Contemporary', monogram:'MS', category:'Political Thought', lens:'justice, markets and morals, civic life, merit, community, public reasoning, and the ethical limits of economic valuation' },
-  { id:'judith-butler', name:'Judith Butler', field:'Philosophy & Critical Theory', era:'Contemporary', monogram:'JB', category:'Philosophy', lens:'gender, performativity, identity, power, language, social norms, recognition, and critical analysis of categories' },
-  { id:'cornel-west', name:'Cornel West', field:'Philosophy & Public Thought', era:'Contemporary', monogram:'CW', category:'Philosophy', lens:'democracy, race, justice, prophetic tradition, moral courage, public philosophy, solidarity, and critique of domination' },
-  { id:'fukuyama', name:'Francis Fukuyama', field:'Political Science', era:'Contemporary', monogram:'FF', category:'Political Thought', lens:'political order, institutions, liberal democracy, identity, state capacity, modernization, and long-run political development' },
-  { id:'ferguson', name:'Niall Ferguson', field:'History', era:'Contemporary', monogram:'NF', category:'History', lens:'financial history, empire, institutions, networks, war, economic change, counterfactual analysis, and long-run historical comparison' },
-  { id:'harari', name:'Yuval Noah Harari', field:'History & Public Thought', era:'Contemporary', monogram:'YNH', category:'History', lens:'large-scale historical narratives, cognition, institutions, technology, shared myths, global systems, and speculative futures' },
-  { id:'applebaum', name:'Anne Applebaum', field:'History & Journalism', era:'Contemporary', monogram:'AA', category:'History', lens:'authoritarianism, communism, democratic institutions, propaganda, political networks, civic resilience, and historical comparison' },
-  { id:'drucker', name:'Peter Drucker', field:'Management', era:'20th century', monogram:'PD', category:'Business & Innovation', lens:'management, organizations, knowledge work, objectives, decentralization, innovation, customers, and institutional effectiveness' },
-  { id:'christensen', name:'Clayton Christensen', field:'Business & Innovation', era:'20th–21st century', monogram:'CC', category:'Business & Innovation', lens:'disruptive innovation, technology adoption, business models, organizational incentives, market entry, and why successful firms can fail' },
-  { id:'buffett', name:'Warren Buffett', field:'Investing & Business', era:'Contemporary', monogram:'WB', category:'Business & Innovation', lens:'capital allocation, intrinsic value, competitive advantage, incentives, management quality, patience, risk, and long-term business economics' },
-  { id:'munger', name:'Charlie Munger', field:'Investing & Decision-Making', era:'20th–21st century', monogram:'CM', category:'Business & Innovation', lens:'mental models, incentives, probabilistic thinking, multidisciplinary reasoning, behavioral errors, business quality, and long-term judgment' },
-  { id:'jobs', name:'Steve Jobs', field:'Technology & Product Design', era:'20th–21st century', monogram:'SJ', category:'Business & Innovation', lens:'product design, simplicity, user experience, integration of hardware and software, creative leadership, focus, and technology as a liberal art' },
-  { id:'gates', name:'Bill Gates', field:'Technology & Philanthropy', era:'Contemporary', monogram:'BGAT', category:'Business & Innovation', lens:'software platforms, technology strategy, scaling organizations, global health, philanthropy, energy innovation, and evidence-informed problem solving' },
-  { id:'atwood', name:'Margaret Atwood', field:'Literature', era:'Contemporary', monogram:'MAW', category:'Literature', lens:'dystopia, gender, power, ecology, language, speculative fiction, historical memory, and social institutions' },
-  { id:'rushdie', name:'Salman Rushdie', field:'Literature', era:'Contemporary', monogram:'SRU', category:'Literature', lens:'identity, migration, religion, freedom of expression, magical realism, history, language, and cultural hybridity' },
-  { id:'ishiguro', name:'Kazuo Ishiguro', field:'Literature', era:'Contemporary', monogram:'KI', category:'Literature', lens:'memory, dignity, self-deception, responsibility, identity, technology, unreliable narration, and emotional restraint' },
-  { id:'oates', name:'Joyce Carol Oates', field:'Literature', era:'Contemporary', monogram:'JCO', category:'Literature', lens:'American identity, violence, family, class, psychology, social pressure, literary realism, and formal experimentation' },
-  { id:'john-williams', name:'John Williams', field:'Music & Film Scoring', era:'Contemporary', monogram:'JW', category:'Music & Arts', lens:'film scoring, leitmotif, orchestration, thematic development, narrative music, symphonic tradition, and the relationship between music and story' },
-  { id:'yo-yo-ma', name:'Yo-Yo Ma', field:'Music', era:'Contemporary', monogram:'YYM', category:'Music & Arts', lens:'performance, interpretation, collaboration, cultural exchange, musical communication, listening, and the social role of art' },
-  { id:'marsalis', name:'Wynton Marsalis', field:'Music & Jazz', era:'Contemporary', monogram:'WM', category:'Music & Arts', lens:'jazz history, improvisation, swing, composition, musical education, tradition, ensemble discipline, and American musical culture' },
-  { id:'hans-zimmer', name:'Hans Zimmer', field:'Music & Film Scoring', era:'Contemporary', monogram:'HZ', category:'Music & Arts', lens:'film scoring, sound design, orchestral and electronic integration, thematic atmosphere, collaboration, and music as cinematic architecture' },
-  { id:'scorsese', name:'Martin Scorsese', field:'Film', era:'Contemporary', monogram:'MSCO', category:'Music & Arts', lens:'cinema history, visual storytelling, character, moral conflict, editing, film preservation, and the relationship between style and human behavior' },
-  { id:'nt-wright', name:'N. T. Wright', field:'Theology & Biblical Studies', era:'Contemporary', monogram:'NTW', category:'Religion & Theology', lens:'New Testament history, Pauline theology, resurrection, early Christianity, historical context, biblical interpretation, and Christian ethics' },
-  { id:'rowan-williams', name:'Rowan Williams', field:'Theology & Philosophy', era:'Contemporary', monogram:'RW', category:'Religion & Theology', lens:'Christian theology, spirituality, ethics, language, literature, political responsibility, and reflective engagement across traditions' },
-  { id:'pagels', name:'Elaine Pagels', field:'History of Religion', era:'Contemporary', monogram:'EP', category:'Religion & Theology', lens:'early Christianity, Gnostic texts, religious diversity, historical interpretation, scripture, community formation, and the development of doctrine' },
-  { id:'barron', name:'Robert Barron', field:'Theology & Philosophy', era:'Contemporary', monogram:'RB', category:'Religion & Theology', lens:'Catholic theology, classical philosophy, scripture, culture, evangelization, aesthetics, and explaining religious ideas in public discourse' }
+  { id:'socrates', name:'Socrates', field:'Philosophy', era:'Classical Greece', monogram:'S', lens:'Socratic questioning, definitions, assumptions, and examination of reasons' },
+  { id:'plato', name:'Plato', field:'Philosophy', era:'Classical Greece', monogram:'P', lens:'forms, justice, education, political philosophy, metaphysics, and dialectic' },
+  { id:'aristotle', name:'Aristotle', field:'Philosophy & Science', era:'Classical Greece', monogram:'A', lens:'logic, causes, virtue, politics, biology, classification, and empirical observation' },
+  { id:'aquinas', name:'Thomas Aquinas', field:'Theology & Philosophy', era:'Medieval', monogram:'TA', lens:'natural law, scholastic argument, metaphysics, ethics, theology, objections and replies' },
+  { id:'bacon', name:'Francis Bacon', field:'Science & Philosophy', era:'Early Modern', monogram:'FB', lens:'induction, experiment, idols of the mind, scientific method, and useful knowledge' },
+  { id:'newton', name:'Isaac Newton', field:'Mathematics & Physics', era:'Scientific Revolution', monogram:'N', lens:'mechanics, gravitation, optics, calculus, mathematical modeling, and disciplined inference' },
+  { id:'darwin', name:'Charles Darwin', field:'Biology', era:'19th century', monogram:'D', lens:'natural selection, variation, evidence, comparative biology, gradual change, and explanatory mechanisms' },
+  { id:'curie', name:'Marie Curie', field:'Physics & Chemistry', era:'Modern Science', monogram:'MC', lens:'radioactivity, experimental rigor, measurement, scientific perseverance, and evidence' },
+  { id:'einstein', name:'Albert Einstein', field:'Physics', era:'Modern Physics', monogram:'E', lens:'relativity, thought experiments, invariance, physical intuition, and conceptual simplicity' },
+  { id:'lovelace', name:'Ada Lovelace', field:'Mathematics & Computing', era:'19th century', monogram:'AL', lens:'symbolic computation, algorithms, mathematical imagination, and the possibilities and limits of machines' },
+  { id:'turing', name:'Alan Turing', field:'Mathematics & Computing', era:'20th century', monogram:'T', lens:'computation, algorithms, machine intelligence, formal reasoning, and cryptanalysis' },
+  { id:'shakespeare', name:'William Shakespeare', field:'Literature', era:'Renaissance', monogram:'WS', lens:'character, rhetoric, tragedy, comedy, ambition, power, motive, language, and dramatic irony' },
+  { id:'austen', name:'Jane Austen', field:'Literature', era:'Regency', monogram:'JA', lens:'character, social convention, moral judgment, irony, class, courtship, and self-knowledge' },
+  { id:'bach', name:'J. S. Bach', field:'Music', era:'Baroque', monogram:'JSB', lens:'counterpoint, harmony, form, sacred music, structure, variation, and disciplined musical craft' },
+  { id:'beethoven', name:'L. van Beethoven', field:'Music', era:'Classical / Romantic', monogram:'LvB', lens:'motivic development, form, expressive architecture, struggle, transformation, and musical innovation' },
+  { id:'herodotus', name:'Herodotus', field:'History', era:'Classical Greece', monogram:'H', lens:'historical inquiry, competing accounts, culture, causation, memory, and the limits of testimony' },
+  { id:'gibbon', name:'Edward Gibbon', field:'History', era:'Enlightenment', monogram:'EG', lens:'long-run historical causation, institutions, religion, civic life, sources, and decline' },
+  { id:'dubois', name:'W. E. B. Du Bois', field:'History & Sociology', era:'Modern', monogram:'WEB', lens:'history, sociology, political economy, culture, evidence, institutions, and lived experience' }
 ];
-
-for (const customPerson of loadSymposiumCustomPeople()) {
-  if (!SYMPOSIUM_PARTICIPANTS.some((person)=>person.id === customPerson.id)) {
-    SYMPOSIUM_PARTICIPANTS.push(customPerson);
-  }
-}
-
 
 function symposiumEscape(value) { return escapeHtml(String(value ?? '')); }
 
@@ -23403,39 +23057,13 @@ function ensureSymposiumStyles() {
     .symposium-setup{padding:18px 20px 22px;display:grid;gap:16px}.symposium-setup label{display:grid;gap:7px;font-weight:700;font-size:.88rem}.symposium-setup input,.symposium-setup textarea,.symposium-setup select{width:100%;border:1px solid #cbd7e5;border-radius:11px;padding:10px 12px;background:white;color:#10233f;font:inherit;box-sizing:border-box}.symposium-setup textarea{min-height:105px;resize:vertical;line-height:1.45}
     .symposium-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.symposium-mode{position:relative}.symposium-mode input{position:absolute;opacity:0;pointer-events:none}.symposium-mode span{display:block;padding:11px 12px;border:1px solid #d3deea;border-radius:12px;background:#fbfdff;cursor:pointer;font-weight:800}.symposium-mode small{display:block;margin-top:3px;font-weight:500;color:#6b7c90}.symposium-mode input:checked+span{border-color:#c79a22;background:#fff8e6;box-shadow:inset 0 0 0 1px #e0b94d}
     .symposium-context-choice{display:flex;gap:8px;flex-wrap:wrap}.symposium-context-choice button,.symposium-mini-button{border:1px solid #cbd7e5;border-radius:999px;background:white;padding:7px 10px;font-weight:700;color:#24476e;cursor:pointer}.symposium-context-choice button:hover,.symposium-mini-button:hover{background:#f2f7fc}
-    .symposium-roster{max-height:355px;overflow:auto;padding-right:4px;display:grid;gap:8px}
-    .symposium-roster-tools{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:8px;margin:7px 0 8px}
-    .symposium-roster-tools input,.symposium-roster-tools select{width:100%;min-width:0;border:1px solid #cbd7e4;border-radius:9px;padding:8px 9px;background:white;color:#17304e;font:inherit}
-    .symposium-roster-summary{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:.73rem;color:#718095;margin:0 0 6px}
-    .symposium-person[hidden]{display:none!important}
-    .symposium-person-category{display:inline-block;margin-left:5px;padding:1px 5px;border-radius:999px;background:#eef3f8;color:#52677f;font-size:.64rem;font-weight:700}
-    @media(max-width:560px){.symposium-roster-tools{grid-template-columns:1fr}}
-.symposium-person{display:grid;grid-template-columns:auto 42px 1fr;gap:9px;align-items:center;padding:9px;border:1px solid #e0e8f1;border-radius:12px;background:#fff;cursor:pointer}.symposium-person:has(input:checked){border-color:#c99f37;background:#fffaf0}.symposium-person input{width:auto}.symposium-avatar{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#173c66,#0c2340);color:#f2cc68;border:2px solid #e2bd52;font-family:Georgia,serif;font-size:.78rem;font-weight:800;box-shadow:0 4px 12px rgba(12,35,64,.15)}.symposium-person strong{display:block;font-size:.9rem}.symposium-person small{display:block;color:#718095;font-size:.76rem;margin-top:2px}
+    .symposium-roster{max-height:355px;overflow:auto;padding-right:4px;display:grid;gap:8px}.symposium-person{display:grid;grid-template-columns:auto 42px 1fr;gap:9px;align-items:center;padding:9px;border:1px solid #e0e8f1;border-radius:12px;background:#fff;cursor:pointer}.symposium-person:has(input:checked){border-color:#c99f37;background:#fffaf0}.symposium-person input{width:auto}.symposium-avatar{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#173c66,#0c2340);color:#f2cc68;border:2px solid #e2bd52;font-family:Georgia,serif;font-size:.78rem;font-weight:800;box-shadow:0 4px 12px rgba(12,35,64,.15)}.symposium-person strong{display:block;font-size:.9rem}.symposium-person small{display:block;color:#718095;font-size:.76rem;margin-top:2px}
     .symposium-custom-row{display:grid;grid-template-columns:1fr auto;gap:8px}.symposium-custom-row button,.symposium-start{border:0;border-radius:11px;background:#0c2340;color:white;font-weight:800;padding:10px 14px;cursor:pointer}.symposium-start{width:100%;padding:13px 16px;color:#f3cc67}.symposium-start:disabled{opacity:.55;cursor:wait}
     .symposium-stage{min-height:720px;display:flex;flex-direction:column}.symposium-stage-toolbar{padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #e3eaf2;background:#fbfdff;flex-wrap:wrap}.symposium-stage-status{font-weight:800;color:#395a7d}.symposium-stage-actions{display:flex;gap:8px;flex-wrap:wrap}.symposium-stage-actions button{border:1px solid #cbd7e5;background:white;color:#24476e;border-radius:9px;padding:7px 10px;cursor:pointer;font-weight:700}
     .symposium-transcript{padding:20px;display:flex;flex-direction:column;gap:14px;min-height:430px;max-height:680px;overflow:auto;background:linear-gradient(180deg,#fff,#fbfdff)}
-    .symposium-transcript,.symposium-turn-body p{user-select:text;-webkit-user-select:text}
-    .symposium-transcript ::selection{background:#f2ca60;color:#10233d}
-    .symposium-selection-toolbar{
-      position:fixed;z-index:10050;display:flex;align-items:center;gap:6px;
-      padding:6px;border:1px solid #c7d2df;border-radius:10px;background:#fff;
-      box-shadow:0 8px 24px rgba(12,35,64,.18)
-    }
-    .symposium-selection-toolbar[hidden]{display:none!important}
-    .symposium-selection-toolbar button{
-      border:0;border-radius:8px;padding:7px 10px;font:inherit;font-size:.78rem;
-      font-weight:800;cursor:pointer;white-space:nowrap
-    }
-    .symposium-selection-toolbar [data-symposium-copy-selection]{background:#eaf0f6;color:#17304e}
-    .symposium-selection-toolbar [data-symposium-save-selection]{background:#0c2340;color:#f2ca60}
-
     .symposium-empty{margin:auto;text-align:center;max-width:520px;color:#718095;padding:44px}.symposium-empty .symposium-empty-icon{font-size:3rem;display:block;margin-bottom:12px}.symposium-empty h2{color:#0c2340;margin:.25rem 0 .5rem;font-family:Georgia,serif}
     .symposium-turn{display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px;align-items:start}.symposium-turn.user{grid-template-columns:minmax(0,1fr) 48px}.symposium-turn.user .symposium-turn-body{order:1;background:#eef5fc}.symposium-turn.user .symposium-avatar{order:2;background:#405c7a}.symposium-turn.moderator .symposium-avatar{background:linear-gradient(145deg,#80631a,#513d0d);color:white}.symposium-turn-body{border:1px solid #dde6ef;border-radius:16px;padding:13px 15px;background:white;box-shadow:0 5px 16px rgba(38,67,98,.05)}.symposium-turn-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}.symposium-turn-head strong{color:#0c2340}.symposium-turn-head span{font-size:.76rem;color:#7a899b}.symposium-turn-body p{margin:0;line-height:1.58;color:#30465f;white-space:pre-wrap}.symposium-turn-tools{margin-top:8px;display:flex;gap:6px}.symposium-turn-tools button{border:0;background:transparent;color:#315d8b;font-size:.78rem;cursor:pointer;padding:2px 0}
     .symposium-participate{margin-top:auto;border-top:1px solid #e1e8f0;padding:16px 18px;background:#f8fbff}.symposium-participate label{font-size:.8rem;font-weight:800;color:#435b75}.symposium-user-grid{display:grid;grid-template-columns:150px 1fr auto;gap:9px;margin-top:7px}.symposium-user-grid select,.symposium-user-grid textarea{border:1px solid #cbd7e5;border-radius:10px;padding:9px 10px;font:inherit;background:white}.symposium-user-grid textarea{resize:vertical;min-height:52px}.symposium-user-grid button{border:0;border-radius:10px;background:#0c2340;color:#f2ca60;padding:10px 14px;font-weight:800;cursor:pointer}.symposium-hint{font-size:.76rem;color:#758498;margin:7px 0 0}
-    .symposium-custom-personality{display:grid;gap:7px;margin-top:6px}
-    .symposium-custom-personality input,.symposium-custom-personality textarea{width:100%;box-sizing:border-box;border:1px solid #cbd7e4;border-radius:9px;padding:8px 9px;background:white;color:#17304e;font:inherit}
-    .symposium-custom-personality textarea{min-height:70px;resize:vertical}
-    .symposium-custom-personality button{justify-self:start;border:0;border-radius:9px;background:#0c2340;color:#f2ca60;padding:9px 13px;font-weight:800;cursor:pointer}
     .symposium-source-pill{display:inline-flex;align-items:center;border-radius:999px;background:#edf4fb;color:#365b81;padding:4px 8px;font-size:.72rem;font-weight:800;margin-top:8px}
     .symposium-loading{display:inline-flex;gap:5px;align-items:center}.symposium-loading i{width:6px;height:6px;border-radius:50%;background:#8da1b6;animation:sympPulse 1.1s infinite alternate}.symposium-loading i:nth-child(2){animation-delay:.2s}.symposium-loading i:nth-child(3){animation-delay:.4s}@keyframes sympPulse{to{opacity:.25;transform:translateY(-2px)}}
     .symposium-nav-link{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:.55rem .7rem;border-radius:8px}.symposium-nav-link:hover{background:rgba(255,255,255,.08)}
@@ -23479,22 +23107,6 @@ function symposiumSelectedPeople(root) {
     .filter(Boolean);
 }
 
-function symposiumCategoryOptions() {
-  return [...new Set(SYMPOSIUM_PARTICIPANTS.map((person)=>person.category || person.field || 'Other'))]
-    .sort((a,b)=>a.localeCompare(b));
-}
-
-function symposiumPersonSearchText(person) {
-  return [
-    person.name,
-    person.field,
-    person.era,
-    person.category,
-    person.lens
-  ].filter(Boolean).join(' ').toLocaleLowerCase();
-}
-
-
 function symposiumTurnHtml({name, monogram='?', field='', text='', kind='participant', sourceLabel=''}) {
   const safeKind = kind === 'user' ? 'user' : (kind === 'moderator' ? 'moderator' : 'participant');
   return `<article class="symposium-turn ${safeKind}">
@@ -23536,7 +23148,7 @@ async function symposiumAskAi({person, mode, topic, context, transcript, userCon
   };
   const prior = transcript.slice(-8).map((turn)=>`${turn.name}: ${turn.text}`).join('\n');
   const readerDirective = userContribution ? `\n\nIMMEDIATE RESPONSE REQUIREMENT — THIS OVERRIDES THE NORMAL FLOW:\nThe reader has just contributed the following point:\n${userContribution}\n\nYou are the participant Athena selected to answer it. Do NOT merely continue the general discussion. Your response must directly engage this reader contribution before doing anything else. In your opening 1–2 sentences, identify the substance of the reader's point in your own words (without saying only “I agree” or “good point”). Then clearly state whether you agree, disagree, or qualify it, and explain why using argument and evidence appropriate to ${person.name}. If the reader asked a question, answer that question explicitly. If the reader supplied evidence, assess that evidence. If the reader challenged a claim, defend, revise, or concede the challenged claim. Only after this direct engagement may you reconnect the point to the broader Symposium topic. Do not ignore, sidestep, or replace the reader's point with a different issue.` : '';
-  const prompt = `You are participating in Mark, Set, Go!'s Symposium as ${person.name}, representing ${person.field}. Use deep knowledge associated with ${person.name}'s work, historical context, methods, and characteristic intellectual concerns (${person.lens}). GENERAL REASONING AND HISTORICAL KNOWLEDGE RULES:\nYou are not a quotation machine or a narrow caricature. Think, reason, compare, infer, question assumptions, and follow arguments with broad human intelligence. Give especially strong weight to the participant's documented specialties, methods, habits of thought, vocabulary, values, and intellectual context.\n\nHowever, the participant's independent factual knowledge is bounded by what could reasonably have been known during that person's lifetime. Do not give a historical participant knowledge of later discoveries, inventions, events, theories, scientific terminology, people, books, technologies, political developments, or cultural references that arose after the participant's lifetime. Do not silently translate modern knowledge backward and pretend the participant already possessed it.\n\nIf the reader or another participant introduces a later concept that this person could not have known, the participant may notice that the term or idea is unfamiliar, ask what it means, request clarification, or reason conditionally from the explanation supplied in the conversation. Once the later concept has been explained, the participant may analyze it using the participant's own historically appropriate concepts and methods, but must clearly frame that analysis as a response to information newly supplied by the reader or conversation. For example, Thomas Aquinas should not independently know what dark energy is; he might ask what the term means, and after it is explained he could examine the claim through Aristotelian-Thomistic ideas of causation, motion, substance, or natural philosophy.\n\nAvoid anachronistic vocabulary in the participant's own voice unless the reader has introduced the term and using it is necessary for clarity. When possible, restate a modern concept in historically appropriate language rather than making the historical participant sound modern.\n\nFor living people, the knowledge horizon extends only to public information and published ideas available during their lifetime up to the present conversation date. Do not imply access to private thoughts, unpublished/current private opinions, confidential knowledge, or real-time personal views. Do not fabricate quotations. Remain cordial, charitable, concise, and substantive.\n\n${modeInstructions[mode] || modeInstructions.debate}\n\nTOPIC:\n${topic}\n\nREADING CONTEXT:\n${context || 'No reading passage supplied.'}\n\nRECENT TRANSCRIPT:\n${prior || 'No prior turns.'}${readerDirective}\n\nRespond as ${person.name} in about 120-220 words. Use reasons and evidence. Reason beyond the participant's specialty when the topic requires it, but let the participant's specialties and intellectual methods shape the strongest parts of the response. Never exceed the participant's historical knowledge horizon except to analyze information explicitly supplied within this conversation. Do not use stage directions.`;
+  const prompt = `You are participating in Mark, Set, Go!'s Symposium as ${person.name}, representing ${person.field}. Use deep knowledge associated with ${person.name}'s work, historical context, methods, and characteristic intellectual concerns (${person.lens}). Do not claim private knowledge or fabricate quotations. When a modern topic postdates this thinker, reason from the thinker's documented ideas and clearly frame the response as an application rather than a literal historical statement. Remain cordial, charitable, concise, and substantive.\n\n${modeInstructions[mode] || modeInstructions.debate}\n\nTOPIC:\n${topic}\n\nREADING CONTEXT:\n${context || 'No reading passage supplied.'}\n\nRECENT TRANSCRIPT:\n${prior || 'No prior turns.'}${readerDirective}\n\nRespond as ${person.name} in about 120-220 words. Use reasons and evidence. Do not use stage directions.`;
 
   // IMPORTANT: /api/mark-selection is selection-centered. When the reader has
   // just spoken, make the reader's exact contribution the primary selection so
@@ -23585,7 +23197,7 @@ function renderSymposium() {
         <div>
           <span class="symposium-kicker">◉ The Symposium · Prototype</span>
           <h1>Put great minds around the same table.</h1>
-          <p>Explore what you are reading through friendly debate, interview, explanation, or a court-style examination of a claim. AI participants represent the methods and ideas of historical, modern, contemporary, and user-created thinkers while the moderator keeps the exchange charitable, evidence-based, and on topic.</p>
+          <p>Explore what you are reading through friendly debate, interview, explanation, or a court-style examination of a claim. AI participants represent the methods and ideas of major thinkers while the moderator keeps the exchange charitable, evidence-based, and on topic.</p>
         </div>
         <aside class="symposium-badge"><strong>Reader participates</strong><small>Listen, read, question, challenge, supply evidence, or enter your own argument at any point.</small></aside>
       </header>
@@ -23623,38 +23235,16 @@ function renderSymposium() {
             </label>
 
             <div>
-              <label>Participants <span style="font-weight:500;color:#718095">(choose up to 6 from ${SYMPOSIUM_PARTICIPANTS.length})</span></label>
-              <div class="symposium-roster-tools">
-                <input id="symposium-person-search" type="search" placeholder="Search thinkers, fields, eras, or ideas…" autocomplete="off">
-                <select id="symposium-category-filter" aria-label="Filter Symposium participants by category">
-                  <option value="">All categories</option>
-                  ${symposiumCategoryOptions().map((category)=>`<option value="${symposiumEscape(category)}">${symposiumEscape(category)}</option>`).join('')}
-                </select>
-              </div>
-              <div class="symposium-roster-summary">
-                <span id="symposium-roster-count">${SYMPOSIUM_PARTICIPANTS.length} built-in personalities</span>
-                <span>Custom guests can still be added below</span>
-              </div>
+              <label>Participants <span style="font-weight:500;color:#718095">(choose 1–6)</span></label>
               <div class="symposium-roster" id="symposium-roster">
-                ${SYMPOSIUM_PARTICIPANTS.map((person)=>`<label class="symposium-person"
-                    data-symposium-category="${symposiumEscape(person.category || person.field || 'Other')}"
-                    data-symposium-search="${symposiumEscape(symposiumPersonSearchText(person))}">
-                  <input type="checkbox" data-symposium-person value="${person.id}" ${defaultChecked.has(person.id)?'checked':''}>
-                  <span class="symposium-avatar">${symposiumEscape(person.monogram)}</span>
-                  <span><strong>${symposiumEscape(person.name)}</strong><small>${symposiumEscape(person.field)} · ${symposiumEscape(person.era)} <span class="symposium-person-category">${symposiumEscape(person.category || 'Other')}</span></small></span>
-                </label>`).join('')}
+                ${SYMPOSIUM_PARTICIPANTS.map((person)=>`<label class="symposium-person"><input type="checkbox" data-symposium-person value="${person.id}" ${defaultChecked.has(person.id)?'checked':''}><span class="symposium-avatar">${symposiumEscape(person.monogram)}</span><span><strong>${symposiumEscape(person.name)}</strong><small>${symposiumEscape(person.field)} · ${symposiumEscape(person.era)}</small></span></label>`).join('')}
               </div>
             </div>
 
             <div>
-              <label>Add your own personality</label>
-              <div class="symposium-custom-personality">
-                <input id="symposium-custom-person" placeholder="Name">
-                <input id="symposium-custom-field" placeholder="Field or role (optional)">
-                <textarea id="symposium-custom-lens" placeholder="Perspective or instructions (optional)"></textarea>
-                <button type="button" id="symposium-add-person">Save personality</button>
-              </div>
-              <p class="symposium-hint">Saved personalities remain in your roster on this browser. The AI represents public/published ideas or the perspective you specify; it does not claim to literally be the real person.</p>
+              <label>Add a participant</label>
+              <div class="symposium-custom-row"><input id="symposium-custom-person" placeholder="e.g., Hannah Arendt"><button type="button" id="symposium-add-person">Add</button></div>
+              <p class="symposium-hint">Custom participants join this session as an AI representation of their published ideas.</p>
             </div>
 
             <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
@@ -23669,14 +23259,10 @@ function renderSymposium() {
           <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
             <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
           </div>
-          <div class="symposium-selection-toolbar" id="symposium-selection-toolbar" hidden role="toolbar" aria-label="Selected Symposium text actions">
-            <button type="button" data-symposium-copy-selection>Copy</button>
-            <button type="button" data-symposium-save-selection>Save to Notebook</button>
-          </div>
           <div class="symposium-participate">
             <label for="symposium-reader-input">Join the discussion</label>
             <div class="symposium-user-grid"><select id="symposium-reader-kind"><option value="argument">My argument</option><option value="evidence">Add evidence</option><option value="question">Question</option><option value="challenge">Challenge</option></select><textarea id="symposium-reader-input" placeholder="Add your opinion, reasoning, evidence, or question…"></textarea><button type="button" id="symposium-reader-submit" disabled>Enter</button></div>
-            <p class="symposium-hint">The moderator will invite the panel to address your contribution directly. Historical participants reason freely but cannot independently know discoveries, events, or terminology from after their lifetimes; you can explain a later concept and ask them to analyze it from their own perspective.</p>
+            <p class="symposium-hint">The moderator will invite the panel to address your contribution directly.</p>
           </div>
         </main>
       </div>
@@ -23684,195 +23270,13 @@ function renderSymposium() {
 
   const root = app.querySelector('.symposium-page');
   const transcriptEl = root.querySelector('#symposium-transcript');
-  const selectionToolbar = root.querySelector('#symposium-selection-toolbar');
   const statusEl = root.querySelector('#symposium-stage-status');
   const nextButton = root.querySelector('#symposium-next');
   const saveButton = root.querySelector('#symposium-save');
   const readerButton = root.querySelector('#symposium-reader-submit');
   const startButton = root.querySelector('#symposium-start');
   const rosterEl = root.querySelector('#symposium-roster');
-  const personSearchEl = root.querySelector('#symposium-person-search');
-  const categoryFilterEl = root.querySelector('#symposium-category-filter');
-  const rosterCountEl = root.querySelector('#symposium-roster-count');
-  const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'', startedAt:'' };
-
-  let symposiumSelection = null;
-
-  const hideSymposiumSelectionToolbar = ({ clearSelection = false } = {}) => {
-    if (selectionToolbar) selectionToolbar.hidden = true;
-    if (clearSelection) {
-      const selection = window.getSelection?.();
-      if (selection && selection.rangeCount) selection.removeAllRanges();
-    }
-  };
-
-  const selectedSymposiumSpeaker = (range) => {
-    const elementForNode = (node) => (
-      node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement
-    );
-    const startTurn = elementForNode(range.startContainer)?.closest?.('.symposium-turn');
-    const endTurn = elementForNode(range.endContainer)?.closest?.('.symposium-turn');
-    if (!startTurn || startTurn !== endTurn) return 'Multiple speakers';
-    return startTurn.querySelector('.symposium-turn-head strong')?.textContent?.trim() || 'Symposium';
-  };
-
-  const captureSymposiumSelection = () => {
-    const selection = window.getSelection?.();
-    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-      symposiumSelection = null;
-      hideSymposiumSelectionToolbar();
-      return null;
-    }
-
-    const range = selection.getRangeAt(0);
-    const containsNode = (node) => {
-      const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
-      return Boolean(element && transcriptEl.contains(element));
-    };
-    if (!containsNode(range.startContainer) || !containsNode(range.endContainer)) {
-      symposiumSelection = null;
-      hideSymposiumSelectionToolbar();
-      return null;
-    }
-
-    const text = selection.toString().replace(/\s+/g, ' ').trim();
-    if (!text) {
-      symposiumSelection = null;
-      hideSymposiumSelectionToolbar();
-      return null;
-    }
-
-    const topic = String(session.topic || root.querySelector('#symposium-topic')?.value || 'Symposium discussion').trim();
-    symposiumSelection = {
-      text,
-      speaker: selectedSymposiumSpeaker(range),
-      topic,
-      rect: range.getBoundingClientRect()
-    };
-    return symposiumSelection;
-  };
-
-  const positionSymposiumSelectionToolbar = (rect) => {
-    if (!selectionToolbar || !rect) return;
-    selectionToolbar.hidden = false;
-    const width = selectionToolbar.offsetWidth || 230;
-    const height = selectionToolbar.offsetHeight || 42;
-    const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + rect.width / 2 - width / 2));
-    let top = rect.bottom + 8;
-    if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 8);
-    selectionToolbar.style.left = `${left}px`;
-    selectionToolbar.style.top = `${top}px`;
-  };
-
-  const showSymposiumSelectionToolbar = () => {
-    const selected = captureSymposiumSelection();
-    if (!selected) return;
-    positionSymposiumSelectionToolbar(selected.rect);
-  };
-
-  const copySymposiumSelection = async () => {
-    const text = String(symposiumSelection?.text || '').trim();
-    if (!text) return false;
-
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {}
-
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.setAttribute('readonly', '');
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    document.body.appendChild(textarea);
-    textarea.select();
-    let copied = false;
-    try { copied = document.execCommand('copy'); } catch {}
-    textarea.remove();
-    return copied;
-  };
-
-  const saveSymposiumSelectionToNotebook = () => {
-    const selected = symposiumSelection;
-    if (!selected?.text) return { ok:false, error:'Select Symposium text first.' };
-
-    return saveMarkInsight({
-      recordType:'symposium-excerpt',
-      selection:selected.text,
-      documentId:state.documentId || `symposium-${session.startedAt || Date.now()}`,
-      title:`Symposium · ${selected.topic || 'Discussion'}`,
-      chapter:selected.speaker && selected.speaker !== 'Multiple speakers'
-        ? `${selected.speaker} · Symposium`
-        : 'Symposium transcript',
-      pageContext:'Symposium',
-      symposiumTopic:selected.topic || '',
-      symposiumSpeaker:selected.speaker || ''
-    });
-  };
-
-  // Prevent toolbar clicks from collapsing the browser selection before the
-  // action can use it.
-  selectionToolbar?.addEventListener('pointerdown', (event) => event.preventDefault());
-
-  selectionToolbar?.querySelector('[data-symposium-copy-selection]')?.addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    const copied = await copySymposiumSelection();
-    const original = 'Copy';
-    button.textContent = copied ? 'Copied' : 'Copy failed';
-    if (copied) statusEl.textContent = 'Selected Symposium text copied.';
-    window.setTimeout(() => { if (button.isConnected) button.textContent = original; }, 1400);
-  });
-
-  selectionToolbar?.querySelector('[data-symposium-save-selection]')?.addEventListener('click', (event) => {
-    const button = event.currentTarget;
-    const saved = saveSymposiumSelectionToNotebook();
-    if (saved?.ok) {
-      button.textContent = 'Saved';
-      statusEl.textContent = 'Selected Symposium text saved to Notebook.';
-      window.setTimeout(() => { if (button.isConnected) button.textContent = 'Save to Notebook'; }, 1600);
-    } else {
-      button.textContent = 'Save failed';
-      statusEl.textContent = saved?.error || 'The selected text could not be saved.';
-      window.setTimeout(() => { if (button.isConnected) button.textContent = 'Save to Notebook'; }, 1800);
-    }
-  });
-
-  transcriptEl.addEventListener('pointerup', () => {
-    window.setTimeout(showSymposiumSelectionToolbar, 0);
-  });
-  transcriptEl.addEventListener('keyup', () => {
-    window.setTimeout(showSymposiumSelectionToolbar, 0);
-  });
-  transcriptEl.addEventListener('scroll', () => hideSymposiumSelectionToolbar());
-
-  root.addEventListener('pointerdown', (event) => {
-    if (event.target.closest('#symposium-selection-toolbar')) return;
-    if (event.target.closest('#symposium-transcript')) return;
-    hideSymposiumSelectionToolbar();
-  });
-
-  const filterSymposiumRoster = () => {
-    const query = String(personSearchEl?.value || '').trim().toLocaleLowerCase();
-    const category = String(categoryFilterEl?.value || '').trim();
-    let visible = 0;
-
-    rosterEl?.querySelectorAll('.symposium-person').forEach((row) => {
-      const matchesQuery = !query || String(row.dataset.symposiumSearch || '').includes(query);
-      const matchesCategory = !category || row.dataset.symposiumCategory === category;
-      const show = matchesQuery && matchesCategory;
-      row.hidden = !show;
-      if (show) visible += 1;
-    });
-
-    if (rosterCountEl) {
-      rosterCountEl.textContent = query || category
-        ? `${visible} of ${SYMPOSIUM_PARTICIPANTS.length} personalities shown`
-        : `${SYMPOSIUM_PARTICIPANTS.length} built-in personalities`;
-    }
-  };
-
-  personSearchEl?.addEventListener('input', filterSymposiumRoster);
-  categoryFilterEl?.addEventListener('change', filterSymposiumRoster);
+  const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'' };
 
   const scrollTranscript = () => { transcriptEl.scrollTop = transcriptEl.scrollHeight; };
   const shouldSpeak = () => session.output === 'both' || session.output === 'speak';
@@ -23880,16 +23284,7 @@ function renderSymposium() {
     if (transcriptEl.querySelector('.symposium-empty')) transcriptEl.innerHTML = '';
     session.transcript.push(turn);
     transcriptEl.insertAdjacentHTML('beforeend', symposiumTurnHtml(turn));
-    const liveSelection = window.getSelection?.();
-    const hasTranscriptSelection = Boolean(
-      liveSelection && !liveSelection.isCollapsed && liveSelection.rangeCount
-      && transcriptEl.contains(
-        liveSelection.getRangeAt(0).commonAncestorContainer.nodeType === Node.ELEMENT_NODE
-          ? liveSelection.getRangeAt(0).commonAncestorContainer
-          : liveSelection.getRangeAt(0).commonAncestorContainer.parentElement
-      )
-    );
-    if (!hasTranscriptSelection) scrollTranscript();
+    scrollTranscript();
     if (speak && shouldSpeak()) symposiumSpeak(turn.text, turn.name);
   };
   const setBusy = (busy, label='') => {
@@ -23912,63 +23307,19 @@ function renderSymposium() {
   rosterEl.addEventListener('change', (event)=>{
     if (!event.target.matches('[data-symposium-person]')) return;
     const checked = symposiumSelectedPeople(root);
-    if (checked.length > 6) {
-      event.target.checked = false;
-      window.alert('Choose up to six participants for a readable discussion. You can swap speakers between sessions.');
-    }
+    if (checked.length > 6) { event.target.checked = false; window.alert('Choose up to six participants for a readable discussion.'); }
   });
 
   root.querySelector('#symposium-add-person').addEventListener('click',()=>{
     const input = root.querySelector('#symposium-custom-person');
-    const fieldInput = root.querySelector('#symposium-custom-field');
-    const lensInput = root.querySelector('#symposium-custom-lens');
-
     const name = input.value.trim();
-    if (!name) {
-      input.focus();
-      return;
-    }
-
-    const field = String(fieldInput?.value || '').trim() || 'Guest thinker';
-    const customLens = String(lensInput?.value || '').trim();
-    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    if (!name) return;
+    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
     const monogram = name.split(/\s+/).slice(0,2).map((part)=>part[0]?.toUpperCase() || '').join('');
-
-    const person = {
-      id,
-      name,
-      field,
-      era:'Custom',
-      monogram:monogram || '?',
-      category:'My personalities',
-      lens:customLens || `the published work, arguments, methods, and intellectual context of ${name}`,
-      custom:true
-    };
-
+    const person = { id, name, field:'Guest thinker', era:'Custom', monogram:monogram || '?', lens:`the published work, arguments, methods, and intellectual context of ${name}` };
     SYMPOSIUM_PARTICIPANTS.push(person);
-    saveSymposiumCustomPeople();
-
-    rosterEl.insertAdjacentHTML('afterbegin', `<label class="symposium-person"
-      data-symposium-category="My personalities"
-      data-symposium-search="${symposiumEscape(symposiumPersonSearchText(person))}">
-      <input type="checkbox" data-symposium-person value="${symposiumEscape(id)}" checked>
-      <span class="symposium-avatar">${symposiumEscape(person.monogram)}</span>
-      <span><strong>${symposiumEscape(name)}</strong><small>${symposiumEscape(field)} · Custom <span class="symposium-person-category">My personalities</span></small></span>
-    </label>`);
-
+    rosterEl.insertAdjacentHTML('afterbegin', `<label class="symposium-person"><input type="checkbox" data-symposium-person value="${symposiumEscape(id)}" checked><span class="symposium-avatar">${symposiumEscape(person.monogram)}</span><span><strong>${symposiumEscape(name)}</strong><small>Guest thinker · Custom</small></span></label>`);
     input.value = '';
-    if (fieldInput) fieldInput.value = '';
-    if (lensInput) lensInput.value = '';
-    if (personSearchEl) personSearchEl.value = '';
-    if (categoryFilterEl) categoryFilterEl.value = '';
-    filterSymposiumRoster();
-
-    const checked = symposiumSelectedPeople(root);
-    if (checked.length > 6) {
-      const newCheckbox = rosterEl.querySelector(`[data-symposium-person][value="${CSS.escape(id)}"]`);
-      if (newCheckbox) newCheckbox.checked = false;
-      window.alert('Personality saved. Six speakers are already selected, so it was added to your roster without being selected.');
-    }
   });
 
   async function moderatorOpening() {
@@ -23995,8 +23346,6 @@ function renderSymposium() {
     if (!topic) { root.querySelector('#symposium-topic').focus(); return window.alert('Enter a topic or question for the Symposium.'); }
     if (!people.length) return window.alert('Choose at least one participant.');
     session.active = true;
-    session.startedAt = new Date().toISOString();
-    hideSymposiumSelectionToolbar({ clearSelection:true });
     session.mode = root.querySelector('[name="symposium-mode"]:checked')?.value || 'debate';
     session.topic = topic;
     session.context = root.querySelector('#symposium-context').value || '';
@@ -24329,8 +23678,9 @@ window.setInterval(checkActionNotifications, 30000);
 window.setTimeout(checkActionNotifications, 1500);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkActionNotifications(); });
 
-// v5.16: startup stays lightweight. The last book is restored only after an explicit Resume action.
-renderHome();
+// Workspace runtime: expose the normal page renderers without booting a second Home page.
+// The outer application remains the one authenticated application and owns the Reader.
+if (!window.__MSG_WORKSPACE_PANE__) renderHome();
 
 // Keep top navigation popovers over the page rather than in document flow.
 // The top-level menu summaries are controlled explicitly instead of relying on

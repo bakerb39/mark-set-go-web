@@ -478,15 +478,14 @@
   window.addEventListener('pagehide', () => { syncLocalMetadata(); });
   window.addEventListener('pageshow', () => { decorateLibraryView(); scheduleSync(500); });
 
-  const observer = new MutationObserver(() => {
-    if (!document.querySelector('.my-library-hub') || state.decorateScheduled) return;
+  document.addEventListener('marksetgo:library-rendered', () => {
+    if (state.decorateScheduled) return;
     state.decorateScheduled = true;
     requestAnimationFrame(() => {
       state.decorateScheduled = false;
       decorateLibraryView();
     });
   });
-  observer.observe(document.getElementById('app') || document.body, { childList: true, subtree: true });
 
   window.MarkSetGoCloudLibrary = Object.freeze({
     get state() { return { ...state, books: state.books.slice(), byClientId: undefined }; },

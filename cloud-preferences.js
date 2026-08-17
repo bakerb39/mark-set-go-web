@@ -146,8 +146,11 @@
     scheduleSave();
   });
 
-  const observer = new MutationObserver(() => applyReadingDefaults());
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  const scheduleReaderDefaultsApply = () => {
+    [0, 60, 180, 420].forEach((delay) => window.setTimeout(applyReadingDefaults, delay));
+  };
+  document.addEventListener('marksetgo:document-available', scheduleReaderDefaultsApply);
+  window.addEventListener('pageshow', scheduleReaderDefaultsApply);
 
   // Handle the case where authentication/bootstrap completed before this adapter loaded.
   queueMicrotask(() => {

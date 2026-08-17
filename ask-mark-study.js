@@ -47,16 +47,27 @@
   function legacySelectionPanel() { return $('#mark-selection-panel', legacyHost || shell || document); }
   function selectionText() { return legacySelectionPanel()?.querySelector('.mark-selection-card blockquote')?.textContent?.trim() || ''; }
   function readerFirstName() {
-    const account = window.MarkSetGoAuth?.session?.account || {};
-    const value = window.MarkSetGoAuth?.getFirstName?.() || account.firstName || account.first_name || account.displayName || account.display_name || '';
+    const session = window.MarkSetGoAuth?.session || {};
+    const profile = session.user || session.account || window.MarkSetGoAuth?.user || window.MarkSetGoAuth?.account || {};
+    const value = window.MarkSetGoAuth?.getFirstName?.() ||
+      profile.firstName || profile.first_name || profile.givenName || profile.given_name ||
+      profile.displayName || profile.display_name || profile.fullName || profile.full_name || profile.name || '';
     return String(value).trim().split(/\s+/)[0] || '';
   }
   function greeting() {
     const h = new Date().getHours();
     const salutation = h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
-    const firstName = readerFirstName();
-    return `${salutation}${firstName ? `, ${firstName}` : ''}`;
+    const name = readerFirstName();
+    return `${salutation}${name ? `, ${name}` : ''}`;
   }
+  function refreshPersonalization() {
+    const text = greeting();
+    $$('[data-mark-personal-greeting]').forEach((node) => { node.textContent = text; });
+  }
+  document.addEventListener('marksetgo:auth-changed', refreshPersonalization);
+  document.addEventListener('marksetgo:auth-ready', refreshPersonalization);
+  window.addEventListener('marksetgo:auth-ready', refreshPersonalization);
+
 
   function sceneMarkup() {
     const ctx = getBookContext();
@@ -91,7 +102,7 @@
               <div class="mark-scene-copy">
                 <span class="mark-scene-eyebrow">Your reading companion</span>
                 <h2>Ask Mark</h2>
-                <p data-mark-scene-line data-mark-personal-greeting>${greeting()}. I was just reading. What shall we explore?</p>
+                <p data-mark-scene-line><span data-mark-personal-greeting>${greeting()}</span>. I was just reading. What shall we explore?</p>
               </div>
               <button class="mark-enter-chat" data-mark-focus-input>Start a conversation <span>→</span></button>
             </div>
@@ -105,7 +116,7 @@
             <div class="mark-conversation" data-mark-conversation aria-live="polite">
               <article class="mark-chat-row is-mark">
                 <img src="${AVATAR}" alt="">
-                <div><small>Mark</small><p><strong data-mark-personal-greeting>${greeting()}.</strong> Highlight a passage or ask me about the book. I can explain, summarize, compare ideas, quiz you, or help save an insight.</p></div>
+                <div><small>Mark</small><p><strong data-mark-personal-greeting>${greeting()}</strong>. Highlight a passage or ask me about the book. I can explain, summarize, compare ideas, quiz you, or help save an insight.</p></div>
               </article>
             </div>
 
@@ -295,8 +306,8 @@
     while(shell.firstChild) legacyHost.appendChild(shell.firstChild);
     shell.appendChild(legacyHost); shell.insertAdjacentHTML('beforeend',sceneMarkup()); bind();
     const legacy = legacySelectionPanel();
-    if (legacy) { selectionObserver?.disconnect(); selectionObserver=new MutationObserver(()=>{syncSelection();syncResponse();}); selectionObserver.observe(legacy,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']}); }
-    syncSelection(); syncContext(); lookUpSequence();
+    selectionObserver = null;
+    syncSelection(); syncResponse(); syncContext(); lookUpSequence();
     return true;
   }
 
@@ -328,17 +339,11 @@
   function install() { const ready=configureToolbar()&&configureShell(); installPageGuide(); return ready; }
   function retry() { installCount++; if(!install()&&installCount<240) requestAnimationFrame(retry); }
 
-  const appObserver=new MutationObserver(()=>{ clearTimeout(appObserver._t); appObserver._t=setTimeout(installPageGuide,120); });
-  appObserver.observe(app,{childList:true,subtree:false});
+  document.addEventListener('marksetgo:askmark-legacy-updated',()=>{syncSelection();syncResponse();});
+  document.addEventListener('marksetgo:library-rendered',()=>setTimeout(installPageGuide,0));
+  document.addEventListener('click',event=>{if(event.target.closest?.('[data-action],[data-read]'))setTimeout(installPageGuide,0);},true);
   document.addEventListener('selectionchange',()=>setTimeout(syncSelection,60));
   document.addEventListener('marksetgo:document-available',()=>{installCount=0;requestAnimationFrame(retry);});
   document.addEventListener('marksetgo:transform-state',syncContext);
   requestAnimationFrame(retry); [400,900,1800,3200].forEach(d=>setTimeout(install,d));
-
-  document.addEventListener('marksetgo:auth-changed', () => {
-    document.querySelectorAll('[data-mark-personal-greeting]').forEach((node) => {
-      if (node.matches('strong')) node.textContent = `${greeting()}.`;
-      else node.textContent = `${greeting()}. I was just reading. What shall we explore?`;
-    });
-  });
 })();

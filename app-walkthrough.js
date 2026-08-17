@@ -771,16 +771,10 @@
       document.body.appendChild(highlight);
     }
 
-    // Some app views append portals/popovers after a walkthrough step is shown.
-    // Keep this overlay outside those stacking contexts and last in <body>.
-    if (!topHighlightObserver && document.body) {
-      topHighlightObserver = new MutationObserver(() => {
-        const node = document.getElementById(TOP_HIGHLIGHT_ID);
-        if (node && node.parentNode === document.body && document.body.lastElementChild !== node) {
-          document.body.appendChild(node);
-        }
-      });
-      topHighlightObserver.observe(document.body, { childList: true });
+    // Keep the overlay at the end of body when it is actively requested; its
+    // maximal z-index makes continuous DOM watching unnecessary.
+    if (highlight.parentNode === document.body && document.body.lastElementChild !== highlight) {
+      document.body.appendChild(highlight);
     }
     return highlight;
   }

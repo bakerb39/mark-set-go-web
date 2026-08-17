@@ -62,20 +62,18 @@
 
     let appeared = false;
     const startedAt = Date.now();
-    const observer = new MutationObserver(() => {
+    const checkModal = () => {
       const present = clerkModalIsPresent();
       if (present) appeared = true;
       if ((appeared && !present) || (!appeared && Date.now() - startedAt > 5000)) {
-        observer.disconnect();
+        window.clearInterval(modalCheckTimer);
         document.body.classList.remove('clerk-auth-dialog-open');
       }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+    };
+    const modalCheckTimer = window.setInterval(checkModal, 120);
     window.setTimeout(() => {
-      if (!appeared && !clerkModalIsPresent()) {
-        observer.disconnect();
-        document.body.classList.remove('clerk-auth-dialog-open');
-      }
+      window.clearInterval(modalCheckTimer);
+      if (!clerkModalIsPresent()) document.body.classList.remove('clerk-auth-dialog-open');
     }, 5500);
   }
 
@@ -137,23 +135,50 @@
 
 
   function currentFirstName() {
-    const account = state.session?.account || {};
+    // Prefer Clerk's explicit first-name fields. The API display name can fall
+    // back to an email address when the account profile has no name, and an
+    // email must never be used as a greeting.
+    const profile = state.session?.user || state.session?.account || {};
     const clerkUser = state.clerk?.user || {};
-    const displayName =
-      account.firstName ||
-      account.first_name ||
-      account.displayName ||
-      account.display_name ||
-      clerkUser.firstName ||
-      clerkUser.first_name ||
-      clerkUser.fullName ||
-      clerkUser.full_name ||
-      '';
-    return String(displayName).trim().split(/\s+/)[0] || '';
+    const candidates = [
+      clerkUser.firstName,
+      clerkUser.first_name,
+      profile.firstName,
+      profile.first_name,
+      profile.givenName,
+      profile.given_name,
+      clerkUser.fullName,
+      clerkUser.full_name,
+      profile.displayName,
+      profile.display_name,
+      profile.fullName,
+      profile.full_name,
+      profile.name,
+      clerkUser.username
+    ];
+
+    for (const candidate of candidates) {
+      const value = String(candidate || '').trim();
+      if (!value || value.includes('@')) continue;
+      const first = value.split(/\s+/)[0].replace(/^[^A-Za-z]+|[^A-Za-z'’-]+$/g, '');
+      if (first) return first;
+    }
+    return '';
   }
 
   function publishAuthState(session = state.session) {
-    window.MarkSetGoAuth = { clerk: state.clerk, session, refresh: fetchSession, getFirstName: currentFirstName };
+    const profile = session?.user || session?.account || null;
+    window.MarkSetGoAuth = {
+      clerk: state.clerk,
+      session,
+      user: profile,
+      account: profile,
+      refresh: fetchSession,
+      getFirstName: currentFirstName
+    };
+    const detail = { session, firstName: currentFirstName() };
+    document.dispatchEvent(new CustomEvent('marksetgo:auth-ready', { detail }));
+    window.dispatchEvent(new CustomEvent('marksetgo:auth-ready', { detail }));
   }
 
   async function fetchSession() {

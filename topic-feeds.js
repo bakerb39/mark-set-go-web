@@ -21,6 +21,18 @@
   let dailyAutoOpenAttempted = false;
   let navFrame = 0;
 
+  if (!document.getElementById('topic-feed-pane-refresh-style')) {
+    const style = document.createElement('style');
+    style.id = 'topic-feed-pane-refresh-style';
+    style.textContent = `
+      .topic-feed-sidebar-actions{display:inline-flex;align-items:center;gap:.35rem}
+      #topic-pane-refresh{width:30px;height:30px;min-width:30px;padding:0;border:1px solid #1769aa;border-radius:7px;background:#1769aa;color:#fff;font-size:19px;line-height:1;cursor:pointer;display:inline-grid;place-items:center}
+      #topic-pane-refresh:hover:not(:disabled){filter:brightness(.94)}
+      #topic-pane-refresh:disabled{opacity:.55;cursor:default}
+    `;
+    document.head.appendChild(style);
+  }
+
   // New/Edit Topic is a transactional screen. Background cloud hydration,
   // authentication refreshes, and in-flight feed refreshes must never replace
   // it while the reader is typing.
@@ -360,15 +372,27 @@
     return request;
   }
 
-  async function refreshTopic({ forceLocal = false } = {}) {
-    const topic = currentTopic();
+  async function refreshTopic({ forceLocal = false, preserveReader = false } = {}) {
+    const keepReader = Boolean(preserveReader && isTopicFeedReaderActive());
+    const contextTopicId = String(window.MSGTopicFeedReaderContext?.topicId || '');
+    const topic = keepReader
+      ? (state.topics.find((item) => item.id === contextTopicId) || currentTopic())
+      : currentTopic();
+    const renderRefreshState = () => {
+      if (!keepReader) { render(); return; }
+      const button = document.querySelector('[data-reader-refresh-topics]');
+      if (button) {
+        button.disabled = Boolean(loading || preparing);
+        button.textContent = preparing ? 'Downloading…' : loading ? 'Refreshing…' : '↻ Refresh';
+      }
+    };
     if (!topic || loading || !topic.sources.length) return;
     loading = true;
-    render();
+    renderRefreshState();
     try {
       if (cloudAuthenticated && !forceLocal) {
         preparing = true;
-        render();
+        renderRefreshState();
         const response = await fetch('/api/topic-feeds/refresh', {
           method: 'POST',
           credentials: 'same-origin',
@@ -420,7 +444,7 @@
         curate(topic);
         saveState();
         preparing = true;
-        render();
+        renderRefreshState();
         const selected = [...topic.articles].sort((a,b) => Number(b.recommended)-Number(a.recommended)).slice(0,60);
         await prefetchArticles(selected, { wait: true }).catch(() => null);
         topic.preparedAt = new Date().toISOString();
@@ -432,7 +456,8 @@
     } finally {
       preparing = false;
       loading = false;
-      render();
+      renderRefreshState();
+      if (keepReader) decorateReaderNavigation({ forceList: true });
     }
   }
 
@@ -589,9 +614,8 @@
     meta.style.top = `${paddingTop}px`;
     meta.style.width = `${headerWidth}px`;
 
-    if (actionRow) {
-      // Read Anything deliberately requires this node to remain a direct child
-      // of #reader. Leave it there and change only its visual placement.
+    if (actionRow && actionRow.parentElement === reader) {
+      // Legacy fallback only. Current builds keep article actions outside #reader.
       actionRow.style.setProperty('position', 'absolute', 'important');
       actionRow.style.setProperty('left', `${paddingLeft}px`, 'important');
       actionRow.style.setProperty('width', `${headerWidth}px`, 'important');
@@ -609,7 +633,7 @@
       const metaHeight = Math.ceil(meta.getBoundingClientRect().height || 0);
       const actionGap = Math.max(5, Math.round(fontSize * 0.35));
 
-      if (actionRow?.isConnected) {
+      if (actionRow?.isConnected && actionRow.parentElement === reader) {
         actionRow.style.setProperty(
           'top',
           `${paddingTop + metaHeight + actionGap}px`,
@@ -620,7 +644,7 @@
       window.requestAnimationFrame(() => {
         if (!reader.isConnected || !spacer.isConnected) return;
 
-        const actionHeight = actionRow?.isConnected
+        const actionHeight = actionRow?.isConnected && actionRow.parentElement === reader
           ? Math.ceil(actionRow.getBoundingClientRect().height || 0)
           : 0;
 
@@ -652,31 +676,17 @@
       return;
     }
 
-    // Read Anything may re-prepend the row. That is expected and no longer a
-    // conflict: direct-child ownership is preserved, while CSS positioning puts
-    // it beneath the source/share divider.
-    if (actionRow.parentElement !== reader) {
-      reader.prepend(actionRow);
-    }
-
+    // Article actions are intentionally outside #reader so animated reading
+    // modes never rebuild or reposition them. Keep only the story metadata
+    // geometry inside the Reader.
     positionTopicFeedStoryHeader();
   }
 
   function observeTopicFeedStoryHeader() {
     const reader = document.querySelector('#reader');
-    if (!reader || reader === topicFeedStoryHeaderReader) return;
-
-    topicFeedStoryHeaderObserver?.disconnect?.();
+    if (!reader) return;
     topicFeedStoryHeaderReader = reader;
-
-    topicFeedStoryHeaderObserver = new MutationObserver(() => {
-      if (!isTopicFeedReaderActive()) return;
-      window.requestAnimationFrame(() => {
-        keepTopicFeedArticleActionsInHeader();
-      });
-    });
-
-    topicFeedStoryHeaderObserver.observe(reader, { childList: true });
+    window.requestAnimationFrame(() => keepTopicFeedArticleActionsInHeader());
   }
 
   function topicFeedSourceCredit(topic, article, payload) {
@@ -832,6 +842,99 @@
     });
   }
 
+  function topicFeedReaderWords(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  }
+
+  function normalizeTopicFeedHeading(value) {
+    return String(value || '')
+      .toLocaleLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function realignTopicFeedDocumentToc(text, toc) {
+    const entries = Array.isArray(toc) ? toc : [];
+    if (!entries.length) return [];
+
+    const sourceText = String(text || '').replace(/\r/g, '');
+    const sourceWords = topicFeedReaderWords(sourceText);
+    if (!sourceWords.length) return entries;
+
+    // Build exact line anchors using the same whitespace-only word counting
+    // used by the Reader. This prevents server/client token-count drift from
+    // styling body words immediately before a real section heading.
+    const lineAnchors = [];
+    let runningWordIndex = 0;
+    sourceText.split('\n').forEach((rawLine) => {
+      const line = String(rawLine || '').replace(/\s+/g, ' ').trim();
+      const count = topicFeedReaderWords(line).length;
+      if (line && count) {
+        lineAnchors.push({
+          key: normalizeTopicFeedHeading(line),
+          index: runningWordIndex
+        });
+      }
+      runningWordIndex += count;
+    });
+
+    const normalizedSourceWords = sourceWords.map(normalizeTopicFeedHeading);
+    let previousResolvedIndex = -1;
+
+    const nearestCandidate = (indexes, approximateIndex) => {
+      const usable = indexes.filter((index) => index > previousResolvedIndex);
+      const pool = usable.length ? usable : indexes;
+      if (!pool.length) return null;
+      const approximate = Number.isFinite(Number(approximateIndex))
+        ? Number(approximateIndex)
+        : previousResolvedIndex + 1;
+      return pool.reduce((best, index) => (
+        best === null || Math.abs(index - approximate) < Math.abs(best - approximate)
+          ? index
+          : best
+      ), null);
+    };
+
+    return entries.map((entry) => {
+      const title = String(entry?.title || '').trim();
+      const key = normalizeTopicFeedHeading(title);
+      if (!title || !key) return entry;
+
+      const approximateIndex = Number(entry?.index);
+      const exactLineIndexes = lineAnchors
+        .filter((anchor) => anchor.key === key)
+        .map((anchor) => anchor.index);
+
+      let resolvedIndex = nearestCandidate(exactLineIndexes, approximateIndex);
+
+      // Fallback for sources that flatten headings onto the same line as body
+      // text. Match the heading token sequence and choose the occurrence nearest
+      // the server's approximate index while keeping TOC order monotonic.
+      if (resolvedIndex === null) {
+        const headingWords = topicFeedReaderWords(title).map(normalizeTopicFeedHeading).filter(Boolean);
+        const matches = [];
+        if (headingWords.length) {
+          for (let index = 0; index <= normalizedSourceWords.length - headingWords.length; index += 1) {
+            let matchesHeading = true;
+            for (let offset = 0; offset < headingWords.length; offset += 1) {
+              if (normalizedSourceWords[index + offset] !== headingWords[offset]) {
+                matchesHeading = false;
+                break;
+              }
+            }
+            if (matchesHeading) matches.push(index);
+          }
+        }
+        resolvedIndex = nearestCandidate(matches, approximateIndex);
+      }
+
+      if (resolvedIndex === null) return entry;
+      previousResolvedIndex = resolvedIndex;
+      return { ...entry, index: resolvedIndex };
+    });
+  }
+
   function openPreparedArticle(topic, article, payload) {
     if (!window.MarkSetGoReadAnything?.openDocument) throw new Error('The Reader importer is not ready.');
     window.MSGTopicFeedReaderContext = {
@@ -855,10 +958,8 @@
         feedSourceId: article.sourceClientId || '',
         articleId: article.id || '',
         fullArticle: payload.fullArticle !== false,
-        importMethod: payload.importMethod || '',
-        publisherRestricted: Boolean(payload.publisherRestricted),
         importWarning: payload.warning || '',
-        documentToc: Array.isArray(payload.documentToc) ? payload.documentToc : [],
+        documentToc: realignTopicFeedDocumentToc(payload.text, payload.documentToc),
         importedAt: new Date().toISOString()
       }
     });
@@ -893,7 +994,6 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             url: article.url, title: article.title, summary: article.summary || '',
-            feedText: article.feedText || article.feedContent || article.fullText || '',
             source: article.sourceName || 'Topic Feed', publisherUrl: article.sourceUrl || ''
           })
         });
@@ -1060,7 +1160,7 @@
         </header>
         <div class="topic-feeds-layout">
           <aside class="topic-feeds-sidebar">
-            <div class="topic-feed-sidebar-head"><strong>Topics &amp; feeds</strong><button id="topic-new" type="button" aria-label="New topic">+</button></div>
+            <div class="topic-feed-sidebar-head"><strong>Topics &amp; feeds</strong><span class="topic-feed-sidebar-actions"><button id="topic-pane-refresh" type="button" aria-label="Refresh latest stories" title="Refresh latest stories" ${(loading || preparing) ? 'disabled' : ''}>↻</button><button id="topic-new" type="button" aria-label="New topic">+</button></span></div>
             ${sidebarMarkup(topic)}
           </aside>
           <div class="topic-feeds-content">
@@ -1311,6 +1411,7 @@
     document.getElementById('topic-crypto-starter')?.addEventListener('click', starterCryptoTopic);
     document.getElementById('topic-manage')?.addEventListener('click', showManager);
     document.getElementById('topic-refresh')?.addEventListener('click', () => { void refreshTopic(); });
+    document.getElementById('topic-pane-refresh')?.addEventListener('click', () => { void refreshTopic(); });
     document.getElementById('topic-clear-source')?.addEventListener('click', () => { activeSourceId = ''; render(); });
 
     document.querySelectorAll('[data-topic-id]').forEach((button) => button.addEventListener('click', () => {
@@ -1454,16 +1555,7 @@
         topicBookDividerResizeObserver.observe(reader);
       }
 
-      topicBookDividerClassObserver = new MutationObserver(() => {
-        window.requestAnimationFrame(() => {
-          positionTopicBookDivider();
-          positionTopicFeedStoryHeader();
-        });
-      });
-      topicBookDividerClassObserver.observe(reader, {
-        attributes: true,
-        attributeFilter: ['class', 'style']
-      });
+      topicBookDividerClassObserver = null;
     }
 
     positionTopicBookDivider();
@@ -1644,6 +1736,7 @@
         <h2>My Topics</h2>
         <div class="topic-reader-nav-actions">
           <span data-reader-bookmark-slot></span>
+          <button type="button" data-reader-refresh-topics ${(loading || preparing) ? 'disabled' : ''}>${preparing ? 'Downloading…' : loading ? 'Refreshing…' : '↻ Refresh'}</button>
           <button type="button" data-reader-manage-topics>Manage</button>
         </div>
       </div>
@@ -1675,7 +1768,7 @@
     </div>`;
   }
 
-  function decorateReaderNavigation() {
+  function decorateReaderNavigation({ forceList = false } = {}) {
     if (!isTopicFeedReaderActive()) return;
     const pane = document.querySelector('#navigation-pane');
     if (!pane) return;
@@ -1701,7 +1794,8 @@
 
     bindTopicReaderPanePreference();
 
-    if (!view.querySelector('.topic-reader-nav')) {
+    const paneScrollBeforeListRefresh = Math.max(0, Number(pane.scrollTop) || 0);
+    if (forceList || !view.querySelector('.topic-reader-nav')) {
       // IMPORTANT: renderNavigationPane() has already bound the Reader's
       // #add-bookmark button to its native addBookmark() function. Keep that
       // exact DOM node before replacing Contents so bookmarks continue to use
@@ -1717,7 +1811,12 @@
         nativeBookmarkButton.title = 'Bookmark the current reading position';
         bookmarkSlot.replaceChildren(nativeBookmarkButton);
       }
+      if (forceList) pane.scrollTop = paneScrollBeforeListRefresh;
     }
+
+    view.querySelector('[data-reader-refresh-topics]')?.addEventListener('click', () => {
+      void refreshTopic({ preserveReader: true });
+    }, { once:true });
 
     view.querySelector('[data-reader-manage-topics]')?.addEventListener('click', () => {
       render();
@@ -1774,8 +1873,13 @@
     navFrame = requestAnimationFrame(decorateReaderNavigation);
   }
 
-  const appObserver = app ? new MutationObserver(() => scheduleReaderNavigation()) : null;
-  if (appObserver && app) appObserver.observe(app, { childList:true, subtree:true });
+  document.addEventListener('marksetgo:library-rendered', scheduleReaderNavigation);
+  document.addEventListener('marksetgo:transform-state', () => window.setTimeout(scheduleReaderNavigation, 0));
+  document.addEventListener('change', (event) => {
+    if (event.target.closest?.('#mode-select,#word-count,#book-pages,#font-size,#theme-select')) {
+      window.setTimeout(() => { scheduleReaderNavigation(); ensureTopicBookDivider(); positionTopicFeedStoryHeader(); }, 0);
+    }
+  });
 
   document.addEventListener('marksetgo:auth-changed', (event) => {
     if (event.detail?.authenticated) void hydrateCloudState();
