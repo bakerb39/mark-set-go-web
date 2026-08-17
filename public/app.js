@@ -23113,6 +23113,39 @@ function renderMyLinks(selectedId = '') {
    current-reading context when the user chooses to bring it into a session.
    ========================================================================== */
 const SYMPOSIUM_STORAGE_KEY = 'markSetGoSymposiumSessionsV1';
+const SYMPOSIUM_CUSTOM_PEOPLE_KEY = 'markSetGoSymposiumCustomPeopleV1';
+
+function loadSymposiumCustomPeople() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SYMPOSIUM_CUSTOM_PEOPLE_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((person)=>person && typeof person.name === 'string' && person.name.trim())
+      .map((person)=>({
+        id:String(person.id || `custom-${Date.now()}-${Math.random().toString(36).slice(2,8)}`),
+        name:String(person.name || '').trim().slice(0,100),
+        field:String(person.field || 'Guest thinker').trim().slice(0,120),
+        era:'Custom',
+        monogram:String(person.monogram || '').trim().slice(0,4) || '?',
+        category:'My personalities',
+        lens:String(person.lens || `the published work, arguments, methods, and intellectual context of ${person.name}`).trim().slice(0,1000),
+        custom:true
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function saveSymposiumCustomPeople() {
+  try {
+    const customPeople = SYMPOSIUM_PARTICIPANTS
+      .filter((person)=>person.custom)
+      .map(({id,name,field,monogram,lens})=>({id,name,field,monogram,lens}));
+    localStorage.setItem(SYMPOSIUM_CUSTOM_PEOPLE_KEY, JSON.stringify(customPeople.slice(0,100)));
+  } catch (error) {
+    console.warn('Custom Symposium personalities could not be saved.', error);
+  }
+}
 
 const SYMPOSIUM_PARTICIPANTS = [
   { id:'socrates', name:'Socrates', field:'Philosophy', era:'Classical Greece', monogram:'S', category:'Philosophy', lens:'Socratic questioning, definitions, assumptions, and examination of reasons' },
@@ -23227,8 +23260,69 @@ const SYMPOSIUM_PARTICIPANTS = [
   { id:'bernstein', name:'Leonard Bernstein', field:'Music & Education', era:'20th century', monogram:'LB', category:'Music & Arts', lens:'conducting, musical analysis, theater, rhythm, public education, interpretation, and connections across musical traditions' },
   { id:'leonardo', name:'Leonardo da Vinci', field:'Art, Engineering & Science', era:'Renaissance', monogram:'LDV', category:'Music & Arts', lens:'observation, anatomy, mechanics, drawing, design, proportion, curiosity, and integration of art and science' },
   { id:'michelangelo', name:'Michelangelo', field:'Art & Architecture', era:'Renaissance', monogram:'MB', category:'Music & Arts', lens:'form, anatomy, sculpture, monumental design, artistic discipline, patronage, and expressive human figure' },
-  { id:'van-gogh', name:'Vincent van Gogh', field:'Art', era:'19th century', monogram:'VVG', category:'Music & Arts', lens:'color, perception, emotion, landscape, portraiture, artistic persistence, and expressive brushwork' }
+  { id:'van-gogh', name:'Vincent van Gogh', field:'Art', era:'19th century', monogram:'VVG', category:'Music & Arts', lens:'color, perception, emotion, landscape, portraiture, artistic persistence, and expressive brushwork' },
+  { id:'hinton', name:'Geoffrey Hinton', field:'Computer Science & AI', era:'Contemporary', monogram:'GH', category:'AI & Technology', lens:'neural networks, representation learning, deep learning, machine intelligence, learning systems, and the risks and possibilities of advanced AI' },
+  { id:'lecun', name:'Yann LeCun', field:'Computer Science & AI', era:'Contemporary', monogram:'YL', category:'AI & Technology', lens:'machine learning, convolutional networks, self-supervised learning, world models, open scientific debate, and the architecture of intelligent systems' },
+  { id:'fei-fei-li', name:'Fei-Fei Li', field:'Computer Science & AI', era:'Contemporary', monogram:'FFL', category:'AI & Technology', lens:'computer vision, human-centered AI, large-scale visual learning, responsible AI, scientific collaboration, and the relationship between perception and intelligence' },
+  { id:'andrew-ng', name:'Andrew Ng', field:'Computer Science & AI', era:'Contemporary', monogram:'ANG', category:'AI & Technology', lens:'machine learning engineering, practical AI adoption, education, data-centric development, product deployment, and making AI useful in organizations' },
+  { id:'hassabis', name:'Demis Hassabis', field:'AI & Computational Science', era:'Contemporary', monogram:'DHAS', category:'AI & Technology', lens:'artificial intelligence, reinforcement learning, scientific discovery, computational biology, general-purpose learning systems, and AI as a tool for understanding complex problems' },
+  { id:'kurzweil', name:'Ray Kurzweil', field:'Technology & Futurism', era:'Contemporary', monogram:'RK', category:'AI & Technology', lens:'technological acceleration, computing trends, artificial intelligence, human-machine integration, forecasting, and long-run technological change' },
+  { id:'pearl', name:'Judea Pearl', field:'Computer Science & Statistics', era:'Contemporary', monogram:'JP', category:'AI & Technology', lens:'causal inference, Bayesian networks, counterfactual reasoning, probability, graphical models, and distinguishing correlation from causation' },
+  { id:'berners-lee', name:'Tim Berners-Lee', field:'Computer Science & Web', era:'Contemporary', monogram:'TBL', category:'AI & Technology', lens:'the World Wide Web, open standards, decentralization, interoperability, data ownership, public-interest technology, and the social architecture of the internet' },
+  { id:'goodall', name:'Jane Goodall', field:'Primatology & Conservation', era:'Contemporary', monogram:'JG', category:'Science', lens:'animal behavior, long-term observation, chimpanzee societies, conservation, empathy grounded in evidence, and human responsibilities toward nature' },
+  { id:'brian-greene', name:'Brian Greene', field:'Physics', era:'Contemporary', monogram:'BG', category:'Science', lens:'string theory, cosmology, spacetime, quantum physics, mathematical unification, and clear explanation of difficult physical ideas' },
+  { id:'tyson', name:'Neil deGrasse Tyson', field:'Astrophysics & Science Communication', era:'Contemporary', monogram:'NDT', category:'Science', lens:'astrophysics, scientific literacy, cosmic perspective, evidence, public science communication, and connecting science with culture' },
+  { id:'dawkins', name:'Richard Dawkins', field:'Evolutionary Biology', era:'Contemporary', monogram:'RDW', category:'Science', lens:'evolution, natural selection, genes, adaptation, scientific explanation, skepticism, and communication of evolutionary ideas' },
+  { id:'sean-carroll', name:'Sean Carroll', field:'Physics & Philosophy of Science', era:'Contemporary', monogram:'SC', category:'Science', lens:'cosmology, quantum mechanics, entropy, emergence, scientific naturalism, philosophy of physics, and explanatory models' },
+  { id:'randall', name:'Lisa Randall', field:'Physics', era:'Contemporary', monogram:'LR', category:'Science', lens:'particle physics, cosmology, extra dimensions, dark matter, model building, evidence, and the relationship between theory and experiment' },
+  { id:'kip-thorne', name:'Kip Thorne', field:'Physics', era:'Contemporary', monogram:'KT', category:'Science', lens:'general relativity, black holes, gravitational waves, theoretical prediction, experimental confirmation, and collaboration between theory and observation' },
+  { id:'pinker', name:'Steven Pinker', field:'Psychology & Cognitive Science', era:'Contemporary', monogram:'SP', category:'Psychology', lens:'language, cognition, human nature, violence, progress, statistical reasoning, and explaining behavioral patterns with evidence' },
+  { id:'haidt', name:'Jonathan Haidt', field:'Social Psychology', era:'Contemporary', monogram:'JH', category:'Psychology', lens:'moral psychology, intuition and reasoning, political psychology, social media effects, institutions, group dynamics, and viewpoint diversity' },
+  { id:'sapolsky', name:'Robert Sapolsky', field:'Neuroscience & Biology', era:'Contemporary', monogram:'RS', category:'Psychology', lens:'stress, behavior, neurobiology, hormones, environment, biological constraints, human aggression, and the interaction of biology and context' },
+  { id:'dweck', name:'Carol Dweck', field:'Psychology', era:'Contemporary', monogram:'CDW', category:'Psychology', lens:'motivation, mindset, learning, feedback, achievement, resilience, and how beliefs about ability shape behavior' },
+  { id:'duckworth', name:'Angela Duckworth', field:'Psychology', era:'Contemporary', monogram:'AD', category:'Psychology', lens:'grit, deliberate practice, perseverance, achievement, motivation, measurement, and the limits and uses of character traits' },
+  { id:'acemoglu', name:'Daron Acemoglu', field:'Economics', era:'Contemporary', monogram:'DA', category:'Economics & Society', lens:'institutions, political economy, growth, technology, inequality, labor markets, state capacity, and how rules shape prosperity' },
+  { id:'duflo', name:'Esther Duflo', field:'Economics', era:'Contemporary', monogram:'EDU', category:'Economics & Society', lens:'development economics, randomized evaluation, poverty policy, empirical field research, human behavior, and evidence-based intervention' },
+  { id:'krugman', name:'Paul Krugman', field:'Economics', era:'Contemporary', monogram:'PK', category:'Economics & Society', lens:'macroeconomics, trade, economic geography, recessions, policy analysis, models, and communicating economic arguments to the public' },
+  { id:'sowell', name:'Thomas Sowell', field:'Economics & Social Theory', era:'Contemporary', monogram:'TS', category:'Economics & Society', lens:'incentives, tradeoffs, institutions, dispersed knowledge, economic history, social policy, and comparing intended goals with actual consequences' },
+  { id:'taleb', name:'Nassim Nicholas Taleb', field:'Risk & Decision Theory', era:'Contemporary', monogram:'NNT', category:'Economics & Society', lens:'uncertainty, fat tails, antifragility, optionality, forecasting limits, skin in the game, and decision-making under extreme risk' },
+  { id:'amartya-sen', name:'Amartya Sen', field:'Economics & Philosophy', era:'Contemporary', monogram:'ASEN', category:'Economics & Society', lens:'capabilities, welfare, development, famine, justice, freedom, social choice, and evaluating well-being beyond income' },
+  { id:'nussbaum', name:'Martha Nussbaum', field:'Philosophy', era:'Contemporary', monogram:'MN', category:'Philosophy', lens:'ethics, capabilities, emotion, justice, human dignity, classical philosophy, education, and the moral importance of literature' },
+  { id:'peter-singer', name:'Peter Singer', field:'Philosophy & Ethics', era:'Contemporary', monogram:'PS', category:'Philosophy', lens:'utilitarian ethics, animal welfare, global poverty, effective altruism, moral consistency, and extending ethical consideration' },
+  { id:'sandel', name:'Michael Sandel', field:'Political Philosophy', era:'Contemporary', monogram:'MS', category:'Political Thought', lens:'justice, markets and morals, civic life, merit, community, public reasoning, and the ethical limits of economic valuation' },
+  { id:'judith-butler', name:'Judith Butler', field:'Philosophy & Critical Theory', era:'Contemporary', monogram:'JB', category:'Philosophy', lens:'gender, performativity, identity, power, language, social norms, recognition, and critical analysis of categories' },
+  { id:'cornel-west', name:'Cornel West', field:'Philosophy & Public Thought', era:'Contemporary', monogram:'CW', category:'Philosophy', lens:'democracy, race, justice, prophetic tradition, moral courage, public philosophy, solidarity, and critique of domination' },
+  { id:'fukuyama', name:'Francis Fukuyama', field:'Political Science', era:'Contemporary', monogram:'FF', category:'Political Thought', lens:'political order, institutions, liberal democracy, identity, state capacity, modernization, and long-run political development' },
+  { id:'ferguson', name:'Niall Ferguson', field:'History', era:'Contemporary', monogram:'NF', category:'History', lens:'financial history, empire, institutions, networks, war, economic change, counterfactual analysis, and long-run historical comparison' },
+  { id:'harari', name:'Yuval Noah Harari', field:'History & Public Thought', era:'Contemporary', monogram:'YNH', category:'History', lens:'large-scale historical narratives, cognition, institutions, technology, shared myths, global systems, and speculative futures' },
+  { id:'applebaum', name:'Anne Applebaum', field:'History & Journalism', era:'Contemporary', monogram:'AA', category:'History', lens:'authoritarianism, communism, democratic institutions, propaganda, political networks, civic resilience, and historical comparison' },
+  { id:'drucker', name:'Peter Drucker', field:'Management', era:'20th century', monogram:'PD', category:'Business & Innovation', lens:'management, organizations, knowledge work, objectives, decentralization, innovation, customers, and institutional effectiveness' },
+  { id:'christensen', name:'Clayton Christensen', field:'Business & Innovation', era:'20th–21st century', monogram:'CC', category:'Business & Innovation', lens:'disruptive innovation, technology adoption, business models, organizational incentives, market entry, and why successful firms can fail' },
+  { id:'buffett', name:'Warren Buffett', field:'Investing & Business', era:'Contemporary', monogram:'WB', category:'Business & Innovation', lens:'capital allocation, intrinsic value, competitive advantage, incentives, management quality, patience, risk, and long-term business economics' },
+  { id:'munger', name:'Charlie Munger', field:'Investing & Decision-Making', era:'20th–21st century', monogram:'CM', category:'Business & Innovation', lens:'mental models, incentives, probabilistic thinking, multidisciplinary reasoning, behavioral errors, business quality, and long-term judgment' },
+  { id:'jobs', name:'Steve Jobs', field:'Technology & Product Design', era:'20th–21st century', monogram:'SJ', category:'Business & Innovation', lens:'product design, simplicity, user experience, integration of hardware and software, creative leadership, focus, and technology as a liberal art' },
+  { id:'gates', name:'Bill Gates', field:'Technology & Philanthropy', era:'Contemporary', monogram:'BGAT', category:'Business & Innovation', lens:'software platforms, technology strategy, scaling organizations, global health, philanthropy, energy innovation, and evidence-informed problem solving' },
+  { id:'atwood', name:'Margaret Atwood', field:'Literature', era:'Contemporary', monogram:'MAW', category:'Literature', lens:'dystopia, gender, power, ecology, language, speculative fiction, historical memory, and social institutions' },
+  { id:'rushdie', name:'Salman Rushdie', field:'Literature', era:'Contemporary', monogram:'SRU', category:'Literature', lens:'identity, migration, religion, freedom of expression, magical realism, history, language, and cultural hybridity' },
+  { id:'ishiguro', name:'Kazuo Ishiguro', field:'Literature', era:'Contemporary', monogram:'KI', category:'Literature', lens:'memory, dignity, self-deception, responsibility, identity, technology, unreliable narration, and emotional restraint' },
+  { id:'oates', name:'Joyce Carol Oates', field:'Literature', era:'Contemporary', monogram:'JCO', category:'Literature', lens:'American identity, violence, family, class, psychology, social pressure, literary realism, and formal experimentation' },
+  { id:'john-williams', name:'John Williams', field:'Music & Film Scoring', era:'Contemporary', monogram:'JW', category:'Music & Arts', lens:'film scoring, leitmotif, orchestration, thematic development, narrative music, symphonic tradition, and the relationship between music and story' },
+  { id:'yo-yo-ma', name:'Yo-Yo Ma', field:'Music', era:'Contemporary', monogram:'YYM', category:'Music & Arts', lens:'performance, interpretation, collaboration, cultural exchange, musical communication, listening, and the social role of art' },
+  { id:'marsalis', name:'Wynton Marsalis', field:'Music & Jazz', era:'Contemporary', monogram:'WM', category:'Music & Arts', lens:'jazz history, improvisation, swing, composition, musical education, tradition, ensemble discipline, and American musical culture' },
+  { id:'hans-zimmer', name:'Hans Zimmer', field:'Music & Film Scoring', era:'Contemporary', monogram:'HZ', category:'Music & Arts', lens:'film scoring, sound design, orchestral and electronic integration, thematic atmosphere, collaboration, and music as cinematic architecture' },
+  { id:'scorsese', name:'Martin Scorsese', field:'Film', era:'Contemporary', monogram:'MSCO', category:'Music & Arts', lens:'cinema history, visual storytelling, character, moral conflict, editing, film preservation, and the relationship between style and human behavior' },
+  { id:'nt-wright', name:'N. T. Wright', field:'Theology & Biblical Studies', era:'Contemporary', monogram:'NTW', category:'Religion & Theology', lens:'New Testament history, Pauline theology, resurrection, early Christianity, historical context, biblical interpretation, and Christian ethics' },
+  { id:'rowan-williams', name:'Rowan Williams', field:'Theology & Philosophy', era:'Contemporary', monogram:'RW', category:'Religion & Theology', lens:'Christian theology, spirituality, ethics, language, literature, political responsibility, and reflective engagement across traditions' },
+  { id:'pagels', name:'Elaine Pagels', field:'History of Religion', era:'Contemporary', monogram:'EP', category:'Religion & Theology', lens:'early Christianity, Gnostic texts, religious diversity, historical interpretation, scripture, community formation, and the development of doctrine' },
+  { id:'barron', name:'Robert Barron', field:'Theology & Philosophy', era:'Contemporary', monogram:'RB', category:'Religion & Theology', lens:'Catholic theology, classical philosophy, scripture, culture, evangelization, aesthetics, and explaining religious ideas in public discourse' }
 ];
+
+for (const customPerson of loadSymposiumCustomPeople()) {
+  if (!SYMPOSIUM_PARTICIPANTS.some((person)=>person.id === customPerson.id)) {
+    SYMPOSIUM_PARTICIPANTS.push(customPerson);
+  }
+}
+
 
 function symposiumEscape(value) { return escapeHtml(String(value ?? '')); }
 
@@ -23263,6 +23357,10 @@ function ensureSymposiumStyles() {
     .symposium-empty{margin:auto;text-align:center;max-width:520px;color:#718095;padding:44px}.symposium-empty .symposium-empty-icon{font-size:3rem;display:block;margin-bottom:12px}.symposium-empty h2{color:#0c2340;margin:.25rem 0 .5rem;font-family:Georgia,serif}
     .symposium-turn{display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px;align-items:start}.symposium-turn.user{grid-template-columns:minmax(0,1fr) 48px}.symposium-turn.user .symposium-turn-body{order:1;background:#eef5fc}.symposium-turn.user .symposium-avatar{order:2;background:#405c7a}.symposium-turn.moderator .symposium-avatar{background:linear-gradient(145deg,#80631a,#513d0d);color:white}.symposium-turn-body{border:1px solid #dde6ef;border-radius:16px;padding:13px 15px;background:white;box-shadow:0 5px 16px rgba(38,67,98,.05)}.symposium-turn-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}.symposium-turn-head strong{color:#0c2340}.symposium-turn-head span{font-size:.76rem;color:#7a899b}.symposium-turn-body p{margin:0;line-height:1.58;color:#30465f;white-space:pre-wrap}.symposium-turn-tools{margin-top:8px;display:flex;gap:6px}.symposium-turn-tools button{border:0;background:transparent;color:#315d8b;font-size:.78rem;cursor:pointer;padding:2px 0}
     .symposium-participate{margin-top:auto;border-top:1px solid #e1e8f0;padding:16px 18px;background:#f8fbff}.symposium-participate label{font-size:.8rem;font-weight:800;color:#435b75}.symposium-user-grid{display:grid;grid-template-columns:150px 1fr auto;gap:9px;margin-top:7px}.symposium-user-grid select,.symposium-user-grid textarea{border:1px solid #cbd7e5;border-radius:10px;padding:9px 10px;font:inherit;background:white}.symposium-user-grid textarea{resize:vertical;min-height:52px}.symposium-user-grid button{border:0;border-radius:10px;background:#0c2340;color:#f2ca60;padding:10px 14px;font-weight:800;cursor:pointer}.symposium-hint{font-size:.76rem;color:#758498;margin:7px 0 0}
+    .symposium-custom-personality{display:grid;gap:7px;margin-top:6px}
+    .symposium-custom-personality input,.symposium-custom-personality textarea{width:100%;box-sizing:border-box;border:1px solid #cbd7e4;border-radius:9px;padding:8px 9px;background:white;color:#17304e;font:inherit}
+    .symposium-custom-personality textarea{min-height:70px;resize:vertical}
+    .symposium-custom-personality button{justify-self:start;border:0;border-radius:9px;background:#0c2340;color:#f2ca60;padding:9px 13px;font-weight:800;cursor:pointer}
     .symposium-source-pill{display:inline-flex;align-items:center;border-radius:999px;background:#edf4fb;color:#365b81;padding:4px 8px;font-size:.72rem;font-weight:800;margin-top:8px}
     .symposium-loading{display:inline-flex;gap:5px;align-items:center}.symposium-loading i{width:6px;height:6px;border-radius:50%;background:#8da1b6;animation:sympPulse 1.1s infinite alternate}.symposium-loading i:nth-child(2){animation-delay:.2s}.symposium-loading i:nth-child(3){animation-delay:.4s}@keyframes sympPulse{to{opacity:.25;transform:translateY(-2px)}}
     .symposium-nav-link{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:.55rem .7rem;border-radius:8px}.symposium-nav-link:hover{background:rgba(255,255,255,.08)}
@@ -23363,7 +23461,7 @@ async function symposiumAskAi({person, mode, topic, context, transcript, userCon
   };
   const prior = transcript.slice(-8).map((turn)=>`${turn.name}: ${turn.text}`).join('\n');
   const readerDirective = userContribution ? `\n\nIMMEDIATE RESPONSE REQUIREMENT — THIS OVERRIDES THE NORMAL FLOW:\nThe reader has just contributed the following point:\n${userContribution}\n\nYou are the participant Athena selected to answer it. Do NOT merely continue the general discussion. Your response must directly engage this reader contribution before doing anything else. In your opening 1–2 sentences, identify the substance of the reader's point in your own words (without saying only “I agree” or “good point”). Then clearly state whether you agree, disagree, or qualify it, and explain why using argument and evidence appropriate to ${person.name}. If the reader asked a question, answer that question explicitly. If the reader supplied evidence, assess that evidence. If the reader challenged a claim, defend, revise, or concede the challenged claim. Only after this direct engagement may you reconnect the point to the broader Symposium topic. Do not ignore, sidestep, or replace the reader's point with a different issue.` : '';
-  const prompt = `You are participating in Mark, Set, Go!'s Symposium as ${person.name}, representing ${person.field}. Use deep knowledge associated with ${person.name}'s work, historical context, methods, and characteristic intellectual concerns (${person.lens}). Do not claim private knowledge or fabricate quotations. When a modern topic postdates this thinker, reason from the thinker's documented ideas and clearly frame the response as an application rather than a literal historical statement. Remain cordial, charitable, concise, and substantive.\n\n${modeInstructions[mode] || modeInstructions.debate}\n\nTOPIC:\n${topic}\n\nREADING CONTEXT:\n${context || 'No reading passage supplied.'}\n\nRECENT TRANSCRIPT:\n${prior || 'No prior turns.'}${readerDirective}\n\nRespond as ${person.name} in about 120-220 words. Use reasons and evidence. Do not use stage directions.`;
+  const prompt = `You are participating in Mark, Set, Go!'s Symposium as ${person.name}, representing ${person.field}. Use deep knowledge associated with ${person.name}'s work, historical context, methods, and characteristic intellectual concerns (${person.lens}). Do not claim private knowledge or fabricate quotations. For living or contemporary people, do not imply access to private thoughts, unpublished/current private opinions, or real-time personal views; represent only public/published ideas and the configured lens. When a modern topic postdates a historical thinker, reason from documented ideas and clearly frame the response as an application rather than a literal historical statement. Remain cordial, charitable, concise, and substantive.\n\n${modeInstructions[mode] || modeInstructions.debate}\n\nTOPIC:\n${topic}\n\nREADING CONTEXT:\n${context || 'No reading passage supplied.'}\n\nRECENT TRANSCRIPT:\n${prior || 'No prior turns.'}${readerDirective}\n\nRespond as ${person.name} in about 120-220 words. Use reasons and evidence. Do not use stage directions.`;
 
   // IMPORTANT: /api/mark-selection is selection-centered. When the reader has
   // just spoken, make the reader's exact contribution the primary selection so
@@ -23412,7 +23510,7 @@ function renderSymposium() {
         <div>
           <span class="symposium-kicker">◉ The Symposium · Prototype</span>
           <h1>Put great minds around the same table.</h1>
-          <p>Explore what you are reading through friendly debate, interview, explanation, or a court-style examination of a claim. AI participants represent the methods and ideas of major thinkers while the moderator keeps the exchange charitable, evidence-based, and on topic.</p>
+          <p>Explore what you are reading through friendly debate, interview, explanation, or a court-style examination of a claim. AI participants represent the methods and ideas of historical, modern, contemporary, and user-created thinkers while the moderator keeps the exchange charitable, evidence-based, and on topic.</p>
         </div>
         <aside class="symposium-badge"><strong>Reader participates</strong><small>Listen, read, question, challenge, supply evidence, or enter your own argument at any point.</small></aside>
       </header>
@@ -23474,9 +23572,14 @@ function renderSymposium() {
             </div>
 
             <div>
-              <label>Add a participant</label>
-              <div class="symposium-custom-row"><input id="symposium-custom-person" placeholder="e.g., Hannah Arendt"><button type="button" id="symposium-add-person">Add</button></div>
-              <p class="symposium-hint">Custom participants join this session as an AI representation of their published ideas.</p>
+              <label>Add your own personality</label>
+              <div class="symposium-custom-personality">
+                <input id="symposium-custom-person" placeholder="Name">
+                <input id="symposium-custom-field" placeholder="Field or role (optional)">
+                <textarea id="symposium-custom-lens" placeholder="Perspective or instructions (optional)"></textarea>
+                <button type="button" id="symposium-add-person">Save personality</button>
+              </div>
+              <p class="symposium-hint">Saved personalities remain in your roster on this browser. The AI represents public/published ideas or the perspective you specify; it does not claim to literally be the real person.</p>
             </div>
 
             <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
@@ -23573,23 +23676,55 @@ function renderSymposium() {
 
   root.querySelector('#symposium-add-person').addEventListener('click',()=>{
     const input = root.querySelector('#symposium-custom-person');
+    const fieldInput = root.querySelector('#symposium-custom-field');
+    const lensInput = root.querySelector('#symposium-custom-lens');
+
     const name = input.value.trim();
-    if (!name) return;
-    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+    if (!name) {
+      input.focus();
+      return;
+    }
+
+    const field = String(fieldInput?.value || '').trim() || 'Guest thinker';
+    const customLens = String(lensInput?.value || '').trim();
+    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
     const monogram = name.split(/\s+/).slice(0,2).map((part)=>part[0]?.toUpperCase() || '').join('');
-    const person = { id, name, field:'Guest thinker', era:'Custom', monogram:monogram || '?', category:'Guest', lens:`the published work, arguments, methods, and intellectual context of ${name}` };
+
+    const person = {
+      id,
+      name,
+      field,
+      era:'Custom',
+      monogram:monogram || '?',
+      category:'My personalities',
+      lens:customLens || `the published work, arguments, methods, and intellectual context of ${name}`,
+      custom:true
+    };
+
     SYMPOSIUM_PARTICIPANTS.push(person);
+    saveSymposiumCustomPeople();
+
     rosterEl.insertAdjacentHTML('afterbegin', `<label class="symposium-person"
-      data-symposium-category="Guest"
+      data-symposium-category="My personalities"
       data-symposium-search="${symposiumEscape(symposiumPersonSearchText(person))}">
       <input type="checkbox" data-symposium-person value="${symposiumEscape(id)}" checked>
       <span class="symposium-avatar">${symposiumEscape(person.monogram)}</span>
-      <span><strong>${symposiumEscape(name)}</strong><small>Guest thinker · Custom <span class="symposium-person-category">Guest</span></small></span>
+      <span><strong>${symposiumEscape(name)}</strong><small>${symposiumEscape(field)} · Custom <span class="symposium-person-category">My personalities</span></small></span>
     </label>`);
+
     input.value = '';
+    if (fieldInput) fieldInput.value = '';
+    if (lensInput) lensInput.value = '';
     if (personSearchEl) personSearchEl.value = '';
     if (categoryFilterEl) categoryFilterEl.value = '';
     filterSymposiumRoster();
+
+    const checked = symposiumSelectedPeople(root);
+    if (checked.length > 6) {
+      const newCheckbox = rosterEl.querySelector(`[data-symposium-person][value="${CSS.escape(id)}"]`);
+      if (newCheckbox) newCheckbox.checked = false;
+      window.alert('Personality saved. Six speakers are already selected, so it was added to your roster without being selected.');
+    }
   });
 
   async function moderatorOpening() {
