@@ -123,7 +123,7 @@
     return `
       <div class="askmark-premium" data-askmark-premium>
         <header class="askmark-hero">
-          <button class="askmark-close" type="button" data-askmark-close aria-label="Close ${companionAsk()}" style="pointer-events:auto;position:relative;z-index:50;cursor:pointer">×</button>
+          <button class="askmark-close" type="button" data-askmark-close aria-label="Close ${companionAsk()}">×</button>
           <div class="askmark-avatar-wrap" aria-hidden="true">
             <span class="askmark-avatar-glow"></span>
             <img class="askmark-avatar" src="${companionAvatar()}" alt="${companionName()}">

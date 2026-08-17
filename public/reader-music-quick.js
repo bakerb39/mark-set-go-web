@@ -337,27 +337,27 @@
 
   function insertTopRightMusicButton() {
     const paneControls = document.querySelector('#app .reader-pane-controls');
-    const fullscreenButton = paneControls?.querySelector('#toggle-reader-fullscreen');
+    const fullscreenButton = document.querySelector('#app #toggle-reader-fullscreen');
     if (!paneControls || !fullscreenButton) {
       speedButton = null;
       return;
     }
 
-    let stack = paneControls.querySelector('.reader-topright-media-stack');
-    if (!stack) {
-      stack = document.createElement('div');
-      stack.className = 'reader-topright-media-stack';
-      stack.setAttribute('aria-label', 'Reader media and fullscreen controls');
-
-      // Move the existing fullscreen DOM node into this wrapper. Moving the node
-      // preserves app.js's already-bound fullscreen click handler.
-      fullscreenButton.parentNode.insertBefore(stack, fullscreenButton);
-      stack.appendChild(fullscreenButton);
-    } else if (!stack.contains(fullscreenButton)) {
-      stack.appendChild(fullscreenButton);
+    // Undo any older wrapper version first, while preserving the real
+    // fullscreen DOM node and its already-bound click handler.
+    const oldStack = paneControls.querySelector('.reader-topright-media-stack');
+    if (oldStack) {
+      const oldMusic = oldStack.querySelector('[data-reader-wpm-music-toggle]');
+      if (fullscreenButton.parentElement === oldStack) {
+        oldStack.parentNode.insertBefore(fullscreenButton, oldStack);
+      }
+      if (oldMusic && oldMusic.parentElement === oldStack) {
+        oldStack.parentNode.insertBefore(oldMusic, oldStack);
+      }
+      oldStack.remove();
     }
 
-    let button = stack.querySelector('[data-reader-wpm-music-toggle]');
+    let button = paneControls.querySelector('[data-reader-wpm-music-toggle]');
     if (!button) {
       button = document.createElement('button');
       button.type = 'button';
@@ -374,18 +374,48 @@
         if (chooser && !chooser.hidden) closeChooser();
         else openChooser();
       });
+
+      paneControls.appendChild(button);
     }
 
-    // IMPORTANT: enforce the DOM order on EVERY Reader render.
-    // Older versions could leave Full screen before Music. Merely changing CSS
-    // then preserved that stale child order. Always make Music the first child
-    // and Full screen the second child.
-    if (stack.firstElementChild !== button) {
-      stack.insertBefore(button, stack.firstElementChild);
-    }
-    if (button.nextElementSibling !== fullscreenButton) {
-      stack.insertBefore(fullscreenButton, button.nextElementSibling);
-    }
+    // Never change Full screen positioning. Let the Reader's existing CSS keep
+    // it in the correct place when the Ask Mark/Chad pane opens or closes.
+    fullscreenButton.style.removeProperty('position');
+    fullscreenButton.style.removeProperty('top');
+    fullscreenButton.style.removeProperty('right');
+    fullscreenButton.style.removeProperty('bottom');
+    fullscreenButton.style.removeProperty('left');
+    fullscreenButton.style.removeProperty('margin');
+    fullscreenButton.style.removeProperty('transform');
+    fullscreenButton.style.removeProperty('z-index');
+
+    paneControls.style.position = paneControls.style.position || 'relative';
+
+    const placeMusicAboveFullscreen = () => {
+      if (!button.isConnected || !fullscreenButton.isConnected || !paneControls.isConnected) return;
+
+      const controlsRect = paneControls.getBoundingClientRect();
+      const fullRect = fullscreenButton.getBoundingClientRect();
+
+      // Match Full screen's right edge exactly, and sit about 8px above it.
+      const right = Math.max(0, controlsRect.right - fullRect.right);
+      const buttonHeight = button.getBoundingClientRect().height || 30;
+      const top = Math.max(0, fullRect.top - controlsRect.top - buttonHeight - 8);
+
+      Object.assign(button.style, {
+        position: 'absolute',
+        top: `${top}px`,
+        right: `${right}px`,
+        bottom: 'auto',
+        left: 'auto',
+        margin: '0',
+        transform: 'none',
+        zIndex: '8'
+      });
+    };
+
+    placeMusicAboveFullscreen();
+    window.requestAnimationFrame(placeMusicAboveFullscreen);
 
     speedButton = button;
   }
