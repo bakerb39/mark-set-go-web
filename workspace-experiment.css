@@ -369,9 +369,16 @@ body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
   }
 }
 
-/* v0.3 — opt-in all-page workspace tabs */
+/* v0.3.2 — opt-in all-page workspace tabs */
+.site-header nav > .msg-workspace-optin,
 .msg-workspace-optin{
-  display:inline-flex;
+  display:inline-flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  width:auto !important;
+  height:auto !important;
+  position:static !important;
+  flex:0 0 auto !important;
   align-items:center;
   gap:5px;
   padding:3px 7px;
@@ -388,9 +395,16 @@ body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
 }
 .msg-workspace-optin:hover{background:rgba(255,255,255,.08)}
 .msg-workspace-optin input{
-  width:13px;
-  height:13px;
-  margin:0;
+  display:inline-block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  appearance:auto !important;
+  -webkit-appearance:checkbox !important;
+  width:13px !important;
+  min-width:13px !important;
+  height:13px !important;
+  margin:0 !important;
+  padding:0 !important;
   accent-color:#d9a514;
   cursor:pointer;
 }

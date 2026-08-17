@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.3
+ * Mark, Set, Go! Workspace Experiment v0.3.2
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -15,6 +15,22 @@
     document.documentElement.classList.add('msg-workspace-pane-document');
     const mode = PARAMS.get('msgWorkspaceMode') || 'action';
     const value = PARAMS.get('msgWorkspaceValue') || 'home';
+
+    // Keyboard focus lives inside this iframe while a workspace page is active.
+    // Forward only the Topic Feed story shortcuts to the outer Reader; ordinary
+    // typing keeps comma/period untouched.
+    document.addEventListener('keydown', (event) => {
+      if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.key !== ',' && event.key !== '.') return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest?.('input, textarea, select, [contenteditable="true"], [role="textbox"]')) return;
+      try {
+        window.parent?.postMessage?.({
+          type: 'msg-workspace-topic-feed-key',
+          key: event.key
+        }, window.location.origin);
+      } catch {}
+    }, true);
 
     const openRequestedPage = () => {
       // Let every deferred app/module script finish installing its delegated
@@ -75,6 +91,71 @@
   function workspaceEnabled() {
     return Boolean(workspaceCheckbox()?.checked);
   }
+
+  function isTopicFeedReaderActive() {
+    try {
+      const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+      if (current?.source) return current.source.type === 'topic-feed';
+    } catch {}
+    return Boolean(window.MSGTopicFeedReaderContext);
+  }
+
+  function advanceTopicFeedStory(direction) {
+    if (!isTopicFeedReaderActive()) return false;
+
+    const pane = APP.querySelector('#navigation-pane');
+    if (!pane) return false;
+
+    const context = window.MSGTopicFeedReaderContext || {};
+    const topicId = String(context.topicId || '');
+    const articleId = String(context.articleId || '');
+
+    let buttons = [...pane.querySelectorAll('[data-reader-topic-article]')];
+    if (topicId) {
+      const sameTopic = buttons.filter((button) => String(button.dataset.readerTopicParent || '') === topicId);
+      if (sameTopic.length) buttons = sameTopic;
+    }
+    if (!buttons.length) return false;
+
+    let index = buttons.findIndex((button) => String(button.dataset.readerTopicArticle || '') === articleId);
+    if (index < 0) index = direction > 0 ? -1 : 0;
+    const nextIndex = (index + direction + buttons.length) % buttons.length;
+    const target = buttons[nextIndex];
+    if (!target) return false;
+
+    // If the next story is in the collapsed overflow, use the Topic Feed's own
+    // Show all control so the selected story remains visible in My Topics.
+    if (target.hidden) {
+      const sourceBlock = target.closest('.topic-reader-source');
+      const more = sourceBlock?.querySelector?.('[data-reader-topic-more]');
+      if (more?.getAttribute('aria-expanded') === 'false') more.click();
+    }
+
+    target.click();
+    return true;
+  }
+
+  function handleTopicFeedStoryShortcut(eventOrKey) {
+    const key = typeof eventOrKey === 'string' ? eventOrKey : eventOrKey?.key;
+    if (key !== ',' && key !== '.') return false;
+    return advanceTopicFeedStory(key === '.' ? 1 : -1);
+  }
+
+  document.addEventListener('keydown', (event) => {
+    if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+    if (event.key !== ',' && event.key !== '.') return;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest?.('input, textarea, select, [contenteditable="true"], [role="textbox"]')) return;
+    if (!handleTopicFeedStoryShortcut(event)) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }, true);
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (event.data?.type !== 'msg-workspace-topic-feed-key') return;
+    handleTopicFeedStoryShortcut(String(event.data.key || ''));
+  });
 
   function humanize(value) {
     return String(value || '')
@@ -423,13 +504,18 @@
     if (!nav) return false;
     const symposium = document.querySelector('[data-action="symposium"]');
 
-    let label = document.querySelector('.msg-workspace-optin');
-    if (!label) {
-      label = document.createElement('label');
-      label.className = 'msg-workspace-optin';
-      label.title = 'When checked, menu pages open beside the Reader instead of replacing it.';
-      label.innerHTML = '<input id="msg-workspace-optin" type="checkbox"><span>Open in workspace</span>';
-      nav.appendChild(label);
+    // Use a neutral span wrapper rather than a bare <label>. The site's main
+    // header has broad label styling in some builds, which can suppress a
+    // direct-child label even though the workspace script itself loaded.
+    let control = document.querySelector('.msg-workspace-optin');
+    if (!control) {
+      control = document.createElement('span');
+      control.className = 'msg-workspace-optin';
+      control.title = 'When checked, menu pages open beside the Reader instead of replacing it.';
+      control.setAttribute('role', 'group');
+      control.setAttribute('aria-label', 'Open pages in workspace');
+      control.innerHTML = '<input id="msg-workspace-optin" type="checkbox" aria-label="Open in workspace"><span>Open in workspace</span>';
+      nav.appendChild(control);
     }
 
     let button = document.querySelector('[data-msg-workspace-open="browser"]');
@@ -443,12 +529,12 @@
       nav.appendChild(button);
     }
 
-    // Once Symposium exists, keep the three experimental controls grouped.
+    // Keep the opt-in visibly between Symposium and Web.
     if (symposium) {
-      nav.insertBefore(label, symposium);
-      if (symposium.nextSibling !== button) nav.insertBefore(button, symposium.nextSibling);
+      if (symposium.nextSibling !== control) nav.insertBefore(control, symposium.nextSibling);
+      if (control.nextSibling !== button) nav.insertBefore(button, control.nextSibling);
     }
-    return Boolean(symposium);
+    return Boolean(symposium && control.isConnected && button.isConnected);
   }
 
   function navigationDescriptor(element) {
@@ -469,6 +555,18 @@
   }, true);
 
   document.addEventListener('click', (event) => {
+    const optinControl = event.target.closest?.('.msg-workspace-optin');
+    if (optinControl && !event.target.matches?.('#msg-workspace-optin')) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const checkbox = optinControl.querySelector('#msg-workspace-optin');
+      if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        checkbox.dispatchEvent(new Event('change', { bubbles:true }));
+      }
+      return;
+    }
+
     const close = event.target.closest?.('[data-msg-workspace-close]');
     if (close) {
       event.preventDefault();
@@ -535,12 +633,16 @@
   }, true);
 
   // Symposium is injected shortly after startup. Polling keeps this experiment
-  // isolated and avoids a MutationObserver.
+  // isolated and avoids a MutationObserver. Also retry at a few later points in
+  // case another startup script finishes arranging the header after our first pass.
+  ensureWorkspaceControls();
   let navAttempts = 0;
   const navTimer = window.setInterval(() => {
     navAttempts += 1;
     if (ensureWorkspaceControls() || navAttempts > 40) window.clearInterval(navTimer);
   }, 250);
+  [1200, 3000, 6000].forEach((delay) => window.setTimeout(ensureWorkspaceControls, delay));
+  window.addEventListener('pageshow', ensureWorkspaceControls);
 
   window.MSGWorkspaceExperiment = Object.freeze({
     open: showWorkspacePanel,
