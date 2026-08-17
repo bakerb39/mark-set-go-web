@@ -425,9 +425,9 @@ function captureReaderControls() {
     focusAnchorFontSize: Number(app.querySelector('#focus-anchor-font-size')?.value || state.focusAnchorFontSize || 24),
     focusAnchorColor: app.querySelector('#focus-anchor-color')?.value || state.focusAnchorColor || '#20a866',
     focusAnchorBold: Boolean(app.querySelector('#focus-anchor-bold')?.checked ?? state.focusAnchorBold),
-    fontFamily: app.querySelector('#font-family')?.value || 'serif',
+    fontFamily: app.querySelector('#font-family')?.value || 'system',
     fontSize: Number(app.querySelector('#font-size')?.value || 14),
-    theme: app.querySelector('#theme-select')?.value || 'light',
+    theme: app.querySelector('#theme-select')?.value || 'dark',
     bionic: Boolean(app.querySelector('#bionic-reading')?.checked ?? state.bionic),
     bookPages: Boolean(app.querySelector('#book-pages')?.checked ?? state.bookPages),
     illustrationMode: app.querySelector('#illustration-mode')?.value || state.illustrationMode || 'off'
@@ -1384,57 +1384,6 @@ function stopMusic() {
   musicDock.hidden = true;
   try { localStorage.removeItem('markSetGoMusic'); } catch {}
 }
-
-
-window.MarkSetGoMusicPlayer = Object.freeze({
-  playSuggestedForCurrentReading() {
-    const current = window.MarkSetGoCurrentReaderDocument?.get?.();
-    const title = String(current?.title || state?.title || '').trim();
-    const text = String(current?.text || state?.currentText || '');
-    if (!title) return false;
-
-    const recommendation = recommendedPlayerChoice(title, text);
-    if (!recommendation?.scoreQuery) return false;
-
-    void playYouTubeSearch(
-      recommendation.scoreQuery,
-      `${title} — suggested reading music`
-    );
-    return true;
-  },
-
-  playReadingMoodForCurrentReading() {
-    const current = window.MarkSetGoCurrentReaderDocument?.get?.();
-    const title = String(current?.title || state?.title || '').trim();
-    const text = String(current?.text || state?.currentText || '');
-    if (!title) return false;
-
-    const recommendation = recommendedPlayerChoice(title, text);
-    if (!recommendation?.moodQuery) return false;
-
-    void playYouTubeSearch(
-      recommendation.moodQuery,
-      `${title} — reading mood`
-    );
-    return true;
-  },
-
-  nextResult() {
-    if (!musicSearchState?.videoIds?.length) return false;
-    playMusicSearchCandidate(musicSearchState.index + 1);
-    return true;
-  },
-
-  getState() {
-    return {
-      hasSearchResults: Boolean(musicSearchState?.videoIds?.length),
-      resultIndex: Number(musicSearchState?.index || 0),
-      resultCount: Number(musicSearchState?.videoIds?.length || 0),
-      title: musicNowTitle?.textContent || '',
-      source: musicNowSource?.textContent || ''
-    };
-  }
-});
 
 function renderMusicLibrary() {
   stopReader();
@@ -4049,8 +3998,8 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   const mode = requestedMode === 'two-column' ? 'highlight' : requestedMode;
   const wordCount = Math.max(1, Number(controls.wordCount ?? 1));
   const fontSize = Math.max(10, Number(controls.fontSize ?? 14));
-  const fontFamily = controls.fontFamily || 'serif';
-  const theme = controls.theme || 'light';
+  const fontFamily = controls.fontFamily || 'system';
+  const theme = controls.theme || 'dark';
   const savedIndex = Math.max(0, Number(snapshot.playbackIndex ?? snapshot.index) || 0);
   const savedViewportAnchor = Math.max(0, Number(snapshot.viewportAnchorIndex ?? savedIndex) || 0);
 
@@ -12910,8 +12859,110 @@ function bindModernGuideInlineActions(source = state?.source || {}) {
   }, true);
 }
 
+
+function normalizeTopicFeedHeadingWord(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function realignTopicFeedDocumentToc(text, toc) {
+  const entries = Array.isArray(toc) ? toc : [];
+  if (!entries.length) return [];
+
+  const words = splitWords(String(text || ''));
+  const normalizedWords = words.map(normalizeTopicFeedHeadingWord);
+  if (!normalizedWords.length) return [];
+
+  let previousIndex = -1;
+
+  const exactMatches = (headingWords, start, end) => {
+    const matches = [];
+    const safeStart = Math.max(0, start);
+    const safeEnd = Math.min(normalizedWords.length - headingWords.length, end);
+    for (let index = safeStart; index <= safeEnd; index += 1) {
+      let matched = true;
+      for (let offset = 0; offset < headingWords.length; offset += 1) {
+        if (normalizedWords[index + offset] !== headingWords[offset]) {
+          matched = false;
+          break;
+        }
+      }
+      if (matched) matches.push(index);
+    }
+    return matches;
+  };
+
+  const nearest = (matches, approximate) => {
+    const ordered = matches.filter((index) => index > previousIndex);
+    const pool = ordered.length ? ordered : matches;
+    if (!pool.length) return null;
+    return pool.reduce((best, index) => (
+      best === null || Math.abs(index - approximate) < Math.abs(best - approximate)
+        ? index
+        : best
+    ), null);
+  };
+
+  const aligned = [];
+  for (const entry of entries) {
+    const title = String(entry?.title || '').replace(/\s+/g, ' ').trim();
+    if (!title) continue;
+
+    const headingWords = splitWords(title)
+      .map(normalizeTopicFeedHeadingWord)
+      .filter(Boolean);
+    if (!headingWords.length) continue;
+
+    const approximate = Number.isFinite(Number(entry?.index))
+      ? Math.max(0, Number(entry.index))
+      : Math.max(0, previousIndex + 1);
+
+    // First search near the server-provided position. If the publisher/server
+    // counted words differently, the real heading is normally only a short
+    // distance away.
+    let matches = exactMatches(
+      headingWords,
+      Math.max(previousIndex + 1, approximate - 120),
+      approximate + 120
+    );
+
+    // If needed, search the complete article. This is still exact heading-text
+    // matching, so ordinary body words cannot become headings just because a
+    // numeric index drifted.
+    if (!matches.length) {
+      matches = exactMatches(
+        headingWords,
+        Math.max(0, previousIndex + 1),
+        normalizedWords.length - headingWords.length
+      );
+    }
+
+    const resolved = nearest(matches, approximate);
+    if (resolved === null) {
+      // Do not use an unverified numeric index for Topic Feed styling. A bad
+      // index is what caused fragments such as "Gates," and "sector. A little"
+      // to become bold instead of the actual following heading.
+      continue;
+    }
+
+    previousIndex = resolved;
+    aligned.push({ ...entry, index: resolved });
+  }
+
+  return aligned;
+}
+
 function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.dataset.viewKey = 'reader';
+
+  const READER_CLICK_CONTROLS_KEY = 'msg_reader_click_controls_v1';
+  let readerClickControlsEnabled = true;
+  try {
+    readerClickControlsEnabled = localStorage.getItem(READER_CLICK_CONTROLS_KEY) !== 'off';
+  } catch {}
 
   // Topic Feed story handoff: preserve the existing left navigation pane as the
   // exact same DOM node while the Reader shell is rebuilt. This branch is
@@ -12942,7 +12993,10 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   // EPUBs carry an authoritative navigation document. Prefer that TOC over
   // heuristic heading detection, while still keeping detected structure for
   // reader formatting and illustration placement.
-  const authoritativeToc = Array.isArray(source?.documentToc) ? source.documentToc : null;
+  const rawAuthoritativeToc = Array.isArray(source?.documentToc) ? source.documentToc : null;
+  const authoritativeToc = source?.type === 'topic-feed' && rawAuthoritativeToc
+    ? realignTopicFeedDocumentToc(text, rawAuthoritativeToc)
+    : rawAuthoritativeToc;
   const suppliedToc = Array.isArray(authoritativeToc)
     ? authoritativeToc
     : Array.isArray(source?.epubToc)
@@ -13090,8 +13144,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
           <summary><span>Display</span><span class="settings-summary">Font, size, theme, bionic</span></summary>
           <div class="toolbar-fields display-fields settings-content">
             <div class="control"><label for="font-family">Font</label><select id="font-family">
-              <option value="system">System Sans</option>
-              <option value="serif" selected>Book Serif</option>
+              <option value="system" selected>System Sans</option>
+              <option value="serif">Book Serif</option>
               <option value="georgia">Georgia</option>
               <option value="verdana">Verdana</option>
               <option value="trebuchet">Trebuchet</option>
@@ -13099,7 +13153,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
               <option value="dyslexic">Dyslexia-friendly</option>
             </select></div>
             <div class="control"><label for="font-size">Text size</label><select id="font-size">${fontOptions(14)}</select></div>
-            <div class="control"><label for="theme-select">Theme</label><select id="theme-select"><option value="dark">Dark</option><option value="light" selected>Light</option></select></div>
+            <div class="control"><label for="theme-select">Theme</label><select id="theme-select"><option value="dark" selected>Dark</option><option value="light">Light</option></select></div>
             <label class="compact-toggle"><input id="bionic-reading" type="checkbox"><span>Bionic text</span></label>
             <label class="compact-toggle" title="Show the current word or phrase at a fixed center point while using Flash or another guided mode."><input id="focus-anchor" type="checkbox"><span>Center focus anchor overlay</span></label>
             <div class="control"><label for="focus-anchor-font-size">Focus anchor size</label><select id="focus-anchor-font-size">${fontOptions(24)}</select></div>
@@ -13173,6 +13227,10 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                   <button id="fs-start" class="primary" type="button">Start</button>
                   <button id="fs-pause" class="secondary" type="button">Pause</button>
                   <button id="fs-reset" class="secondary" type="button">Reset</button>
+                  <button id="fs-reader-click-controls" class="secondary" type="button"
+                          aria-pressed="${readerClickControlsEnabled ? 'true' : 'false'}">
+                    Reader clicks: ${readerClickControlsEnabled ? 'On' : 'Off'}
+                  </button>
                   <button id="fs-check-comprehension" class="secondary" type="button">Check comprehension</button>
                 </div>
               </details>
@@ -13193,11 +13251,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <summary>Display</summary>
                 <div class="fullscreen-options-grid">
                   <label>Font<select id="fs-font-family">
-                    <option value="system">System Sans</option><option value="serif" selected>Book Serif</option><option value="georgia">Georgia</option>
+                    <option value="system">System Sans</option><option value="serif">Book Serif</option><option value="georgia">Georgia</option>
                     <option value="verdana">Verdana</option><option value="trebuchet">Trebuchet</option><option value="monospace">Monospace</option><option value="dyslexic">Dyslexia-friendly</option>
                   </select></label>
                   <label>Text size<select id="fs-font-size">${fontOptions(14)}</select></label>
-                  <label>Theme<select id="fs-theme-select"><option value="dark">Dark</option><option value="light" selected>Light</option></select></label>
+                  <label>Theme<select id="fs-theme-select"><option value="dark">Dark</option><option value="light">Light</option></select></label>
                   <label class="fullscreen-checkbox"><input id="fs-book-pages" type="checkbox"> Book pages</label>
                   <label>Illustrations<select id="fs-illustration-mode"><option value="off">Off</option><option value="chapter">Chapter openings</option><option value="automatic">Automatic</option></select></label>
                   <button id="fs-show-hidden-illustrations" class="secondary fullscreen-inline-button" type="button" disabled>Show hidden illustrations</button>
@@ -13227,7 +13285,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 </div>
               </details>
 
-              <p class="fullscreen-options-hint">Click text or press <kbd>Space</kbd> to pause/resume. Press <kbd>O</kbd> to restore hidden controls.</p>
+              <p class="fullscreen-options-hint">Use “Reader clicks” to choose whether text clicks control playback. Press <kbd>Space</kbd> for keyboard pause/resume. Press <kbd>O</kbd> to restore hidden controls.</p>
             </section>
           </div>
           <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
@@ -13308,7 +13366,12 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         <button id="start-reader" class="primary">Start</button>
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
-        <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. Click a word to continue from there; click empty space or press Space to pause or resume.</span>
+        <button id="reader-click-controls" class="secondary" type="button"
+                aria-pressed="${readerClickControlsEnabled ? 'true' : 'false'}"
+                title="Turn Reader text-click controls on or off.">
+          Reader clicks: ${readerClickControlsEnabled ? 'On' : 'Off'}
+        </button>
+        <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. ${readerClickControlsEnabled ? 'Click a word to move the reading position.' : 'Reader clicks are off. Read, scroll, and select text normally; use Start, Pause, or Reset only when wanted.'}</span>
       </div>
     </section>`;
 
@@ -13587,6 +13650,11 @@ document.addEventListener('keydown', state.spacebarHandler);
       return;
     }
 
+    // Passive reading mode: clicks/taps on the Reader text cannot start,
+    // resume, pause, or seek playback. Scrolling, selection, annotations,
+    // translation lookup, and explicit buttons remain available.
+    if (!readerClickControlsEnabled) return;
+
     const clickedWord = target.closest('.reader-word[data-index]');
     const clickedGroup = target.closest('.reader-group[data-start-index]');
     const mode = getSelectedMode();
@@ -13629,6 +13697,36 @@ document.addEventListener('keydown', state.spacebarHandler);
   });
   app.querySelector('#pause-reader').addEventListener('click', () => { pauseReader(); persistReaderSession(); });
   app.querySelector('#reset-reader').addEventListener('click', () => { resetReader(); persistReaderSession(); });
+
+  const syncReaderClickControlButtons = () => {
+    const label = `Reader clicks: ${readerClickControlsEnabled ? 'On' : 'Off'}`;
+    for (const selector of ['#reader-click-controls', '#fs-reader-click-controls']) {
+      const button = app.querySelector(selector);
+      if (!button) continue;
+      button.textContent = label;
+      button.setAttribute('aria-pressed', String(readerClickControlsEnabled));
+      button.title = readerClickControlsEnabled
+        ? 'Reader text clicks can move the reading position.'
+        : 'Reader text clicks are passive. Use Start, Pause, and Reset deliberately.';
+    }
+  };
+
+  const toggleReaderClickControls = () => {
+    readerClickControlsEnabled = !readerClickControlsEnabled;
+    try {
+      localStorage.setItem(READER_CLICK_CONTROLS_KEY, readerClickControlsEnabled ? 'on' : 'off');
+    } catch {}
+    syncReaderClickControlButtons();
+    updateReaderStatus(
+      readerClickControlsEnabled
+        ? 'Reader click controls are on.'
+        : 'Reader click controls are off. Read, scroll, and select text normally; Reader clicks will not control playback.'
+    );
+  };
+
+  app.querySelector('#reader-click-controls')?.addEventListener('click', toggleReaderClickControls);
+  app.querySelector('#fs-reader-click-controls')?.addEventListener('click', toggleReaderClickControls);
+  syncReaderClickControlButtons();
   app.querySelector('#check-comprehension')?.addEventListener('click', startComprehensionCheck);
   app.querySelector('#fs-check-comprehension')?.addEventListener('click', startComprehensionCheck);
   app.querySelector('#bionic-reading').addEventListener('change', (event) => {
