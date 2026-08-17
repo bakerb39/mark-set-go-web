@@ -1,0 +1,115 @@
+/* Mark, Set, Go! workspace experiment */
+.msg-workspace-shell{
+  --msg-secondary-width: 520px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 8px minmax(340px,var(--msg-secondary-width));
+  width:100%;
+  min-width:0;
+  align-items:stretch;
+}
+.msg-workspace-primary{min-width:0;overflow:visible}
+.msg-workspace-divider{
+  position:relative;
+  cursor:col-resize;
+  touch-action:none;
+  background:transparent;
+  z-index:4;
+}
+.msg-workspace-divider::before{
+  content:"";
+  position:absolute;
+  top:8px;bottom:8px;left:3px;width:2px;
+  border-radius:2px;
+  background:#d7dee8;
+}
+.msg-workspace-divider:hover::before,
+body.msg-workspace-resizing .msg-workspace-divider::before{background:#17365d}
+body.msg-workspace-resizing{cursor:col-resize!important;user-select:none!important}
+.msg-workspace-secondary{
+  min-width:0;
+  min-height:640px;
+  background:#fff;
+  border:1px solid #dbe2ea;
+  border-radius:12px;
+  overflow:hidden;
+  box-shadow:0 8px 26px rgba(17,40,70,.10);
+  display:flex;
+  flex-direction:column;
+  position:sticky;
+  top:8px;
+  align-self:start;
+  height:calc(100vh - 24px);
+}
+.msg-workspace-shell.is-closed{grid-template-columns:minmax(0,1fr) 0 0}
+.msg-workspace-shell.is-closed .msg-workspace-divider,
+.msg-workspace-shell.is-closed .msg-workspace-secondary{display:none}
+.msg-workspace-panel-head{
+  flex:0 0 auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:8px 10px;
+  border-bottom:1px solid #e1e6ed;
+  background:#f8fafc;
+}
+.msg-workspace-panel-tabs{display:flex;gap:6px;min-width:0}
+.msg-workspace-panel-tabs button,
+.msg-workspace-close,
+.msg-browser-toolbar button{
+  border:1px solid #cbd5e1;
+  background:#fff;
+  color:#17365d;
+  border-radius:8px;
+  min-height:34px;
+  padding:6px 10px;
+  font:inherit;
+  cursor:pointer;
+}
+.msg-workspace-panel-tabs button.active{
+  background:#17365d;
+  border-color:#17365d;
+  color:#fff;
+}
+.msg-workspace-close{font-size:22px;line-height:1;width:36px;padding:0}
+.msg-workspace-panel-body{flex:1 1 auto;min-height:0;overflow:auto}
+.msg-workspace-panel{min-height:100%;background:#fff}
+
+/* Make the existing Symposium usable in a side pane without changing its logic. */
+.msg-workspace-symposium .symposium-page{padding:12px!important}
+.msg-workspace-symposium .symposium-hero{grid-template-columns:1fr!important;padding:18px!important;gap:12px!important}
+.msg-workspace-symposium .symposium-hero h1{font-size:clamp(1.45rem,2vw,2rem)!important}
+.msg-workspace-symposium .symposium-badge{min-width:0!important;width:auto!important}
+.msg-workspace-symposium .symposium-layout{grid-template-columns:1fr!important;gap:12px!important}
+.msg-workspace-symposium .symposium-panel{min-width:0!important}
+.msg-workspace-symposium .symposium-stage{min-height:560px}
+.msg-workspace-symposium .symposium-mode-grid{grid-template-columns:1fr 1fr!important}
+
+.msg-browser{display:flex;flex-direction:column;min-height:100%;height:100%}
+.msg-browser-toolbar{flex:0 0 auto;padding:10px;border-bottom:1px solid #e1e6ed;background:#fff}
+.msg-browser-address-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:7px}
+.msg-browser-address{
+  width:100%;min-width:0;box-sizing:border-box;
+  border:1px solid #bfc9d5;border-radius:8px;
+  min-height:38px;padding:7px 10px;font:inherit;color:#172b4d;background:#fff;
+}
+.msg-browser-address:focus{outline:2px solid rgba(23,54,93,.18);border-color:#17365d}
+.msg-browser-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.msg-browser-actions [data-msg-browser-import]{background:#17365d;color:#fff;border-color:#17365d}
+.msg-browser-actions button:disabled{opacity:.45;cursor:not-allowed}
+.msg-browser-status{flex:0 0 auto;padding:8px 12px;font-size:.86rem;color:#526173;background:#f8fafc;border-bottom:1px solid #e6ebf0}
+.msg-browser-status.error{color:#8a1c1c;background:#fff5f5}
+.msg-browser-status.success{color:#244e2e;background:#f3fbf4}
+.msg-browser-frame-wrap{position:relative;flex:1 1 auto;min-height:0;background:#f1f4f8}
+.msg-browser-frame{width:100%;height:100%;min-height:560px;border:0;background:#fff;display:block}
+.msg-browser-frame[hidden]{display:none}
+.msg-browser-start{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:36px;color:#526173}
+.msg-browser-start[hidden]{display:none}
+.msg-browser-start>span{font-size:42px}.msg-browser-start h2{margin:8px 0 4px;color:#17365d}.msg-browser-start p{max-width:430px;margin:0;line-height:1.5}
+
+@media(max-width:900px){
+  .msg-workspace-shell:not(.is-closed){grid-template-columns:1fr;grid-template-rows:auto 0 minmax(360px,48vh)}
+  .msg-workspace-shell:not(.is-closed) .msg-workspace-divider{display:none}
+  .msg-workspace-secondary{position:relative;top:auto;height:48vh;min-height:360px;border-radius:10px;margin-top:10px}
+  .msg-workspace-symposium .symposium-mode-grid{grid-template-columns:1fr!important}
+}
