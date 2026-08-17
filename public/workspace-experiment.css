@@ -113,3 +113,258 @@ body.msg-workspace-resizing{cursor:col-resize!important;user-select:none!importa
   .msg-workspace-secondary{position:relative;top:auto;height:48vh;min-height:360px;border-radius:10px;margin-top:10px}
   .msg-workspace-symposium .symposium-mode-grid{grid-template-columns:1fr!important}
 }
+
+/* v0.2 — wide multi-pane workspace + compact secondary UI
+   When a second tool is open, use the browser real estate instead of the
+   normal single-page app width. Reader typography itself is left alone. */
+body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
+  width:min(1880px, calc(100vw - 24px)) !important;
+  max-width:none !important;
+  margin-left:auto !important;
+  margin-right:auto !important;
+}
+
+.msg-workspace-shell:not(.is-closed){
+  grid-template-columns:minmax(640px,1fr) 8px minmax(420px,var(--msg-secondary-width));
+}
+
+/* Compact workspace chrome */
+.msg-workspace-panel-head{padding:6px 8px}
+.msg-workspace-panel-tabs{gap:5px}
+.msg-workspace-panel-tabs button,
+.msg-workspace-close,
+.msg-browser-toolbar button{
+  min-height:30px;
+  padding:4px 8px;
+  border-radius:7px;
+  font-size:.82rem;
+}
+.msg-workspace-close{width:32px;padding:0;font-size:19px}
+
+/* Symposium: intentionally denser when it shares the screen with Reader. */
+.msg-workspace-symposium .symposium-page{
+  padding:10px !important;
+  font-size:13px;
+}
+.msg-workspace-symposium .symposium-hero{
+  display:grid !important;
+  grid-template-columns:minmax(0,1.45fr) minmax(165px,.75fr) !important;
+  align-items:start !important;
+  gap:12px !important;
+  margin-bottom:10px !important;
+  padding:14px 15px !important;
+  border-radius:16px !important;
+}
+.msg-workspace-symposium .symposium-kicker{font-size:.65rem !important}
+.msg-workspace-symposium .symposium-hero h1{
+  font-size:clamp(1.35rem,1.6vw,1.75rem) !important;
+  line-height:1.03 !important;
+  margin:.3rem 0 .45rem !important;
+}
+.msg-workspace-symposium .symposium-hero p{
+  font-size:.80rem !important;
+  line-height:1.45 !important;
+}
+.msg-workspace-symposium .symposium-badge{
+  min-width:0 !important;
+  width:auto !important;
+  padding:10px 11px !important;
+  border-radius:13px !important;
+}
+.msg-workspace-symposium .symposium-badge strong{font-size:.88rem !important}
+.msg-workspace-symposium .symposium-badge small{
+  margin-top:4px !important;
+  font-size:.72rem !important;
+  line-height:1.38 !important;
+}
+.msg-workspace-symposium .symposium-layout{gap:10px !important}
+.msg-workspace-symposium .symposium-panel{border-radius:14px !important}
+.msg-workspace-symposium .symposium-panel-head{
+  padding:11px 13px 8px !important;
+}
+.msg-workspace-symposium .symposium-panel-head h2{
+  margin-bottom:2px !important;
+  font-size:1rem !important;
+}
+.msg-workspace-symposium .symposium-panel-head p{
+  font-size:.75rem !important;
+  line-height:1.35 !important;
+}
+.msg-workspace-symposium .symposium-setup{
+  padding:10px 12px 13px !important;
+  gap:10px !important;
+}
+.msg-workspace-symposium .symposium-setup label{
+  gap:5px !important;
+  font-size:.76rem !important;
+}
+.msg-workspace-symposium .symposium-setup input,
+.msg-workspace-symposium .symposium-setup textarea,
+.msg-workspace-symposium .symposium-setup select{
+  padding:7px 9px !important;
+  border-radius:8px !important;
+  font-size:.79rem !important;
+}
+.msg-workspace-symposium .symposium-setup textarea{
+  min-height:70px !important;
+  line-height:1.35 !important;
+}
+.msg-workspace-symposium .symposium-mode-grid{gap:6px !important}
+.msg-workspace-symposium .symposium-mode span{
+  padding:7px 9px !important;
+  border-radius:9px !important;
+  font-size:.78rem !important;
+}
+.msg-workspace-symposium .symposium-mode small{
+  margin-top:2px !important;
+  font-size:.69rem !important;
+}
+.msg-workspace-symposium .symposium-context-choice{gap:5px !important}
+.msg-workspace-symposium .symposium-context-choice button,
+.msg-workspace-symposium .symposium-mini-button{
+  padding:5px 8px !important;
+  font-size:.72rem !important;
+}
+.msg-workspace-symposium .symposium-roster{
+  max-height:260px !important;
+  gap:5px !important;
+}
+.msg-workspace-symposium .symposium-person{
+  grid-template-columns:auto 32px 1fr !important;
+  gap:6px !important;
+  padding:6px !important;
+  border-radius:9px !important;
+}
+.msg-workspace-symposium .symposium-avatar{
+  width:30px !important;
+  height:30px !important;
+  font-size:.66rem !important;
+  border-width:1px !important;
+}
+.msg-workspace-symposium .symposium-person strong{font-size:.78rem !important}
+.msg-workspace-symposium .symposium-person small{
+  margin-top:1px !important;
+  font-size:.66rem !important;
+}
+.msg-workspace-symposium .symposium-custom-row{gap:5px !important}
+.msg-workspace-symposium .symposium-custom-row button,
+.msg-workspace-symposium .symposium-start{
+  padding:7px 10px !important;
+  border-radius:8px !important;
+  font-size:.78rem !important;
+}
+.msg-workspace-symposium .symposium-start{padding:9px 11px !important}
+.msg-workspace-symposium .symposium-stage{min-height:500px !important}
+.msg-workspace-symposium .symposium-stage-toolbar{
+  padding:8px 10px !important;
+  gap:7px !important;
+}
+.msg-workspace-symposium .symposium-stage-status{font-size:.76rem !important}
+.msg-workspace-symposium .symposium-stage-actions{gap:5px !important}
+.msg-workspace-symposium .symposium-stage-actions button{
+  padding:5px 7px !important;
+  border-radius:7px !important;
+  font-size:.70rem !important;
+}
+.msg-workspace-symposium .symposium-transcript{
+  padding:10px !important;
+  gap:8px !important;
+  min-height:300px !important;
+  max-height:610px !important;
+}
+.msg-workspace-symposium .symposium-empty{
+  padding:24px !important;
+  font-size:.78rem !important;
+}
+.msg-workspace-symposium .symposium-empty .symposium-empty-icon{
+  font-size:2rem !important;
+  margin-bottom:7px !important;
+}
+.msg-workspace-symposium .symposium-empty h2{font-size:1.1rem !important}
+.msg-workspace-symposium .symposium-turn{
+  grid-template-columns:32px minmax(0,1fr) !important;
+  gap:7px !important;
+}
+.msg-workspace-symposium .symposium-turn.user{
+  grid-template-columns:minmax(0,1fr) 32px !important;
+}
+.msg-workspace-symposium .symposium-turn-body{
+  padding:8px 9px !important;
+  border-radius:10px !important;
+}
+.msg-workspace-symposium .symposium-turn-head{margin-bottom:4px !important}
+.msg-workspace-symposium .symposium-turn-head strong{font-size:.78rem !important}
+.msg-workspace-symposium .symposium-turn-head span{font-size:.66rem !important}
+.msg-workspace-symposium .symposium-turn-body p{
+  font-size:.78rem !important;
+  line-height:1.45 !important;
+}
+.msg-workspace-symposium .symposium-turn-tools{margin-top:5px !important}
+.msg-workspace-symposium .symposium-turn-tools button{font-size:.68rem !important}
+.msg-workspace-symposium .symposium-participate{
+  padding:9px 10px !important;
+}
+.msg-workspace-symposium .symposium-participate label{font-size:.70rem !important}
+.msg-workspace-symposium .symposium-user-grid{
+  grid-template-columns:110px 1fr auto !important;
+  gap:6px !important;
+  margin-top:5px !important;
+}
+.msg-workspace-symposium .symposium-user-grid select,
+.msg-workspace-symposium .symposium-user-grid textarea{
+  padding:6px 8px !important;
+  border-radius:7px !important;
+  font-size:.76rem !important;
+}
+.msg-workspace-symposium .symposium-user-grid textarea{min-height:42px !important}
+.msg-workspace-symposium .symposium-user-grid button{
+  padding:7px 9px !important;
+  border-radius:7px !important;
+  font-size:.76rem !important;
+}
+.msg-workspace-symposium .symposium-hint{
+  margin-top:4px !important;
+  font-size:.66rem !important;
+}
+.msg-workspace-symposium .symposium-source-pill{
+  margin-top:5px !important;
+  padding:3px 6px !important;
+  font-size:.63rem !important;
+}
+
+/* Browser side pane uses the same denser scale. */
+.msg-workspace-browser{font-size:13px}
+.msg-browser-toolbar{padding:8px}
+.msg-browser-address-form{gap:5px}
+.msg-browser-address{
+  min-height:33px;
+  padding:5px 8px;
+  border-radius:7px;
+  font-size:.80rem;
+}
+.msg-browser-actions{gap:5px;margin-top:6px}
+.msg-browser-status{padding:6px 9px;font-size:.74rem}
+.msg-browser-start{padding:24px;font-size:.80rem}
+.msg-browser-start>span{font-size:32px}
+.msg-browser-start h2{font-size:1.1rem}
+
+@media(max-width:1100px){
+  body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
+    width:calc(100vw - 16px) !important;
+  }
+  .msg-workspace-shell:not(.is-closed){
+    grid-template-columns:minmax(500px,1fr) 8px minmax(380px,var(--msg-secondary-width));
+  }
+}
+
+@media(max-width:900px){
+  body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
+    width:auto !important;
+  }
+  .msg-workspace-symposium .symposium-hero{
+    grid-template-columns:1fr !important;
+  }
+  .msg-workspace-symposium .symposium-user-grid{
+    grid-template-columns:1fr !important;
+  }
+}
