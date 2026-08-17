@@ -180,6 +180,17 @@
     tools.querySelectorAll('.reader-font-group .reader-quick-item').forEach((item) => {
       item.style.setProperty('width', '24px', 'important');
       item.style.setProperty('color', '#ffffff', 'important');
+      item.style.setProperty('-webkit-text-fill-color', '#ffffff', 'important');
+      item.style.setProperty('opacity', '1', 'important');
+      item.style.setProperty('text-shadow', 'none', 'important');
+      item.style.setProperty('filter', 'none', 'important');
+    });
+
+    const minusItem = tools.querySelector('[data-reader-font-decrease]');
+    const plusItem = tools.querySelector('[data-reader-font-increase]');
+    [minusItem, plusItem].forEach((item) => {
+      if (!item) return;
+      item.style.setProperty('font-weight', '700', 'important');
     });
 
     const innerDivider = tools.querySelector('.reader-font-divider');
@@ -215,7 +226,7 @@
     const controlsRect = controls.getBoundingClientRect();
     const fullRect = fullscreen.getBoundingClientRect();
     const toolsRect = tools.getBoundingClientRect();
-    const gap = 8;
+    const gap = 16;
 
     const left = Math.max(0, fullRect.left - controlsRect.left - toolsRect.width - gap);
     const top = fullRect.top - controlsRect.top + (fullRect.height - toolsRect.height) / 2;
