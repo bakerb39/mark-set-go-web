@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.4.1
+ * Mark, Set, Go! Workspace Experiment v0.4.2
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -226,6 +226,118 @@
   let activePanelKey = '';
   let secondaryWidth = Math.max(420, Math.min(760, Math.round(window.innerWidth * 0.42)));
 
+  async function workspaceClerkToken() {
+    const candidates = [
+      () => window.Clerk?.session?.getToken?.(),
+      () => window.MarkSetGoAuth?.getToken?.(),
+      () => window.MarkSetGoAuth?.session?.getToken?.()
+    ];
+    for (const getToken of candidates) {
+      try {
+        const token = await getToken();
+        if (typeof token === 'string' && token.trim()) return token.trim();
+      } catch {}
+    }
+    return '';
+  }
+
+  async function workspaceYouTubeSearch(query, title = 'YouTube search') {
+    const cleanQuery = String(query || '').trim();
+    if (!cleanQuery) return;
+
+    const dock = document.querySelector('#music-dock');
+    const player = document.querySelector('#music-player');
+    const playerWrap = document.querySelector('#music-player-wrap');
+    const nowTitle = document.querySelector('#music-now-title');
+    const nowSource = document.querySelector('#music-now-source');
+    const nextButton = document.querySelector('#music-next');
+
+    if (nowTitle) nowTitle.textContent = String(title || 'YouTube search');
+    if (nowSource) nowSource.textContent = 'Searching YouTube…';
+    if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
+    if (playerWrap) playerWrap.hidden = false;
+    if (player) player.src = '';
+    if (nextButton) nextButton.hidden = true;
+
+    const request = async (token = '') => {
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+      const response = await fetch(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers
+      });
+      const payload = await response.json().catch(() => ({}));
+      return { response, payload };
+    };
+
+    try {
+      let token = await workspaceClerkToken();
+      let result = await request(token);
+
+      // Clerk can finish restoring the browser session a fraction after app.js.
+      // Retry an auth failure once with a freshly requested session token.
+      if ((result.response.status === 401 || result.response.status === 403)) {
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+        const refreshedToken = await workspaceClerkToken();
+        if (refreshedToken && refreshedToken !== token) {
+          token = refreshedToken;
+          result = await request(token);
+        }
+      }
+
+      if (!result.response.ok) {
+        throw new Error(result.payload?.detail || result.payload?.error || `Music search failed (HTTP ${result.response.status}).`);
+      }
+
+      const videoIds = Array.isArray(result.payload?.videoIds)
+        ? result.payload.videoIds.filter((id) => /^[A-Za-z0-9_-]{11}$/.test(String(id || ''))).slice(0, 12)
+        : [];
+      if (!videoIds.length) throw new Error('No playable YouTube results were found.');
+
+      const search = { query: cleanQuery, title: String(title || 'YouTube search'), videoIds, index: 0 };
+      const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoIds[0])}?autoplay=1&playsinline=1&rel=0`;
+      const choice = {
+        title: search.title,
+        source: `YouTube result 1 of ${videoIds.length}`,
+        provider: 'youtube',
+        src,
+        search
+      };
+
+      if (typeof window.playMusic === 'function') {
+        window.playMusic(choice);
+      } else {
+        if (nowTitle) nowTitle.textContent = choice.title;
+        if (nowSource) nowSource.textContent = choice.source;
+        if (player) player.src = src;
+        if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
+        if (playerWrap) playerWrap.hidden = false;
+        if (nextButton) nextButton.hidden = videoIds.length < 2;
+      }
+
+      try {
+        localStorage.setItem('markSetGoMusic', JSON.stringify({
+          title: choice.title,
+          source: choice.source,
+          provider: 'youtube',
+          src,
+          search
+        }));
+      } catch {}
+    } catch (error) {
+      if (nowSource) nowSource.textContent = error?.message || 'Music search failed';
+      if (player) player.src = '';
+      if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
+      if (playerWrap) playerWrap.hidden = false;
+      console.warn('Workspace music search failed:', error);
+    }
+  }
+
+  // Search-driven music is the one music path that hits a protected API.
+  // Route every caller (Reader mood/score and workspace suggestions) through the
+  // authenticated outer window while leaving normal/static playback untouched.
+  try { window.playYouTubeSearch = workspaceYouTubeSearch; } catch {}
+
   const escapeWorkspaceHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -317,15 +429,15 @@
     if (event.data?.type === 'msg-workspace-music-search') {
       const query = String(event.data.query || '').trim();
       const title = String(event.data.title || 'Suggested music').trim();
-      if (query && typeof playYouTubeSearch === 'function') {
-        playYouTubeSearch(query, title);
+      if (query && typeof window.playYouTubeSearch === 'function') {
+        window.playYouTubeSearch(query, title);
       }
       return;
     }
     if (event.data?.type === 'msg-workspace-music-play') {
       const choice = event.data.choice;
-      if (choice && typeof playMusic === 'function') {
-        playMusic(choice);
+      if (choice && typeof window.playMusic === 'function') {
+        window.playMusic(choice);
       }
       return;
     }
