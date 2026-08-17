@@ -630,7 +630,7 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
 }
 
 
-/* v0.4.8 — Reader controls while a workspace pane is open.
+/* v0.4.9 — Reader controls while a workspace pane is open.
    WPM remains in its original footer. Only font resize + music + Full screen
    share the Reader's upper-right flex row, so all three follow Reader width. */
 #app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-pane-controls{
@@ -646,7 +646,8 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
   justify-content:flex-end !important;
   gap:8px !important;
   width:auto !important;
-  transform:none !important;
+  /* Move the one shared three-control div upward together. */
+  transform:translateY(-16px) !important;
   flex:0 0 auto !important;
 }
 #app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .reader-topright-font-control,
@@ -668,4 +669,22 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
   inset:auto !important;
   margin-left:auto !important;
   transform:none !important;
+}
+
+
+/* v0.4.9 — current-reading music suggestions in the lightweight Music pane. */
+.msg-workspace-pane-document .msg-workspace-reading-music-suggestions{
+  display:grid;
+  gap:8px;
+}
+.msg-workspace-pane-document .msg-workspace-reading-music-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:2px;
+}
+.msg-workspace-pane-document .msg-workspace-reading-music-actions button{
+  min-height:36px;
+  padding:7px 12px;
 }

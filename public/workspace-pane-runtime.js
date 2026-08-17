@@ -1,4 +1,4 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v0.4.8 */
+/* Mark, Set, Go! lightweight workspace pane runtime v0.4.9 */
 (() => {
   'use strict';
 
@@ -57,6 +57,95 @@
     return true;
   }
 
+  function parentReaderDocument() {
+    try {
+      const doc = parent?.MarkSetGoCurrentReaderDocument?.get?.();
+      if (!doc?.title) return null;
+      return {
+        title: String(doc.title || '').trim(),
+        text: String(doc.text || ''),
+        source: doc.source && typeof doc.source === 'object' ? { ...doc.source } : {}
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function parentReadingMusicQueries(doc) {
+    if (!doc?.title) return null;
+    try {
+      const recommendation = parent?.recommendedPlayerChoice?.(doc.title, doc.text);
+      if (recommendation?.scoreQuery || recommendation?.moodQuery) {
+        return {
+          suggested: String(recommendation.scoreQuery || `${doc.title} instrumental reading music`).trim(),
+          mood: String(recommendation.moodQuery || `${doc.title} atmospheric instrumental reading music`).trim()
+        };
+      }
+    } catch {}
+    return {
+      suggested: `${doc.title} instrumental reading music`,
+      mood: `${doc.title} atmospheric instrumental reading music`
+    };
+  }
+
+  function installMusicReadingSuggestions() {
+    if (mode !== 'action' || value !== 'music') return;
+    const page = document.querySelector('.music-library');
+    if (!page) return;
+    const doc = parentReaderDocument();
+    if (!doc) return;
+
+    // The workspace Music page is intentionally lightweight, so its local
+    // ReaderEngine has no active book. Reflect the one real Reader in the
+    // parent window instead of showing the misleading "No book open" state.
+    const current = page.querySelector('.music-current-book');
+    if (current) {
+      const label = current.querySelector(':scope > span');
+      const title = current.querySelector(':scope > strong');
+      const detail = current.querySelector(':scope > small');
+      if (label) label.textContent = 'Current reading';
+      if (title) title.textContent = `“${doc.title}”`;
+      if (detail) detail.textContent = 'Suggestions below are based on the Reader open beside this pane.';
+    }
+
+    page.querySelector('.msg-workspace-reading-music-suggestions')?.remove();
+    const queries = parentReadingMusicQueries(doc);
+    if (!queries) return;
+
+    const section = document.createElement('section');
+    section.className = 'music-current-book msg-workspace-reading-music-suggestions';
+    section.setAttribute('aria-label', 'Suggested music for current reading');
+
+    const eyebrow = document.createElement('span');
+    eyebrow.textContent = 'Suggested for this reading';
+    const title = document.createElement('strong');
+    title.textContent = 'Music matched to what you are reading';
+    const actions = document.createElement('div');
+    actions.className = 'msg-workspace-reading-music-actions';
+
+    const suggested = document.createElement('button');
+    suggested.type = 'button';
+    suggested.className = 'secondary';
+    suggested.textContent = '♫ Suggested music';
+    suggested.addEventListener('click', () => {
+      requestParentMusicSearch(queries.suggested, `${doc.title} — suggested music`);
+    });
+
+    const mood = document.createElement('button');
+    mood.type = 'button';
+    mood.className = 'secondary';
+    mood.textContent = '♫ Reading mood';
+    mood.addEventListener('click', () => {
+      requestParentMusicSearch(queries.mood, `${doc.title} — reading mood`);
+    });
+
+    actions.append(suggested, mood);
+    section.append(eyebrow, title, actions);
+    const primary = page.querySelector('.music-primary-section');
+    if (primary) primary.before(section);
+    else page.appendChild(section);
+  }
+
   function installWorkspaceToggle() {
     const page = document.querySelector('.profile-preferences-page');
     if (!page || page.querySelector('.msg-workspace-profile-card')) return;
@@ -102,6 +191,7 @@
     }
     if (!handled) fallbackRoute();
     if (mode === 'action' && value === 'profile-preferences') installWorkspaceToggle();
+    if (mode === 'action' && value === 'music') installMusicReadingSuggestions();
     requestAnimationFrame(() => requestAnimationFrame(() => {
       document.documentElement.classList.add('msg-workspace-pane-ready');
       sendParent('msg-workspace-pane-ready', { mode, value });
