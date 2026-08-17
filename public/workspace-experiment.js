@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.4.9
+ * Mark, Set, Go! Workspace Experiment v0.5.0
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -576,6 +576,9 @@
     const url = new URL('/workspace-pane.html', window.location.origin);
     url.searchParams.set('msgWorkspaceMode', mode);
     url.searchParams.set('msgWorkspaceValue', value);
+    // Keep the pane document/runtime in lockstep with the router and prevent an
+    // older cached pane from reviving the former hand-maintained page list.
+    url.searchParams.set('msgWorkspaceBuild', '0.5.0');
     return url.toString();
   }
 

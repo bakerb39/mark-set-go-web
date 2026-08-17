@@ -1,4 +1,4 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v0.4.9 */
+/* Mark, Set, Go! lightweight workspace pane runtime v0.5.0 */
 (() => {
   'use strict';
 
@@ -8,36 +8,10 @@
   const PREF_KEY = 'msg-workspace-optin-v1';
   const app = document.getElementById('app');
 
-  const actionRenderers = {
-    home: () => window.renderHome?.(),
-    browse: () => window.renderBrowseHub?.(),
-    'drm-free-books': () => window.renderDrmFreeBookFinder?.(),
-    'my-links': () => window.renderMyLinks?.(),
-    'my-library': () => window.renderMyLibraryHub?.(),
-    'profile-preferences': () => window.renderProfilePreferences?.(),
-    'ai-center': () => window.renderAiCenter?.(),
-    'mark-notebook': () => window.renderGlobalNotebook?.(),
-    'knowledge-graph': () => window.renderKnowledgeGraph?.(),
-    'library-bookmarks': () => window.renderLibraryRecords?.('bookmarks'),
-    'library-notes': () => window.renderLibraryRecords?.('notes'),
-    about: () => window.renderAbout?.(),
-    contact: () => window.renderContact?.(),
-    privacy: () => window.renderPrivacy?.(),
-    terms: () => window.renderTerms?.(),
-    help: () => window.renderHelp?.(),
-    music: () => window.renderMusicLibrary?.(),
-    'my-reading': () => window.renderReadingList?.(),
-    'reading-list': () => window.renderReadingList?.(),
-    'progress-dashboard': () => window.renderProgressDashboard?.(),
-    'progress-awards': () => window.renderProgressDashboard?.(),
-    'action-center': () => window.renderActionCenter?.(),
-    'vocabulary-builder': () => window.renderVocabularyBuilder?.(),
-    'reading-skills': () => window.renderReadingSkillsHub?.(),
-    'comprehension-library': () => window.renderComprehensionLibrary?.(),
-    mnemonics: () => window.renderMnemonicsPage?.(),
-    'language-learning': () => window.renderLanguageLearningPage?.(),
-    'learning-courses': () => window.renderLearningCoursesPage?.()
-  };
+  // No second page-routing table lives here. The lightweight pane replays the
+  // app's own data-action / data-read / data-test navigation event, so module-
+  // owned pages and future menu destinations work without workspace exceptions.
+
 
   function sendParent(type, extra = {}) {
     try { parent.postMessage({ type, ...extra }, location.origin); } catch {}
@@ -180,16 +154,10 @@
   }
 
   function renderRequested() {
-    let handled = false;
-    if (mode === 'action' && actionRenderers[value]) {
-      try {
-        const result = actionRenderers[value]();
-        handled = result !== undefined || Boolean(app?.children?.length);
-      } catch (error) {
-        console.warn('Workspace direct renderer failed:', value, error);
-      }
-    }
-    if (!handled) fallbackRoute();
+    // The pane is stripped of Clerk/cloud startup, but navigation itself should
+    // be identical to the main application. This one path covers Help, Topic
+    // Feeds, Great Books, Bible Study, tests, and future internal destinations.
+    fallbackRoute();
     if (mode === 'action' && value === 'profile-preferences') installWorkspaceToggle();
     if (mode === 'action' && value === 'music') installMusicReadingSuggestions();
     requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -197,6 +165,7 @@
       sendParent('msg-workspace-pane-ready', { mode, value });
     }));
   }
+
 
   // Never let a secondary page manufacture another Reader. Reader-bound actions
   // belong to the already-mounted Reader in the outer application.
