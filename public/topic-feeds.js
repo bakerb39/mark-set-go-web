@@ -2,7 +2,6 @@
   'use strict';
 
   const STORAGE_KEY = 'markSetGoTopicFeedsV1';
-  const BACKUP_STORAGE_KEY = 'markSetGoTopicFeedsV1Backup';
   const app = document.getElementById('app');
   const defaultTimezone = (() => {
     try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'; }
@@ -21,6 +20,18 @@
   let recommendationTimer = 0;
   let dailyAutoOpenAttempted = false;
   let navFrame = 0;
+
+  if (!document.getElementById('topic-feed-pane-refresh-style')) {
+    const style = document.createElement('style');
+    style.id = 'topic-feed-pane-refresh-style';
+    style.textContent = `
+      .topic-feed-sidebar-actions{display:inline-flex;align-items:center;gap:.35rem}
+      #topic-pane-refresh{width:30px;height:30px;min-width:30px;padding:0;border:1px solid #1769aa;border-radius:7px;background:#1769aa;color:#fff;font-size:19px;line-height:1;cursor:pointer;display:inline-grid;place-items:center}
+      #topic-pane-refresh:hover:not(:disabled){filter:brightness(.94)}
+      #topic-pane-refresh:disabled{opacity:.55;cursor:default}
+    `;
+    document.head.appendChild(style);
+  }
 
   // New/Edit Topic is a transactional screen. Background cloud hydration,
   // authentication refreshes, and in-flight feed refreshes must never replace
@@ -100,13 +111,6 @@
   function loadState() {
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"topics":[]}');
-      if (parsed && Array.isArray(parsed.topics) && parsed.topics.length) return normalizeState(parsed);
-
-      const backup = JSON.parse(localStorage.getItem(BACKUP_STORAGE_KEY) || '{"topics":[]}');
-      if (backup && Array.isArray(backup.topics) && backup.topics.length) {
-        return normalizeState(backup);
-      }
-
       if (parsed && Array.isArray(parsed.topics)) return normalizeState(parsed);
     } catch {}
     return normalizeState({ topics: [] });
@@ -144,15 +148,7 @@
 
   function saveLocalState() {
     try {
-      const compact = compactStateForStorage(state);
-      const serialized = JSON.stringify(compact);
-
-      // Keep a last-known-good topic snapshot. An empty/malformed cloud response
-      // must never destroy the only local copy of the reader's topic setup.
-      if (compact.topics.length) {
-        localStorage.setItem(BACKUP_STORAGE_KEY, serialized);
-      }
-      localStorage.setItem(STORAGE_KEY, serialized);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(compactStateForStorage(state)));
       return true;
     } catch (error) {
       console.warn('Topic Feed local cache could not be saved.', error);
@@ -210,11 +206,8 @@
         cloudAuthenticated = false;
         return false;
       }
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || 'Unable to load Topic Feeds.');
-      if (!payload || !Array.isArray(payload.topics)) {
-        throw new Error('Topic Feed state endpoint returned an invalid response. Keeping the local topic list.');
-      }
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Unable to load Topic Feeds.');
 
       cloudAuthenticated = true;
       let remote = normalizeState(payload);
@@ -225,14 +218,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cloudPayload())
         });
-        const imported = await importResponse.json().catch(() => null);
-        if (importResponse.ok && imported && Array.isArray(imported.topics)) {
-          remote = normalizeState(imported);
-        } else {
-          // A missing/stale server must never replace a populated local cache
-          // with an empty account response.
-          remote = normalizeState(cloudPayload());
-        }
+        const imported = await importResponse.json().catch(() => ({}));
+        if (importResponse.ok) remote = normalizeState(imported);
       }
 
       if (topicManagerIsOpen()) {
@@ -532,6 +519,8 @@
     });
   }
 
+  let topicFeedStoryHeaderObserver = null;
+  let topicFeedStoryHeaderReader = null;
   let topicFeedStoryHeaderReflowTimer = 0;
 
   function topicFeedStoryHeaderParts(reader = document.querySelector('#reader')) {
@@ -685,6 +674,23 @@
     positionTopicFeedStoryHeader();
   }
 
+  function observeTopicFeedStoryHeader() {
+    const reader = document.querySelector('#reader');
+    if (!reader || reader === topicFeedStoryHeaderReader) return;
+
+    topicFeedStoryHeaderObserver?.disconnect?.();
+    topicFeedStoryHeaderReader = reader;
+
+    topicFeedStoryHeaderObserver = new MutationObserver(() => {
+      if (!isTopicFeedReaderActive()) return;
+      window.requestAnimationFrame(() => {
+        keepTopicFeedArticleActionsInHeader();
+      });
+    });
+
+    topicFeedStoryHeaderObserver.observe(reader, { childList: true });
+  }
+
   function topicFeedSourceCredit(topic, article, payload) {
     const sourceName = String(article?.sourceName || 'Topic Feed').trim();
     const originalUrl = String(payload?.sourceUrl || article?.url || '').trim();
@@ -819,6 +825,7 @@
       // Read Anything keeps Summarize / Analyze as a direct child of #reader.
       // We preserve that contract and position it visually below this source row.
       keepTopicFeedArticleActionsInHeader();
+      observeTopicFeedStoryHeader();
       positionTopicFeedStoryHeader();
 
       return true;
@@ -834,6 +841,99 @@
           decorateTopicFeedArticleFooter();
         }
       }, delay);
+    });
+  }
+
+  function topicFeedReaderWords(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  }
+
+  function normalizeTopicFeedHeading(value) {
+    return String(value || '')
+      .toLocaleLowerCase()
+      .replace(/[^\p{L}\p{N}]+/gu, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function realignTopicFeedDocumentToc(text, toc) {
+    const entries = Array.isArray(toc) ? toc : [];
+    if (!entries.length) return [];
+
+    const sourceText = String(text || '').replace(/\r/g, '');
+    const sourceWords = topicFeedReaderWords(sourceText);
+    if (!sourceWords.length) return entries;
+
+    // Build exact line anchors using the same whitespace-only word counting
+    // used by the Reader. This prevents server/client token-count drift from
+    // styling body words immediately before a real section heading.
+    const lineAnchors = [];
+    let runningWordIndex = 0;
+    sourceText.split('\n').forEach((rawLine) => {
+      const line = String(rawLine || '').replace(/\s+/g, ' ').trim();
+      const count = topicFeedReaderWords(line).length;
+      if (line && count) {
+        lineAnchors.push({
+          key: normalizeTopicFeedHeading(line),
+          index: runningWordIndex
+        });
+      }
+      runningWordIndex += count;
+    });
+
+    const normalizedSourceWords = sourceWords.map(normalizeTopicFeedHeading);
+    let previousResolvedIndex = -1;
+
+    const nearestCandidate = (indexes, approximateIndex) => {
+      const usable = indexes.filter((index) => index > previousResolvedIndex);
+      const pool = usable.length ? usable : indexes;
+      if (!pool.length) return null;
+      const approximate = Number.isFinite(Number(approximateIndex))
+        ? Number(approximateIndex)
+        : previousResolvedIndex + 1;
+      return pool.reduce((best, index) => (
+        best === null || Math.abs(index - approximate) < Math.abs(best - approximate)
+          ? index
+          : best
+      ), null);
+    };
+
+    return entries.map((entry) => {
+      const title = String(entry?.title || '').trim();
+      const key = normalizeTopicFeedHeading(title);
+      if (!title || !key) return entry;
+
+      const approximateIndex = Number(entry?.index);
+      const exactLineIndexes = lineAnchors
+        .filter((anchor) => anchor.key === key)
+        .map((anchor) => anchor.index);
+
+      let resolvedIndex = nearestCandidate(exactLineIndexes, approximateIndex);
+
+      // Fallback for sources that flatten headings onto the same line as body
+      // text. Match the heading token sequence and choose the occurrence nearest
+      // the server's approximate index while keeping TOC order monotonic.
+      if (resolvedIndex === null) {
+        const headingWords = topicFeedReaderWords(title).map(normalizeTopicFeedHeading).filter(Boolean);
+        const matches = [];
+        if (headingWords.length) {
+          for (let index = 0; index <= normalizedSourceWords.length - headingWords.length; index += 1) {
+            let matchesHeading = true;
+            for (let offset = 0; offset < headingWords.length; offset += 1) {
+              if (normalizedSourceWords[index + offset] !== headingWords[offset]) {
+                matchesHeading = false;
+                break;
+              }
+            }
+            if (matchesHeading) matches.push(index);
+          }
+        }
+        resolvedIndex = nearestCandidate(matches, approximateIndex);
+      }
+
+      if (resolvedIndex === null) return entry;
+      previousResolvedIndex = resolvedIndex;
+      return { ...entry, index: resolvedIndex };
     });
   }
 
@@ -861,7 +961,7 @@
         articleId: article.id || '',
         fullArticle: payload.fullArticle !== false,
         importWarning: payload.warning || '',
-        documentToc: Array.isArray(payload.documentToc) ? payload.documentToc : [],
+        documentToc: realignTopicFeedDocumentToc(payload.text, payload.documentToc),
         importedAt: new Date().toISOString()
       }
     });
@@ -896,7 +996,6 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             url: article.url, title: article.title, summary: article.summary || '',
-            feedText: article.feedText || article.feedContent || article.fullText || '',
             source: article.sourceName || 'Topic Feed', publisherUrl: article.sourceUrl || ''
           })
         });
@@ -1063,7 +1162,7 @@
         </header>
         <div class="topic-feeds-layout">
           <aside class="topic-feeds-sidebar">
-            <div class="topic-feed-sidebar-head"><strong>Topics &amp; feeds</strong><button id="topic-new" type="button" aria-label="New topic">+</button></div>
+            <div class="topic-feed-sidebar-head"><strong>Topics &amp; feeds</strong><span class="topic-feed-sidebar-actions"><button id="topic-pane-refresh" type="button" aria-label="Refresh latest stories" title="Refresh latest stories" ${(loading || preparing) ? 'disabled' : ''}>↻</button><button id="topic-new" type="button" aria-label="New topic">+</button></span></div>
             ${sidebarMarkup(topic)}
           </aside>
           <div class="topic-feeds-content">
@@ -1116,17 +1215,14 @@
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Recommendations unavailable.');
       const existing = new Set([...document.querySelectorAll('.topic-source-url')].map((input) => cleanUrl(input.value)).filter(Boolean));
-      const recommended = Array.isArray(payload.sources) ? payload.sources : [];
-      const items = recommended.filter((source) => !existing.has(cleanUrl(source.url)));
+      const items = (payload.sources || []).filter((source) => !existing.has(cleanUrl(source.url)));
       container.innerHTML = items.length ? items.map((source) => `
         <article class="topic-feed-recommendation">
           <div><strong>${escapeHtml(source.name)}</strong><p>${escapeHtml(source.description || '')}</p></div>
           <button type="button" data-add-recommended-feed="${escapeHtml(source.key)}"
                   data-feed-name="${escapeHtml(source.name)}" data-feed-type="${escapeHtml(source.type || 'website')}"
                   data-feed-url="${escapeHtml(source.url)}">Add</button>
-        </article>`).join('') : recommended.length
-          ? '<p class="topic-recommendation-note">You already added the recommended feeds shown for this topic.</p>'
-          : '<p class="topic-recommendation-note">No recommended feeds were returned for this topic yet. You can still add a feed URL below.</p>';
+        </article>`).join('') : '<p class="topic-recommendation-note">You already added the recommended feeds shown for this topic.</p>';
     } catch (error) {
       container.innerHTML = `<p class="topic-recommendation-note">${escapeHtml(error.message)}</p>`;
     }
@@ -1317,6 +1413,7 @@
     document.getElementById('topic-crypto-starter')?.addEventListener('click', starterCryptoTopic);
     document.getElementById('topic-manage')?.addEventListener('click', showManager);
     document.getElementById('topic-refresh')?.addEventListener('click', () => { void refreshTopic(); });
+    document.getElementById('topic-pane-refresh')?.addEventListener('click', () => { void refreshTopic(); });
     document.getElementById('topic-clear-source')?.addEventListener('click', () => { activeSourceId = ''; render(); });
 
     document.querySelectorAll('[data-topic-id]').forEach((button) => button.addEventListener('click', () => {
@@ -1343,7 +1440,7 @@
 
   function markTopicPaneUserIntent(open) {
     // Save the user's intent BEFORE app.js changes the layout. The My Topics
-    // reader reflow can run during the same click; without this guard it can
+    // MutationObserver can run during the same click; without this guard it can
     // see the old "open" preference and immediately reopen a panel the user
     // just closed.
     saveTopicReaderPanePreference(open);
@@ -1383,11 +1480,14 @@
 
   let topicBookPageGeometryTimer = 0;
   let topicBookDividerResizeObserver = null;
+  let topicBookDividerClassObserver = null;
   let topicBookDividerFrame = null;
 
   function removeTopicBookDivider() {
     topicBookDividerResizeObserver?.disconnect?.();
     topicBookDividerResizeObserver = null;
+    topicBookDividerClassObserver?.disconnect?.();
+    topicBookDividerClassObserver = null;
 
     const frame = topicBookDividerFrame || document.querySelector('#reader-frame');
     frame?.querySelectorAll('[data-topic-feed-book-divider]').forEach((node) => node.remove());
@@ -1457,6 +1557,16 @@
         topicBookDividerResizeObserver.observe(reader);
       }
 
+      topicBookDividerClassObserver = new MutationObserver(() => {
+        window.requestAnimationFrame(() => {
+          positionTopicBookDivider();
+          positionTopicFeedStoryHeader();
+        });
+      });
+      topicBookDividerClassObserver.observe(reader, {
+        attributes: true,
+        attributeFilter: ['class', 'style']
+      });
     }
 
     positionTopicBookDivider();
@@ -1499,7 +1609,7 @@
       reader.dataset.topicFeedGeometrySynced = signature;
 
       // app.js already has the correct Book Pages reflow logic and a
-      // existing resize/reflow logic on #reader. A temporary 4px navigation-width nudge makes
+      // ResizeObserver on #reader. A temporary 4px navigation-width nudge makes
       // that existing observer see the final panel geometry after state.bookPages
       // is active. The property is restored immediately on the next frame.
       const previousInline = layout.style.getPropertyValue('--navigation-width');
@@ -1524,7 +1634,8 @@
     if (!isTopicFeedReaderActive()) return;
 
     // A real user click always wins over automatic restoration. This prevents
-    // the close/open flicker caused by decorateReaderNavigation() running during the same interaction.
+    // the close/open flicker caused by decorateReaderNavigation() running from
+    // MutationObserver changes during the same interaction.
     if (Date.now() < topicPaneUserIntentUntil) return;
 
     const layout = document.querySelector('#reader-layout');
@@ -1559,7 +1670,7 @@
       toggle.dataset.topicFeedStickyBound = '1';
 
       // Capture phase is deliberate: persist the desired state before app.js's
-      // own click handler changes the Reader layout.
+      // own click handler changes classes and triggers MutationObserver work.
       toggle.addEventListener('click', () => {
         if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
 
@@ -1766,6 +1877,9 @@
     navFrame = requestAnimationFrame(decorateReaderNavigation);
   }
 
+  const appObserver = app ? new MutationObserver(() => scheduleReaderNavigation()) : null;
+  if (appObserver && app) appObserver.observe(app, { childList:true, subtree:true });
+
   document.addEventListener('marksetgo:auth-changed', (event) => {
     if (event.detail?.authenticated) void hydrateCloudState();
     else cloudAuthenticated = false;
@@ -1818,24 +1932,7 @@
       window.requestAnimationFrame(() => {
         ensureTopicBookDivider();
         positionTopicFeedStoryHeader();
-        scheduleReaderNavigation();
       });
-    }
-  });
-
-  // Explicit event-driven refresh for Reader controls that rebuild or resize
-  // the Topic Feed view. No DOM mutation observer is used.
-  document.addEventListener('click', (event) => {
-    if (!isTopicFeedReaderActive()) return;
-    if (event.target.closest?.(
-      '#toggle-navigation-pane, #close-navigation-pane, #toggle-mark-panel, ' +
-      '[data-reader-tab], [data-reader-mode], [data-action="reader"], [data-topic-read]'
-    )) {
-      window.setTimeout(scheduleReaderNavigation, 0);
-      window.setTimeout(() => {
-        ensureTopicBookDivider();
-        positionTopicFeedStoryHeader();
-      }, 80);
     }
   });
 
