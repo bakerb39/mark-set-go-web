@@ -1,4 +1,4 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v0.4.4 */
+/* Mark, Set, Go! lightweight workspace pane runtime v0.4.5 */
 (() => {
   'use strict';
 
@@ -41,6 +41,20 @@
 
   function sendParent(type, extra = {}) {
     try { parent.postMessage({ type, ...extra }, location.origin); } catch {}
+  }
+
+  function requestParentMusicSearch(query, title = 'Suggested music') {
+    const cleanQuery = String(query || '').trim();
+    if (!cleanQuery) return false;
+    try {
+      const direct = parent?.MSGWorkspaceExperiment?.musicSearch;
+      if (typeof direct === 'function') {
+        direct(cleanQuery, String(title || 'Suggested music'));
+        return true;
+      }
+    } catch {}
+    sendParent('msg-workspace-music-search', { query: cleanQuery, title: String(title || 'Suggested music') });
+    return true;
   }
 
   function installWorkspaceToggle() {
@@ -106,7 +120,7 @@
           event.preventDefault();
           event.stopImmediatePropagation();
           const label = String(suggestedMusic.textContent || 'Suggested music').replace(/^\s*♫\s*/, '').trim();
-          sendParent('msg-workspace-music-search', { query, title: label || 'Suggested music' });
+          requestParentMusicSearch(query, label || 'Suggested music');
           return;
         }
       } catch {}

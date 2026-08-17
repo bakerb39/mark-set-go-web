@@ -1323,6 +1323,13 @@ async function playYouTubeSearch(query, title = 'YouTube search') {
   if (!cleanQuery) return;
   if (window.__MSG_WORKSPACE_PANE__ && window.parent && window.parent !== window) {
     try {
+      const direct = window.parent?.MSGWorkspaceExperiment?.musicSearch;
+      if (typeof direct === 'function') {
+        direct(cleanQuery, String(title || 'YouTube search'));
+        return;
+      }
+    } catch {}
+    try {
       window.parent.postMessage({
         type: 'msg-workspace-music-search',
         query: cleanQuery,

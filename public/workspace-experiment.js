@@ -513,6 +513,24 @@
     return advanceTopicFeedStory(key === '.' ? 1 : -1);
   }
 
+  // Suggested-music links can appear in either the outer app or a lightweight
+  // workspace page. In the outer app, route them straight into the one shared
+  // music player instead of opening a separate YouTube tab.
+  document.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    const link = target?.closest?.('.book-music-link');
+    if (!link?.href) return;
+    try {
+      const url = new URL(link.href, window.location.href);
+      const query = url.searchParams.get('search_query') || url.searchParams.get('q') || '';
+      if (!query) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const label = String(link.textContent || 'Suggested music').replace(/^\s*♫\s*/, '').trim();
+      workspaceYouTubeSearch(query, label || 'Suggested music');
+    } catch {}
+  }, true);
+
   document.addEventListener('keydown', (event) => {
     if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key !== ',' && event.key !== '.') return;
@@ -1029,6 +1047,7 @@
     close: closeWorkspacePanel,
     browser: () => showWorkspacePanel('browser'),
     symposium: () => showWorkspacePanel('symposium'),
+    musicSearch: (query, title) => workspaceYouTubeSearch(query, title),
     enabled: workspaceEnabled,
     setEnabled: (enabled) => { writeWorkspacePreference(Boolean(enabled)); installProfileWorkspaceToggle(document); if (!enabled) closeWorkspacePanel(); }
   });
