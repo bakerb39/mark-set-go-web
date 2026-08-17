@@ -92,8 +92,10 @@
       tools.className = 'reader-quick-tools';
       tools.setAttribute('aria-label', 'Reader quick controls');
       tools.innerHTML = `
-        <button type="button" class="reader-quick-font" data-reader-font-decrease aria-label="Decrease reader font size" title="Smaller text">−</button>
-        <button type="button" class="reader-quick-font" data-reader-font-increase aria-label="Increase reader font size" title="Larger text">+</button>
+        <div class="reader-font-stepper" role="group" aria-label="Reader font size">
+          <button type="button" data-reader-font-decrease aria-label="Decrease reader font size" title="Smaller text">−</button>
+          <button type="button" data-reader-font-increase aria-label="Increase reader font size" title="Larger text">+</button>
+        </div>
       `;
       controls.appendChild(tools);
 
@@ -101,8 +103,7 @@
       tools.querySelector('[data-reader-font-increase]')?.addEventListener('click', () => changeReaderFont(1));
     }
 
-    // Move only the MUSIC BUTTON into the floating quick-tools group.
-    // Full screen stays untouched in its native app position.
+    // Keep the music button in the same compact row, after the font stepper.
     if (music.parentElement !== tools) tools.appendChild(music);
 
     controls.style.setProperty('position', 'relative', 'important');
@@ -112,50 +113,72 @@
       position: 'absolute',
       display: 'flex',
       alignItems: 'center',
-      gap: '5px',
+      gap: '6px',
       margin: '0',
-      zIndex: '40'
+      zIndex: '40',
+      whiteSpace: 'nowrap'
     });
 
-    tools.querySelectorAll('button').forEach(button => {
+    const stepper = tools.querySelector('.reader-font-stepper');
+    Object.assign(stepper.style, {
+      display: 'inline-flex',
+      alignItems: 'center',
+      height: '28px',
+      border: '1px solid #b9c7d6',
+      borderRadius: '7px',
+      overflow: 'hidden',
+      background: '#ffffff',
+      boxShadow: '0 1px 2px rgba(15, 35, 55, .08)'
+    });
+
+    const minus = tools.querySelector('[data-reader-font-decrease]');
+    const plus = tools.querySelector('[data-reader-font-increase]');
+
+    [minus, plus].forEach((button, index) => {
+      if (!button) return;
       button.style.setProperty('position', 'static', 'important');
       button.style.setProperty('inset', 'auto', 'important');
       button.style.setProperty('margin', '0', 'important');
       button.style.setProperty('transform', 'none', 'important');
+      button.style.setProperty('width', '25px', 'important');
+      button.style.setProperty('height', '28px', 'important');
+      button.style.setProperty('min-width', '25px', 'important');
+      button.style.setProperty('padding', '0', 'important');
+      button.style.setProperty('border', '0', 'important');
+      button.style.setProperty('border-left', index === 1 ? '1px solid #d6dee7' : '0', 'important');
+      button.style.setProperty('border-radius', '0', 'important');
+      button.style.setProperty('background', '#ffffff', 'important');
+      button.style.setProperty('color', '#173f67', 'important');
+      button.style.setProperty('font-size', '16px', 'important');
+      button.style.setProperty('line-height', '1', 'important');
+      button.style.setProperty('font-weight', '600', 'important');
+      button.style.setProperty('cursor', 'pointer', 'important');
+      button.style.setProperty('box-shadow', 'none', 'important');
     });
+
+    music.style.setProperty('position', 'static', 'important');
+    music.style.setProperty('inset', 'auto', 'important');
+    music.style.setProperty('margin', '0', 'important');
+    music.style.setProperty('transform', 'none', 'important');
+    music.style.setProperty('width', '28px', 'important');
+    music.style.setProperty('height', '28px', 'important');
+    music.style.setProperty('min-width', '28px', 'important');
+    music.style.setProperty('padding', '0', 'important');
+    music.style.setProperty('border-radius', '7px', 'important');
 
     const controlsRect = controls.getBoundingClientRect();
     const fullRect = fullscreen.getBoundingClientRect();
-
-    // Measure after the toolbar is assembled.
     const toolsRect = tools.getBoundingClientRect();
     const gap = 8;
 
-    // Put the entire toolbar immediately LEFT of Full screen and vertically centered.
-    const left = fullRect.left - controlsRect.left - toolsRect.width - gap;
+    // Position the complete compact group immediately left of Full screen.
+    const left = Math.max(0, fullRect.left - controlsRect.left - toolsRect.width - gap);
     const top = fullRect.top - controlsRect.top + (fullRect.height - toolsRect.height) / 2;
 
     tools.style.setProperty('left', `${Math.round(left)}px`, 'important');
     tools.style.setProperty('top', `${Math.round(top)}px`, 'important');
     tools.style.setProperty('right', 'auto', 'important');
     tools.style.setProperty('bottom', 'auto', 'important');
-
-    // Compact, matching controls.
-    tools.querySelectorAll('.reader-quick-font').forEach(button => {
-      button.style.setProperty('width', '30px', 'important');
-      button.style.setProperty('height', '30px', 'important');
-      button.style.setProperty('min-width', '30px', 'important');
-      button.style.setProperty('padding', '0', 'important');
-      button.style.setProperty('border-radius', '7px', 'important');
-      button.style.setProperty('font-size', '20px', 'important');
-      button.style.setProperty('line-height', '1', 'important');
-      button.style.setProperty('font-weight', '700', 'important');
-    });
-
-    music.style.setProperty('width', '30px', 'important');
-    music.style.setProperty('height', '30px', 'important');
-    music.style.setProperty('min-width', '30px', 'important');
-    music.style.setProperty('padding', '0', 'important');
   }
 
   let scheduled = false;
