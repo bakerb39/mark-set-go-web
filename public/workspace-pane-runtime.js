@@ -1,4 +1,4 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v0.4.0 */
+/* Mark, Set, Go! lightweight workspace pane runtime v0.4.1 */
 (() => {
   'use strict';
 
@@ -97,6 +97,21 @@
   // Never let a secondary page manufacture another Reader. Reader-bound actions
   // belong to the already-mounted Reader in the outer application.
   document.addEventListener('click', (event) => {
+    const suggestedMusic = event.target.closest?.('.book-music-link');
+    if (suggestedMusic?.href) {
+      try {
+        const target = new URL(suggestedMusic.href, location.href);
+        const query = target.searchParams.get('search_query') || target.searchParams.get('q') || '';
+        if (query) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          const label = String(suggestedMusic.textContent || 'Suggested music').replace(/^\s*♫\s*/, '').trim();
+          sendParent('msg-workspace-music-search', { query, title: label || 'Suggested music' });
+          return;
+        }
+      } catch {}
+    }
+
     const readerAction = event.target.closest?.('[data-action="reader"]');
     if (!readerAction) return;
     event.preventDefault();

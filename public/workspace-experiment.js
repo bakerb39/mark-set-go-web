@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.4.0
+ * Mark, Set, Go! Workspace Experiment v0.4.1
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -312,6 +312,21 @@
     }
     if (event.data?.type === 'msg-workspace-return-reader') {
       closeWorkspacePanel();
+      return;
+    }
+    if (event.data?.type === 'msg-workspace-music-search') {
+      const query = String(event.data.query || '').trim();
+      const title = String(event.data.title || 'Suggested music').trim();
+      if (query && typeof playYouTubeSearch === 'function') {
+        playYouTubeSearch(query, title);
+      }
+      return;
+    }
+    if (event.data?.type === 'msg-workspace-music-play') {
+      const choice = event.data.choice;
+      if (choice && typeof playMusic === 'function') {
+        playMusic(choice);
+      }
       return;
     }
     if (event.data?.type === 'msg-workspace-preference') {

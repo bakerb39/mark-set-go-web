@@ -1321,6 +1321,16 @@ function parseYouTubeInput(rawValue) {
 async function playYouTubeSearch(query, title = 'YouTube search') {
   const cleanQuery = String(query || '').trim();
   if (!cleanQuery) return;
+  if (window.__MSG_WORKSPACE_PANE__ && window.parent && window.parent !== window) {
+    try {
+      window.parent.postMessage({
+        type: 'msg-workspace-music-search',
+        query: cleanQuery,
+        title: String(title || 'YouTube search')
+      }, window.location.origin);
+    } catch {}
+    return;
+  }
   musicNowTitle.textContent = title;
   musicNowSource.textContent = 'Searching YouTube…';
   musicDock.hidden = false;
@@ -1364,6 +1374,15 @@ function playMusicSearchCandidate(index) {
 }
 
 function playMusic(choiceOrParsed) {
+  if (window.__MSG_WORKSPACE_PANE__ && window.parent && window.parent !== window) {
+    try {
+      window.parent.postMessage({
+        type: 'msg-workspace-music-play',
+        choice: choiceOrParsed || null
+      }, window.location.origin);
+    } catch {}
+    return;
+  }
   musicSearchState = choiceOrParsed?.search || null;
   if (musicNextButton) musicNextButton.hidden = !musicSearchState?.videoIds?.length;
   const isChoice = Boolean(choiceOrParsed?.youtubeId);
