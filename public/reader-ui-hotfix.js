@@ -52,6 +52,32 @@
     if (fsSelect) fsSelect.value = String(next);
   }
 
+  function canonicalNotebookLabel() {
+    const live = window.MSGCompanion?.config;
+    if (live?.name) return `${String(live.name).trim()}'s Notebook`;
+
+    let id = 'mark';
+    try {
+      id = String(
+        localStorage.getItem('msg_companion_persona_v2') ||
+        localStorage.getItem('msg_companion_persona_v1') ||
+        'mark'
+      ).toLowerCase();
+    } catch {}
+
+    if (id === 'chad') return "Chad's Notebook";
+    if (id === 'beth') return "Beth's Notebook";
+    return "Mark's Notebook";
+  }
+
+  function stabilizeNotebookHeading() {
+    const heading = document.querySelector('#app .askmark-subhead h3');
+    if (!heading) return;
+    const label = canonicalNotebookLabel();
+    if (heading.textContent !== label) heading.textContent = label;
+  }
+
+
   function ensureQuickTools() {
     const app = document.querySelector('#app');
     const fullscreen = app?.querySelector('#toggle-reader-fullscreen');
@@ -143,6 +169,7 @@
         button.style.setProperty('cursor', 'pointer', 'important');
         button.style.setProperty('z-index', '50', 'important');
       });
+      stabilizeNotebookHeading();
       ensureQuickTools();
     });
   }
@@ -157,6 +184,7 @@
 
   window.addEventListener('resize', schedule, { passive: true });
   document.addEventListener('marksetgo:document-available', schedule);
+  window.addEventListener('msg:companion-changed', schedule);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', schedule, { once: true });
