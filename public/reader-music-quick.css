@@ -574,3 +574,80 @@
   border-color:#5b88aa;
   outline:none;
 }
+
+
+/* v1.5.3 — one Reader command row, structurally.
+   .reader-topright-media-stack is now a CHILD of .reader-pane-buttons.
+   The left Reader actions stay left; text size, Music, and Full screen use
+   margin-left:auto and therefore sit at the far right of that same flex row.
+   This final block intentionally overrides all older floating/translate rules. */
+#app .reader-pane-controls.ask-mark-toolbar > .reader-pane-buttons,
+#app .reader-pane-controls > .reader-pane-buttons {
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  width:100% !important;
+  flex:1 1 100% !important;
+  gap:8px !important;
+}
+
+#app .reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack {
+  position:static !important;
+  inset:auto !important;
+  margin:0 0 0 auto !important;
+  padding:0 !important;
+  display:inline-flex !important;
+  flex-direction:row !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  width:auto !important;
+  min-width:0 !important;
+  flex:0 0 auto !important;
+  transform:none !important;
+  overflow:visible !important;
+  z-index:auto !important;
+}
+
+#app .reader-pane-controls.ask-mark-toolbar .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-font-control,
+#app .reader-pane-controls.ask-mark-toolbar .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-music-toggle,
+#app .reader-pane-controls.ask-mark-toolbar .reader-pane-buttons > .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button,
+#app .reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-font-control,
+#app .reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-music-toggle,
+#app .reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button {
+  position:static !important;
+  inset:auto !important;
+  top:auto !important;
+  right:auto !important;
+  bottom:auto !important;
+  left:auto !important;
+  margin:0 !important;
+  transform:none !important;
+  align-self:center !important;
+  flex:0 0 auto !important;
+  order:initial !important;
+}
+
+/* styles.css has an older desktop rule that absolutely positions Full screen
+   anywhere under .ask-mark-toolbar.  The more specific rule above/below keeps
+   the EXISTING fullscreen DOM node in the shared right-side group instead. */
+@media (min-width:701px) {
+  #app .reader-pane-controls.ask-mark-toolbar .reader-pane-buttons > .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button {
+    position:static !important;
+    top:auto !important;
+    right:auto !important;
+    left:auto !important;
+    bottom:auto !important;
+    margin:0 !important;
+    transform:none !important;
+  }
+}
+
+/* Workspace resizing must never move this group independently from its row. */
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack {
+  position:static !important;
+  inset:auto !important;
+  margin-left:auto !important;
+  transform:none !important;
+}

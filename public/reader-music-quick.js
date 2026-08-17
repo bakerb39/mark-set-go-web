@@ -535,8 +535,9 @@
 
   function insertTopRightMusicButton() {
     const paneControls = document.querySelector('#app .reader-pane-controls');
+    const paneButtons = paneControls?.querySelector(':scope > .reader-pane-buttons') || paneControls?.querySelector('.reader-pane-buttons');
     const fullscreenButton = paneControls?.querySelector('#toggle-reader-fullscreen');
-    if (!paneControls || !fullscreenButton) {
+    if (!paneControls || !paneButtons || !fullscreenButton) {
       speedButton = null;
       fontControl = null;
       return;
@@ -555,8 +556,13 @@
       stack = document.createElement('div');
       stack.className = 'reader-topright-media-stack';
       stack.setAttribute('aria-label', 'Reader text, music, and fullscreen controls');
-      fullscreenButton.parentNode.insertBefore(stack, fullscreenButton);
     }
+
+    // The utility cluster is part of the SAME command row as Marks & Contents /
+    // Ask Mark.  Keeping it inside .reader-pane-buttons means one flex row owns
+    // both sides: normal Reader controls on the left and text/music/fullscreen on
+    // the far right.  No floating/translate positioning is necessary.
+    if (stack.parentElement !== paneButtons) paneButtons.appendChild(stack);
 
     const textSize = ensureTopRightFontControl(stack);
 
