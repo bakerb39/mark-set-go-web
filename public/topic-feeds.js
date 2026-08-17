@@ -2,6 +2,7 @@
   'use strict';
 
   const STORAGE_KEY = 'markSetGoTopicFeedsV1';
+  const BACKUP_STORAGE_KEY = 'markSetGoTopicFeedsV1Backup';
   const app = document.getElementById('app');
   const defaultTimezone = (() => {
     try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York'; }
@@ -20,19 +21,6 @@
   let recommendationTimer = 0;
   let dailyAutoOpenAttempted = false;
   let navFrame = 0;
-
-  if (!document.getElementById('topic-feed-pane-refresh-style')) {
-    const style = document.createElement('style');
-    style.id = 'topic-feed-pane-refresh-style';
-    style.textContent = `
-      .topic-feed-sidebar-actions{display:inline-flex;align-items:center;gap:.35rem}
-      #topic-pane-refresh{width:30px;height:30px;min-width:30px;padding:0;border:1px solid #1769aa;border-radius:7px;background:#1769aa;color:#fff;font-size:19px;line-height:1;cursor:pointer;display:inline-grid;place-items:center}
-      #topic-pane-refresh:hover:not(:disabled){filter:brightness(.94)}
-      #topic-pane-refresh:disabled{opacity:.55;cursor:default}
-      .topic-reader-article.is-current-story{box-shadow:inset 0 0 0 1px #1769aa;border-radius:6px}
-    `;
-    document.head.appendChild(style);
-  }
 
   // New/Edit Topic is a transactional screen. Background cloud hydration,
   // authentication refreshes, and in-flight feed refreshes must never replace
@@ -112,6 +100,13 @@
   function loadState() {
     try {
       const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{"topics":[]}');
+      if (parsed && Array.isArray(parsed.topics) && parsed.topics.length) return normalizeState(parsed);
+
+      const backup = JSON.parse(localStorage.getItem(BACKUP_STORAGE_KEY) || '{"topics":[]}');
+      if (backup && Array.isArray(backup.topics) && backup.topics.length) {
+        return normalizeState(backup);
+      }
+
       if (parsed && Array.isArray(parsed.topics)) return normalizeState(parsed);
     } catch {}
     return normalizeState({ topics: [] });
@@ -149,7 +144,15 @@
 
   function saveLocalState() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(compactStateForStorage(state)));
+      const compact = compactStateForStorage(state);
+      const serialized = JSON.stringify(compact);
+
+      // Keep a last-known-good topic snapshot. An empty/malformed cloud response
+      // must never destroy the only local copy of the reader's topic setup.
+      if (compact.topics.length) {
+        localStorage.setItem(BACKUP_STORAGE_KEY, serialized);
+      }
+      localStorage.setItem(STORAGE_KEY, serialized);
       return true;
     } catch (error) {
       console.warn('Topic Feed local cache could not be saved.', error);
@@ -207,8 +210,11 @@
         cloudAuthenticated = false;
         return false;
       }
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Unable to load Topic Feeds.');
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || 'Unable to load Topic Feeds.');
+      if (!payload || !Array.isArray(payload.topics)) {
+        throw new Error('Topic Feed state endpoint returned an invalid response. Keeping the local topic list.');
+      }
 
       cloudAuthenticated = true;
       let remote = normalizeState(payload);
@@ -219,8 +225,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cloudPayload())
         });
-        const imported = await importResponse.json().catch(() => ({}));
-        if (importResponse.ok) remote = normalizeState(imported);
+        const imported = await importResponse.json().catch(() => null);
+        if (importResponse.ok && imported && Array.isArray(imported.topics)) {
+          remote = normalizeState(imported);
+        } else {
+          // A missing/stale server must never replace a populated local cache
+          // with an empty account response.
+          remote = normalizeState(cloudPayload());
+        }
       }
 
       if (topicManagerIsOpen()) {
@@ -520,8 +532,6 @@
     });
   }
 
-  let topicFeedStoryHeaderObserver = null;
-  let topicFeedStoryHeaderReader = null;
   let topicFeedStoryHeaderReflowTimer = 0;
 
   function topicFeedStoryHeaderParts(reader = document.querySelector('#reader')) {
@@ -675,23 +685,6 @@
     positionTopicFeedStoryHeader();
   }
 
-  function observeTopicFeedStoryHeader() {
-    const reader = document.querySelector('#reader');
-    if (!reader || reader === topicFeedStoryHeaderReader) return;
-
-    topicFeedStoryHeaderObserver?.disconnect?.();
-    topicFeedStoryHeaderReader = reader;
-
-    topicFeedStoryHeaderObserver = new MutationObserver(() => {
-      if (!isTopicFeedReaderActive()) return;
-      window.requestAnimationFrame(() => {
-        keepTopicFeedArticleActionsInHeader();
-      });
-    });
-
-    topicFeedStoryHeaderObserver.observe(reader, { childList: true });
-  }
-
   function topicFeedSourceCredit(topic, article, payload) {
     const sourceName = String(article?.sourceName || 'Topic Feed').trim();
     const originalUrl = String(payload?.sourceUrl || article?.url || '').trim();
@@ -826,7 +819,6 @@
       // Read Anything keeps Summarize / Analyze as a direct child of #reader.
       // We preserve that contract and position it visually below this source row.
       keepTopicFeedArticleActionsInHeader();
-      observeTopicFeedStoryHeader();
       positionTopicFeedStoryHeader();
 
       return true;
@@ -904,6 +896,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             url: article.url, title: article.title, summary: article.summary || '',
+            feedText: article.feedText || article.feedContent || article.fullText || '',
             source: article.sourceName || 'Topic Feed', publisherUrl: article.sourceUrl || ''
           })
         });
@@ -1070,7 +1063,7 @@
         </header>
         <div class="topic-feeds-layout">
           <aside class="topic-feeds-sidebar">
-            <div class="topic-feed-sidebar-head"><strong>Topics &amp; feeds</strong><span class="topic-feed-sidebar-actions"><button id="topic-pane-refresh" type="button" aria-label="Refresh latest stories" title="Refresh latest stories" ${(loading || preparing) ? 'disabled' : ''}>↻</button><button id="topic-new" type="button" aria-label="New topic">+</button></span></div>
+            <div class="topic-feed-sidebar-head"><strong>Topics &amp; feeds</strong><button id="topic-new" type="button" aria-label="New topic">+</button></div>
             ${sidebarMarkup(topic)}
           </aside>
           <div class="topic-feeds-content">
@@ -1123,14 +1116,17 @@
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Recommendations unavailable.');
       const existing = new Set([...document.querySelectorAll('.topic-source-url')].map((input) => cleanUrl(input.value)).filter(Boolean));
-      const items = (payload.sources || []).filter((source) => !existing.has(cleanUrl(source.url)));
+      const recommended = Array.isArray(payload.sources) ? payload.sources : [];
+      const items = recommended.filter((source) => !existing.has(cleanUrl(source.url)));
       container.innerHTML = items.length ? items.map((source) => `
         <article class="topic-feed-recommendation">
           <div><strong>${escapeHtml(source.name)}</strong><p>${escapeHtml(source.description || '')}</p></div>
           <button type="button" data-add-recommended-feed="${escapeHtml(source.key)}"
                   data-feed-name="${escapeHtml(source.name)}" data-feed-type="${escapeHtml(source.type || 'website')}"
                   data-feed-url="${escapeHtml(source.url)}">Add</button>
-        </article>`).join('') : '<p class="topic-recommendation-note">You already added the recommended feeds shown for this topic.</p>';
+        </article>`).join('') : recommended.length
+          ? '<p class="topic-recommendation-note">You already added the recommended feeds shown for this topic.</p>'
+          : '<p class="topic-recommendation-note">No recommended feeds were returned for this topic yet. You can still add a feed URL below.</p>';
     } catch (error) {
       container.innerHTML = `<p class="topic-recommendation-note">${escapeHtml(error.message)}</p>`;
     }
@@ -1321,7 +1317,6 @@
     document.getElementById('topic-crypto-starter')?.addEventListener('click', starterCryptoTopic);
     document.getElementById('topic-manage')?.addEventListener('click', showManager);
     document.getElementById('topic-refresh')?.addEventListener('click', () => { void refreshTopic(); });
-    document.getElementById('topic-pane-refresh')?.addEventListener('click', () => { void refreshTopic(); });
     document.getElementById('topic-clear-source')?.addEventListener('click', () => { activeSourceId = ''; render(); });
 
     document.querySelectorAll('[data-topic-id]').forEach((button) => button.addEventListener('click', () => {
@@ -1348,7 +1343,7 @@
 
   function markTopicPaneUserIntent(open) {
     // Save the user's intent BEFORE app.js changes the layout. The My Topics
-    // MutationObserver can run during the same click; without this guard it can
+    // reader reflow can run during the same click; without this guard it can
     // see the old "open" preference and immediately reopen a panel the user
     // just closed.
     saveTopicReaderPanePreference(open);
@@ -1388,14 +1383,11 @@
 
   let topicBookPageGeometryTimer = 0;
   let topicBookDividerResizeObserver = null;
-  let topicBookDividerClassObserver = null;
   let topicBookDividerFrame = null;
 
   function removeTopicBookDivider() {
     topicBookDividerResizeObserver?.disconnect?.();
     topicBookDividerResizeObserver = null;
-    topicBookDividerClassObserver?.disconnect?.();
-    topicBookDividerClassObserver = null;
 
     const frame = topicBookDividerFrame || document.querySelector('#reader-frame');
     frame?.querySelectorAll('[data-topic-feed-book-divider]').forEach((node) => node.remove());
@@ -1465,16 +1457,6 @@
         topicBookDividerResizeObserver.observe(reader);
       }
 
-      topicBookDividerClassObserver = new MutationObserver(() => {
-        window.requestAnimationFrame(() => {
-          positionTopicBookDivider();
-          positionTopicFeedStoryHeader();
-        });
-      });
-      topicBookDividerClassObserver.observe(reader, {
-        attributes: true,
-        attributeFilter: ['class', 'style']
-      });
     }
 
     positionTopicBookDivider();
@@ -1517,7 +1499,7 @@
       reader.dataset.topicFeedGeometrySynced = signature;
 
       // app.js already has the correct Book Pages reflow logic and a
-      // ResizeObserver on #reader. A temporary 4px navigation-width nudge makes
+      // existing resize/reflow logic on #reader. A temporary 4px navigation-width nudge makes
       // that existing observer see the final panel geometry after state.bookPages
       // is active. The property is restored immediately on the next frame.
       const previousInline = layout.style.getPropertyValue('--navigation-width');
@@ -1542,8 +1524,7 @@
     if (!isTopicFeedReaderActive()) return;
 
     // A real user click always wins over automatic restoration. This prevents
-    // the close/open flicker caused by decorateReaderNavigation() running from
-    // MutationObserver changes during the same interaction.
+    // the close/open flicker caused by decorateReaderNavigation() running during the same interaction.
     if (Date.now() < topicPaneUserIntentUntil) return;
 
     const layout = document.querySelector('#reader-layout');
@@ -1578,7 +1559,7 @@
       toggle.dataset.topicFeedStickyBound = '1';
 
       // Capture phase is deliberate: persist the desired state before app.js's
-      // own click handler changes classes and triggers MutationObserver work.
+      // own click handler changes the Reader layout.
       toggle.addEventListener('click', () => {
         if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
 
@@ -1655,7 +1636,6 @@
         <h2>My Topics</h2>
         <div class="topic-reader-nav-actions">
           <span data-reader-bookmark-slot></span>
-          <button type="button" data-reader-refresh-topics title="Refresh all topics with the latest stories">↻ Refresh</button>
           <button type="button" data-reader-manage-topics>Manage</button>
         </div>
       </div>
@@ -1670,7 +1650,7 @@
             return `<div class="topic-reader-source" data-reader-topic-source-block="${escapeHtml(source.id)}">
               <div class="topic-reader-source-head"><strong>${escapeHtml(source.name)}</strong><span>${sourceArticleCount(topic, source.id, true)} new</span></div>
               ${articles.length ? articles.map((article, index) => `<button type="button"
-                 class="topic-reader-article ${article.read ? 'is-read' : ''} ${article.id === window.MSGTopicFeedReaderContext?.articleId ? 'is-current-story' : ''}"
+                 class="topic-reader-article ${article.read ? 'is-read' : ''}"
                  ${index >= initialLimit ? 'hidden data-reader-topic-overflow="1"' : ''}
                  data-reader-topic-article="${escapeHtml(article.id)}"
                  data-reader-topic-parent="${escapeHtml(topic.id)}">
@@ -1685,126 +1665,6 @@
           }).join('')}
         </details>`).join('') : '<p class="navigation-empty">No Topic Feeds yet.</p>'}
     </div>`;
-  }
-
-  let readerTopicsRefreshing = false;
-
-  function rebuildReaderTopicListPreservingControls() {
-    const pane = document.querySelector('#navigation-pane');
-    const view = pane?.querySelector('[data-reader-view="contents"]');
-    const existingNav = view?.querySelector('.topic-reader-nav');
-    if (!view || !existingNav) return;
-
-    const scrollTop = Math.max(0, Number(pane.scrollTop) || 0);
-    const openTopicIds = new Set(
-      Array.from(existingNav.querySelectorAll('.topic-reader-group[open]'))
-        .map((details) => details.querySelector('[data-reader-topic-parent]')?.dataset.readerTopicParent || details.querySelector('summary strong')?.textContent || '')
-        .filter(Boolean)
-    );
-    const nativeBookmarkButton = existingNav.querySelector('#add-bookmark');
-
-    const holder = document.createElement('div');
-    holder.innerHTML = readerTopicListMarkup();
-    const freshNav = holder.firstElementChild;
-    if (!freshNav) return;
-
-    if (nativeBookmarkButton) {
-      const bookmarkSlot = freshNav.querySelector('[data-reader-bookmark-slot]');
-      bookmarkSlot?.replaceChildren(nativeBookmarkButton);
-    }
-
-    // Preserve which topic cards were expanded. Prefer IDs from article buttons,
-    // and fall back to matching the visible topic name when a topic has no stories.
-    freshNav.querySelectorAll('.topic-reader-group').forEach((details) => {
-      const articleButton = details.querySelector('[data-reader-topic-parent]');
-      const key = articleButton?.dataset.readerTopicParent || details.querySelector('summary strong')?.textContent || '';
-      if (openTopicIds.has(key)) details.open = true;
-    });
-
-    existingNav.replaceWith(freshNav);
-    pane.scrollTop = scrollTop;
-  }
-
-  async function refreshReaderTopics(trigger) {
-    if (readerTopicsRefreshing) return;
-    const topics = state.topics.filter((topic) => Array.isArray(topic.sources) && topic.sources.length);
-    if (!topics.length) return;
-
-    readerTopicsRefreshing = true;
-    const originalLabel = trigger?.textContent || '↻ Refresh';
-    if (trigger) {
-      trigger.disabled = true;
-      trigger.textContent = 'Refreshing…';
-    }
-
-    try {
-      for (const topic of topics) {
-        if (cloudAuthenticated) {
-          const response = await fetch('/api/topic-feeds/refresh', {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topicId: topic.id })
-          });
-          const payload = await response.json().catch(() => ({}));
-          if (!response.ok) throw new Error(payload.error || `Unable to refresh ${topic.name}.`);
-
-          const index = state.topics.findIndex((item) => item.id === topic.id);
-          if (index >= 0 && payload.topic) {
-            const live = state.topics[index];
-            state.topics[index] = {
-              ...payload.topic,
-              id: live.id,
-              name: live.name,
-              cadence: live.cadence,
-              maxRecommended: live.maxRecommended,
-              preferences: live.preferences,
-              sources: live.sources,
-              articles: filterArticlesForSources(payload.topic.articles, live.sources),
-              lastErrors: Array.isArray(payload.topic.lastErrors) ? payload.topic.lastErrors : (live.lastErrors || [])
-            };
-          }
-        } else {
-          const response = await fetch('/api/topic-feeds/fetch', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ topic: topic.name, sources: topic.sources })
-          });
-          const payload = await response.json().catch(() => ({}));
-          if (!response.ok) throw new Error(payload.error || `Unable to refresh ${topic.name}.`);
-
-          const existingRead = new Set((topic.articles || []).filter((article) => article.read).map((article) => article.url));
-          topic.articles = (payload.articles || []).map((article) => ({ ...article, read: existingRead.has(article.url) }));
-          topic.lastErrors = payload.sources?.filter?.((source) => !source.ok).map((source) => source.error) || [];
-          topic.lastRefresh = new Date().toISOString();
-          curate(topic);
-          const selected = [...topic.articles].sort((a,b) => Number(b.recommended)-Number(a.recommended)).slice(0,60);
-          await prefetchArticles(selected, { wait: true }).catch(() => null);
-          topic.preparedAt = new Date().toISOString();
-        }
-      }
-
-      saveState({ cloud: false });
-      rebuildReaderTopicListPreservingControls();
-      scheduleReaderNavigation();
-    } catch (error) {
-      console.warn('Reader topic refresh failed:', error);
-      if (trigger) {
-        trigger.textContent = 'Refresh failed';
-        trigger.title = error?.message || 'Unable to refresh topics.';
-        window.setTimeout(() => {
-          if (!trigger.isConnected) return;
-          trigger.textContent = originalLabel;
-          trigger.title = 'Refresh all topics with the latest stories';
-        }, 2200);
-      }
-    } finally {
-      readerTopicsRefreshing = false;
-      if (trigger?.isConnected) {
-        trigger.disabled = false;
-        if (trigger.textContent === 'Refreshing…') trigger.textContent = originalLabel;
-      }
-    }
   }
 
   function decorateReaderNavigation() {
@@ -1855,12 +1715,6 @@
       render();
     }, { once:true });
 
-    const readerRefreshButton = view.querySelector('[data-reader-refresh-topics]');
-    if (readerRefreshButton && readerRefreshButton.dataset.bound !== '1') {
-      readerRefreshButton.dataset.bound = '1';
-      readerRefreshButton.addEventListener('click', () => { void refreshReaderTopics(readerRefreshButton); });
-    }
-
     view.querySelectorAll('[data-reader-topic-article]').forEach((button) => {
       if (button.dataset.bound === '1') return;
       button.dataset.bound = '1';
@@ -1872,13 +1726,6 @@
           openArticle(article, button, topic);
         }
       });
-    });
-
-    view.querySelectorAll('[data-reader-topic-article]').forEach((button) => {
-      const current = button.dataset.readerTopicArticle === window.MSGTopicFeedReaderContext?.articleId;
-      button.classList.toggle('is-current-story', current);
-      if (current) button.setAttribute('aria-current', 'true');
-      else button.removeAttribute('aria-current');
     });
 
     view.querySelectorAll('[data-reader-topic-more]').forEach((button) => {
@@ -1918,69 +1765,6 @@
     cancelAnimationFrame(navFrame);
     navFrame = requestAnimationFrame(decorateReaderNavigation);
   }
-
-  const appObserver = app ? new MutationObserver(() => scheduleReaderNavigation()) : null;
-  if (appObserver && app) appObserver.observe(app, { childList:true, subtree:true });
-
-  // Topic Feed story keyboard navigation. The Reader already owns Left/Right
-  // Arrow for manual pacing, so use comma/period shortcuts instead of
-  // intercepting those established Reader controls.
-  let topicStoryKeyboardOpening = false;
-
-  function orderedArticlesForCurrentTopicFeed() {
-    const context = window.MSGTopicFeedReaderContext;
-    if (!context?.topicId) return { topic: null, articles: [] };
-
-    const topic = state.topics.find((item) => item.id === context.topicId);
-    if (!topic) return { topic: null, articles: [] };
-
-    const sourceId = String(context.sourceId || '');
-    const articles = (topic.articles || [])
-      .filter((article) => !sourceId || String(article.sourceClientId || '') === sourceId)
-      .slice()
-      .sort((a, b) => new Date(b.publishedAt || b.published || b.fetchedAt || 0) - new Date(a.publishedAt || a.published || a.fetchedAt || 0));
-
-    return { topic, articles };
-  }
-
-  async function cycleTopicStory(direction) {
-    if (topicStoryKeyboardOpening || !isTopicFeedReaderActive()) return;
-
-    const context = window.MSGTopicFeedReaderContext;
-    const { topic, articles } = orderedArticlesForCurrentTopicFeed();
-    if (!topic || articles.length < 2) return;
-
-    const currentIndex = articles.findIndex((article) => article.id === context?.articleId);
-    if (currentIndex < 0) return;
-
-    const nextIndex = (currentIndex + direction + articles.length) % articles.length;
-    const article = articles[nextIndex];
-    if (!article || article.id === context?.articleId) return;
-
-    topicStoryKeyboardOpening = true;
-    try {
-      captureTopicReaderScroll(article.id);
-      await openArticle(article, null, topic);
-    } finally {
-      topicStoryKeyboardOpening = false;
-    }
-  }
-
-  document.addEventListener('keydown', (event) => {
-    if (!isTopicFeedReaderActive() || event.defaultPrevented || event.repeat) return;
-    if (event.ctrlKey || event.metaKey || event.altKey) return;
-
-    const target = event.target;
-    const tag = String(target?.tagName || '').toLowerCase();
-    if (target?.isContentEditable || ['input', 'textarea', 'select'].includes(tag)) return;
-
-    const key = String(event.key || '');
-    if (key !== ',' && key !== '.') return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    void cycleTopicStory(key === '.' ? 1 : -1);
-  });
 
   document.addEventListener('marksetgo:auth-changed', (event) => {
     if (event.detail?.authenticated) void hydrateCloudState();
@@ -2034,7 +1818,24 @@
       window.requestAnimationFrame(() => {
         ensureTopicBookDivider();
         positionTopicFeedStoryHeader();
+        scheduleReaderNavigation();
       });
+    }
+  });
+
+  // Explicit event-driven refresh for Reader controls that rebuild or resize
+  // the Topic Feed view. No DOM mutation observer is used.
+  document.addEventListener('click', (event) => {
+    if (!isTopicFeedReaderActive()) return;
+    if (event.target.closest?.(
+      '#toggle-navigation-pane, #close-navigation-pane, #toggle-mark-panel, ' +
+      '[data-reader-tab], [data-reader-mode], [data-action="reader"], [data-topic-read]'
+    )) {
+      window.setTimeout(scheduleReaderNavigation, 0);
+      window.setTimeout(() => {
+        ensureTopicBookDivider();
+        positionTopicFeedStoryHeader();
+      }, 80);
     }
   });
 

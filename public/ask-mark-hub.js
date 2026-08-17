@@ -9,24 +9,48 @@
   const transformApi = () => window.MarkSetGoReadAnything;
 
   const COMPANION_STORAGE_KEY = 'msg_companion_persona_v2';
-  const COMPANION_CONFIGS = Object.freeze({
-    mark: Object.freeze({ id:'mark', name:'Mark', ask:'Ask Mark', notebook:'Mark’s Notebook', avatar:'/assets/ask-mark/ask-mark-avatar.png' }),
-    beth: Object.freeze({ id:'beth', name:'Beth', ask:'Ask Beth', notebook:'Beth’s Notebook', avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9' }),
-    chad: Object.freeze({ id:'chad', name:'Chad', ask:'Ask Chad', notebook:'Chad’s Notebook', avatar:'/assets/companions/chad/chad-avatar.png' }),
-    scott: Object.freeze({ id:'scott', name:'Scott', ask:'Ask Scott', notebook:'Scott’s Notebook', avatar:'/assets/companions/scott/scott-avatar.png?v=20260816-scott-button-fix-2' })
-  });
   const companionConfig = () => {
-    let selected = 'mark';
-    try {
-      selected = String(
-        localStorage.getItem(COMPANION_STORAGE_KEY) ||
-        localStorage.getItem('msg_companion_persona_v1') ||
-        'mark'
-      ).toLowerCase();
-    } catch {}
-    // Storage is the single source of truth. A stale live config must never
-    // override the companion the reader actually selected.
-    return COMPANION_CONFIGS[selected] || COMPANION_CONFIGS.mark;
+    const live = window.MSGCompanion?.config;
+    if (live?.id) return live;
+    const selected = localStorage.getItem(COMPANION_STORAGE_KEY) || localStorage.getItem('msg_companion_persona_v1') || 'mark';
+
+    if (selected === 'chad') {
+      return {
+        id:'chad',
+        name:'Chad',
+        ask:'Ask Chad',
+        notebook:'Chad’s Notebook',
+        avatar:'/assets/companions/chad/chad-avatar.png'
+      };
+    }
+
+    if (selected === 'scott') {
+      return {
+        id:'scott',
+        name:'Scott',
+        ask:'Ask Scott',
+        notebook:'Scott’s Notebook',
+        avatar:'/assets/companions/scott/scott-avatar.png?v=20260816-scott-integrated'
+      };
+    }
+
+    if (selected === 'beth') {
+      return {
+        id:'beth',
+        name:'Beth',
+        ask:'Ask Beth',
+        notebook:'Beth’s Notebook',
+        avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9'
+      };
+    }
+
+    return {
+      id:'mark',
+      name:'Mark',
+      ask:'Ask Mark',
+      notebook:'Mark’s Notebook',
+      avatar:'/assets/ask-mark/ask-mark-avatar.png'
+    };
   };
   const companionName = () => companionConfig().name;
   const companionAsk = () => companionConfig().ask;
@@ -778,23 +802,6 @@
     });
   }
 
-  function closeAskMarkPane() {
-    const layout = document.getElementById('reader-layout');
-    const wordPanel = document.getElementById('word-panel');
-    const markButton = document.getElementById('toggle-mark-panel');
-    const toolsButton = document.getElementById('toggle-word-panel');
-
-    if (layout) layout.classList.add('word-panel-hidden');
-    // Fallback for any transitional shell where the layout node is not present.
-    if (!layout && wordPanel) wordPanel.hidden = true;
-
-    markButton?.setAttribute('aria-pressed', 'false');
-    toolsButton?.setAttribute('aria-pressed', 'false');
-    markButton?.classList.add('pane-closed');
-    toolsButton?.classList.add('pane-closed');
-    return Boolean(layout || wordPanel);
-  }
-
   function bindPremiumEvents() {
     installAskMarkScrollIsolation();
     $('[data-askmark-close]', shell)?.addEventListener('click', (event) => {
@@ -804,7 +811,8 @@
       const layout = document.getElementById('reader-layout');
       if (!layout) return;
 
-      // Restore the previously working direct-close behavior.
+      // Close Ask Mark directly instead of routing through the toolbar toggle.
+      // This avoids toggle-state mismatches that can make the X appear unresponsive.
       layout.classList.add('word-panel-hidden');
 
       const markButton = document.getElementById('toggle-mark-panel');
@@ -1033,7 +1041,7 @@
       const img = message.querySelector(':scope > img');
       if (img) { img.src = c.avatar; img.alt = c.name; }
       const name = message.querySelector(':scope > div > span');
-      if (name && /^(Mark|Beth|Chad|Scott)(\s*·.*)?$/.test(name.textContent.trim())) {
+      if (name && /^(Mark|Beth)(\s*·.*)?$/.test(name.textContent.trim())) {
         name.textContent = name.textContent.includes('·') ? `${c.name} · ${name.textContent.split('·').slice(1).join('·').trim()}` : c.name;
       }
       message.querySelectorAll('.mark-response-heading span').forEach((node) => { node.textContent = c.ask; });

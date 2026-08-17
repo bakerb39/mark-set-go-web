@@ -8,10 +8,21 @@
     id: 'chad',
     name: 'Chad',
     ask: 'Ask Chad',
+    notebook: 'Chad’s Notebook',
     avatar: '/assets/companions/chad/chad-avatar.png',
-    home: '/assets/companions/chad/chad-avatar.png',
     specialty: 'Financial analysis, investing, markets, business, and economics'
   });
+
+  const SCOTT = Object.freeze({
+    id: 'scott',
+    name: 'Scott',
+    ask: 'Ask Scott',
+    notebook: 'Scott’s Notebook',
+    avatar: '/assets/companions/scott/scott-avatar.png?v=20260816-scott-integrated',
+    specialty: 'Enterprise software, Microsoft Dynamics 365, banking and treasury automation, finance operations, product strategy, implementation, and executive decision-making'
+  });
+
+  const VALID_COMPANIONS = Object.freeze(['mark', 'beth', 'chad', 'scott']);
 
   const FALLBACK_DELAY_MS = 1500;
   let scheduled = false;
@@ -22,14 +33,14 @@
     try {
       const value = (localStorage.getItem(STORAGE_KEY) ||
         localStorage.getItem(LEGACY_KEY) || 'mark').toLowerCase();
-      return ['mark', 'beth', 'chad'].includes(value) ? value : 'mark';
+      return VALID_COMPANIONS.includes(value) ? value : 'mark';
     } catch {
       return 'mark';
     }
   }
 
   function writeSelected(id) {
-    const value = ['mark', 'beth', 'chad'].includes(id) ? id : 'mark';
+    const value = VALID_COMPANIONS.includes(id) ? id : 'mark';
     try {
       localStorage.setItem(STORAGE_KEY, value);
       localStorage.setItem(LEGACY_KEY, value);
@@ -38,28 +49,30 @@
     document.dispatchEvent(new CustomEvent('marksetgo:companion-changed', {
       detail: { id: value }
     }));
+    window.dispatchEvent(new CustomEvent('msg:companion-changed', {
+      detail: { id: value }
+    }));
   }
 
   function currentIdentity() {
     if (selected() === 'chad') return CHAD;
+    if (selected() === 'scott') return SCOTT;
 
     const live = window.MSGCompanion?.config;
-    if (live?.id && live.id !== 'chad') return live;
+    if (live?.id && !['chad', 'scott'].includes(live.id)) return live;
 
     return selected() === 'beth'
       ? {
           id: 'beth',
           name: 'Beth',
           ask: 'Ask Beth',
-          avatar: '/assets/companions/beth/beth-ui-avatar.png?v=9.6.9',
-          home: '/assets/companions/beth/beth-frontpage-badge.png'
+          avatar: '/assets/companions/beth/beth-avatar.png'
         }
       : {
           id: 'mark',
           name: 'Mark',
           ask: 'Ask Mark',
-          avatar: '/assets/ask-mark/ask-mark-avatar.png',
-          home: '/assets/ask-mark/ask-mark-avatar.png'
+          avatar: '/assets/ask-mark/ask-mark-avatar.png'
         };
   }
 
@@ -83,6 +96,7 @@
     const proxy = new Proxy(target, {
       get(targetObject, property, receiver) {
         if (property === 'config' && selected() === 'chad') return CHAD;
+        if (property === 'config' && selected() === 'scott') return SCOTT;
         const value = Reflect.get(targetObject, property, receiver);
         return typeof value === 'function' ? value.bind(targetObject) : value;
       }
@@ -95,23 +109,39 @@
       window.__MSG_CHAD_COMPANION_PROXY__ = true;
       window.__MSG_CHAD_ORIGINAL_COMPANION__ = target;
     } catch (error) {
-      console.warn('Ask Chad could not wrap the existing companion API.', error);
+      console.warn('Companion extension could not wrap the existing companion API.', error);
     }
   }
 
-  function chadCardMarkup() {
+  function companionCardMarkup(identity, className, description) {
     return `
       <button type="button"
-              data-companion-choice="chad"
-              class="companion-chad-choice"
+              data-companion-choice="${identity.id}"
+              class="${className}"
               aria-pressed="false">
-        <img src="${CHAD.avatar}" alt="Chad">
+        <img src="${identity.avatar}" alt="${identity.name}">
         <span>
-          <strong>Chad</strong>
-          <small>Financial analysis, investing, markets &amp; economics</small>
+          <strong>${identity.name}</strong>
+          <small>${description}</small>
         </span>
         <span class="companion-check" aria-hidden="true">✓</span>
       </button>`;
+  }
+
+  function chadCardMarkup() {
+    return companionCardMarkup(
+      CHAD,
+      'companion-chad-choice',
+      'Financial analysis, investing, markets &amp; economics'
+    );
+  }
+
+  function scottCardMarkup() {
+    return companionCardMarkup(
+      SCOTT,
+      'companion-scott-choice',
+      'Enterprise software, banking, treasury &amp; product strategy'
+    );
   }
 
   function canonicalCompanionOptions() {
@@ -130,41 +160,48 @@
       .forEach((section) => section.remove());
   }
 
-  function bindChadButton(button) {
-    if (!button || button.dataset.chadBound === '1') return;
-    button.dataset.chadBound = '1';
+  function bindSpecialCompanionButton(button, id) {
+    if (!button || button.dataset.specialCompanionBound === '1') return;
+    button.dataset.specialCompanionBound = '1';
 
     button.addEventListener('click', (event) => {
-      // The legacy Mark/Beth selector does not understand a third value.
-      // Prevent its delegated click handler from normalizing Chad back to Beth.
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
 
-      writeSelected('chad');
+      writeSelected(id);
       installCompanionProxy();
       applyNow();
     }, true);
   }
 
-  function addChadToCanonicalSelector() {
+  function addSpecialCompanionsToCanonicalSelector() {
     const options = canonicalCompanionOptions();
     if (!options) return false;
 
     removeFallbackSelector();
 
-    let button = options.querySelector(
+    let chadButton = options.querySelector(
       '[data-companion-choice="chad"], [data-persona="chad"]'
     );
-
-    if (!button) {
+    if (!chadButton) {
       const holder = document.createElement('div');
       holder.innerHTML = chadCardMarkup().trim();
-      button = holder.firstElementChild;
-      options.appendChild(button);
+      chadButton = holder.firstElementChild;
+      options.appendChild(chadButton);
     }
+    bindSpecialCompanionButton(chadButton, 'chad');
 
-    bindChadButton(button);
+    let scottButton = options.querySelector(
+      '[data-companion-choice="scott"], [data-persona="scott"]'
+    );
+    if (!scottButton) {
+      const holder = document.createElement('div');
+      holder.innerHTML = scottCardMarkup().trim();
+      scottButton = holder.firstElementChild;
+      options.appendChild(scottButton);
+    }
+    bindSpecialCompanionButton(scottButton, 'scott');
     return true;
   }
 
@@ -193,11 +230,12 @@
           <span class="companion-check" aria-hidden="true">✓</span>
         </button>
         <button type="button" data-companion-choice="beth">
-          <img src="/assets/companions/beth/beth-ui-avatar.png?v=9.6.9" alt="Beth">
+          <img src="/assets/companions/beth/beth-avatar.png" alt="Beth">
           <span><strong>Beth</strong><small>A warm, encouraging reading companion</small></span>
           <span class="companion-check" aria-hidden="true">✓</span>
         </button>
         ${chadCardMarkup()}
+        ${scottCardMarkup()}
       </div>`;
 
     const hero = page.querySelector('.platform-hero');
@@ -211,23 +249,30 @@
       writeSelected('beth');
       applyNow();
     });
-    bindChadButton(section.querySelector('[data-companion-choice="chad"]'));
+    bindSpecialCompanionButton(section.querySelector('[data-companion-choice="chad"]'), 'chad');
+    bindSpecialCompanionButton(section.querySelector('[data-companion-choice="scott"]'), 'scott');
   }
 
   function ensureProfileSelector() {
-    // The unified Profile selector is owned by companion-persona-safe.js.
-    // Never create a second/emergency selector here.
     window.clearTimeout(fallbackTimer);
-    addChadToCanonicalSelector();
-    syncProfileSelection();
+
+    if (addSpecialCompanionsToCanonicalSelector()) return;
+
+    // Give the existing Mark/Beth companion script time to inject its canonical
+    // selector. Only create a fallback if it truly never appears.
+    fallbackTimer = window.setTimeout(() => {
+      if (!addSpecialCompanionsToCanonicalSelector()) createFallbackSelector();
+      syncProfileSelection();
+    }, FALLBACK_DELAY_MS);
   }
 
   function resolvedChoiceId(button) {
     const explicit = button?.dataset?.companionChoice ||
       button?.dataset?.persona || '';
-    if (['mark', 'beth', 'chad'].includes(explicit)) return explicit;
+    if (VALID_COMPANIONS.includes(explicit)) return explicit;
 
     const text = (button?.textContent || '').toLowerCase();
+    if (text.includes('scott')) return 'scott';
     if (text.includes('chad')) return 'chad';
     if (text.includes('beth')) return 'beth';
     return 'mark';
@@ -265,15 +310,15 @@
       let next = current;
 
       next = next
-        .replace(/Ask (Mark|Beth|Chad)/gi, identity.ask)
-        .replace(/Meet (Mark|Beth|Chad)/gi, `Meet ${identity.name}`)
-        .replace(/Hi,\s*I[’']m (?:Ask )?(Mark|Beth|Chad)/gi, `Hi, I’m ${identity.name}`)
-        .replace(/\b(Mark|Beth|Chad)[’']s notebook\b/gi, `${identity.name}’s notebook`);
+        .replace(/Ask (Mark|Beth|Chad|Scott)/gi, identity.ask)
+        .replace(/Meet (Mark|Beth|Chad|Scott)/gi, `Meet ${identity.name}`)
+        .replace(/Hi,\s*I[’']m (?:Ask )?(Mark|Beth|Chad|Scott)/gi, `Hi, I’m ${identity.name}`)
+        .replace(/\b(Mark|Beth|Chad|Scott)[’']s notebook\b/gi, `${identity.name}’s notebook`);
 
       // Companion labels in the drawer/header are often standalone uppercase
       // text nodes such as "BETH".
       const trimmed = next.trim();
-      if (/^(MARK|BETH|CHAD)$/i.test(trimmed)) {
+      if (/^(MARK|BETH|CHAD|SCOTT)$/i.test(trimmed)) {
         const prefix = next.slice(0, next.indexOf(trimmed));
         const suffix = next.slice(next.indexOf(trimmed) + trimmed.length);
         const replacement = trimmed === trimmed.toUpperCase()
@@ -296,11 +341,13 @@
       src.includes('/assets/ask-mark/') ||
       src.includes('/assets/companions/beth/') ||
       src.includes('/assets/companions/chad/') ||
+      src.includes('/assets/companions/scott/') ||
       src.includes('ask-mark-avatar') ||
       src.includes('beth-avatar') ||
       src.includes('beth-universal') ||
       src.includes('chad-avatar') ||
-      /^(mark|beth|chad)$/.test(alt.trim())
+      src.includes('scott-avatar') ||
+      /^(mark|beth|chad|scott)$/.test(alt.trim())
     );
   }
 
@@ -330,29 +377,12 @@
       if (
         value.includes('ask-mark') ||
         value.includes('companions/beth') ||
-        value.includes('companions/chad')
+        value.includes('companions/chad') ||
+        value.includes('companions/scott')
       ) {
         element.style.backgroundImage = `url("${identity.avatar}")`;
       }
     });
-  }
-
-  function cleanDuplicateReaderButtonLabel(button) {
-    if (!button) return;
-
-    const personaText = /^(Ask\s+)?(Mark|Beth|Chad)$/i;
-
-    // Remove the temporary label span introduced by the broken profile repair.
-    button.querySelectorAll(':scope > [data-companion-label]').forEach((node) => node.remove());
-
-    // If more than one direct child contains exactly the same Ask-persona label,
-    // keep the first and remove only the duplicates. Icons/images are untouched.
-    const labelChildren = Array.from(button.children).filter((child) =>
-      child.tagName !== 'IMG' &&
-      child.getAttribute('aria-hidden') !== 'true' &&
-      personaText.test((child.textContent || '').trim())
-    );
-    labelChildren.slice(1).forEach((node) => node.remove());
   }
 
   function syncReaderButtons(identity) {
@@ -365,7 +395,6 @@
     ].filter(Boolean);
 
     for (const button of buttons) {
-      cleanDuplicateReaderButtonLabel(button);
       const img = button.querySelector('img');
 
       if (img) {
@@ -418,14 +447,11 @@
   function syncFrontPage(identity) {
     const avatar = document.querySelector('.home-mark-avatar');
     if (avatar) {
-      // Compact Reader/profile/chat buttons use identity.avatar.
-      // The front page may use a dedicated branded badge instead.
-      const homeImage = identity.home || identity.avatar;
-      setImage(avatar, homeImage, `${identity.name}, your reading companion.`);
+      setImage(avatar, identity.avatar, `${identity.name}, your reading companion.`);
       const stage = avatar.closest('.home-mark-icon-stage');
       stage?.classList.toggle(
         'companion-frontpage-badge-mode',
-        identity.id === 'beth' || identity.id === 'chad'
+        identity.id === 'beth' || identity.id === 'chad' || identity.id === 'scott'
       );
     }
 
@@ -497,6 +523,10 @@
         'msg-chad-active',
         selected() === 'chad'
       );
+      document.documentElement.classList.toggle(
+        'msg-scott-active',
+        selected() === 'scott'
+      );
       document.documentElement.style.setProperty(
         '--msg-companion-button-avatar',
         `url("${identity.avatar}")`
@@ -526,7 +556,7 @@
   // just synchronize the Chad layer to whatever choice they saved.
   document.addEventListener('click', (event) => {
     const choice = event.target.closest?.('.companion-persona-options button');
-    if (!choice || resolvedChoiceId(choice) === 'chad') return;
+    if (!choice || ['chad', 'scott'].includes(resolvedChoiceId(choice))) return;
     window.setTimeout(scheduleApply, 0);
   });
 
@@ -535,13 +565,19 @@
   const boot = () => {
     installCompanionProxy();
     applyNow();
-
-    const target = document.getElementById('app') || document.body;
-    new MutationObserver(scheduleApply).observe(target, {
-      childList: true,
-      subtree: true
-    });
   };
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest?.('[data-action], [data-read], .top-nav-menu, .profile-preferences-page')) {
+      window.setTimeout(scheduleApply, 0);
+    }
+  });
+  document.addEventListener('marksetgo:document-available', scheduleApply);
+  document.addEventListener('marksetgo:companion-changed', scheduleApply);
+  document.addEventListener('marksetgo:auth-changed', scheduleApply);
+  window.addEventListener('msg:companion-changed', scheduleApply);
+  window.addEventListener('hashchange', scheduleApply);
+  window.addEventListener('popstate', scheduleApply);
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot, { once: true });
@@ -554,6 +590,17 @@
     selected: () => selected() === 'chad',
     select() {
       writeSelected('chad');
+      applyNow();
+    },
+    apply: scheduleApply
+  });
+
+
+  window.MSGScott = Object.freeze({
+    config: SCOTT,
+    selected: () => selected() === 'scott',
+    select() {
+      writeSelected('scott');
       applyNow();
     },
     apply: scheduleApply

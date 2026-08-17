@@ -7,7 +7,7 @@ html[data-companion="chad"] {
 
 /* The canonical chooser is now one Mark / Beth / Chad selector, never two. */
 #app .companion-persona-options {
-  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
 }
 
 #app .companion-persona-options button {
@@ -156,4 +156,26 @@ html[data-companion="chad"] #word-panel {
 
 html[data-companion="chad"] #fullscreen-mark-drawer {
   --msg-companion-button-avatar: url("/assets/companions/chad/chad-avatar.png");
+}
+
+
+/* Scott uses the same established companion-card and badge treatment as Chad. */
+html[data-companion="scott"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-portrait-wrap::before{
+  display:none !important;
+}
+html[data-companion="scott"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-avatar{
+  box-shadow:none !important;
+  border-radius:0 !important;
+  object-fit:contain !important;
+  aspect-ratio:auto !important;
+  max-width:540px !important;
+}
+html[data-companion="scott"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-stage-caption{
+  display:none !important;
+}
+html[data-companion="scott"] .home-mark-icon-stage.companion-frontpage-badge-mode{
+  background:transparent !important;
+}
+html[data-companion="scott"] .msg-walkthrough-mark-figure::after{
+  content:"ASK SCOTT" !important;
 }
