@@ -1,0 +1,39 @@
+/* Scott companion — additive styling only. */
+.companion-persona-options [data-companion-scott="scott"] img {
+  object-fit: contain !important;
+  object-position: center !important;
+  background: #0d2942 !important;
+}
+
+.companion-persona-options [data-companion-scott="scott"].is-selected {
+  border-color: #d7a928 !important;
+  background: #fff9e7 !important;
+  box-shadow: 0 0 0 3px rgba(215,169,40,.12) !important;
+}
+
+html[data-companion="scott"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-portrait-wrap::before {
+  display: none !important;
+}
+
+html[data-companion="scott"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-avatar {
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  aspect-ratio: auto !important;
+  max-width: 540px !important;
+}
+
+html[data-companion="scott"] .home-mark-icon-stage.companion-frontpage-badge-mode .home-mark-stage-caption {
+  display: none !important;
+}
+
+html[data-companion="scott"] .home-mark-icon-stage.companion-frontpage-badge-mode {
+  background: transparent !important;
+}
+
+@media (max-width: 700px) {
+  .companion-persona-options [data-companion-scott="scott"] {
+    min-width: 0;
+  }
+}

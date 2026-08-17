@@ -14,6 +14,16 @@
     if (live?.id) return live;
     const selected = localStorage.getItem(COMPANION_STORAGE_KEY) || localStorage.getItem('msg_companion_persona_v1') || 'mark';
 
+    if (selected === 'scott') {
+      return {
+        id:'scott',
+        name:'Scott',
+        ask:'Ask Scott',
+        notebook:'Scott’s Notebook',
+        avatar:'/assets/companions/scott/scott-avatar.png'
+      };
+    }
+
     if (selected === 'chad') {
       return {
         id:'chad',
@@ -797,13 +807,21 @@
     $('[data-askmark-close]', shell)?.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      if (window.MarkSetGoReaderPanels?.closeRightPane?.()) return;
 
       const layout = document.getElementById('reader-layout');
       if (!layout) return;
+
+      // Close Ask Mark directly instead of routing through the toolbar toggle.
+      // This avoids toggle-state mismatches that can make the X appear unresponsive.
       layout.classList.add('word-panel-hidden');
-      document.getElementById('toggle-mark-panel')?.setAttribute('aria-pressed', 'false');
-      document.getElementById('toggle-word-panel')?.setAttribute('aria-pressed', 'false');
+
+      const markButton = document.getElementById('toggle-mark-panel');
+      const toolsButton = document.getElementById('toggle-word-panel');
+
+      markButton?.setAttribute('aria-pressed', 'false');
+      toolsButton?.setAttribute('aria-pressed', 'false');
+      markButton?.classList.add('pane-closed');
+      toolsButton?.classList.add('pane-closed');
     });
     $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
     $$('[data-askmark-view]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView(button.dataset.askmarkView)));
@@ -997,18 +1015,7 @@
 
   document.addEventListener('marksetgo:document-available', () => {
     installAttempts = 0;
-  
-  // Capture-phase fallback: close even if a later panel rerender drops the
-  // element-specific listener or another bubble-phase handler interferes.
-  document.addEventListener('click', (event) => {
-    const closeButton = event.target?.closest?.('[data-askmark-close]');
-    if (!closeButton) return;
-    event.preventDefault();
-    event.stopPropagation();
-    window.MarkSetGoReaderPanels?.closeRightPane?.();
-  }, true);
-
-  requestAnimationFrame(retryInstall);
+    requestAnimationFrame(retryInstall);
     window.setTimeout(()=>refreshMarkProgress(),220);
   });
   document.addEventListener('marksetgo:goals-updated',()=>window.setTimeout(()=>refreshMarkProgress({force:true}),80));
@@ -1034,7 +1041,7 @@
       const img = message.querySelector(':scope > img');
       if (img) { img.src = c.avatar; img.alt = c.name; }
       const name = message.querySelector(':scope > div > span');
-      if (name && /^(Mark|Beth)(\s*·.*)?$/.test(name.textContent.trim())) {
+      if (name && /^(Mark|Beth|Chad|Scott)(\s*·.*)?$/.test(name.textContent.trim())) {
         name.textContent = name.textContent.includes('·') ? `${c.name} · ${name.textContent.split('·').slice(1).join('·').trim()}` : c.name;
       }
       message.querySelectorAll('.mark-response-heading span').forEach((node) => { node.textContent = c.ask; });
