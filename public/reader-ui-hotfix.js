@@ -82,9 +82,9 @@
     const app = document.querySelector('#app');
     const fullscreen = app?.querySelector('#toggle-reader-fullscreen');
     const controls = fullscreen?.closest('.reader-pane-controls');
-    const music = app?.querySelector('[data-reader-wpm-music-toggle]');
+    const originalMusic = app?.querySelector('[data-reader-wpm-music-toggle]');
 
-    if (!app || !fullscreen || !controls || !music) return;
+    if (!app || !fullscreen || !controls || !originalMusic) return;
 
     let tools = controls.querySelector('.reader-quick-tools');
     if (!tools) {
@@ -92,108 +92,133 @@
       tools.className = 'reader-quick-tools';
       tools.setAttribute('aria-label', 'Reader quick controls');
       tools.innerHTML = `
-        <button type="button" data-reader-font-decrease aria-label="Decrease reader font size" title="Smaller text">−</button>
-        <span class="reader-quick-divider" aria-hidden="true"></span>
-        <button type="button" data-reader-font-increase aria-label="Increase reader font size" title="Larger text">+</button>
-        <span class="reader-quick-divider" aria-hidden="true"></span>
+        <span class="reader-font-group" aria-label="Reader font size">
+          <span class="reader-quick-item" data-reader-font-decrease role="button" tabindex="0" aria-label="Decrease reader font size" title="Smaller text">−</span>
+          <span class="reader-font-divider" aria-hidden="true">|</span>
+          <span class="reader-quick-item" data-reader-font-increase role="button" tabindex="0" aria-label="Increase reader font size" title="Larger text">+</span>
+        </span>
+        <span class="reader-outer-divider" aria-hidden="true">|</span>
+        <span class="reader-quick-item reader-music-item" data-reader-music-proxy role="button" tabindex="0" aria-label="Open reading music" title="Reading music">♫</span>
       `;
       controls.appendChild(tools);
 
-      tools.querySelector('[data-reader-font-decrease]')?.addEventListener('click', () => changeReaderFont(-1));
-      tools.querySelector('[data-reader-font-increase]')?.addEventListener('click', () => changeReaderFont(1));
+      const activate = (node, fn) => {
+        node?.addEventListener('click', fn);
+        node?.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            fn();
+          }
+        });
+      };
+
+      activate(tools.querySelector('[data-reader-font-decrease]'), () => changeReaderFont(-1));
+      activate(tools.querySelector('[data-reader-font-increase]'), () => changeReaderFont(1));
+      activate(tools.querySelector('[data-reader-music-proxy]'), () => {
+        const liveMusic = document.querySelector('#app [data-reader-wpm-music-toggle]');
+        liveMusic?.click();
+      });
     }
 
-    if (music.parentElement !== tools) tools.appendChild(music);
+    // Keep the real music button alive for its existing behavior, but hide it visually.
+    originalMusic.style.setProperty('position', 'absolute', 'important');
+    originalMusic.style.setProperty('width', '1px', 'important');
+    originalMusic.style.setProperty('height', '1px', 'important');
+    originalMusic.style.setProperty('padding', '0', 'important');
+    originalMusic.style.setProperty('margin', '-1px', 'important');
+    originalMusic.style.setProperty('overflow', 'hidden', 'important');
+    originalMusic.style.setProperty('clip', 'rect(0 0 0 0)', 'important');
+    originalMusic.style.setProperty('clip-path', 'inset(50%)', 'important');
+    originalMusic.style.setProperty('white-space', 'nowrap', 'important');
+    originalMusic.style.setProperty('border', '0', 'important');
 
     controls.style.setProperty('position', 'relative', 'important');
     controls.style.setProperty('overflow', 'visible', 'important');
 
-    // Exact visual: [ − | + | ♫ ]
+    // Exact visual target:
+    // [ − | + ]  |  ♫
     tools.style.setProperty('position', 'absolute', 'important');
     tools.style.setProperty('display', 'inline-flex', 'important');
     tools.style.setProperty('align-items', 'center', 'important');
-    tools.style.setProperty('justify-content', 'center', 'important');
-    tools.style.setProperty('width', '110px', 'important');
-    tools.style.setProperty('height', '36px', 'important');
-    tools.style.setProperty('padding', '0 5px', 'important');
+    tools.style.setProperty('height', '34px', 'important');
+    tools.style.setProperty('padding', '0', 'important');
     tools.style.setProperty('margin', '0', 'important');
-    tools.style.setProperty('box-sizing', 'border-box', 'important');
-    tools.style.setProperty('border-radius', '8px', 'important');
-    tools.style.setProperty('background', '#0b2e4f', 'important');
-    tools.style.setProperty('border', '1px solid rgba(255,255,255,.08)', 'important');
-    tools.style.setProperty('box-shadow', '0 2px 7px rgba(10,30,50,.22)', 'important');
+    tools.style.setProperty('background', 'transparent', 'important');
+    tools.style.setProperty('border', '0', 'important');
+    tools.style.setProperty('box-shadow', 'none', 'important');
     tools.style.setProperty('z-index', '40', 'important');
     tools.style.setProperty('white-space', 'nowrap', 'important');
-    tools.style.setProperty('overflow', 'hidden', 'important');
 
-    const minus = tools.querySelector('[data-reader-font-decrease]');
-    const plus = tools.querySelector('[data-reader-font-increase]');
-
-    [minus, plus, music].forEach((button) => {
-      if (!button) return;
-      button.style.setProperty('position', 'static', 'important');
-      button.style.setProperty('inset', 'auto', 'important');
-      button.style.setProperty('display', 'inline-flex', 'important');
-      button.style.setProperty('align-items', 'center', 'important');
-      button.style.setProperty('justify-content', 'center', 'important');
-      button.style.setProperty('flex', '0 0 30px', 'important');
-      button.style.setProperty('width', '30px', 'important');
-      button.style.setProperty('height', '30px', 'important');
-      button.style.setProperty('min-width', '30px', 'important');
-      button.style.setProperty('max-width', '30px', 'important');
-      button.style.setProperty('padding', '0', 'important');
-      button.style.setProperty('margin', '0', 'important');
-      button.style.setProperty('border', '0', 'important');
-      button.style.setProperty('border-radius', '0', 'important');
-      button.style.setProperty('background', 'transparent', 'important');
-      button.style.setProperty('color', '#ffffff', 'important');
-      button.style.setProperty('box-shadow', 'none', 'important');
-      button.style.setProperty('transform', 'none', 'important');
-      button.style.setProperty('line-height', '1', 'important');
-      button.style.setProperty('cursor', 'pointer', 'important');
+    const fontGroup = tools.querySelector('.reader-font-group');
+    Object.assign(fontGroup.style, {
+      display: 'inline-flex',
+      alignItems: 'center',
+      height: '34px',
+      padding: '0 8px',
+      borderRadius: '8px',
+      background: '#0b2e4f',
+      border: '1px solid rgba(255,255,255,.08)',
+      boxShadow: '0 2px 7px rgba(10,30,50,.22)'
     });
 
-    if (minus) {
-      minus.textContent = '−';
-      minus.style.setProperty('font-size', '16px', 'important');
-      minus.style.setProperty('font-weight', '500', 'important');
-    }
-
-    if (plus) {
-      plus.textContent = '+';
-      plus.style.setProperty('font-size', '16px', 'important');
-      plus.style.setProperty('font-weight', '500', 'important');
-    }
-
-    // Normalize the music glyph so it occupies only its own third of the bar.
-    music.innerHTML = '<span aria-hidden="true">♫</span>';
-    const musicGlyph = music.querySelector('span');
-    if (musicGlyph) {
-      musicGlyph.style.setProperty('display', 'block', 'important');
-      musicGlyph.style.setProperty('font-size', '15px', 'important');
-      musicGlyph.style.setProperty('line-height', '1', 'important');
-      musicGlyph.style.setProperty('margin', '0', 'important');
-      musicGlyph.style.setProperty('padding', '0', 'important');
-      musicGlyph.style.setProperty('transform', 'none', 'important');
-    }
-
-    tools.querySelectorAll('.reader-quick-divider').forEach((divider) => {
-      divider.style.setProperty('display', 'block', 'important');
-      divider.style.setProperty('flex', '0 0 1px', 'important');
-      divider.style.setProperty('width', '1px', 'important');
-      divider.style.setProperty('height', '18px', 'important');
-      divider.style.setProperty('margin', '0 3px', 'important');
-      divider.style.setProperty('background', 'rgba(255,255,255,.28)', 'important');
+    tools.querySelectorAll('.reader-quick-item').forEach((item) => {
+      item.style.setProperty('display', 'inline-flex', 'important');
+      item.style.setProperty('align-items', 'center', 'important');
+      item.style.setProperty('justify-content', 'center', 'important');
+      item.style.setProperty('height', '34px', 'important');
+      item.style.setProperty('padding', '0', 'important');
+      item.style.setProperty('margin', '0', 'important');
+      item.style.setProperty('border', '0', 'important');
+      item.style.setProperty('background', 'transparent', 'important');
+      item.style.setProperty('font-size', '15px', 'important');
+      item.style.setProperty('font-weight', '500', 'important');
+      item.style.setProperty('line-height', '1', 'important');
+      item.style.setProperty('cursor', 'pointer', 'important');
+      item.style.setProperty('user-select', 'none', 'important');
     });
+
+    tools.querySelectorAll('.reader-font-group .reader-quick-item').forEach((item) => {
+      item.style.setProperty('width', '24px', 'important');
+      item.style.setProperty('color', '#ffffff', 'important');
+    });
+
+    const innerDivider = tools.querySelector('.reader-font-divider');
+    Object.assign(innerDivider.style, {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '12px',
+      height: '34px',
+      color: 'rgba(255,255,255,.4)',
+      fontSize: '13px',
+      pointerEvents: 'none'
+    });
+
+    const outerDivider = tools.querySelector('.reader-outer-divider');
+    Object.assign(outerDivider.style, {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: '22px',
+      height: '34px',
+      margin: '0 3px',
+      color: '#6d7f91',
+      fontSize: '14px',
+      pointerEvents: 'none'
+    });
+
+    const musicItem = tools.querySelector('.reader-music-item');
+    musicItem.style.setProperty('width', '28px', 'important');
+    musicItem.style.setProperty('color', '#173f67', 'important');
+    musicItem.style.setProperty('font-size', '15px', 'important');
 
     const controlsRect = controls.getBoundingClientRect();
     const fullRect = fullscreen.getBoundingClientRect();
-    const toolbarWidth = 110;
-    const toolbarHeight = 36;
+    const toolsRect = tools.getBoundingClientRect();
     const gap = 8;
 
-    const left = Math.max(0, fullRect.left - controlsRect.left - toolbarWidth - gap);
-    const top = fullRect.top - controlsRect.top + (fullRect.height - toolbarHeight) / 2;
+    const left = Math.max(0, fullRect.left - controlsRect.left - toolsRect.width - gap);
+    const top = fullRect.top - controlsRect.top + (fullRect.height - toolsRect.height) / 2;
 
     tools.style.setProperty('left', `${Math.round(left)}px`, 'important');
     tools.style.setProperty('right', 'auto', 'important');
