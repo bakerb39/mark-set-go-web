@@ -11697,6 +11697,18 @@ function selectReaderParagraphFromEvent(event){
     openMarkPanel('selection');
   }
 }
+
+function readerClickControlsAreEnabled() {
+  const checkbox = app.querySelector('#reader-click-controls');
+  if (checkbox && checkbox.type === 'checkbox') return Boolean(checkbox.checked);
+
+  try {
+    return localStorage.getItem('msg_reader_click_controls_v1') !== 'off';
+  } catch {
+    return readerClickControlsAreEnabled();
+  }
+}
+
 function bindMarkCompanion(reader){
   const toolbar=app.querySelector('#mark-selection-toolbar');
   if(!reader||!toolbar)return;
@@ -11792,7 +11804,7 @@ function bindMarkCompanion(reader){
         state.markSuppressNextReaderClick=false;
         interaction.selecting=false;
         interaction.moved=false;
-        if(interaction.wasRunning && !isReaderRunning()) startReader();
+        if(readerClickControlsAreEnabled() && interaction.wasRunning && !isReaderRunning()) startReader();
       });
     });
   };
@@ -11813,6 +11825,11 @@ function bindMarkCompanion(reader){
 
     event.preventDefault();
     event.stopImmediatePropagation();
+
+    if(!readerClickControlsAreEnabled()){
+      updateReaderStatus('Reader click controls are off.');
+      return;
+    }
 
     const clickedWord=event.target.closest?.('.reader-word[data-index]');
     const clickedGroup=event.target.closest?.('.reader-group[data-start-index]');
@@ -11860,7 +11877,7 @@ function bindMarkCompanion(reader){
     // temporary highlight. Playback resumes only if it had been running before
     // the selection began; the click itself is handled in the capture listener.
     if(state.markSelectionLocked){
-      const shouldResume=Boolean(state.markSelectionWasRunning);
+      const shouldResume=readerClickControlsAreEnabled() && Boolean(state.markSelectionWasRunning);
       clearMarkSelectionForReadingResume();
       state.markSelectionWasRunning=false;
       state.markResumeOnNextReaderClick={shouldResume};
@@ -11932,6 +11949,7 @@ function bindMarkCompanion(reader){
   document.addEventListener('selectionchange',state.markSelectionChangeHandler);
 
   const performStableReaderPointerAction=(interaction)=>{
+    if(!readerClickControlsAreEnabled()) return;
     const mode=getSelectedMode();
     if(mode==='two-column') return;
 
@@ -11963,6 +11981,13 @@ function bindMarkCompanion(reader){
     // or replaces the clicked word before the browser dispatches `click`.
     if(interaction?.active && !interaction.selecting && !interaction.moved){
       interaction.active=false;
+
+      if(!readerClickControlsAreEnabled()){
+        // Passive reading: consume no playback action. Leave the browser's
+        // normal click available for non-playback UI/selection semantics.
+        return;
+      }
+
       performStableReaderPointerAction(interaction);
 
       state.readerSuppressSyntheticClick=true;
@@ -11978,7 +12003,7 @@ function bindMarkCompanion(reader){
     const interaction=state.markSelectionInteraction;
     if(!interaction) return;
     interaction.active=false;
-    if(interaction.paused && !state.markSelectionLocked && interaction.wasRunning && !isReaderRunning()){
+    if(readerClickControlsAreEnabled() && interaction.paused && !state.markSelectionLocked && interaction.wasRunning && !isReaderRunning()){
       state.markSuppressNextReaderClick=false;
       startReader();
     }
@@ -11996,6 +12021,13 @@ function bindMarkCompanion(reader){
 
   // This capture listener runs before the reader's normal click handler.
   reader.addEventListener('click',(event)=>{
+    if(!readerClickControlsAreEnabled() && state.markResumeOnNextReaderClick!==null){
+      state.markResumeOnNextReaderClick=null;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      updateReaderStatus('Reader click controls are off.');
+      return;
+    }
     if(state.markResumeOnNextReaderClick!==null){
       resumeAfterLockedSelectionClick(event);
       return;
@@ -12021,6 +12053,7 @@ function bindMarkCompanion(reader){
       return;
     }
     if(event.ctrlKey || event.metaKey) return;
+    if(!readerClickControlsAreEnabled()) return;
 
     const target=event.target instanceof Element ? event.target : null;
     if(!target) return;
@@ -12963,6 +12996,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   try {
     readerClickControlsEnabled = localStorage.getItem(READER_CLICK_CONTROLS_KEY) !== 'off';
   } catch {}
+  state.readerClickControlsEnabled = readerClickControlsEnabled;
 
   // Topic Feed story handoff: preserve the existing left navigation pane as the
   // exact same DOM node while the Reader shell is rebuilt. This branch is
@@ -13227,10 +13261,11 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                   <button id="fs-start" class="primary" type="button">Start</button>
                   <button id="fs-pause" class="secondary" type="button">Pause</button>
                   <button id="fs-reset" class="secondary" type="button">Reset</button>
-                  <button id="fs-reader-click-controls" class="secondary" type="button"
-                          aria-pressed="${readerClickControlsEnabled ? 'true' : 'false'}">
-                    Reader clicks: ${readerClickControlsEnabled ? 'On' : 'Off'}
-                  </button>
+                  <label class="compact-toggle fullscreen-reader-click-controls-toggle"
+                         title="When unchecked, clicking or tapping Reader text cannot control playback.">
+                    <input id="fs-reader-click-controls" type="checkbox" ${readerClickControlsEnabled ? 'checked' : ''}>
+                    <span>Reader click controls</span>
+                  </label>
                   <button id="fs-check-comprehension" class="secondary" type="button">Check comprehension</button>
                 </div>
               </details>
@@ -13285,7 +13320,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 </div>
               </details>
 
-              <p class="fullscreen-options-hint">Use “Reader clicks” to choose whether text clicks control playback. Press <kbd>Space</kbd> for keyboard pause/resume. Press <kbd>O</kbd> to restore hidden controls.</p>
+              <p class="fullscreen-options-hint">Use “Reader click controls” to choose whether text clicks control playback. Press <kbd>Space</kbd> for keyboard pause/resume. Press <kbd>O</kbd> to restore hidden controls.</p>
             </section>
           </div>
           <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
@@ -13366,12 +13401,12 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         <button id="start-reader" class="primary">Start</button>
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
-        <button id="reader-click-controls" class="secondary" type="button"
-                style="flex:0 0 auto;width:auto;min-width:8.5rem;max-width:max-content;white-space:nowrap;"
-                aria-pressed="${readerClickControlsEnabled ? 'true' : 'false'}"
-                title="Turn Reader text-click controls on or off.">
-          Reader clicks: ${readerClickControlsEnabled ? 'On' : 'Off'}
-        </button>
+        <label class="compact-toggle reader-click-controls-toggle"
+               title="When unchecked, clicking or tapping the Reader text cannot start, resume, pause, or seek playback."
+               style="flex:0 0 auto;min-height:2.08rem;display:inline-flex;align-items:center;gap:.4rem;padding:.34rem .68rem;white-space:nowrap;">
+          <input id="reader-click-controls" type="checkbox" ${readerClickControlsEnabled ? 'checked' : ''}>
+          <span>Reader click controls</span>
+        </label>
         <span id="reader-status" class="status"
               style="flex:0 0 100%;width:100%;margin:.15rem 0 0;">
           ${state.words.length.toLocaleString()} words loaded. ${readerClickControlsEnabled ? 'Click a word to move the reading position.' : 'Reader clicks are off. Read, scroll, and select text normally; use Start, Pause, or Reset only when wanted.'}
@@ -13657,7 +13692,7 @@ document.addEventListener('keydown', state.spacebarHandler);
     // Passive reading mode: clicks/taps on the Reader text cannot start,
     // resume, pause, or seek playback. Scrolling, selection, annotations,
     // translation lookup, and explicit buttons remain available.
-    if (!readerClickControlsEnabled) return;
+    if (!readerClickControlsAreEnabled()) return;
 
     const clickedWord = target.closest('.reader-word[data-index]');
     const clickedGroup = target.closest('.reader-group[data-start-index]');
@@ -13702,35 +13737,38 @@ document.addEventListener('keydown', state.spacebarHandler);
   app.querySelector('#pause-reader').addEventListener('click', () => { pauseReader(); persistReaderSession(); });
   app.querySelector('#reset-reader').addEventListener('click', () => { resetReader(); persistReaderSession(); });
 
-  const syncReaderClickControlButtons = () => {
-    const label = `Reader clicks: ${readerClickControlsEnabled ? 'On' : 'Off'}`;
-    for (const selector of ['#reader-click-controls', '#fs-reader-click-controls']) {
-      const button = app.querySelector(selector);
-      if (!button) continue;
-      button.textContent = label;
-      button.setAttribute('aria-pressed', String(readerClickControlsEnabled));
-      button.title = readerClickControlsEnabled
-        ? 'Reader text clicks can move the reading position.'
-        : 'Reader text clicks are passive. Use Start, Pause, and Reset deliberately.';
+  const syncReaderClickControlCheckboxes = (enabled) => {
+    readerClickControlsEnabled = Boolean(enabled);
+    state.readerClickControlsEnabled = readerClickControlsEnabled;
+
+    const mainCheckbox = app.querySelector('#reader-click-controls');
+    const fullscreenCheckbox = app.querySelector('#fs-reader-click-controls');
+    if (mainCheckbox) mainCheckbox.checked = readerClickControlsEnabled;
+    if (fullscreenCheckbox) fullscreenCheckbox.checked = readerClickControlsEnabled;
+  };
+
+  const setReaderClickControls = (enabled, { announce = true } = {}) => {
+    syncReaderClickControlCheckboxes(enabled);
+    try {
+      localStorage.setItem(READER_CLICK_CONTROLS_KEY, enabled ? 'on' : 'off');
+    } catch {}
+
+    if (announce) {
+      updateReaderStatus(
+        enabled
+          ? 'Reader click controls are on.'
+          : 'Reader click controls are off. Clicking or tapping Reader text will not start, resume, pause, or seek playback.'
+      );
     }
   };
 
-  const toggleReaderClickControls = () => {
-    readerClickControlsEnabled = !readerClickControlsEnabled;
-    try {
-      localStorage.setItem(READER_CLICK_CONTROLS_KEY, readerClickControlsEnabled ? 'on' : 'off');
-    } catch {}
-    syncReaderClickControlButtons();
-    updateReaderStatus(
-      readerClickControlsEnabled
-        ? 'Reader click controls are on.'
-        : 'Reader click controls are off. Read, scroll, and select text normally; Reader clicks will not control playback.'
-    );
-  };
-
-  app.querySelector('#reader-click-controls')?.addEventListener('click', toggleReaderClickControls);
-  app.querySelector('#fs-reader-click-controls')?.addEventListener('click', toggleReaderClickControls);
-  syncReaderClickControlButtons();
+  app.querySelector('#reader-click-controls')?.addEventListener('change', (event) => {
+    setReaderClickControls(Boolean(event.currentTarget.checked));
+  });
+  app.querySelector('#fs-reader-click-controls')?.addEventListener('change', (event) => {
+    setReaderClickControls(Boolean(event.currentTarget.checked));
+  });
+  syncReaderClickControlCheckboxes(readerClickControlsEnabled);
   app.querySelector('#check-comprehension')?.addEventListener('click', startComprehensionCheck);
   app.querySelector('#fs-check-comprehension')?.addEventListener('click', startComprehensionCheck);
   app.querySelector('#bionic-reading').addEventListener('change', (event) => {
