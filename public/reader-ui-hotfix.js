@@ -92,8 +92,10 @@
       tools.className = 'reader-quick-tools';
       tools.setAttribute('aria-label', 'Reader quick controls');
       tools.innerHTML = `
-        <button type="button" class="reader-quick-tool" data-reader-font-decrease aria-label="Decrease reader font size" title="Smaller text">−</button>
-        <button type="button" class="reader-quick-tool" data-reader-font-increase aria-label="Increase reader font size" title="Larger text">+</button>
+        <button type="button" data-reader-font-decrease aria-label="Decrease reader font size" title="Smaller text">−</button>
+        <span class="reader-quick-divider" aria-hidden="true"></span>
+        <button type="button" data-reader-font-increase aria-label="Increase reader font size" title="Larger text">+</button>
+        <span class="reader-quick-divider" aria-hidden="true"></span>
       `;
       controls.appendChild(tools);
 
@@ -106,41 +108,53 @@
     controls.style.setProperty('position', 'relative', 'important');
     controls.style.setProperty('overflow', 'visible', 'important');
 
-    // Fixed-size three-button toolbar. No width measurement, no wrapping,
-    // and no chance for the + button to be squeezed out.
-    tools.style.setProperty('position', 'absolute', 'important');
-    tools.style.setProperty('display', 'grid', 'important');
-    tools.style.setProperty('grid-template-columns', '26px 26px 28px', 'important');
-    tools.style.setProperty('align-items', 'center', 'important');
-    tools.style.setProperty('gap', '4px', 'important');
-    tools.style.setProperty('width', '88px', 'important');
-    tools.style.setProperty('height', '30px', 'important');
-    tools.style.setProperty('margin', '0', 'important');
-    tools.style.setProperty('padding', '0', 'important');
-    tools.style.setProperty('white-space', 'nowrap', 'important');
-    tools.style.setProperty('z-index', '40', 'important');
+    // One polished navy control group that visually matches Full screen.
+    Object.assign(tools.style, {
+      position: 'absolute',
+      display: 'inline-flex',
+      alignItems: 'center',
+      height: '36px',
+      padding: '0 4px',
+      margin: '0',
+      borderRadius: '8px',
+      background: '#0b2e4f',
+      border: '1px solid rgba(255,255,255,.08)',
+      boxShadow: '0 2px 7px rgba(10,30,50,.22)',
+      zIndex: '40',
+      whiteSpace: 'nowrap'
+    });
 
-    tools.querySelectorAll('.reader-quick-tool').forEach((button) => {
+    tools.querySelectorAll('button').forEach((button) => {
       button.style.setProperty('position', 'static', 'important');
       button.style.setProperty('inset', 'auto', 'important');
       button.style.setProperty('display', 'inline-flex', 'important');
       button.style.setProperty('align-items', 'center', 'important');
       button.style.setProperty('justify-content', 'center', 'important');
-      button.style.setProperty('width', '26px', 'important');
-      button.style.setProperty('height', '28px', 'important');
-      button.style.setProperty('min-width', '26px', 'important');
+      button.style.setProperty('width', '30px', 'important');
+      button.style.setProperty('height', '30px', 'important');
+      button.style.setProperty('min-width', '30px', 'important');
       button.style.setProperty('padding', '0', 'important');
       button.style.setProperty('margin', '0', 'important');
-      button.style.setProperty('border', '1px solid #c6d1dc', 'important');
+      button.style.setProperty('border', '0', 'important');
       button.style.setProperty('border-radius', '6px', 'important');
-      button.style.setProperty('background', '#ffffff', 'important');
-      button.style.setProperty('color', '#173f67', 'important');
-      button.style.setProperty('font-size', '15px', 'important');
+      button.style.setProperty('background', 'transparent', 'important');
+      button.style.setProperty('color', '#ffffff', 'important');
+      button.style.setProperty('font-size', '16px', 'important');
       button.style.setProperty('font-weight', '600', 'important');
       button.style.setProperty('line-height', '1', 'important');
-      button.style.setProperty('box-shadow', '0 1px 2px rgba(15,35,55,.06)', 'important');
+      button.style.setProperty('box-shadow', 'none', 'important');
       button.style.setProperty('cursor', 'pointer', 'important');
       button.style.setProperty('transform', 'none', 'important');
+    });
+
+    tools.querySelectorAll('.reader-quick-divider').forEach((divider) => {
+      Object.assign(divider.style, {
+        width: '1px',
+        height: '18px',
+        margin: '0 2px',
+        background: 'rgba(255,255,255,.18)',
+        flex: '0 0 1px'
+      });
     });
 
     music.style.setProperty('position', 'static', 'important');
@@ -148,27 +162,28 @@
     music.style.setProperty('display', 'inline-flex', 'important');
     music.style.setProperty('align-items', 'center', 'important');
     music.style.setProperty('justify-content', 'center', 'important');
-    music.style.setProperty('width', '28px', 'important');
-    music.style.setProperty('height', '28px', 'important');
-    music.style.setProperty('min-width', '28px', 'important');
+    music.style.setProperty('width', '30px', 'important');
+    music.style.setProperty('height', '30px', 'important');
+    music.style.setProperty('min-width', '30px', 'important');
     music.style.setProperty('padding', '0', 'important');
     music.style.setProperty('margin', '0', 'important');
+    music.style.setProperty('border', '0', 'important');
     music.style.setProperty('border-radius', '6px', 'important');
+    music.style.setProperty('background', 'transparent', 'important');
+    music.style.setProperty('color', '#ffffff', 'important');
+    music.style.setProperty('box-shadow', 'none', 'important');
     music.style.setProperty('transform', 'none', 'important');
 
     const controlsRect = controls.getBoundingClientRect();
     const fullRect = fullscreen.getBoundingClientRect();
-    const toolbarWidth = 88;
-    const toolbarHeight = 30;
+    const toolsRect = tools.getBoundingClientRect();
     const gap = 8;
 
-    // Anchor from Full screen's LEFT edge. This is much more stable than
-    // measuring the toolbar after browser/CSS layout.
-    const right = Math.max(0, controlsRect.right - fullRect.left + gap);
-    const top = fullRect.top - controlsRect.top + (fullRect.height - toolbarHeight) / 2;
+    const left = Math.max(0, fullRect.left - controlsRect.left - toolsRect.width - gap);
+    const top = fullRect.top - controlsRect.top + (fullRect.height - toolsRect.height) / 2;
 
-    tools.style.setProperty('right', `${Math.round(right)}px`, 'important');
-    tools.style.setProperty('left', 'auto', 'important');
+    tools.style.setProperty('left', `${Math.round(left)}px`, 'important');
+    tools.style.setProperty('right', 'auto', 'important');
     tools.style.setProperty('top', `${Math.round(top)}px`, 'important');
     tools.style.setProperty('bottom', 'auto', 'important');
   }
