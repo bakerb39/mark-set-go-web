@@ -67,13 +67,7 @@
     });
   }
 
-  const observer = new MutationObserver(schedule);
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true,
-    attributes: true,
-    attributeFilter: ['class', 'hidden']
-  });
+  // Event-driven only. No MutationObserver.
 
   document.addEventListener('marksetgo:document-available', schedule);
   window.addEventListener('msg:companion-changed', schedule);

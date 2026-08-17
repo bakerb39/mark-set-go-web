@@ -63,8 +63,12 @@
     });
   }
 
-  const observer = new MutationObserver(scheduleFix);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  // Event-driven only. No MutationObserver.
+  document.addEventListener('click', (event) => {
+    if (event.target?.closest?.('.library-menu-root, .professional-library-menu')) {
+      setTimeout(scheduleFix, 0);
+    }
+  });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', scheduleFix, { once: true });
