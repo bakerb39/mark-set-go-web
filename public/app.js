@@ -1385,6 +1385,57 @@ function stopMusic() {
   try { localStorage.removeItem('markSetGoMusic'); } catch {}
 }
 
+
+window.MarkSetGoMusicPlayer = Object.freeze({
+  playSuggestedForCurrentReading() {
+    const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+    const title = String(current?.title || state?.title || '').trim();
+    const text = String(current?.text || state?.currentText || '');
+    if (!title) return false;
+
+    const recommendation = recommendedPlayerChoice(title, text);
+    if (!recommendation?.scoreQuery) return false;
+
+    void playYouTubeSearch(
+      recommendation.scoreQuery,
+      `${title} — suggested reading music`
+    );
+    return true;
+  },
+
+  playReadingMoodForCurrentReading() {
+    const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+    const title = String(current?.title || state?.title || '').trim();
+    const text = String(current?.text || state?.currentText || '');
+    if (!title) return false;
+
+    const recommendation = recommendedPlayerChoice(title, text);
+    if (!recommendation?.moodQuery) return false;
+
+    void playYouTubeSearch(
+      recommendation.moodQuery,
+      `${title} — reading mood`
+    );
+    return true;
+  },
+
+  nextResult() {
+    if (!musicSearchState?.videoIds?.length) return false;
+    playMusicSearchCandidate(musicSearchState.index + 1);
+    return true;
+  },
+
+  getState() {
+    return {
+      hasSearchResults: Boolean(musicSearchState?.videoIds?.length),
+      resultIndex: Number(musicSearchState?.index || 0),
+      resultCount: Number(musicSearchState?.videoIds?.length || 0),
+      title: musicNowTitle?.textContent || '',
+      source: musicNowSource?.textContent || ''
+    };
+  }
+});
+
 function renderMusicLibrary() {
   stopReader();
   const preferred = getPreferredMusic();
