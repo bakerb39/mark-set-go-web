@@ -30,17 +30,6 @@ const MAX_TRANSLATION_CHARS = 120000;
 const MAX_GUTENBERG_BOOK_BYTES = 12 * 1024 * 1024;
 const MAX_ACCOUNT_DOCUMENT_BYTES = 5 * 1024 * 1024;
 const GUTENDEX_BASE = 'https://gutendex.com';
-const WEB_CAPTURE_CACHE = new Map();
-const WEB_CAPTURE_TTL_MS = 10 * 60 * 1000;
-const TOPIC_ARTICLE_CACHE = new Map();
-const TOPIC_ARTICLE_CACHE_TTL_MS = 18 * 60 * 60 * 1000;
-const CRYPTO_TICKER_CACHE_TTL_MS = 60 * 1000;
-const MARKET_INDEX_CACHE_TTL_MS = 60 * 1000;
-let marketIndexCache = { fetchedAt: 0, data: null };
-
-let cryptoTickerCache = { fetchedAt: 0, data: null };
-
-
 const GUTENBERG_MIRROR_BASES = (process.env.GUTENBERG_MIRROR_BASES || process.env.GUTENBERG_MIRROR_BASE || 'https://gutenberg.pglaf.org,https://mirrors.xmission.com/gutenberg').split(',').map((value) => value.trim().replace(/\/+$/, '')).filter(Boolean);
 
 const CURRENT_READING_SOURCES = [
@@ -59,131 +48,9 @@ const CURRENT_READING_SOURCES = [
   { id: 'books', category: 'interests', name: 'Books & Literary Culture', description: 'Books, authors, criticism, and literary culture.', feedUrl: 'https://news.google.com/rss/search?q=books+literary+criticism+authors&hl=en-US&gl=US&ceid=US:en', siteUrl: 'https://news.google.com/search?q=books%20literary%20criticism' }
 ];
 
-
-const TOPIC_FEED_RECOMMENDED_SOURCES = Object.freeze([
-  { key:'reuters', name:'Reuters', type:'website', url:'https://www.reuters.com/', description:'Broad international, business, markets, politics, technology, and breaking-news coverage.', tags:['news','world','international','business','markets','economy','economics','politics','technology','energy','health'] },
-  { key:'ap', name:'Associated Press', type:'website', url:'https://apnews.com/', description:'Straightforward breaking news and broad national/international reporting.', tags:['news','world','us','politics','government','elections','business','science','health','sports'] },
-  { key:'bbc', name:'BBC News', type:'website', url:'https://www.bbc.com/news', description:'International news, politics, business, science, technology, and culture.', tags:['news','world','international','politics','business','science','technology','culture','health'] },
-  { key:'npr', name:'NPR', type:'website', url:'https://www.npr.org/', description:'News, culture, science, health, economics, books, and public affairs.', tags:['news','culture','science','health','economics','books','politics','education'] },
-  { key:'coindesk', name:'CoinDesk', type:'website', url:'https://www.coindesk.com/', description:'Cryptocurrency, digital assets, markets, regulation, and blockchain business.', tags:['crypto','cryptocurrency','bitcoin','ethereum','blockchain','digital assets','markets','investing','regulation'] },
-  { key:'bitcoin-magazine', name:'Bitcoin Magazine', type:'website', url:'https://bitcoinmagazine.com/', description:'Bitcoin-focused news, mining, policy, markets, and ecosystem coverage.', tags:['bitcoin','crypto','cryptocurrency','mining','lightning','blockchain','markets'] },
-  { key:'sec', name:'U.S. Securities and Exchange Commission', type:'website', url:'https://www.sec.gov/', description:'Official U.S. securities regulation, enforcement, filings, speeches, and releases.', tags:['sec','securities','investing','markets','regulation','finance','stocks','etf','crypto','enforcement'] },
-  { key:'fed', name:'Federal Reserve', type:'website', url:'https://www.federalreserve.gov/', description:'Official monetary policy, interest-rate decisions, economic research, and financial-system releases.', tags:['federal reserve','fed','interest rates','inflation','economy','economics','monetary policy','banking','markets'] },
-  { key:'bls', name:'Bureau of Labor Statistics', type:'website', url:'https://www.bls.gov/', description:'Official inflation, employment, wages, productivity, and labor-market data.', tags:['inflation','jobs','employment','unemployment','wages','economy','cpi','labor'] },
-  { key:'ars', name:'Ars Technica', type:'website', url:'https://arstechnica.com/', description:'Technology, computing, AI, science, cybersecurity, and digital policy.', tags:['technology','tech','ai','artificial intelligence','computing','cybersecurity','science','software','internet'] },
-  { key:'verge', name:'The Verge', type:'website', url:'https://www.theverge.com/', description:'Consumer technology, AI, software, platforms, gadgets, and media.', tags:['technology','tech','ai','artificial intelligence','software','gadgets','internet','media'] },
-  { key:'techcrunch', name:'TechCrunch', type:'website', url:'https://techcrunch.com/', description:'Technology companies, startups, venture capital, AI, and product news.', tags:['technology','tech','startups','venture capital','ai','artificial intelligence','software','business'] },
-  { key:'mit-tech', name:'MIT Technology Review', type:'website', url:'https://www.technologyreview.com/', description:'Emerging technology, artificial intelligence, biotechnology, climate, and computing.', tags:['technology','ai','artificial intelligence','science','biotechnology','climate','computing','innovation'] },
-  { key:'nature', name:'Nature', type:'website', url:'https://www.nature.com/', description:'Research news and commentary across science, medicine, climate, and technology.', tags:['science','research','medicine','health','biology','physics','climate','technology'] },
-  { key:'nasa', name:'NASA', type:'website', url:'https://www.nasa.gov/', description:'Official space exploration, astronomy, Earth science, missions, and discoveries.', tags:['space','nasa','astronomy','science','moon','mars','rocket','earth science'] },
-  { key:'nih', name:'National Institutes of Health', type:'website', url:'https://www.nih.gov/', description:'Official biomedical research, health science, and medical research news.', tags:['health','medicine','medical','research','biomedical','disease','science'] },
-  { key:'cdc', name:'CDC', type:'website', url:'https://www.cdc.gov/', description:'Official public-health guidance, surveillance, outbreaks, and health data.', tags:['health','public health','disease','outbreak','medicine','epidemiology','cdc'] },
-  { key:'stat', name:'STAT', type:'website', url:'https://www.statnews.com/', description:'Medicine, biotechnology, health policy, pharmaceuticals, and life-science business.', tags:['health','medicine','biotech','pharma','health policy','science','business'] },
-  { key:'smithsonian', name:'Smithsonian Magazine', type:'website', url:'https://www.smithsonianmag.com/', description:'History, archaeology, science, culture, and discovery reporting.', tags:['history','archaeology','science','culture','museum','discovery'] },
-  { key:'archaeology', name:'Archaeology Magazine', type:'website', url:'https://www.archaeology.org/', description:'Archaeological discoveries, ancient history, sites, and field research.', tags:['archaeology','ancient history','history','artifacts','excavation'] },
-  { key:'lithub', name:'Literary Hub', type:'website', url:'https://lithub.com/', description:'Books, authors, criticism, publishing, essays, and literary culture.', tags:['books','literature','authors','publishing','reading','writing','culture'] },
-  { key:'espn', name:'ESPN', type:'website', url:'https://www.espn.com/', description:'Major U.S. and international sports news, analysis, teams, and leagues.', tags:['sports','football','basketball','baseball','hockey','soccer','tennis','golf'] }
-]);
-
 function stripMarkup(value) {
   const $ = cheerio.load(`<div>${String(value || '')}</div>`);
   return $('div').text().replace(/\s+/g, ' ').trim();
-}
-
-
-function directUrlFromEmbeddedText(value, preferredHost = '') {
-  const raw = String(value || '');
-  if (!raw) return '';
-
-  const normalized = raw
-    .replace(/\\u002f/gi, '/')
-    .replace(/\\u003a/gi, ':')
-    .replace(/\\\//g, '/')
-    .replace(/&amp;/gi, '&');
-
-  const candidates = new Set();
-
-  const addCandidate = (candidate) => {
-    if (!candidate) return;
-    let value = String(candidate)
-      .replace(/^[("'[\s]+/, '')
-      .replace(/[)"'\]>,;\s]+$/, '');
-    try { value = decodeURIComponent(value); } catch {}
-    if (/^https?:\/\//i.test(value)) candidates.add(value);
-  };
-
-  for (const match of normalized.matchAll(/https?:\/\/[^\s"'<>\\]+/gi)) addCandidate(match[0]);
-  for (const match of normalized.matchAll(/https?%3A%2F%2F[^\s"'<>\\]+/gi)) addCandidate(match[0]);
-
-  const preferred = String(preferredHost || '').toLowerCase().replace(/^www\./, '');
-  const blockedHosts = [
-    'news.google.com', 'google.com', 'www.google.com', 'gstatic.com', 'googleusercontent.com',
-    'w3.org', 'www.w3.org', 'schema.org', 'www.schema.org',
-    'purl.org', 'www.purl.org', 'xmlns.com', 'www.xmlns.com'
-  ];
-
-  const ranked = [...candidates].map((url) => {
-    try {
-      const parsed = new URL(url);
-      const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
-      if (blockedHosts.some((blocked) => host === blocked || host.endsWith(`.${blocked}`))) return null;
-
-      const preferredMatch = Boolean(preferred) &&
-        (host === preferred || host.endsWith(`.${preferred}`) || preferred.endsWith(`.${host}`));
-
-      // If we know the publisher hostname, do not accept random URLs embedded in
-      // XML namespaces, tracking markup, ads, schema metadata, or related links.
-      if (preferred && !preferredMatch) return null;
-
-      const pathScore = parsed.pathname.split('/').filter(Boolean).length;
-      return { url: parsed.toString(), preferredMatch, pathScore };
-    } catch {
-      return null;
-    }
-  }).filter(Boolean);
-
-  ranked.sort((a, b) =>
-    Number(b.preferredMatch) - Number(a.preferredMatch) ||
-    b.pathScore - a.pathScore
-  );
-
-  return ranked[0]?.url || '';
-}
-
-async function directUrlFromGoogleNewsPage(rawUrl, publisherUrl = '') {
-  const googleUrl = await validatePublicUrl(rawUrl);
-  let preferredHost = '';
-  try { preferredHost = publisherUrl ? new URL(publisherUrl).hostname : ''; } catch {}
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 18000);
-  try {
-    const response = await fetch(googleUrl, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MarkSetGoWeb/2.6; +google-news-resolver)',
-        Accept: 'text/html,application/xhtml+xml,*/*;q=0.1'
-      }
-    });
-    if (!response.ok) return '';
-
-    const html = await response.text();
-
-    // The Google News wrapper often carries the real publisher URL somewhere in
-    // its HTML/serialized page data even when the HTTP redirect itself stays on Google.
-    let direct = directUrlFromEmbeddedText(html, preferredHost);
-    if (direct) return direct;
-
-    const $ = cheerio.load(html);
-    const hrefs = $('a[href]').toArray().map((element) => $(element).attr('href')).filter(Boolean);
-    direct = directUrlFromEmbeddedText(hrefs.join('\n'), preferredHost);
-    return direct || '';
-  } catch {
-    return '';
-  } finally {
-    clearTimeout(timeout);
-  }
 }
 
 async function fetchFeedItems(source) {
@@ -198,252 +65,25 @@ async function fetchFeedItems(source) {
     const xml = await response.text();
     const $ = cheerio.load(xml, { xmlMode: true });
     const nodes = $('item, entry').toArray().slice(0, 30);
-
     return nodes.map((node) => {
       const item = $(node);
       const atomLink = item.find('link[rel="alternate"]').attr('href') || item.find('link').attr('href');
       const rssLink = item.find('link').first().text().trim();
-      const googleOrPrimaryLink = atomLink || rssLink || item.find('guid').first().text().trim();
-
+      const link = atomLink || rssLink || item.find('guid').first().text().trim();
       const title = stripMarkup(item.find('title').first().text()) || 'Untitled article';
-      const rawDescription =
-        item.find('description').first().text() ||
-        item.find('summary').first().text() ||
-        item.find('content\\:encoded').first().text() ||
-        item.find('content').first().text();
-
-      const sourceElement = item.children('source').first();
-      let sourceUrl = sourceElement.attr('url') || '';
-      if (sourceUrl && /w3\.org|schema\.org|xmlns\.com|purl\.org/i.test(sourceUrl)) sourceUrl = '';
-
-      let preferredHost = '';
-      try {
-        preferredHost = sourceUrl
-          ? new URL(sourceUrl).hostname
-          : new URL(source.feedUrl).hostname;
-      } catch {}
-
-      // On a publisher's own RSS/Atom feed, <link> is the canonical article URL.
-      // Never replace a valid publisher link with URLs found inside the description
-      // (Google Tag Manager, analytics, schema resources, ads, etc.).
-      let embeddedPublisherUrl = '';
-      let primaryHost = '';
-      try { primaryHost = new URL(googleOrPrimaryLink).hostname.toLowerCase(); } catch {}
-
-      const primaryNeedsResolution =
-        primaryHost === 'news.google.com' || primaryHost.endsWith('.news.google.com') ||
-        primaryHost === 'w3.org' || primaryHost.endsWith('.w3.org') ||
-        primaryHost === 'schema.org' || primaryHost.endsWith('.schema.org') ||
-        primaryHost === 'purl.org' || primaryHost.endsWith('.purl.org') ||
-        primaryHost === 'xmlns.com' || primaryHost.endsWith('.xmlns.com');
-
-      if (primaryNeedsResolution) {
-        embeddedPublisherUrl = directUrlFromEmbeddedText(rawDescription, preferredHost);
-      }
-
-      const link = embeddedPublisherUrl || googleOrPrimaryLink;
-
-      const published =
-        item.find('pubDate').first().text() ||
-        item.find('published').first().text() ||
-        item.find('updated').first().text();
-
-      return {
-        title,
-        link,
-        googleLink: embeddedPublisherUrl ? googleOrPrimaryLink : '',
-        sourceUrl,
-        summary: stripMarkup(rawDescription).slice(0, 1800),
-        published
-      };
+      // Prefer publisher-supplied full feed content when it exists.  Many RSS/Atom
+      // feeds expose a complete article in content:encoded/content even when the
+      // public webpage later changes structure or blocks automated retrieval.
+      const encodedContent = item.find('content\:encoded').first().text() || item.find('content').first().text();
+      const description = item.find('description').first().text() || item.find('summary').first().text();
+      const feedText = stripMarkup(encodedContent).slice(0, 500000);
+      const summaryText = stripMarkup(description || encodedContent).slice(0, 1800);
+      const published = item.find('pubDate').first().text() || item.find('published').first().text() || item.find('updated').first().text();
+      return { title, link, summary: summaryText, feedText: feedText.length >= 350 ? feedText : '', published };
     }).filter((item) => item.link && /^https?:\/\//i.test(item.link));
   } finally {
     clearTimeout(timeout);
   }
-}
-
-
-
-const VERIFIED_PUBLISHER_FEEDS = Object.freeze({
-  'coindesk.com': 'https://www.coindesk.com/arc/outboundfeeds/rss/',
-  'sec.gov': 'https://www.sec.gov/news/pressreleases.rss'
-});
-
-function verifiedPublisherFeedForHost(hostname = '') {
-  const host = String(hostname || '').toLowerCase().replace(/^www\./, '');
-  for (const [publisherHost, feedUrl] of Object.entries(VERIFIED_PUBLISHER_FEEDS)) {
-    if (host === publisherHost || host.endsWith(`.${publisherHost}`)) return feedUrl;
-  }
-  return '';
-}
-
-async function discoverPublisherFeed(rawUrl) {
-  const parsed = await validatePublicUrl(rawUrl);
-  const origin = parsed.origin;
-  const candidates = [];
-  const seen = new Set();
-
-  const verifiedFeed = verifiedPublisherFeedForHost(parsed.hostname);
-  if (verifiedFeed) {
-    try {
-      const items = await fetchFeedItems({ feedUrl: verifiedFeed });
-      if (items.length) return { feedUrl: verifiedFeed, items, verified: true };
-    } catch (error) {
-      console.warn(`Verified publisher RSS failed for ${parsed.hostname}:`, error?.message || error);
-    }
-  }
-
-  const add = (value) => {
-    if (!value) return;
-    let absolute = '';
-    try { absolute = new URL(value, parsed).toString(); } catch { return; }
-    if (!/^https?:\/\//i.test(absolute) || seen.has(absolute)) return;
-    seen.add(absolute);
-    candidates.push(absolute);
-  };
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
-  try {
-    const response = await fetch(parsed, {
-      redirect: 'follow',
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MarkSetGoWeb/2.3; +feed discovery)',
-        Accept: 'text/html,application/xhtml+xml,*/*;q=0.1'
-      }
-    });
-    if (response.ok) {
-      const html = await response.text();
-      const $ = cheerio.load(html);
-      $('link[rel="alternate"]').each((_i, element) => {
-        const type = String($(element).attr('type') || '').toLowerCase();
-        const href = $(element).attr('href');
-        if (href && (type.includes('rss') || type.includes('atom') || type.includes('xml'))) add(href);
-      });
-    }
-  } catch (_) {
-    // Continue to conventional feed paths.
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  [
-    '/feed', '/feed/', '/rss', '/rss/', '/rss.xml', '/feed.xml',
-    '/atom.xml', '/index.xml', '/feeds/posts/default?alt=rss'
-  ].forEach((path) => add(new URL(path, origin).toString()));
-
-  for (const feedUrl of candidates.slice(0, 12)) {
-    try {
-      const items = await fetchFeedItems({ feedUrl });
-      if (items.length) return { feedUrl, items };
-    } catch (_) {}
-  }
-
-  return null;
-}
-
-
-function samePublisherHost(a, b) {
-  const normalize = (host) => String(host || '').toLowerCase().replace(/^www\./, '');
-  const left = normalize(a);
-  const right = normalize(b);
-  return left === right || left.endsWith(`.${right}`) || right.endsWith(`.${left}`);
-}
-
-function likelyArticlePath(pathname = '') {
-  const path = String(pathname || '').toLowerCase();
-  if (!path || path === '/' || path.length < 8) return false;
-  if (/\/(?:tag|tags|author|authors|category|categories|topic|topics|page|search|about|contact|privacy|terms|newsletter|podcast|video|videos|markets?|news)\/?$/.test(path)) return false;
-  if (/\.(?:jpg|jpeg|png|gif|webp|svg|pdf|xml|rss|atom|css|js)$/i.test(path)) return false;
-  const segments = path.split('/').filter(Boolean);
-  return segments.length >= 2 || /-\w+-\w+/.test(path);
-}
-
-async function discoverPublisherPageArticles(rawUrl, topic = '') {
-  const parsed = await validatePublicUrl(rawUrl);
-  const origin = parsed.origin;
-
-  const pageCandidates = [];
-  const seenPages = new Set();
-  const addPage = (value) => {
-    try {
-      const url = new URL(value, parsed).toString();
-      if (!seenPages.has(url)) {
-        seenPages.add(url);
-        pageCandidates.push(url);
-      }
-    } catch {}
-  };
-
-  addPage(parsed.toString());
-  ['/news', '/latest', '/articles', '/blog', '/markets'].forEach((path) => addPage(new URL(path, origin).toString()));
-
-  const topicWords = String(topic || '').toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 3);
-  const results = [];
-  const seenUrls = new Set();
-
-  for (const pageUrl of pageCandidates.slice(0, 6)) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    try {
-      const response = await fetch(await validatePublicUrl(pageUrl), {
-        redirect: 'follow',
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; MarkSetGoWeb/2.4; +publisher discovery)',
-          Accept: 'text/html,application/xhtml+xml,*/*;q=0.1'
-        }
-      });
-      if (!response.ok) continue;
-      const html = await response.text();
-      const $ = cheerio.load(html);
-      const pageBase = response.url || pageUrl;
-
-      $('a[href]').each((_i, element) => {
-        const anchor = $(element);
-        const label = stripMarkup(anchor.text()).replace(/\s+/g, ' ').trim();
-        if (label.length < 24 || label.length > 220) return;
-
-        let absolute;
-        try { absolute = new URL(anchor.attr('href'), pageBase); } catch { return; }
-        if (!/^https?:$/.test(absolute.protocol)) return;
-        if (!samePublisherHost(absolute.hostname, parsed.hostname)) return;
-        if (!likelyArticlePath(absolute.pathname)) return;
-
-        const cleanUrl = absolute.toString().split('#')[0];
-        if (seenUrls.has(cleanUrl)) return;
-
-        const lowerLabel = label.toLowerCase();
-        const topicMatch = !topicWords.length || topicWords.some((word) => lowerLabel.includes(word));
-        const articleClassHint = `${anchor.attr('class') || ''} ${anchor.parent().attr('class') || ''} ${anchor.closest('article').attr('class') || ''}`.toLowerCase();
-        const structuralHint = Boolean(anchor.closest('article').length) || /article|story|post|headline|title|card/.test(articleClassHint);
-
-        // Keep obvious article links even when the exact topic word is absent.
-        if (!topicMatch && !structuralHint) return;
-
-        const container = anchor.closest('article').length ? anchor.closest('article') : anchor.parent();
-        const summary = stripMarkup(container.find('p').first().text()).slice(0, 1800);
-        const timeText = container.find('time').first().attr('datetime') || container.find('time').first().text() || '';
-
-        seenUrls.add(cleanUrl);
-        results.push({
-          title: label,
-          link: cleanUrl,
-          summary,
-          published: String(timeText || '').trim()
-        });
-      });
-
-      if (results.length >= 20) break;
-    } catch (_) {
-      // Try the next likely listing page.
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  return results.slice(0, 30);
 }
 
 
@@ -2017,17 +1657,12 @@ Do not provide answer keys in the exercise text.`;
 
 
 app.post('/api/mark-selection', async (req, res) => {
-  const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
-    ? String(req.body.companion).trim().toLowerCase()
-    : 'mark';
-  const companionName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
-
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
-  if (!apiKey) return res.status(503).json({ error: `${companionName} is not configured. Add OPENAI_API_KEY to the server environment.` });
+  if (!apiKey) return res.status(503).json({ error: 'Mark is not configured. Add OPENAI_API_KEY to the server environment.' });
 
   const action = String(req.body?.action || 'explain').trim();
   const allowed = new Set(['explain','summarize','analyze','simplify','context','related','ask','translate']);
-  if (!allowed.has(action)) return res.status(400).json({ error: `Unsupported ${companionName} action.` });
+  if (!allowed.has(action)) return res.status(400).json({ error: 'Unsupported Mark action.' });
 
   const selection = String(req.body?.selection || '').replace(/\s+/g,' ').trim().slice(0,12000);
   const before = String(req.body?.before || '').replace(/\s+/g,' ').trim().slice(-5000);
@@ -2054,15 +1689,8 @@ app.post('/api/mark-selection', async (req, res) => {
     keyPoints:{type:'array',minItems:0,maxItems:6,items:{type:'string'}},
     cautions:{type:'array',minItems:0,maxItems:4,items:{type:'string'}}
   }};
-  const personaInstruction = companion === 'chad'
-    ? `You are Chad, the finance, markets, economics, business, and investing specialist inside an e-reader. When the passage is financially relevant, emphasize market significance, investor implications, risks, catalysts, incentives, valuation logic, and uncertainty where supported. For non-financial passages, answer the reading request normally and do not force an investment angle.`
-    : companion === 'beth'
-      ? `You are Beth, a warm, thoughtful reading companion inside an e-reader. Be clear, encouraging, grounded in the text, and intellectually serious.`
-      : `You are Mark, a careful reading companion inside an e-reader.`;
-
-  const prompt=`${personaInstruction} ${actionInstructions[action]}
-Use the surrounding text only to disambiguate the selection. Never summarize or reveal later plot beyond the supplied context. Do not invent facts, allusions, authorial intentions, financial facts, or quotations. State uncertainty plainly. Keep the response useful and proportionate to the selection.
-Your active companion name is ${companionName}. If you refer to yourself anywhere in the response, use ${companionName} only. Never identify yourself as Mark, Beth, or Chad unless that is the active companion name. Do not mention the existence of alternate companions unless the reader explicitly asks about that feature.`;
+  const prompt=`You are Mark, a careful reading companion inside an e-reader. ${actionInstructions[action]}
+Use the surrounding text only to disambiguate the selection. Never summarize or reveal later plot beyond the supplied context. Do not invent facts, allusions, authorial intentions, or quotations. State uncertainty plainly. Keep the response useful and proportionate to the selection.`;
   try {
     const response=await fetch('https://api.openai.com/v1/responses',{method:'POST',headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},body:JSON.stringify({
       model:COMPREHENSION_MODEL,reasoning:{effort:action==='analyze'||action==='related'?'medium':'low'},store:false,
@@ -2070,10 +1698,10 @@ Your active companion name is ${companionName}. If you refer to yourself anywher
       text:{format:{type:'json_schema',name:'mark_selection_response',strict:true,schema}}
     })});
     const payload=await response.json().catch(()=>({}));
-    if(!response.ok) return res.status(502).json({error:`${companionName} could not complete the request.`,detail:payload?.error?.message||`HTTP ${response.status}`});
+    if(!response.ok) return res.status(502).json({error:'Mark could not complete the request.',detail:payload?.error?.message||`HTTP ${response.status}`});
     const outputText=extractOpenAIOutputText(payload); if(!outputText) throw new Error('No response text.');
-    res.json({model:COMPREHENSION_MODEL,action,companion:{id:companion,name:companionName},result:JSON.parse(outputText)});
-  } catch(error){ console.error(`${companionName} selection failed:`,error); res.status(502).json({error:`${companionName} could not complete the request.`}); }
+    res.json({model:COMPREHENSION_MODEL,action,result:JSON.parse(outputText)});
+  } catch(error){ console.error('Mark selection failed:',error); res.status(502).json({error:'Mark could not complete the request.'}); }
 });
 
 
@@ -2084,10 +1712,6 @@ app.post('/api/app-help', async (req, res) => {
   const pageKey = String(req.body?.pageKey || 'unknown').trim().slice(0, 120);
   const pageTitle = String(req.body?.pageTitle || 'Current page').trim().slice(0, 200);
   const question = String(req.body?.question || '').trim().slice(0, 800);
-  const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
-    ? String(req.body.companion).trim().toLowerCase()
-    : 'mark';
-  const companionName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
   const safeObject = (value, maxChars) => {
     if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
     try { return JSON.parse(JSON.stringify(value).slice(0, maxChars)); } catch { return {}; }
@@ -2100,11 +1724,10 @@ app.post('/api/app-help', async (req, res) => {
     type: 'object', additionalProperties: false, required: ['inScope','answer'],
     properties: { inScope: { type: 'boolean' }, answer: { type: 'string' } }
   };
-  const prompt = `You are ${companionName}, the in-app help companion for Mark, Set, Go!.
+  const prompt = `You are Mark, the in-app help companion for Mark, Set, Go!.
 Your ONLY job in this mode is to answer questions about how to use the CURRENT APP PAGE, the controls/features described for that page, or closely related navigation needed to complete a task from that page.
 Use the supplied STORED PAGE HELP as the primary authority and GLOBAL APP HELP only for supporting navigation/context.
 Do not answer general knowledge, book-content questions, personal advice, current events, coding, or unrelated questions.
-Your active companion name is ${companionName}. If you refer to yourself in the answer, use ${companionName} only; never call yourself another companion.
 Do not discuss highlighted reading text in this mode.
 Do not invent controls, behavior, storage guarantees, or features that are not supported by the supplied help knowledge.
 When the user asks how to accomplish something, give short concrete steps and name the actual control/page when the knowledge supplies one.
@@ -2659,6 +2282,93 @@ function headlineMatches(expectedTitle, pageTitle) {
   return matches >= Math.min(2, Math.ceil(expected.size * 0.25));
 }
 
+function normalizeArticleCandidate(value) {
+  let raw = String(value || '').trim();
+  if (!raw) return '';
+
+  // JSON-LD articleBody is usually plain text, but a few publishers embed HTML.
+  // Preserve paragraph boundaries before stripping markup so Reader formatting is
+  // still useful instead of collapsing the complete story into one giant line.
+  if (/<\/?[a-z][\s\S]*>/i.test(raw)) {
+    raw = raw
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(?:p|div|li|section|article|h[1-6])>/gi, '$&\n\n');
+    const $ = cheerio.load(`<div id="msg-article-candidate">${raw}</div>`);
+    $('#msg-article-candidate script, #msg-article-candidate style, #msg-article-candidate noscript').remove();
+    raw = $('#msg-article-candidate').text();
+  }
+
+  return raw
+    .replace(/\r/g, '')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n[ \t]+/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function jsonLdArticleCandidates(value, results = []) {
+  if (Array.isArray(value)) {
+    value.forEach((item) => jsonLdArticleCandidates(item, results));
+    return results;
+  }
+  if (!value || typeof value !== 'object') return results;
+
+  const types = Array.isArray(value['@type']) ? value['@type'] : [value['@type']];
+  const articleLike = types.some((type) => /(?:NewsArticle|Article|ReportageNewsArticle|AnalysisNewsArticle|BlogPosting)$/i.test(String(type || '')));
+  const body = normalizeArticleCandidate(value.articleBody || '');
+  if (articleLike && body) {
+    results.push({
+      headline: String(value.headline || value.name || '').trim(),
+      body
+    });
+  }
+
+  // @graph is common, but recursively walking the object also handles publishers
+  // that nest NewsArticle under mainEntity/itemListElement or framework state.
+  Object.values(value).forEach((child) => {
+    if (child && typeof child === 'object') jsonLdArticleCandidates(child, results);
+  });
+  return results;
+}
+
+function extractStructuredArticle($, expectedTitle) {
+  const candidates = [];
+  $('script[type="application/ld+json"]').each((_index, element) => {
+    const raw = $(element).html() || $(element).text() || '';
+    if (!raw.trim()) return;
+    try {
+      const parsed = JSON.parse(raw.trim());
+      jsonLdArticleCandidates(parsed, candidates);
+    } catch {
+      // Invalid publisher JSON-LD should never prevent the ordinary HTML path.
+    }
+  });
+
+  const eligible = candidates
+    .filter((candidate) => candidate.body.length >= 350)
+    .filter((candidate) => !candidate.headline || headlineMatches(expectedTitle, candidate.headline))
+    .sort((a, b) => b.body.length - a.body.length);
+  return eligible[0]?.body?.slice(0, 500000) || '';
+}
+
+function publisherRestrictionError(message, status = 0) {
+  const error = new Error(message || 'The publisher blocked automated full-text import.');
+  error.code = 'PUBLISHER_RESTRICTED';
+  error.publisherRestricted = true;
+  error.status = Number(status) || 0;
+  return error;
+}
+
+function looksLikePublisherChallenge(value = '') {
+  const lower = String(value || '').toLowerCase();
+  const signals = [
+    'datadome', 'captcha', 'verify you are human', 'are you a robot',
+    'access denied', 'request blocked', 'unusual traffic', 'security check',
+    'enable javascript and cookies', 'checking your browser', 'bot detection'
+  ];
+  return signals.some((signal) => lower.includes(signal));
+}
+
 async function fetchArticleForFeed(rawUrl, expectedTitle) {
   const parsed = await validatePublicUrl(rawUrl);
   const controller = new AbortController();
@@ -2668,140 +2378,88 @@ async function fetchArticleForFeed(rawUrl, expectedTitle) {
       redirect: 'follow',
       signal: controller.signal,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MarkSetGoWeb/2.2; +reader)',
+        'User-Agent': 'Mozilla/5.0 (compatible; MarkSetGoWeb/2.3; +reader)',
         Accept: 'text/html,application/xhtml+xml,text/plain;q=0.8,*/*;q=0.1'
       }
     });
-    if (!response.ok) throw new Error(`The publisher returned HTTP ${response.status}.`);
+
+    if (!response.ok) {
+      if ([401, 403, 429, 451].includes(response.status)) {
+        throw publisherRestrictionError(`The publisher blocked automated full-text import (HTTP ${response.status}).`, response.status);
+      }
+      throw new Error(`The publisher returned HTTP ${response.status}.`);
+    }
+
     const contentType = response.headers.get('content-type') || '';
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.length > MAX_RESPONSE_BYTES) throw new Error('The article is too large to import.');
     const source = buffer.toString('utf8');
+
     if (contentType.includes('text/plain')) {
-      const text = source.replace(/\s+/g, ' ').trim();
+      const text = normalizeArticleCandidate(source);
       if (text.length < 300) throw new Error('The publisher did not return enough article text.');
-      return { text, documentToc: [] };
+      return text;
     }
 
     const $ = cheerio.load(source);
-    $('script, style, noscript, svg, iframe, form, nav, footer, header, aside, dialog, [aria-hidden="true"]').remove();
+
+    // Layer 1: publisher structured data. This is deliberately checked before
+    // scripts are removed. NewsArticle/Article JSON-LD often survives page-layout
+    // redesigns and is therefore more stable than CSS selectors.
+    const structuredArticle = extractStructuredArticle($, expectedTitle);
+    if (structuredArticle) return structuredArticle;
+
     const pageTitle = $('meta[property="og:title"]').attr('content') || $('h1').first().text() || $('title').first().text();
     if (!headlineMatches(expectedTitle, pageTitle)) {
+      if (looksLikePublisherChallenge(source)) {
+        throw publisherRestrictionError('The publisher returned an access-verification page instead of the article.');
+      }
       throw new Error('The publisher returned a navigation or unrelated page instead of this article.');
     }
 
+    // Layer 2: ordinary semantic/article HTML extraction.
+    $('script, style, noscript, svg, iframe, form, nav, footer, header, aside, dialog, [aria-hidden="true"]').remove();
     const selectors = [
       'article [itemprop="articleBody"]', '[itemprop="articleBody"]',
       'article .article-body', 'article .story-body', 'article .entry-content',
-      'article .post-content', 'article .content-body', 'article',
+      'article .post-content', 'article .content-body', 'article [data-testid*="body"]',
+      'article [class*="article-body"]', 'article [class*="story-body"]', 'article',
       'main .article-body', 'main .story-body', 'main .entry-content',
       'main .post-content', 'main [role="article"]', 'main'
     ];
 
-    const stopHeadings = [
-      'related assets',
-      'latest crypto news',
-      'latest research',
-      'more from markets',
-      'more from bitcoin',
-      'more from',
-      'recommended',
-      'you may also like',
-      'read more'
-    ];
-
-    const readerWordCount = (value) =>
-      String(value || '').trim().split(/\s+/).filter(Boolean).length;
-
-    const extractArticleBlocks = (element) => {
-      const container = $(element).clone();
-
-      container.find([
-        'nav', 'footer', 'header', 'aside', 'form', 'button', 'figure', 'figcaption',
-        '.advertisement', '.ad', '[class*="promo"]', '[class*="newsletter"]',
-        '[class*="recommend"]', '[class*="related"]', '[class*="sidebar"]',
-        '[class*="latest"]', '[class*="research"]'
-      ].join(',')).remove();
-
-      const blocks = [];
-      const seen = new Set();
-      const nodes = container.find('p, h2, h3, h4, li, blockquote').toArray();
-
-      for (const node of nodes) {
-        const tag = String(node.tagName || node.name || '').toLowerCase();
-        const text = $(node).text().replace(/\s+/g, ' ').trim();
-        if (!text) continue;
-
-        const lowerText = text.toLowerCase().replace(/[:\s]+$/g, '');
-        const isHeading = /^h[234]$/.test(tag);
-
-        if (
-          isHeading &&
-          blocks.length >= 2 &&
-          stopHeadings.some((heading) =>
-            lowerText === heading ||
-            lowerText.startsWith(`${heading} `)
-          )
-        ) {
-          break;
-        }
-
-        if (!isHeading && text.length < 28) continue;
-        if (isHeading && text.length > 160) continue;
-
-        const dedupeKey = text.toLowerCase();
-        if (seen.has(dedupeKey)) continue;
-        seen.add(dedupeKey);
-
-        blocks.push({
-          text: tag === 'li' ? `• ${text}` : text,
-          heading: isHeading,
-          headingTitle: isHeading ? text : ''
-        });
-      }
-
-      let wordIndex = 0;
-      const documentToc = [];
-      const pieces = [];
-
-      for (const block of blocks) {
-        if (block.heading && block.headingTitle) {
-          documentToc.push({
-            title: block.headingTitle,
-            index: wordIndex,
-            type: 'section'
-          });
-        }
-        pieces.push(block.text);
-        wordIndex += readerWordCount(block.text);
-      }
-
-      return {
-        text: pieces.join('\n\n').trim(),
-        documentToc
-      };
-    };
-
-    let best = { text: '', documentToc: [] };
+    let best = '';
     for (const selector of selectors) {
       $(selector).each((_index, element) => {
-        const candidate = extractArticleBlocks(element);
-        if (candidate.text.length > best.text.length) best = candidate;
+        const container = $(element).clone();
+        container.find('nav, footer, header, aside, form, button, figure, figcaption, .advertisement, .ad, [class*="promo"], [class*="related"], [class*="newsletter"]').remove();
+        const paragraphs = container.find('p').toArray()
+          .map((p) => normalizeArticleCandidate($(p).text()))
+          .filter((text) => text.length >= 35);
+        const candidate = paragraphs.length >= 3
+          ? paragraphs.join('\n\n')
+          : normalizeArticleCandidate(container.text());
+        if (candidate.length > best.length) best = candidate;
       });
-
-      if (best.text.length >= 900) break;
+      if (best.length >= 1200) break;
     }
 
-    if (best.text.length < 350) throw new Error('The publisher did not expose readable article text.');
-    const genericSignals = ['sign in to continue', 'enable javascript', 'accept all cookies', 'latest news and headlines'];
-    const lower = best.text.toLowerCase();
-    if (genericSignals.some((signal) => lower.includes(signal)) && best.text.length < 1200) {
+    if (best.length < 350) {
+      if (looksLikePublisherChallenge(source) || looksLikePublisherChallenge(best)) {
+        throw publisherRestrictionError('The publisher blocked automated full-text import.');
+      }
+      throw new Error('The publisher did not expose readable article text.');
+    }
+
+    const genericSignals = [
+      'sign in to continue', 'enable javascript', 'accept all cookies',
+      'latest news and headlines', 'subscribe to continue'
+    ];
+    const lower = best.toLowerCase();
+    if (genericSignals.some((signal) => lower.includes(signal)) && best.length < 1200) {
       throw new Error('The publisher returned a consent or navigation page instead of article text.');
     }
-    return {
-      text: best.text.slice(0, 500000),
-      documentToc: best.documentToc.slice(0, 100)
-    };
+    return best.slice(0, 500000);
   } finally {
     clearTimeout(timeout);
   }
@@ -3568,54 +3226,6 @@ app.post('/api/import/docx', express.raw({
   }
 });
 
-
-function cleanCaptureDocumentToc(value) {
-  let parsed = value;
-  if (typeof parsed === 'string') {
-    try { parsed = JSON.parse(parsed); } catch { parsed = []; }
-  }
-  if (!Array.isArray(parsed)) return [];
-  return parsed.slice(0, 200).map((entry) => ({
-    title: String(entry?.title || '').replace(/\s+/g, ' ').trim().slice(0, 220),
-    index: Math.max(0, Number(entry?.index) || 0),
-    type: String(entry?.type || 'section').trim().slice(0, 40) || 'section'
-  })).filter((entry) => entry.title);
-}
-
-function purgeExpiredWebCaptures() {
-  const now = Date.now();
-  for (const [token, record] of WEB_CAPTURE_CACHE) {
-    if (!record?.expiresAt || record.expiresAt <= now) WEB_CAPTURE_CACHE.delete(token);
-  }
-}
-
-function topicArticleCacheKey(url, title = '') {
-  return `${String(url || '').trim().toLowerCase()}|${String(title || '').trim().toLowerCase()}`;
-}
-
-function getCachedTopicArticle(url, title = '') {
-  const key = topicArticleCacheKey(url, title);
-  const record = TOPIC_ARTICLE_CACHE.get(key);
-  if (!record) return null;
-  if (record.expiresAt <= Date.now()) {
-    TOPIC_ARTICLE_CACHE.delete(key);
-    return null;
-  }
-  return record.payload;
-}
-
-function putCachedTopicArticle(urls, title, payload) {
-  const expiresAt = Date.now() + TOPIC_ARTICLE_CACHE_TTL_MS;
-  for (const url of [...new Set((Array.isArray(urls) ? urls : [urls]).filter(Boolean))]) {
-    TOPIC_ARTICLE_CACHE.set(topicArticleCacheKey(url, title), { expiresAt, payload });
-  }
-  // Keep the beta cache bounded.
-  if (TOPIC_ARTICLE_CACHE.size > 800) {
-    const excess = TOPIC_ARTICLE_CACHE.size - 700;
-    for (const key of [...TOPIC_ARTICLE_CACHE.keys()].slice(0, excess)) TOPIC_ARTICLE_CACHE.delete(key);
-  }
-}
-
 app.post('/capture', (req, res) => {
   const payload = {
     title: String(req.body?.title || 'Web Article').trim().slice(0, 500),
@@ -3623,35 +3233,11 @@ app.post('/capture', (req, res) => {
     url: String(req.body?.url || '').trim().slice(0, 4000),
     text: String(req.body?.text || '').trim().slice(0, 5_000_000),
     captureType: req.body?.captureType === 'selection' ? 'selection' : 'page',
-    context: String(req.body?.context || '').trim().slice(0, 10000),
-    documentToc: cleanCaptureDocumentToc(req.body?.structure)
+    context: String(req.body?.context || '').trim().slice(0, 10000)
   };
   if (!payload.text) return res.status(400).send('No readable webpage text was received.');
-
-  purgeExpiredWebCaptures();
-  const token = crypto.randomBytes(18).toString('base64url');
-  WEB_CAPTURE_CACHE.set(token, {
-    payload,
-    expiresAt: Date.now() + WEB_CAPTURE_TTL_MS
-  });
-
-  // Redirect directly into the app. This avoids writing a multi-megabyte capture
-  // into localStorage, which can fail when browser storage is full.
-  return res.redirect(303, `/#read-anything-capture=${encodeURIComponent(token)}`);
-});
-
-app.get('/api/capture/:token', (req, res) => {
-  purgeExpiredWebCaptures();
-  const token = String(req.params?.token || '');
-  const record = WEB_CAPTURE_CACHE.get(token);
-  if (!record || record.expiresAt <= Date.now()) {
-    WEB_CAPTURE_CACHE.delete(token);
-    return res.status(404).json({ error: 'This captured page expired. Run the bookmarklet again.' });
-  }
-  // Keep the short-lived capture available for retry until its TTL expires.
-  // The client removes the capture hash after a successful Reader open, so
-  // normal navigation will not reopen it.
-  return res.json(record.payload);
+  const serialized = JSON.stringify(payload).replace(/</g, '\\u003c');
+  res.type('html').send(`<!doctype html><meta charset="utf-8"><title>Opening Mark, Set, Go!</title><p>Opening the captured content in Mark, Set, Go!…</p><script>localStorage.setItem('markSetGoPendingWebCaptureV1',${JSON.stringify(serialized)});location.replace('/#read-anything-capture=1');<\/script>`);
 });
 
 app.post('/api/fetch-text', async (req, res) => {
@@ -3777,744 +3363,57 @@ app.get('/api/gutenberg/books/:id/text', async (req, res) => {
 });
 
 
-
-async function resolvePublisherArticleUrl(publisherUrl, expectedTitle) {
-  if (!publisherUrl || !expectedTitle) return '';
-
-  const parsed = await validatePublicUrl(publisherUrl);
-  const origin = parsed.origin;
-  const candidates = [
-    parsed.toString(),
-    new URL('/news', origin).toString(),
-    new URL('/latest', origin).toString(),
-    new URL('/articles', origin).toString(),
-    new URL('/blog', origin).toString(),
-    new URL('/markets', origin).toString()
-  ];
-
-  let bestUrl = '';
-  let bestScore = 0;
-  const expectedWords = normalizedHeadlineWords(expectedTitle);
-
-  for (const pageUrl of [...new Set(candidates)]) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
-    try {
-      const response = await fetch(await validatePublicUrl(pageUrl), {
-        redirect: 'follow',
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; MarkSetGoWeb/2.5; +article resolver)',
-          Accept: 'text/html,application/xhtml+xml,*/*;q=0.1'
-        }
-      });
-      if (!response.ok) continue;
-
-      const html = await response.text();
-      const $ = cheerio.load(html);
-      const responseBase = response.url || pageUrl;
-
-      $('a[href]').each((_i, element) => {
-        const label = stripMarkup($(element).text()).replace(/\s+/g, ' ').trim();
-        if (label.length < 15) return;
-
-        const actualWords = normalizedHeadlineWords(label);
-        if (!expectedWords.size || !actualWords.size) return;
-
-        let matches = 0;
-        for (const word of expectedWords) if (actualWords.has(word)) matches += 1;
-        const score = matches / Math.max(expectedWords.size, actualWords.size);
-        if (matches < Math.min(3, Math.ceil(expectedWords.size * 0.45))) return;
-        if (score < bestScore) return;
-
-        let absolute;
-        try { absolute = new URL($(element).attr('href'), responseBase); } catch { return; }
-        if (!/^https?:$/.test(absolute.protocol)) return;
-        if (!samePublisherHost(absolute.hostname, parsed.hostname)) return;
-        if (!likelyArticlePath(absolute.pathname)) return;
-
-        bestScore = score;
-        bestUrl = absolute.toString().split('#')[0];
-      });
-
-      if (bestScore >= 0.8 && bestUrl) break;
-    } catch (_) {
-      // Continue through likely publisher listing pages.
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-
-  return bestUrl;
-}
-
-
-function publisherSiteForSourceName(sourceName = '') {
-  const name = String(sourceName || '').trim().toLowerCase();
-  if (name.includes('coindesk')) return 'https://www.coindesk.com/';
-  if (name.includes('bitcoin magazine')) return 'https://bitcoinmagazine.com/';
-  if (name === 'sec' || name.includes('u.s. sec') || name.includes('securities and exchange commission')) {
-    return 'https://www.sec.gov/';
-  }
-  return '';
-}
-
-function isBadArticleHost(hostname = '') {
-  const host = String(hostname || '').toLowerCase().replace(/^www\./, '');
-  return [
-    'news.google.com',
-    'googletagmanager.com',
-    'google-analytics.com',
-    'doubleclick.net',
-    'googlesyndication.com',
-    'w3.org',
-    'schema.org',
-    'purl.org',
-    'xmlns.com'
-  ].some((bad) => host === bad || host.endsWith(`.${bad}`));
-}
-
-function hostMatchesPublisher(articleUrl, publisherUrl) {
-  if (!publisherUrl) return true;
-  try {
-    const articleHost = new URL(articleUrl).hostname.toLowerCase().replace(/^www\./, '');
-    const publisherHost = new URL(publisherUrl).hostname.toLowerCase().replace(/^www\./, '');
-    return articleHost === publisherHost ||
-      articleHost.endsWith(`.${publisherHost}`) ||
-      publisherHost.endsWith(`.${articleHost}`);
-  } catch {
-    return false;
-  }
-}
-
-async function resolveArticleFromPublisherFeed(publisherUrl, expectedTitle) {
-  if (!publisherUrl || !expectedTitle) return '';
-
-  try {
-    const discovered = await discoverPublisherFeed(publisherUrl);
-    const items = Array.isArray(discovered?.items) ? discovered.items : [];
-    const expected = normalizedHeadlineWords(expectedTitle);
-    if (!expected.size) return '';
-
-    let bestUrl = '';
-    let bestScore = 0;
-
-    for (const item of items) {
-      if (!item?.link || !hostMatchesPublisher(item.link, publisherUrl)) continue;
-
-      const actual = normalizedHeadlineWords(item.title || '');
-      if (!actual.size) continue;
-
-      let matches = 0;
-      for (const word of expected) if (actual.has(word)) matches += 1;
-
-      const coverage = matches / expected.size;
-      const score = matches / Math.max(expected.size, actual.size);
-
-      if (matches >= Math.min(3, Math.ceil(expected.size * 0.45)) &&
-          coverage >= 0.55 &&
-          score > bestScore) {
-        bestScore = score;
-        bestUrl = item.link;
-      }
-    }
-
-    return bestUrl;
-  } catch {
-    return '';
-  }
-}
-
-
-async function prepareTopicArticle({
-  originalUrl,
-  title = 'Article',
-  summary = '',
-  source = 'Feed',
-  publisherUrl = ''
-}) {
-  const cached = getCachedTopicArticle(originalUrl, title);
-  if (cached) return { ...cached, cacheHit: true };
-
-  let resolvedPublisherUrl = String(publisherUrl || '').trim();
-  if (!resolvedPublisherUrl) resolvedPublisherUrl = publisherSiteForSourceName(source);
-
-  let articleUrl = originalUrl;
-  let needsRepair = false;
-
-  try {
-    const host = new URL(originalUrl).hostname;
-    needsRepair = isBadArticleHost(host) ||
-      (resolvedPublisherUrl && !hostMatchesPublisher(originalUrl, resolvedPublisherUrl));
-  } catch {
-    needsRepair = true;
-  }
-
-  if (needsRepair && resolvedPublisherUrl) {
-    const feedResolved = await resolveArticleFromPublisherFeed(resolvedPublisherUrl, title);
-    if (feedResolved) {
-      articleUrl = feedResolved;
-    } else {
-      const pageResolved = await resolvePublisherArticleUrl(resolvedPublisherUrl, title);
-      if (pageResolved && hostMatchesPublisher(pageResolved, resolvedPublisherUrl)) articleUrl = pageResolved;
-    }
-  }
-
-  try {
-    const finalHost = new URL(articleUrl).hostname;
-    if (
-      isBadArticleHost(finalHost) ||
-      (resolvedPublisherUrl && !hostMatchesPublisher(articleUrl, resolvedPublisherUrl))
-    ) {
-      throw new Error('The feed did not provide a usable publisher article URL.');
-    }
-  } catch (error) {
-    const payload = summary ? {
-      title,
-      fullArticle: false,
-      sourceUrl: resolvedPublisherUrl || originalUrl,
-      documentToc: [],
-      text: `${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${resolvedPublisherUrl || originalUrl}`,
-      warning: error?.message || 'A direct publisher article URL could not be resolved.'
-    } : null;
-    if (payload) {
-      putCachedTopicArticle([originalUrl], title, payload);
-      return payload;
-    }
-    throw error;
-  }
-
-  try {
-    const article = await fetchArticleForFeed(articleUrl, title);
-    const payload = {
-      title,
-      fullArticle: true,
-      sourceUrl: articleUrl,
-      repairedUrl: articleUrl !== originalUrl,
-      documentToc: Array.isArray(article?.documentToc) ? article.documentToc : [],
-      text: `${String(article?.text || '').trim()}\n\nSource: ${source}\n${articleUrl}`
-    };
-    putCachedTopicArticle([originalUrl, articleUrl], title, payload);
-    return payload;
-  } catch (error) {
-    if (summary) {
-      const payload = {
-        title,
-        fullArticle: false,
-        sourceUrl: articleUrl,
-        repairedUrl: articleUrl !== originalUrl,
-        documentToc: [],
-        text: `${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${articleUrl}`,
-        warning: error?.message || 'The publisher did not expose readable article text.'
-      };
-      putCachedTopicArticle([originalUrl, articleUrl], title, payload);
-      return payload;
-    }
-    throw error;
-  }
-}
-
 app.post('/api/current/article', async (req, res) => {
-  const originalUrl = String(req.body?.url || '').trim();
+  const url = String(req.body?.url || '').trim();
   const title = String(req.body?.title || 'Article').trim();
   const summary = String(req.body?.summary || '').trim();
+  const feedText = normalizeArticleCandidate(req.body?.feedText || req.body?.feedContent || '');
   const source = String(req.body?.source || 'Feed').trim();
-  const publisherUrl = String(req.body?.publisherUrl || '').trim();
+  if (!url) return res.status(400).json({ error: 'The article URL is missing.' });
 
-  if (!originalUrl) return res.status(400).json({ error: 'The article URL is missing.' });
+  // Layer 0: if the feed legally supplied the complete story, use it directly.
+  // This is the most resilient path because it does not depend on publisher HTML.
+  if (feedText.length >= 350 && feedText.length > Math.max(600, summary.length * 1.35)) {
+    return res.json({
+      title,
+      fullArticle: true,
+      importMethod: 'feed-content',
+      text: `${title}\n\n${feedText.slice(0, 500000)}\n\nSource: ${source}\n${url}`
+    });
+  }
 
   try {
-    const payload = await prepareTopicArticle({ originalUrl, title, summary, source, publisherUrl });
-    return res.json(payload);
+    const articleText = await fetchArticleForFeed(url, title);
+    return res.json({
+      title,
+      fullArticle: true,
+      importMethod: 'publisher-page',
+      text: `${title}\n\n${articleText}\n\nSource: ${source}\n${url}`
+    });
   } catch (error) {
+    if (summary) {
+      const restricted = Boolean(error?.publisherRestricted || error?.code === 'PUBLISHER_RESTRICTED');
+      const fallbackNote = restricted
+        ? 'The publisher supplied this headline/summary but blocked automated full-text import. Open the original article at the source link for the complete story.'
+        : 'The publisher supplied this headline/summary, but the full article could not be extracted reliably. Open the original article at the source link for the complete story.';
+      return res.json({
+        title,
+        fullArticle: false,
+        importMethod: restricted ? 'publisher-restricted-summary' : 'summary-fallback',
+        publisherRestricted: restricted,
+        text: `${title}\n\n${summary}\n\n${fallbackNote}\n\nSource: ${source}\n${url}`,
+        warning: error?.message || 'The publisher did not expose readable article text.'
+      });
+    }
     const message = error?.name === 'AbortError'
       ? 'The article took too long to respond.'
       : error?.message || 'The article could not be imported.';
-    return res.status(502).json({ error: message });
-  }
-});
-
-
-/* Topic Feeds v2: recommendations + cloud persistence + prepared mornings. */
-let topicFeedSchemaPromise = null;
-
-async function ensureTopicFeedSchema() {
-  if (!databaseConfigured()) return false;
-  if (!topicFeedSchemaPromise) {
-    topicFeedSchemaPromise = query(`
-      create table if not exists topic_feed_accounts (
-        user_id uuid primary key references app_users(id) on delete cascade,
-        state jsonb not null default '{"topics":[]}'::jsonb,
-        preferences jsonb not null default '{}'::jsonb,
-        last_morning_refresh_date date,
-        last_daily_open_date date,
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      );
-      create table if not exists topic_feed_prepared_articles (
-        user_id uuid not null references app_users(id) on delete cascade,
-        article_id text not null,
-        topic_id text not null,
-        source_id text not null,
-        url text not null,
-        title text not null,
-        prepared_text text not null,
-        prepared_metadata jsonb not null default '{}'::jsonb,
-        prepared_at timestamptz not null default now(),
-        updated_at timestamptz not null default now(),
-        primary key(user_id, article_id)
-      );
-      create index if not exists topic_feed_prepared_articles_source_idx
-        on topic_feed_prepared_articles(user_id, source_id, prepared_at desc);
-    `).then(() => true).catch((error) => {
-      topicFeedSchemaPromise = null;
-      throw error;
+    return res.status(error?.publisherRestricted ? 403 : 502).json({
+      error: message,
+      publisherRestricted: Boolean(error?.publisherRestricted)
     });
   }
-  return topicFeedSchemaPromise;
-}
-
-function topicFeedTokens(value) {
-  return String(value || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((word) => word.length > 2);
-}
-
-function topicFeedSourceScore(source, topic) {
-  const phrase = String(topic || '').toLowerCase();
-  const tokens = new Set(topicFeedTokens(topic));
-  const haystack = `${source.name} ${source.description} ${(source.tags || []).join(' ')}`.toLowerCase();
-  let score = ['reuters','ap','bbc','npr'].includes(source.key) ? 1 : 0;
-  for (const tag of source.tags || []) {
-    const lower = String(tag).toLowerCase();
-    if (phrase.includes(lower) || lower.includes(phrase)) score += 16;
-    topicFeedTokens(lower).forEach((token) => { if (tokens.has(token)) score += 6; });
-  }
-  tokens.forEach((token) => { if (haystack.includes(token)) score += 2; });
-  return score;
-}
-
-function recommendTopicFeedSources(topic, limit = 8) {
-  const ranked = TOPIC_FEED_RECOMMENDED_SOURCES
-    .map((source) => ({ ...source, score: topicFeedSourceScore(source, topic) }))
-    .sort((a,b) => b.score - a.score || a.name.localeCompare(b.name));
-  const relevant = ranked.filter((item) => item.score > 1);
-  const fallback = ranked.filter((item) => ['reuters','ap','bbc','npr'].includes(item.key));
-  const merged = [...relevant];
-  fallback.forEach((item) => { if (!merged.some((x) => x.key === item.key)) merged.push(item); });
-  return merged.slice(0, Math.max(1, Math.min(12, Number(limit) || 8))).map(({tags,score,...item}) => item);
-}
-
-function topicFeedTitleSimilarity(a, b) {
-  const left = new Set(topicFeedTokens(a)), right = new Set(topicFeedTokens(b));
-  if (!left.size || !right.size) return 0;
-  let overlap = 0;
-  left.forEach((word) => { if (right.has(word)) overlap += 1; });
-  return overlap / Math.min(left.size, right.size);
-}
-
-function curateTopicFeedArticles(articles, topic) {
-  const topicTerms = topicFeedTokens(topic?.name || '');
-  const prefTerms = topicFeedTokens(topic?.preferences || '');
-  const ranked = [...articles].map((article) => {
-    const body = `${article.title || ''} ${article.summary || ''}`.toLowerCase();
-    let score = Math.max(0, 8 - (Number(article.sourceRank) || 0));
-    topicTerms.forEach((term) => { if (body.includes(term)) score += 8; });
-    prefTerms.forEach((term) => { if (body.includes(term)) score += 3; });
-    const published = Date.parse(article.published || '');
-    if (Number.isFinite(published) && published > 0) {
-      const ageHours = Math.max(0, (Date.now() - published) / 3600000);
-      score += Math.max(0, 14 - ageHours / 8);
-    }
-    return { ...article, score };
-  }).sort((a,b) => b.score - a.score);
-
-  const picks = [];
-  for (const article of ranked) {
-    if (picks.some((item) => topicFeedTitleSimilarity(item.title, article.title) >= .66)) continue;
-    picks.push(article);
-    if (picks.length >= Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8))) break;
-  }
-  const ids = new Set(picks.map((item) => item.id));
-  return ranked.map((item) => ({ ...item, recommended: ids.has(item.id) }));
-}
-
-function sanitizeTopicFeedState(raw) {
-  const topics = (Array.isArray(raw?.topics) ? raw.topics : []).slice(0, 60).map((topic) => ({
-    id: cleanText(topic?.id, 200),
-    name: cleanText(topic?.name, 200),
-    cadence: topic?.cadence === 'weekly' ? 'weekly' : 'daily',
-    maxRecommended: Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8)),
-    preferences: cleanText(topic?.preferences, 4000),
-    sources: (Array.isArray(topic?.sources) ? topic.sources : []).slice(0, 30).map((source) => ({
-      id: cleanText(source?.id, 200),
-      name: cleanText(source?.name, 200),
-      type: source?.type === 'rss' ? 'rss' : 'website',
-      url: cleanText(source?.url, 2000),
-      origin: source?.origin === 'recommended' ? 'recommended' : 'manual',
-      recommendationKey: cleanText(source?.recommendationKey, 120)
-    })).filter((source) => source.id && source.name && source.url),
-    articles: (Array.isArray(topic?.articles) ? topic.articles : []).slice(0, 300).map((article) => ({
-      id: cleanText(article?.id, 200),
-      cloudId: cleanText(article?.cloudId, 100),
-      title: cleanText(article?.title, 1200),
-      url: cleanText(article?.url, 4000),
-      summary: cleanText(article?.summary, 8000),
-      published: article?.published || '',
-      author: cleanText(article?.author, 500),
-      sourceName: cleanText(article?.sourceName, 200),
-      sourceUrl: cleanText(article?.sourceUrl, 2000),
-      sourceType: article?.sourceType === 'rss' ? 'rss' : 'website',
-      sourceClientId: cleanText(article?.sourceClientId, 200),
-      feedMode: cleanText(article?.feedMode, 120),
-      sourceRank: clampInteger(article?.sourceRank, 0, 1000),
-      recommended: Boolean(article?.recommended),
-      prepared: Boolean(article?.prepared),
-      read: Boolean(article?.read)
-    })).filter((article) => article.id && article.title && article.url),
-    lastRefresh: topic?.lastRefresh || null,
-    preparedAt: topic?.preparedAt || null,
-    lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : []).slice(0, 30).map((value) => cleanText(value, 1000))
-  })).filter((topic) => topic.id && topic.name);
-  return { topics };
-}
-
-function sanitizeTopicFeedPreferences(raw) {
-  return {
-    timezone: cleanText(raw?.timezone, 100) || 'America/New_York',
-    morningHour: clampInteger(raw?.morningHour ?? 5, 0, 23),
-    dailyOpenSourceId: cleanText(raw?.dailyOpenSourceId, 200)
-  };
-}
-
-async function getTopicFeedAccount(userId) {
-  await ensureTopicFeedSchema();
-  const result = await query(`select state, preferences, last_morning_refresh_date, last_daily_open_date
-                              from topic_feed_accounts where user_id=$1`, [userId]);
-  const row = result.rows[0];
-  return {
-    state: sanitizeTopicFeedState(row?.state || { topics:[] }),
-    preferences: sanitizeTopicFeedPreferences(row?.preferences || {}),
-    lastMorningRefreshDate: row?.last_morning_refresh_date || null,
-    lastDailyOpenDate: row?.last_daily_open_date || null
-  };
-}
-
-async function saveTopicFeedAccount(userId, state, preferences, extra = {}) {
-  await ensureTopicFeedSchema();
-  const cleanState = sanitizeTopicFeedState(state);
-  const cleanPrefs = sanitizeTopicFeedPreferences(preferences);
-  await query(`
-    insert into topic_feed_accounts(user_id,state,preferences,last_morning_refresh_date,last_daily_open_date,updated_at)
-    values($1,$2::jsonb,$3::jsonb,$4::date,$5::date,now())
-    on conflict(user_id) do update set
-      state=excluded.state,
-      preferences=excluded.preferences,
-      last_morning_refresh_date=coalesce(excluded.last_morning_refresh_date,topic_feed_accounts.last_morning_refresh_date),
-      last_daily_open_date=coalesce(excluded.last_daily_open_date,topic_feed_accounts.last_daily_open_date),
-      updated_at=now()
-  `, [
-    userId, JSON.stringify(cleanState), JSON.stringify(cleanPrefs),
-    extra.lastMorningRefreshDate || null, extra.lastDailyOpenDate || null
-  ]);
-  return { state:cleanState, preferences:cleanPrefs };
-}
-
-async function fetchTopicFeedEdition(topic, requestedSources) {
-  const cleanTopic = cleanText(topic, 200);
-  const sources = Array.isArray(requestedSources) ? requestedSources.slice(0, 30) : [];
-  if (!cleanTopic) throw new Error('A topic is required.');
-  if (!sources.length) throw new Error('Add at least one source.');
-
-  const articles = [];
-  const sourceResults = [];
-  for (let sourceIndex = 0; sourceIndex < sources.length; sourceIndex += 1) {
-    const rawSource = sources[sourceIndex] || {};
-    const type = rawSource?.type === 'rss' ? 'rss' : 'website';
-    const rawUrl = cleanText(rawSource?.url, 2000);
-    const name = cleanText(rawSource?.name, 200) || rawUrl;
-    const sourceClientId = cleanText(rawSource?.id, 200);
-    if (!rawUrl) continue;
-    try {
-      const parsed = await validatePublicUrl(rawUrl);
-      let feedUrl = parsed.toString(), items = [], mode = 'rss';
-      if (type === 'website') {
-        const discoveredFeed = await discoverPublisherFeed(parsed.toString());
-        if (discoveredFeed?.items?.length) {
-          feedUrl = discoveredFeed.feedUrl;
-          items = discoveredFeed.items;
-          mode = discoveredFeed.verified ? 'verified-publisher-feed' : 'publisher-feed';
-        } else {
-          const publisherItems = await discoverPublisherPageArticles(parsed.toString(), cleanTopic);
-          if (publisherItems.length) {
-            items = publisherItems; feedUrl = parsed.toString(); mode = 'publisher-page';
-          } else {
-            feedUrl = topicFeedGoogleNewsUrl(cleanTopic, parsed.hostname);
-            items = await fetchFeedItems({ feedUrl });
-            mode = 'google-news-fallback';
-          }
-        }
-      } else {
-        items = await fetchFeedItems({ feedUrl });
-      }
-      for (const item of items) {
-        articles.push({
-          id: crypto.createHash('sha1').update(`${sourceClientId || name}|${item.link}|${item.title}`).digest('hex'),
-          title:item.title, url:item.link, summary:item.summary || '', published:item.published || '',
-          author:item.author || '', sourceName:name, sourceUrl:rawUrl, sourceType:type,
-          sourceClientId, sourceRank:sourceIndex, feedMode:mode
-        });
-      }
-      sourceResults.push({ id:sourceClientId, name, url:rawUrl, ok:true, count:items.length, feedUrl, mode });
-    } catch (error) {
-      sourceResults.push({ id:sourceClientId, name, url:rawUrl, ok:false, count:0, error:error?.message || 'The source could not be refreshed.' });
-    }
-  }
-  const seen = new Set();
-  const deduped = articles.filter((article) => {
-    const key = String(article.url || '').toLowerCase();
-    if (!key || seen.has(key)) return false;
-    seen.add(key); return true;
-  }).sort((a,b) => (Date.parse(b.published || '') || 0) - (Date.parse(a.published || '') || 0)).slice(0,300);
-  return { topic:cleanTopic, articles:deduped, sources:sourceResults };
-}
-
-async function prepareAndStoreTopicArticle(userId, topic, article) {
-  const cached = await query(`select prepared_text, prepared_metadata from topic_feed_prepared_articles
-                              where user_id=$1 and article_id=$2`, [userId, article.id]);
-  if (cached.rows[0]?.prepared_text) {
-    return { text:cached.rows[0].prepared_text, ...(cached.rows[0].prepared_metadata || {}) };
-  }
-  const payload = await prepareTopicArticle({
-    originalUrl:article.url, title:article.title, summary:article.summary || '',
-    source:article.sourceName || 'Topic Feed', publisherUrl:article.sourceUrl || ''
-  });
-  const metadata = {
-    title:payload.title || article.title, fullArticle:payload.fullArticle !== false,
-    sourceUrl:payload.sourceUrl || article.url, repairedUrl:Boolean(payload.repairedUrl),
-    warning:payload.warning || '', documentToc:Array.isArray(payload.documentToc) ? payload.documentToc : []
-  };
-  await query(`
-    insert into topic_feed_prepared_articles
-      (user_id,article_id,topic_id,source_id,url,title,prepared_text,prepared_metadata,prepared_at,updated_at)
-    values($1,$2,$3,$4,$5,$6,$7,$8::jsonb,now(),now())
-    on conflict(user_id,article_id) do update set
-      topic_id=excluded.topic_id, source_id=excluded.source_id, url=excluded.url, title=excluded.title,
-      prepared_text=excluded.prepared_text, prepared_metadata=excluded.prepared_metadata,
-      prepared_at=now(), updated_at=now()
-  `, [userId, article.id, topic.id, article.sourceClientId || '', article.url, article.title, String(payload.text || ''), JSON.stringify(metadata)]);
-  return { text:String(payload.text || ''), ...metadata };
-}
-
-async function refreshTopicFeedForAccount(userId, topicId, { prepare = true } = {}) {
-  const account = await getTopicFeedAccount(userId);
-  const topic = account.state.topics.find((item) => item.id === topicId);
-  if (!topic) throw new Error('Topic not found.');
-  const edition = await fetchTopicFeedEdition(topic.name, topic.sources);
-  const oldRead = new Set((topic.articles || []).filter((article) => article.read).map((article) => article.url));
-  topic.articles = curateTopicFeedArticles(edition.articles, topic).map((article) => ({
-    ...article, read:oldRead.has(article.url), prepared:false
-  }));
-  topic.lastErrors = edition.sources.filter((source) => !source.ok).map((source) => source.error || `${source.name} could not be loaded.`);
-  topic.lastRefresh = new Date().toISOString();
-
-  if (prepare) {
-    const selected = [...topic.articles]
-      .sort((a,b) => Number(b.recommended) - Number(a.recommended) || (Date.parse(b.published || '') || 0) - (Date.parse(a.published || '') || 0))
-      .slice(0,60);
-    let cursor = 0;
-    const workers = Math.min(5, selected.length);
-    async function worker() {
-      while (cursor < selected.length) {
-        const article = selected[cursor++];
-        try {
-          await prepareAndStoreTopicArticle(userId, topic, article);
-          article.prepared = true;
-        } catch {}
-      }
-    }
-    await Promise.all(Array.from({length:workers}, () => worker()));
-    topic.preparedAt = new Date().toISOString();
-  }
-  await saveTopicFeedAccount(userId, account.state, account.preferences);
-  return topic;
-}
-
-function localTopicFeedDate(timezone, date = new Date()) {
-  let formatter;
-  try {
-    formatter = new Intl.DateTimeFormat('en-CA',{timeZone:timezone || 'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'});
-  } catch {
-    formatter = new Intl.DateTimeFormat('en-CA',{timeZone:'UTC',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'});
-  }
-  const parts = Object.fromEntries(formatter.formatToParts(date).filter((part) => part.type !== 'literal').map((part) => [part.type,part.value]));
-  return { date:`${parts.year}-${parts.month}-${parts.day}`, hour:Number(parts.hour) || 0 };
-}
-
-async function refreshDueTopicFeeds({ now = new Date(), userLimit = 200 } = {}) {
-  if (!databaseConfigured()) return { usersChecked:0, usersRefreshed:0, topicsRefreshed:0 };
-  await ensureTopicFeedSchema();
-  const rows = await query(`select user_id,state,preferences,last_morning_refresh_date from topic_feed_accounts
-                            where jsonb_array_length(coalesce(state->'topics','[]'::jsonb)) > 0
-                            order by updated_at desc limit $1`, [Math.max(1,Math.min(1000,Number(userLimit)||200))]);
-  let usersRefreshed = 0, topicsRefreshed = 0;
-  for (const row of rows.rows) {
-    const prefs = sanitizeTopicFeedPreferences(row.preferences || {});
-    const local = localTopicFeedDate(prefs.timezone, now);
-    if (local.hour < prefs.morningHour || String(row.last_morning_refresh_date || '') === local.date) continue;
-    const state = sanitizeTopicFeedState(row.state || {});
-    let userDidRefresh = false;
-    for (const topic of state.topics) {
-      const last = topic.lastRefresh ? Date.parse(topic.lastRefresh) : 0;
-      if (topic.cadence === 'weekly' && last && Date.now() - last < 6.5 * 86400000) continue;
-      try {
-        await refreshTopicFeedForAccount(row.user_id, topic.id, {prepare:true});
-        topicsRefreshed += 1; userDidRefresh = true;
-      } catch (error) {
-        console.error(`Topic Feed morning refresh failed for ${topic.name}:`, error.message);
-      }
-    }
-    const account = await getTopicFeedAccount(row.user_id);
-    await saveTopicFeedAccount(row.user_id, account.state, account.preferences, {lastMorningRefreshDate:local.date});
-    if (userDidRefresh) usersRefreshed += 1;
-  }
-  return { usersChecked:rows.rows.length, usersRefreshed, topicsRefreshed };
-}
-
-app.get('/api/topic-feeds/recommend', (req,res) => {
-  const topic = cleanText(req.query?.topic,200);
-  res.json({ topic, sources:topic ? recommendTopicFeedSources(topic,8) : [] });
 });
-
-app.get('/api/topic-feeds/state', async (req,res) => {
-  try {
-    const user = await requireAccountUser(req,res); if (!user) return;
-    const account = await getTopicFeedAccount(user.id);
-    res.json({ ...account.state, preferences:account.preferences, lastMorningRefreshDate:account.lastMorningRefreshDate, lastDailyOpenDate:account.lastDailyOpenDate });
-  } catch (error) {
-    console.error('Topic Feed state load failed:', error);
-    res.status(500).json({error:'Unable to load Topic Feeds.'});
-  }
-});
-
-app.put('/api/topic-feeds/state', async (req,res) => {
-  try {
-    const user = await requireAccountUser(req,res); if (!user) return;
-    const saved = await saveTopicFeedAccount(user.id, req.body || {}, req.body?.preferences || {});
-    res.json({ ...saved.state, preferences:saved.preferences });
-  } catch (error) {
-    console.error('Topic Feed state save failed:', error);
-    res.status(500).json({error:'Unable to save Topic Feeds.'});
-  }
-});
-
-app.post('/api/topic-feeds/import', async (req,res) => {
-  try {
-    const user = await requireAccountUser(req,res); if (!user) return;
-    const current = await getTopicFeedAccount(user.id);
-    if (!current.state.topics.length) {
-      const saved = await saveTopicFeedAccount(user.id, req.body || {}, req.body?.preferences || {});
-      return res.json({ ...saved.state, preferences:saved.preferences, imported:true });
-    }
-    res.json({ ...current.state, preferences:current.preferences, imported:false });
-  } catch (error) {
-    console.error('Topic Feed import failed:', error);
-    res.status(500).json({error:'Unable to migrate Topic Feeds to your account.'});
-  }
-});
-
-app.post('/api/topic-feeds/refresh', async (req,res) => {
-  try {
-    const user = await requireAccountUser(req,res); if (!user) return;
-    const topic = await refreshTopicFeedForAccount(user.id, cleanText(req.body?.topicId,200), {prepare:true});
-    res.json({topic});
-  } catch (error) {
-    console.error('Topic Feed refresh failed:', error);
-    res.status(502).json({error:error?.message || 'Unable to refresh Topic Feed.'});
-  }
-});
-
-app.post('/api/topic-feeds/open', async (req,res) => {
-  try {
-    const user = await requireAccountUser(req,res); if (!user) return;
-    const articleId = cleanText(req.body?.articleId,200);
-    const account = await getTopicFeedAccount(user.id);
-    let topic = null, article = null;
-    for (const candidate of account.state.topics) {
-      const found = candidate.articles.find((item) => item.id === articleId);
-      if (found) { topic = candidate; article = found; break; }
-    }
-    if (!topic || !article) return res.status(404).json({error:'Article not found.'});
-    const payload = await prepareAndStoreTopicArticle(user.id, topic, article);
-    article.read = true; article.prepared = true;
-    await saveTopicFeedAccount(user.id, account.state, account.preferences);
-    res.json({article,payload,topic:{id:topic.id,name:topic.name}});
-  } catch (error) {
-    console.error('Topic Feed article open failed:', error);
-    res.status(502).json({error:error?.message || 'The prepared article could not be opened.'});
-  }
-});
-
-app.post('/api/topic-feeds/daily-open', async (req,res) => {
-  try {
-    const user = await requireAccountUser(req,res); if (!user) return;
-    const account = await getTopicFeedAccount(user.id);
-    const sourceId = account.preferences.dailyOpenSourceId;
-    if (!sourceId) return res.json({article:null,reason:'no-daily-source'});
-    const local = localTopicFeedDate(account.preferences.timezone,new Date());
-    if (String(account.lastDailyOpenDate || '') === local.date) return res.json({article:null,reason:'already-opened-today'});
-    let topic = null;
-    let candidates = [];
-    for (const item of account.state.topics) {
-      const matches = item.articles.filter((article) => article.sourceClientId === sourceId);
-      if (matches.length) { topic = item; candidates = matches; break; }
-    }
-    if (!topic || !candidates.length) return res.json({article:null,reason:'no-article'});
-    candidates.sort((a,b) => Number(a.read)-Number(b.read) || (Date.parse(b.published || '')||0)-(Date.parse(a.published || '')||0));
-    const article = candidates[0];
-    const payload = await prepareAndStoreTopicArticle(user.id,topic,article);
-    article.read = true; article.prepared = true;
-    await saveTopicFeedAccount(user.id,account.state,account.preferences,{lastDailyOpenDate:local.date});
-    res.json({article,payload,topic:{id:topic.id,name:topic.name},autoOpened:true});
-  } catch (error) {
-    console.error('Daily Topic Feed open failed:', error);
-    res.status(502).json({error:error?.message || 'Daily reading could not be opened.'});
-  }
-});
-
-
-app.post('/api/topic-feeds/prefetch', async (req, res) => {
-  const articles = Array.isArray(req.body?.articles) ? req.body.articles.slice(0, 60) : [];
-  if (!articles.length) return res.json({ prepared: 0, failed: 0 });
-
-  let cursor = 0;
-  let prepared = 0;
-  let failed = 0;
-  const workers = Math.min(6, articles.length);
-
-  async function worker() {
-    while (cursor < articles.length) {
-      const index = cursor++;
-      const article = articles[index] || {};
-      const originalUrl = String(article.url || '').trim();
-      if (!originalUrl) { failed += 1; continue; }
-      try {
-        await prepareTopicArticle({
-          originalUrl,
-          title: String(article.title || 'Article').trim(),
-          summary: String(article.summary || '').trim(),
-          source: String(article.sourceName || 'Topic Feed').trim(),
-          publisherUrl: String(article.sourceUrl || '').trim()
-        });
-        prepared += 1;
-      } catch {
-        failed += 1;
-      }
-    }
-  }
-
-  await Promise.all(Array.from({ length: workers }, () => worker()));
-  return res.json({ prepared, failed });
-});
-
 
 app.get('/api/current/sources', (_req, res) => {
   return res.json({ sources: CURRENT_READING_SOURCES.map(({ feedUrl, ...source }) => source) });
@@ -5442,7 +4341,7 @@ app.post('/api/read-anything/summarize', async (req, res) => {
       body: JSON.stringify({
         model, reasoning: { effort: 'low' }, store: false,
         input: [
-          { role: 'developer', content: [{ type: 'input_text', text: 'Summarize the supplied reading according to the requested style. Quick: summarize the WHOLE supplied article as 3–5 short bullet points, no more than 90 words total. Lead with the article’s main takeaway, then preserve the most important facts, evidence, numbers, developments, and qualifications. Do not summarize only the opening paragraphs. Study: 180–250 words with the main argument, essential evidence, and key qualifications. Detailed: a concise section-by-section summary that remains substantially shorter than the source. Omit repetition and minor examples unless essential. Preserve critical names, dates, numbers, and uncertainty. Do not invent information, add opinions, or mention these instructions. Return only the summary.' }] },
+          { role: 'developer', content: [{ type: 'input_text', text: 'Summarize the supplied reading according to the requested style. Quick: no more than 75 words or 5 short bullets. Study: 180–250 words with the main argument, essential evidence, and key qualifications. Detailed: a concise section-by-section summary that remains substantially shorter than the source. Omit repetition and minor examples unless essential. Preserve critical names, dates, numbers, and uncertainty. Do not invent information, add opinions, or mention these instructions. Return only the summary.' }] },
           { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ title, text, style, customInstructions: customInstructions || undefined }) }] }
         ]
       })
@@ -5460,328 +4359,6 @@ app.post('/api/read-anything/summarize', async (req, res) => {
     });
   } finally { clearTimeout(timeout); }
 });
-
-
-app.post('/api/read-anything/investor-analysis', async (req, res) => {
-  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
-
-  const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
-    ? String(req.body.companion).trim().toLowerCase()
-    : 'mark';
-  const analystName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
-
-  if (!apiKey) {
-    return res.status(503).json({
-      error: 'Investor analysis is not configured. Add OPENAI_API_KEY to the server environment.'
-    });
-  }
-
-  const title = String(req.body?.title || 'Untitled').trim().slice(0, 300);
-  const text = String(req.body?.text || '').replace(/\r/g, '').trim();
-  const sourceUrl = String(req.body?.sourceUrl || '').trim().slice(0, 4000);
-  const topic = String(req.body?.topic || '').trim().slice(0, 200);
-
-  if (text.length < 40) {
-    return res.status(400).json({ error: 'There is not enough article text to analyze.' });
-  }
-  if (text.length > 120000) {
-    return res.status(413).json({ error: 'This article is too long to analyze in one request.' });
-  }
-
-  const model = process.env.OPENAI_STUDY_MODEL ||
-    process.env.OPENAI_COMPREHENSION_MODEL ||
-    'gpt-5.6-luna';
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 80000);
-
-  const prompt = `You are ${analystName}, the active financial-news analyst inside a reading app.
-
-Analyze the WHOLE supplied article, from beginning to end. Do not base the analysis only on the first paragraphs, a summary, or a visible excerpt.
-
-Use only facts in the supplied article. Clearly distinguish article facts from inference. Do not silently add later events, current prices, or outside facts.
-
-Return concise professional investor analysis using EXACTLY these section labels:
-
-HEADING:
-One short descriptive heading
-
-ANALYSIS:
-A compact synthesis of the article's investment significance.
-
-KEY POINTS:
-- 2 to 6 bullets
-
-CATALYSTS:
-- 0 to 5 bullets, or "- None clearly identified"
-
-RISKS:
-- 0 to 5 bullets, or "- None clearly identified"
-
-RECOMMENDATION:
-A general investor posture based on this article alone. Do not give personalized portfolio allocation or guarantee returns.
-
-CAUTIONS:
-- 1 to 4 bullets
-
-If the article does not support a meaningful investment conclusion, say so.
-If you refer to yourself, use ${analystName} only.`;
-
-  function section(textValue, name, nextNames = []) {
-    const upper = String(textValue || '');
-    const start = upper.search(new RegExp(`(?:^|\\n)${name}:\\s*`, 'i'));
-    if (start < 0) return '';
-
-    const afterLabel = upper.slice(start).replace(new RegExp(`^(?:\\n)?${name}:\\s*`, 'i'), '');
-    let end = afterLabel.length;
-
-    for (const next of nextNames) {
-      const match = afterLabel.search(new RegExp(`\\n${next}:\\s*`, 'i'));
-      if (match >= 0 && match < end) end = match;
-    }
-    return afterLabel.slice(0, end).trim();
-  }
-
-  function bullets(value) {
-    return String(value || '')
-      .split(/\n+/)
-      .map((line) => line.replace(/^\s*[-•*]\s*/, '').trim())
-      .filter((line) => line && !/^none clearly identified$/i.test(line))
-      .slice(0, 6);
-  }
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        reasoning: { effort: 'low' },
-        store: false,
-        input: [
-          {
-            role: 'developer',
-            content: [{ type: 'input_text', text: prompt }]
-          },
-          {
-            role: 'user',
-            content: [{
-              type: 'input_text',
-              text: JSON.stringify({
-                title,
-                topic: topic || undefined,
-                sourceUrl: sourceUrl || undefined,
-                wholeArticle: text
-              })
-            }]
-          }
-        ]
-      })
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload?.error?.message || `OpenAI returned HTTP ${response.status}.`);
-    }
-
-    const output = extractOpenAIOutputText(payload).trim();
-    if (!output) throw new Error('No investor analysis was returned.');
-
-    const heading = section(output, 'HEADING', ['ANALYSIS']) || 'Investor analysis';
-    const analysis = section(output, 'ANALYSIS', ['KEY POINTS', 'CATALYSTS', 'RISKS', 'RECOMMENDATION', 'CAUTIONS']) || output;
-    const keyPoints = bullets(section(output, 'KEY POINTS', ['CATALYSTS', 'RISKS', 'RECOMMENDATION', 'CAUTIONS']));
-    const catalysts = bullets(section(output, 'CATALYSTS', ['RISKS', 'RECOMMENDATION', 'CAUTIONS']));
-    const risks = bullets(section(output, 'RISKS', ['RECOMMENDATION', 'CAUTIONS']));
-    const recommendation = section(output, 'RECOMMENDATION', ['CAUTIONS']) ||
-      'The article alone does not support a clear investment posture.';
-    const cautions = bullets(section(output, 'CAUTIONS', []));
-
-    return res.json({
-      title,
-      result: {
-        heading,
-        analysis,
-        keyPoints,
-        catalysts,
-        risks,
-        recommendation,
-        cautions
-      },
-      model,
-      companion: { id: companion, name: analystName }
-    });
-  } catch (error) {
-    console.error(`${analystName} investor analysis failed:`, error);
-    return res.status(502).json({
-      error: error?.name === 'AbortError'
-        ? `${analystName}’s investor analysis took too long.`
-        : `${analystName} could not complete the investor analysis.`,
-      detail: error?.name === 'AbortError'
-        ? 'Please try Analyze again.'
-        : error?.message || 'Unknown investor analysis error.'
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-});
-
-
-app.post('/api/read-anything/article-followup', async (req, res) => {
-  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
-
-  const companion = ['mark','beth','chad'].includes(String(req.body?.companion || '').trim().toLowerCase())
-    ? String(req.body.companion).trim().toLowerCase()
-    : 'mark';
-  const companionName = companion === 'chad' ? 'Chad' : companion === 'beth' ? 'Beth' : 'Mark';
-
-  if (!apiKey) {
-    return res.status(503).json({
-      error: `${companionName} is not configured. Add OPENAI_API_KEY to the server environment.`
-    });
-  }
-
-  const title = String(req.body?.title || 'Current article').trim().slice(0, 300);
-  const sourceUrl = String(req.body?.sourceUrl || '').trim().slice(0, 4000);
-  const articleText = String(req.body?.articleText || '').replace(/\r/g, '').trim();
-  const question = String(req.body?.question || '').trim().slice(0, 1800);
-  const initialAnalysis = req.body?.analysis && typeof req.body.analysis === 'object'
-    ? req.body.analysis
-    : {};
-  const history = Array.isArray(req.body?.history)
-    ? req.body.history.slice(-8).map((item) => ({
-        role: item?.role === 'assistant' ? 'assistant' : 'user',
-        text: String(item?.text || '').trim().slice(0, 3000)
-      })).filter((item) => item.text)
-    : [];
-
-  if (articleText.length < 40) {
-    return res.status(400).json({ error: 'The whole article is not available for this follow-up.' });
-  }
-  if (articleText.length > 120000) {
-    return res.status(413).json({ error: 'This article is too long for a single whole-article follow-up.' });
-  }
-  if (!question) {
-    return res.status(400).json({ error: 'Enter a follow-up question.' });
-  }
-
-  const model = process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna';
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 110000);
-
-  const schema = {
-    type: 'object',
-    additionalProperties: false,
-    required: ['heading', 'response', 'keyPoints', 'cautions'],
-    properties: {
-      heading: { type: 'string' },
-      response: { type: 'string' },
-      keyPoints: {
-        type: 'array',
-        minItems: 0,
-        maxItems: 5,
-        items: { type: 'string' }
-      },
-      cautions: {
-        type: 'array',
-        minItems: 0,
-        maxItems: 4,
-        items: { type: 'string' }
-      }
-    }
-  };
-
-  const developerPrompt = `You are ${companionName}, the active reading companion.
-This is a FOLLOW-UP conversation about a financial/news article that has already been analyzed.
-
-CRITICAL SCOPE RULE:
-Answer the user's question from the WHOLE supplied article, not merely a highlighted passage, visible paragraph, summary, excerpt, or the initial analysis. The full article is the authoritative source. The initial analysis and prior conversation are secondary context only.
-
-If the question asks for a bottom line, recommendation, implication, risk, catalyst, thesis, or investor takeaway, synthesize across the entire article.
-Clearly distinguish:
-- facts stated by the article;
-- reasonable inference;
-- uncertainty or missing information.
-
-Do not silently add later events, current prices, or outside facts that are not in the supplied article.
-Do not give personalized financial advice, portfolio allocations, or guarantees.
-If the article does not support the requested conclusion, say so directly.
-If you refer to yourself, use ${companionName} only.
-Return only the requested structured result.`;
-
-  try {
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        reasoning: { effort: 'medium' },
-        store: false,
-        input: [
-          {
-            role: 'developer',
-            content: [{ type: 'input_text', text: developerPrompt }]
-          },
-          {
-            role: 'user',
-            content: [{
-              type: 'input_text',
-              text: JSON.stringify({
-                title,
-                sourceUrl: sourceUrl || undefined,
-                initialAnalysis,
-                priorConversation: history,
-                question,
-                wholeArticle: articleText
-              })
-            }]
-          }
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'whole_article_followup',
-            strict: true,
-            schema
-          }
-        }
-      })
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload?.error?.message || `OpenAI returned HTTP ${response.status}.`);
-    }
-
-    const output = extractOpenAIOutputText(payload).trim();
-    if (!output) throw new Error('No follow-up answer was returned.');
-
-    return res.json({
-      title,
-      result: JSON.parse(output),
-      model,
-      companion: { id: companion, name: companionName }
-    });
-  } catch (error) {
-    console.error(`${companionName} whole-article follow-up failed:`, error);
-    return res.status(502).json({
-      error: error?.name === 'AbortError'
-        ? `${companionName} took too long to answer.`
-        : `${companionName} could not answer that follow-up.`,
-      detail: error?.message || 'Unknown whole-article follow-up error.'
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-});
-
 
 
 app.post('/api/read-anything/transform', async (req, res) => {
@@ -5905,227 +4482,14 @@ app.post('/api/read-anything/adapt', async (req, res) => {
 });
 
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
-/* Topic Feeds beta ---------------------------------------------------------
-   User-defined RSS/Atom or website sources. Website URLs are converted to a
-   topic-filtered Google News RSS query for that domain. Custom URLs are
-   validated with the same public-URL guard used by webpage import.
-*/
-function topicFeedGoogleNewsUrl(topic, hostname) {
-  const queryText = `${topic}${hostname ? ` site:${hostname.replace(/^www\./i, '')}` : ''}`;
-  const params = new URLSearchParams({
-    q: queryText,
-    hl: 'en-US',
-    gl: 'US',
-    ceid: 'US:en'
-  });
-  return `https://news.google.com/rss/search?${params.toString()}`;
-}
-
-app.get('/api/market-indexes', async (_req, res) => {
-  const now = Date.now();
-
-  if (marketIndexCache.data && now - marketIndexCache.fetchedAt < MARKET_INDEX_CACHE_TTL_MS) {
-    return res.json({ ...marketIndexCache.data, cached: true });
-  }
-
-  const indexes = [
-    { symbol: '^GSPC', label: 'S&P 500', short: 'S&P 500' },
-    { symbol: '^DJI', label: 'Dow Jones Industrial Average', short: 'Dow' },
-    { symbol: '^IXIC', label: 'NASDAQ Composite', short: 'Nasdaq' },
-    { symbol: '^RUT', label: 'Russell 2000', short: 'Russell 2000' }
-  ];
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const rows = await Promise.all(indexes.map(async (item) => {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(item.symbol)}?interval=1d&range=5d`;
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          Accept: 'application/json',
-          'User-Agent': 'Mozilla/5.0 MarkSetGo/1.0'
-        }
-      });
-
-      if (!response.ok) throw new Error(`Market data provider returned HTTP ${response.status}.`);
-
-      const payload = await response.json();
-      const result = payload?.chart?.result?.[0];
-      const meta = result?.meta || {};
-      const price = Number(meta.regularMarketPrice);
-      const previousClose = Number(meta.chartPreviousClose ?? meta.previousClose);
-      const change = Number.isFinite(price) && Number.isFinite(previousClose) && previousClose !== 0
-        ? ((price - previousClose) / previousClose) * 100
-        : null;
-
-      if (!Number.isFinite(price)) throw new Error(`No current value was returned for ${item.short}.`);
-
-      return {
-        symbol: item.symbol,
-        label: item.label,
-        short: item.short,
-        value: price,
-        change24h: Number.isFinite(change) ? change : null,
-        marketState: String(meta.marketState || ''),
-        currency: String(meta.currency || 'USD'),
-        exchangeName: String(meta.exchangeName || '')
-      };
-    }));
-
-    const data = {
-      indexes: rows,
-      provider: 'Yahoo Finance',
-      fetchedAt: new Date().toISOString()
-    };
-
-    marketIndexCache = { fetchedAt: now, data };
-    return res.json({ ...data, cached: false });
-  } catch (error) {
-    if (marketIndexCache.data) {
-      return res.json({
-        ...marketIndexCache.data,
-        cached: true,
-        stale: true,
-        warning: error?.message || 'Market index values are temporarily unavailable.'
-      });
-    }
-
-    return res.status(502).json({
-      error: error?.name === 'AbortError'
-        ? 'Market index values took too long to respond.'
-        : error?.message || 'Market index values are temporarily unavailable.'
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-});
-
-
-app.get('/api/crypto-ticker', async (_req, res) => {
-  const now = Date.now();
-
-  if (cryptoTickerCache.data && now - cryptoTickerCache.fetchedAt < CRYPTO_TICKER_CACHE_TTL_MS) {
-    return res.json({ ...cryptoTickerCache.data, cached: true });
-  }
-
-  const ids = [
-    ['bitcoin', 'BTC', 'Bitcoin'],
-    ['ethereum', 'ETH', 'Ethereum'],
-    ['solana', 'SOL', 'Solana'],
-    ['ripple', 'XRP', 'XRP'],
-    ['dogecoin', 'DOGE', 'Dogecoin']
-  ];
-
-  const url = new URL('https://api.coingecko.com/api/v3/simple/price');
-  url.searchParams.set('ids', ids.map(([id]) => id).join(','));
-  url.searchParams.set('vs_currencies', 'usd');
-  url.searchParams.set('include_24hr_change', 'true');
-  url.searchParams.set('include_last_updated_at', 'true');
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
-
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'MarkSetGo/1.0 crypto ticker'
-      }
-    });
-
-    if (!response.ok) {
-      const error = new Error(`Crypto price provider returned HTTP ${response.status}.`);
-      error.status = response.status;
-      throw error;
-    }
-
-    const payload = await response.json();
-    const coins = ids.map(([id, symbol, name]) => {
-      const row = payload?.[id] || {};
-      const price = Number(row.usd);
-      const change24h = Number(row.usd_24h_change);
-      const updatedAt = Number(row.last_updated_at);
-
-      return {
-        id,
-        symbol,
-        name,
-        price: Number.isFinite(price) ? price : null,
-        change24h: Number.isFinite(change24h) ? change24h : null,
-        updatedAt: Number.isFinite(updatedAt) ? updatedAt : null
-      };
-    }).filter((coin) => coin.price !== null);
-
-    if (!coins.length) throw new Error('No cryptocurrency prices were returned.');
-
-    const data = {
-      coins,
-      provider: 'CoinGecko',
-      fetchedAt: new Date().toISOString()
-    };
-
-    cryptoTickerCache = { fetchedAt: now, data };
-    return res.json({ ...data, cached: false });
-  } catch (error) {
-    // If the public provider is temporarily rate-limited/unavailable, keep the
-    // last successful strip visible rather than blanking the user's header.
-    if (cryptoTickerCache.data) {
-      return res.json({
-        ...cryptoTickerCache.data,
-        cached: true,
-        stale: true,
-        warning: error?.message || 'Live cryptocurrency prices are temporarily unavailable.'
-      });
-    }
-
-    return res.status(error?.status === 429 ? 429 : 502).json({
-      error: error?.name === 'AbortError'
-        ? 'Cryptocurrency prices took too long to respond.'
-        : error?.message || 'Cryptocurrency prices are temporarily unavailable.'
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-});
-
-
-app.post('/api/topic-feeds/fetch', async (req, res) => {
-  try {
-    const edition = await fetchTopicFeedEdition(cleanText(req.body?.topic,200), Array.isArray(req.body?.sources) ? req.body.sources : []);
-    res.json(edition);
-  } catch (error) {
-    res.status(/required|at least one source/i.test(error?.message || '') ? 400 : 502)
-      .json({error:error?.message || 'Unable to refresh topic feeds.'});
-  }
-});
-
-let server = null;
-
-if (require.main === module) {
-  server = app.listen(PORT, () => {
-    console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`);
-    if (databaseConfigured()) {
-      ensureTopicFeedSchema().catch((error) => console.error('Topic Feed schema check failed:', error.message));
-    }
-  });
-}
+const server = app.listen(PORT, () => console.log(`Mark, Set, Go! is running at http://localhost:${PORT}`));
 
 async function shutdown(signal) {
   console.log(`${signal} received; shutting down.`);
-  if (!server) {
-    await closeDatabase().catch((error) => console.error('Database shutdown error:', error.message));
-    return;
-  }
   server.close(async () => {
     await closeDatabase().catch((error) => console.error('Database shutdown error:', error.message));
     process.exit(0);
   });
 }
-if (require.main === module) {
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
-}
-module.exports = { app, ensureTopicFeedSchema, refreshDueTopicFeeds };
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
