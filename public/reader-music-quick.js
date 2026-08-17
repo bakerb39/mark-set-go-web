@@ -386,15 +386,16 @@
       return;
     }
 
-    // Remove every older toolbar/wrapper shape first.
-    paneControls.querySelectorAll('.reader-quick-tools, .reader-topright-media-stack').forEach((node) => {
-      if (node.classList.contains('reader-topright-media-stack') && node.contains(fullscreenButton)) {
-        node.parentNode?.insertBefore(fullscreenButton, node);
-      }
-      node.remove();
-    });
+    // Remove older toolbar wrappers but preserve the native Full screen button.
+    paneControls.querySelectorAll('.reader-compact-toolbar, .reader-topright-media-stack, .reader-quick-tools')
+      .forEach((node) => {
+        if (node.contains(fullscreenButton)) {
+          node.parentNode?.insertBefore(fullscreenButton, node);
+        }
+        node.remove();
+      });
 
-    // Keep one hidden real music trigger so all existing chooser behavior stays intact.
+    // Keep one hidden real music trigger for existing chooser behavior.
     let musicButton = paneControls.querySelector('[data-reader-wpm-music-toggle]');
     if (!musicButton) {
       musicButton = document.createElement('button');
@@ -416,7 +417,6 @@
       paneControls.appendChild(musicButton);
     }
 
-    // Visually hide the real trigger; the toolbar's ♫ span activates it.
     [
       ['position', 'absolute'],
       ['width', '1px'],
@@ -430,40 +430,29 @@
       ['border', '0']
     ].forEach(([property, value]) => musicButton.style.setProperty(property, value, 'important'));
 
-    let toolbar = paneControls.querySelector('.reader-compact-toolbar');
-    if (!toolbar) {
-      toolbar = document.createElement('div');
-      toolbar.className = 'reader-compact-toolbar';
-      toolbar.setAttribute('aria-label', 'Reader quick controls');
-      toolbar.innerHTML = `
-        <span class="reader-font-group" aria-label="Reader font size">
-          <span class="reader-toolbar-action" data-reader-font-decrease role="button" tabindex="0" aria-label="Decrease reader font size" title="Smaller text">−</span>
-          <span class="reader-font-separator" aria-hidden="true">|</span>
-          <span class="reader-toolbar-action" data-reader-font-increase role="button" tabindex="0" aria-label="Increase reader font size" title="Larger text">+</span>
-        </span>
-        <span class="reader-toolbar-separator" aria-hidden="true">|</span>
-        <span class="reader-toolbar-action reader-toolbar-music" data-reader-music-proxy role="button" tabindex="0" aria-label="Open reading music" title="Reading music">♫</span>
-      `;
-      paneControls.appendChild(toolbar);
+    // Build the visible toolbar once.
+    const toolbar = document.createElement('div');
+    toolbar.className = 'reader-compact-toolbar';
+    toolbar.setAttribute('aria-label', 'Reader quick controls');
+    toolbar.innerHTML = `
+      <span class="reader-font-group" aria-label="Reader font size">
+        <span class="reader-toolbar-action" data-reader-font-decrease role="button" tabindex="0" aria-label="Decrease reader font size" title="Smaller text">−</span>
+        <span class="reader-font-separator" aria-hidden="true"></span>
+        <span class="reader-toolbar-action" data-reader-font-increase role="button" tabindex="0" aria-label="Increase reader font size" title="Larger text">+</span>
+      </span>
+      <span class="reader-toolbar-separator" aria-hidden="true"></span>
+      <span class="reader-toolbar-action reader-toolbar-music" data-reader-music-proxy role="button" tabindex="0" aria-label="Open reading music" title="Reading music">♫</span>
+    `;
+    paneControls.appendChild(toolbar);
 
-      bindKeyboardActivation(
-        toolbar.querySelector('[data-reader-font-decrease]'),
-        () => changeReaderFont(-1)
-      );
-      bindKeyboardActivation(
-        toolbar.querySelector('[data-reader-font-increase]'),
-        () => changeReaderFont(1)
-      );
-      bindKeyboardActivation(
-        toolbar.querySelector('[data-reader-music-proxy]'),
-        () => musicButton.click()
-      );
-    }
+    bindKeyboardActivation(toolbar.querySelector('[data-reader-font-decrease]'), () => changeReaderFont(-1));
+    bindKeyboardActivation(toolbar.querySelector('[data-reader-font-increase]'), () => changeReaderFont(1));
+    bindKeyboardActivation(toolbar.querySelector('[data-reader-music-proxy]'), () => musicButton.click());
 
-    // This file is now the ONLY owner of toolbar presentation.
     paneControls.style.setProperty('position', 'relative', 'important');
     paneControls.style.setProperty('overflow', 'visible', 'important');
 
+    // OUTER TOOLBAR: exact visual spacing target
     toolbar.style.setProperty('position', 'absolute', 'important');
     toolbar.style.setProperty('display', 'inline-flex', 'important');
     toolbar.style.setProperty('align-items', 'center', 'important');
@@ -476,25 +465,32 @@
     toolbar.style.setProperty('white-space', 'nowrap', 'important');
     toolbar.style.setProperty('z-index', '40', 'important');
 
+    // FONT GROUP: [ − | + ]
     const fontGroup = toolbar.querySelector('.reader-font-group');
     fontGroup.style.setProperty('display', 'inline-flex', 'important');
     fontGroup.style.setProperty('align-items', 'center', 'important');
     fontGroup.style.setProperty('height', '34px', 'important');
-    fontGroup.style.setProperty('padding', '0 9px', 'important');
+    fontGroup.style.setProperty('padding', '0 10px', 'important');
     fontGroup.style.setProperty('border-radius', '8px', 'important');
     fontGroup.style.setProperty('background', '#0b2e4f', 'important');
     fontGroup.style.setProperty('border', '1px solid rgba(255,255,255,.08)', 'important');
     fontGroup.style.setProperty('box-shadow', '0 2px 7px rgba(10,30,50,.22)', 'important');
 
-    toolbar.querySelectorAll('.reader-toolbar-action').forEach((item) => {
+    const minus = toolbar.querySelector('[data-reader-font-decrease]');
+    const plus = toolbar.querySelector('[data-reader-font-increase]');
+
+    [minus, plus].forEach((item) => {
       item.style.setProperty('display', 'inline-flex', 'important');
       item.style.setProperty('align-items', 'center', 'important');
       item.style.setProperty('justify-content', 'center', 'important');
+      item.style.setProperty('width', '20px', 'important');
       item.style.setProperty('height', '34px', 'important');
       item.style.setProperty('padding', '0', 'important');
       item.style.setProperty('margin', '0', 'important');
       item.style.setProperty('border', '0', 'important');
       item.style.setProperty('background', 'transparent', 'important');
+      item.style.setProperty('color', '#ffffff', 'important');
+      item.style.setProperty('-webkit-text-fill-color', '#ffffff', 'important');
       item.style.setProperty('font-size', '15px', 'important');
       item.style.setProperty('font-weight', '600', 'important');
       item.style.setProperty('line-height', '1', 'important');
@@ -505,45 +501,52 @@
       item.style.setProperty('text-shadow', 'none', 'important');
     });
 
-    toolbar.querySelectorAll('.reader-font-group .reader-toolbar-action').forEach((item) => {
-      item.style.setProperty('width', '24px', 'important');
-      item.style.setProperty('color', '#ffffff', 'important');
-      item.style.setProperty('-webkit-text-fill-color', '#ffffff', 'important');
-    });
-
+    // Inner divider is a real neutral line, not a text glyph.
     const innerSeparator = toolbar.querySelector('.reader-font-separator');
-    innerSeparator.style.setProperty('display', 'inline-flex', 'important');
-    innerSeparator.style.setProperty('align-items', 'center', 'important');
-    innerSeparator.style.setProperty('justify-content', 'center', 'important');
-    innerSeparator.style.setProperty('width', '14px', 'important');
-    innerSeparator.style.setProperty('height', '34px', 'important');
-    innerSeparator.style.setProperty('color', 'rgba(255,255,255,.55)', 'important');
-    innerSeparator.style.setProperty('-webkit-text-fill-color', 'rgba(255,255,255,.55)', 'important');
-    innerSeparator.style.setProperty('font-size', '13px', 'important');
+    innerSeparator.style.setProperty('display', 'block', 'important');
+    innerSeparator.style.setProperty('width', '1px', 'important');
+    innerSeparator.style.setProperty('height', '16px', 'important');
+    innerSeparator.style.setProperty('margin', '0 8px', 'important');
+    innerSeparator.style.setProperty('background', 'rgba(255,255,255,.42)', 'important');
+    innerSeparator.style.setProperty('flex', '0 0 1px', 'important');
     innerSeparator.style.setProperty('pointer-events', 'none', 'important');
 
+    // Outer divider is also a real neutral line.
     const outerSeparator = toolbar.querySelector('.reader-toolbar-separator');
-    outerSeparator.style.setProperty('display', 'inline-flex', 'important');
-    outerSeparator.style.setProperty('align-items', 'center', 'important');
-    outerSeparator.style.setProperty('justify-content', 'center', 'important');
-    outerSeparator.style.setProperty('width', '28px', 'important');
-    outerSeparator.style.setProperty('height', '34px', 'important');
-    outerSeparator.style.setProperty('margin', '0 4px', 'important');
-    outerSeparator.style.setProperty('color', '#7f8b96', 'important');
-    outerSeparator.style.setProperty('-webkit-text-fill-color', '#7f8b96', 'important');
-    outerSeparator.style.setProperty('font-size', '14px', 'important');
+    outerSeparator.style.setProperty('display', 'block', 'important');
+    outerSeparator.style.setProperty('width', '1px', 'important');
+    outerSeparator.style.setProperty('height', '18px', 'important');
+    outerSeparator.style.setProperty('margin', '0 14px', 'important');
+    outerSeparator.style.setProperty('background', '#8a96a3', 'important');
+    outerSeparator.style.setProperty('flex', '0 0 1px', 'important');
     outerSeparator.style.setProperty('pointer-events', 'none', 'important');
 
     const musicProxy = toolbar.querySelector('.reader-toolbar-music');
-    musicProxy.style.setProperty('width', '28px', 'important');
+    musicProxy.style.setProperty('display', 'inline-flex', 'important');
+    musicProxy.style.setProperty('align-items', 'center', 'important');
+    musicProxy.style.setProperty('justify-content', 'center', 'important');
+    musicProxy.style.setProperty('width', '22px', 'important');
+    musicProxy.style.setProperty('height', '34px', 'important');
+    musicProxy.style.setProperty('padding', '0', 'important');
+    musicProxy.style.setProperty('margin', '0', 'important');
+    musicProxy.style.setProperty('border', '0', 'important');
+    musicProxy.style.setProperty('background', 'transparent', 'important');
     musicProxy.style.setProperty('color', '#173f67', 'important');
     musicProxy.style.setProperty('-webkit-text-fill-color', '#173f67', 'important');
+    musicProxy.style.setProperty('font-size', '15px', 'important');
+    musicProxy.style.setProperty('font-weight', '600', 'important');
+    musicProxy.style.setProperty('line-height', '1', 'important');
+    musicProxy.style.setProperty('cursor', 'pointer', 'important');
+    musicProxy.style.setProperty('user-select', 'none', 'important');
+    musicProxy.style.setProperty('opacity', '1', 'important');
+    musicProxy.style.setProperty('filter', 'none', 'important');
+    musicProxy.style.setProperty('text-shadow', 'none', 'important');
 
-    // Leave a deliberate extra gap before Full screen.
+    // Deliberate visual spacing before Full screen.
     const controlsRect = paneControls.getBoundingClientRect();
     const fullscreenRect = fullscreenButton.getBoundingClientRect();
     const toolbarRect = toolbar.getBoundingClientRect();
-    const gapToFullscreen = 18;
+    const gapToFullscreen = 22;
 
     const left = Math.max(
       0,
