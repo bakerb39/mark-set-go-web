@@ -13367,11 +13367,15 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
         <button id="reader-click-controls" class="secondary" type="button"
+                style="flex:0 0 auto;width:auto;min-width:8.5rem;max-width:max-content;white-space:nowrap;"
                 aria-pressed="${readerClickControlsEnabled ? 'true' : 'false'}"
                 title="Turn Reader text-click controls on or off.">
           Reader clicks: ${readerClickControlsEnabled ? 'On' : 'Off'}
         </button>
-        <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. ${readerClickControlsEnabled ? 'Click a word to move the reading position.' : 'Reader clicks are off. Read, scroll, and select text normally; use Start, Pause, or Reset only when wanted.'}</span>
+        <span id="reader-status" class="status"
+              style="flex:0 0 100%;width:100%;margin:.15rem 0 0;">
+          ${state.words.length.toLocaleString()} words loaded. ${readerClickControlsEnabled ? 'Click a word to move the reading position.' : 'Reader clicks are off. Read, scroll, and select text normally; use Start, Pause, or Reset only when wanted.'}
+        </span>
       </div>
     </section>`;
 
