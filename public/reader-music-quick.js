@@ -335,59 +335,230 @@
     });
   }
 
+
+  function changeReaderFont(delta) {
+    const select = document.querySelector('#app #font-size');
+    if (!select) return;
+
+    const values = Array.from(select.options || [])
+      .map((option) => Number(option.value))
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b);
+
+    const current = Number(select.value) || 14;
+    let next = current;
+
+    if (values.length) {
+      next = delta > 0
+        ? (values.find((value) => value > current) ?? values[values.length - 1])
+        : ([...values].reverse().find((value) => value < current) ?? values[0]);
+    } else {
+      next = Math.max(10, Math.min(40, current + delta * 2));
+    }
+
+    if (next === current) return;
+
+    select.value = String(next);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const fullscreenSelect = document.querySelector('#app #fs-font-size');
+    if (fullscreenSelect) fullscreenSelect.value = String(next);
+  }
+
+  function bindKeyboardActivation(node, action) {
+    if (!node || node.dataset.quickBound === '1') return;
+    node.dataset.quickBound = '1';
+
+    node.addEventListener('click', action);
+    node.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      action();
+    });
+  }
+
   function insertTopRightMusicButton() {
     const paneControls = document.querySelector('#app .reader-pane-controls');
     const fullscreenButton = paneControls?.querySelector('#toggle-reader-fullscreen');
+
     if (!paneControls || !fullscreenButton) {
       speedButton = null;
       return;
     }
 
-    let stack = paneControls.querySelector('.reader-topright-media-stack');
-    if (!stack) {
-      stack = document.createElement('div');
-      stack.className = 'reader-topright-media-stack';
-      stack.setAttribute('aria-label', 'Reader media and fullscreen controls');
+    // Remove every older toolbar/wrapper shape first.
+    paneControls.querySelectorAll('.reader-quick-tools, .reader-topright-media-stack').forEach((node) => {
+      if (node.classList.contains('reader-topright-media-stack') && node.contains(fullscreenButton)) {
+        node.parentNode?.insertBefore(fullscreenButton, node);
+      }
+      node.remove();
+    });
 
-      // Move the existing fullscreen DOM node into this wrapper. Moving the node
-      // preserves app.js's already-bound fullscreen click handler.
-      fullscreenButton.parentNode.insertBefore(stack, fullscreenButton);
-      stack.appendChild(fullscreenButton);
-    } else if (!stack.contains(fullscreenButton)) {
-      stack.appendChild(fullscreenButton);
-    }
+    // Keep one hidden real music trigger so all existing chooser behavior stays intact.
+    let musicButton = paneControls.querySelector('[data-reader-wpm-music-toggle]');
+    if (!musicButton) {
+      musicButton = document.createElement('button');
+      musicButton.type = 'button';
+      musicButton.className = 'reader-topright-music-toggle';
+      musicButton.dataset.readerWpmMusicToggle = '1';
+      musicButton.setAttribute('aria-label', 'Open my reading playlists');
+      musicButton.setAttribute('aria-controls', 'reader-music-wpm-chooser');
+      musicButton.setAttribute('aria-expanded', 'false');
+      musicButton.title = 'My reading playlists';
+      musicButton.innerHTML = '<span aria-hidden="true">♫</span>';
 
-    let button = stack.querySelector('[data-reader-wpm-music-toggle]');
-    if (!button) {
-      button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'reader-topright-music-toggle';
-      button.dataset.readerWpmMusicToggle = '1';
-      button.setAttribute('aria-label', 'Open my reading playlists');
-      button.setAttribute('aria-controls', 'reader-music-wpm-chooser');
-      button.setAttribute('aria-expanded', 'false');
-      button.title = 'My reading playlists';
-      button.innerHTML = '<span aria-hidden="true">♫</span>';
-
-      button.addEventListener('click', () => {
+      musicButton.addEventListener('click', () => {
         ensureChooser();
         if (chooser && !chooser.hidden) closeChooser();
         else openChooser();
       });
+
+      paneControls.appendChild(musicButton);
     }
 
-    // IMPORTANT: enforce the DOM order on EVERY Reader render.
-    // Older versions could leave Full screen before Music. Merely changing CSS
-    // then preserved that stale child order. Always make Music the first child
-    // and Full screen the second child.
-    if (stack.firstElementChild !== button) {
-      stack.insertBefore(button, stack.firstElementChild);
-    }
-    if (button.nextElementSibling !== fullscreenButton) {
-      stack.insertBefore(fullscreenButton, button.nextElementSibling);
+    // Visually hide the real trigger; the toolbar's ♫ span activates it.
+    [
+      ['position', 'absolute'],
+      ['width', '1px'],
+      ['height', '1px'],
+      ['padding', '0'],
+      ['margin', '-1px'],
+      ['overflow', 'hidden'],
+      ['clip', 'rect(0 0 0 0)'],
+      ['clip-path', 'inset(50%)'],
+      ['white-space', 'nowrap'],
+      ['border', '0']
+    ].forEach(([property, value]) => musicButton.style.setProperty(property, value, 'important'));
+
+    let toolbar = paneControls.querySelector('.reader-compact-toolbar');
+    if (!toolbar) {
+      toolbar = document.createElement('div');
+      toolbar.className = 'reader-compact-toolbar';
+      toolbar.setAttribute('aria-label', 'Reader quick controls');
+      toolbar.innerHTML = `
+        <span class="reader-font-group" aria-label="Reader font size">
+          <span class="reader-toolbar-action" data-reader-font-decrease role="button" tabindex="0" aria-label="Decrease reader font size" title="Smaller text">−</span>
+          <span class="reader-font-separator" aria-hidden="true">|</span>
+          <span class="reader-toolbar-action" data-reader-font-increase role="button" tabindex="0" aria-label="Increase reader font size" title="Larger text">+</span>
+        </span>
+        <span class="reader-toolbar-separator" aria-hidden="true">|</span>
+        <span class="reader-toolbar-action reader-toolbar-music" data-reader-music-proxy role="button" tabindex="0" aria-label="Open reading music" title="Reading music">♫</span>
+      `;
+      paneControls.appendChild(toolbar);
+
+      bindKeyboardActivation(
+        toolbar.querySelector('[data-reader-font-decrease]'),
+        () => changeReaderFont(-1)
+      );
+      bindKeyboardActivation(
+        toolbar.querySelector('[data-reader-font-increase]'),
+        () => changeReaderFont(1)
+      );
+      bindKeyboardActivation(
+        toolbar.querySelector('[data-reader-music-proxy]'),
+        () => musicButton.click()
+      );
     }
 
-    speedButton = button;
+    // This file is now the ONLY owner of toolbar presentation.
+    paneControls.style.setProperty('position', 'relative', 'important');
+    paneControls.style.setProperty('overflow', 'visible', 'important');
+
+    toolbar.style.setProperty('position', 'absolute', 'important');
+    toolbar.style.setProperty('display', 'inline-flex', 'important');
+    toolbar.style.setProperty('align-items', 'center', 'important');
+    toolbar.style.setProperty('height', '34px', 'important');
+    toolbar.style.setProperty('padding', '0', 'important');
+    toolbar.style.setProperty('margin', '0', 'important');
+    toolbar.style.setProperty('background', 'transparent', 'important');
+    toolbar.style.setProperty('border', '0', 'important');
+    toolbar.style.setProperty('box-shadow', 'none', 'important');
+    toolbar.style.setProperty('white-space', 'nowrap', 'important');
+    toolbar.style.setProperty('z-index', '40', 'important');
+
+    const fontGroup = toolbar.querySelector('.reader-font-group');
+    fontGroup.style.setProperty('display', 'inline-flex', 'important');
+    fontGroup.style.setProperty('align-items', 'center', 'important');
+    fontGroup.style.setProperty('height', '34px', 'important');
+    fontGroup.style.setProperty('padding', '0 9px', 'important');
+    fontGroup.style.setProperty('border-radius', '8px', 'important');
+    fontGroup.style.setProperty('background', '#0b2e4f', 'important');
+    fontGroup.style.setProperty('border', '1px solid rgba(255,255,255,.08)', 'important');
+    fontGroup.style.setProperty('box-shadow', '0 2px 7px rgba(10,30,50,.22)', 'important');
+
+    toolbar.querySelectorAll('.reader-toolbar-action').forEach((item) => {
+      item.style.setProperty('display', 'inline-flex', 'important');
+      item.style.setProperty('align-items', 'center', 'important');
+      item.style.setProperty('justify-content', 'center', 'important');
+      item.style.setProperty('height', '34px', 'important');
+      item.style.setProperty('padding', '0', 'important');
+      item.style.setProperty('margin', '0', 'important');
+      item.style.setProperty('border', '0', 'important');
+      item.style.setProperty('background', 'transparent', 'important');
+      item.style.setProperty('font-size', '15px', 'important');
+      item.style.setProperty('font-weight', '600', 'important');
+      item.style.setProperty('line-height', '1', 'important');
+      item.style.setProperty('cursor', 'pointer', 'important');
+      item.style.setProperty('user-select', 'none', 'important');
+      item.style.setProperty('opacity', '1', 'important');
+      item.style.setProperty('filter', 'none', 'important');
+      item.style.setProperty('text-shadow', 'none', 'important');
+    });
+
+    toolbar.querySelectorAll('.reader-font-group .reader-toolbar-action').forEach((item) => {
+      item.style.setProperty('width', '24px', 'important');
+      item.style.setProperty('color', '#ffffff', 'important');
+      item.style.setProperty('-webkit-text-fill-color', '#ffffff', 'important');
+    });
+
+    const innerSeparator = toolbar.querySelector('.reader-font-separator');
+    innerSeparator.style.setProperty('display', 'inline-flex', 'important');
+    innerSeparator.style.setProperty('align-items', 'center', 'important');
+    innerSeparator.style.setProperty('justify-content', 'center', 'important');
+    innerSeparator.style.setProperty('width', '14px', 'important');
+    innerSeparator.style.setProperty('height', '34px', 'important');
+    innerSeparator.style.setProperty('color', 'rgba(255,255,255,.55)', 'important');
+    innerSeparator.style.setProperty('-webkit-text-fill-color', 'rgba(255,255,255,.55)', 'important');
+    innerSeparator.style.setProperty('font-size', '13px', 'important');
+    innerSeparator.style.setProperty('pointer-events', 'none', 'important');
+
+    const outerSeparator = toolbar.querySelector('.reader-toolbar-separator');
+    outerSeparator.style.setProperty('display', 'inline-flex', 'important');
+    outerSeparator.style.setProperty('align-items', 'center', 'important');
+    outerSeparator.style.setProperty('justify-content', 'center', 'important');
+    outerSeparator.style.setProperty('width', '28px', 'important');
+    outerSeparator.style.setProperty('height', '34px', 'important');
+    outerSeparator.style.setProperty('margin', '0 4px', 'important');
+    outerSeparator.style.setProperty('color', '#7f8b96', 'important');
+    outerSeparator.style.setProperty('-webkit-text-fill-color', '#7f8b96', 'important');
+    outerSeparator.style.setProperty('font-size', '14px', 'important');
+    outerSeparator.style.setProperty('pointer-events', 'none', 'important');
+
+    const musicProxy = toolbar.querySelector('.reader-toolbar-music');
+    musicProxy.style.setProperty('width', '28px', 'important');
+    musicProxy.style.setProperty('color', '#173f67', 'important');
+    musicProxy.style.setProperty('-webkit-text-fill-color', '#173f67', 'important');
+
+    // Leave a deliberate extra gap before Full screen.
+    const controlsRect = paneControls.getBoundingClientRect();
+    const fullscreenRect = fullscreenButton.getBoundingClientRect();
+    const toolbarRect = toolbar.getBoundingClientRect();
+    const gapToFullscreen = 18;
+
+    const left = Math.max(
+      0,
+      fullscreenRect.left - controlsRect.left - toolbarRect.width - gapToFullscreen
+    );
+    const top =
+      fullscreenRect.top - controlsRect.top +
+      (fullscreenRect.height - toolbarRect.height) / 2;
+
+    toolbar.style.setProperty('left', `${Math.round(left)}px`, 'important');
+    toolbar.style.setProperty('right', 'auto', 'important');
+    toolbar.style.setProperty('top', `${Math.round(top)}px`, 'important');
+    toolbar.style.setProperty('bottom', 'auto', 'important');
+
+    speedButton = musicButton;
   }
 
   function sync() {
