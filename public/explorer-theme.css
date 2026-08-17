@@ -1,4 +1,4 @@
-/* Explorer / Discovery appearance experiment — v1.0.2
+/* Explorer / Discovery appearance — v1.1.0 native profile integration
    Presentation only. Reader engine and document-canvas behavior are untouched. */
 
 html[data-msg-experience-theme="explorer"] {
@@ -116,7 +116,7 @@ html[data-msg-experience-theme="explorer"] #app > .platform-page,
 html[data-msg-experience-theme="explorer"] #app > .panel:not(.reader-page-panel),
 html[data-msg-experience-theme="explorer"] #app > .hero {
   background:
-    linear-gradient(rgba(255,250,235,.95),rgba(248,244,224,.96)),
+    linear-gradient(180deg,rgba(255,250,235,.90),rgba(248,244,224,.96) 260px),
     radial-gradient(circle at 18% 20%, rgba(157,124,66,.08) 0 1px, transparent 2px) !important;
   background-size:auto, 14px 14px !important;
   border-color:rgba(128,112,63,.35) !important;
@@ -145,6 +145,40 @@ html[data-msg-experience-theme="explorer"] #app > .panel:not(.reader-page-panel)
   margin-left:.7rem;
   vertical-align:middle;
   background:linear-gradient(90deg,#c39d4f,transparent);
+}
+
+
+
+/* Scenic page banners make Explorer feel like a true experience rather than a palette swap. */
+html[data-msg-experience-theme="explorer"] #app .platform-hero {
+  position:relative;
+  overflow:hidden;
+  min-height:150px;
+  border:1px solid rgba(118,101,55,.34) !important;
+  background:
+    linear-gradient(90deg,rgba(252,247,225,.96) 0%,rgba(244,242,218,.88) 48%,rgba(219,233,207,.66) 100%),
+    url('/explorer-landscape.svg') right 38% / cover no-repeat !important;
+  box-shadow:0 10px 28px rgba(38,74,57,.12), inset 0 1px rgba(255,255,255,.84) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .platform-hero::after {
+  content:"✦";
+  position:absolute;
+  right:22px;
+  bottom:18px;
+  display:grid;
+  place-items:center;
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  color:#f2d17d;
+  background:rgba(24,83,73,.88);
+  border:2px solid rgba(211,173,88,.9);
+  box-shadow:0 8px 18px rgba(27,70,57,.24);
+  font-size:1.25rem;
+}
+html[data-msg-experience-theme="explorer"] #app .platform-hero > * {
+  position:relative;
+  z-index:1;
 }
 
 html[data-msg-experience-theme="explorer"] .section-heading,
