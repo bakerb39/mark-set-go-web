@@ -2,12 +2,10 @@
   'use strict';
 
   const CLOSE_SELECTOR = '[data-askmark-close]';
-  const MUSIC_SELECTOR = '[data-reader-wpm-music-toggle]';
-  const FULLSCREEN_SELECTOR = '#toggle-reader-fullscreen';
 
   function closeCompanionPanel(event) {
-    const target = event?.target?.closest?.(CLOSE_SELECTOR);
-    if (!target) return false;
+    const closeButton = event?.target?.closest?.(CLOSE_SELECTOR);
+    if (!closeButton) return;
 
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -15,115 +13,155 @@
     const layout = document.querySelector('#app #reader-layout');
     if (layout) layout.classList.add('word-panel-hidden');
 
-    const markButton = document.querySelector('#app #toggle-mark-panel');
-    const toolsButton = document.querySelector('#app #toggle-word-panel');
-
-    for (const button of [markButton, toolsButton]) {
+    for (const id of ['toggle-mark-panel', 'toggle-word-panel']) {
+      const button = document.querySelector(`#app #${id}`);
       button?.setAttribute('aria-pressed', 'false');
       button?.classList.add('pane-closed');
     }
 
-    // Fire resize so book-page and reader measurements settle after the pane closes.
     window.requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
-    return true;
   }
 
-  // Capture before any Ask Mark/Chad handlers. Pointerdown makes the close action
-  // work even if a later click listener is lost during a panel rerender.
   document.addEventListener('pointerdown', closeCompanionPanel, true);
   document.addEventListener('click', closeCompanionPanel, true);
 
-  let scheduled = false;
+  function changeReaderFont(delta) {
+    const select = document.querySelector('#app #font-size');
+    if (!select) return;
 
-  function positionMusicAboveFullscreen() {
-    scheduled = false;
+    const options = Array.from(select.options || [])
+      .map(option => Number(option.value))
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b);
 
-    const app = document.querySelector('#app');
-    const music = app?.querySelector(MUSIC_SELECTOR);
-    const fullscreen = app?.querySelector(FULLSCREEN_SELECTOR);
-    const controls = fullscreen?.closest('.reader-pane-controls');
+    const current = Number(select.value) || 14;
+    let next;
 
-    if (!music || !fullscreen || !controls) return;
-
-    // Restore the original Full screen control completely. The hotfix moves ONLY
-    // the music icon and does not touch the companion panel/header.
-    for (const property of ['position','top','right','bottom','left','margin','transform','z-index']) {
-      fullscreen.style.removeProperty(property);
+    if (options.length) {
+      if (delta > 0) next = options.find(value => value > current) ?? options[options.length - 1];
+      else next = [...options].reverse().find(value => value < current) ?? options[0];
+    } else {
+      next = Math.max(10, Math.min(40, current + delta * 2));
     }
+
+    if (next === current) return;
+    select.value = String(next);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+
+    const fsSelect = document.querySelector('#app #fs-font-size');
+    if (fsSelect) fsSelect.value = String(next);
+  }
+
+  function ensureQuickTools() {
+    const app = document.querySelector('#app');
+    const fullscreen = app?.querySelector('#toggle-reader-fullscreen');
+    const controls = fullscreen?.closest('.reader-pane-controls');
+    const music = app?.querySelector('[data-reader-wpm-music-toggle]');
+
+    if (!app || !fullscreen || !controls || !music) return;
+
+    let tools = controls.querySelector('.reader-quick-tools');
+    if (!tools) {
+      tools = document.createElement('div');
+      tools.className = 'reader-quick-tools';
+      tools.setAttribute('aria-label', 'Reader quick controls');
+      tools.innerHTML = `
+        <button type="button" class="reader-quick-font" data-reader-font-decrease aria-label="Decrease reader font size" title="Smaller text">−</button>
+        <button type="button" class="reader-quick-font" data-reader-font-increase aria-label="Increase reader font size" title="Larger text">+</button>
+      `;
+      controls.appendChild(tools);
+
+      tools.querySelector('[data-reader-font-decrease]')?.addEventListener('click', () => changeReaderFont(-1));
+      tools.querySelector('[data-reader-font-increase]')?.addEventListener('click', () => changeReaderFont(1));
+    }
+
+    // Move only the MUSIC BUTTON into the floating quick-tools group.
+    // Full screen stays untouched in its native app position.
+    if (music.parentElement !== tools) tools.appendChild(music);
 
     controls.style.setProperty('position', 'relative', 'important');
     controls.style.setProperty('overflow', 'visible', 'important');
 
-    // First neutralize every prior music positioning rule.
-    music.style.setProperty('position', 'absolute', 'important');
-    music.style.setProperty('right', 'auto', 'important');
-    music.style.setProperty('bottom', 'auto', 'important');
-    music.style.setProperty('margin', '0', 'important');
-    music.style.setProperty('transform', 'none', 'important');
-    music.style.setProperty('z-index', '30', 'important');
+    Object.assign(tools.style, {
+      position: 'absolute',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '5px',
+      margin: '0',
+      zIndex: '40'
+    });
+
+    tools.querySelectorAll('button').forEach(button => {
+      button.style.setProperty('position', 'static', 'important');
+      button.style.setProperty('inset', 'auto', 'important');
+      button.style.setProperty('margin', '0', 'important');
+      button.style.setProperty('transform', 'none', 'important');
+    });
 
     const controlsRect = controls.getBoundingClientRect();
     const fullRect = fullscreen.getBoundingClientRect();
-    const musicRect = music.getBoundingClientRect();
 
-    const width = musicRect.width || 30;
-    const height = musicRect.height || 30;
+    // Measure after the toolbar is assembled.
+    const toolsRect = tools.getBoundingClientRect();
+    const gap = 8;
 
-    // Match Full screen's RIGHT EDGE and place Music 8px ABOVE it.
-    const left = Math.max(0, fullRect.right - controlsRect.left - width);
-    const top = fullRect.top - controlsRect.top - height - 8;
+    // Put the entire toolbar immediately LEFT of Full screen and vertically centered.
+    const left = fullRect.left - controlsRect.left - toolsRect.width - gap;
+    const top = fullRect.top - controlsRect.top + (fullRect.height - toolsRect.height) / 2;
 
-    music.style.setProperty('left', `${Math.round(left)}px`, 'important');
-    music.style.setProperty('top', `${Math.round(top)}px`, 'important');
+    tools.style.setProperty('left', `${Math.round(left)}px`, 'important');
+    tools.style.setProperty('top', `${Math.round(top)}px`, 'important');
+    tools.style.setProperty('right', 'auto', 'important');
+    tools.style.setProperty('bottom', 'auto', 'important');
+
+    // Compact, matching controls.
+    tools.querySelectorAll('.reader-quick-font').forEach(button => {
+      button.style.setProperty('width', '30px', 'important');
+      button.style.setProperty('height', '30px', 'important');
+      button.style.setProperty('min-width', '30px', 'important');
+      button.style.setProperty('padding', '0', 'important');
+      button.style.setProperty('border-radius', '7px', 'important');
+      button.style.setProperty('font-size', '20px', 'important');
+      button.style.setProperty('line-height', '1', 'important');
+      button.style.setProperty('font-weight', '700', 'important');
+    });
+
+    music.style.setProperty('width', '30px', 'important');
+    music.style.setProperty('height', '30px', 'important');
+    music.style.setProperty('min-width', '30px', 'important');
+    music.style.setProperty('padding', '0', 'important');
   }
 
-  function schedulePosition() {
+  let scheduled = false;
+  function schedule() {
     if (scheduled) return;
     scheduled = true;
-    window.requestAnimationFrame(positionMusicAboveFullscreen);
+    requestAnimationFrame(() => {
+      scheduled = false;
+      document.querySelectorAll(CLOSE_SELECTOR).forEach(button => {
+        button.style.setProperty('pointer-events', 'auto', 'important');
+        button.style.setProperty('cursor', 'pointer', 'important');
+        button.style.setProperty('z-index', '50', 'important');
+      });
+      ensureQuickTools();
+    });
   }
 
-  // Re-apply after Reader rerenders, companion opens/closes, and viewport changes.
-  const observer = new MutationObserver(schedulePosition);
+  const observer = new MutationObserver(schedule);
   observer.observe(document.documentElement, {
     childList: true,
     subtree: true,
     attributes: true,
-    attributeFilter: ['class', 'hidden', 'style']
+    attributeFilter: ['class', 'hidden']
   });
 
-  window.addEventListener('resize', schedulePosition, { passive: true });
-  window.addEventListener('scroll', schedulePosition, { passive: true });
-  document.addEventListener('marksetgo:document-available', schedulePosition);
-
-  // Keep the close X clickable without changing its layout coordinates.
-  function protectCloseButton() {
-    document.querySelectorAll(CLOSE_SELECTOR).forEach((button) => {
-      button.style.setProperty('pointer-events', 'auto', 'important');
-      button.style.setProperty('cursor', 'pointer', 'important');
-      button.style.setProperty('z-index', '50', 'important');
-    });
-  }
-
-  const protectObserver = new MutationObserver(() => {
-    protectCloseButton();
-    schedulePosition();
-  });
-  protectObserver.observe(document.documentElement, { childList: true, subtree: true });
+  window.addEventListener('resize', schedule, { passive: true });
+  document.addEventListener('marksetgo:document-available', schedule);
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      protectCloseButton();
-      schedulePosition();
-    }, { once: true });
+    document.addEventListener('DOMContentLoaded', schedule, { once: true });
   } else {
-    protectCloseButton();
-    schedulePosition();
+    schedule();
   }
-
-  // One delayed pass catches the Reader's deferred scripts.
-  window.setTimeout(() => {
-    protectCloseButton();
-    schedulePosition();
-  }, 250);
+  setTimeout(schedule, 250);
 })();
