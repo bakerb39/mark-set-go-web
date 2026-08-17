@@ -1,4 +1,4 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v0.4.1 */
+/* Mark, Set, Go! lightweight workspace pane runtime v0.4.4 */
 (() => {
   'use strict';
 

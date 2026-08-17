@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.4.3
+ * Mark, Set, Go! Workspace Experiment v0.4.4
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -299,6 +299,51 @@
     return '';
   }
 
+  const WORKSPACE_MUSIC_FALLBACKS = [
+    { id:'lofi-study', title:'Lofi Study Radio', category:'Reading mood', type:'video', youtubeId:'jfKfPfyJRdk', test:/lofi|beats|study|coffee|casual/i },
+    { id:'sleepy-lofi', title:'Sleepy Lofi', category:'Reading mood', type:'video', youtubeId:'rUxyKA_-grg', test:/sleep|evening|night|soft|calm/i },
+    { id:'classical-piano', title:'Classical Piano', category:'Reading mood', type:'playlist', youtubeId:'PLgW6PU42e5RLa6NENfz5kusVilq58Cojm', test:/piano|romantic|austen|bronte|regency/i },
+    { id:'rain-focus', title:'Rain & Focus', category:'Reading mood', type:'playlist', youtubeId:'OLAK5uy_lN5SVZjZwWb3XM5BIKUreV5wRCD0VLsqQ', test:/rain|nature|forest|ocean|sea|storm|river/i },
+    { id:'deep-focus', title:'Deep Focus', category:'Reading mood', type:'playlist', youtubeId:'PLUrnxvhuvpSU0b2YvM4Gf1V3bHnLAcvBj', test:/scholar|philosoph|science|history|essay|treatise|focus/i },
+    { id:'classical-reading', title:'Classical Reading', category:'Reading score', type:'playlist', youtubeId:'PLe4JMT6isxp-rx1IRUeEo0puoloL2N9NQ', test:/classical|orchestral|score|soundtrack|historical|ancient|greek|roman|medieval|war|epic|period/i },
+    { id:'ambient-reading', title:'Ambient Reading', category:'Reading mood', type:'playlist', youtubeId:'OLAK5uy_nCi20x1Eo0ZW2q_cfufw06g2Bvn8a4u-c', test:/ambient|mystery|gothic|fantasy|space|dark|atmospheric/i }
+  ];
+
+  function workspaceFallbackMusic(query, title, reason = '') {
+    const key = `${query || ''} ${title || ''}`;
+    const choice = WORKSPACE_MUSIC_FALLBACKS.find((item) => item.test.test(key))
+      || (/score|soundtrack/i.test(key) ? WORKSPACE_MUSIC_FALLBACKS.find((item) => item.id === 'classical-reading') : null)
+      || WORKSPACE_MUSIC_FALLBACKS.find((item) => item.id === 'ambient-reading');
+    if (!choice) return false;
+
+    const dock = document.querySelector('#music-dock');
+    const player = document.querySelector('#music-player');
+    const playerWrap = document.querySelector('#music-player-wrap');
+    const nowTitle = document.querySelector('#music-now-title');
+    const nowSource = document.querySelector('#music-now-source');
+    const nextButton = document.querySelector('#music-next');
+    const src = choice.type === 'playlist'
+      ? `https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(choice.youtubeId)}&autoplay=1&playsinline=1&rel=0`
+      : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(choice.youtubeId)}?autoplay=1&playsinline=1&rel=0`;
+
+    if (nowTitle) nowTitle.textContent = String(title || choice.title);
+    if (nowSource) nowSource.textContent = `${choice.title} · suggestion fallback${reason ? ` · ${reason}` : ''}`;
+    if (player) player.src = src;
+    if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
+    if (playerWrap) playerWrap.hidden = false;
+    if (nextButton) nextButton.hidden = true;
+    try {
+      localStorage.setItem('markSetGoMusic', JSON.stringify({
+        title:String(title || choice.title),
+        source:choice.title,
+        provider:'youtube',
+        src,
+        fallback:true
+      }));
+    } catch {}
+    return true;
+  }
+
   async function workspaceYouTubeSearch(query, title = 'YouTube search') {
     const cleanQuery = String(query || '').trim();
     if (!cleanQuery) return;
@@ -383,11 +428,15 @@
         }));
       } catch {}
     } catch (error) {
-      if (nowSource) nowSource.textContent = error?.message || 'Music search failed';
-      if (player) player.src = '';
-      if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
-      if (playerWrap) playerWrap.hidden = false;
-      console.warn('Workspace music search failed:', error);
+      const reason = String(error?.message || 'live search unavailable').replace(/\s+/g, ' ').trim().slice(0, 90);
+      const recovered = workspaceFallbackMusic(cleanQuery, title, reason);
+      if (!recovered) {
+        if (nowSource) nowSource.textContent = reason || 'Music search failed';
+        if (player) player.src = '';
+        if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
+        if (playerWrap) playerWrap.hidden = false;
+      }
+      console.warn('Workspace music search failed; fallback used:', error);
     }
   }
 
