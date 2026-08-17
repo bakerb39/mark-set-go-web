@@ -7,7 +7,7 @@
     mark: Object.freeze({ id:'mark', name:'Mark', ask:'Ask Mark', notebook:'Mark’s Notebook', avatar:'/assets/ask-mark/ask-mark-avatar.png', description:'Your reading coach and guide' }),
     beth: Object.freeze({ id:'beth', name:'Beth', ask:'Ask Beth', notebook:'Beth’s Notebook', avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9', description:'Your learning partner and analyst' }),
     chad: Object.freeze({ id:'chad', name:'Chad', ask:'Ask Chad', notebook:'Chad’s Notebook', avatar:'/assets/companions/chad/chad-avatar.png', description:'Your finance & investor specialist' }),
-    scott: Object.freeze({ id:'scott', name:'Scott', ask:'Ask Scott', notebook:'Scott’s Notebook', avatar:'/assets/companions/scott/scott-avatar.png', description:'CEO & Co-Founder · SK Global Software' })
+    scott: Object.freeze({ id:'scott', name:'Scott', ask:'Ask Scott', notebook:'Scott’s Notebook', avatar:'/assets/companions/scott/scott-avatar.png?v=20260816-scott-button-fix-2', description:'CEO & Co-Founder · SK Global Software' })
   });
 
   function selectedId() {
@@ -109,7 +109,19 @@
     document.querySelectorAll('#toggle-mark-panel, .reader-pane-buttons .mark-pane-button, .ask-mark-button, [data-action="ask-mark"], #fullscreen-mark-toggle')
       .forEach((button) => {
         replaceAskText(button, next);
-        button.classList.add('msg-companion-avatar-fallback');
+
+        // Use a real image node for the active companion. This avoids the old
+        // fallback pseudo-element retaining a stale Mark/Chad portrait.
+        let img = button.querySelector('img');
+        if (!img) {
+          img = document.createElement('img');
+          img.alt = '';
+          img.setAttribute('aria-hidden', 'true');
+          button.prepend(img);
+        }
+        if (img.getAttribute('src') !== next.avatar) img.setAttribute('src', next.avatar);
+        img.alt = '';
+        button.classList.remove('msg-companion-avatar-fallback');
       });
 
     const home = document.querySelector('.home-mark-avatar');

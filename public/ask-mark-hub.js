@@ -13,7 +13,7 @@
     mark: Object.freeze({ id:'mark', name:'Mark', ask:'Ask Mark', notebook:'Mark’s Notebook', avatar:'/assets/ask-mark/ask-mark-avatar.png' }),
     beth: Object.freeze({ id:'beth', name:'Beth', ask:'Ask Beth', notebook:'Beth’s Notebook', avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9' }),
     chad: Object.freeze({ id:'chad', name:'Chad', ask:'Ask Chad', notebook:'Chad’s Notebook', avatar:'/assets/companions/chad/chad-avatar.png' }),
-    scott: Object.freeze({ id:'scott', name:'Scott', ask:'Ask Scott', notebook:'Scott’s Notebook', avatar:'/assets/companions/scott/scott-avatar.png' })
+    scott: Object.freeze({ id:'scott', name:'Scott', ask:'Ask Scott', notebook:'Scott’s Notebook', avatar:'/assets/companions/scott/scott-avatar.png?v=20260816-scott-button-fix-2' })
   });
   const companionConfig = () => {
     let selected = 'mark';
@@ -800,7 +800,20 @@
     $('[data-askmark-close]', shell)?.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      closeAskMarkPane();
+
+      const layout = document.getElementById('reader-layout');
+      if (!layout) return;
+
+      // Restore the previously working direct-close behavior.
+      layout.classList.add('word-panel-hidden');
+
+      const markButton = document.getElementById('toggle-mark-panel');
+      const toolsButton = document.getElementById('toggle-word-panel');
+
+      markButton?.setAttribute('aria-pressed', 'false');
+      toolsButton?.setAttribute('aria-pressed', 'false');
+      markButton?.classList.add('pane-closed');
+      toolsButton?.classList.add('pane-closed');
     });
     $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
     $$('[data-askmark-view]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView(button.dataset.askmarkView)));
@@ -994,18 +1007,7 @@
 
   document.addEventListener('marksetgo:document-available', () => {
     installAttempts = 0;
-    // Durable close fallback: the Ask panel is rebuilt dynamically, so keep one
-  // delegated close handler on the document rather than depending on a specific
-  // shell instance. No DOM observer is involved.
-  document.addEventListener('click', (event) => {
-    const close = event.target.closest?.('[data-askmark-close]');
-    if (!close) return;
-    event.preventDefault();
-    event.stopPropagation();
-    closeAskMarkPane();
-  }, true);
-
-  requestAnimationFrame(retryInstall);
+    requestAnimationFrame(retryInstall);
     window.setTimeout(()=>refreshMarkProgress(),220);
   });
   document.addEventListener('marksetgo:goals-updated',()=>window.setTimeout(()=>refreshMarkProgress({force:true}),80));
