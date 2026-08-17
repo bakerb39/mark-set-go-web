@@ -108,79 +108,92 @@
     controls.style.setProperty('position', 'relative', 'important');
     controls.style.setProperty('overflow', 'visible', 'important');
 
-    // One polished navy control group that visually matches Full screen.
-    Object.assign(tools.style, {
-      position: 'absolute',
-      display: 'inline-flex',
-      alignItems: 'center',
-      height: '36px',
-      padding: '0 4px',
-      margin: '0',
-      borderRadius: '8px',
-      background: '#0b2e4f',
-      border: '1px solid rgba(255,255,255,.08)',
-      boxShadow: '0 2px 7px rgba(10,30,50,.22)',
-      zIndex: '40',
-      whiteSpace: 'nowrap'
-    });
+    // Exact visual: [ − | + | ♫ ]
+    tools.style.setProperty('position', 'absolute', 'important');
+    tools.style.setProperty('display', 'inline-flex', 'important');
+    tools.style.setProperty('align-items', 'center', 'important');
+    tools.style.setProperty('justify-content', 'center', 'important');
+    tools.style.setProperty('width', '110px', 'important');
+    tools.style.setProperty('height', '36px', 'important');
+    tools.style.setProperty('padding', '0 5px', 'important');
+    tools.style.setProperty('margin', '0', 'important');
+    tools.style.setProperty('box-sizing', 'border-box', 'important');
+    tools.style.setProperty('border-radius', '8px', 'important');
+    tools.style.setProperty('background', '#0b2e4f', 'important');
+    tools.style.setProperty('border', '1px solid rgba(255,255,255,.08)', 'important');
+    tools.style.setProperty('box-shadow', '0 2px 7px rgba(10,30,50,.22)', 'important');
+    tools.style.setProperty('z-index', '40', 'important');
+    tools.style.setProperty('white-space', 'nowrap', 'important');
+    tools.style.setProperty('overflow', 'hidden', 'important');
 
-    tools.querySelectorAll('button').forEach((button) => {
+    const minus = tools.querySelector('[data-reader-font-decrease]');
+    const plus = tools.querySelector('[data-reader-font-increase]');
+
+    [minus, plus, music].forEach((button) => {
+      if (!button) return;
       button.style.setProperty('position', 'static', 'important');
       button.style.setProperty('inset', 'auto', 'important');
       button.style.setProperty('display', 'inline-flex', 'important');
       button.style.setProperty('align-items', 'center', 'important');
       button.style.setProperty('justify-content', 'center', 'important');
+      button.style.setProperty('flex', '0 0 30px', 'important');
       button.style.setProperty('width', '30px', 'important');
       button.style.setProperty('height', '30px', 'important');
       button.style.setProperty('min-width', '30px', 'important');
+      button.style.setProperty('max-width', '30px', 'important');
       button.style.setProperty('padding', '0', 'important');
       button.style.setProperty('margin', '0', 'important');
       button.style.setProperty('border', '0', 'important');
-      button.style.setProperty('border-radius', '6px', 'important');
+      button.style.setProperty('border-radius', '0', 'important');
       button.style.setProperty('background', 'transparent', 'important');
       button.style.setProperty('color', '#ffffff', 'important');
-      button.style.setProperty('font-size', '16px', 'important');
-      button.style.setProperty('font-weight', '600', 'important');
-      button.style.setProperty('line-height', '1', 'important');
       button.style.setProperty('box-shadow', 'none', 'important');
-      button.style.setProperty('cursor', 'pointer', 'important');
       button.style.setProperty('transform', 'none', 'important');
+      button.style.setProperty('line-height', '1', 'important');
+      button.style.setProperty('cursor', 'pointer', 'important');
     });
+
+    if (minus) {
+      minus.textContent = '−';
+      minus.style.setProperty('font-size', '16px', 'important');
+      minus.style.setProperty('font-weight', '500', 'important');
+    }
+
+    if (plus) {
+      plus.textContent = '+';
+      plus.style.setProperty('font-size', '16px', 'important');
+      plus.style.setProperty('font-weight', '500', 'important');
+    }
+
+    // Normalize the music glyph so it occupies only its own third of the bar.
+    music.innerHTML = '<span aria-hidden="true">♫</span>';
+    const musicGlyph = music.querySelector('span');
+    if (musicGlyph) {
+      musicGlyph.style.setProperty('display', 'block', 'important');
+      musicGlyph.style.setProperty('font-size', '15px', 'important');
+      musicGlyph.style.setProperty('line-height', '1', 'important');
+      musicGlyph.style.setProperty('margin', '0', 'important');
+      musicGlyph.style.setProperty('padding', '0', 'important');
+      musicGlyph.style.setProperty('transform', 'none', 'important');
+    }
 
     tools.querySelectorAll('.reader-quick-divider').forEach((divider) => {
-      Object.assign(divider.style, {
-        width: '1px',
-        height: '18px',
-        margin: '0 2px',
-        background: 'rgba(255,255,255,.18)',
-        flex: '0 0 1px'
-      });
+      divider.style.setProperty('display', 'block', 'important');
+      divider.style.setProperty('flex', '0 0 1px', 'important');
+      divider.style.setProperty('width', '1px', 'important');
+      divider.style.setProperty('height', '18px', 'important');
+      divider.style.setProperty('margin', '0 3px', 'important');
+      divider.style.setProperty('background', 'rgba(255,255,255,.28)', 'important');
     });
-
-    music.style.setProperty('position', 'static', 'important');
-    music.style.setProperty('inset', 'auto', 'important');
-    music.style.setProperty('display', 'inline-flex', 'important');
-    music.style.setProperty('align-items', 'center', 'important');
-    music.style.setProperty('justify-content', 'center', 'important');
-    music.style.setProperty('width', '30px', 'important');
-    music.style.setProperty('height', '30px', 'important');
-    music.style.setProperty('min-width', '30px', 'important');
-    music.style.setProperty('padding', '0', 'important');
-    music.style.setProperty('margin', '0', 'important');
-    music.style.setProperty('border', '0', 'important');
-    music.style.setProperty('border-radius', '6px', 'important');
-    music.style.setProperty('background', 'transparent', 'important');
-    music.style.setProperty('color', '#ffffff', 'important');
-    music.style.setProperty('box-shadow', 'none', 'important');
-    music.style.setProperty('transform', 'none', 'important');
 
     const controlsRect = controls.getBoundingClientRect();
     const fullRect = fullscreen.getBoundingClientRect();
-    const toolsRect = tools.getBoundingClientRect();
+    const toolbarWidth = 110;
+    const toolbarHeight = 36;
     const gap = 8;
 
-    const left = Math.max(0, fullRect.left - controlsRect.left - toolsRect.width - gap);
-    const top = fullRect.top - controlsRect.top + (fullRect.height - toolsRect.height) / 2;
+    const left = Math.max(0, fullRect.left - controlsRect.left - toolbarWidth - gap);
+    const top = fullRect.top - controlsRect.top + (fullRect.height - toolbarHeight) / 2;
 
     tools.style.setProperty('left', `${Math.round(left)}px`, 'important');
     tools.style.setProperty('right', 'auto', 'important');
