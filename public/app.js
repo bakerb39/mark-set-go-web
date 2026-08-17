@@ -1249,7 +1249,21 @@ const musicPlayerWrap = document.querySelector('#music-player-wrap');
 const musicNowTitle = document.querySelector('#music-now-title');
 const musicNowSource = document.querySelector('#music-now-source');
 const musicNextButton = document.querySelector('#music-next');
+
 let musicSearchState = null;
+
+function notifyCompactMusicPlayer() {
+  document.dispatchEvent(new CustomEvent('marksetgo:music-player-updated', {
+    detail: {
+      title: musicNowTitle?.textContent || '',
+      source: musicNowSource?.textContent || '',
+      hasSearchResults: Boolean(musicSearchState?.videoIds?.length),
+      resultIndex: Number(musicSearchState?.index || 0),
+      resultCount: Number(musicSearchState?.videoIds?.length || 0)
+    }
+  }));
+}
+
 
 function musicSearchQuery(choice) {
   return choice.searchQuery || `${choice.title || 'reading music'} YouTube`;
@@ -1328,6 +1342,7 @@ async function playYouTubeSearch(query, title = 'YouTube search') {
   musicPlayerWrap.hidden = false;
   musicPlayer.src = '';
   if (musicNextButton) musicNextButton.hidden = true;
+  notifyCompactMusicPlayer();
   try {
     const payload = await loadApiPayload(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`);
     const videoIds = Array.isArray(payload.videoIds) ? payload.videoIds : [];
@@ -1338,6 +1353,7 @@ async function playYouTubeSearch(query, title = 'YouTube search') {
     musicSearchState = null;
     musicNowSource.textContent = error?.message || 'Music search failed';
     musicPlayer.src = '';
+    notifyCompactMusicPlayer();
   }
 }
 
@@ -1361,6 +1377,7 @@ function playMusicSearchCandidate(index) {
       search: musicSearchState
     }));
   } catch {}
+  notifyCompactMusicPlayer();
 }
 
 function playMusic(choiceOrParsed) {
@@ -1375,6 +1392,7 @@ function playMusic(choiceOrParsed) {
   musicDock.classList.remove('minimized');
   musicPlayerWrap.hidden = false;
   try { localStorage.setItem('markSetGoMusic', JSON.stringify({ title: musicNowTitle.textContent, source: musicNowSource.textContent, provider: choiceOrParsed.provider || (isChoice ? 'youtube' : ''), src })); } catch {}
+  notifyCompactMusicPlayer();
 }
 
 function stopMusic() {
@@ -1383,7 +1401,47 @@ function stopMusic() {
   musicPlayer.src = '';
   musicDock.hidden = true;
   try { localStorage.removeItem('markSetGoMusic'); } catch {}
+  notifyCompactMusicPlayer();
 }
+
+
+window.MarkSetGoMusicPlayer = Object.freeze({
+  playSuggestedForCurrentReading() {
+    const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+    const title = String(current?.title || state?.title || '').trim();
+    const text = String(current?.text || state?.currentText || '');
+    if (!title) return false;
+    const recommendation = recommendedPlayerChoice(title, text);
+    void playYouTubeSearch(recommendation.scoreQuery, `${title} — suggested reading music`);
+    return true;
+  },
+
+  playReadingMoodForCurrentReading() {
+    const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+    const title = String(current?.title || state?.title || '').trim();
+    const text = String(current?.text || state?.currentText || '');
+    if (!title) return false;
+    const recommendation = recommendedPlayerChoice(title, text);
+    void playYouTubeSearch(recommendation.moodQuery, `${title} — reading mood`);
+    return true;
+  },
+
+  nextResult() {
+    if (!musicSearchState?.videoIds?.length) return false;
+    playMusicSearchCandidate(musicSearchState.index + 1);
+    return true;
+  },
+
+  getState() {
+    return {
+      hasSearchResults: Boolean(musicSearchState?.videoIds?.length),
+      resultIndex: Number(musicSearchState?.index || 0),
+      resultCount: Number(musicSearchState?.videoIds?.length || 0),
+      title: musicNowTitle?.textContent || '',
+      source: musicNowSource?.textContent || ''
+    };
+  }
+});
 
 function renderMusicLibrary() {
   stopReader();
@@ -12225,23 +12283,7 @@ function bindMarkCompanion(reader){
       const groupSize=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);
       const wasRunning=isReaderRunning();
 
-      layout.classList.add('word-panel-hidden');
-      const markButton=app.querySelector('#toggle-mark-panel');
-      const toolsButton=app.querySelector('#toggle-word-panel');
-      markButton?.setAttribute('aria-pressed','false');
-      toolsButton?.setAttribute('aria-pressed','false');
-      markButton?.classList.add('pane-closed');
-      toolsButton?.classList.add('pane-closed');
-
-      if(reader){
-        window.requestAnimationFrame(()=>window.requestAnimationFrame(()=>{
-          state.index=Math.max(0,Math.min(state.words.length-1,anchorIndex));
-          if(state.bookPages) scheduleBookPageReflow({delay:0,anchorIndex});
-          else restoreReadingAnchor(reader,mode,groupSize,anchorIndex);
-          if(wasRunning&&!isReaderRunning()) startReader();
-          persistReaderSession({immediate:true});
-        }));
-      }
+      closeReaderRightPane();
     } else {
       openMarkPanel('selection');
       renderMarkSelectionCard();
@@ -14162,6 +14204,42 @@ function arrangeReaderSidePanels() {
   wordPanel.replaceChildren(shell);shell.querySelector('#reader-control-core')?.appendChild(toolbar);if(media)shell.querySelector('#reader-control-media')?.appendChild(media);if(translation)shell.querySelector('#reader-control-language')?.appendChild(translation);if(wordResult)shell.querySelector('#reader-control-language')?.appendChild(wordResult);
   shell.querySelector('#close-reader-controls')?.addEventListener('click',()=>app.querySelector('#toggle-word-panel')?.click());
 }
+
+function closeReaderRightPane() {
+  const layout = app.querySelector('#reader-layout');
+  if (!layout) return false;
+
+  const reader = app.querySelector('#reader');
+  const anchorIndex = Math.max(0, Number(state.index) || 0);
+  const mode = state.renderedMode || getSelectedMode();
+  const groupSize = Math.max(1, Number(app.querySelector('#word-count')?.value) || 1);
+  const wasRunning = isReaderRunning();
+
+  layout.classList.add('word-panel-hidden');
+
+  const markButton = app.querySelector('#toggle-mark-panel');
+  const toolsButton = app.querySelector('#toggle-word-panel');
+  markButton?.setAttribute('aria-pressed', 'false');
+  toolsButton?.setAttribute('aria-pressed', 'false');
+  markButton?.classList.add('pane-closed');
+  toolsButton?.classList.add('pane-closed');
+
+  if (reader) {
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      state.index = Math.max(0, Math.min(state.words.length - 1, anchorIndex));
+      if (state.bookPages) scheduleBookPageReflow({ delay: 0, anchorIndex });
+      else restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
+      if (wasRunning && !isReaderRunning()) startReader();
+      persistReaderSession({ immediate: true });
+    }));
+  }
+  return true;
+}
+
+window.MarkSetGoReaderPanels = Object.freeze({
+  closeRightPane: closeReaderRightPane
+});
+
 function bindReaderPaneControls() {
   const layout = app.querySelector('#reader-layout');
   const navigationButton = app.querySelector('#toggle-navigation-pane');

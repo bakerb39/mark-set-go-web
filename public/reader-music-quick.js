@@ -41,6 +41,11 @@
     return String(document.querySelector('.reader-title-copy h1')?.textContent || '').trim();
   }
 
+
+  function playerApi() {
+    return window.MarkSetGoMusicPlayer || null;
+  }
+
   function musicKey(title) {
     return String(title || '').trim().toLowerCase()
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 120);
@@ -189,6 +194,24 @@
             <strong>${esc(document.querySelector('#music-now-title')?.textContent || 'Music')}</strong>
           </div>` : ''}
 
+        ${currentReaderTitle() ? `
+          <div class="reader-music-compact-field">
+            <span>Suggested for this reading</span>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+              <button type="button" class="reader-music-compact-manage" data-wpm-music-suggested>
+                ♫ Play suggestion
+              </button>
+              <button type="button" class="reader-music-compact-manage" data-wpm-music-mood>
+                ◇ Reading mood
+              </button>
+              <button type="button" class="reader-music-compact-manage" data-wpm-music-next-result
+                ${playerApi()?.getState?.().hasSearchResults ? '' : 'disabled'}
+                title="Try another result from the current recommendation">
+                ↻ Other result
+              </button>
+            </div>
+          </div>` : ''}
+
         <label class="reader-music-compact-field">
           <span>My saved playlists</span>
           <select data-wpm-music-preferred-select ${preferred.length ? '' : 'disabled'}>
@@ -240,6 +263,24 @@
       event.target.value = '';
     });
 
+
+    chooser.querySelector('[data-wpm-music-suggested]')?.addEventListener('click', () => {
+      playerApi()?.playSuggestedForCurrentReading?.();
+      closeChooser({ keepDock: true });
+    });
+
+    chooser.querySelector('[data-wpm-music-mood]')?.addEventListener('click', () => {
+      playerApi()?.playReadingMoodForCurrentReading?.();
+      closeChooser({ keepDock: true });
+    });
+
+    chooser.querySelector('[data-wpm-music-next-result]')?.addEventListener('click', () => {
+      if (playerApi()?.nextResult?.()) {
+        // Keep the chooser open so the reader can continue cycling if desired.
+        renderChooser();
+      }
+    });
+
     chooser.querySelector('[data-wpm-music-manage]')?.addEventListener('click', () => {
       closeChooser();
       document.querySelector('[data-action="music"]')?.click();
@@ -272,13 +313,11 @@
     // every time the Reader DOM is rebuilt so only the top-right control exists.
 
     document.querySelectorAll('#app .reader-viewer-footer [data-reader-wpm-music-toggle]').forEach((button) => {
-      if (!button.classList.contains('reader-topright-music-toggle') &&
-          !button.closest('.reader-topright-media-stack')) button.remove();
+      if (!button.closest('.reader-topright-media-stack')) button.remove();
     });
 
     document.querySelectorAll('#app .control [data-reader-wpm-music-toggle]').forEach((button) => {
-      if (!button.classList.contains('reader-topright-music-toggle') &&
-          !button.closest('.reader-topright-media-stack')) button.remove();
+      if (!button.closest('.reader-topright-media-stack')) button.remove();
     });
 
     document.querySelectorAll('#app .reader-viewer-music-stack').forEach((stack) => {
@@ -297,34 +336,28 @@
   }
 
   function insertTopRightMusicButton() {
-    const fullscreenButton = document.querySelector('#app #toggle-reader-fullscreen');
-    if (!fullscreenButton) {
+    const paneControls = document.querySelector('#app .reader-pane-controls');
+    const fullscreenButton = paneControls?.querySelector('#toggle-reader-fullscreen');
+    if (!paneControls || !fullscreenButton) {
       speedButton = null;
       return;
     }
 
-    // Undo the older wrapper approach if it exists. Full screen must stay exactly
-    // where the Reader itself placed it.
-    const oldStack = fullscreenButton.closest('.reader-topright-media-stack');
-    if (oldStack) {
-      const parent = oldStack.parentNode;
-      if (parent) parent.insertBefore(fullscreenButton, oldStack);
-      oldStack.querySelectorAll('[data-reader-wpm-music-toggle]').forEach((node) => node.remove());
-      oldStack.remove();
+    let stack = paneControls.querySelector('.reader-topright-media-stack');
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.className = 'reader-topright-media-stack';
+      stack.setAttribute('aria-label', 'Reader media and fullscreen controls');
+
+      // Move the existing fullscreen DOM node into this wrapper. Moving the node
+      // preserves app.js's already-bound fullscreen click handler.
+      fullscreenButton.parentNode.insertBefore(stack, fullscreenButton);
+      stack.appendChild(fullscreenButton);
+    } else if (!stack.contains(fullscreenButton)) {
+      stack.appendChild(fullscreenButton);
     }
 
-    // Keep one standalone top-right music button and remove only duplicates.
-    let button = document.querySelector('#app .reader-topright-music-toggle[data-reader-wpm-music-toggle]');
-    document.querySelectorAll('#app [data-reader-wpm-music-toggle]').forEach((node) => {
-      if (node !== button && !node.closest('.reader-topright-media-stack')) node.remove();
-    });
-
-    const host = fullscreenButton.offsetParent || fullscreenButton.parentElement;
-    if (!host) {
-      speedButton = null;
-      return;
-    }
-
+    let button = stack.querySelector('[data-reader-wpm-music-toggle]');
     if (!button) {
       button = document.createElement('button');
       button.type = 'button';
@@ -341,38 +374,18 @@
         if (chooser && !chooser.hidden) closeChooser();
         else openChooser();
       });
-
-      host.appendChild(button);
-    } else if (button.parentNode !== host) {
-      host.appendChild(button);
     }
 
-    const placeButton = () => {
-      if (!button.isConnected || !fullscreenButton.isConnected) return;
-
-      // Position Music from Full screen's *actual* rendered location.
-      // This never changes Full screen's own styles or DOM position.
-      button.style.setProperty('position', 'absolute', 'important');
-      button.style.setProperty('margin', '0', 'important');
-      button.style.setProperty('z-index', '9', 'important');
-      button.style.setProperty('left', 'auto', 'important');
-      button.style.setProperty('bottom', 'auto', 'important');
-      button.style.setProperty('transform', 'none', 'important');
-
-      const hostRect = host.getBoundingClientRect();
-      const fullRect = fullscreenButton.getBoundingClientRect();
-      const buttonRect = button.getBoundingClientRect();
-
-      const right = Math.max(0, hostRect.right - fullRect.right);
-      const top = fullRect.top - hostRect.top - buttonRect.height - 12;
-
-      button.style.setProperty('right', `${right}px`, 'important');
-      button.style.setProperty('top', `${top}px`, 'important');
-    };
-
-    placeButton();
-    window.requestAnimationFrame(placeButton);
-    window.setTimeout(placeButton, 50);
+    // IMPORTANT: enforce the DOM order on EVERY Reader render.
+    // Older versions could leave Full screen before Music. Merely changing CSS
+    // then preserved that stale child order. Always make Music the first child
+    // and Full screen the second child.
+    if (stack.firstElementChild !== button) {
+      stack.insertBefore(button, stack.firstElementChild);
+    }
+    if (button.nextElementSibling !== fullscreenButton) {
+      stack.insertBefore(fullscreenButton, button.nextElementSibling);
+    }
 
     speedButton = button;
   }
@@ -408,6 +421,11 @@
     }
 
     document.addEventListener('marksetgo:document-available', () => window.setTimeout(sync, 0));
+
+
+    document.addEventListener('marksetgo:music-player-updated', () => {
+      if (chooser && !chooser.hidden) renderChooser();
+    });
 
     document.addEventListener('marksetgo:music-store-ready', () => {
       if (chooser && !chooser.hidden) renderChooser();

@@ -123,7 +123,7 @@
     return `
       <div class="askmark-premium" data-askmark-premium>
         <header class="askmark-hero">
-          <button class="askmark-close" type="button" data-askmark-close aria-label="Close ${companionAsk()}">×</button>
+          <button class="askmark-close" type="button" data-askmark-close aria-label="Close ${companionAsk()}" style="pointer-events:auto;position:relative;z-index:50;cursor:pointer">×</button>
           <div class="askmark-avatar-wrap" aria-hidden="true">
             <span class="askmark-avatar-glow"></span>
             <img class="askmark-avatar" src="${companionAvatar()}" alt="${companionName()}">
@@ -794,7 +794,17 @@
 
   function bindPremiumEvents() {
     installAskMarkScrollIsolation();
-    $('[data-askmark-close]', shell)?.addEventListener('click', () => $('#toggle-mark-panel')?.click());
+    $('[data-askmark-close]', shell)?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (window.MarkSetGoReaderPanels?.closeRightPane?.()) return;
+
+      const layout = document.getElementById('reader-layout');
+      if (!layout) return;
+      layout.classList.add('word-panel-hidden');
+      document.getElementById('toggle-mark-panel')?.setAttribute('aria-pressed', 'false');
+      document.getElementById('toggle-word-panel')?.setAttribute('aria-pressed', 'false');
+    });
     $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
     $$('[data-askmark-view]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView(button.dataset.askmarkView)));
     $$('[data-askmark-back]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView('chat')));
@@ -987,7 +997,18 @@
 
   document.addEventListener('marksetgo:document-available', () => {
     installAttempts = 0;
-    requestAnimationFrame(retryInstall);
+  
+  // Capture-phase fallback: close even if a later panel rerender drops the
+  // element-specific listener or another bubble-phase handler interferes.
+  document.addEventListener('click', (event) => {
+    const closeButton = event.target?.closest?.('[data-askmark-close]');
+    if (!closeButton) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.MarkSetGoReaderPanels?.closeRightPane?.();
+  }, true);
+
+  requestAnimationFrame(retryInstall);
     window.setTimeout(()=>refreshMarkProgress(),220);
   });
   document.addEventListener('marksetgo:goals-updated',()=>window.setTimeout(()=>refreshMarkProgress({force:true}),80));
