@@ -1,0 +1,20 @@
+--- public/app.js
++++ public/app.js
+@@ renderReaderWithText
++  const READER_CLICK_CONTROLS_KEY = 'msg_reader_click_controls_v1';
++  let readerClickControlsEnabled = true;
++  try {
++    readerClickControlsEnabled = localStorage.getItem(READER_CLICK_CONTROLS_KEY) !== 'off';
++  } catch {}
+
+@@ playback-controls
++  <button id="reader-click-controls" class="secondary" type="button"
++    aria-pressed="${readerClickControlsEnabled ? 'true' : 'false'}">
++    Reader clicks: ${readerClickControlsEnabled ? 'On' : 'Off'}
++  </button>
+
+@@ after spacebar binding
++  // Bind persisted Reader click-control toggle.
+
+@@ readerFrame click handler, after translated-word handling
++  if (!readerClickControlsEnabled) return;
