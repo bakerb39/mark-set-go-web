@@ -9,48 +9,24 @@
   const transformApi = () => window.MarkSetGoReadAnything;
 
   const COMPANION_STORAGE_KEY = 'msg_companion_persona_v2';
+  const COMPANION_CONFIGS = Object.freeze({
+    mark: Object.freeze({ id:'mark', name:'Mark', ask:'Ask Mark', notebook:'Mark’s Notebook', avatar:'/assets/ask-mark/ask-mark-avatar.png' }),
+    beth: Object.freeze({ id:'beth', name:'Beth', ask:'Ask Beth', notebook:'Beth’s Notebook', avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9' }),
+    chad: Object.freeze({ id:'chad', name:'Chad', ask:'Ask Chad', notebook:'Chad’s Notebook', avatar:'/assets/companions/chad/chad-avatar.png' }),
+    scott: Object.freeze({ id:'scott', name:'Scott', ask:'Ask Scott', notebook:'Scott’s Notebook', avatar:'/assets/companions/scott/scott-avatar.png' })
+  });
   const companionConfig = () => {
-    const live = window.MSGCompanion?.config;
-    if (live?.id) return live;
-    const selected = localStorage.getItem(COMPANION_STORAGE_KEY) || localStorage.getItem('msg_companion_persona_v1') || 'mark';
-
-    if (selected === 'scott') {
-      return {
-        id:'scott',
-        name:'Scott',
-        ask:'Ask Scott',
-        notebook:'Scott’s Notebook',
-        avatar:'/assets/companions/scott/scott-avatar.png'
-      };
-    }
-
-    if (selected === 'chad') {
-      return {
-        id:'chad',
-        name:'Chad',
-        ask:'Ask Chad',
-        notebook:"Chad's Notebook",
-        avatar:'/assets/companions/chad/chad-avatar.png'
-      };
-    }
-
-    if (selected === 'beth') {
-      return {
-        id:'beth',
-        name:'Beth',
-        ask:'Ask Beth',
-        notebook:"Beth's Notebook",
-        avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9'
-      };
-    }
-
-    return {
-      id:'mark',
-      name:'Mark',
-      ask:'Ask Mark',
-      notebook:"Mark's Notebook",
-      avatar:'/assets/ask-mark/ask-mark-avatar.png'
-    };
+    let selected = 'mark';
+    try {
+      selected = String(
+        localStorage.getItem(COMPANION_STORAGE_KEY) ||
+        localStorage.getItem('msg_companion_persona_v1') ||
+        'mark'
+      ).toLowerCase();
+    } catch {}
+    // Storage is the single source of truth. A stale live config must never
+    // override the companion the reader actually selected.
+    return COMPANION_CONFIGS[selected] || COMPANION_CONFIGS.mark;
   };
   const companionName = () => companionConfig().name;
   const companionAsk = () => companionConfig().ask;
@@ -802,26 +778,29 @@
     });
   }
 
+  function closeAskMarkPane() {
+    const layout = document.getElementById('reader-layout');
+    const wordPanel = document.getElementById('word-panel');
+    const markButton = document.getElementById('toggle-mark-panel');
+    const toolsButton = document.getElementById('toggle-word-panel');
+
+    if (layout) layout.classList.add('word-panel-hidden');
+    // Fallback for any transitional shell where the layout node is not present.
+    if (!layout && wordPanel) wordPanel.hidden = true;
+
+    markButton?.setAttribute('aria-pressed', 'false');
+    toolsButton?.setAttribute('aria-pressed', 'false');
+    markButton?.classList.add('pane-closed');
+    toolsButton?.classList.add('pane-closed');
+    return Boolean(layout || wordPanel);
+  }
+
   function bindPremiumEvents() {
     installAskMarkScrollIsolation();
     $('[data-askmark-close]', shell)?.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-
-      const layout = document.getElementById('reader-layout');
-      if (!layout) return;
-
-      // Close Ask Mark directly instead of routing through the toolbar toggle.
-      // This avoids toggle-state mismatches that can make the X appear unresponsive.
-      layout.classList.add('word-panel-hidden');
-
-      const markButton = document.getElementById('toggle-mark-panel');
-      const toolsButton = document.getElementById('toggle-word-panel');
-
-      markButton?.setAttribute('aria-pressed', 'false');
-      toolsButton?.setAttribute('aria-pressed', 'false');
-      markButton?.classList.add('pane-closed');
-      toolsButton?.classList.add('pane-closed');
+      closeAskMarkPane();
     });
     $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
     $$('[data-askmark-view]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView(button.dataset.askmarkView)));
@@ -1015,7 +994,18 @@
 
   document.addEventListener('marksetgo:document-available', () => {
     installAttempts = 0;
-    requestAnimationFrame(retryInstall);
+    // Durable close fallback: the Ask panel is rebuilt dynamically, so keep one
+  // delegated close handler on the document rather than depending on a specific
+  // shell instance. No DOM observer is involved.
+  document.addEventListener('click', (event) => {
+    const close = event.target.closest?.('[data-askmark-close]');
+    if (!close) return;
+    event.preventDefault();
+    event.stopPropagation();
+    closeAskMarkPane();
+  }, true);
+
+  requestAnimationFrame(retryInstall);
     window.setTimeout(()=>refreshMarkProgress(),220);
   });
   document.addEventListener('marksetgo:goals-updated',()=>window.setTimeout(()=>refreshMarkProgress({force:true}),80));

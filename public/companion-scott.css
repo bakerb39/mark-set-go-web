@@ -37,3 +37,7 @@ html[data-companion="scott"] .home-mark-icon-stage.companion-frontpage-badge-mod
     min-width: 0;
   }
 }
+
+/* Single-selection guard. Only the actual shared companion selection shows a check. */
+.companion-persona-options button[aria-pressed="false"] .companion-check{opacity:0!important;}
+.companion-persona-options button[aria-pressed="true"] .companion-check{opacity:1!important;}
