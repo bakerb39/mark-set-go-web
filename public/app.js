@@ -23115,24 +23115,119 @@ function renderMyLinks(selectedId = '') {
 const SYMPOSIUM_STORAGE_KEY = 'markSetGoSymposiumSessionsV1';
 
 const SYMPOSIUM_PARTICIPANTS = [
-  { id:'socrates', name:'Socrates', field:'Philosophy', era:'Classical Greece', monogram:'S', lens:'Socratic questioning, definitions, assumptions, and examination of reasons' },
-  { id:'plato', name:'Plato', field:'Philosophy', era:'Classical Greece', monogram:'P', lens:'forms, justice, education, political philosophy, metaphysics, and dialectic' },
-  { id:'aristotle', name:'Aristotle', field:'Philosophy & Science', era:'Classical Greece', monogram:'A', lens:'logic, causes, virtue, politics, biology, classification, and empirical observation' },
-  { id:'aquinas', name:'Thomas Aquinas', field:'Theology & Philosophy', era:'Medieval', monogram:'TA', lens:'natural law, scholastic argument, metaphysics, ethics, theology, objections and replies' },
-  { id:'bacon', name:'Francis Bacon', field:'Science & Philosophy', era:'Early Modern', monogram:'FB', lens:'induction, experiment, idols of the mind, scientific method, and useful knowledge' },
-  { id:'newton', name:'Isaac Newton', field:'Mathematics & Physics', era:'Scientific Revolution', monogram:'N', lens:'mechanics, gravitation, optics, calculus, mathematical modeling, and disciplined inference' },
-  { id:'darwin', name:'Charles Darwin', field:'Biology', era:'19th century', monogram:'D', lens:'natural selection, variation, evidence, comparative biology, gradual change, and explanatory mechanisms' },
-  { id:'curie', name:'Marie Curie', field:'Physics & Chemistry', era:'Modern Science', monogram:'MC', lens:'radioactivity, experimental rigor, measurement, scientific perseverance, and evidence' },
-  { id:'einstein', name:'Albert Einstein', field:'Physics', era:'Modern Physics', monogram:'E', lens:'relativity, thought experiments, invariance, physical intuition, and conceptual simplicity' },
-  { id:'lovelace', name:'Ada Lovelace', field:'Mathematics & Computing', era:'19th century', monogram:'AL', lens:'symbolic computation, algorithms, mathematical imagination, and the possibilities and limits of machines' },
-  { id:'turing', name:'Alan Turing', field:'Mathematics & Computing', era:'20th century', monogram:'T', lens:'computation, algorithms, machine intelligence, formal reasoning, and cryptanalysis' },
-  { id:'shakespeare', name:'William Shakespeare', field:'Literature', era:'Renaissance', monogram:'WS', lens:'character, rhetoric, tragedy, comedy, ambition, power, motive, language, and dramatic irony' },
-  { id:'austen', name:'Jane Austen', field:'Literature', era:'Regency', monogram:'JA', lens:'character, social convention, moral judgment, irony, class, courtship, and self-knowledge' },
-  { id:'bach', name:'J. S. Bach', field:'Music', era:'Baroque', monogram:'JSB', lens:'counterpoint, harmony, form, sacred music, structure, variation, and disciplined musical craft' },
-  { id:'beethoven', name:'L. van Beethoven', field:'Music', era:'Classical / Romantic', monogram:'LvB', lens:'motivic development, form, expressive architecture, struggle, transformation, and musical innovation' },
-  { id:'herodotus', name:'Herodotus', field:'History', era:'Classical Greece', monogram:'H', lens:'historical inquiry, competing accounts, culture, causation, memory, and the limits of testimony' },
-  { id:'gibbon', name:'Edward Gibbon', field:'History', era:'Enlightenment', monogram:'EG', lens:'long-run historical causation, institutions, religion, civic life, sources, and decline' },
-  { id:'dubois', name:'W. E. B. Du Bois', field:'History & Sociology', era:'Modern', monogram:'WEB', lens:'history, sociology, political economy, culture, evidence, institutions, and lived experience' }
+  { id:'socrates', name:'Socrates', field:'Philosophy', era:'Classical Greece', monogram:'S', category:'Philosophy', lens:'Socratic questioning, definitions, assumptions, and examination of reasons' },
+  { id:'plato', name:'Plato', field:'Philosophy', era:'Classical Greece', monogram:'P', category:'Philosophy', lens:'forms, justice, education, political philosophy, metaphysics, and dialectic' },
+  { id:'aristotle', name:'Aristotle', field:'Philosophy & Science', era:'Classical Greece', monogram:'A', category:'Philosophy', lens:'logic, causes, virtue, politics, biology, classification, and empirical observation' },
+  { id:'confucius', name:'Confucius', field:'Ethics & Political Thought', era:'Ancient China', monogram:'C', category:'Philosophy', lens:'virtue, ritual, education, humane government, family duty, moral cultivation, and social harmony' },
+  { id:'laozi', name:'Laozi', field:'Philosophy', era:'Ancient China', monogram:'LZ', category:'Philosophy', lens:'the Dao, non-forcing, simplicity, paradox, naturalness, humility, and limits of deliberate control' },
+  { id:'epictetus', name:'Epictetus', field:'Stoic Philosophy', era:'Roman era', monogram:'EPI', category:'Philosophy', lens:'control and responsibility, judgment, discipline, freedom, resilience, and Stoic practice' },
+  { id:'marcus-aurelius', name:'Marcus Aurelius', field:'Stoic Philosophy', era:'Roman era', monogram:'MA', category:'Philosophy', lens:'self-command, duty, impermanence, rational perspective, civic responsibility, and Stoic ethics' },
+  { id:'augustine', name:'Augustine of Hippo', field:'Theology & Philosophy', era:'Late Antiquity', monogram:'AU', category:'Religion & Theology', lens:'will, memory, time, grace, moral psychology, faith and reason, and the nature of evil' },
+  { id:'aquinas', name:'Thomas Aquinas', field:'Theology & Philosophy', era:'Medieval', monogram:'TA', category:'Religion & Theology', lens:'natural law, scholastic argument, metaphysics, ethics, theology, objections and replies' },
+  { id:'maimonides', name:'Maimonides', field:'Philosophy & Theology', era:'Medieval', monogram:'MM', category:'Religion & Theology', lens:'reason and revelation, negative theology, law, ethics, medicine, and disciplined interpretation' },
+  { id:'pascal', name:'Blaise Pascal', field:'Mathematics & Philosophy', era:'17th century', monogram:'BP', category:'Philosophy', lens:'reason and its limits, probability, faith, human grandeur and misery, rhetoric, and decision under uncertainty' },
+  { id:'descartes', name:'René Descartes', field:'Philosophy & Mathematics', era:'17th century', monogram:'RD', category:'Philosophy', lens:'methodic doubt, rationalism, mind and body, certainty, analytic method, and foundations of knowledge' },
+  { id:'spinoza', name:'Baruch Spinoza', field:'Philosophy', era:'17th century', monogram:'BS', category:'Philosophy', lens:'substance, necessity, emotion, freedom through understanding, ethics, and rational analysis' },
+  { id:'locke', name:'John Locke', field:'Philosophy & Political Thought', era:'17th century', monogram:'JL', category:'Political Thought', lens:'natural rights, consent, property, toleration, empiricism, education, and limited government' },
+  { id:'hume', name:'David Hume', field:'Philosophy & History', era:'18th century', monogram:'DH', category:'Philosophy', lens:'empiricism, causation, skepticism, habit, sentiment, probability, and criticism of unwarranted inference' },
+  { id:'rousseau', name:'Jean-Jacques Rousseau', field:'Political Philosophy', era:'18th century', monogram:'JR', category:'Political Thought', lens:'freedom, inequality, education, civic life, the general will, authenticity, and corruption by social convention' },
+  { id:'kant', name:'Immanuel Kant', field:'Philosophy', era:'Enlightenment', monogram:'IK', category:'Philosophy', lens:'duty, autonomy, categories of understanding, limits of reason, universal principles, and human dignity' },
+  { id:'hegel', name:'G. W. F. Hegel', field:'Philosophy', era:'19th century', monogram:'GH', category:'Philosophy', lens:'dialectical development, history, recognition, freedom, institutions, and the evolution of ideas' },
+  { id:'kierkegaard', name:'Søren Kierkegaard', field:'Philosophy & Theology', era:'19th century', monogram:'SK', category:'Philosophy', lens:'choice, anxiety, faith, individuality, inwardness, responsibility, and critiques of crowd thinking' },
+  { id:'nietzsche', name:'Friedrich Nietzsche', field:'Philosophy', era:'19th century', monogram:'FN', category:'Philosophy', lens:'genealogy, values, perspectivism, ressentiment, self-overcoming, culture, and critique of conventional morality' },
+  { id:'mill', name:'John Stuart Mill', field:'Philosophy & Political Economy', era:'19th century', monogram:'JSM', category:'Political Thought', lens:'liberty, utilitarianism, individuality, free speech, representative government, and social reform' },
+  { id:'james', name:'William James', field:'Philosophy & Psychology', era:'19th–20th century', monogram:'WJ', category:'Psychology', lens:'pragmatism, attention, habit, experience, belief, consciousness, and practical consequences' },
+  { id:'russell', name:'Bertrand Russell', field:'Philosophy & Logic', era:'20th century', monogram:'BR', category:'Philosophy', lens:'logic, analytic clarity, skepticism, language, mathematics, education, and criticism of dogma' },
+  { id:'wittgenstein', name:'Ludwig Wittgenstein', field:'Philosophy', era:'20th century', monogram:'LW', category:'Philosophy', lens:'language games, meaning in use, conceptual confusion, logic, ordinary language, and limits of expression' },
+  { id:'popper', name:'Karl Popper', field:'Philosophy of Science', era:'20th century', monogram:'KP', category:'Philosophy', lens:'falsifiability, conjecture and refutation, open society, piecemeal reform, and criticism of historicism' },
+  { id:'arendt', name:'Hannah Arendt', field:'Political Theory', era:'20th century', monogram:'HA', category:'Political Thought', lens:'totalitarianism, power, authority, judgment, public life, responsibility, and the human condition' },
+  { id:'beauvoir', name:'Simone de Beauvoir', field:'Philosophy & Literature', era:'20th century', monogram:'SB', category:'Philosophy', lens:'freedom, ambiguity, ethics, gender, social construction, responsibility, and lived experience' },
+  { id:'bacon', name:'Francis Bacon', field:'Science & Philosophy', era:'Early Modern', monogram:'FB', category:'Science', lens:'induction, experiment, idols of the mind, scientific method, and useful knowledge' },
+  { id:'copernicus', name:'Nicolaus Copernicus', field:'Astronomy', era:'Renaissance', monogram:'NC', category:'Science', lens:'heliocentrism, mathematical astronomy, model comparison, and rethinking inherited cosmology' },
+  { id:'galileo', name:'Galileo Galilei', field:'Physics & Astronomy', era:'Scientific Revolution', monogram:'GG', category:'Science', lens:'experiment, measurement, telescopic evidence, motion, mathematical description, and scientific controversy' },
+  { id:'kepler', name:'Johannes Kepler', field:'Astronomy & Mathematics', era:'Scientific Revolution', monogram:'JK', category:'Science', lens:'planetary motion, mathematical patterns, empirical correction, geometry, and physical astronomy' },
+  { id:'newton', name:'Isaac Newton', field:'Mathematics & Physics', era:'Scientific Revolution', monogram:'N', category:'Science', lens:'mechanics, gravitation, optics, calculus, mathematical modeling, and disciplined inference' },
+  { id:'faraday', name:'Michael Faraday', field:'Physics & Chemistry', era:'19th century', monogram:'MF', category:'Science', lens:'electromagnetism, experimental demonstration, fields, induction, and physical intuition' },
+  { id:'maxwell', name:'James Clerk Maxwell', field:'Physics & Mathematics', era:'19th century', monogram:'JCM', category:'Science', lens:'electromagnetism, field theory, mathematical unification, statistical reasoning, and physical modeling' },
+  { id:'darwin', name:'Charles Darwin', field:'Biology', era:'19th century', monogram:'D', category:'Science', lens:'natural selection, variation, evidence, comparative biology, gradual change, and explanatory mechanisms' },
+  { id:'mendel', name:'Gregor Mendel', field:'Genetics', era:'19th century', monogram:'GM', category:'Science', lens:'inheritance, controlled experiment, quantitative patterns, traits, and probabilistic biological reasoning' },
+  { id:'pasteur', name:'Louis Pasteur', field:'Chemistry & Microbiology', era:'19th century', monogram:'LP', category:'Science', lens:'germ theory, experiment, vaccination, fermentation, laboratory method, and applied science' },
+  { id:'curie', name:'Marie Curie', field:'Physics & Chemistry', era:'Modern Science', monogram:'MC', category:'Science', lens:'radioactivity, experimental rigor, measurement, scientific perseverance, and evidence' },
+  { id:'einstein', name:'Albert Einstein', field:'Physics', era:'Modern Physics', monogram:'E', category:'Science', lens:'relativity, thought experiments, invariance, physical intuition, and conceptual simplicity' },
+  { id:'bohr', name:'Niels Bohr', field:'Physics', era:'20th century', monogram:'NB', category:'Science', lens:'quantum theory, complementarity, measurement, conceptual models, and limits of classical description' },
+  { id:'schrodinger', name:'Erwin Schrödinger', field:'Physics', era:'20th century', monogram:'ES', category:'Science', lens:'wave mechanics, quantum states, thought experiments, physical interpretation, and conceptual paradox' },
+  { id:'heisenberg', name:'Werner Heisenberg', field:'Physics', era:'20th century', monogram:'WH', category:'Science', lens:'quantum mechanics, uncertainty, observables, mathematical formalism, and limits of measurement' },
+  { id:'feynman', name:'Richard Feynman', field:'Physics', era:'20th century', monogram:'RF', category:'Science', lens:'first-principles reasoning, quantum electrodynamics, models, explanatory clarity, skepticism, and scientific playfulness' },
+  { id:'carson', name:'Rachel Carson', field:'Biology & Environmental Science', era:'20th century', monogram:'RC', category:'Science', lens:'ecology, environmental evidence, unintended consequences, public science, and precaution' },
+  { id:'mcclintock', name:'Barbara McClintock', field:'Genetics', era:'20th century', monogram:'BM', category:'Science', lens:'chromosome behavior, transposable elements, careful observation, biological complexity, and patient experimentation' },
+  { id:'sagan', name:'Carl Sagan', field:'Astronomy & Science Communication', era:'20th century', monogram:'CS', category:'Science', lens:'cosmic perspective, skepticism, planetary science, evidence, public understanding of science, and scientific wonder' },
+  { id:'euclid', name:'Euclid', field:'Mathematics', era:'Ancient Greece', monogram:'EU', category:'Mathematics & Computing', lens:'axioms, proof, geometry, deductive structure, definitions, and rigorous mathematical construction' },
+  { id:'archimedes', name:'Archimedes', field:'Mathematics & Engineering', era:'Ancient Greece', monogram:'AR', category:'Mathematics & Computing', lens:'geometry, mechanics, approximation, leverage, buoyancy, and inventive mathematical problem-solving' },
+  { id:'hypatia', name:'Hypatia', field:'Mathematics & Philosophy', era:'Late Antiquity', monogram:'HY', category:'Mathematics & Computing', lens:'mathematical teaching, astronomy, geometry, philosophical inquiry, and preservation of mathematical traditions' },
+  { id:'euler', name:'Leonhard Euler', field:'Mathematics', era:'18th century', monogram:'LE', category:'Mathematics & Computing', lens:'analysis, graph theory, mechanics, notation, mathematical generalization, and prolific problem-solving' },
+  { id:'gauss', name:'Carl Friedrich Gauss', field:'Mathematics', era:'18th–19th century', monogram:'CFG', category:'Mathematics & Computing', lens:'number theory, statistics, geometry, astronomy, precision, and mathematical elegance' },
+  { id:'noether', name:'Emmy Noether', field:'Mathematics & Physics', era:'20th century', monogram:'EN', category:'Mathematics & Computing', lens:'abstract algebra, symmetry, invariants, conservation laws, and structural mathematical reasoning' },
+  { id:'ramanujan', name:'Srinivasa Ramanujan', field:'Mathematics', era:'20th century', monogram:'SR', category:'Mathematics & Computing', lens:'number theory, infinite series, partitions, intuition, identities, and pattern discovery' },
+  { id:'lovelace', name:'Ada Lovelace', field:'Mathematics & Computing', era:'19th century', monogram:'AL', category:'Mathematics & Computing', lens:'symbolic computation, algorithms, mathematical imagination, and the possibilities and limits of machines' },
+  { id:'turing', name:'Alan Turing', field:'Mathematics & Computing', era:'20th century', monogram:'T', category:'Mathematics & Computing', lens:'computation, algorithms, machine intelligence, formal reasoning, and cryptanalysis' },
+  { id:'von-neumann', name:'John von Neumann', field:'Mathematics & Computing', era:'20th century', monogram:'JVN', category:'Mathematics & Computing', lens:'game theory, computing architecture, quantum theory, numerical methods, strategy, and formal modeling' },
+  { id:'shannon', name:'Claude Shannon', field:'Information Theory', era:'20th century', monogram:'CSH', category:'Mathematics & Computing', lens:'information, entropy, coding, communication, Boolean logic, probability, and abstraction' },
+  { id:'hopper', name:'Grace Hopper', field:'Computing', era:'20th century', monogram:'GH', category:'Mathematics & Computing', lens:'programming languages, compilers, debugging, practical computing, standards, and making computers accessible' },
+  { id:'herodotus', name:'Herodotus', field:'History', era:'Classical Greece', monogram:'H', category:'History', lens:'historical inquiry, competing accounts, culture, causation, memory, and the limits of testimony' },
+  { id:'thucydides', name:'Thucydides', field:'History & Political Thought', era:'Classical Greece', monogram:'TH', category:'History', lens:'war, power, fear, interest, rhetoric, evidence, political decision-making, and human nature' },
+  { id:'plutarch', name:'Plutarch', field:'History & Biography', era:'Greco-Roman', monogram:'PL', category:'History', lens:'character, moral biography, leadership, comparison, civic virtue, and the relationship between personality and public action' },
+  { id:'ibn-khaldun', name:'Ibn Khaldun', field:'History & Social Theory', era:'Medieval', monogram:'IKH', category:'History', lens:'dynastic cycles, social cohesion, institutions, economic life, state formation, and historical causation' },
+  { id:'machiavelli', name:'Niccolò Machiavelli', field:'Political Thought & History', era:'Renaissance', monogram:'NM', category:'Strategy & Leadership', lens:'power, statecraft, republican institutions, fortune, necessity, military affairs, and political realism' },
+  { id:'sun-tzu', name:'Sun Tzu', field:'Strategy', era:'Ancient China', monogram:'ST', category:'Strategy & Leadership', lens:'strategy, deception, intelligence, terrain, adaptation, economy of force, and winning without unnecessary conflict' },
+  { id:'clausewitz', name:'Carl von Clausewitz', field:'Military Theory', era:'19th century', monogram:'CvC', category:'Strategy & Leadership', lens:'war and politics, friction, uncertainty, centers of gravity, escalation, and strategic judgment' },
+  { id:'gibbon', name:'Edward Gibbon', field:'History', era:'Enlightenment', monogram:'EG', category:'History', lens:'long-run historical causation, institutions, religion, civic life, sources, and decline' },
+  { id:'tocqueville', name:'Alexis de Tocqueville', field:'Political Thought & Sociology', era:'19th century', monogram:'AT', category:'Political Thought', lens:'democracy, equality, associations, local government, majority power, civic habits, and social change' },
+  { id:'lincoln', name:'Abraham Lincoln', field:'Politics & Leadership', era:'19th century', monogram:'ALN', category:'Strategy & Leadership', lens:'union, constitutional government, slavery, democratic persuasion, wartime leadership, and moral argument' },
+  { id:'douglass', name:'Frederick Douglass', field:'Politics & Literature', era:'19th century', monogram:'FD', category:'Political Thought', lens:'freedom, slavery, constitutional argument, rhetoric, human dignity, education, and civic equality' },
+  { id:'dubois', name:'W. E. B. Du Bois', field:'History & Sociology', era:'Modern', monogram:'WEB', category:'History', lens:'history, sociology, political economy, culture, evidence, institutions, and lived experience' },
+  { id:'churchill', name:'Winston Churchill', field:'Politics & History', era:'20th century', monogram:'WC', category:'Strategy & Leadership', lens:'wartime leadership, rhetoric, grand strategy, democratic resolve, historical analogy, and political judgment' },
+  { id:'adam-smith', name:'Adam Smith', field:'Economics & Moral Philosophy', era:'18th century', monogram:'AS', category:'Economics & Society', lens:'markets, specialization, moral sentiments, institutions, incentives, sympathy, and unintended coordination' },
+  { id:'marx', name:'Karl Marx', field:'Political Economy & Philosophy', era:'19th century', monogram:'KM', category:'Economics & Society', lens:'class, capital, labor, ideology, historical development, alienation, and political economy' },
+  { id:'weber', name:'Max Weber', field:'Sociology', era:'19th–20th century', monogram:'MW', category:'Economics & Society', lens:'bureaucracy, authority, rationalization, institutions, culture, vocation, and social explanation' },
+  { id:'durkheim', name:'Émile Durkheim', field:'Sociology', era:'19th–20th century', monogram:'ED', category:'Economics & Society', lens:'social facts, solidarity, institutions, norms, collective life, and empirical sociology' },
+  { id:'keynes', name:'John Maynard Keynes', field:'Economics', era:'20th century', monogram:'JMK', category:'Economics & Society', lens:'aggregate demand, uncertainty, investment, employment, expectations, macroeconomic policy, and practical economic judgment' },
+  { id:'hayek', name:'F. A. Hayek', field:'Economics & Political Thought', era:'20th century', monogram:'FAH', category:'Economics & Society', lens:'distributed knowledge, prices, spontaneous order, institutions, limits of central planning, and rule of law' },
+  { id:'schumpeter', name:'Joseph Schumpeter', field:'Economics', era:'20th century', monogram:'JS', category:'Economics & Society', lens:'entrepreneurship, innovation, creative destruction, capitalism, business cycles, and institutional change' },
+  { id:'freud', name:'Sigmund Freud', field:'Psychology', era:'19th–20th century', monogram:'SF', category:'Psychology', lens:'unconscious motives, conflict, defense, dreams, development, repression, and psychoanalytic interpretation' },
+  { id:'jung', name:'Carl Jung', field:'Psychology', era:'20th century', monogram:'CJ', category:'Psychology', lens:'archetypes, individuation, symbols, personality, dreams, myth, and the collective unconscious' },
+  { id:'pavlov', name:'Ivan Pavlov', field:'Physiology & Psychology', era:'19th–20th century', monogram:'IP', category:'Psychology', lens:'conditioning, experimental control, reflexes, learning, prediction, and behavioral physiology' },
+  { id:'skinner', name:'B. F. Skinner', field:'Psychology', era:'20th century', monogram:'BFS', category:'Psychology', lens:'operant conditioning, reinforcement, behavior, environment, experimental analysis, and learning' },
+  { id:'piaget', name:'Jean Piaget', field:'Developmental Psychology', era:'20th century', monogram:'JP', category:'Psychology', lens:'cognitive development, schemas, stages, adaptation, learning, and how children construct knowledge' },
+  { id:'vygotsky', name:'Lev Vygotsky', field:'Psychology & Education', era:'20th century', monogram:'LV', category:'Psychology', lens:'social learning, language, cultural tools, scaffolding, development, and the zone of proximal development' },
+  { id:'frankl', name:'Viktor Frankl', field:'Psychiatry & Psychology', era:'20th century', monogram:'VF', category:'Psychology', lens:'meaning, responsibility, suffering, freedom of attitude, logotherapy, and existential resilience' },
+  { id:'homer', name:'Homer', field:'Epic Poetry', era:'Ancient Greece', monogram:'HO', category:'Literature', lens:'heroism, fate, honor, war, homecoming, hospitality, character, and oral epic structure' },
+  { id:'dante', name:'Dante Alighieri', field:'Poetry & Theology', era:'Medieval', monogram:'DA', category:'Literature', lens:'moral order, political exile, spiritual journey, poetic architecture, symbolism, and judgment' },
+  { id:'shakespeare', name:'William Shakespeare', field:'Literature', era:'Renaissance', monogram:'WS', category:'Literature', lens:'character, rhetoric, tragedy, comedy, ambition, power, motive, language, and dramatic irony' },
+  { id:'cervantes', name:'Miguel de Cervantes', field:'Literature', era:'Early Modern', monogram:'MCV', category:'Literature', lens:'idealism and reality, narration, identity, parody, social class, imagination, and self-deception' },
+  { id:'milton', name:'John Milton', field:'Poetry & Political Thought', era:'17th century', monogram:'JM', category:'Literature', lens:'liberty, authority, conscience, epic form, temptation, obedience, rebellion, and religious imagination' },
+  { id:'goethe', name:'Johann Wolfgang von Goethe', field:'Literature & Science', era:'18th–19th century', monogram:'JG', category:'Literature', lens:'formation, striving, art, science, nature, desire, responsibility, and European humanism' },
+  { id:'austen', name:'Jane Austen', field:'Literature', era:'Regency', monogram:'JA', category:'Literature', lens:'character, social convention, moral judgment, irony, class, courtship, and self-knowledge' },
+  { id:'dickens', name:'Charles Dickens', field:'Literature', era:'19th century', monogram:'CD', category:'Literature', lens:'social class, institutions, poverty, character, moral sentiment, satire, and urban modernity' },
+  { id:'tolstoy', name:'Leo Tolstoy', field:'Literature & Moral Thought', era:'19th century', monogram:'LT', category:'Literature', lens:'history, family, war, moral responsibility, spiritual searching, ordinary life, and social institutions' },
+  { id:'dostoevsky', name:'Fyodor Dostoevsky', field:'Literature & Psychology', era:'19th century', monogram:'FDOS', category:'Literature', lens:'freedom, guilt, faith, nihilism, moral psychology, suffering, responsibility, and ideological conflict' },
+  { id:'twain', name:'Mark Twain', field:'Literature & Satire', era:'19th–20th century', monogram:'MT', category:'Literature', lens:'satire, hypocrisy, race, American identity, vernacular voice, moral convention, and social criticism' },
+  { id:'woolf', name:'Virginia Woolf', field:'Literature', era:'20th century', monogram:'VW', category:'Literature', lens:'consciousness, time, gender, perception, interior life, modernism, and literary form' },
+  { id:'orwell', name:'George Orwell', field:'Literature & Political Essay', era:'20th century', monogram:'GO', category:'Literature', lens:'language and politics, propaganda, totalitarianism, class, truth, clarity, and democratic socialism' },
+  { id:'borges', name:'Jorge Luis Borges', field:'Literature', era:'20th century', monogram:'JLB', category:'Literature', lens:'infinity, identity, libraries, labyrinths, memory, interpretation, metaphysics, and literary paradox' },
+  { id:'morrison', name:'Toni Morrison', field:'Literature', era:'20th–21st century', monogram:'TM', category:'Literature', lens:'memory, race, identity, history, language, community, trauma, and moral imagination' },
+  { id:'bach', name:'J. S. Bach', field:'Music', era:'Baroque', monogram:'JSB', category:'Music & Arts', lens:'counterpoint, harmony, form, sacred music, structure, variation, and disciplined musical craft' },
+  { id:'handel', name:'George Frideric Handel', field:'Music', era:'Baroque', monogram:'GFH', category:'Music & Arts', lens:'oratorio, opera, melody, dramatic pacing, large-form structure, adaptation, and public musical communication' },
+  { id:'vivaldi', name:'Antonio Vivaldi', field:'Music', era:'Baroque', monogram:'AV', category:'Music & Arts', lens:'concerto form, rhythm, instrumental color, sequence, contrast, and programmatic musical imagery' },
+  { id:'mozart', name:'Wolfgang Amadeus Mozart', field:'Music', era:'Classical', monogram:'WAM', category:'Music & Arts', lens:'clarity, balance, opera, characterization, formal proportion, melodic invention, and dramatic musical dialogue' },
+  { id:'beethoven', name:'L. van Beethoven', field:'Music', era:'Classical / Romantic', monogram:'LvB', category:'Music & Arts', lens:'motivic development, form, expressive architecture, struggle, transformation, and musical innovation' },
+  { id:'chopin', name:'Frédéric Chopin', field:'Music', era:'Romantic', monogram:'FC', category:'Music & Arts', lens:'piano idiom, lyricism, harmony, rubato, miniature forms, national style, and expressive nuance' },
+  { id:'debussy', name:'Claude Debussy', field:'Music', era:'Modern', monogram:'CDb', category:'Music & Arts', lens:'timbre, harmony, atmosphere, ambiguity, orchestral color, musical suggestion, and formal freedom' },
+  { id:'stravinsky', name:'Igor Stravinsky', field:'Music', era:'20th century', monogram:'IS', category:'Music & Arts', lens:'rhythm, orchestration, form, reinvention, primitivism, neoclassicism, and musical structure' },
+  { id:'ellington', name:'Duke Ellington', field:'Music', era:'20th century', monogram:'DE', category:'Music & Arts', lens:'jazz composition, orchestration, ensemble voice, swing, musical portraiture, improvisation, and American musical culture' },
+  { id:'bernstein', name:'Leonard Bernstein', field:'Music & Education', era:'20th century', monogram:'LB', category:'Music & Arts', lens:'conducting, musical analysis, theater, rhythm, public education, interpretation, and connections across musical traditions' },
+  { id:'leonardo', name:'Leonardo da Vinci', field:'Art, Engineering & Science', era:'Renaissance', monogram:'LDV', category:'Music & Arts', lens:'observation, anatomy, mechanics, drawing, design, proportion, curiosity, and integration of art and science' },
+  { id:'michelangelo', name:'Michelangelo', field:'Art & Architecture', era:'Renaissance', monogram:'MB', category:'Music & Arts', lens:'form, anatomy, sculpture, monumental design, artistic discipline, patronage, and expressive human figure' },
+  { id:'van-gogh', name:'Vincent van Gogh', field:'Art', era:'19th century', monogram:'VVG', category:'Music & Arts', lens:'color, perception, emotion, landscape, portraiture, artistic persistence, and expressive brushwork' }
 ];
 
 function symposiumEscape(value) { return escapeHtml(String(value ?? '')); }
@@ -23154,7 +23249,14 @@ function ensureSymposiumStyles() {
     .symposium-setup{padding:18px 20px 22px;display:grid;gap:16px}.symposium-setup label{display:grid;gap:7px;font-weight:700;font-size:.88rem}.symposium-setup input,.symposium-setup textarea,.symposium-setup select{width:100%;border:1px solid #cbd7e5;border-radius:11px;padding:10px 12px;background:white;color:#10233f;font:inherit;box-sizing:border-box}.symposium-setup textarea{min-height:105px;resize:vertical;line-height:1.45}
     .symposium-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.symposium-mode{position:relative}.symposium-mode input{position:absolute;opacity:0;pointer-events:none}.symposium-mode span{display:block;padding:11px 12px;border:1px solid #d3deea;border-radius:12px;background:#fbfdff;cursor:pointer;font-weight:800}.symposium-mode small{display:block;margin-top:3px;font-weight:500;color:#6b7c90}.symposium-mode input:checked+span{border-color:#c79a22;background:#fff8e6;box-shadow:inset 0 0 0 1px #e0b94d}
     .symposium-context-choice{display:flex;gap:8px;flex-wrap:wrap}.symposium-context-choice button,.symposium-mini-button{border:1px solid #cbd7e5;border-radius:999px;background:white;padding:7px 10px;font-weight:700;color:#24476e;cursor:pointer}.symposium-context-choice button:hover,.symposium-mini-button:hover{background:#f2f7fc}
-    .symposium-roster{max-height:355px;overflow:auto;padding-right:4px;display:grid;gap:8px}.symposium-person{display:grid;grid-template-columns:auto 42px 1fr;gap:9px;align-items:center;padding:9px;border:1px solid #e0e8f1;border-radius:12px;background:#fff;cursor:pointer}.symposium-person:has(input:checked){border-color:#c99f37;background:#fffaf0}.symposium-person input{width:auto}.symposium-avatar{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#173c66,#0c2340);color:#f2cc68;border:2px solid #e2bd52;font-family:Georgia,serif;font-size:.78rem;font-weight:800;box-shadow:0 4px 12px rgba(12,35,64,.15)}.symposium-person strong{display:block;font-size:.9rem}.symposium-person small{display:block;color:#718095;font-size:.76rem;margin-top:2px}
+    .symposium-roster{max-height:355px;overflow:auto;padding-right:4px;display:grid;gap:8px}
+    .symposium-roster-tools{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:8px;margin:7px 0 8px}
+    .symposium-roster-tools input,.symposium-roster-tools select{width:100%;min-width:0;border:1px solid #cbd7e4;border-radius:9px;padding:8px 9px;background:white;color:#17304e;font:inherit}
+    .symposium-roster-summary{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:.73rem;color:#718095;margin:0 0 6px}
+    .symposium-person[hidden]{display:none!important}
+    .symposium-person-category{display:inline-block;margin-left:5px;padding:1px 5px;border-radius:999px;background:#eef3f8;color:#52677f;font-size:.64rem;font-weight:700}
+    @media(max-width:560px){.symposium-roster-tools{grid-template-columns:1fr}}
+.symposium-person{display:grid;grid-template-columns:auto 42px 1fr;gap:9px;align-items:center;padding:9px;border:1px solid #e0e8f1;border-radius:12px;background:#fff;cursor:pointer}.symposium-person:has(input:checked){border-color:#c99f37;background:#fffaf0}.symposium-person input{width:auto}.symposium-avatar{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#173c66,#0c2340);color:#f2cc68;border:2px solid #e2bd52;font-family:Georgia,serif;font-size:.78rem;font-weight:800;box-shadow:0 4px 12px rgba(12,35,64,.15)}.symposium-person strong{display:block;font-size:.9rem}.symposium-person small{display:block;color:#718095;font-size:.76rem;margin-top:2px}
     .symposium-custom-row{display:grid;grid-template-columns:1fr auto;gap:8px}.symposium-custom-row button,.symposium-start{border:0;border-radius:11px;background:#0c2340;color:white;font-weight:800;padding:10px 14px;cursor:pointer}.symposium-start{width:100%;padding:13px 16px;color:#f3cc67}.symposium-start:disabled{opacity:.55;cursor:wait}
     .symposium-stage{min-height:720px;display:flex;flex-direction:column}.symposium-stage-toolbar{padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #e3eaf2;background:#fbfdff;flex-wrap:wrap}.symposium-stage-status{font-weight:800;color:#395a7d}.symposium-stage-actions{display:flex;gap:8px;flex-wrap:wrap}.symposium-stage-actions button{border:1px solid #cbd7e5;background:white;color:#24476e;border-radius:9px;padding:7px 10px;cursor:pointer;font-weight:700}
     .symposium-transcript{padding:20px;display:flex;flex-direction:column;gap:14px;min-height:430px;max-height:680px;overflow:auto;background:linear-gradient(180deg,#fff,#fbfdff)}
@@ -23203,6 +23305,22 @@ function symposiumSelectedPeople(root) {
     .map((input)=>SYMPOSIUM_PARTICIPANTS.find((person)=>person.id===input.value))
     .filter(Boolean);
 }
+
+function symposiumCategoryOptions() {
+  return [...new Set(SYMPOSIUM_PARTICIPANTS.map((person)=>person.category || person.field || 'Other'))]
+    .sort((a,b)=>a.localeCompare(b));
+}
+
+function symposiumPersonSearchText(person) {
+  return [
+    person.name,
+    person.field,
+    person.era,
+    person.category,
+    person.lens
+  ].filter(Boolean).join(' ').toLocaleLowerCase();
+}
+
 
 function symposiumTurnHtml({name, monogram='?', field='', text='', kind='participant', sourceLabel=''}) {
   const safeKind = kind === 'user' ? 'user' : (kind === 'moderator' ? 'moderator' : 'participant');
@@ -23332,9 +23450,26 @@ function renderSymposium() {
             </label>
 
             <div>
-              <label>Participants <span style="font-weight:500;color:#718095">(choose 1–6)</span></label>
+              <label>Participants <span style="font-weight:500;color:#718095">(choose up to 6 from ${SYMPOSIUM_PARTICIPANTS.length})</span></label>
+              <div class="symposium-roster-tools">
+                <input id="symposium-person-search" type="search" placeholder="Search thinkers, fields, eras, or ideas…" autocomplete="off">
+                <select id="symposium-category-filter" aria-label="Filter Symposium participants by category">
+                  <option value="">All categories</option>
+                  ${symposiumCategoryOptions().map((category)=>`<option value="${symposiumEscape(category)}">${symposiumEscape(category)}</option>`).join('')}
+                </select>
+              </div>
+              <div class="symposium-roster-summary">
+                <span id="symposium-roster-count">${SYMPOSIUM_PARTICIPANTS.length} built-in personalities</span>
+                <span>Custom guests can still be added below</span>
+              </div>
               <div class="symposium-roster" id="symposium-roster">
-                ${SYMPOSIUM_PARTICIPANTS.map((person)=>`<label class="symposium-person"><input type="checkbox" data-symposium-person value="${person.id}" ${defaultChecked.has(person.id)?'checked':''}><span class="symposium-avatar">${symposiumEscape(person.monogram)}</span><span><strong>${symposiumEscape(person.name)}</strong><small>${symposiumEscape(person.field)} · ${symposiumEscape(person.era)}</small></span></label>`).join('')}
+                ${SYMPOSIUM_PARTICIPANTS.map((person)=>`<label class="symposium-person"
+                    data-symposium-category="${symposiumEscape(person.category || person.field || 'Other')}"
+                    data-symposium-search="${symposiumEscape(symposiumPersonSearchText(person))}">
+                  <input type="checkbox" data-symposium-person value="${person.id}" ${defaultChecked.has(person.id)?'checked':''}>
+                  <span class="symposium-avatar">${symposiumEscape(person.monogram)}</span>
+                  <span><strong>${symposiumEscape(person.name)}</strong><small>${symposiumEscape(person.field)} · ${symposiumEscape(person.era)} <span class="symposium-person-category">${symposiumEscape(person.category || 'Other')}</span></small></span>
+                </label>`).join('')}
               </div>
             </div>
 
@@ -23373,7 +23508,33 @@ function renderSymposium() {
   const readerButton = root.querySelector('#symposium-reader-submit');
   const startButton = root.querySelector('#symposium-start');
   const rosterEl = root.querySelector('#symposium-roster');
+  const personSearchEl = root.querySelector('#symposium-person-search');
+  const categoryFilterEl = root.querySelector('#symposium-category-filter');
+  const rosterCountEl = root.querySelector('#symposium-roster-count');
   const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'' };
+
+  const filterSymposiumRoster = () => {
+    const query = String(personSearchEl?.value || '').trim().toLocaleLowerCase();
+    const category = String(categoryFilterEl?.value || '').trim();
+    let visible = 0;
+
+    rosterEl?.querySelectorAll('.symposium-person').forEach((row) => {
+      const matchesQuery = !query || String(row.dataset.symposiumSearch || '').includes(query);
+      const matchesCategory = !category || row.dataset.symposiumCategory === category;
+      const show = matchesQuery && matchesCategory;
+      row.hidden = !show;
+      if (show) visible += 1;
+    });
+
+    if (rosterCountEl) {
+      rosterCountEl.textContent = query || category
+        ? `${visible} of ${SYMPOSIUM_PARTICIPANTS.length} personalities shown`
+        : `${SYMPOSIUM_PARTICIPANTS.length} built-in personalities`;
+    }
+  };
+
+  personSearchEl?.addEventListener('input', filterSymposiumRoster);
+  categoryFilterEl?.addEventListener('change', filterSymposiumRoster);
 
   const scrollTranscript = () => { transcriptEl.scrollTop = transcriptEl.scrollHeight; };
   const shouldSpeak = () => session.output === 'both' || session.output === 'speak';
@@ -23404,7 +23565,10 @@ function renderSymposium() {
   rosterEl.addEventListener('change', (event)=>{
     if (!event.target.matches('[data-symposium-person]')) return;
     const checked = symposiumSelectedPeople(root);
-    if (checked.length > 6) { event.target.checked = false; window.alert('Choose up to six participants for a readable discussion.'); }
+    if (checked.length > 6) {
+      event.target.checked = false;
+      window.alert('Choose up to six participants for a readable discussion. You can swap speakers between sessions.');
+    }
   });
 
   root.querySelector('#symposium-add-person').addEventListener('click',()=>{
@@ -23413,10 +23577,19 @@ function renderSymposium() {
     if (!name) return;
     const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
     const monogram = name.split(/\s+/).slice(0,2).map((part)=>part[0]?.toUpperCase() || '').join('');
-    const person = { id, name, field:'Guest thinker', era:'Custom', monogram:monogram || '?', lens:`the published work, arguments, methods, and intellectual context of ${name}` };
+    const person = { id, name, field:'Guest thinker', era:'Custom', monogram:monogram || '?', category:'Guest', lens:`the published work, arguments, methods, and intellectual context of ${name}` };
     SYMPOSIUM_PARTICIPANTS.push(person);
-    rosterEl.insertAdjacentHTML('afterbegin', `<label class="symposium-person"><input type="checkbox" data-symposium-person value="${symposiumEscape(id)}" checked><span class="symposium-avatar">${symposiumEscape(person.monogram)}</span><span><strong>${symposiumEscape(name)}</strong><small>Guest thinker · Custom</small></span></label>`);
+    rosterEl.insertAdjacentHTML('afterbegin', `<label class="symposium-person"
+      data-symposium-category="Guest"
+      data-symposium-search="${symposiumEscape(symposiumPersonSearchText(person))}">
+      <input type="checkbox" data-symposium-person value="${symposiumEscape(id)}" checked>
+      <span class="symposium-avatar">${symposiumEscape(person.monogram)}</span>
+      <span><strong>${symposiumEscape(name)}</strong><small>Guest thinker · Custom <span class="symposium-person-category">Guest</span></small></span>
+    </label>`);
     input.value = '';
+    if (personSearchEl) personSearchEl.value = '';
+    if (categoryFilterEl) categoryFilterEl.value = '';
+    filterSymposiumRoster();
   });
 
   async function moderatorOpening() {
