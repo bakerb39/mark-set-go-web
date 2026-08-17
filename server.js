@@ -6008,7 +6008,6 @@ app.post('/api/read-anything/adapt', async (req, res) => {
   }
 });
 
-app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 /* Topic Feeds beta ---------------------------------------------------------
    User-defined RSS/Atom or website sources. Website URLs are converted to a
    topic-filtered Google News RSS query for that domain. Custom URLs are
@@ -6205,6 +6204,9 @@ app.post('/api/topic-feeds/fetch', async (req, res) => {
       .json({error:error?.message || 'Unable to refresh topic feeds.'});
   }
 });
+
+// SPA fallback must come after every API route so it cannot intercept API requests.
+app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 let server = null;
 let topicFeedMorningTimer = null;
