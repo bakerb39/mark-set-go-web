@@ -34,11 +34,15 @@ const WEB_CAPTURE_CACHE = new Map();
 const WEB_CAPTURE_TTL_MS = 10 * 60 * 1000;
 const TOPIC_ARTICLE_CACHE = new Map();
 const TOPIC_ARTICLE_CACHE_TTL_MS = 18 * 60 * 60 * 1000;
-const CRYPTO_TICKER_CACHE_TTL_MS = 60 * 1000;
+const CRYPTO_TICKER_CACHE_TTL_MS = 10 * 60 * 1000;
+const CRYPTO_TICKER_RATE_LIMIT_BACKOFF_MS = 15 * 60 * 1000;
+const CRYPTO_TICKER_MIN_RETRY_MS = 30 * 1000;
 const MARKET_INDEX_CACHE_TTL_MS = 60 * 1000;
 let marketIndexCache = { fetchedAt: 0, data: null };
 
 let cryptoTickerCache = { fetchedAt: 0, data: null };
+let cryptoTickerBackoffUntil = 0;
+let cryptoTickerLastAttemptAt = 0;
 
 
 const GUTENBERG_MIRROR_BASES = (process.env.GUTENBERG_MIRROR_BASES || process.env.GUTENBERG_MIRROR_BASE || 'https://gutenberg.pglaf.org,https://mirrors.xmission.com/gutenberg').split(',').map((value) => value.trim().replace(/\/+$/, '')).filter(Boolean);
@@ -6109,9 +6113,53 @@ app.get('/api/market-indexes', async (_req, res) => {
 app.get('/api/crypto-ticker', async (_req, res) => {
   const now = Date.now();
 
+  const sendCached = (extra = {}) => res.json({
+    ...cryptoTickerCache.data,
+    cached: true,
+    ...extra
+  });
+
+  const sendTemporarilyUnavailable = (retryAfterMs = CRYPTO_TICKER_MIN_RETRY_MS) => {
+    const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+    res.set('Retry-After', String(retryAfterSeconds));
+    return res.status(503).json({
+      error: 'Cryptocurrency prices are temporarily unavailable. Retrying shortly.',
+      retryAfterSeconds
+    });
+  };
+
   if (cryptoTickerCache.data && now - cryptoTickerCache.fetchedAt < CRYPTO_TICKER_CACHE_TTL_MS) {
-    return res.json({ ...cryptoTickerCache.data, cached: true });
+    return sendCached();
   }
+
+  // CoinGecko can rate-limit shared cloud IPs. Once that happens, do not keep
+  // sending provider requests on every browser refresh. Keep the last good
+  // ticker visible when possible and wait out a server-side backoff window.
+  if (now < cryptoTickerBackoffUntil) {
+    const retryAfterMs = cryptoTickerBackoffUntil - now;
+    res.set('Retry-After', String(Math.max(1, Math.ceil(retryAfterMs / 1000))));
+    if (cryptoTickerCache.data) {
+      return sendCached({
+        stale: true,
+        warning: 'Live cryptocurrency prices are temporarily unavailable; showing the last successful values.'
+      });
+    }
+    return sendTemporarilyUnavailable(retryAfterMs);
+  }
+
+  // Coalesce rapid refreshes/tabs into one provider attempt window.
+  if (cryptoTickerLastAttemptAt && now - cryptoTickerLastAttemptAt < CRYPTO_TICKER_MIN_RETRY_MS) {
+    const retryAfterMs = CRYPTO_TICKER_MIN_RETRY_MS - (now - cryptoTickerLastAttemptAt);
+    if (cryptoTickerCache.data) {
+      return sendCached({
+        stale: true,
+        warning: 'Live cryptocurrency prices are refreshing; showing the last successful values.'
+      });
+    }
+    return sendTemporarilyUnavailable(retryAfterMs);
+  }
+
+  cryptoTickerLastAttemptAt = now;
 
   const ids = [
     ['bitcoin', 'BTC', 'Bitcoin'],
@@ -6140,7 +6188,7 @@ app.get('/api/crypto-ticker', async (_req, res) => {
     });
 
     if (!response.ok) {
-      const error = new Error(`Crypto price provider returned HTTP ${response.status}.`);
+      const error = new Error('Cryptocurrency prices are temporarily unavailable.');
       error.status = response.status;
       throw error;
     }
@@ -6170,30 +6218,35 @@ app.get('/api/crypto-ticker', async (_req, res) => {
       fetchedAt: new Date().toISOString()
     };
 
-    cryptoTickerCache = { fetchedAt: now, data };
+    cryptoTickerBackoffUntil = 0;
+    cryptoTickerCache = { fetchedAt: Date.now(), data };
     return res.json({ ...data, cached: false });
   } catch (error) {
-    // If the public provider is temporarily rate-limited/unavailable, keep the
-    // last successful strip visible rather than blanking the user's header.
+    if (error?.status === 429) {
+      cryptoTickerBackoffUntil = Date.now() + CRYPTO_TICKER_RATE_LIMIT_BACKOFF_MS;
+    }
+
+    // Keep the last successful strip visible through provider outages/rate limits.
     if (cryptoTickerCache.data) {
-      return res.json({
-        ...cryptoTickerCache.data,
-        cached: true,
+      return sendCached({
         stale: true,
-        warning: error?.message || 'Live cryptocurrency prices are temporarily unavailable.'
+        warning: 'Live cryptocurrency prices are temporarily unavailable; showing the last successful values.'
       });
     }
 
-    return res.status(error?.status === 429 ? 429 : 502).json({
+    if (error?.status === 429) {
+      return sendTemporarilyUnavailable(CRYPTO_TICKER_RATE_LIMIT_BACKOFF_MS);
+    }
+
+    return res.status(502).json({
       error: error?.name === 'AbortError'
         ? 'Cryptocurrency prices took too long to respond.'
-        : error?.message || 'Cryptocurrency prices are temporarily unavailable.'
+        : 'Cryptocurrency prices are temporarily unavailable.'
     });
   } finally {
     clearTimeout(timeout);
   }
 });
-
 
 app.post('/api/topic-feeds/fetch', async (req, res) => {
   try {
