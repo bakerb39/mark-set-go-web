@@ -11,7 +11,7 @@
       ask: 'Ask Mark',
       notebook: 'Mark’s Notebook',
       avatar: '/assets/ask-mark/ask-mark-avatar.png',
-      home: '/assets/walkthrough/mark-walkthrough-guide.png',
+      home: '/assets/ask-mark/ask-mark-avatar.png',
       description: 'Your thoughtful general reading companion'
     }),
     beth: Object.freeze({

@@ -133,7 +133,7 @@
     return `
       <div class="askmark-premium" data-askmark-premium>
         <header class="askmark-hero">
-          <button class="askmark-close" type="button" data-askmark-close aria-label="Close ${companionAsk()}">×</button>
+          <button class="askmark-close" type="button" data-askmark-close aria-label="Close ${companionAsk()}" style="pointer-events:auto;z-index:50;touch-action:manipulation">×</button>
           <div class="askmark-avatar-wrap" aria-hidden="true">
             <span class="askmark-avatar-glow"></span>
             <img class="askmark-avatar" src="${companionAvatar()}" alt="${companionName()}">
@@ -804,13 +804,13 @@
 
   function closeAskMarkPanel(event) {
     event?.preventDefault?.();
-    event?.stopPropagation?.();
+    event?.stopImmediatePropagation?.();
 
     const layout = document.getElementById('reader-layout');
     if (!layout) return false;
 
-    // Use the Reader's canonical right-pane state directly. This is the same
-    // state used by #toggle-mark-panel in app.js.
+    // The Reader owns right-pane visibility with this class. Close that state
+    // directly so the X never depends on which Companion/Tools tab is active.
     layout.classList.add('word-panel-hidden');
 
     const markButton = document.getElementById('toggle-mark-panel');
@@ -819,24 +819,35 @@
     toolsButton?.setAttribute('aria-pressed', 'false');
     markButton?.classList.add('pane-closed');
     toolsButton?.classList.add('pane-closed');
+
     return true;
   }
+
+  function installGlobalAskMarkClose() {
+    // Bind above the Reader lifecycle. The Reader can rebuild the entire chat
+    // shell, but this document-level handler remains alive and catches the new X.
+    if (document.documentElement.dataset.askmarkGlobalCloseBound === '1') return;
+    document.documentElement.dataset.askmarkGlobalCloseBound = '1';
+
+    const handleClose = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const closeButton = target.closest('[data-askmark-close]');
+      if (!closeButton) return;
+      closeAskMarkPanel(event);
+    };
+
+    // pointerdown makes mouse/touch close immediate; click also supports keyboard
+    // activation. The operation is idempotent, so receiving both is harmless.
+    document.addEventListener('pointerdown', handleClose, true);
+    document.addEventListener('click', handleClose, true);
+  }
+
+  installGlobalAskMarkClose();
 
   function bindPremiumEvents() {
     installAskMarkScrollIsolation();
 
-    // Bind once to the stable shell, not to the X button itself. The premium
-    // header can be rebuilt while the Reader is alive; delegation keeps the X
-    // working after those rebuilds without observing the DOM. Capture phase
-    // ensures older target-level handlers cannot swallow the close click first.
-    if (shell && shell.dataset.askmarkCloseBound !== '1') {
-      shell.dataset.askmarkCloseBound = '1';
-      shell.addEventListener('click', (event) => {
-        const closeButton = event.target.closest?.('[data-askmark-close]');
-        if (!closeButton || !shell.contains(closeButton)) return;
-        closeAskMarkPanel(event);
-      }, true);
-    }
     $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
     $$('[data-askmark-view]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView(button.dataset.askmarkView)));
     $$('[data-askmark-back]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView('chat')));
