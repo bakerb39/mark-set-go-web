@@ -1,9 +1,9 @@
-/* Mark, Set, Go! Workspace Experiment v0.4.3 */
+/* Mark, Set, Go! Workspace Experiment v0.4.6 */
 /* Mark, Set, Go! workspace experiment */
 .msg-workspace-shell{
-  --msg-secondary-width: 520px;
+  --msg-secondary-width: 360px;
   display:grid;
-  grid-template-columns:minmax(0,1fr) 8px minmax(340px,var(--msg-secondary-width));
+  grid-template-columns:minmax(0,1fr) 8px minmax(360px,var(--msg-secondary-width));
   width:100%;
   min-width:0;
   align-items:stretch;
@@ -126,7 +126,7 @@ body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
 }
 
 .msg-workspace-shell:not(.is-closed){
-  grid-template-columns:minmax(640px,1fr) 8px minmax(420px,var(--msg-secondary-width));
+  grid-template-columns:minmax(640px,1fr) 8px minmax(360px,var(--msg-secondary-width));
 }
 
 /* Compact workspace chrome */
@@ -354,7 +354,7 @@ body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
     width:calc(100vw - 16px) !important;
   }
   .msg-workspace-shell:not(.is-closed){
-    grid-template-columns:minmax(500px,1fr) 8px minmax(380px,var(--msg-secondary-width));
+    grid-template-columns:minmax(500px,1fr) 8px minmax(360px,var(--msg-secondary-width));
   }
 }
 
@@ -630,9 +630,9 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
 }
 
 
-/* v0.4.3 — keep the speed/music/fullscreen cluster attached to the Reader
-   while the workspace divider changes Reader width. This intentionally beats
-   older absolute-position !important rules from button-feedback.css. */
+/* v0.4.6 — Reader controls while a workspace pane is open.
+   WPM remains in its original footer. Only font resize + music + Full screen
+   share the Reader's upper-right flex row, so all three follow Reader width. */
 #app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-pane-controls{
   align-items:center !important;
 }
@@ -647,9 +647,11 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
   gap:8px !important;
   width:auto !important;
   transform:none !important;
+  flex:0 0 auto !important;
 }
-#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .viewer-wpm-control,
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .msg-workspace-font-resize-control,
 #app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .reader-topright-music-toggle,
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack [data-reader-wpm-music-toggle],
 #app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .viewer-fullscreen-button{
   position:static !important;
   inset:auto !important;
@@ -661,9 +663,9 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
   transform:none !important;
   flex:0 0 auto !important;
 }
-#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .viewer-wpm-control{
-  display:inline-flex !important;
-  align-items:center !important;
-  justify-content:center !important;
-  grid-column:auto !important;
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-viewer-footer .viewer-wpm-control{
+  position:static !important;
+  inset:auto !important;
+  margin-left:auto !important;
+  transform:none !important;
 }

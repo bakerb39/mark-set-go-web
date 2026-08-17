@@ -1,4 +1,4 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v0.4.5 */
+/* Mark, Set, Go! lightweight workspace pane runtime v0.4.6 */
 (() => {
   'use strict';
 
@@ -111,15 +111,22 @@
   // Never let a secondary page manufacture another Reader. Reader-bound actions
   // belong to the already-mounted Reader in the outer application.
   document.addEventListener('click', (event) => {
-    const suggestedMusic = event.target.closest?.('.book-music-link');
+    const clickedLink = event.target.closest?.('a[href]');
+    const suggestedMusic = event.target.closest?.('.book-music-link')
+      || (clickedLink?.closest?.('.book-music-recommendations') ? clickedLink : null);
     if (suggestedMusic?.href) {
       try {
         const target = new URL(suggestedMusic.href, location.href);
         const query = target.searchParams.get('search_query') || target.searchParams.get('q') || '';
-        if (query) {
+        const label = String(suggestedMusic.textContent || 'Suggested music').replace(/^\s*♫\s*/, '').trim();
+        const isSuggestion = Boolean(query) && (
+          suggestedMusic.classList.contains('book-music-link')
+          || Boolean(suggestedMusic.closest('.book-music-recommendations'))
+          || /reading mood|adaptation score|film or tv score|music score/i.test(label)
+        );
+        if (isSuggestion) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          const label = String(suggestedMusic.textContent || 'Suggested music').replace(/^\s*♫\s*/, '').trim();
           requestParentMusicSearch(query, label || 'Suggested music');
           return;
         }

@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.4.4
+ * Mark, Set, Go! Workspace Experiment v0.4.6
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -224,90 +224,125 @@
   const PANELS = new Map();
   const PANEL_ORDER = [];
   let activePanelKey = '';
-  let secondaryWidth = Math.max(420, Math.min(760, Math.round(window.innerWidth * 0.42)));
-  let workspaceWpmHomeMarker = null;
+  const MIN_SECONDARY_WIDTH = 360;
+  let secondaryWidth = MIN_SECONDARY_WIDTH;
+  const readerControlOrigins = new WeakMap();
+  const movedReaderControls = new Set();
+
+  const WORKSPACE_MUSIC_FALLBACKS = [
+    { id:'classical-reading', title:'Classical Reading', type:'playlist', youtubeId:'PLe4JMT6isxp-rx1IRUeEo0puoloL2N9NQ', test:/classical|score|soundtrack|cinematic|orchestral|epic|historical|war|roman|greek|medieval|period|philosoph|scholarly/i },
+    { id:'classical-piano', title:'Classical Piano', type:'playlist', youtubeId:'PLgW6PU42e5RLa6NENfz5kusVilq58Cojm', test:/piano|romantic|austen|bronte|warm|nostalg|drawing room|regency/i },
+    { id:'rain-focus', title:'Rain Focus', type:'playlist', youtubeId:'OLAK5uy_lN5SVZjZwWb3XM5BIKUreV5wRCD0VLsqQ', test:/rain|storm|nature|forest|river|ocean|sea|ship|whale/i },
+    { id:'deep-focus', title:'Deep Focus', type:'playlist', youtubeId:'PLUrnxvhuvpSU0b2YvM4Gf1V3bHnLAcvBj', test:/focus|study|science|essay|treatise|theology|ethics|politic/i },
+    { id:'lofi-study', title:'Lofi Study Radio', type:'video', youtubeId:'jfKfPfyJRdk', test:/lofi|lo-fi|jazz|1920|evening|chill/i },
+    { id:'ambient-reading', title:'Ambient Reading', type:'playlist', youtubeId:'OLAK5uy_nCi20x1Eo0ZW2q_cfufw06g2Bvn8a4u-c', test:/ambient|mystery|detective|gothic|horror|fantasy|magic|adventure|mood|reading/i }
+  ];
+
+  async function workspaceClerkToken() {
+    try {
+      const clerk = window.Clerk;
+      if (!clerk) return '';
+      if (clerk.loaded === false && typeof clerk.load === 'function') await clerk.load();
+      return String(await clerk.session?.getToken?.() || '');
+    } catch {
+      return '';
+    }
+  }
+
+  function rememberReaderControlOrigin(node) {
+    if (!node || readerControlOrigins.has(node)) return;
+    readerControlOrigins.set(node, { parent:node.parentNode, next:node.nextSibling });
+    movedReaderControls.add(node);
+  }
+
+  function findReaderFontResizeControl(primary) {
+    if (!primary) return null;
+    const named = primary.querySelector([
+      '.reader-font-size-control', '.reader-font-control', '.reader-text-size-control',
+      '[data-reader-font-size-control]', '[data-reader-text-size-control]',
+      '[role="group"][aria-label*="font size" i]', '[role="group"][aria-label*="text size" i]'
+    ].join(','));
+    if (named && !named.closest('.viewer-wpm-control,.reader-viewer-footer')) return named;
+
+    const buttons = [...primary.querySelectorAll('button')];
+    for (const minus of buttons) {
+      if (minus.closest('.viewer-wpm-control,.reader-viewer-footer')) continue;
+      const minusText = String(minus.textContent || '').trim();
+      const minusLabel = `${minus.getAttribute('aria-label') || ''} ${minus.title || ''}`.toLowerCase();
+      const looksMinus = /^[−-]$/.test(minusText) || (/font|text/.test(minusLabel) && /decrease|smaller|minus/.test(minusLabel));
+      if (!looksMinus) continue;
+      let parent = minus.parentElement;
+      for (let depth = 0; parent && depth < 3; depth += 1, parent = parent.parentElement) {
+        if (parent.matches?.('.viewer-wpm-control,.reader-viewer-footer')) break;
+        const directButtons = [...parent.children].filter((node) => node instanceof HTMLButtonElement);
+        const plus = directButtons.find((button) => {
+          const text = String(button.textContent || '').trim();
+          const label = `${button.getAttribute('aria-label') || ''} ${button.title || ''}`.toLowerCase();
+          return /^[+＋]$/.test(text) || (/font|text/.test(label) && /increase|larger|plus/.test(label));
+        });
+        if (plus && directButtons.length <= 4) return parent;
+      }
+    }
+    return null;
+  }
 
   function dockReaderTopControlsForWorkspace() {
     const shell = workspaceShell();
     if (!shell || shell.classList.contains('is-closed')) return;
-
-    const paneControls = shell.querySelector('.msg-workspace-primary .reader-pane-controls');
+    const primary = shell.querySelector('.msg-workspace-primary');
+    const paneControls = primary?.querySelector('.reader-pane-controls');
+    const footer = primary?.querySelector('.reader-viewer-footer');
+    const wpm = primary?.querySelector('.viewer-wpm-control');
+    if (footer && wpm && wpm.parentElement !== footer) footer.appendChild(wpm);
     if (!paneControls) return;
 
+    const fullscreen = primary.querySelector('#toggle-reader-fullscreen');
+    const music = primary.querySelector('.reader-topright-music-toggle,[data-reader-wpm-music-toggle]');
     let stack = paneControls.querySelector('.reader-topright-media-stack');
-    const fullscreen = paneControls.querySelector('#toggle-reader-fullscreen');
-    if (!fullscreen) return;
-
-    if (!stack) {
+    if (!stack && fullscreen) {
       stack = document.createElement('div');
       stack.className = 'reader-topright-media-stack';
-      stack.setAttribute('aria-label', 'Reader speed, media, and fullscreen controls');
-      fullscreen.parentNode.insertBefore(stack, fullscreen);
+      stack.setAttribute('aria-label', 'Reader display controls');
+      fullscreen.parentNode?.insertBefore(stack, fullscreen);
       stack.appendChild(fullscreen);
     }
+    if (!stack) return;
 
-    const wpm = shell.querySelector('.msg-workspace-primary .viewer-wpm-control');
-    if (wpm && !stack.contains(wpm)) {
-      const marker = document.createElement('span');
-      marker.hidden = true;
-      marker.dataset.msgWorkspaceWpmHome = '1';
-      wpm.parentNode?.insertBefore(marker, wpm);
-      workspaceWpmHomeMarker = marker;
-      wpm.dataset.msgWorkspaceDocked = '1';
-      stack.insertBefore(wpm, stack.firstChild);
+    if (music && music.parentElement !== stack) stack.insertBefore(music, stack.firstChild);
+    const fontControl = findReaderFontResizeControl(primary);
+    if (fontControl && fontControl !== stack && !stack.contains(fontControl)) {
+      rememberReaderControlOrigin(fontControl);
+      stack.insertBefore(fontControl, stack.firstChild);
+      fontControl.classList.add('msg-workspace-font-resize-control');
     }
+    if (fullscreen && fullscreen.parentElement !== stack) stack.appendChild(fullscreen);
 
-    // Keep one predictable order at the Reader's right edge. Moving existing
-    // nodes preserves every listener already installed by app.js/music code.
-    const liveWpm = stack.querySelector('.viewer-wpm-control');
-    const liveMusic = stack.querySelector('[data-reader-wpm-music-toggle]');
-    if (liveWpm && stack.firstElementChild !== liveWpm) stack.insertBefore(liveWpm, stack.firstElementChild);
-    if (liveMusic) {
-      if (liveWpm) stack.insertBefore(liveMusic, liveWpm.nextSibling);
-      else if (stack.firstElementChild !== liveMusic) stack.insertBefore(liveMusic, stack.firstElementChild);
-    }
-    if (fullscreen && stack.lastElementChild !== fullscreen) stack.appendChild(fullscreen);
+    stack.dataset.msgWorkspaceAnchored = '1';
+    stack.style.setProperty('display', 'inline-flex', 'important');
+    stack.style.setProperty('flex-direction', 'row', 'important');
+    stack.style.setProperty('align-items', 'center', 'important');
+    stack.style.setProperty('justify-content', 'flex-end', 'important');
+    stack.style.setProperty('gap', '8px', 'important');
+    stack.style.setProperty('margin-left', 'auto', 'important');
+    stack.style.setProperty('position', 'static', 'important');
   }
 
   function restoreReaderTopControlsAfterWorkspace() {
+    for (const node of [...movedReaderControls]) {
+      const origin = readerControlOrigins.get(node);
+      if (node?.isConnected && origin?.parent?.isConnected) {
+        const before = origin.next?.parentNode === origin.parent ? origin.next : null;
+        origin.parent.insertBefore(node, before);
+        node.classList.remove('msg-workspace-font-resize-control');
+      }
+      movedReaderControls.delete(node);
+    }
     const shell = workspaceShell();
-    const wpm = shell?.querySelector('.msg-workspace-primary [data-msg-workspace-docked="1"]');
-    const marker = workspaceWpmHomeMarker?.isConnected
-      ? workspaceWpmHomeMarker
-      : shell?.querySelector('.msg-workspace-primary [data-msg-workspace-wpm-home="1"]');
-    if (wpm && marker?.parentNode) {
-      marker.parentNode.insertBefore(wpm, marker);
-      marker.remove();
-      delete wpm.dataset.msgWorkspaceDocked;
-    }
-    workspaceWpmHomeMarker = null;
+    shell?.querySelectorAll('.reader-topright-media-stack[data-msg-workspace-anchored="1"]').forEach((stack) => {
+      delete stack.dataset.msgWorkspaceAnchored;
+      ['display','flex-direction','align-items','justify-content','gap','margin-left','position'].forEach((prop) => stack.style.removeProperty(prop));
+    });
   }
-
-
-  async function workspaceClerkToken() {
-    const candidates = [
-      () => window.Clerk?.session?.getToken?.(),
-      () => window.MarkSetGoAuth?.getToken?.(),
-      () => window.MarkSetGoAuth?.session?.getToken?.()
-    ];
-    for (const getToken of candidates) {
-      try {
-        const token = await getToken();
-        if (typeof token === 'string' && token.trim()) return token.trim();
-      } catch {}
-    }
-    return '';
-  }
-
-  const WORKSPACE_MUSIC_FALLBACKS = [
-    { id:'lofi-study', title:'Lofi Study Radio', category:'Reading mood', type:'video', youtubeId:'jfKfPfyJRdk', test:/lofi|beats|study|coffee|casual/i },
-    { id:'sleepy-lofi', title:'Sleepy Lofi', category:'Reading mood', type:'video', youtubeId:'rUxyKA_-grg', test:/sleep|evening|night|soft|calm/i },
-    { id:'classical-piano', title:'Classical Piano', category:'Reading mood', type:'playlist', youtubeId:'PLgW6PU42e5RLa6NENfz5kusVilq58Cojm', test:/piano|romantic|austen|bronte|regency/i },
-    { id:'rain-focus', title:'Rain & Focus', category:'Reading mood', type:'playlist', youtubeId:'OLAK5uy_lN5SVZjZwWb3XM5BIKUreV5wRCD0VLsqQ', test:/rain|nature|forest|ocean|sea|storm|river/i },
-    { id:'deep-focus', title:'Deep Focus', category:'Reading mood', type:'playlist', youtubeId:'PLUrnxvhuvpSU0b2YvM4Gf1V3bHnLAcvBj', test:/scholar|philosoph|science|history|essay|treatise|focus/i },
-    { id:'classical-reading', title:'Classical Reading', category:'Reading score', type:'playlist', youtubeId:'PLe4JMT6isxp-rx1IRUeEo0puoloL2N9NQ', test:/classical|orchestral|score|soundtrack|historical|ancient|greek|roman|medieval|war|epic|period/i },
-    { id:'ambient-reading', title:'Ambient Reading', category:'Reading mood', type:'playlist', youtubeId:'OLAK5uy_nCi20x1Eo0ZW2q_cfufw06g2Bvn8a4u-c', test:/ambient|mystery|gothic|fantasy|space|dark|atmospheric/i }
-  ];
 
   function workspaceFallbackMusic(query, title, reason = '') {
     const key = `${query || ''} ${title || ''}`;
@@ -346,7 +381,7 @@
 
   async function workspaceYouTubeSearch(query, title = 'YouTube search') {
     const cleanQuery = String(query || '').trim();
-    if (!cleanQuery) return;
+    if (!cleanQuery) return false;
 
     const dock = document.querySelector('#music-dock');
     const player = document.querySelector('#music-player');
@@ -355,12 +390,14 @@
     const nowSource = document.querySelector('#music-now-source');
     const nextButton = document.querySelector('#music-next');
 
-    if (nowTitle) nowTitle.textContent = String(title || 'YouTube search');
-    if (nowSource) nowSource.textContent = 'Searching YouTube…';
+    // Give the click an immediate, playable result. The live YouTube lookup then
+    // replaces this fallback if it succeeds. This keeps Suggested music and
+    // Reading mood responsive even when YouTube search or auth is unavailable.
+    workspaceFallbackMusic(cleanQuery, title, 'finding live match');
+    if (nowTitle) nowTitle.textContent = String(title || 'Suggested music');
+    if (nowSource) nowSource.textContent = 'Finding live YouTube match…';
     if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
     if (playerWrap) playerWrap.hidden = false;
-    if (player) player.src = '';
-    if (nextButton) nextButton.hidden = true;
 
     const request = async (token = '') => {
       const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
@@ -374,20 +411,13 @@
     };
 
     try {
-      let token = await workspaceClerkToken();
-      let result = await request(token);
-
-      // Clerk can finish restoring the browser session a fraction after app.js.
-      // Retry an auth failure once with a freshly requested session token.
-      if ((result.response.status === 401 || result.response.status === 403)) {
-        await new Promise((resolve) => window.setTimeout(resolve, 250));
-        const refreshedToken = await workspaceClerkToken();
-        if (refreshedToken && refreshedToken !== token) {
-          token = refreshedToken;
-          result = await request(token);
-        }
+      // Match the normal app first: the same-origin Clerk session cookie is
+      // normally enough. Only retry with an explicit Clerk token on 401/403.
+      let result = await request('');
+      if (result.response.status === 401 || result.response.status === 403) {
+        const token = await workspaceClerkToken();
+        if (token) result = await request(token);
       }
-
       if (!result.response.ok) {
         throw new Error(result.payload?.detail || result.payload?.error || `Music search failed (HTTP ${result.response.status}).`);
       }
@@ -399,44 +429,28 @@
 
       const search = { query: cleanQuery, title: String(title || 'YouTube search'), videoIds, index: 0 };
       const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoIds[0])}?autoplay=1&playsinline=1&rel=0`;
-      const choice = {
-        title: search.title,
-        source: `YouTube result 1 of ${videoIds.length}`,
-        provider: 'youtube',
-        src,
-        search
-      };
-
-      if (typeof window.playMusic === 'function') {
-        window.playMusic(choice);
-      } else {
-        if (nowTitle) nowTitle.textContent = choice.title;
-        if (nowSource) nowSource.textContent = choice.source;
-        if (player) player.src = src;
-        if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
-        if (playerWrap) playerWrap.hidden = false;
-        if (nextButton) nextButton.hidden = videoIds.length < 2;
-      }
+      if (nowTitle) nowTitle.textContent = search.title;
+      if (nowSource) nowSource.textContent = `YouTube result 1 of ${videoIds.length}`;
+      if (player) player.src = src;
+      if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
+      if (playerWrap) playerWrap.hidden = false;
+      if (nextButton) nextButton.hidden = videoIds.length < 2;
 
       try {
         localStorage.setItem('markSetGoMusic', JSON.stringify({
-          title: choice.title,
-          source: choice.source,
-          provider: 'youtube',
+          title:search.title,
+          source:`YouTube result 1 of ${videoIds.length}`,
+          provider:'youtube',
           src,
           search
         }));
       } catch {}
+      return true;
     } catch (error) {
       const reason = String(error?.message || 'live search unavailable').replace(/\s+/g, ' ').trim().slice(0, 90);
-      const recovered = workspaceFallbackMusic(cleanQuery, title, reason);
-      if (!recovered) {
-        if (nowSource) nowSource.textContent = reason || 'Music search failed';
-        if (player) player.src = '';
-        if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
-        if (playerWrap) playerWrap.hidden = false;
-      }
-      console.warn('Workspace music search failed; fallback used:', error);
+      workspaceFallbackMusic(cleanQuery, title, reason);
+      console.warn('Workspace live music search failed; retained playable fallback:', error);
+      return true;
     }
   }
 
@@ -518,15 +532,22 @@
   // music player instead of opening a separate YouTube tab.
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : event.target?.parentElement;
-    const link = target?.closest?.('.book-music-link');
+    const clickedLink = target?.closest?.('a[href]');
+    const link = target?.closest?.('.book-music-link')
+      || (clickedLink?.closest?.('.book-music-recommendations') ? clickedLink : null);
     if (!link?.href) return;
     try {
       const url = new URL(link.href, window.location.href);
       const query = url.searchParams.get('search_query') || url.searchParams.get('q') || '';
-      if (!query) return;
+      const label = String(link.textContent || 'Suggested music').replace(/^\s*♫\s*/, '').trim();
+      const isSuggestion = Boolean(query) && (
+        link.classList.contains('book-music-link')
+        || Boolean(link.closest('.book-music-recommendations'))
+        || /reading mood|adaptation score|film or tv score|music score/i.test(label)
+      );
+      if (!isSuggestion) return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      const label = String(link.textContent || 'Suggested music').replace(/^\s*♫\s*/, '').trim();
       workspaceYouTubeSearch(query, label || 'Suggested music');
     } catch {}
   }, true);
@@ -643,7 +664,7 @@
     const move = (event) => {
       if (pointerId == null || event.pointerId !== pointerId) return;
       const rect = shell.getBoundingClientRect();
-      const minSecondary = 360;
+      const minSecondary = MIN_SECONDARY_WIDTH;
       const minPrimary = 520;
       const proposed = Math.round(rect.right - event.clientX);
       secondaryWidth = Math.max(minSecondary, Math.min(proposed, Math.max(minSecondary, rect.width - minPrimary - 8)));
@@ -719,6 +740,8 @@
 
     if (activePanelKey !== key) detachActivePanel();
     activePanelKey = key;
+    const wasClosed = shell.classList.contains('is-closed');
+    if (wasClosed) secondaryWidth = MIN_SECONDARY_WIDTH;
     shell.classList.remove('is-closed');
     shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
     window.requestAnimationFrame(dockReaderTopControlsForWorkspace);
