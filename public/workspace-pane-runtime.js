@@ -1,4 +1,4 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v0.4.6 */
+/* Mark, Set, Go! lightweight workspace pane runtime v0.4.8 */
 (() => {
   'use strict';
 
@@ -47,7 +47,7 @@
     const cleanQuery = String(query || '').trim();
     if (!cleanQuery) return false;
     try {
-      const direct = parent?.MSGWorkspaceExperiment?.musicSearch;
+      const direct = parent?.MSGMusicController?.search || parent?.MSGWorkspaceExperiment?.musicSearch;
       if (typeof direct === 'function') {
         direct(cleanQuery, String(title || 'Suggested music'));
         return true;

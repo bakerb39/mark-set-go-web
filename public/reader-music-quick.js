@@ -17,6 +17,8 @@
 
   let chooser = null;
   let speedButton = null;
+  let fontControl = null;
+  let controllerSearchState = null;
 
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -39,11 +41,6 @@
       if (doc?.title) return String(doc.title).trim();
     } catch {}
     return String(document.querySelector('.reader-title-copy h1')?.textContent || '').trim();
-  }
-
-
-  function playerApi() {
-    return window.MarkSetGoMusicPlayer || null;
   }
 
   function musicKey(title) {
@@ -94,6 +91,7 @@
   }
 
   function playInDock({ title, source, provider = '', src }) {
+    controllerSearchState = null;
     const parts = playerParts();
     if (!parts.dock || !parts.iframe || !src) return;
 
@@ -108,7 +106,10 @@
       parts.minimize.textContent = '—';
       parts.minimize.setAttribute('aria-label', 'Minimize music player');
     }
-    if (parts.next) parts.next.hidden = true;
+    if (parts.next) {
+      parts.next.hidden = true;
+      delete parts.next.dataset.msgMusicControllerSearch;
+    }
 
     try {
       localStorage.setItem('markSetGoMusic', JSON.stringify({
@@ -117,6 +118,140 @@
     } catch {}
 
     closeChooser({ keepDock: true });
+  }
+
+  function playControllerSearchCandidate(index) {
+    const state = controllerSearchState;
+    if (!state?.videoIds?.length) return false;
+    const parts = playerParts();
+    if (!parts.dock || !parts.iframe) return false;
+    const safeIndex = ((Number(index) || 0) % state.videoIds.length + state.videoIds.length) % state.videoIds.length;
+    state.index = safeIndex;
+    const videoId = state.videoIds[safeIndex];
+    if (parts.title) parts.title.textContent = state.title || 'Suggested music';
+    if (parts.source) parts.source.textContent = `YouTube result ${safeIndex + 1} of ${state.videoIds.length}`;
+    parts.iframe.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?autoplay=1&playsinline=1&rel=0`;
+    parts.dock.hidden = false;
+    parts.dock.classList.remove('minimized');
+    if (parts.wrap) parts.wrap.hidden = false;
+    if (parts.minimize) {
+      parts.minimize.hidden = false;
+      parts.minimize.textContent = '—';
+      parts.minimize.setAttribute('aria-label', 'Minimize music player');
+    }
+    if (parts.next) {
+      parts.next.hidden = state.videoIds.length < 2;
+      parts.next.dataset.msgMusicControllerSearch = '1';
+    }
+    try {
+      localStorage.setItem('markSetGoMusic', JSON.stringify({
+        title: state.title || 'Suggested music',
+        source: 'YouTube search',
+        provider: 'youtube',
+        src: parts.iframe.src
+      }));
+    } catch {}
+    closeChooser({ keepDock: true });
+    return true;
+  }
+
+  async function searchYouTubeInMainPlayer(query, title = 'Suggested music') {
+    const cleanQuery = String(query || '').trim();
+    if (!cleanQuery) return false;
+    const parts = playerParts();
+    if (!parts.dock || !parts.iframe) return false;
+
+    // React immediately to the click. Even if the server lookup fails, the user
+    // should never be left with a link that appears dead.
+    controllerSearchState = null;
+    if (parts.title) parts.title.textContent = String(title || 'Suggested music');
+    if (parts.source) parts.source.textContent = 'Searching YouTube…';
+    parts.iframe.src = '';
+    parts.dock.hidden = false;
+    parts.dock.classList.remove('minimized');
+    if (parts.wrap) parts.wrap.hidden = false;
+    if (parts.minimize) parts.minimize.hidden = false;
+    if (parts.next) {
+      parts.next.hidden = true;
+      delete parts.next.dataset.msgMusicControllerSearch;
+    }
+
+    try {
+      const response = await fetch(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`, {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: { 'Accept': 'application/json' }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || `Music search failed (${response.status}).`);
+      const videoIds = Array.isArray(payload.videoIds)
+        ? payload.videoIds.map((id) => String(id || '').trim()).filter((id) => /^[\w-]{6,20}$/.test(id))
+        : [];
+      if (!videoIds.length) throw new Error('No playable YouTube results were found.');
+      controllerSearchState = { query: cleanQuery, title: String(title || 'Suggested music'), videoIds, index: 0 };
+      return playControllerSearchCandidate(0);
+    } catch (error) {
+      controllerSearchState = null;
+      if (parts.source) parts.source.textContent = error?.message || 'Music search failed.';
+      if (parts.iframe) parts.iframe.src = '';
+      return false;
+    }
+  }
+
+  function readerFontSelect() {
+    return document.querySelector('#app #font-size');
+  }
+
+  function adjustReaderFont(direction) {
+    const select = readerFontSelect();
+    if (!select) return;
+    const sizes = [...select.options]
+      .map((option) => Number(option.value))
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b);
+    if (!sizes.length) return;
+    const current = Number(select.value) || sizes[0];
+    let index = sizes.findIndex((size) => size === current);
+    if (index < 0) index = sizes.reduce((best, size, i) => Math.abs(size - current) < Math.abs(sizes[best] - current) ? i : best, 0);
+    const next = sizes[Math.max(0, Math.min(sizes.length - 1, index + (direction < 0 ? -1 : 1)))];
+    if (!Number.isFinite(next) || next === current) return;
+    select.value = String(next);
+    select.dispatchEvent(new Event('input', { bubbles: true }));
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  function ensureTopRightFontControl(stack) {
+    if (!stack) return null;
+    let control = stack.querySelector('.reader-topright-font-control');
+    if (!control) {
+      control = document.createElement('div');
+      control.className = 'reader-topright-font-control';
+      control.setAttribute('role', 'group');
+      control.setAttribute('aria-label', 'Reader text size');
+      control.innerHTML = `
+        <button type="button" data-reader-font-step="down" aria-label="Decrease reader text size" title="Decrease text size">−</button>
+        <span aria-hidden="true">|</span>
+        <button type="button" data-reader-font-step="up" aria-label="Increase reader text size" title="Increase text size">+</button>`;
+      control.querySelector('[data-reader-font-step="down"]')?.addEventListener('click', () => adjustReaderFont(-1));
+      control.querySelector('[data-reader-font-step="up"]')?.addEventListener('click', () => adjustReaderFont(1));
+    }
+    fontControl = control;
+    return control;
+  }
+
+  function suggestedMusicLink(event) {
+    const link = event.target instanceof Element ? event.target.closest('a.book-music-link, .book-music-recommendations a') : null;
+    if (!link) return null;
+    try {
+      const url = new URL(link.href, location.href);
+      const query = url.searchParams.get('search_query') || url.searchParams.get('q') || '';
+      if (!query) return null;
+      return {
+        link,
+        query,
+        title: String(link.textContent || 'Suggested music').replace(/^\s*♫\s*/, '').trim() || 'Suggested music'
+      };
+    } catch { return null; }
   }
 
   function playQuick(choice) {
@@ -194,24 +329,6 @@
             <strong>${esc(document.querySelector('#music-now-title')?.textContent || 'Music')}</strong>
           </div>` : ''}
 
-        ${currentReaderTitle() ? `
-          <div class="reader-music-compact-field">
-            <span>Suggested for this reading</span>
-            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-              <button type="button" class="reader-music-compact-manage" data-wpm-music-suggested>
-                ♫ Play suggestion
-              </button>
-              <button type="button" class="reader-music-compact-manage" data-wpm-music-mood>
-                ◇ Reading mood
-              </button>
-              <button type="button" class="reader-music-compact-manage" data-wpm-music-next-result
-                ${playerApi()?.getState?.().hasSearchResults ? '' : 'disabled'}
-                title="Try another result from the current recommendation">
-                ↻ Other result
-              </button>
-            </div>
-          </div>` : ''}
-
         <label class="reader-music-compact-field">
           <span>My saved playlists</span>
           <select data-wpm-music-preferred-select ${preferred.length ? '' : 'disabled'}>
@@ -261,24 +378,6 @@
       if (!id) return;
       playQuick(QUICK_CHOICES.find((item) => item.id === id));
       event.target.value = '';
-    });
-
-
-    chooser.querySelector('[data-wpm-music-suggested]')?.addEventListener('click', () => {
-      const started = playerApi()?.playSuggestedForCurrentReading?.();
-      if (started) closeChooser({ keepDock: true });
-    });
-
-    chooser.querySelector('[data-wpm-music-mood]')?.addEventListener('click', () => {
-      const started = playerApi()?.playReadingMoodForCurrentReading?.();
-      if (started) closeChooser({ keepDock: true });
-    });
-
-    chooser.querySelector('[data-wpm-music-next-result]')?.addEventListener('click', () => {
-      if (playerApi()?.nextResult?.()) {
-        // Keep the chooser open so the reader can continue cycling if desired.
-        renderChooser();
-      }
     });
 
     chooser.querySelector('[data-wpm-music-manage]')?.addEventListener('click', () => {
@@ -335,244 +434,59 @@
     });
   }
 
-
-  function changeReaderFont(delta) {
-    const select = document.querySelector('#app #font-size');
-    if (!select) return;
-
-    const values = Array.from(select.options || [])
-      .map((option) => Number(option.value))
-      .filter(Number.isFinite)
-      .sort((a, b) => a - b);
-
-    const current = Number(select.value) || 14;
-    let next = current;
-
-    if (values.length) {
-      next = delta > 0
-        ? (values.find((value) => value > current) ?? values[values.length - 1])
-        : ([...values].reverse().find((value) => value < current) ?? values[0]);
-    } else {
-      next = Math.max(10, Math.min(40, current + delta * 2));
-    }
-
-    if (next === current) return;
-
-    select.value = String(next);
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-
-    const fullscreenSelect = document.querySelector('#app #fs-font-size');
-    if (fullscreenSelect) fullscreenSelect.value = String(next);
-  }
-
-  function bindKeyboardActivation(node, action) {
-    if (!node || node.dataset.quickBound === '1') return;
-    node.dataset.quickBound = '1';
-
-    node.addEventListener('click', action);
-    node.addEventListener('keydown', (event) => {
-      if (event.key !== 'Enter' && event.key !== ' ') return;
-      event.preventDefault();
-      action();
-    });
-  }
-
   function insertTopRightMusicButton() {
     const paneControls = document.querySelector('#app .reader-pane-controls');
     const fullscreenButton = paneControls?.querySelector('#toggle-reader-fullscreen');
-
     if (!paneControls || !fullscreenButton) {
       speedButton = null;
+      fontControl = null;
       return;
     }
 
-    // Remove only old implementations. The new toolbar uses an ID and no
-    // presentation classes so existing CSS cannot tint/re-skin the visible items.
-    paneControls.querySelectorAll(
-      '.reader-compact-toolbar, .reader-quick-tools, .reader-topright-media-stack, #reader-flat-quick-tools'
-    ).forEach((node) => {
-      if (node.contains(fullscreenButton)) {
-        node.parentNode?.insertBefore(fullscreenButton, node);
-      }
-      node.remove();
+    // Remove any older top-row font widget before installing the single shared
+    // control below. This never touches the Reader footer/WPM or Settings panel.
+    paneControls.querySelectorAll('.reader-font-size-control, .reader-font-control, .reader-text-size-control, [data-reader-font-size-control], [data-reader-text-size-control], [role="group"][aria-label*="font size" i], [role="group"][aria-label*="text size" i]').forEach((node) => {
+      if (!node.classList.contains('reader-topright-font-control')) node.remove();
     });
 
-    // Keep the real music trigger because it owns the existing chooser behavior.
-    let musicButton = paneControls.querySelector('[data-reader-wpm-music-toggle]');
-    if (!musicButton) {
-      musicButton = document.createElement('button');
-      musicButton.type = 'button';
-      musicButton.dataset.readerWpmMusicToggle = '1';
-      musicButton.setAttribute('aria-label', 'Open my reading playlists');
-      musicButton.setAttribute('aria-controls', 'reader-music-wpm-chooser');
-      musicButton.setAttribute('aria-expanded', 'false');
-      musicButton.title = 'My reading playlists';
-      musicButton.innerHTML = '<span aria-hidden="true">♫</span>';
+    // One owner, one layout: text size, music, and Full screen are literal
+    // siblings in this same div. No control is absolutely positioned.
+    let stack = paneControls.querySelector('.reader-topright-media-stack');
+    if (!stack) {
+      stack = document.createElement('div');
+      stack.className = 'reader-topright-media-stack';
+      stack.setAttribute('aria-label', 'Reader text, music, and fullscreen controls');
+      fullscreenButton.parentNode.insertBefore(stack, fullscreenButton);
+    }
 
-      musicButton.addEventListener('click', () => {
+    const textSize = ensureTopRightFontControl(stack);
+
+    let button = stack.querySelector('[data-reader-wpm-music-toggle]');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'reader-topright-music-toggle';
+      button.dataset.readerWpmMusicToggle = '1';
+      button.setAttribute('aria-label', 'Open my reading playlists');
+      button.setAttribute('aria-controls', 'reader-music-wpm-chooser');
+      button.setAttribute('aria-expanded', 'false');
+      button.title = 'My reading playlists';
+      button.innerHTML = '<span aria-hidden="true">▶</span>';
+
+      button.addEventListener('click', () => {
         ensureChooser();
         if (chooser && !chooser.hidden) closeChooser();
         else openChooser();
       });
-
-      paneControls.appendChild(musicButton);
     }
 
-    // Hide the real trigger visually without adding a styling class.
-    [
-      ['position', 'absolute'],
-      ['width', '1px'],
-      ['height', '1px'],
-      ['padding', '0'],
-      ['margin', '-1px'],
-      ['overflow', 'hidden'],
-      ['clip', 'rect(0 0 0 0)'],
-      ['clip-path', 'inset(50%)'],
-      ['white-space', 'nowrap'],
-      ['border', '0']
-    ].forEach(([property, value]) => {
-      musicButton.style.setProperty(property, value, 'important');
-    });
+    // Enforce exact sibling order on every sync.
+    if (textSize && textSize.parentElement !== stack) stack.appendChild(textSize);
+    if (button.parentElement !== stack) stack.appendChild(button);
+    if (fullscreenButton.parentElement !== stack) stack.appendChild(fullscreenButton);
+    [textSize, button, fullscreenButton].filter(Boolean).forEach((node) => stack.appendChild(node));
 
-    const tools = document.createElement('div');
-    tools.id = 'reader-flat-quick-tools';
-    tools.setAttribute('aria-label', 'Reader quick controls');
-    tools.innerHTML = `
-      <span id="reader-font-group" aria-label="Reader font size">
-        <span id="reader-font-minus" role="button" tabindex="0" aria-label="Decrease reader font size" title="Smaller text">−</span>
-        <span id="reader-font-inner-divider" aria-hidden="true"></span>
-        <span id="reader-font-plus" role="button" tabindex="0" aria-label="Increase reader font size" title="Larger text">+</span>
-      </span>
-      <span id="reader-font-outer-divider" aria-hidden="true"></span>
-      <span id="reader-music-flat-trigger" role="button" tabindex="0" aria-label="Open reading media" title="Reading media">▶</span>
-    `;
-    paneControls.appendChild(tools);
-
-    bindKeyboardActivation(
-      tools.querySelector('#reader-font-minus'),
-      () => changeReaderFont(-1)
-    );
-    bindKeyboardActivation(
-      tools.querySelector('#reader-font-plus'),
-      () => changeReaderFont(1)
-    );
-    bindKeyboardActivation(
-      tools.querySelector('#reader-music-flat-trigger'),
-      () => musicButton.click()
-    );
-
-    paneControls.style.setProperty('position', 'relative', 'important');
-    paneControls.style.setProperty('overflow', 'visible', 'important');
-
-    // Completely flat toolbar: no background, border, shadow, radius, or class styling.
-    tools.style.setProperty('position', 'absolute', 'important');
-    tools.style.setProperty('display', 'inline-flex', 'important');
-    tools.style.setProperty('align-items', 'center', 'important');
-    tools.style.setProperty('height', '34px', 'important');
-    tools.style.setProperty('padding', '0', 'important');
-    tools.style.setProperty('margin', '0', 'important');
-    tools.style.setProperty('background', 'transparent', 'important');
-    tools.style.setProperty('border', '0', 'important');
-    tools.style.setProperty('border-radius', '0', 'important');
-    tools.style.setProperty('box-shadow', 'none', 'important');
-    tools.style.setProperty('z-index', '40', 'important');
-    tools.style.setProperty('white-space', 'nowrap', 'important');
-
-    const fontGroup = tools.querySelector('#reader-font-group');
-    fontGroup.style.setProperty('display', 'inline-flex', 'important');
-    fontGroup.style.setProperty('align-items', 'center', 'important');
-    fontGroup.style.setProperty('height', '34px', 'important');
-    fontGroup.style.setProperty('padding', '0 10px', 'important');
-    fontGroup.style.setProperty('margin', '0', 'important');
-    fontGroup.style.setProperty('background', '#0b2e4f', 'important');
-    fontGroup.style.setProperty('border', '1px solid rgba(255,255,255,.08)', 'important');
-    fontGroup.style.setProperty('border-radius', '8px', 'important');
-    fontGroup.style.setProperty('box-shadow', '0 2px 7px rgba(10,30,50,.18)', 'important');
-
-    const minus = tools.querySelector('#reader-font-minus');
-    const plus = tools.querySelector('#reader-font-plus');
-
-    [minus, plus].forEach((item) => {
-      item.style.setProperty('display', 'inline-flex', 'important');
-      item.style.setProperty('align-items', 'center', 'important');
-      item.style.setProperty('justify-content', 'center', 'important');
-      item.style.setProperty('width', '22px', 'important');
-      item.style.setProperty('height', '34px', 'important');
-      item.style.setProperty('padding', '0', 'important');
-      item.style.setProperty('margin', '0', 'important');
-      item.style.setProperty('background', 'transparent', 'important');
-      item.style.setProperty('border', '0', 'important');
-      item.style.setProperty('border-radius', '0', 'important');
-      item.style.setProperty('box-shadow', 'none', 'important');
-
-      // Deliberately dark neutral ink, not blue/white-on-blue.
-      item.style.setProperty('color', '#ffffff', 'important');
-      item.style.setProperty('-webkit-text-fill-color', '#ffffff', 'important');
-      item.style.setProperty('font-family', 'Arial, sans-serif', 'important');
-      item.style.setProperty('font-size', '15px', 'important');
-      item.style.setProperty('font-weight', '600', 'important');
-      item.style.setProperty('line-height', '1', 'important');
-      item.style.setProperty('opacity', '1', 'important');
-      item.style.setProperty('filter', 'none', 'important');
-      item.style.setProperty('text-shadow', 'none', 'important');
-      item.style.setProperty('cursor', 'pointer', 'important');
-      item.style.setProperty('user-select', 'none', 'important');
-    });
-
-    const innerDivider = tools.querySelector('#reader-font-inner-divider');
-    innerDivider.style.setProperty('display', 'block', 'important');
-    innerDivider.style.setProperty('width', '1px', 'important');
-    innerDivider.style.setProperty('height', '16px', 'important');
-    innerDivider.style.setProperty('margin', '0 8px', 'important');
-    innerDivider.style.setProperty('background', 'rgba(255,255,255,.55)', 'important');
-    innerDivider.style.setProperty('flex', '0 0 1px', 'important');
-
-    const outerDivider = tools.querySelector('#reader-font-outer-divider');
-    outerDivider.style.setProperty('display', 'block', 'important');
-    outerDivider.style.setProperty('width', '1px', 'important');
-    outerDivider.style.setProperty('height', '18px', 'important');
-    outerDivider.style.setProperty('margin', '0 14px', 'important');
-    outerDivider.style.setProperty('background', '#9ca3af', 'important');
-    outerDivider.style.setProperty('flex', '0 0 1px', 'important');
-
-    const musicProxy = tools.querySelector('#reader-music-flat-trigger');
-    musicProxy.style.setProperty('display', 'inline-flex', 'important');
-    musicProxy.style.setProperty('align-items', 'center', 'important');
-    musicProxy.style.setProperty('justify-content', 'center', 'important');
-    musicProxy.style.setProperty('width', '24px', 'important');
-    musicProxy.style.setProperty('height', '34px', 'important');
-    musicProxy.style.setProperty('padding', '0', 'important');
-    musicProxy.style.setProperty('margin', '0', 'important');
-    musicProxy.style.setProperty('background', 'transparent', 'important');
-    musicProxy.style.setProperty('border', '0', 'important');
-    musicProxy.style.setProperty('box-shadow', 'none', 'important');
-    musicProxy.style.setProperty('color', '#0b2e4f', 'important');
-    musicProxy.style.setProperty('-webkit-text-fill-color', '#0b2e4f', 'important');
-    musicProxy.style.setProperty('font-size', '14px', 'important');
-    musicProxy.style.setProperty('font-weight', '600', 'important');
-    musicProxy.style.setProperty('cursor', 'pointer', 'important');
-    musicProxy.style.setProperty('user-select', 'none', 'important');
-
-    const controlsRect = paneControls.getBoundingClientRect();
-    const fullRect = fullscreenButton.getBoundingClientRect();
-    const toolsRect = tools.getBoundingClientRect();
-
-    // Clear, deliberate whitespace between music and Full screen.
-    const gapToFullscreen = 24;
-    const left = Math.max(
-      0,
-      fullRect.left - controlsRect.left - toolsRect.width - gapToFullscreen
-    );
-    const top =
-      fullRect.top - controlsRect.top +
-      (fullRect.height - toolsRect.height) / 2;
-
-    tools.style.setProperty('left', `${Math.round(left)}px`, 'important');
-    tools.style.setProperty('right', 'auto', 'important');
-    tools.style.setProperty('top', `${Math.round(top)}px`, 'important');
-    tools.style.setProperty('bottom', 'auto', 'important');
-
-    speedButton = musicButton;
+    speedButton = button;
   }
 
   function sync() {
@@ -592,22 +506,31 @@
       'body > .reader-music-quick-toggle, body > .reader-music-quick-panel'
     ).forEach((node) => node.remove());
 
-    // Clean up every prior Reader-music placement before creating the current
-    // top-right control.
     removeLegacyWpmMusicControls();
-
     ensureChooser();
     sync();
 
-    // Event-driven only. No MutationObserver.
-
-
+    // Finite/event-driven resyncs only. No MutationObserver.
+    [80, 250, 700, 1500].forEach((delay) => window.setTimeout(sync, delay));
     document.addEventListener('marksetgo:document-available', () => window.setTimeout(sync, 0));
+    window.addEventListener('pageshow', () => window.setTimeout(sync, 0));
 
+    document.addEventListener('click', (event) => {
+      const suggestion = suggestedMusicLink(event);
+      if (suggestion) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void searchYouTubeInMainPlayer(suggestion.query, suggestion.title);
+        return;
+      }
 
-    document.addEventListener('marksetgo:music-player-updated', () => {
-      if (chooser && !chooser.hidden) renderChooser();
-    });
+      // Reader/menu navigation can rebuild the Reader. Schedule a finite sync
+      // after those explicit user actions instead of watching DOM mutations.
+      if (event.target instanceof Element && event.target.closest('[data-action="reader"], [data-action="home"], [data-action="music"]')) {
+        window.setTimeout(sync, 80);
+        window.setTimeout(sync, 260);
+      }
+    }, true);
 
     document.addEventListener('marksetgo:music-store-ready', () => {
       if (chooser && !chooser.hidden) renderChooser();
@@ -622,11 +545,25 @@
       if (choice) playQuick(choice);
     });
 
+    document.querySelector('#music-next')?.addEventListener('click', (event) => {
+      if (!controllerSearchState?.videoIds?.length) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      playControllerSearchCandidate(controllerSearchState.index + 1);
+    }, true);
+
     document.querySelector('#music-close')?.addEventListener('click', () => {
+      controllerSearchState = null;
       if (chooser) chooser.hidden = true;
       speedButton?.setAttribute('aria-expanded', 'false');
     });
   }
+
+  window.MSGMusicController = Object.freeze({
+    search: (query, title) => searchYouTubeInMainPlayer(query, title),
+    syncControls: () => sync(),
+    playQuick: (id) => playQuick(QUICK_CHOICES.find((choice) => choice.id === id))
+  });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init, { once:true });

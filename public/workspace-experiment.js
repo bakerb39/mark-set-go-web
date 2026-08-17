@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.4.6
+ * Mark, Set, Go! Workspace Experiment v0.4.8
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -226,238 +226,37 @@
   let activePanelKey = '';
   const MIN_SECONDARY_WIDTH = 360;
   let secondaryWidth = MIN_SECONDARY_WIDTH;
-  const readerControlOrigins = new WeakMap();
-  const movedReaderControls = new Set();
-
-  const WORKSPACE_MUSIC_FALLBACKS = [
-    { id:'classical-reading', title:'Classical Reading', type:'playlist', youtubeId:'PLe4JMT6isxp-rx1IRUeEo0puoloL2N9NQ', test:/classical|score|soundtrack|cinematic|orchestral|epic|historical|war|roman|greek|medieval|period|philosoph|scholarly/i },
-    { id:'classical-piano', title:'Classical Piano', type:'playlist', youtubeId:'PLgW6PU42e5RLa6NENfz5kusVilq58Cojm', test:/piano|romantic|austen|bronte|warm|nostalg|drawing room|regency/i },
-    { id:'rain-focus', title:'Rain Focus', type:'playlist', youtubeId:'OLAK5uy_lN5SVZjZwWb3XM5BIKUreV5wRCD0VLsqQ', test:/rain|storm|nature|forest|river|ocean|sea|ship|whale/i },
-    { id:'deep-focus', title:'Deep Focus', type:'playlist', youtubeId:'PLUrnxvhuvpSU0b2YvM4Gf1V3bHnLAcvBj', test:/focus|study|science|essay|treatise|theology|ethics|politic/i },
-    { id:'lofi-study', title:'Lofi Study Radio', type:'video', youtubeId:'jfKfPfyJRdk', test:/lofi|lo-fi|jazz|1920|evening|chill/i },
-    { id:'ambient-reading', title:'Ambient Reading', type:'playlist', youtubeId:'OLAK5uy_nCi20x1Eo0ZW2q_cfufw06g2Bvn8a4u-c', test:/ambient|mystery|detective|gothic|horror|fantasy|magic|adventure|mood|reading/i }
-  ];
-
-  async function workspaceClerkToken() {
-    try {
-      const clerk = window.Clerk;
-      if (!clerk) return '';
-      if (clerk.loaded === false && typeof clerk.load === 'function') await clerk.load();
-      return String(await clerk.session?.getToken?.() || '');
-    } catch {
-      return '';
-    }
-  }
-
-  function rememberReaderControlOrigin(node) {
-    if (!node || readerControlOrigins.has(node)) return;
-    readerControlOrigins.set(node, { parent:node.parentNode, next:node.nextSibling });
-    movedReaderControls.add(node);
-  }
-
-  function findReaderFontResizeControl(primary) {
-    if (!primary) return null;
-    const named = primary.querySelector([
-      '.reader-font-size-control', '.reader-font-control', '.reader-text-size-control',
-      '[data-reader-font-size-control]', '[data-reader-text-size-control]',
-      '[role="group"][aria-label*="font size" i]', '[role="group"][aria-label*="text size" i]'
-    ].join(','));
-    if (named && !named.closest('.viewer-wpm-control,.reader-viewer-footer')) return named;
-
-    const buttons = [...primary.querySelectorAll('button')];
-    for (const minus of buttons) {
-      if (minus.closest('.viewer-wpm-control,.reader-viewer-footer')) continue;
-      const minusText = String(minus.textContent || '').trim();
-      const minusLabel = `${minus.getAttribute('aria-label') || ''} ${minus.title || ''}`.toLowerCase();
-      const looksMinus = /^[−-]$/.test(minusText) || (/font|text/.test(minusLabel) && /decrease|smaller|minus/.test(minusLabel));
-      if (!looksMinus) continue;
-      let parent = minus.parentElement;
-      for (let depth = 0; parent && depth < 3; depth += 1, parent = parent.parentElement) {
-        if (parent.matches?.('.viewer-wpm-control,.reader-viewer-footer')) break;
-        const directButtons = [...parent.children].filter((node) => node instanceof HTMLButtonElement);
-        const plus = directButtons.find((button) => {
-          const text = String(button.textContent || '').trim();
-          const label = `${button.getAttribute('aria-label') || ''} ${button.title || ''}`.toLowerCase();
-          return /^[+＋]$/.test(text) || (/font|text/.test(label) && /increase|larger|plus/.test(label));
-        });
-        if (plus && directButtons.length <= 4) return parent;
-      }
-    }
-    return null;
-  }
-
   function dockReaderTopControlsForWorkspace() {
     const shell = workspaceShell();
     if (!shell || shell.classList.contains('is-closed')) return;
     const primary = shell.querySelector('.msg-workspace-primary');
-    const paneControls = primary?.querySelector('.reader-pane-controls');
     const footer = primary?.querySelector('.reader-viewer-footer');
     const wpm = primary?.querySelector('.viewer-wpm-control');
+
+    // WPM has one permanent home: the Reader footer.
     if (footer && wpm && wpm.parentElement !== footer) footer.appendChild(wpm);
-    if (!paneControls) return;
 
-    const fullscreen = primary.querySelector('#toggle-reader-fullscreen');
-    const music = primary.querySelector('.reader-topright-music-toggle,[data-reader-wpm-music-toggle]');
-    let stack = paneControls.querySelector('.reader-topright-media-stack');
-    if (!stack && fullscreen) {
-      stack = document.createElement('div');
-      stack.className = 'reader-topright-media-stack';
-      stack.setAttribute('aria-label', 'Reader display controls');
-      fullscreen.parentNode?.insertBefore(stack, fullscreen);
-      stack.appendChild(fullscreen);
-    }
-    if (!stack) return;
-
-    if (music && music.parentElement !== stack) stack.insertBefore(music, stack.firstChild);
-    const fontControl = findReaderFontResizeControl(primary);
-    if (fontControl && fontControl !== stack && !stack.contains(fontControl)) {
-      rememberReaderControlOrigin(fontControl);
-      stack.insertBefore(fontControl, stack.firstChild);
-      fontControl.classList.add('msg-workspace-font-resize-control');
-    }
-    if (fullscreen && fullscreen.parentElement !== stack) stack.appendChild(fullscreen);
-
-    stack.dataset.msgWorkspaceAnchored = '1';
-    stack.style.setProperty('display', 'inline-flex', 'important');
-    stack.style.setProperty('flex-direction', 'row', 'important');
-    stack.style.setProperty('align-items', 'center', 'important');
-    stack.style.setProperty('justify-content', 'flex-end', 'important');
-    stack.style.setProperty('gap', '8px', 'important');
-    stack.style.setProperty('margin-left', 'auto', 'important');
-    stack.style.setProperty('position', 'static', 'important');
+    // Text size + Music + Full screen are owned by reader-music-quick.js as one
+    // literal sibling group. Ask that controller to sync; do not move controls
+    // independently in the workspace layer.
+    try { window.MSGMusicController?.syncControls?.(); } catch {}
   }
 
   function restoreReaderTopControlsAfterWorkspace() {
-    for (const node of [...movedReaderControls]) {
-      const origin = readerControlOrigins.get(node);
-      if (node?.isConnected && origin?.parent?.isConnected) {
-        const before = origin.next?.parentNode === origin.parent ? origin.next : null;
-        origin.parent.insertBefore(node, before);
-        node.classList.remove('msg-workspace-font-resize-control');
-      }
-      movedReaderControls.delete(node);
-    }
-    const shell = workspaceShell();
-    shell?.querySelectorAll('.reader-topright-media-stack[data-msg-workspace-anchored="1"]').forEach((stack) => {
-      delete stack.dataset.msgWorkspaceAnchored;
-      ['display','flex-direction','align-items','justify-content','gap','margin-left','position'].forEach((prop) => stack.style.removeProperty(prop));
-    });
+    // No DOM restoration is needed. The shared Reader control group remains in
+    // .reader-pane-controls whether the workspace is open or closed.
   }
 
-  function workspaceFallbackMusic(query, title, reason = '') {
-    const key = `${query || ''} ${title || ''}`;
-    const choice = WORKSPACE_MUSIC_FALLBACKS.find((item) => item.test.test(key))
-      || (/score|soundtrack/i.test(key) ? WORKSPACE_MUSIC_FALLBACKS.find((item) => item.id === 'classical-reading') : null)
-      || WORKSPACE_MUSIC_FALLBACKS.find((item) => item.id === 'ambient-reading');
-    if (!choice) return false;
-
-    const dock = document.querySelector('#music-dock');
-    const player = document.querySelector('#music-player');
-    const playerWrap = document.querySelector('#music-player-wrap');
-    const nowTitle = document.querySelector('#music-now-title');
-    const nowSource = document.querySelector('#music-now-source');
-    const nextButton = document.querySelector('#music-next');
-    const src = choice.type === 'playlist'
-      ? `https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(choice.youtubeId)}&autoplay=1&playsinline=1&rel=0`
-      : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(choice.youtubeId)}?autoplay=1&playsinline=1&rel=0`;
-
-    if (nowTitle) nowTitle.textContent = String(title || choice.title);
-    if (nowSource) nowSource.textContent = `${choice.title} · suggestion fallback${reason ? ` · ${reason}` : ''}`;
-    if (player) player.src = src;
-    if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
-    if (playerWrap) playerWrap.hidden = false;
-    if (nextButton) nextButton.hidden = true;
-    try {
-      localStorage.setItem('markSetGoMusic', JSON.stringify({
-        title:String(title || choice.title),
-        source:choice.title,
-        provider:'youtube',
-        src,
-        fallback:true
-      }));
-    } catch {}
-    return true;
-  }
-
-  async function workspaceYouTubeSearch(query, title = 'YouTube search') {
+  function workspaceYouTubeSearch(query, title = 'Suggested music') {
     const cleanQuery = String(query || '').trim();
     if (!cleanQuery) return false;
-
-    const dock = document.querySelector('#music-dock');
-    const player = document.querySelector('#music-player');
-    const playerWrap = document.querySelector('#music-player-wrap');
-    const nowTitle = document.querySelector('#music-now-title');
-    const nowSource = document.querySelector('#music-now-source');
-    const nextButton = document.querySelector('#music-next');
-
-    // Give the click an immediate, playable result. The live YouTube lookup then
-    // replaces this fallback if it succeeds. This keeps Suggested music and
-    // Reading mood responsive even when YouTube search or auth is unavailable.
-    workspaceFallbackMusic(cleanQuery, title, 'finding live match');
-    if (nowTitle) nowTitle.textContent = String(title || 'Suggested music');
-    if (nowSource) nowSource.textContent = 'Finding live YouTube match…';
-    if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
-    if (playerWrap) playerWrap.hidden = false;
-
-    const request = async (token = '') => {
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-      const response = await fetch(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`, {
-        credentials: 'same-origin',
-        cache: 'no-store',
-        headers
-      });
-      const payload = await response.json().catch(() => ({}));
-      return { response, payload };
-    };
-
-    try {
-      // Match the normal app first: the same-origin Clerk session cookie is
-      // normally enough. Only retry with an explicit Clerk token on 401/403.
-      let result = await request('');
-      if (result.response.status === 401 || result.response.status === 403) {
-        const token = await workspaceClerkToken();
-        if (token) result = await request(token);
-      }
-      if (!result.response.ok) {
-        throw new Error(result.payload?.detail || result.payload?.error || `Music search failed (HTTP ${result.response.status}).`);
-      }
-
-      const videoIds = Array.isArray(result.payload?.videoIds)
-        ? result.payload.videoIds.filter((id) => /^[A-Za-z0-9_-]{11}$/.test(String(id || ''))).slice(0, 12)
-        : [];
-      if (!videoIds.length) throw new Error('No playable YouTube results were found.');
-
-      const search = { query: cleanQuery, title: String(title || 'YouTube search'), videoIds, index: 0 };
-      const src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoIds[0])}?autoplay=1&playsinline=1&rel=0`;
-      if (nowTitle) nowTitle.textContent = search.title;
-      if (nowSource) nowSource.textContent = `YouTube result 1 of ${videoIds.length}`;
-      if (player) player.src = src;
-      if (dock) { dock.hidden = false; dock.classList.remove('minimized'); }
-      if (playerWrap) playerWrap.hidden = false;
-      if (nextButton) nextButton.hidden = videoIds.length < 2;
-
-      try {
-        localStorage.setItem('markSetGoMusic', JSON.stringify({
-          title:search.title,
-          source:`YouTube result 1 of ${videoIds.length}`,
-          provider:'youtube',
-          src,
-          search
-        }));
-      } catch {}
-      return true;
-    } catch (error) {
-      const reason = String(error?.message || 'live search unavailable').replace(/\s+/g, ' ').trim().slice(0, 90);
-      workspaceFallbackMusic(cleanQuery, title, reason);
-      console.warn('Workspace live music search failed; retained playable fallback:', error);
-      return true;
+    const controller = window.MSGMusicController;
+    if (controller && typeof controller.search === 'function') {
+      return controller.search(cleanQuery, String(title || 'Suggested music'));
     }
+    console.warn('Music controller is not ready yet.');
+    return false;
   }
-
-  // Search-driven music is the one music path that hits a protected API.
-  // Route every caller (Reader mood/score and workspace suggestions) through the
-  // authenticated outer window while leaving normal/static playback untouched.
-  try { window.playYouTubeSearch = workspaceYouTubeSearch; } catch {}
 
   const escapeWorkspaceHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -575,9 +374,7 @@
     if (event.data?.type === 'msg-workspace-music-search') {
       const query = String(event.data.query || '').trim();
       const title = String(event.data.title || 'Suggested music').trim();
-      if (query && typeof window.playYouTubeSearch === 'function') {
-        window.playYouTubeSearch(query, title);
-      }
+      if (query) workspaceYouTubeSearch(query, title);
       return;
     }
     if (event.data?.type === 'msg-workspace-music-play') {

@@ -372,15 +372,27 @@
     return request;
   }
 
-  async function refreshTopic({ forceLocal = false } = {}) {
-    const topic = currentTopic();
+  async function refreshTopic({ forceLocal = false, preserveReader = false } = {}) {
+    const keepReader = Boolean(preserveReader && isTopicFeedReaderActive());
+    const contextTopicId = String(window.MSGTopicFeedReaderContext?.topicId || '');
+    const topic = keepReader
+      ? (state.topics.find((item) => item.id === contextTopicId) || currentTopic())
+      : currentTopic();
+    const renderRefreshState = () => {
+      if (!keepReader) { render(); return; }
+      const button = document.querySelector('[data-reader-refresh-topics]');
+      if (button) {
+        button.disabled = Boolean(loading || preparing);
+        button.textContent = preparing ? 'Downloading…' : loading ? 'Refreshing…' : '↻ Refresh';
+      }
+    };
     if (!topic || loading || !topic.sources.length) return;
     loading = true;
-    render();
+    renderRefreshState();
     try {
       if (cloudAuthenticated && !forceLocal) {
         preparing = true;
-        render();
+        renderRefreshState();
         const response = await fetch('/api/topic-feeds/refresh', {
           method: 'POST',
           credentials: 'same-origin',
@@ -432,7 +444,7 @@
         curate(topic);
         saveState();
         preparing = true;
-        render();
+        renderRefreshState();
         const selected = [...topic.articles].sort((a,b) => Number(b.recommended)-Number(a.recommended)).slice(0,60);
         await prefetchArticles(selected, { wait: true }).catch(() => null);
         topic.preparedAt = new Date().toISOString();
@@ -444,7 +456,8 @@
     } finally {
       preparing = false;
       loading = false;
-      render();
+      renderRefreshState();
+      if (keepReader) decorateReaderNavigation({ forceList: true });
     }
   }
 
@@ -1747,6 +1760,7 @@
         <h2>My Topics</h2>
         <div class="topic-reader-nav-actions">
           <span data-reader-bookmark-slot></span>
+          <button type="button" data-reader-refresh-topics ${(loading || preparing) ? 'disabled' : ''}>${preparing ? 'Downloading…' : loading ? 'Refreshing…' : '↻ Refresh'}</button>
           <button type="button" data-reader-manage-topics>Manage</button>
         </div>
       </div>
@@ -1778,7 +1792,7 @@
     </div>`;
   }
 
-  function decorateReaderNavigation() {
+  function decorateReaderNavigation({ forceList = false } = {}) {
     if (!isTopicFeedReaderActive()) return;
     const pane = document.querySelector('#navigation-pane');
     if (!pane) return;
@@ -1804,7 +1818,8 @@
 
     bindTopicReaderPanePreference();
 
-    if (!view.querySelector('.topic-reader-nav')) {
+    const paneScrollBeforeListRefresh = Math.max(0, Number(pane.scrollTop) || 0);
+    if (forceList || !view.querySelector('.topic-reader-nav')) {
       // IMPORTANT: renderNavigationPane() has already bound the Reader's
       // #add-bookmark button to its native addBookmark() function. Keep that
       // exact DOM node before replacing Contents so bookmarks continue to use
@@ -1820,7 +1835,12 @@
         nativeBookmarkButton.title = 'Bookmark the current reading position';
         bookmarkSlot.replaceChildren(nativeBookmarkButton);
       }
+      if (forceList) pane.scrollTop = paneScrollBeforeListRefresh;
     }
+
+    view.querySelector('[data-reader-refresh-topics]')?.addEventListener('click', () => {
+      void refreshTopic({ preserveReader: true });
+    }, { once:true });
 
     view.querySelector('[data-reader-manage-topics]')?.addEventListener('click', () => {
       render();

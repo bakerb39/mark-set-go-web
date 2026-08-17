@@ -1,4 +1,4 @@
-/* Mark, Set, Go! Workspace Experiment v0.4.6 */
+/* Mark, Set, Go! Workspace Experiment v0.4.8 */
 /* Mark, Set, Go! workspace experiment */
 .msg-workspace-shell{
   --msg-secondary-width: 360px;
@@ -630,7 +630,7 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
 }
 
 
-/* v0.4.6 — Reader controls while a workspace pane is open.
+/* v0.4.8 — Reader controls while a workspace pane is open.
    WPM remains in its original footer. Only font resize + music + Full screen
    share the Reader's upper-right flex row, so all three follow Reader width. */
 #app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-pane-controls{
@@ -649,7 +649,7 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
   transform:none !important;
   flex:0 0 auto !important;
 }
-#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .msg-workspace-font-resize-control,
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .reader-topright-font-control,
 #app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .reader-topright-music-toggle,
 #app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack [data-reader-wpm-music-toggle],
 #app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .viewer-fullscreen-button{
