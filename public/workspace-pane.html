@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en" class="msg-workspace-pane-document">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mark, Set, Go! Workspace</title>
+<link href="/styles.css?v=reader-annotations-v8-reconciled" rel="stylesheet">
+<link href="/read-anything.css?v=8.8.0" rel="stylesheet">
+<link href="/workspace-experiment.css?v=0.4.0" rel="stylesheet">
+<link href="/ask-mark-hub.css?v=9.2.87-reader-tools-scroll-format" rel="stylesheet">
+<link rel="stylesheet" href="/topic-feeds.css?v=2.1.17-clean-header">
+<link rel="stylesheet" href="/reader-music-quick.css?v=1.4.5-final-order">
+<link href="/theme-system.css?v=9.2.41-reader-contrast-final" rel="stylesheet">
+<script>
+  // This is a secondary view only. Do not boot a second authenticated app.
+  window.__MSG_WORKSPACE_PANE__ = true;
+  window.MSGWorkspacePane = true;
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const raw = typeof input === 'string' ? input : (input && input.url) || '';
+    try {
+      const u = new URL(raw, location.href);
+      if (u.pathname === '/api/topic-feeds/daily-open') {
+        return Promise.resolve(new Response(JSON.stringify({ workspacePane:true }), {status:200, headers:{'Content-Type':'application/json'}}));
+      }
+    } catch {}
+    return nativeFetch(input, init);
+  };
+</script>
+<script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
+<script defer src="/reader/SessionManager.js?v=3.2.1-stable-recovery"></script>
+<script defer src="/reader/ReaderEngine.js?v=3.2.1-stable-recovery"></script>
+<script defer src="/reader/VirtualRenderer.js?v=pdf-structure-v4"></script>
+<script defer src="/modules/reading/digital-sign-mode.js?v=7.2.1"></script>
+<script defer src="/modules/reading/pacman-mode.js?v=7.2.2"></script>
+<script defer src="/modules/pages/help-page.js?v=9.3.1-kindle-import"></script>
+<script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
+<script defer src="/app-workspace.js?v=0.4.0"></script>
+<script defer src="/topic-feeds.js?v=2.1.15-menu-click-fix"></script>
+<script defer src="/workspace-pane-runtime.js?v=0.4.0"></script>
+</head>
+<body>
+<main id="app" class="app-shell" tabindex="-1" aria-live="polite"></main>
+<aside aria-label="Music player" class="music-dock" hidden id="music-dock">
+  <div class="music-dock-bar"><div><strong id="music-now-title">Music</strong><span id="music-now-source">YouTube</span></div><div class="music-dock-actions"><button aria-label="Try another result" id="music-next" type="button" hidden>↻</button><button aria-label="Minimize music player" id="music-minimize" type="button">—</button><button aria-label="Close music player" id="music-close" type="button">×</button></div></div>
+  <div class="music-player-wrap" id="music-player-wrap"><iframe allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen loading="lazy" id="music-player" referrerpolicy="strict-origin-when-cross-origin" title="Spotify or YouTube music player"></iframe></div>
+</aside>
+</body>
+</html>
