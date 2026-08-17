@@ -13,14 +13,42 @@
     const live = window.MSGCompanion?.config;
     if (live?.id) return live;
     const selected = localStorage.getItem(COMPANION_STORAGE_KEY) || localStorage.getItem('msg_companion_persona_v1') || 'mark';
-    return selected === 'beth'
-      ? { id:'beth', name:'Beth', ask:'Ask Beth', notebook:"Beth's Notebook", avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9' }
-      : { id:'mark', name:'Mark', ask:'Ask Mark', notebook:"Mark's Notebook", avatar:'/assets/ask-mark/ask-mark-avatar.png' };
+
+    if (selected === 'chad') {
+      return {
+        id:'chad',
+        name:'Chad',
+        ask:'Ask Chad',
+        notebook:"Chad's Notebook",
+        avatar:'/assets/companions/chad/chad-avatar.png'
+      };
+    }
+
+    if (selected === 'beth') {
+      return {
+        id:'beth',
+        name:'Beth',
+        ask:'Ask Beth',
+        notebook:"Beth's Notebook",
+        avatar:'/assets/companions/beth/beth-ui-avatar.png?v=9.6.9'
+      };
+    }
+
+    return {
+      id:'mark',
+      name:'Mark',
+      ask:'Ask Mark',
+      notebook:"Mark's Notebook",
+      avatar:'/assets/ask-mark/ask-mark-avatar.png'
+    };
   };
   const companionName = () => companionConfig().name;
   const companionAsk = () => companionConfig().ask;
   const companionAvatar = () => companionConfig().avatar;
-  const companionNotebook = () => companionConfig().id === 'beth' ? 'Beth’s Notebook' : 'Mark’s Notebook';
+  const companionNotebook = () => {
+    const config = companionConfig();
+    return config.notebook || `${config.name}’s Notebook`;
+  };
 
   let shell = null;
   let legacyHost = null;
@@ -191,12 +219,36 @@
       </div>`;
   }
 
+  function scrollConversationToMessage(message, { smooth = true } = {}) {
+    const conversation = $('[data-askmark-conversation]', shell);
+    if (!conversation || !message) return;
+
+    const top = Math.max(0, message.offsetTop - 12);
+
+    // Place the reader's question at the top of the chat viewport so the
+    // response grows beneath it instead of forcing the reader to scroll down.
+    conversation.scrollTo({
+      top,
+      behavior: smooth ? 'smooth' : 'auto'
+    });
+  }
+
+  function latestUserMessage() {
+    const messages = $$('[data-askmark-conversation] .askmark-message.user-message', shell);
+    return messages[messages.length - 1] || null;
+  }
+
   function addUserMessage(text) {
     const conversation = $('[data-askmark-conversation]', shell);
-    if (!conversation || !text) return;
+    if (!conversation || !text) return null;
+
+    const id = `askmark-user-${Date.now()}-${Math.random().toString(36).slice(2,7)}`;
     conversation.insertAdjacentHTML('beforeend', `
-      <article class="askmark-message user-message"><div><span>You</span><p>${escapeHtml(text)}</p></div></article>`);
-    conversation.scrollTop = conversation.scrollHeight;
+      <article class="askmark-message user-message" id="${id}"><div><span>You</span><p>${escapeHtml(text)}</p></div></article>`);
+
+    const message = document.getElementById(id);
+    scrollConversationToMessage(message, { smooth: true });
+    return message;
   }
 
   const MARK_PROGRESS_SEEN_KEY='markSetGoMarkProgressSeenV1';
@@ -274,8 +326,17 @@
         <img src="${companionAvatar()}" alt="${companionName()}">
         <div><span>${companionName()}</span><p><i></i><i></i><i></i></p></div>
       </article>`);
-    conversation.scrollTop = conversation.scrollHeight;
-    return document.getElementById(id);
+    const thinking = document.getElementById(id);
+
+    // Keep the user's question anchored near the top while the answer is
+    // being prepared. Do not jump the chat to the bottom just because the
+    // typing indicator was appended.
+    const userMessage = latestUserMessage();
+    if (userMessage) {
+      window.requestAnimationFrame(() => scrollConversationToMessage(userMessage, { smooth: false }));
+    }
+
+    return thinking;
   }
 
   function syncLegacyResponse() {
@@ -315,8 +376,15 @@
     }
 
     response.hidden = true;
-    const conversation = $('[data-askmark-conversation]', shell);
-    if (conversation) conversation.scrollTop = conversation.scrollHeight;
+
+    // Keep the reader's latest question at the top after a normal highlighted-
+    // passage answer is converted into the premium threaded chat.
+    const userMessage = latestUserMessage();
+    if (userMessage) {
+      window.requestAnimationFrame(() => {
+        scrollConversationToMessage(userMessage, { smooth: true });
+      });
+    }
   }
 
 
@@ -369,6 +437,137 @@
       if (legacyTools) $('[data-tools-slot]', shell)?.appendChild(legacyTools);
     }
   }
+
+  function activeWholeArticleConversation() {
+    const context = window.MSGInvestorArticleContext;
+    if (!context?.articleText) return null;
+    if (String(context.articleText).trim().length < 40) return null;
+
+    // A real user highlight deliberately takes priority over Analyze mode.
+    if (context.highlightOverride) return null;
+
+    return context;
+  }
+
+  function responseParagraphsHtml(value = '') {
+    return String(value || '')
+      .trim()
+      .split(/\n{2,}/)
+      .filter(Boolean)
+      .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+      .join('');
+  }
+
+  function renderWholeArticleFollowup(thinking, result = {}) {
+    if (!thinking?.isConnected) return;
+
+    const companion = companionConfig();
+    const keyPoints = Array.isArray(result?.keyPoints) ? result.keyPoints : [];
+    const cautions = Array.isArray(result?.cautions) ? result.cautions : [];
+
+    thinking.classList.remove('is-thinking');
+    thinking.innerHTML = `
+      <img src="${escapeHtml(companion.avatar)}" alt="${escapeHtml(companion.name)}">
+      <div>
+        <span>${escapeHtml(companion.name)}</span>
+        <div class="askmark-rich-response">
+          <div class="mark-response-heading">
+            <span>${escapeHtml(companion.ask)}</span>
+            <strong>${escapeHtml(result?.heading || 'Whole-article answer')}</strong>
+          </div>
+          ${responseParagraphsHtml(result?.response || '')}
+          ${keyPoints.length ? `
+            <h4>Key points</h4>
+            <ul>${keyPoints.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>
+          ` : ''}
+          ${cautions.length ? `
+            <div class="mark-cautions">
+              ${cautions.map((item) => `<p>${escapeHtml(item)}</p>`).join('')}
+            </div>
+          ` : ''}
+        </div>
+      </div>`;
+
+    const userMessage = latestUserMessage();
+    if (userMessage) {
+      // Re-anchor after the response bubble expands. This keeps the question
+      // visible at the top and lets the answer continue directly underneath.
+      window.requestAnimationFrame(() => {
+        scrollConversationToMessage(userMessage, { smooth: true });
+      });
+    }
+  }
+
+  async function runWholeArticleFollowup(question) {
+    const context = activeWholeArticleConversation();
+    if (!context || !question) return false;
+
+    addUserMessage(question);
+    const thinking = addThinkingMessage();
+    const companion = companionConfig();
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 90000);
+
+    try {
+      const history = Array.isArray(context.history)
+        ? context.history.slice(-8)
+        : [];
+
+      const response = await fetch('/api/read-anything/article-followup', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companion: companion.id,
+          title: context.title || getBookContext().title || 'Current article',
+          sourceUrl: context.sourceUrl || '',
+          articleText: context.articleText,
+          analysis: context.analysis || {},
+          history,
+          question
+        })
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          payload.detail ||
+          payload.error ||
+          `Request failed with HTTP ${response.status}.`
+        );
+      }
+
+      const result = payload.result || {};
+
+      context.history = Array.isArray(context.history) ? context.history : [];
+      context.history.push(
+        { role: 'user', text: question },
+        { role: 'assistant', text: String(result.response || '').trim() }
+      );
+      context.history = context.history.slice(-12);
+      context.updatedAt = new Date().toISOString();
+
+      renderWholeArticleFollowup(thinking, result);
+      return true;
+    } catch (error) {
+      if (thinking?.isConnected) {
+        thinking.classList.remove('is-thinking');
+        const message = error?.name === 'AbortError'
+          ? `${companion.name} took too long to answer. Please try again.`
+          : error?.message || `${companion.name} could not answer that follow-up.`;
+
+        const paragraph = thinking.querySelector('p');
+        if (paragraph) {
+          paragraph.className = 'status error';
+          paragraph.textContent = message;
+        }
+      }
+      return false;
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  }
+
 
   function runSelectionAction(action, question = '') {
     const panel = getLegacySelectionPanel();
@@ -595,7 +794,17 @@
 
   function bindPremiumEvents() {
     installAskMarkScrollIsolation();
-    $('[data-askmark-close]', shell)?.addEventListener('click', () => $('#toggle-mark-panel')?.click());
+    $('[data-askmark-close]', shell)?.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (window.MarkSetGoReaderPanels?.closeRightPane?.()) return;
+
+      const layout = document.getElementById('reader-layout');
+      if (!layout) return;
+      layout.classList.add('word-panel-hidden');
+      document.getElementById('toggle-mark-panel')?.setAttribute('aria-pressed', 'false');
+      document.getElementById('toggle-word-panel')?.setAttribute('aria-pressed', 'false');
+    });
     $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
     $$('[data-askmark-view]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView(button.dataset.askmarkView)));
     $$('[data-askmark-back]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView('chat')));
@@ -664,6 +873,16 @@
       if (!value) return;
       input.value = '';
       input.style.height = '';
+
+      // Analyze owns a whole-article conversation. Route follow-up questions
+      // directly from THIS threaded chat handler to the whole-article endpoint.
+      // If the reader highlighted a real passage, highlightOverride is true and
+      // the normal passage-selection Ask flow remains in control.
+      if (activeWholeArticleConversation()) {
+        void runWholeArticleFollowup(value);
+        return;
+      }
+
       runSelectionAction('ask', value);
     };
     $('[data-askmark-send]', shell)?.addEventListener('click', send);
@@ -728,8 +947,9 @@
       readerTools.innerHTML = '<span aria-hidden="true">⚙</span> Reader';
     }
     if (ask) {
+      const companion = companionConfig();
       ask.hidden = false;
-      ask.innerHTML = '<img src="/assets/ask-mark/ask-mark-avatar.png" alt=""> <span>Ask Mark</span>';
+      ask.innerHTML = `<img src="${escapeHtml(companion.avatar)}" alt=""> <span>${escapeHtml(companion.ask)}</span>`;
       ask.classList.add('ask-mark-primary-toggle');
     }
     $('#read-anything-format-control')?.remove();
@@ -777,7 +997,18 @@
 
   document.addEventListener('marksetgo:document-available', () => {
     installAttempts = 0;
-    requestAnimationFrame(retryInstall);
+  
+  // Capture-phase fallback: close even if a later panel rerender drops the
+  // element-specific listener or another bubble-phase handler interferes.
+  document.addEventListener('click', (event) => {
+    const closeButton = event.target?.closest?.('[data-askmark-close]');
+    if (!closeButton) return;
+    event.preventDefault();
+    event.stopPropagation();
+    window.MarkSetGoReaderPanels?.closeRightPane?.();
+  }, true);
+
+  requestAnimationFrame(retryInstall);
     window.setTimeout(()=>refreshMarkProgress(),220);
   });
   document.addEventListener('marksetgo:goals-updated',()=>window.setTimeout(()=>refreshMarkProgress({force:true}),80));
