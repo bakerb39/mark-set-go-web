@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.3.3
+ * Mark, Set, Go! Workspace Experiment v0.3.5
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -10,11 +10,96 @@
 
   const PARAMS = new URLSearchParams(window.location.search);
   const IS_WORKSPACE_PANE = PARAMS.get('msgWorkspacePane') === '1';
+  const WORKSPACE_PREF_KEY = 'msg-workspace-optin-v1';
+
+  function readWorkspacePreference() {
+    try { return localStorage.getItem(WORKSPACE_PREF_KEY) === '1'; }
+    catch { return false; }
+  }
+
+  function writeWorkspacePreference(enabled) {
+    try { localStorage.setItem(WORKSPACE_PREF_KEY, enabled ? '1' : '0'); } catch {}
+  }
+
+  function installProfileWorkspaceToggle(rootDocument = document) {
+    const page = rootDocument.querySelector('.profile-preferences-page');
+    if (!page) return false;
+
+    let card = page.querySelector('.msg-workspace-profile-card');
+    if (!card) {
+      card = rootDocument.createElement('section');
+      card.className = 'profile-feature-card msg-workspace-profile-card';
+      card.innerHTML = `
+        <div class="section-heading">
+          <div>
+            <span class="source-category">Workspace</span>
+            <h2>Workspace</h2>
+            <p>Choose how other sections open while you are reading.</p>
+          </div>
+        </div>
+        <label class="msg-workspace-profile-toggle" for="msg-workspace-profile-toggle">
+          <span class="msg-workspace-profile-copy">
+            <strong>Open pages in workspace</strong>
+            <small>Keep the Reader open and open other sections beside it.</small>
+          </span>
+          <span class="msg-workspace-switch-wrap">
+            <input id="msg-workspace-profile-toggle" type="checkbox" role="switch" aria-label="Open pages in workspace">
+            <span class="msg-workspace-switch" aria-hidden="true"></span>
+          </span>
+        </label>`;
+
+      const cards = [...page.querySelectorAll(':scope > .profile-feature-card')];
+      const markCard = cards.find((node) => /Personalized coaching/i.test(node.textContent || ''));
+      if (markCard) page.insertBefore(card, markCard);
+      else page.appendChild(card);
+    }
+
+    const toggle = card.querySelector('#msg-workspace-profile-toggle');
+    if (!toggle) return false;
+    toggle.checked = readWorkspacePreference();
+
+    if (toggle.dataset.workspaceBound !== '1') {
+      toggle.dataset.workspaceBound = '1';
+      toggle.addEventListener('change', () => {
+        const enabled = Boolean(toggle.checked);
+        writeWorkspacePreference(enabled);
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.postMessage({ type:'msg-workspace-preference', enabled }, window.location.origin);
+          } catch {}
+        } else if (!enabled) {
+          try { window.MSGWorkspaceExperiment?.close?.(); } catch {}
+        }
+      });
+    }
+    return true;
+  }
 
   function initializeWorkspacePaneDocument() {
     document.documentElement.classList.add('msg-workspace-pane-document');
     const mode = PARAMS.get('msgWorkspaceMode') || 'action';
     const value = PARAMS.get('msgWorkspaceValue') || 'home';
+
+    // A workspace page is a secondary view, not a fresh app launch. Topic Feeds
+    // normally checks the server for its once-daily auto-open during startup; if
+    // that runs inside every iframe it replaces Library/Profile/etc. with a new
+    // Reader moments after the requested page appears. Suppress only that one
+    // startup endpoint inside workspace panes. Manual Topic Feed actions and all
+    // other fetches continue through the normal path.
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      const rawUrl = typeof input === 'string' ? input : (input?.url || '');
+      try {
+        const requested = new URL(rawUrl, window.location.href);
+        if (requested.pathname === '/api/topic-feeds/daily-open') {
+          return Promise.resolve(new Response(JSON.stringify({ workspacePane: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+      } catch {}
+      return nativeFetch(input, init);
+    };
 
     // Keyboard focus lives inside this iframe while a workspace page is active.
     // Forward only the Topic Feed story shortcuts to the outer Reader; ordinary
@@ -45,6 +130,9 @@
         document.body.appendChild(trigger);
         trigger.click();
         trigger.remove();
+        if (mode === 'action' && value === 'profile-preferences') {
+          window.setTimeout(() => installProfileWorkspaceToggle(document), 0);
+        }
         document.documentElement.classList.add('msg-workspace-pane-ready');
       }, 0);
     };
@@ -84,12 +172,8 @@
     return APP.querySelector(':scope > .msg-workspace-shell');
   }
 
-  function workspaceCheckbox() {
-    return document.querySelector('#msg-workspace-optin');
-  }
-
   function workspaceEnabled() {
-    return Boolean(workspaceCheckbox()?.checked);
+    return readWorkspacePreference();
   }
 
   function isTopicFeedReaderActive() {
@@ -153,8 +237,21 @@
 
   window.addEventListener('message', (event) => {
     if (event.origin !== window.location.origin) return;
-    if (event.data?.type !== 'msg-workspace-topic-feed-key') return;
-    handleTopicFeedStoryShortcut(String(event.data.key || ''));
+    if (event.data?.type === 'msg-workspace-topic-feed-key') {
+      handleTopicFeedStoryShortcut(String(event.data.key || ''));
+      return;
+    }
+    if (event.data?.type === 'msg-workspace-preference') {
+      writeWorkspacePreference(Boolean(event.data.enabled));
+      installProfileWorkspaceToggle(document);
+      if (!event.data.enabled) closeWorkspacePanel();
+    }
+  });
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== WORKSPACE_PREF_KEY) return;
+    installProfileWorkspaceToggle(document);
+    if (event.newValue !== '1') closeWorkspacePanel();
   });
 
   function humanize(value) {
@@ -504,29 +601,6 @@
     if (!nav) return false;
     const symposium = document.querySelector('[data-action="symposium"]');
 
-    // v0.3.3: the opt-in lives permanently inside the existing My Library
-    // dropdown. Do not depend on squeezing a dynamically-created label into the
-    // crowded top-level header. Keep this fallback only for older index.html files.
-    let control = document.querySelector('.msg-workspace-menu-option');
-    if (!control) {
-      const popover = document.querySelector('.library-menu-root .menu-popover');
-      if (popover) {
-        control = document.createElement('label');
-        control.className = 'msg-workspace-optin msg-workspace-menu-option';
-        control.title = 'Keep the Reader open while other sections open beside it.';
-        control.innerHTML = '<input id="msg-workspace-optin" type="checkbox" aria-label="Open pages in workspace"><span class="msg-workspace-menu-copy"><strong>Open pages in workspace</strong><small>Keep Reader open while opening other sections</small></span>';
-        const firstSection = popover.querySelector('.menu-section-label');
-        if (firstSection?.nextSibling) popover.insertBefore(control, firstSection.nextSibling);
-        else popover.prepend(control);
-      }
-    }
-
-    const checkbox = control?.querySelector?.('#msg-workspace-optin');
-    if (checkbox && checkbox.dataset.workspaceInitialized !== '1') {
-      checkbox.dataset.workspaceInitialized = '1';
-      try { checkbox.checked = localStorage.getItem('msg-workspace-optin-v1') === '1'; } catch {}
-    }
-
     let button = document.querySelector('[data-msg-workspace-open="browser"]');
     if (!button) {
       button = document.createElement('button');
@@ -538,9 +612,8 @@
       nav.appendChild(button);
     }
 
-    // Keep Web next to Symposium. The opt-in stays inside My Library.
     if (symposium && symposium.nextSibling !== button) nav.insertBefore(button, symposium.nextSibling);
-    return Boolean(symposium && control?.isConnected && button.isConnected);
+    return Boolean(symposium && button.isConnected);
   }
 
   function navigationDescriptor(element) {
@@ -555,25 +628,7 @@
     return Boolean(element?.closest?.('.site-header, .site-footer'));
   }
 
-  document.addEventListener('change', (event) => {
-    if (!event.target.matches?.('#msg-workspace-optin')) return;
-    try { localStorage.setItem('msg-workspace-optin-v1', event.target.checked ? '1' : '0'); } catch {}
-    if (!event.target.checked) closeWorkspacePanel();
-  }, true);
-
   document.addEventListener('click', (event) => {
-    const optinControl = event.target.closest?.('.msg-workspace-optin');
-    if (optinControl && !event.target.matches?.('#msg-workspace-optin')) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const checkbox = optinControl.querySelector('#msg-workspace-optin');
-      if (checkbox) {
-        checkbox.checked = !checkbox.checked;
-        checkbox.dispatchEvent(new Event('change', { bubbles:true }));
-      }
-      return;
-    }
-
     const close = event.target.closest?.('[data-msg-workspace-close]');
     if (close) {
       event.preventDefault();
@@ -606,13 +661,18 @@
         window.alert('Open something in the Reader first to use Web in the workspace.');
         return;
       }
-      if (workspaceCheckbox()) workspaceCheckbox().checked = true;
+      writeWorkspacePreference(true);
+      installProfileWorkspaceToggle(document);
       showWorkspacePanel('browser');
       return;
     }
 
     const navTarget = event.target.closest?.('[data-action], [data-read], [data-test]');
     if (!navTarget || !isTopLevelNavigation(navTarget)) return;
+
+    if (navTarget.dataset.action === 'profile-preferences' && (!workspaceEnabled() || !hasReader())) {
+      window.setTimeout(() => installProfileWorkspaceToggle(document), 0);
+    }
 
     const descriptor = navigationDescriptor(navTarget);
     if (!descriptor) return;
@@ -657,7 +717,8 @@
     close: closeWorkspacePanel,
     browser: () => showWorkspacePanel('browser'),
     symposium: () => showWorkspacePanel('symposium'),
-    enabled: workspaceEnabled
+    enabled: workspaceEnabled,
+    setEnabled: (enabled) => { writeWorkspacePreference(Boolean(enabled)); installProfileWorkspaceToggle(document); if (!enabled) closeWorkspacePanel(); }
   });
 
 function renderSymposiumWorkspace(rootHost) {
