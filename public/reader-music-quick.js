@@ -133,11 +133,11 @@
       : `https://www.youtube-nocookie.com/embed/${encodeURIComponent(choice.youtubeId)}?playsinline=1&rel=0`;
   }
 
-  function closeChooser({ keepDock = false } = {}) {
+  function closeChooser({ keepDock = false, keepPosition = false } = {}) {
     const parts = playerParts();
     if (chooser) chooser.hidden = true;
     parts.dock?.classList.remove('reader-music-chooser-open');
-    resetChooserDockPosition();
+    if (!keepPosition) resetChooserDockPosition();
     speedButton?.setAttribute('aria-expanded', 'false');
     if (!keepDock && parts.dock && !hasPlayback()) parts.dock.hidden = true;
   }
@@ -169,7 +169,8 @@
       }));
     } catch {}
 
-    closeChooser({ keepDock: true });
+    closeChooser({ keepDock: true, keepPosition: true });
+    positionChooserDock();
   }
 
   function playControllerSearchCandidate(index) {
@@ -203,7 +204,8 @@
         src: parts.iframe.src
       }));
     } catch {}
-    closeChooser({ keepDock: true });
+    closeChooser({ keepDock: true, keepPosition: true });
+    positionChooserDock();
     return true;
   }
 
@@ -215,7 +217,8 @@
 
     // React immediately to the click. Even if the server lookup fails, the user
     // should never be left with a link that appears dead.
-    if (chooser && !chooser.hidden) closeChooser({ keepDock: true });
+    if (chooser && !chooser.hidden) closeChooser({ keepDock: true, keepPosition: true });
+    if (speedButton) positionChooserDock();
     else resetChooserDockPosition();
     controllerSearchState = null;
     if (parts.title) parts.title.textContent = String(title || 'Suggested music');
@@ -345,12 +348,11 @@
     const dock = playerParts().dock;
     if (!dock || !speedButton) return;
     const rect = speedButton.getBoundingClientRect();
-    const width = Math.min(292, Math.max(240, window.innerWidth - 16));
-    const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.right - width));
+    const right = Math.max(8, window.innerWidth - rect.right);
     const top = Math.max(8, rect.bottom + 8);
     dock.dataset.readerChooserPositioned = '1';
-    dock.style.setProperty('left', `${Math.round(left)}px`, 'important');
-    dock.style.setProperty('right', 'auto', 'important');
+    dock.style.setProperty('left', 'auto', 'important');
+    dock.style.setProperty('right', `${Math.round(right)}px`, 'important');
     dock.style.setProperty('top', `${Math.round(top)}px`, 'important');
     dock.style.setProperty('bottom', 'auto', 'important');
   }
@@ -461,13 +463,13 @@
 
     chooser.querySelector('[data-wpm-music-suggested]')?.addEventListener('click', () => {
       if (!readingSuggestions?.suggestedQuery) return;
-      closeChooser({ keepDock: true });
+      closeChooser({ keepDock: true, keepPosition: true });
       void searchYouTubeInMainPlayer(readingSuggestions.suggestedQuery, `${readingSuggestions.title} — suggested music`);
     });
 
     chooser.querySelector('[data-wpm-music-mood]')?.addEventListener('click', () => {
       if (!readingSuggestions?.moodQuery) return;
-      closeChooser({ keepDock: true });
+      closeChooser({ keepDock: true, keepPosition: true });
       void searchYouTubeInMainPlayer(readingSuggestions.moodQuery, `${readingSuggestions.title} — reading mood`);
     });
 
@@ -620,7 +622,8 @@
     document.addEventListener('marksetgo:document-available', () => window.setTimeout(sync, 0));
     window.addEventListener('pageshow', () => window.setTimeout(sync, 0));
     window.addEventListener('resize', () => {
-      if (chooser && !chooser.hidden) positionChooserDock();
+      const dock = playerParts().dock;
+      if ((chooser && !chooser.hidden) || dock?.dataset.readerChooserPositioned === '1') positionChooserDock();
     });
 
     document.addEventListener('click', (event) => {
@@ -664,6 +667,7 @@
       controllerSearchState = null;
       if (chooser) chooser.hidden = true;
       speedButton?.setAttribute('aria-expanded', 'false');
+      resetChooserDockPosition();
     });
   }
 

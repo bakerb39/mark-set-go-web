@@ -16,16 +16,49 @@
     }
   };
 
-  /* Baked from the user's exported design JSON. Reset returns here. */
+  /* Baked from the user's latest exported design JSON (2026-08-18).
+     Reset returns to these exact layout choices. */
   const DEFAULT_CONFIG = {
-    version:2,
-    targets:{
-      controls:{minHeight:58,marginBottom:30},
-      reader:{marginTop:0},
-      playback:{marginBottom:0,marginTop:0},
-      shell:{paddingY:6,width:100,marginTop:0},
-      companion:{headerBackground:'#256056'}
-    }
+      "version": 2,
+      "targets": {
+          "controls": {
+              "minHeight": 58,
+              "marginBottom": 30,
+              "marginTop": 6
+          },
+          "reader": {
+              "marginTop": 7,
+              "background": "#ffffff",
+              "pageBackground": "#ffffff"
+          },
+          "playback": {
+              "marginBottom": 19,
+              "marginTop": -57
+          },
+          "shell": {
+              "paddingY": 0,
+              "width": 100,
+              "marginTop": 3,
+              "moveY": -10,
+              "marginBottom": 0
+          },
+          "companion": {
+              "headerBackground": "#317165"
+          },
+          "footer": {
+              "marginTop": -24,
+              "paddingY": 29
+          },
+          "topics": {
+              "marginBottom": -80,
+              "height": 790,
+              "marginTop": 7
+          },
+          "title": {
+              "marginTop": 14,
+              "marginBottom": -1
+          }
+      }
   };
 
   const TARGETS = [
@@ -95,6 +128,7 @@
     reader: [
       range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel #reader-frame','margin-top'),
       color('background','Frame color','.reader-page-panel #reader-frame','background'),
+      color('pageBackground','Actual reading page color','.reader-page-panel #reader','background'),
       color('borderColor','Border color','.reader-page-panel #reader-frame','border-color'),
       range('borderWidth','Border width',0,12,1,'px','.reader-page-panel #reader-frame','border-width'),
       range('radius','Corner radius',0,80,1,'px','.reader-page-panel #reader-frame','border-radius'),

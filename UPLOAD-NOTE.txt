@@ -1,13 +1,11 @@
-Explorer Designer v2.1 — expanded layout control + global Explorer theme persistence
+Explorer Designer v2.2.1 — latest user JSON + no center wall + anchored music player
 
-Upload/extract this ZIP at the repository ROOT so the included public/ paths replace/add files under public/.
+Upload/extract at the repository root so the public/ paths replace the existing files.
 
-What changed:
-- Designer storage key/version stays V2, so existing saved Explorer V2 settings remain compatible.
-- Reader shell: new Move shell up/down and Bottom gap controls; much larger ranges.
-- My Topics: new Top spacing, Pane height, and Bottom spacing controls; much larger width range.
-- Larger min/max ranges across title, top controls, Reader spacing, page controls, playback, companion, and scenery.
-- Removed the large gold Designer selection outline from Top controls; other selection outlines are subtle green dashed lines.
-- Added explorer-theme-persistence.css so pages opened from My Library / Learn / Notebook / Music & Focus / Profile / About / Symposium retain Explorer green/ivory/brass styling instead of falling back to the original blue scheme.
-- No Reader engine/timing/pagination/mode JavaScript changed.
-- No MutationObserver added.
+What this package does:
+- Uses mark-set-go-explorer-design-v2 (4).json as the UI baseline.
+- Adds an "Actual reading page color" picker under Reading page.
+- Removes the obsolete tan/green center filler behind the Reader shell.
+- Keeps the actual music player anchored beneath the top-right music button after a selection starts playing.
+- Keeps Explorer/Antique/Custom theme controls.
+- No Reader engine, reading mode, timing, pagination, or MutationObserver changes.

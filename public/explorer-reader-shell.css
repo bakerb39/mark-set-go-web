@@ -1,4 +1,4 @@
-/* Explorer Reader Shell Recovery v1.0.2 — user JSON baseline
+/* Explorer Reader Shell Recovery v1.0.3 — latest JSON baseline + no center wall
    Restore the original Reader's visual hierarchy first; Explorer scenery decorates
    around the application instead of replacing its structural shell.
    Presentation only: no Reader timing, pagination, mode, or word-DOM changes. */
@@ -200,17 +200,65 @@ html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-
   margin-left: auto !important;
 }
 
-/* User-approved Designer JSON baseline (2026-08-18).
-   These are real defaults now, not values the user must recreate in localStorage. */
-html[data-msg-experience-theme="explorer"] #app .reader-page-panel #reader-frame {
-  margin-top: 0 !important;
-}
-html[data-msg-experience-theme="explorer"] #app .reader-page-panel .playback-controls {
-  margin-top: 0 !important;
-  margin-bottom: 0 !important;
+/* User-approved Designer JSON baseline (latest export, 2026-08-18).
+   These are the actual Explorer defaults, not settings the user must recreate. */
+@media (min-width: 861px) {
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel {
+    width: 100% !important;
+    margin-top: 3px !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    transform: translate3d(0,-10px,0) !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-title-row {
+    margin-top: 14px !important;
+    margin-bottom: -1px !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls,
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar {
+    min-height: 58px !important;
+    margin-top: 6px !important;
+    margin-bottom: 30px !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel .navigation-pane {
+    height: 790px !important;
+    margin-top: 7px !important;
+    margin-bottom: -80px !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel #reader-frame {
+    margin-top: 7px !important;
+    background: #ffffff !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel #reader {
+    background: #ffffff !important;
+    background-image: none !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-viewer-footer {
+    margin-top: -24px !important;
+    padding-top: 29px !important;
+    padding-bottom: 29px !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel .playback-controls {
+    margin-top: -57px !important;
+    margin-bottom: 19px !important;
+  }
 }
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel .mark-companion-panel .askmark-hero {
-  background: #256056 !important;
+  background: #317165 !important;
+}
+
+/* Remove the obsolete center "wall" completely. The fixed Explorer world now
+   owns ONLY the scenic images; it no longer paints a tan/green rectangle through
+   the open space between the Reader shell and the footer. */
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art.msg-vd-designer-surface-active {
+  background: transparent !important;
+  background-image: none !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) body {
+  background: var(--explorer-global-surface,#fffdf7) !important;
+  background-image: none !important;
 }
 
 @media (max-width: 860px) {

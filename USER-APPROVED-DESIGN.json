@@ -1,0 +1,41 @@
+{
+  "version": 2,
+  "targets": {
+    "controls": {
+      "minHeight": 58,
+      "marginBottom": 30,
+      "marginTop": 6
+    },
+    "reader": {
+      "marginTop": 7,
+      "background": "#ffffff"
+    },
+    "playback": {
+      "marginBottom": 19,
+      "marginTop": -57
+    },
+    "shell": {
+      "paddingY": 0,
+      "width": 100,
+      "marginTop": 3,
+      "moveY": -10,
+      "marginBottom": 0
+    },
+    "companion": {
+      "headerBackground": "#317165"
+    },
+    "footer": {
+      "marginTop": -24,
+      "paddingY": 29
+    },
+    "topics": {
+      "marginBottom": -80,
+      "height": 790,
+      "marginTop": 7
+    },
+    "title": {
+      "marginTop": 14,
+      "marginBottom": -1
+    }
+  }
+}
