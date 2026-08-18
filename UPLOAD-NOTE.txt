@@ -1,15 +1,9 @@
-Explorer illustrated finishing pass v1.3.1
+Explorer v1.3.1 focused visual correction
 
-Upload/extract this ZIP at the REPOSITORY ROOT. It already contains public/.
+Extract this ZIP at the REPOSITORY ROOT. It already contains public/.
 
-Verified completion checklist:
-[✓] Full compass/foreground artwork retained and bottom-aligned so it is visible.
-[✓] Right waterfall/books/telescope artwork retained and bottom-aligned.
-[✓] Topic source/share row collapses once the document scrolls/moves.
-[✓] Only Summarize / Analyze / Create Post remains as the compact opaque scroll ceiling.
-[✓] Removed the large white overlay/fade treatment from the Topic article header.
-[✓] Start/Pause/Reset use Explorer green/brass/ivory colors (including fullscreen equivalents).
-[✓] My Topics/navigation pane receives brass/ivory framed edges without changing width.
-[✓] Reader frame/toolbar/footer receive matching brass/ivory visual framing without changing Reader dimensions.
-[✓] No Reader mode/timing/pagination algorithms modified.
-[✓] No MutationObserver added.
+Files replaced:
+  public/index.html
+  public/explorer-theme.css
+
+This is a presentation-only patch. It does not include or modify Reader mode JS.
