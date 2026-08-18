@@ -1,4 +1,4 @@
-/* Explorer Visual Designer v2.1 — expanded layout controls.
+/* Explorer Visual Designer v2.2 — expanded layout controls.
    Editor chrome only. No Reader engine/timing/pagination styles. */
 
 #msg-explorer-design-launcher,
@@ -90,3 +90,10 @@ body.msg-vd-preview-mode .msg-vd-selected { outline:0 !important; }
 .msg-vd-bottom-actions .msg-vd-save { background:linear-gradient(180deg,#327467,#245b52); border-color:#245b52; color:#fff8df; }
 .msg-vd-bottom-actions .msg-vd-danger { color:#7d3a2c; }
 @media(max-width:720px){#msg-explorer-visual-designer{top:8px;right:8px;width:min(310px,calc(100vw - 16px));max-height:calc(100vh - 16px)}#msg-explorer-design-launcher{right:10px;bottom:10px}}
+
+/* v2.2 — palette preset control. */
+.msg-vd-control select {
+  min-width:132px; min-height:27px; padding:3px 24px 3px 6px;
+  border:1px solid #c9b98d; border-radius:5px; background:#fff; color:#263f38; font-size:9px;
+}
+.msg-vd-layer[data-vd-layer="theme"] { grid-column:1 / -1; font-weight:850; background:#f3ead1; }

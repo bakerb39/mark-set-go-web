@@ -5,7 +5,31 @@
   const CONFIG_VERSION = 2;
   const MANAGED_ATTR = 'data-msg-vd-selectable';
 
+  const THEME_PRESETS = {
+    explorer: {
+      page:'#e8e1cf', surface:'#fffdf6', accent:'#2e6f63', accentDark:'#245c53',
+      soft:'#e7f0e8', soft2:'#f5f1df', border:'#c7d7c7', gold:'#d3ad58', ink:'#173e37', muted:'#61766d'
+    },
+    antique: {
+      page:'#d6c4a4', surface:'#fff8e7', accent:'#765b35', accentDark:'#5b432b',
+      soft:'#efe1c2', soft2:'#f6ead1', border:'#c7aa75', gold:'#b8873f', ink:'#3b2b1e', muted:'#756550'
+    }
+  };
+
+  /* Baked from the user's exported design JSON. Reset returns here. */
+  const DEFAULT_CONFIG = {
+    version:2,
+    targets:{
+      controls:{minHeight:58,marginBottom:30},
+      reader:{marginTop:0},
+      playback:{marginBottom:0,marginTop:0},
+      shell:{paddingY:6,width:100,marginTop:0},
+      companion:{headerBackground:'#256056'}
+    }
+  };
+
   const TARGETS = [
+    { id:'theme', label:'Global Explorer Theme', selector:'html', group:'Theme' },
     { id:'shell', label:'Reader shell', selector:'.reader-page-panel', group:'Layout' },
     { id:'title', label:'Reader title', selector:'.reader-page-panel > .reader-title-row', group:'Layout' },
     { id:'controls', label:'Top controls', selector:'.reader-page-panel > .reader-pane-controls', group:'Layout' },
@@ -20,6 +44,19 @@
   ];
 
   const STYLE_CONTROLS = {
+    theme: [
+      selectControl('preset','Theme preset',[['explorer','Explorer Green'],['antique','Antique Parchment'],['custom','Custom']]),
+      color('page','Page background','html','--explorer-global-page'),
+      color('surface','Page / card surface','html','--explorer-global-surface'),
+      color('accent','Primary accent','html','--explorer-global-accent'),
+      color('accentDark','Dark accent','html','--explorer-global-accent-dark'),
+      color('soft','Soft accent','html','--explorer-global-soft'),
+      color('soft2','Warm secondary','html','--explorer-global-soft-2'),
+      color('gold','Brass / gold','html','--explorer-global-gold'),
+      color('border','Borders','html','--explorer-global-border'),
+      color('ink','Text','html','--explorer-global-ink'),
+      color('muted','Muted text','html','--explorer-global-muted')
+    ],
     shell: [
       range('width','Shell width',55,110,1,'%', '.reader-page-panel','width'),
       range('moveY','Move shell up / down',-150,150,1,'translateY','.reader-page-panel','transform'),
@@ -103,11 +140,12 @@
 
   function range(key,label,min,max,step,unit,selector,prop){return{type:'range',key,label,min,max,step,unit,selector,prop};}
   function color(key,label,selector,prop){return{type:'color',key,label,selector,prop};}
+  function selectControl(key,label,options){return{type:'select',key,label,options};}
   function check(key,label){return{type:'check',key,label};}
   function text(key,label){return{type:'text',key,label};}
   function fileControl(key,label){return{type:'file',key,label};}
   function clone(value){return JSON.parse(JSON.stringify(value||{}));}
-  function blankConfig(){return{version:CONFIG_VERSION,targets:{}};}
+  function blankConfig(){return clone(DEFAULT_CONFIG);}
 
   function loadConfig(){
     try{
@@ -257,6 +295,7 @@
     const value=controlValue(target,control);
     if(control.type==='range')return `<div class="msg-vd-control"><label>${control.label}</label><output class="msg-vd-control-output" data-vd-output="${control.key}">${formatValue(control,value)}</output><input type="range" min="${control.min}" max="${control.max}" step="${control.step}" value="${value}" data-vd-control="${control.key}"></div>`;
     if(control.type==='color')return `<div class="msg-vd-control"><label>${control.label}</label><input type="color" value="${normalizeColor(value)}" data-vd-control="${control.key}"></div>`;
+    if(control.type==='select')return `<div class="msg-vd-control"><label>${control.label}</label><select data-vd-control="${control.key}">${control.options.map(([v,l])=>`<option value="${v}" ${String(value)===v?'selected':''}>${l}</option>`).join('')}</select></div>`;
     if(control.type==='check')return `<div class="msg-vd-control"><label class="msg-vd-check"><input type="checkbox" ${value!==false?'checked':''} data-vd-control="${control.key}">${control.label}</label></div>`;
     if(control.type==='text')return `<div class="msg-vd-control"><label>${control.label}</label><input type="text" value="${escapeAttr(value||'')}" placeholder="/assets/explorer/... or https://..." data-vd-control="${control.key}"></div>`;
     if(control.type==='file')return `<div class="msg-vd-control"><label>${control.label}</label><div class="msg-vd-file-row"><button type="button" data-vd-file-pick>Choose image…</button><button type="button" data-vd-image-original>Use original</button><input type="file" accept="image/*" data-vd-image-file hidden></div></div>`;
@@ -273,7 +312,17 @@
       const eventName=control.type==='text'?'change':'input';
       input.addEventListener(eventName,()=>{
         const value=inputValue(control,input);
-        setControlValue(target,control,value);
+        if(target.id==='theme' && control.key==='preset'){
+          applyThemePreset(value);
+          renderInspector();
+        }else{
+          setControlValue(target,control,value);
+          if(target.id==='theme' && control.type==='color'){
+            (config.targets.theme||={}).preset='custom';
+            const presetSelect=host.querySelector('[data-vd-control="preset"]');
+            if(presetSelect)presetSelect.value='custom';
+          }
+        }
         const output=host.querySelector(`[data-vd-output="${control.key}"]`);
         if(output)output.textContent=formatValue(control,value);
         markDirty();
@@ -293,6 +342,7 @@
   function controlValue(target,control){
     const bucket=config.targets[target.id]||{};
     if(Object.prototype.hasOwnProperty.call(bucket,control.key))return bucket[control.key];
+    if(target.id==='theme' && control.key==='preset')return 'explorer';
     if(target.art){
       const el=targetElement(target);
       if(control.key==='x'||control.key==='y')return 0;
@@ -328,6 +378,15 @@
     return input.value;
   }
 
+  function applyThemePreset(name){
+    const preset=THEME_PRESETS[name];
+    const bucket=config.targets.theme||={};
+    bucket.preset=name;
+    if(!preset)return;
+    Object.assign(bucket,preset);
+    applyTarget(targetById('theme'));
+  }
+
   function setControlValue(target,control,value){
     const bucket=config.targets[target.id]||={};
     bucket[control.key]=value;
@@ -343,6 +402,7 @@
     if(target.art){applyArt(target,el,values);return;}
     const controls=STYLE_CONTROLS[target.id]||[];
     controls.forEach(control=>{
+      if(control.type==='select')return;
       if(!Object.prototype.hasOwnProperty.call(values,control.key))return;
       const node=document.querySelector(control.selector||target.selector||'');
       if(node)applyStyleControl(node,control,values[control.key]);
@@ -419,6 +479,7 @@
       const original=el.dataset.msgVdOriginalSrc;if(original)el.setAttribute('src',original);
     }else{
       (STYLE_CONTROLS[target.id]||[]).forEach(control=>{
+        if(control.type==='select')return;
         const node=document.querySelector(control.selector||target.selector||'');if(!node)return;
         if(control.unit==='paddingY'){node.style.removeProperty('padding-top');node.style.removeProperty('padding-bottom');}
         else if(control.unit==='paddingX'){node.style.removeProperty('padding-left');node.style.removeProperty('padding-right');}
