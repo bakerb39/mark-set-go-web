@@ -1386,3 +1386,82 @@ html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-topri
     object-position:bottom !important;
   }
 }
+
+/* ========================================================================
+   Explorer v1.3.2 — remove the spanning Reader slab completely
+   The Reader PAGE is transparent. Only the physical panes own surfaces.
+   ======================================================================== */
+
+/* The full Reader page must never paint a horizontal ivory/green slab behind
+   My Topics, the Reader canvas, or the companion pane. */
+html[data-msg-experience-theme="explorer"] #app > .reader-page-panel,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel {
+  background: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel::before,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* All full-width pre-reader rows are layout-only. They may contain buttons,
+   titles, and controls, but may not paint a band across the page. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-title-row,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-toolbar,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls > .reader-pane-buttons {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls::before,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls::after,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls > .reader-pane-buttons::before,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls > .reader-pane-buttons::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* The individual panes keep the antique/natural framed treatment. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .navigation-pane,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel #reader-frame,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .mark-companion-panel {
+  position: relative;
+}
+
+/* Override reader-music-quick.css using the exact live selector chain.
+   These are the ACTUAL [-|+], play/music, and Full screen controls. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-controls.ask-mark-toolbar .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-font-control,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-font-control {
+  border: 1px solid #a9823c !important;
+  background: linear-gradient(180deg,#fff9e5,#eadbb0) !important;
+  color: #174d45 !important;
+  box-shadow: 0 3px 8px rgba(62,49,25,.16) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-controls.ask-mark-toolbar .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-font-control > button,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-font-control > button {
+  background: transparent !important;
+  color: #174d45 !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-controls.ask-mark-toolbar .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-music-toggle,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-music-toggle {
+  border: 1px solid #a9823c !important;
+  background: linear-gradient(180deg,#36796c,#20584f) !important;
+  color: #fff2c6 !important;
+  box-shadow: 0 3px 8px rgba(22,65,56,.22) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-controls.ask-mark-toolbar .reader-pane-buttons > .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button {
+  border: 1px solid #a9823c !important;
+  background: linear-gradient(180deg,#fff9e5,#eadbb0) !important;
+  color: #174d45 !important;
+  box-shadow: 0 3px 8px rgba(62,49,25,.16) !important;
+}

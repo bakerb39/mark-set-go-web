@@ -1,9 +1,8 @@
-Explorer v1.3.1 focused visual correction
+Explorer v1.3.2 — remove spanning Reader slab
 
-Extract this ZIP at the REPOSITORY ROOT. It already contains public/.
-
-Files replaced:
+Extract at repository root.
+Contains only:
   public/index.html
   public/explorer-theme.css
 
-This is a presentation-only patch. It does not include or modify Reader mode JS.
+No Reader JavaScript or reading-mode files are changed.
