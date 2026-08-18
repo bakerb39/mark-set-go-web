@@ -4964,12 +4964,193 @@ function renderCurrentReader() {
 
 function renderHome() {
   stopReader();
+  app.dataset.viewKey = 'home';
 
   let resumeMeta = null;
   try { resumeMeta = JSON.parse(localStorage.getItem(READER_SESSION_META_KEY) || 'null'); } catch {}
   const resumePercent = resumeMeta?.totalWords
     ? Math.min(100, Math.max(0, Math.round((Number(resumeMeta.index) || 0) / Number(resumeMeta.totalWords) * 100)))
     : null;
+
+  const bindHomeReaderActions = () => {
+    app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));
+
+    app.querySelector('#resume-last-reading')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      if (button.disabled) return;
+      const original = button.innerHTML;
+      button.disabled = true;
+      button.textContent = 'Loading saved reading…';
+      try {
+        const saved = await readReaderSession();
+        if (!saved?.title || !saved?.currentText) {
+          await clearReaderSession();
+          window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
+          button.disabled = false;
+          button.innerHTML = original;
+          return;
+        }
+
+        if (!applyReaderSessionSnapshot(saved, { resumePlayback: false })) {
+          await clearReaderSession();
+          window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
+          button.disabled = false;
+          button.innerHTML = original;
+        }
+      } catch (error) {
+        console.error('Resume reading failed:', error);
+        window.alert('The saved reading session could not be opened. You can still reopen the book from Library or Reading Progress.');
+        button.disabled = false;
+        button.innerHTML = original;
+      }
+    });
+
+    app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
+      await clearReaderSession();
+      clearActiveReaderPane();
+      renderHome();
+    });
+
+    app.querySelectorAll('[data-home-resume-document]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const documentId = button.dataset.homeResumeDocument;
+        if (!documentId) return;
+        let data = null;
+        try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+        if (!data?.text) {
+          renderReadingList();
+          return;
+        }
+        renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
+        const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
+        requestAnimationFrame(() => jumpToWordIndex(record?.lastWord || 0));
+      });
+    });
+  };
+
+  const explorerHome = getExperienceProfile().appearance === 'explorer';
+  if (explorerHome) {
+    const firstName = currentReaderFirstName();
+    const recent = readingSkillBooks().slice(0, 4).map((item, index) => {
+      const totalWords = Math.max(0, Number(item.totalWords) || 0);
+      const position = Math.max(Number(item.lastWord) || 0, Number(item.furthestWord) || 0);
+      const percent = totalWords ? Math.min(100, Math.max(0, Math.round(position / totalWords * 100))) : 0;
+      const title = String(item.title || 'Untitled');
+      const monogram = title
+        .replace(/[^A-Za-z0-9 ]+/g, ' ')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((word) => word.charAt(0).toUpperCase())
+        .join('') || 'MS';
+      return { ...item, index, percent, title, monogram };
+    });
+
+    const journeyCards = recent.length
+      ? recent.map((item) => `
+          <article class="explorer-journey-card explorer-cover-${(item.index % 4) + 1}">
+            <div class="explorer-book-cover" aria-hidden="true">
+              <span>${escapeHtml(item.monogram)}</span>
+              <small>Mark, Set, Go!</small>
+            </div>
+            <div class="explorer-journey-copy">
+              <h3>${escapeHtml(item.title)}</h3>
+              <p>${item.source?.type === 'topic-feed' ? 'Saved article' : item.source?.type === 'modern-guide' ? 'Reading guide' : 'Saved reading'}</p>
+              <div class="explorer-progress-line" aria-label="${item.percent}% complete"><i style="width:${item.percent}%"></i></div>
+              <div class="explorer-journey-meta"><span>${item.percent}% complete</span><span>${item.lastReadAt ? escapeHtml(libraryRecencyLabel(item.lastReadAt)) : 'Ready to continue'}</span></div>
+              <button class="explorer-card-open" type="button" data-home-resume-document="${escapeHtml(item.documentId || '')}">Resume reading <span aria-hidden="true">→</span></button>
+            </div>
+          </article>`).join('')
+      : `
+          <article class="explorer-home-empty-journey">
+            <span class="explorer-empty-compass" aria-hidden="true">✥</span>
+            <div><h3>Your first journey is waiting.</h3><p>Open a book, guide, or article and it will appear here when you return.</p></div>
+            <button class="secondary" type="button" data-action="browse">Explore the library</button>
+          </article>`;
+
+    const recentRows = recent.slice(0, 3).map((item) => `
+      <button class="explorer-recent-row" type="button" data-home-resume-document="${escapeHtml(item.documentId || '')}">
+        <span class="explorer-recent-mark explorer-cover-${(item.index % 4) + 1}" aria-hidden="true">${escapeHtml(item.monogram)}</span>
+        <span class="explorer-recent-copy"><strong>${escapeHtml(item.title)}</strong><small>${item.percent}% complete</small></span>
+        <span class="explorer-recent-progress" aria-hidden="true"><i style="width:${item.percent}%"></i></span>
+        <span aria-hidden="true">›</span>
+      </button>`).join('') || `
+      <div class="explorer-recent-empty">Recent books and articles will collect here as you read.</div>`;
+
+    app.innerHTML = `
+      <section class="explorer-home" aria-label="Mark, Set, Go! home">
+        <header class="explorer-home-hero">
+          <div class="explorer-home-hero-copy">
+            <div class="explorer-home-eyebrow"><span aria-hidden="true">✥</span>${firstName ? `Welcome back, ${escapeHtml(firstName)}` : 'Welcome, Explorer'}</div>
+            <h1>Every great journey begins with a single page.</h1>
+            <p>Mark what matters. Set your path. Go beyond the page.</p>
+            <div class="explorer-home-hero-actions">
+              ${resumeMeta?.title ? `<button class="primary" id="resume-last-reading" type="button"><span aria-hidden="true">↩</span> Continue reading</button>` : `<button class="primary" data-action="reader" type="button"><span aria-hidden="true">✥</span> Start reading</button>`}
+              <button class="secondary" data-action="browse" type="button">Explore library <span aria-hidden="true">→</span></button>
+            </div>
+          </div>
+          <blockquote class="explorer-home-quote">
+            <span class="explorer-quote-compass" aria-hidden="true">✥</span>
+            <p>“All adventures, especially into new territory, are scary.”</p>
+            <cite>— Sally Ride</cite>
+          </blockquote>
+        </header>
+
+        <section class="explorer-home-section explorer-home-journey">
+          <div class="explorer-home-section-heading">
+            <div><span aria-hidden="true">✥</span><h2>Continue Your Journey</h2></div>
+            <button class="explorer-text-link" type="button" data-action="my-library">View library <span aria-hidden="true">→</span></button>
+          </div>
+          <div class="explorer-journey-grid">${journeyCards}</div>
+        </section>
+
+        <div class="explorer-home-lower-grid">
+          <section class="explorer-home-section explorer-home-recent">
+            <div class="explorer-home-section-heading"><div><span aria-hidden="true">↩</span><h2>Pick Up Where You Left Off</h2></div></div>
+            <div class="explorer-recent-list">${recentRows}</div>
+            <button class="explorer-text-link explorer-recent-view-all" type="button" data-action="my-reading">View all recent reading <span aria-hidden="true">→</span></button>
+          </section>
+
+          <div class="explorer-home-discovery-stack">
+            <section class="explorer-home-section explorer-home-topics">
+              <div class="explorer-home-section-heading"><div><span aria-hidden="true">✥</span><h2>Explore Topics</h2></div></div>
+              <div class="explorer-topic-chips">
+                <button type="button" data-action="topic-feeds"><span aria-hidden="true">◉</span> Finance</button>
+                <button type="button" data-action="topic-feeds"><span aria-hidden="true">⚙</span> Technology</button>
+                <button type="button" data-action="browse"><span aria-hidden="true">⌂</span> History</button>
+                <button type="button" data-action="browse"><span aria-hidden="true">❧</span> Philosophy</button>
+                <button type="button" data-action="browse"><span aria-hidden="true">△</span> Self Growth</button>
+                <button type="button" data-action="browse"><span aria-hidden="true">◒</span> Biographies</button>
+              </div>
+            </section>
+
+            <section class="explorer-home-expedition">
+              <div class="explorer-expedition-copy">
+                <span class="source-category">Your reading expedition</span>
+                <h2>Read with purpose. Remember what matters.</h2>
+                <p>Highlight insights, add notes, and build a trail of ideas worth returning to.</p>
+                <div>
+                  <button class="primary" type="button" data-action="my-library">Go to Library <span aria-hidden="true">→</span></button>
+                  <button class="explorer-text-link" type="button" data-action="mark-notebook">Open Notebook</button>
+                </div>
+              </div>
+              <div class="explorer-expedition-art" aria-hidden="true"><span>✥</span></div>
+            </section>
+          </div>
+        </div>
+
+        <footer class="explorer-home-quick-actions">
+          <button type="button" data-start-home><span aria-hidden="true">◷</span><strong>WPM Test</strong><small>Measure your natural pace</small></button>
+          <button type="button" data-action="topic-feeds"><span aria-hidden="true">☰</span><strong>Morning Topics</strong><small>Open your curated feeds</small></button>
+          <button type="button" data-action="symposium"><span aria-hidden="true">♜</span><strong>Symposium</strong><small>Explore ideas through debate</small></button>
+          <button type="button" data-action="mark-notebook"><span aria-hidden="true">✎</span><strong>Notebook</strong><small>Return to saved thinking</small></button>
+        </footer>
+      </section>`;
+
+    bindHomeReaderActions();
+    return;
+  }
 
   app.innerHTML = `
     <section class="home-simple">
@@ -5037,41 +5218,7 @@ function renderHome() {
 
     </section>`;
 
-  app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));
-  app.querySelector('#resume-last-reading')?.addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    const original = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Loading saved reading…';
-    try {
-      const saved = await readReaderSession();
-      if (!saved?.title || !saved?.currentText) {
-        await clearReaderSession();
-        window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
-        button.disabled = false;
-        button.textContent = original;
-        return;
-      }
-
-      if (!applyReaderSessionSnapshot(saved, { resumePlayback: false })) {
-        await clearReaderSession();
-        window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
-        button.disabled = false;
-        button.textContent = original;
-      }
-    } catch (error) {
-      console.error('Resume reading failed:', error);
-      window.alert('The saved reading session could not be opened. You can still reopen the book from Library or Reading Progress.');
-      button.disabled = false;
-      button.textContent = original;
-    }
-  });
-  app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
-    await clearReaderSession();
-    clearActiveReaderPane();
-    renderHome();
-  });
-
+  bindHomeReaderActions();
 }
 
 const WPM_TEST_OPTIONS = [

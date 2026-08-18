@@ -826,6 +826,14 @@
     const descriptor = navigationDescriptor(navTarget);
     if (!descriptor) return;
 
+    // Home / the Mark, Set, Go! brand is the intentional exception to the
+    // workspace: it is the app's full-width welcome/start page. Close any
+    // secondary pane, then allow the normal app.js Home route to run.
+    if (descriptor.mode === 'action' && descriptor.value === 'home') {
+      closeWorkspacePanel();
+      return;
+    }
+
     // Reader means "return focus to Reader" when a workspace is already open.
     if (descriptor.mode === 'action' && descriptor.value === 'reader' && workspaceShell() && !workspaceShell().classList.contains('is-closed')) {
       event.preventDefault();
