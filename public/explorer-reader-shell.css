@@ -1,4 +1,4 @@
-/* Explorer Reader Shell Recovery v1.0.3 — latest JSON baseline + no center wall
+/* Explorer Reader Shell Recovery v1.0.4 — collapse dead app-shell + header occlusion
    Restore the original Reader's visual hierarchy first; Explorer scenery decorates
    around the application instead of replacing its structural shell.
    Presentation only: no Reader timing, pagination, mode, or word-DOM changes. */
@@ -37,6 +37,9 @@ html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explore
    the visual application card, matching the original composition. */
 html[data-msg-experience-theme="explorer"] .app-shell:has(.reader-page-panel) {
   padding: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
   background: transparent !important;
   border: 0 !important;
   border-radius: 0 !important;
@@ -267,4 +270,69 @@ html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) body {
     padding: 10px !important;
     border-radius: 12px !important;
   }
+}
+
+
+/* v1.0.4 — PROOF FIX 1: remove the empty Explorer wall below the Reader.
+   The base app gives .app-shell min-height:650px. Once Explorer made that shell
+   transparent, the unused minimum-height area exposed the scenery/background
+   between the Reader card and footer. Collapse that unused height completely. */
+html[data-msg-experience-theme="explorer"] body:has(#app .reader-page-panel) #app.app-shell,
+html[data-msg-experience-theme="explorer"] .app-shell:has(.reader-page-panel) {
+  min-height: 0 !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
+}
+
+/* The scenery container owns images only — never a center-colored slab. */
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art {
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art::before,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) #app,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .msg-workspace-primary {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* v1.0.4 — PROOF FIX 2: Topic Feed text disappears beneath the compact header.
+   No spanning bar: Source/share leaves after scrolling and only small opaque
+   pads immediately behind the action words occlude the document text. */
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit,
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled > .topic-feed-story-meta-overlay {
+  display: none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action .read-anything-inline-article-summary {
+  position: relative !important;
+  z-index: 2 !important;
+  background: #fff !important;
+  box-shadow: 0 0 0 3px #fff !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action > span[aria-hidden="true"] {
+  position: relative !important;
+  z-index: 2 !important;
+  background: #fff !important;
+  box-shadow: 0 0 0 2px #fff !important;
 }
