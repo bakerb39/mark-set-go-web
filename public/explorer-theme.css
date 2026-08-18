@@ -1465,3 +1465,88 @@ html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-
   color: #174d45 !important;
   box-shadow: 0 3px 8px rgba(62,49,25,.16) !important;
 }
+
+/* ========================================================================
+   Explorer v1.3.3 — warm antique work surface + tighter Reader placement
+   Presentation only. No Reader mode, timing, page, or word-DOM changes.
+   ======================================================================== */
+
+/* The Reader surround should feel like an aged expedition desk, not a mint
+   dashboard panel. Keep the illustrated side scenes, but warm the center and
+   lower work surface into parchment/stone/leather-adjacent neutrals. */
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) body{
+  background:#c9bda5 !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art{
+  background:linear-gradient(180deg,#dfd4bd 0%,#c9b99d 56%,#ad9b7d 100%) !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art::after{
+  display:block !important;
+  content:"" !important;
+  background:
+    linear-gradient(90deg,
+      transparent 0 14%,
+      rgba(232,221,195,.42) 21%,
+      rgba(246,237,214,.76) 31%,
+      rgba(246,237,214,.76) 69%,
+      rgba(232,221,195,.42) 79%,
+      transparent 86%),
+    linear-gradient(180deg,rgba(247,237,214,.18),rgba(171,148,109,.16)) !important;
+}
+
+/* The center Reader shell itself remains transparent. The warm work surface
+   belongs to the illustrated world behind it, not to a giant rectangular UI
+   panel that can cross the Topic/Reader/companion panes. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel{
+  background:transparent !important;
+  background-image:none !important;
+}
+
+/* Pull the working Reader upward by tightening NORMAL FLOW spacing only.
+   Do not translate/absolutely-position the Reader or alter its measured size. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel{
+  padding-top:4px !important;
+  padding-bottom:6px !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-title-row{
+  min-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  gap:6px !important;
+  align-items:flex-start !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-title-copy h1{
+  margin:0 !important;
+  line-height:1.08 !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-title-links{
+  margin:0 !important;
+  line-height:1 !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-toolbar{
+  margin:0 !important;
+  padding:0 !important;
+  min-height:0 !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar{
+  margin:1px 0 4px !important;
+  padding:0 !important;
+  min-height:30px !important;
+  align-items:center !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-controls.ask-mark-toolbar button,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-controls .reader-pane-buttons > button{
+  min-height:30px !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-layout{
+  margin-top:0 !important;
+}
+
+/* Keep the compact right-side utilities proportionate to the tighter command
+   row so they do not recreate vertical dead space. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-topright-media-stack > .reader-topright-font-control,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-topright-media-stack > .reader-topright-music-toggle,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button{
+  min-height:30px !important;
+}

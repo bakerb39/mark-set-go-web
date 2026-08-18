@@ -1,8 +1,9 @@
-Explorer v1.3.2 — remove spanning Reader slab
+Explorer v1.3.3 — warm antique Reader surround + tighter placement
 
-Extract at repository root.
-Contains only:
-  public/index.html
-  public/explorer-theme.css
+Upload/extract at the repository root. The ZIP contains public/.
 
-No Reader JavaScript or reading-mode files are changed.
+Changed files only:
+- public/explorer-theme.css
+- public/index.html
+
+No Reader JavaScript or reading-mode files are included.
