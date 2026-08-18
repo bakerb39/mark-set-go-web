@@ -1,9 +1,18 @@
-Explorer v1.3.3 — warm antique Reader surround + tighter placement
+Explorer Reader Shell Recovery v1
 
-Upload/extract at the repository root. The ZIP contains public/.
+Upload/extract at the repository ROOT. The archive already contains public/ paths.
 
-Changed files only:
-- public/explorer-theme.css
-- public/index.html
+Files:
+  public/index.html
+  public/explorer-reader-shell.css   (NEW)
+  public/explorer-visual-designer.css
+  public/explorer-visual-designer.js
 
-No Reader JavaScript or reading-mode files are included.
+What changed:
+- Restores one coherent white/aged-ivory Reader application shell around title,
+  command row, My Topics, Reader, page controls, and Start/Pause/Reset.
+- Explorer scenery stays outside/behind that shell.
+- Retires the experimental tan Work Surface layer from Designer v1.x.
+- Replaces Designer with v2, which opens on Reader shell and fine-tunes the
+  good composition instead of trying to repair layout with a fake floor.
+- No Reader engine/mode/timing/pagination files are included.

@@ -1,0 +1,207 @@
+/* Explorer Reader Shell Recovery v1.0
+   Restore the original Reader's visual hierarchy first; Explorer scenery decorates
+   around the application instead of replacing its structural shell.
+   Presentation only: no Reader timing, pagination, mode, or word-DOM changes. */
+
+/* Retire the experimental movable "work surface" from Designer v1.x. */
+html[data-msg-experience-theme="explorer"] .msg-vd-center-work-surface,
+#msg-vd-surface-handle {
+  display: none !important;
+}
+
+/* The illustrated world is the environment OUTSIDE the Reader application. */
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) body {
+  background: #b9b6a1 !important;
+  background-image: none !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art.msg-vd-designer-surface-active {
+  background: #b9b6a1 !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art::after,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art.msg-vd-designer-surface-active::after {
+  display: none !important;
+  content: none !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art__left,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art__right {
+  opacity: 1 !important;
+  filter: saturate(1.04) contrast(1.035) !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art__top {
+  opacity: .96 !important;
+  filter: saturate(1.02) contrast(1.02) !important;
+}
+
+/* Keep the app shell itself layout-only. The white/ivory Reader panel below is
+   the visual application card, matching the original composition. */
+html[data-msg-experience-theme="explorer"] .app-shell:has(.reader-page-panel) {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  isolation: auto !important;
+}
+
+/* Restore the single coherent Reader application shell. */
+html[data-msg-experience-theme="explorer"] #app > .reader-page-panel,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel {
+  position: relative !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 14px 16px 12px !important;
+  overflow: visible !important;
+  background: #fffdf7 !important;
+  background-image: none !important;
+  border: 1px solid rgba(146,120,68,.42) !important;
+  border-radius: 16px !important;
+  box-shadow:
+    0 18px 46px rgba(28,50,42,.20),
+    inset 0 0 0 1px rgba(255,255,255,.82) !important;
+  backdrop-filter: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel::before,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Title belongs inside the shell, just like the original Reader. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-title-row {
+  min-height: 0 !important;
+  margin: 0 0 4px !important;
+  padding: 0 !important;
+  gap: 8px !important;
+  align-items: flex-start !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-title-copy h1 {
+  margin: 0 0 2px !important;
+  line-height: 1.12 !important;
+  color: #143f3a !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-title-links {
+  margin: 0 !important;
+  line-height: 1.15 !important;
+}
+
+/* The command row is a real row INSIDE the shell, not scenery and not a band
+   layered across the pane. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-toolbar {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  min-height: 34px !important;
+  margin: 5px 0 8px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls > .reader-pane-buttons {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Restore the original layout hierarchy: panes start together beneath controls. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-layout {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Individual working panes remain crisp white cards inside the larger shell. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .navigation-pane {
+  background: #fffefa !important;
+  border: 1px solid rgba(104,130,120,.24) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 20px rgba(33,56,48,.10) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel #reader-frame {
+  background: #fff !important;
+  border: 1px solid rgba(126,140,133,.28) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 7px 18px rgba(31,52,45,.09) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel #reader {
+  background: #fff !important;
+  background-image: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .mark-companion-panel {
+  border-radius: 10px !important;
+  box-shadow: 0 8px 20px rgba(33,56,48,.10) !important;
+}
+
+/* Footer/page controls and playback remain part of the SAME white application
+   shell. No tan floor, green slab, or separate lower stage. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-viewer-footer {
+  min-height: 1.8rem !important;
+  margin: 0 !important;
+  padding: .35rem .15rem 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .playback-controls {
+  margin: 8px 0 0 !important;
+  padding: 0 !important;
+  gap: 8px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .playback-controls .status {
+  margin-left: .25rem !important;
+}
+
+/* Explorer materials decorate controls without changing their row geometry. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel :is(#start-reader,#fs-start) {
+  border: 1px solid #276257 !important;
+  background: linear-gradient(180deg,#347769,#20584f) !important;
+  color: #fff7dd !important;
+  box-shadow: 0 2px 6px rgba(26,72,62,.17) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel :is(#pause-reader,#reset-reader,#fs-pause,#fs-reset) {
+  border: 1px solid rgba(164,129,61,.56) !important;
+  background: linear-gradient(180deg,#fffaf0,#eee2bd) !important;
+  color: #174d45 !important;
+  box-shadow: 0 2px 5px rgba(71,56,29,.10) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-side-toggle,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .mark-pane-button {
+  border-color: rgba(164,129,61,.48) !important;
+  background: linear-gradient(180deg,#fffaf0,#f2e7c9) !important;
+  color: #174d45 !important;
+}
+
+/* Preserve the already-correct compact top-right utility grouping. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-buttons > .reader-topright-media-stack {
+  margin-left: auto !important;
+}
+
+@media (max-width: 860px) {
+  html[data-msg-experience-theme="explorer"] #app > .reader-page-panel,
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel {
+    padding: 10px !important;
+    border-radius: 12px !important;
+  }
+}
