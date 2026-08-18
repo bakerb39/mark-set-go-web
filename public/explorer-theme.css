@@ -314,3 +314,21 @@ html[data-msg-experience-theme="explorer"] .site-footer {
   html[data-msg-experience-theme="explorer"] .app-shell { padding:.35rem; border-radius:14px; }
   .visual-theme-grid { grid-template-columns:1fr; }
 }
+
+
+/* Reader geometry firewall -------------------------------------------------
+   Explorer may decorate the application around the Reader, but it must not
+   change the geometry used by Book Pages or animated reading modes. The
+   non-reader Explorer presentation (including Topic Feeds) is intentionally
+   unchanged. */
+html[data-msg-experience-theme="explorer"] .app-shell:has(.reader-page-panel) {
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  isolation: auto !important;
+}
+html[data-msg-experience-theme="explorer"] .app-shell:has(.reader-page-panel)::before {
+  display: none !important;
+  content: none !important;
+}

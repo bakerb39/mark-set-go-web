@@ -306,8 +306,8 @@
     while(shell.firstChild) legacyHost.appendChild(shell.firstChild);
     shell.appendChild(legacyHost); shell.insertAdjacentHTML('beforeend',sceneMarkup()); bind();
     const legacy = legacySelectionPanel();
-    if (legacy) { selectionObserver?.disconnect(); selectionObserver=new MutationObserver(()=>{syncSelection();syncResponse();}); selectionObserver.observe(legacy,{childList:true,subtree:true,attributes:true,attributeFilter:['hidden']}); }
-    syncSelection(); syncContext(); lookUpSequence();
+    selectionObserver = null;
+    syncSelection(); syncResponse(); syncContext(); lookUpSequence();
     return true;
   }
 
@@ -339,8 +339,9 @@
   function install() { const ready=configureToolbar()&&configureShell(); installPageGuide(); return ready; }
   function retry() { installCount++; if(!install()&&installCount<240) requestAnimationFrame(retry); }
 
-  const appObserver=new MutationObserver(()=>{ clearTimeout(appObserver._t); appObserver._t=setTimeout(installPageGuide,120); });
-  appObserver.observe(app,{childList:true,subtree:false});
+  document.addEventListener('marksetgo:askmark-legacy-updated',()=>{syncSelection();syncResponse();});
+  document.addEventListener('marksetgo:library-rendered',()=>setTimeout(installPageGuide,0));
+  document.addEventListener('click',event=>{if(event.target.closest?.('[data-action],[data-read]'))setTimeout(installPageGuide,0);},true);
   document.addEventListener('selectionchange',()=>setTimeout(syncSelection,60));
   document.addEventListener('marksetgo:document-available',()=>{installCount=0;requestAnimationFrame(retry);});
   document.addEventListener('marksetgo:transform-state',syncContext);

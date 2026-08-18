@@ -244,13 +244,19 @@ function startPacmanReader({ reader, speed, start, pause }) {
       return;
     }
 
+    const renderedEndBefore = Number(state.renderedWordEnd) || 0;
     ensureWordsRendered(
       reader,
       'pacman',
       1,
       Math.min(state.words.length, state.index + 1000)
     );
-    applyPacmanChompState(reader);
+    // Reconcile persisted chomp state only when the virtual renderer actually
+    // appended/replaced a word window. Walking every rendered word on every
+    // Pac-Man tick was consuming most of the available animation time.
+    if ((Number(state.renderedWordEnd) || 0) !== renderedEndBefore) {
+      applyPacmanChompState(reader);
+    }
 
     const wordIndex = state.index;
     const wordElement = reader.querySelector(`.reader-word[data-index="${wordIndex}"]`);
@@ -264,7 +270,9 @@ function startPacmanReader({ reader, speed, start, pause }) {
     const characters = preparePacmanCharacters(wordElement);
     const wordDuration = Math.max(80, 60000 / speed);
     const visibleCharacters = characters.length || 1;
-    const characterDuration = Math.max(22, wordDuration / visibleCharacters);
+    // Keep the whole word on the selected WPM clock. A 22ms-per-character
+    // floor made long words dramatically slower than the requested pace.
+    const characterDuration = Math.max(4, wordDuration / visibleCharacters);
     let characterIndex = 0;
 
     const chompCharacter = () => {
@@ -286,7 +294,9 @@ function startPacmanReader({ reader, speed, start, pause }) {
       wordElement.setAttribute('aria-hidden', 'true');
 
       state.index = Math.min(state.words.length, wordIndex + 1);
-      persistReaderSession({ immediate: true });
+      // Keep animation timing on the main thread; normal session persistence is
+      // debounced instead of serializing the full document after every word.
+      persistReaderSession();
       updateFocusAnchorOverlay(state.words.slice(wordIndex, wordIndex + 1));
       updateReaderStatus();
 

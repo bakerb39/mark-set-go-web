@@ -180,13 +180,11 @@
     installSetting();
     syncTicker();
 
-    const app = document.getElementById('app');
-    if (app) {
-      new MutationObserver(() => installSetting()).observe(app, {
-        childList: true,
-        subtree: true
-      });
-    }
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest?.('[data-action="profile-preferences"]')) return;
+      [0, 80, 220].forEach((delay) => window.setTimeout(installSetting, delay));
+    }, true);
+    document.addEventListener('marksetgo:experience-profile-changed', () => window.setTimeout(installSetting, 0));
 
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && readEnabled()) void refreshTicker({ force: true });

@@ -136,12 +136,12 @@
     setTimeout(refresh,250);
     setTimeout(refresh,1000);
 
-    const observer = new MutationObserver(refresh);
-    observer.observe(document.querySelector('#app') || document.body,{
-      childList:true,
-      subtree:true
-    });
-    window.__classicGuidesGreatBooksLibraryObserver = observer;
+    document.addEventListener('marksetgo:library-rendered',refresh);
+    document.addEventListener('click',(event)=>{
+      if(event.target.closest?.('[data-read="great-books"],[data-action="browse"]')){
+        setTimeout(refresh,0); setTimeout(refresh,180);
+      }
+    },true);
   }
 
   async function openLibrary(){

@@ -307,7 +307,10 @@
   }
 
   document.addEventListener('click', event => { const button=event.target.closest?.('[data-action="reading-goals"]'); if(!button) return; event.preventDefault(); event.stopImmediatePropagation(); render(); }, true);
-  const observer=new MutationObserver(()=>{ injectProgress(); injectActionCenter(); });
-  window.addEventListener('DOMContentLoaded',()=>{ const app=document.querySelector('#app'); if(app) observer.observe(app,{childList:true,subtree:true}); injectProgress(); injectActionCenter(); });
+  const refreshGoalSurfaces=()=>{ injectProgress(); injectActionCenter(); };
+  document.addEventListener('marksetgo:library-rendered',refreshGoalSurfaces);
+  document.addEventListener('marksetgo:action-saved',refreshGoalSurfaces);
+  document.addEventListener('click',event=>{if(event.target.closest?.('[data-action]'))window.setTimeout(refreshGoalSurfaces,0);},true);
+  window.addEventListener('DOMContentLoaded',()=>{ refreshGoalSurfaces(); [200,700].forEach(d=>setTimeout(refreshGoalSurfaces,d)); });
   window.ReadingGoals={render,getGoals,saveGoals,getMetrics,getCompanionProgress,onSessionStart,injectProgress,injectActionCenter,syncGoals};
 })();

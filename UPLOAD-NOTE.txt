@@ -1,0 +1,12 @@
+Reader repair pass 2
+
+Upload/merge the included public/ folder into the repository root.
+All files are intended for the existing repo public/ folder.
+
+This build:
+- keeps Summarize / Analyze / Create Post visually above the document but outside #reader
+- removes live MutationObserver constructions from the supplied runtime files
+- restores responsive Manual Pace arrow taps/holds
+- improves Pac-Man timing/performance without changing its visual concept
+- isolates Explorer theme geometry from Reader/Book Pages
+- does not modify Topic Feeds styling or Explorer presentation on non-Reader pages

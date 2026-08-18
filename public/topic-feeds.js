@@ -614,9 +614,8 @@
     meta.style.top = `${paddingTop}px`;
     meta.style.width = `${headerWidth}px`;
 
-    if (actionRow) {
-      // Read Anything deliberately requires this node to remain a direct child
-      // of #reader. Leave it there and change only its visual placement.
+    if (actionRow && actionRow.parentElement === reader) {
+      // Legacy fallback only. Current builds keep article actions outside #reader.
       actionRow.style.setProperty('position', 'absolute', 'important');
       actionRow.style.setProperty('left', `${paddingLeft}px`, 'important');
       actionRow.style.setProperty('width', `${headerWidth}px`, 'important');
@@ -634,7 +633,7 @@
       const metaHeight = Math.ceil(meta.getBoundingClientRect().height || 0);
       const actionGap = Math.max(5, Math.round(fontSize * 0.35));
 
-      if (actionRow?.isConnected) {
+      if (actionRow?.isConnected && actionRow.parentElement === reader) {
         actionRow.style.setProperty(
           'top',
           `${paddingTop + metaHeight + actionGap}px`,
@@ -645,7 +644,7 @@
       window.requestAnimationFrame(() => {
         if (!reader.isConnected || !spacer.isConnected) return;
 
-        const actionHeight = actionRow?.isConnected
+        const actionHeight = actionRow?.isConnected && actionRow.parentElement === reader
           ? Math.ceil(actionRow.getBoundingClientRect().height || 0)
           : 0;
 
@@ -677,31 +676,17 @@
       return;
     }
 
-    // Read Anything may re-prepend the row. That is expected and no longer a
-    // conflict: direct-child ownership is preserved, while CSS positioning puts
-    // it beneath the source/share divider.
-    if (actionRow.parentElement !== reader) {
-      reader.prepend(actionRow);
-    }
-
+    // Article actions are intentionally outside #reader so animated reading
+    // modes never rebuild or reposition them. Keep only the story metadata
+    // geometry inside the Reader.
     positionTopicFeedStoryHeader();
   }
 
   function observeTopicFeedStoryHeader() {
     const reader = document.querySelector('#reader');
-    if (!reader || reader === topicFeedStoryHeaderReader) return;
-
-    topicFeedStoryHeaderObserver?.disconnect?.();
+    if (!reader) return;
     topicFeedStoryHeaderReader = reader;
-
-    topicFeedStoryHeaderObserver = new MutationObserver(() => {
-      if (!isTopicFeedReaderActive()) return;
-      window.requestAnimationFrame(() => {
-        keepTopicFeedArticleActionsInHeader();
-      });
-    });
-
-    topicFeedStoryHeaderObserver.observe(reader, { childList: true });
+    window.requestAnimationFrame(() => keepTopicFeedArticleActionsInHeader());
   }
 
   function topicFeedSourceCredit(topic, article, payload) {
@@ -1570,16 +1555,7 @@
         topicBookDividerResizeObserver.observe(reader);
       }
 
-      topicBookDividerClassObserver = new MutationObserver(() => {
-        window.requestAnimationFrame(() => {
-          positionTopicBookDivider();
-          positionTopicFeedStoryHeader();
-        });
-      });
-      topicBookDividerClassObserver.observe(reader, {
-        attributes: true,
-        attributeFilter: ['class', 'style']
-      });
+      topicBookDividerClassObserver = null;
     }
 
     positionTopicBookDivider();
@@ -1897,8 +1873,13 @@
     navFrame = requestAnimationFrame(decorateReaderNavigation);
   }
 
-  const appObserver = app ? new MutationObserver(() => scheduleReaderNavigation()) : null;
-  if (appObserver && app) appObserver.observe(app, { childList:true, subtree:true });
+  document.addEventListener('marksetgo:library-rendered', scheduleReaderNavigation);
+  document.addEventListener('marksetgo:transform-state', () => window.setTimeout(scheduleReaderNavigation, 0));
+  document.addEventListener('change', (event) => {
+    if (event.target.closest?.('#mode-select,#word-count,#book-pages,#font-size,#theme-select')) {
+      window.setTimeout(() => { scheduleReaderNavigation(); ensureTopicBookDivider(); positionTopicFeedStoryHeader(); }, 0);
+    }
+  });
 
   document.addEventListener('marksetgo:auth-changed', (event) => {
     if (event.detail?.authenticated) void hydrateCloudState();

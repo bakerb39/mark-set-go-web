@@ -62,20 +62,18 @@
 
     let appeared = false;
     const startedAt = Date.now();
-    const observer = new MutationObserver(() => {
+    const checkModal = () => {
       const present = clerkModalIsPresent();
       if (present) appeared = true;
       if ((appeared && !present) || (!appeared && Date.now() - startedAt > 5000)) {
-        observer.disconnect();
+        window.clearInterval(modalCheckTimer);
         document.body.classList.remove('clerk-auth-dialog-open');
       }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+    };
+    const modalCheckTimer = window.setInterval(checkModal, 120);
     window.setTimeout(() => {
-      if (!appeared && !clerkModalIsPresent()) {
-        observer.disconnect();
-        document.body.classList.remove('clerk-auth-dialog-open');
-      }
+      window.clearInterval(modalCheckTimer);
+      if (!clerkModalIsPresent()) document.body.classList.remove('clerk-auth-dialog-open');
     }, 5500);
   }
 

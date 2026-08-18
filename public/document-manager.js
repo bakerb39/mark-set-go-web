@@ -208,8 +208,8 @@
   }, true);
 
   document.addEventListener('marksetgo:cloud-library-ready', scheduleDecoration);
-  const observer = new MutationObserver(scheduleDecoration);
-  observer.observe(document.getElementById('app') || document.body, { childList: true, subtree: true });
+  document.addEventListener('marksetgo:library-rendered', scheduleDecoration);
+  window.addEventListener('pageshow', scheduleDecoration);
   injectStyles();
   scheduleDecoration();
 

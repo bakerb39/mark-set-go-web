@@ -314,20 +314,14 @@
 
   const boot = () => {
     applyNow();
-
-    const app = document.getElementById('app');
-    if (app) {
-      new MutationObserver(scheduleApply).observe(app, {
-        childList: true,
-        subtree: true,
-        characterData: true
-      });
-    }
-
-    new MutationObserver(scheduleApply).observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-companion']
-    });
+    document.addEventListener('marksetgo:document-available', scheduleApply);
+    document.addEventListener('marksetgo:library-rendered', scheduleApply);
+    document.addEventListener('marksetgo:experience-profile-changed', scheduleApply);
+    document.addEventListener('marksetgo:transform-state', scheduleApply);
+    window.addEventListener('pageshow', scheduleApply);
+    document.addEventListener('click', (event) => {
+      if (event.target.closest?.('[data-action],[data-read]')) window.setTimeout(scheduleApply, 0);
+    }, true);
   };
 
   if (document.readyState === 'loading') {

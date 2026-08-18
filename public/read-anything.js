@@ -1695,14 +1695,14 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     }
 
     const reader = document.querySelector('#app #reader');
-    if (!reader) return;
+    const readerFrame = reader?.closest('#reader-frame');
+    const documentColumn = readerFrame?.parentElement;
+    if (!reader || !readerFrame || !documentColumn) return;
 
-    // Keep the action inside the Reader, but visually separate from article prose.
-    // It belongs above the first line rather than participating in the text flow.
-    // These are article-level controls, not article prose. They should remain
-    // available whenever the article is reopened or resumed, even if Continue
-    // Reading starts at word/page index > 0. Keep them above the first VISIBLE
-    // line of the current Reader view instead of restricting them to index 0.
+    // Article-level actions look like part of the document, but are deliberately
+    // NOT children of #reader. They occupy their own row immediately above the
+    // Reader frame, so the text is pushed down visually without changing Reader
+    // width, height, pagination columns, animation DOM, or word geometry.
     let actionRow = existing;
 
     if (!actionRow) {
@@ -1715,12 +1715,14 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         'display:block',
         'width:100%',
         'box-sizing:border-box',
-        'margin:0 0 .85em 0',
-        'padding:0',
-        'break-inside:avoid',
-        'page-break-inside:avoid',
+        'margin:0 0 .32rem 0',
+        'padding:.28rem clamp(.75rem,2vw,1.5rem) .18rem',
+        'min-height:1.65rem',
+        'background:transparent',
         'position:relative',
-        'z-index:3'
+        'z-index:3',
+        'flex:0 0 auto',
+        'align-self:stretch'
       ].join(';');
 
       const makeArticleLink = (action, label, ariaLabel) => {
@@ -1788,9 +1790,9 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       );
 
       actionRow.append(summaryLink, separator, investorLink, postSeparator, createPostLink);
-      reader.prepend(actionRow);
-    } else if (actionRow.parentElement !== reader) {
-      reader.prepend(actionRow);
+      documentColumn.insertBefore(actionRow, readerFrame);
+    } else if (actionRow.parentElement !== documentColumn || actionRow.nextElementSibling !== readerFrame) {
+      documentColumn.insertBefore(actionRow, readerFrame);
     }
 
     const link = actionRow.querySelector('[data-action="summarize-whole-article"]');
@@ -1887,26 +1889,9 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     }
   }
 
-  function observeInlineArticleSummary() {
-    const reader = document.querySelector('#app #reader');
-    if (!reader || reader.dataset.inlineArticleSummaryObserved === '1') return;
-    reader.dataset.inlineArticleSummaryObserved = '1';
-
-    let queued = false;
-    const observer = new MutationObserver(() => {
-      if (queued) return;
-      queued = true;
-      window.requestAnimationFrame(() => {
-        queued = false;
-        if (!reader.isConnected || !activeImportedDocument || !isWholeArticleDocument()) {
-          observer.disconnect();
-          return;
-        }
-        installArticleSummaryButton();
-      });
-    });
-
-    observer.observe(reader, { childList: true });
+  function refreshInlineArticleActions() {
+    // Explicit lifecycle hook only; never watch Reader DOM mutations.
+    installArticleSummaryButton();
   }
 
   function installDefaultArticleBookPages() {
@@ -1928,35 +1913,21 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     [0, 100, 350, 800].forEach((delay) => window.setTimeout(() => {
       installDisplayFormatControl();
       installArticleSummaryButton();
-      observeInlineArticleSummary();
+      refreshInlineArticleActions();
       installDefaultArticleBookPages();
     }, delay));
     return;
-    formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
-    formatControlAttachTimers = [];
-    let frame = 0;
-    const attachObserver = new MutationObserver(() => {
-      if (!activeImportedDocument) return attachObserver.disconnect();
-      installFormatControl();
-      if (document.querySelector('#read-anything-format-control')) attachObserver.disconnect();
-    });
-    attachObserver.observe(app, { childList: true, subtree: true });
-    window.setTimeout(() => attachObserver.disconnect(), 5000);
-    const attachAfterRender = () => {
-      if (!activeImportedDocument) return;
-      installFormatControl();
-      if (document.querySelector('#read-anything-format-control')) return;
-      frame += 1;
-      if (frame < 180) window.requestAnimationFrame(attachAfterRender);
-    };
-    window.requestAnimationFrame(attachAfterRender);
-    [250, 750, 1500, 3000].forEach((delay) => {
-      const timer = window.setTimeout(() => {
-        if (activeImportedDocument) installFormatControl();
-      }, delay);
-      formatControlAttachTimers.push(timer);
-    });
   }
+
+  document.addEventListener('marksetgo:document-available', () => {
+    [0, 60, 180, 420].forEach((delay) => window.setTimeout(refreshInlineArticleActions, delay));
+  });
+  document.addEventListener('marksetgo:transform-state', () => {
+    window.setTimeout(refreshInlineArticleActions, 0);
+  });
+  window.addEventListener('resize', () => {
+    if (activeImportedDocument && isWholeArticleDocument()) window.setTimeout(refreshInlineArticleActions, 0);
+  });
 
   function installFormatControl() {
     if (!activeImportedDocument) return;
@@ -2344,7 +2315,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
         scheduleFormatControlAttach();
         installArticleSummaryButton();
-        observeInlineArticleSummary();
+        refreshInlineArticleActions();
 
         if (activeImportedDocument && isWholeArticleDocument()) {
           complete = true;

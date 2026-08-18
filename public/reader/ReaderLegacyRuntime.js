@@ -960,22 +960,19 @@ function bindFullscreenOptions(readerFrame) {
     }
   };
   document.addEventListener('fullscreenchange', state.fullscreenOptionsChangeHandler);
-
-  state.fullscreenOptionsObserver = new MutationObserver(() => {
-    if (!readerFrame.isConnected) {
-      state.fullscreenOptionsObserver?.disconnect();
-      state.fullscreenOptionsObserver = null;
-      return;
-    }
-    if (readerFrame.classList.contains('fullscreen-fallback')) {
+  state.fullscreenOptionsObserver = null;
+  const fullscreenToggleButton = app.querySelector('#toggle-reader-fullscreen');
+  fullscreenToggleButton?.addEventListener('click', () => {
+    window.setTimeout(() => {
+      if (!readerFrame.isConnected || !isFullscreen()) return;
       strip.classList.remove('controls-hidden');
       readerFrame.classList.remove('fullscreen-controls-hidden');
       closeMenu();
       closeMarkDrawer();
       syncFromMain();
-    }
+      requestAnimationFrame(refreshFocusAnchorFullscreenLayout);
+    }, 0);
   });
-  state.fullscreenOptionsObserver.observe(readerFrame, { attributes: true, attributeFilter: ['class'] });
 
   closeMenu();
   closeMarkDrawer();

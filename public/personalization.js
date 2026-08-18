@@ -75,8 +75,12 @@
   window.addEventListener('marksetgo:auth-ready', scheduleApply);
   document.addEventListener('DOMContentLoaded', scheduleApply, { once: true });
 
-  const observer = new MutationObserver(scheduleApply);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  document.addEventListener('marksetgo:library-rendered', scheduleApply);
+  document.addEventListener('marksetgo:document-available', () => window.setTimeout(scheduleApply, 0));
+  document.addEventListener('marksetgo:experience-profile-changed', scheduleApply);
+  document.addEventListener('click', (event) => {
+    if (event.target.closest?.('[data-action],[data-read]')) window.setTimeout(scheduleApply, 0);
+  }, true);
 
   [100, 500, 1200, 2500].forEach((delay) => window.setTimeout(scheduleApply, delay));
 })();

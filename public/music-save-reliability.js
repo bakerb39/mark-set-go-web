@@ -452,14 +452,11 @@
       }
     }, true);
 
-    const app = document.querySelector('#app');
-    if (app) {
-      new MutationObserver(() => {
-        if (document.querySelector('#preferred-music-list')) {
-          window.setTimeout(renderSavedList, 0);
-        }
-      }).observe(app, { childList: true, subtree: true });
-    }
+    document.addEventListener('click', (event) => {
+      if (!event.target.closest?.('[data-action="music"]')) return;
+      [0, 80, 220].forEach((delay) => window.setTimeout(renderSavedList, delay));
+    }, true);
+    window.addEventListener('pageshow', () => window.setTimeout(renderSavedList, 0));
   }
 
   window.MSGMusicStore = Object.freeze({

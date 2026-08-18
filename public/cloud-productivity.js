@@ -149,8 +149,12 @@
   }
 
   document.addEventListener('click',(event)=>{if(event.target.closest('[data-random-notes-nav]')){event.preventDefault();document.querySelectorAll('.site-header nav details[open]').forEach(x=>x.removeAttribute('open'));renderRandomNotes()}},true);
-  const observer=new MutationObserver(()=>requestAnimationFrame(()=>{addNavigation();enhanceActionCenter();enhanceCloudDocumentLabels()}));observer.observe(document.body,{childList:true,subtree:true});
-  document.addEventListener('marksetgo:cloud-library-ready',enhanceCloudDocumentLabels);
+  const refreshProductivityEnhancements=()=>requestAnimationFrame(()=>{addNavigation();enhanceActionCenter();enhanceCloudDocumentLabels()});
+  document.addEventListener('marksetgo:library-rendered',refreshProductivityEnhancements);
+  document.addEventListener('marksetgo:action-saved',refreshProductivityEnhancements);
+  document.addEventListener('marksetgo:cloud-library-ready',()=>{enhanceCloudDocumentLabels();refreshProductivityEnhancements();});
+  document.addEventListener('click',(event)=>{if(event.target.closest?.('[data-action]'))window.setTimeout(refreshProductivityEnhancements,0);},true);
+  [100,500,1200].forEach(delay=>window.setTimeout(refreshProductivityEnhancements,delay));
   injectStyles(); addNavigation();
   window.MarkSetGoRandomNotes=Object.freeze({open:renderRandomNotes,refresh:loadNotes,email:emailRandomNotes,version:VERSION});
 })();

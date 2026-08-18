@@ -11803,12 +11803,9 @@ function bindMarkCompanion(reader){
   state.markSuppressNextReaderClick=false;
   state.markResumeOnNextReaderClick=null;
   state.markSelectionWasRunning=false;
-
-  state.markHighlightObserver?.disconnect?.();
-  state.markHighlightObserver=new MutationObserver(()=>{
-    if(state.markPersistentSelection) requestAnimationFrame(applyPersistentMarkSelectionHighlight);
-  });
-  state.markHighlightObserver.observe(reader,{childList:true,subtree:true});
+  // Reader isolation: persistent selection highlighting is refreshed by explicit
+  // Reader events (scroll/reflow/selection actions), never by DOM mutation watching.
+  state.markHighlightObserver = null;
 
   const pauseForSelection=(interaction)=>{
     if(!interaction || interaction.paused) return;
@@ -12271,21 +12268,10 @@ function bindMarkCompanion(reader){
     finishPassageHighlightAction();
     updateReaderStatus(result.highlightChanged || result.writingRemoved || result.drawingRemoved ? 'Markup erased from selected passage.' : 'No saved markup found in the selected passage.');
   });
-
-  // Virtualized reader windows replace word nodes as the reader moves. Repaint
-  // durable passage highlights and reposition written overlays whenever that DOM
-  // window changes. Ignore mutations generated inside the overlay layer itself.
-  state.passageHighlightObserver?.disconnect?.();
-  state.passageHighlightObserver = new MutationObserver((mutations)=>{
-    if (mutations.length && mutations.every((mutation)=>mutation.target instanceof Element && mutation.target.closest('[data-reader-writing-layer], [data-reader-drawing-layer], [data-reader-workspace-id]'))) return;
-    requestAnimationFrame(()=>{
-      applySavedPassageHighlights();
-      applySavedReaderWritingOverlays();
-      applySavedReaderDrawings();
-      applySavedReaderWorkspaces();
-    });
-  });
-  state.passageHighlightObserver.observe(reader,{childList:true,subtree:true});
+  // Reader isolation: annotation repainting is event-driven. Virtual window changes
+  // are followed by reader scroll/resize or an explicit Reader action, so no DOM
+  // observer is allowed to run during animated reading modes.
+  state.passageHighlightObserver = null;
   applySavedPassageHighlights();
   applySavedReaderWritingOverlays();
   applySavedReaderDrawings();
@@ -12294,7 +12280,13 @@ function bindMarkCompanion(reader){
   let writingPositionFrame = 0;
   const scheduleWritingPosition = () => {
     cancelAnimationFrame(writingPositionFrame);
-    writingPositionFrame = requestAnimationFrame(()=>{ applySavedReaderWritingOverlays(); applySavedReaderDrawings(); });
+    writingPositionFrame = requestAnimationFrame(()=>{
+      if (state.markPersistentSelection) applyPersistentMarkSelectionHighlight();
+      applySavedPassageHighlights();
+      applySavedReaderWritingOverlays();
+      applySavedReaderDrawings();
+      applySavedReaderWorkspaces();
+    });
   };
   reader.addEventListener('scroll', scheduleWritingPosition, {passive:true});
   state.readerWritingResizeObserver?.disconnect?.();
@@ -14383,22 +14375,19 @@ function bindFullscreenOptions(readerFrame) {
     }
   };
   document.addEventListener('fullscreenchange', state.fullscreenOptionsChangeHandler);
-
-  state.fullscreenOptionsObserver = new MutationObserver(() => {
-    if (!readerFrame.isConnected) {
-      state.fullscreenOptionsObserver?.disconnect();
-      state.fullscreenOptionsObserver = null;
-      return;
-    }
-    if (readerFrame.classList.contains('fullscreen-fallback')) {
+  state.fullscreenOptionsObserver = null;
+  const fullscreenToggleButton = app.querySelector('#toggle-reader-fullscreen');
+  fullscreenToggleButton?.addEventListener('click', () => {
+    window.setTimeout(() => {
+      if (!readerFrame.isConnected || !isFullscreen()) return;
       strip.classList.remove('controls-hidden');
       readerFrame.classList.remove('fullscreen-controls-hidden');
       closeMenu();
       closeMarkDrawer();
       syncFromMain();
-    }
+      requestAnimationFrame(refreshFocusAnchorFullscreenLayout);
+    }, 0);
   });
-  state.fullscreenOptionsObserver.observe(readerFrame, { attributes: true, attributeFilter: ['class'] });
 
   closeMenu();
   closeMarkDrawer();
@@ -15088,6 +15077,12 @@ function startManualPaceHeldDirection(direction) {
   // If both are physically held, the most recently pressed key wins.
   session.direction = next;
   session.paused = false;
+
+  // A quick key tap must still move one chunk. Previously the first movement
+  // was delayed until the WPM timer fired, so releasing the key before that
+  // timer made Manual Pace appear completely unresponsive. Holding the arrow
+  // continues from this immediate first step on the normal WPM clock.
+  manualPaceStep(next, 1, { fromTimer:false });
   scheduleManualPaceMotion();
 
   const wpm = manualPaceWpm();

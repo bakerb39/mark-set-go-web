@@ -256,8 +256,15 @@
   }
 
   ensureShell();
-  const observer = new MutationObserver(scheduleUpdate);
-  observer.observe(app, { childList: true, subtree: true });
+  document.addEventListener('marksetgo:document-available', () => {
+    [0, 80, 220].forEach((delay) => window.setTimeout(scheduleUpdate, delay));
+  });
+  document.addEventListener('marksetgo:library-rendered', scheduleUpdate);
+  document.addEventListener('marksetgo:experience-profile-changed', scheduleUpdate);
+  window.addEventListener('pageshow', scheduleUpdate);
+  document.addEventListener('click', (event) => {
+    if (event.target.closest?.('[data-action],[data-read],[data-mobile-route]')) window.setTimeout(scheduleUpdate, 0);
+  }, true);
   app.addEventListener('input', refreshReaderControlLabels);
   app.addEventListener('change', refreshReaderControlLabels);
   app.addEventListener('click', () => setTimeout(refreshReaderControlLabels, 0));
