@@ -1,18 +1,13 @@
-Explorer Reader Shell Recovery v1
+Explorer Reader Shell Spacing v1.0.1
 
-Upload/extract at the repository ROOT. The archive already contains public/ paths.
+Upload/extract at the repository ROOT.
 
-Files:
-  public/index.html
-  public/explorer-reader-shell.css   (NEW)
-  public/explorer-visual-designer.css
-  public/explorer-visual-designer.js
+Changed files:
+- public/explorer-reader-shell.css
+- public/index.html
 
 What changed:
-- Restores one coherent white/aged-ivory Reader application shell around title,
-  command row, My Topics, Reader, page controls, and Start/Pause/Reset.
-- Explorer scenery stays outside/behind that shell.
-- Retires the experimental tan Work Surface layer from Designer v1.x.
-- Replaces Designer with v2, which opens on Reader shell and fine-tunes the
-  good composition instead of trying to repair layout with a fake floor.
-- No Reader engine/mode/timing/pagination files are included.
+- The command row now reserves 40px of height so Contents / Ask Beth cannot protrude into the pane row.
+- Increased the clear ivory gap below the command row from 8px to 14px.
+- Added a 2px pane-row separation for a continuous clean line across My Topics / Reader / Companion.
+- No Reader JS, pagination, timing, mode, Topic Feed, or companion logic changed.

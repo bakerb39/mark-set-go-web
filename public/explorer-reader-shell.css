@@ -1,4 +1,4 @@
-/* Explorer Reader Shell Recovery v1.0
+/* Explorer Reader Shell Recovery v1.0.1
    Restore the original Reader's visual hierarchy first; Explorer scenery decorates
    around the application instead of replacing its structural shell.
    Presentation only: no Reader timing, pagination, mode, or word-DOM changes. */
@@ -105,8 +105,8 @@ html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pan
   align-items: center !important;
   justify-content: space-between !important;
   gap: 8px !important;
-  min-height: 34px !important;
-  margin: 5px 0 8px !important;
+  min-height: 40px !important;
+  margin: 5px 0 14px !important;
   padding: 0 !important;
   background: transparent !important;
   background-image: none !important;
@@ -123,6 +123,8 @@ html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pan
 /* Restore the original layout hierarchy: panes start together beneath controls. */
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-layout {
   margin: 0 !important;
+  /* Keep a clean ivory breathing line between the command row and every pane. */
+  margin-top: 2px !important;
   padding: 0 !important;
   background: transparent !important;
   border: 0 !important;
