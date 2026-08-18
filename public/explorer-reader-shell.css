@@ -336,3 +336,31 @@ html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-hea
   background: #fff !important;
   box-shadow: 0 0 0 2px #fff !important;
 }
+
+
+/* v1.0.5 — THREE SURGICAL EXPLORER READER FIXES
+   1) Do not let #app flex-grow below the Reader shell.
+   2) Keep the real green footer, but remove the gap before it.
+   3) Music is a fixed overlay and must never participate in page flow. */
+
+/* FIX 1 — stop the Explorer Reader app container from stretching vertically. */
+html[data-msg-experience-theme="explorer"] body:has(#app .reader-page-panel) #app.app-shell,
+html[data-msg-experience-theme="explorer"] #app.app-shell:has(.reader-page-panel) {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
+}
+
+/* FIX 2 — preserve the green footer itself, but remove all space before it. */
+html[data-msg-experience-theme="explorer"] body:has(#app .reader-page-panel) > .site-footer {
+  flex: 0 0 auto !important;
+  margin-top: 0 !important;
+}
+
+/* FIX 3 — undo explorer-theme.css's position:relative override on the music dock.
+   The dock must float above the page and never add height to the document. */
+html[data-msg-experience-theme="explorer"] .music-dock {
+  position: fixed !important;
+  z-index: 9999 !important;
+}
