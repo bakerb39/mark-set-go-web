@@ -2,6 +2,7 @@
 
 (() => {
   const STORAGE_KEY = 'markSetGoExplorerVisualDesignerV2';
+  const PANEL_POSITION_KEY = 'markSetGoExplorerVisualDesignerPanelPositionV1';
   const CONFIG_VERSION = 2;
   const MANAGED_ATTR = 'data-msg-vd-selectable';
 
@@ -171,6 +172,7 @@
   let undoStack = [];
   let editBaseline = null;
   let dragState = null;
+  let panelDragState = null;
 
   function range(key,label,min,max,step,unit,selector,prop){return{type:'range',key,label,min,max,step,unit,selector,prop};}
   function color(key,label,selector,prop){return{type:'color',key,label,selector,prop};}
@@ -210,8 +212,9 @@
       panel.hidden=true;
       panel.setAttribute('aria-label','Explorer visual designer');
       panel.innerHTML=`
-        <div class="msg-vd-head">
-          <div class="msg-vd-head-copy"><strong>Explorer Designer</strong><small>Fine-tune the restored Reader composition</small></div>
+        <div class="msg-vd-head" data-vd-drag-handle title="Drag to move the Designer">
+          <span class="msg-vd-drag-grip" aria-hidden="true">⋮⋮</span>
+          <div class="msg-vd-head-copy"><strong>Explorer Designer</strong><small>Drag this header to move · fine-tune the Reader composition</small></div>
           <button type="button" data-vd-preview title="Preview without editor outlines">◉</button>
           <button type="button" data-vd-close aria-label="Close designer">×</button>
         </div>
@@ -253,11 +256,101 @@
     panel.querySelector('[data-vd-export]')?.addEventListener('click',exportConfig);
     panel.querySelector('[data-vd-import]')?.addEventListener('click',()=>panel.querySelector('[data-vd-import-file]')?.click());
     panel.querySelector('[data-vd-import-file]')?.addEventListener('change',importConfig);
+    bindPanelDragging();
+  }
+
+  function panelPositionBounds(left,top){
+    if(!panel)return{left:8,top:8};
+    const rect=panel.getBoundingClientRect();
+    const margin=8;
+    const maxLeft=Math.max(margin,window.innerWidth-rect.width-margin);
+    const maxTop=Math.max(margin,window.innerHeight-rect.height-margin);
+    return{
+      left:Math.round(clamp(Number(left)||margin,margin,maxLeft)),
+      top:Math.round(clamp(Number(top)||margin,margin,maxTop))
+    };
+  }
+
+  function loadPanelPosition(){
+    try{
+      const saved=JSON.parse(localStorage.getItem(PANEL_POSITION_KEY)||'null');
+      if(!saved||!Number.isFinite(Number(saved.left))||!Number.isFinite(Number(saved.top)))return null;
+      return{left:Number(saved.left),top:Number(saved.top)};
+    }catch{return null;}
+  }
+
+  function savePanelPosition(){
+    if(!panel||panel.hidden)return;
+    const rect=panel.getBoundingClientRect();
+    const position=panelPositionBounds(rect.left,rect.top);
+    try{localStorage.setItem(PANEL_POSITION_KEY,JSON.stringify(position));}catch{}
+  }
+
+  function applyPanelPosition(position=loadPanelPosition()){
+    if(!panel||!position)return;
+    const bounded=panelPositionBounds(position.left,position.top);
+    panel.style.setProperty('left',`${bounded.left}px`,'important');
+    panel.style.setProperty('top',`${bounded.top}px`,'important');
+    panel.style.setProperty('right','auto','important');
+    panel.style.setProperty('bottom','auto','important');
+  }
+
+  function bindPanelDragging(){
+    const handle=panel?.querySelector('[data-vd-drag-handle]');
+    if(!handle||handle.dataset.vdDragBound==='1')return;
+    handle.dataset.vdDragBound='1';
+
+    handle.addEventListener('pointerdown',event=>{
+      if(event.target instanceof Element&&event.target.closest('button,input,select,a'))return;
+      if(!panel||panel.hidden)return;
+      const rect=panel.getBoundingClientRect();
+      panelDragState={
+        pointerId:event.pointerId,
+        startX:event.clientX,
+        startY:event.clientY,
+        left:rect.left,
+        top:rect.top
+      };
+      handle.setPointerCapture?.(event.pointerId);
+      document.body.classList.add('msg-vd-panel-dragging');
+      event.preventDefault();
+    });
+
+    handle.addEventListener('pointermove',event=>{
+      if(!panelDragState||event.pointerId!==panelDragState.pointerId||!panel)return;
+      const next=panelPositionBounds(
+        panelDragState.left+(event.clientX-panelDragState.startX),
+        panelDragState.top+(event.clientY-panelDragState.startY)
+      );
+      panel.style.setProperty('left',`${next.left}px`,'important');
+      panel.style.setProperty('top',`${next.top}px`,'important');
+      panel.style.setProperty('right','auto','important');
+      panel.style.setProperty('bottom','auto','important');
+    });
+
+    const finish=event=>{
+      if(!panelDragState||event.pointerId!==panelDragState.pointerId)return;
+      panelDragState=null;
+      document.body.classList.remove('msg-vd-panel-dragging');
+      savePanelPosition();
+    };
+    handle.addEventListener('pointerup',finish);
+    handle.addEventListener('pointercancel',finish);
+
+    handle.addEventListener('dblclick',event=>{
+      if(event.target instanceof Element&&event.target.closest('button,input,select,a'))return;
+      try{localStorage.removeItem(PANEL_POSITION_KEY);}catch{}
+      panel.style.removeProperty('left');
+      panel.style.removeProperty('top');
+      panel.style.removeProperty('right');
+      panel.style.removeProperty('bottom');
+    });
   }
 
   function openDesigner(){
     ensureUI();
     panel.hidden=false;
+    window.requestAnimationFrame(()=>applyPanelPosition());
     launcher.textContent='✦ Designing';
     document.body.classList.add('msg-vd-design-mode');
     document.body.classList.remove('msg-vd-preview-mode');
@@ -275,7 +368,7 @@
   function togglePreview(){
     const preview=document.body.classList.toggle('msg-vd-preview-mode');
     if(preview){panel.hidden=true;launcher.textContent='✦ Edit';clearSelectionOutline();}
-    else{panel.hidden=false;launcher.textContent='✦ Designing';applySelectionOutline();}
+    else{panel.hidden=false;window.requestAnimationFrame(()=>applyPanelPosition());launcher.textContent='✦ Designing';applySelectionOutline();}
   }
 
   function markSelectableElements(){
@@ -600,7 +693,19 @@
     document.addEventListener('pointercancel',onPointerUp,true);
     document.addEventListener('marksetgo:document-available',scheduleApply);
     window.addEventListener('pageshow',scheduleApply);
-    window.addEventListener('resize',()=>{if(panel&&!panel.hidden)refreshLayers();});
+    window.addEventListener('resize',()=>{
+      if(panel&&!panel.hidden){
+        refreshLayers();
+        const rect=panel.getBoundingClientRect();
+        const bounded=panelPositionBounds(rect.left,rect.top);
+        if(Math.abs(rect.left-bounded.left)>1||Math.abs(rect.top-bounded.top)>1){
+          panel.style.setProperty('left',`${bounded.left}px`,'important');
+          panel.style.setProperty('top',`${bounded.top}px`,'important');
+          panel.style.setProperty('right','auto','important');
+          savePanelPosition();
+        }
+      }
+    });
     document.addEventListener('click',event=>{if(event.target instanceof Element&&event.target.closest('[data-action],[data-read],[data-topic-read]'))scheduleApply();},true);
   }
 
