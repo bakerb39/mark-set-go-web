@@ -1215,3 +1215,134 @@ html[data-msg-experience-theme="explorer"] .explorer-home-expedition{
   html[data-msg-experience-theme="explorer"] .explorer-world-art__top{height:64px}
   html[data-msg-experience-theme="explorer"] .explorer-world-art::after{display:none}
 }
+
+
+/* ========================================================================
+   Explorer finishing pass v1.3.1
+   Visual shell only: no Reader mode/timing/pagination logic is changed.
+   ======================================================================== */
+
+/* Keep the foreground objects visible. `cover` was cropping the lower compass
+   and books because these side illustrations are much taller than their gutter. */
+html[data-msg-experience-theme="explorer"] .explorer-world-art__left{
+  object-position:right bottom !important;
+}
+html[data-msg-experience-theme="explorer"] .explorer-world-art__right{
+  object-position:left bottom !important;
+}
+
+/* Give the existing My Topics pane the framed field-journal character from the
+   illustrated concepts without changing its width or its internal structure. */
+html[data-msg-experience-theme="explorer"] .reader-page-panel .navigation-pane{
+  background:linear-gradient(180deg,rgba(255,252,241,.985),rgba(247,239,216,.985)) !important;
+  border-radius:12px !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(171,132,61,.62),
+    inset 0 0 0 4px rgba(255,249,225,.62),
+    0 10px 24px rgba(31,54,45,.16) !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel .navigation-pane .topic-reader-nav-head{
+  border-bottom-color:rgba(161,124,55,.30) !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel .navigation-pane .topic-reader-nav-head h2{
+  color:#174d45 !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel .navigation-pane :is(.topic-reader-topic,.topic-reader-source){
+  border-color:rgba(72,108,91,.20) !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel .navigation-pane .topic-reader-topic.active{
+  background:linear-gradient(90deg,rgba(218,234,218,.90),rgba(249,244,225,.78)) !important;
+  border-color:rgba(53,104,88,.46) !important;
+}
+
+/* Add the same brass/ivory physical framing to the Reader itself. Inset shadows
+   create the edge without changing measured Reader geometry. */
+html[data-msg-experience-theme="explorer"] .reader-page-panel #reader-frame{
+  border-radius:13px !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(174,133,58,.68),
+    inset 0 0 0 4px rgba(255,248,224,.54),
+    0 14px 30px rgba(27,54,47,.18) !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel .reader-pane-controls{
+  background:linear-gradient(180deg,rgba(255,253,246,.985),rgba(248,241,220,.975)) !important;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.95),
+    inset 0 -1px rgba(170,130,58,.34),
+    0 6px 16px rgba(39,62,51,.07) !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel .reader-viewer-footer{
+  background:linear-gradient(180deg,rgba(250,246,231,.96),rgba(243,235,210,.97)) !important;
+  box-shadow:inset 0 1px rgba(174,133,58,.28) !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel .reader-title-row{
+  border-bottom-color:rgba(169,129,57,.28) !important;
+}
+
+/* Reader playback controls inherit Explorer rather than the default navy. */
+html[data-msg-experience-theme="explorer"] .reader-page-panel #start-reader,
+html[data-msg-experience-theme="explorer"] .reader-page-panel #fs-start{
+  background:linear-gradient(180deg,#2f7567,#1d554c) !important;
+  border:1px solid #174b43 !important;
+  color:#fff8dd !important;
+  box-shadow:0 4px 10px rgba(27,75,64,.22),inset 0 1px rgba(255,255,255,.16) !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel :is(#pause-reader,#reset-reader,#fs-pause,#fs-reset){
+  background:linear-gradient(180deg,#fff8df,#eadcae) !important;
+  border:1px solid #b38c43 !important;
+  color:#174d45 !important;
+  box-shadow:0 3px 8px rgba(79,67,38,.11),inset 0 1px rgba(255,255,255,.72) !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel :is(#start-reader,#pause-reader,#reset-reader,#fs-start,#fs-pause,#fs-reset):hover:not(:disabled){
+  filter:brightness(.97) saturate(1.04);
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel :is(#start-reader,#pause-reader,#reset-reader,#fs-start,#fs-pause,#fs-reset):disabled{
+  opacity:.52 !important;
+}
+
+/* Topic article scrolling: the external wrapper itself is transparent. At the
+   top, Source/share is shown normally. Once the article moves, Source/share
+   collapses and only the tiny action strip remains as an opaque scroll ceiling.
+   There is no large white mask and no fade laid over the document. */
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external{
+  overflow:visible !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external::after{
+  display:none !important;
+  content:none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external > .topic-feed-story-meta-overlay{
+  overflow:hidden;
+  max-height:34px;
+  opacity:1;
+  transition:max-height .14s ease,opacity .11s ease;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit{
+  background:#fff !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action{
+  position:relative !important;
+  z-index:2;
+  width:100% !important;
+  margin:.08rem 0 0 !important;
+  padding:.08rem 0 .13rem !important;
+  background:#fff !important;
+  box-shadow:0 2px 0 rgba(23,77,69,.08),0 5px 8px -8px rgba(25,52,44,.62) !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled > .topic-feed-story-meta-overlay{
+  max-height:0 !important;
+  opacity:0 !important;
+  pointer-events:none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled > #read-anything-article-summary-action{
+  margin-top:0 !important;
+}
+
+@media(max-height:760px) and (min-width:861px){
+  html[data-msg-experience-theme="explorer"] .explorer-world-art__left,
+  html[data-msg-experience-theme="explorer"] .explorer-world-art__right{
+    object-position:bottom !important;
+  }
+}

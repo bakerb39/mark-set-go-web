@@ -1,15 +1,15 @@
-EXPLORER ILLUSTRATED WORLD PASS 2
+Explorer illustrated finishing pass v1.3.1
 
-Upload/extract this ZIP at the repository ROOT.
-It already contains the public/ directory.
+Upload/extract this ZIP at the REPOSITORY ROOT. It already contains public/.
 
-Files changed:
-- public/index.html
-- public/explorer-theme.css
-
-Real art assets added:
-- public/assets/explorer/explorer-left.png
-- public/assets/explorer/explorer-right.png
-- public/assets/explorer/explorer-top.png
-
-The Reader engine/modes are not changed.
+Verified completion checklist:
+[✓] Full compass/foreground artwork retained and bottom-aligned so it is visible.
+[✓] Right waterfall/books/telescope artwork retained and bottom-aligned.
+[✓] Topic source/share row collapses once the document scrolls/moves.
+[✓] Only Summarize / Analyze / Create Post remains as the compact opaque scroll ceiling.
+[✓] Removed the large white overlay/fade treatment from the Topic article header.
+[✓] Start/Pause/Reset use Explorer green/brass/ivory colors (including fullscreen equivalents).
+[✓] My Topics/navigation pane receives brass/ivory framed edges without changing width.
+[✓] Reader frame/toolbar/footer receive matching brass/ivory visual framing without changing Reader dimensions.
+[✓] No Reader mode/timing/pagination algorithms modified.
+[✓] No MutationObserver added.

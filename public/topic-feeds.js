@@ -534,6 +534,7 @@
 
   let topicFeedStoryHeaderReader = null;
   let topicFeedStoryHeaderReflowTimer = 0;
+  const topicFeedStoryScrollReaders = new WeakSet();
 
   function topicFeedStoryHeaderParts(reader = document.querySelector('#reader')) {
     if (!reader) return {};
@@ -618,10 +619,14 @@
       const actionGap = Math.max(5, Math.round(fontSize * .35));
       const reserve = Math.max(fontSize * 2, overlayHeight + actionGap + fontSize);
       const previous = Number.parseFloat(reader.style.getPropertyValue('--topic-feed-story-header-reserve')) || 0;
+      // Never shrink the initial article-header reserve while the reader is
+      // scrolling. The Source row may collapse visually, but changing the
+      // document reserve mid-scroll would make the article jump.
+      const stableReserve = Math.max(previous, reserve);
 
-      reader.style.setProperty('--topic-feed-story-header-reserve', `${Math.ceil(reserve)}px`);
+      reader.style.setProperty('--topic-feed-story-header-reserve', `${Math.ceil(stableReserve)}px`);
       reader.style.setProperty('--topic-feed-story-header-width', `${Math.ceil(headerWidth)}px`);
-      if (Math.abs(previous - reserve) > 1) scheduleTopicFeedStoryBookReflow();
+      if (Math.abs(previous - stableReserve) > 1) scheduleTopicFeedStoryBookReflow();
     });
   }
 
@@ -633,13 +638,38 @@
     positionTopicFeedStoryHeader();
   }
 
+  function syncTopicFeedStoryHeaderScrollState(reader = document.querySelector('#reader')) {
+    if (!reader) return;
+    const frame = reader.closest('#reader-frame') || reader.parentElement;
+    const overlay = frame?.querySelector(':scope > [data-topic-feed-story-header-external]');
+    if (!overlay) return;
+
+    // At the beginning of the document show Source/share + actions. Once the
+    // document moves, Source/share quietly gets out of the way and ONLY the
+    // compact Summarize / Analyze / Create Post strip remains as the visual
+    // ceiling. This keeps scrolling text from colliding with header metadata.
+    const moved = Math.abs(Number(reader.scrollTop) || 0) > 6 || Math.abs(Number(reader.scrollLeft) || 0) > 6;
+    overlay.classList.toggle('topic-feed-story-header-scrolled', moved);
+  }
+
   function observeTopicFeedStoryHeader() {
     // Name retained for call-site compatibility. This is deliberately finite
     // and event-driven; no MutationObserver watches the Reader.
     const reader = document.querySelector('#reader');
     if (!reader) return;
     topicFeedStoryHeaderReader = reader;
-    window.requestAnimationFrame(() => keepTopicFeedArticleActionsInHeader());
+
+    if (!topicFeedStoryScrollReaders.has(reader)) {
+      topicFeedStoryScrollReaders.add(reader);
+      reader.addEventListener('scroll', () => {
+        window.requestAnimationFrame(() => syncTopicFeedStoryHeaderScrollState(reader));
+      }, { passive: true });
+    }
+
+    window.requestAnimationFrame(() => {
+      keepTopicFeedArticleActionsInHeader();
+      syncTopicFeedStoryHeaderScrollState(reader);
+    });
   }
 
   document.addEventListener('marksetgo:article-actions-updated', () => {
