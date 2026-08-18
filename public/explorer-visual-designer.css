@@ -1,4 +1,4 @@
-/* Explorer Visual Designer v1.1
+/* Explorer Visual Designer v1.3
    Editor chrome only. The Reader engine/timing/pagination DOM is not restyled here. */
 
 #msg-explorer-design-launcher,
@@ -162,9 +162,6 @@ body.msg-vd-preview-mode .msg-vd-selected { outline:0 !important; }
 html[data-msg-experience-theme="explorer"][style*="--msg-vd-workspace-color"] body {
   background-color: var(--msg-vd-workspace-color) !important;
 }
-html[data-msg-experience-theme="explorer"][style*="--msg-vd-world-color"] .explorer-world-art {
-  background: var(--msg-vd-world-color) !important;
-}
 html[data-msg-experience-theme="explorer"][style*="--msg-vd-accent-color"] #app .reader-page-panel :is(.primary,button.primary) {
   background: var(--msg-vd-accent-color) !important;
 }
@@ -174,19 +171,21 @@ html[data-msg-experience-theme="explorer"][style*="--msg-vd-accent-color"] #app 
   #msg-explorer-design-launcher { right:10px; bottom:10px; }
 }
 
-html[data-msg-experience-theme="explorer"][style*="--msg-vd-overlay-opacity"] .explorer-world-art::after {
-  opacity: var(--msg-vd-overlay-opacity) !important;
+
+
+/* v1.3 — Center Work Surface -------------------------------------------------
+   This is the ACTUAL tan filler behind/below the Reader. Explorer's old
+   .explorer-world-art background and ::after overlay are disabled while this
+   DOM surface is active, so dragging this layer moves the visible surface
+   itself rather than a decorative lookalike on top of it. */
+html[data-msg-experience-theme="explorer"] .explorer-world-art.msg-vd-designer-surface-active {
+  background: #9f9278 !important;
 }
-
-
-/* v1.1 — the antique Reader backdrop is a real movable Designer layer.
-   It replaces the Explorer ::after paint with an equivalent DOM layer so the
-   user can drag/resize it without touching Reader geometry or code. */
-html[data-msg-experience-theme="explorer"] .explorer-world-art.msg-vd-designer-backdrop-active::after {
+html[data-msg-experience-theme="explorer"] .explorer-world-art.msg-vd-designer-surface-active::after {
   display:none !important;
   content:none !important;
 }
-html[data-msg-experience-theme="explorer"] .msg-vd-antique-backdrop {
+html[data-msg-experience-theme="explorer"] .msg-vd-center-work-surface {
   position:absolute;
   z-index:0;
   left:0;
@@ -204,26 +203,27 @@ html[data-msg-experience-theme="explorer"] .msg-vd-antique-backdrop {
       rgba(246,237,214,.76) 69%,
       rgba(232,221,195,.42) 79%,
       transparent 86%),
-    linear-gradient(180deg,rgba(247,237,214,.18),rgba(171,148,109,.16));
+    linear-gradient(180deg,rgba(247,237,214,.18),rgba(171,148,109,.16)),
+    linear-gradient(180deg,#dfd4bd 0%,#c9b99d 56%,#ad9b7d 100%);
 }
-#msg-vd-backdrop-handle {
+#msg-vd-surface-handle {
   position:fixed;
   z-index:12035;
   box-sizing:border-box;
-  border:2px dashed #d09b35;
-  border-radius:5px;
-  background:rgba(229,196,117,.055);
-  box-shadow:inset 0 0 0 1px rgba(255,255,255,.7);
+  border:3px dashed #c98d1d;
+  border-radius:6px;
+  background:rgba(229,196,117,.035);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.75);
   cursor:move;
   pointer-events:auto;
 }
-#msg-vd-backdrop-handle::before {
-  content:"Antique Reader Backdrop — drag to move";
+#msg-vd-surface-handle::before {
+  content:"Center Work Surface — drag anywhere inside this outline";
   position:absolute;
-  top:7px;
+  top:9px;
   left:50%;
   transform:translateX(-50%);
-  padding:5px 9px;
+  padding:6px 10px;
   border:1px solid #b98a36;
   border-radius:999px;
   background:#fff9e7;
@@ -233,17 +233,18 @@ html[data-msg-experience-theme="explorer"] .msg-vd-antique-backdrop {
   white-space:nowrap;
   pointer-events:none;
 }
-#msg-vd-backdrop-handle[hidden] { display:none !important; }
-html:not([data-msg-experience-theme="explorer"]) #msg-vd-backdrop-handle { display:none !important; }
-.msg-vd-layer[data-vd-layer="backdrop"] {
+#msg-vd-surface-handle[hidden] { display:none !important; }
+html:not([data-msg-experience-theme="explorer"]) #msg-vd-surface-handle { display:none !important; }
+.msg-vd-layer[data-vd-layer="surface"] {
   grid-column:1 / -1;
-  border-color:rgba(168,124,48,.38);
-  background:#fff9e9;
+  border-color:rgba(168,124,48,.55);
+  background:#fff4d6;
+  font-weight:850;
 }
-.msg-vd-layer[data-vd-layer="backdrop"].is-selected {
-  background:#edddb2;
+.msg-vd-layer[data-vd-layer="surface"].is-selected {
+  background:#e9d096;
 }
 @media(max-width:860px){
-  html[data-msg-experience-theme="explorer"] .msg-vd-antique-backdrop{display:none !important}
-  #msg-vd-backdrop-handle{display:none !important}
+  html[data-msg-experience-theme="explorer"] .msg-vd-center-work-surface{display:none !important}
+  #msg-vd-surface-handle{display:none !important}
 }

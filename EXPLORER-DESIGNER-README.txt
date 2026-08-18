@@ -1,18 +1,12 @@
-Explorer Visual Designer v1.1
+Explorer Visual Designer v1.3 — Center Work Surface
 
-Upload/extract this ZIP at the repository root.
+Upload/extract at the repository ROOT. The ZIP already contains public/.
 
-New in v1.1:
-- Layers now includes ANTIQUE READER BACKDROP (shown as “Antique Reader Backdrop”).
-- Select it, then drag the large dashed outline directly to move it.
-- Inspector controls: left/right, up/down, width, height, opacity, antique tint, border, radius, shadow, show/hide.
-- Existing Visual Designer v1 saved settings remain compatible.
+Key correction:
+- The tan filler behind/below the Reader is now the real `Center Work Surface` layer.
+- Select Center Work Surface in Design mode.
+- It has Move left/right, Move up/down, width, height, color, opacity, border, radius, shadow, show/hide.
+- When selected, a dashed outline covers the actual surface. Drag anywhere inside the outline to move it directly.
+- Workspace no longer contains the misleading Center work surface color control.
 
-The actual Reader engine/timing/pagination code is not modified.
-No MutationObserver is used.
-
-
-v1.2 companion fix:
-- Companion Main body now targets the visible .askmark-premium surface.
-- Header and Composer have separate visible color controls.
-- Existing saved companion background values continue to use the same key and now affect the visible body.
+No Reader engine/mode files are included. No MutationObserver is used.

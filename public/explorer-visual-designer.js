@@ -7,7 +7,7 @@
 
   const TARGETS = [
     { id:'workspace', label:'Workspace', virtual:true, group:'Environment' },
-    { id:'backdrop', label:'Antique Reader Backdrop', selector:'.msg-vd-antique-backdrop', group:'Environment', backdrop:true },
+    { id:'surface', label:'Center Work Surface', selector:'.msg-vd-center-work-surface', group:'Environment', surface:true },
     { id:'title', label:'Reader title', selector:'.reader-page-panel > .reader-title-row', group:'Reader' },
     { id:'controls', label:'Top controls', selector:'.reader-page-panel > .reader-pane-controls', group:'Reader' },
     { id:'topics', label:'My Topics', selector:'.reader-page-panel .navigation-pane', group:'Panes' },
@@ -82,25 +82,23 @@
     fileControl('imageFile','Replace with image')
   ];
 
-  const BACKDROP_CONTROLS = [
+  const SURFACE_CONTROLS = [
     range('x','Move left / right',-500,500,2,'px',null,null),
     range('y','Move up / down',-450,450,2,'px',null,null),
-    range('width','Backdrop width',40,140,1,'%',null,null),
-    range('height','Backdrop height',35,140,1,'%',null,null),
+    range('width','Surface width',35,140,1,'%',null,null),
+    range('height','Surface height',20,160,1,'%',null,null),
     range('opacity','Opacity',0,100,1,'%',null,null),
-    color('color','Antique tint',null,null),
+    color('color','Surface color',null,null),
     range('borderWidth','Border width',0,8,1,'px',null,null),
     color('borderColor','Border color',null,null),
     range('radius','Corner radius',0,60,1,'px',null,null),
     range('shadow','Shadow',0,60,1,'shadow',null,null),
-    check('visible','Show backdrop')
+    check('visible','Show surface')
   ];
 
   const WORKSPACE_CONTROLS = [
     colorVar('workspaceColor','Page background','--msg-vd-workspace-color'),
-    colorVar('worldColor','Center work surface','--msg-vd-world-color'),
-    colorVar('accentColor','Primary accent','--msg-vd-accent-color'),
-    rangeVar('overlayOpacity','Center overlay',0,100,1,'%', '--msg-vd-overlay-opacity')
+    colorVar('accentColor','Primary accent','--msg-vd-accent-color')
   ];
 
   let launcher = null;
@@ -112,7 +110,7 @@
   let undoStack = [];
   let editBaseline = null;
   let dragState = null;
-  let backdropHandle = null;
+  let surfaceHandle = null;
 
   function range(key,label,min,max,step,unit,selector,prop) {
     return { type:'range', key,label,min,max,step,unit,selector,prop };
@@ -132,6 +130,9 @@
       if (!raw || raw.version !== CONFIG_VERSION) return blankConfig();
       raw.targets ||= {};
       raw.globals ||= {};
+      delete raw.globals.worldColor;
+      delete raw.globals.overlayOpacity;
+      delete raw.targets.backdrop;
       return raw;
     } catch { return blankConfig(); }
   }
@@ -143,57 +144,57 @@
   function targetById(id) { return TARGETS.find((item) => item.id === id) || null; }
   function targetElement(target) {
     if (target?.virtual) return document.documentElement;
-    if (target?.backdrop) return ensureBackdrop();
+    if (target?.surface) return ensureSurface();
     return document.querySelector(target?.selector || '');
   }
 
-  function ensureBackdrop() {
+  function ensureSurface() {
     const world = document.querySelector('.explorer-world-art');
     if (!world) return null;
-    let backdrop = world.querySelector('.msg-vd-antique-backdrop');
-    if (!backdrop) {
-      backdrop = document.createElement('div');
-      backdrop.className = 'msg-vd-antique-backdrop';
-      backdrop.setAttribute('aria-hidden','true');
-      world.insertBefore(backdrop,world.firstChild);
+    let surface = world.querySelector('.msg-vd-center-work-surface');
+    if (!surface) {
+      surface = document.createElement('div');
+      surface.className = 'msg-vd-center-work-surface';
+      surface.setAttribute('aria-hidden','true');
+      world.insertBefore(surface,world.firstChild);
     }
-    world.classList.add('msg-vd-designer-backdrop-active');
-    return backdrop;
+    world.classList.add('msg-vd-designer-surface-active');
+    return surface;
   }
 
-  function ensureBackdropHandle() {
-    if (backdropHandle) return backdropHandle;
-    backdropHandle = document.createElement('div');
-    backdropHandle.id = 'msg-vd-backdrop-handle';
-    backdropHandle.dataset.vdBackdropHandle = '1';
-    backdropHandle.hidden = true;
-    backdropHandle.setAttribute('aria-label','Drag Antique Reader Backdrop');
-    backdropHandle.title = 'Drag to move the Antique Reader Backdrop';
-    document.body.appendChild(backdropHandle);
-    return backdropHandle;
+  function ensureSurfaceHandle() {
+    if (surfaceHandle) return surfaceHandle;
+    surfaceHandle = document.createElement('div');
+    surfaceHandle.id = 'msg-vd-surface-handle';
+    surfaceHandle.dataset.vdSurfaceHandle = '1';
+    surfaceHandle.hidden = true;
+    surfaceHandle.setAttribute('aria-label','Drag Center Work Surface');
+    surfaceHandle.title = 'Drag to move the Center Work Surface';
+    document.body.appendChild(surfaceHandle);
+    return surfaceHandle;
   }
 
-  function hideBackdropHandle() {
-    if (backdropHandle) backdropHandle.hidden = true;
+  function hideSurfaceHandle() {
+    if (surfaceHandle) surfaceHandle.hidden = true;
   }
 
-  function syncBackdropHandle() {
-    const handle = ensureBackdropHandle();
-    const backdrop = ensureBackdrop();
+  function syncSurfaceHandle() {
+    const handle = ensureSurfaceHandle();
+    const surface = ensureSurface();
     const shouldShow = Boolean(
-      backdrop &&
+      surface &&
       isExplorer() &&
-      selectedId === 'backdrop' &&
+      selectedId === 'surface' &&
       document.body.classList.contains('msg-vd-design-mode') &&
       !document.body.classList.contains('msg-vd-preview-mode') &&
       panel && !panel.hidden &&
-      getComputedStyle(backdrop).display !== 'none'
+      getComputedStyle(surface).display !== 'none'
     );
     if (!shouldShow) {
       handle.hidden = true;
       return;
     }
-    const rect = backdrop.getBoundingClientRect();
+    const rect = surface.getBoundingClientRect();
     handle.hidden = false;
     handle.style.left = `${Math.round(rect.left)}px`;
     handle.style.top = `${Math.round(rect.top)}px`;
@@ -202,8 +203,8 @@
   }
 
   function ensureUI() {
-    ensureBackdrop();
-    ensureBackdropHandle();
+    ensureSurface();
+    ensureSurfaceHandle();
     if (!launcher) {
       launcher = document.createElement('button');
       launcher.id = 'msg-explorer-design-launcher';
@@ -284,7 +285,7 @@
     document.body.classList.remove('msg-vd-design-mode','msg-vd-preview-mode');
     clearSelectionOutline();
     clearSelectableMarks();
-    hideBackdropHandle();
+    hideSurfaceHandle();
   }
 
   function togglePreview() {
@@ -293,12 +294,12 @@
       panel.hidden = true;
       launcher.textContent = '✦ Edit';
       clearSelectionOutline();
-      hideBackdropHandle();
+      hideSurfaceHandle();
     } else {
       panel.hidden = false;
       launcher.textContent = '✦ Designing';
       applySelectionOutline();
-      syncBackdropHandle();
+      syncSurfaceHandle();
     }
   }
 
@@ -343,20 +344,20 @@
 
   function clearSelectionOutline() {
     document.querySelectorAll('.msg-vd-selected').forEach((el) => el.classList.remove('msg-vd-selected'));
-    hideBackdropHandle();
+    hideSurfaceHandle();
   }
   function applySelectionOutline() {
     if (document.body.classList.contains('msg-vd-preview-mode')) return;
     const target = targetById(selectedId);
     const element = targetElement(target);
     if (element && !target?.virtual) element.classList.add('msg-vd-selected');
-    if (target?.backdrop) syncBackdropHandle();
+    if (target?.surface) syncSurfaceHandle();
   }
 
   function controlsForTarget(target) {
     if (!target) return [];
     if (target.virtual) return WORKSPACE_CONTROLS;
-    if (target.backdrop) return BACKDROP_CONTROLS;
+    if (target.surface) return SURFACE_CONTROLS;
     if (target.art) return ART_CONTROLS;
     return STYLE_CONTROLS[target.id] || [];
   }
@@ -441,7 +442,7 @@
     const bucket = target.virtual ? config.globals : (config.targets[target.id] ||= {});
     if (Object.prototype.hasOwnProperty.call(bucket,control.key)) return bucket[control.key];
 
-    if (target.backdrop) {
+    if (target.surface) {
       const el = targetElement(target);
       const parent = el?.parentElement;
       const computed = el ? getComputedStyle(el) : null;
@@ -449,7 +450,7 @@
       if (control.key === 'width') return parent?.clientWidth ? Math.round((el.getBoundingClientRect().width / parent.clientWidth) * 100) : 100;
       if (control.key === 'height') return parent?.clientHeight ? Math.round((el.getBoundingClientRect().height / parent.clientHeight) * 100) : 100;
       if (control.key === 'opacity') return Math.round((parseFloat(computed?.opacity) || 1) * 100);
-      if (control.key === 'color') return '#f6edd6';
+      if (control.key === 'color') return '#d9c8a7';
       if (control.key === 'borderWidth') return parseFloat(computed?.borderTopWidth) || 0;
       if (control.key === 'borderColor') return normalizeColor(computed?.borderTopColor || '#a9823c');
       if (control.key === 'radius') return parseFloat(computed?.borderTopLeftRadius) || 0;
@@ -514,21 +515,21 @@
   }
 
   function applyAll() {
-    ensureBackdrop();
+    ensureSurface();
     applyGlobals();
     TARGETS.filter((target) => !target.virtual).forEach(applyTarget);
     markSelectableElements();
     applySelectionOutline();
-    syncBackdropHandle();
+    syncSurfaceHandle();
   }
 
   function applyGlobals() {
     const root = document.documentElement;
     const globals = config.globals || {};
     setOrRemove(root,'--msg-vd-workspace-color',globals.workspaceColor);
-    setOrRemove(root,'--msg-vd-world-color',globals.worldColor);
+    root.style.removeProperty('--msg-vd-world-color');
+    root.style.removeProperty('--msg-vd-overlay-opacity');
     setOrRemove(root,'--msg-vd-accent-color',globals.accentColor);
-    setOrRemove(root,'--msg-vd-overlay-opacity',Object.prototype.hasOwnProperty.call(globals,'overlayOpacity') ? String(Number(globals.overlayOpacity)/100) : '');
   }
 
   function applyTarget(target) {
@@ -537,9 +538,9 @@
     const el = targetElement(target);
     if (!el) return;
 
-    if (target.backdrop) {
-      applyBackdrop(el,values);
-      syncBackdropHandle();
+    if (target.surface) {
+      applySurface(el,values);
+      syncSurfaceHandle();
       return;
     }
 
@@ -586,7 +587,7 @@
     }
   }
 
-  function applyBackdrop(el,values) {
+  function applySurface(el,values) {
     const x = Number(values.x ?? 0);
     const y = Number(values.y ?? 0);
     el.style.setProperty('transform',`translate3d(${x}px,${y}px,0)`,'important');
@@ -605,7 +606,7 @@
       const rgb = hexToRgb(values.color);
       if (rgb) {
         el.style.setProperty('background',
-          `linear-gradient(90deg,transparent 0 14%,rgba(${rgb.r},${rgb.g},${rgb.b},.42) 21%,rgba(${rgb.r},${rgb.g},${rgb.b},.78) 31%,rgba(${rgb.r},${rgb.g},${rgb.b},.78) 69%,rgba(${rgb.r},${rgb.g},${rgb.b},.42) 79%,transparent 86%),linear-gradient(180deg,rgba(255,249,233,.18),rgba(114,84,49,.16))`,
+          `linear-gradient(180deg,rgba(${rgb.r},${rgb.g},${rgb.b},.98),rgba(${rgb.r},${rgb.g},${rgb.b},.90) 58%,rgba(${rgb.r},${rgb.g},${rgb.b},.80))`,
           'important');
       }
     }
@@ -670,9 +671,9 @@
       ['--msg-vd-workspace-color','--msg-vd-world-color','--msg-vd-accent-color','--msg-vd-overlay-opacity'].forEach((prop) => document.documentElement.style.removeProperty(prop));
       return;
     }
-    const controls = target.backdrop ? BACKDROP_CONTROLS : (target.art ? ART_CONTROLS : (STYLE_CONTROLS[target.id] || []));
+    const controls = target.surface ? SURFACE_CONTROLS : (target.art ? ART_CONTROLS : (STYLE_CONTROLS[target.id] || []));
     const el = targetElement(target);
-    if (target.backdrop && el) {
+    if (target.surface && el) {
       ['width','height','transform','opacity','display','background','border-width','border-color','border-radius','box-shadow'].forEach((prop) => el.style.removeProperty(prop));
     } else if (target.art && el) {
       ['width','transform','transform-origin','opacity','display'].forEach((prop) => el.style.removeProperty(prop));
@@ -696,7 +697,7 @@
       });
     }
     delete config.targets[target.id];
-    if (target.backdrop) syncBackdropHandle();
+    if (target.surface) syncSurfaceHandle();
   }
 
   function resetSelected() {
@@ -798,7 +799,7 @@
 
   function findTargetFromClick(element) {
     if (!(element instanceof Element)) return null;
-    if (element.closest('#msg-vd-backdrop-handle')) return targetById('backdrop');
+    if (element.closest('#msg-vd-surface-handle')) return targetById('surface');
     return TARGETS.find((target) => !target.virtual && element.closest(target.selector)) || null;
   }
 
@@ -815,8 +816,8 @@
   function onPointerDown(event) {
     if (!document.body.classList.contains('msg-vd-design-mode') || document.body.classList.contains('msg-vd-preview-mode')) return;
     if (!(event.target instanceof Element)) return;
-    const target = event.target.closest('#msg-vd-backdrop-handle')
-      ? targetById('backdrop')
+    const target = event.target.closest('#msg-vd-surface-handle')
+      ? targetById('surface')
       : TARGETS.find((candidate) => candidate.art && event.target.closest(candidate.selector));
     if (!target) return;
     event.preventDefault();
@@ -841,15 +842,15 @@
     values.x = Math.round(dragState.baseX + event.clientX - dragState.startX);
     values.y = Math.round(dragState.baseY + event.clientY - dragState.startY);
     applyTarget(dragState.target);
-    if (dragState.target.backdrop) syncBackdropHandle();
+    if (dragState.target.surface) syncSurfaceHandle();
     if (selectedId === dragState.target.id) renderInspector();
-    markDirty(dragState.target.backdrop ? 'Antique Reader Backdrop moved. Save when positioned correctly.' : 'Artwork moved. Save when positioned correctly.');
+    markDirty(dragState.target.surface ? 'Center Work Surface moved. Save when positioned correctly.' : 'Artwork moved. Save when positioned correctly.');
   }
 
   function onPointerUp(event) {
     if (!dragState || event.pointerId !== dragState.pointerId) return;
     dragState = null;
-    syncBackdropHandle();
+    syncSurfaceHandle();
     updateUndoState();
   }
 
@@ -880,7 +881,6 @@
   }
   function fallbackGlobalColor(key) {
     if (key === 'workspaceColor') return normalizeColor(getComputedStyle(document.body).backgroundColor) || '#c9bda5';
-    if (key === 'worldColor') return '#d9c9aa';
     return '#285f56';
   }
   function escapeAttr(value) {
@@ -891,7 +891,7 @@
     [0,80,260,700].forEach((delay) => window.setTimeout(() => {
       applyAll();
       if (panel && !panel.hidden) refreshLayers();
-      syncBackdropHandle();
+      syncSurfaceHandle();
     },delay));
   }
 
@@ -905,7 +905,7 @@
     document.addEventListener('pointercancel',onPointerUp,true);
     document.addEventListener('marksetgo:document-available',scheduleApply);
     window.addEventListener('pageshow',scheduleApply);
-    window.addEventListener('resize',() => { if (panel && !panel.hidden) refreshLayers(); syncBackdropHandle(); });
+    window.addEventListener('resize',() => { if (panel && !panel.hidden) refreshLayers(); syncSurfaceHandle(); });
 
     // The app rebuilds views after explicit navigation. Reapply only after those
     // user events; there is intentionally no MutationObserver watching the Reader.
