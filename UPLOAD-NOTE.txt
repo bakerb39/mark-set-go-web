@@ -1,24 +1,15 @@
-EXPLORER VISUAL POLISH — CODE PASS 1
+EXPLORER ILLUSTRATED WORLD PASS 2
 
-Upload/extract this ZIP at the REPOSITORY ROOT.
-The ZIP already contains the public/ folder.
+Upload/extract this ZIP at the repository ROOT.
+It already contains the public/ directory.
 
-Files intentionally changed:
-  public/app.js
-    - Explorer-only full-width Home/start page
-    - Resume/Continue Journey cards use existing reading-progress data
-    - Existing non-Explorer Home remains unchanged
-  public/explorer-theme.css
-    - scenic Explorer Home styling
-    - richer visual-only Reader atmosphere
-    - compact Topic Feed source/action band in Explorer
-    - opaque scroll mask so article text does not draw over the header
-  public/workspace-experiment.js
-    - Mark, Set, Go!/Home bypasses the workspace side panel
-  public/index.html
-    - cache-busts only the changed JS/CSS
-  public/explorer-landscape.svg
-    - unchanged existing Explorer artwork, included for completeness
+Files changed:
+- public/index.html
+- public/explorer-theme.css
 
-Reader algorithms/modes were not modified.
-No MutationObserver construction was added.
+Real art assets added:
+- public/assets/explorer/explorer-left.png
+- public/assets/explorer/explorer-right.png
+- public/assets/explorer/explorer-top.png
+
+The Reader engine/modes are not changed.

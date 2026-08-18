@@ -1058,3 +1058,160 @@ html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-hea
   font-size:.6rem !important;
   opacity:.34 !important;
 }
+
+/* ========================================================================
+   Explorer Illustrated World v1.3
+   Real image assets frame the live application. Reader mechanics/geometry
+   remain untouched; this is a shell/art layer only.
+   ======================================================================== */
+.explorer-world-art{display:none}
+
+html[data-msg-experience-theme="explorer"] body{
+  background:#d8e3d8 !important;
+  background-image:none !important;
+}
+
+html[data-msg-experience-theme="explorer"] .explorer-world-art{
+  display:block;
+  position:fixed;
+  inset:43px 0 0;
+  z-index:0;
+  overflow:hidden;
+  pointer-events:none;
+  background:linear-gradient(180deg,#e6eadc 0%,#cddccf 54%,#b8cdbc 100%);
+}
+html[data-msg-experience-theme="explorer"] .explorer-world-art::after{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:linear-gradient(90deg,transparent 0 16%,rgba(238,243,231,.46) 28%,rgba(238,243,231,.46) 72%,transparent 84%);
+  pointer-events:none;
+}
+html[data-msg-experience-theme="explorer"] .explorer-world-art__top{
+  position:absolute;
+  z-index:1;
+  top:0;
+  left:0;
+  width:100%;
+  height:78px;
+  object-fit:cover;
+  object-position:center top;
+  opacity:.98;
+}
+html[data-msg-experience-theme="explorer"] .explorer-world-art__left,
+html[data-msg-experience-theme="explorer"] .explorer-world-art__right{
+  position:absolute;
+  z-index:2;
+  top:0;
+  width:clamp(175px,16vw,300px);
+  height:100%;
+  object-fit:cover;
+  filter:saturate(.96) contrast(1.02);
+}
+html[data-msg-experience-theme="explorer"] .explorer-world-art__left{
+  left:0;
+  object-position:right top;
+}
+html[data-msg-experience-theme="explorer"] .explorer-world-art__right{
+  right:0;
+  object-position:left top;
+}
+html[data-msg-experience-theme="explorer"] .site-header,
+html[data-msg-experience-theme="explorer"] #app,
+html[data-msg-experience-theme="explorer"] .music-dock,
+html[data-msg-experience-theme="explorer"] .site-footer{
+  position:relative;
+  z-index:3;
+}
+
+/* Let the actual illustrations, not a fake parchment background, provide the
+   atmosphere around the Reader. The central document stays clean and bright. */
+html[data-msg-experience-theme="explorer"] .app-shell:has(.reader-page-panel){
+  background:transparent !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel{
+  background:rgba(246,248,239,.92) !important;
+  box-shadow:0 18px 42px rgba(20,51,43,.18) !important;
+  backdrop-filter:blur(1.5px);
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel #reader-frame{
+  background:#fff !important;
+  box-shadow:0 12px 28px rgba(27,54,47,.14) !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel #reader{
+  background:#fff !important;
+  background-image:none !important;
+}
+
+/* The art should be visible in the gutters without narrowing the existing
+   Reader. Its current max-width/margins are left exactly as the stable app set them. */
+html[data-msg-experience-theme="explorer"] body:has(.reader-page-panel) #app{
+  background:transparent !important;
+}
+
+/* Topic/news header: compact, opaque, and visually part of the document.
+   Scrolling text disappears beneath it instead of showing through. */
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external{
+  z-index:30 !important;
+  overflow:hidden !important;
+  background:#fff !important;
+  border-radius:0 !important;
+  box-shadow:0 1px 0 rgba(19,63,57,.10),0 7px 12px rgba(26,54,47,.06) !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external::after{
+  bottom:-8px !important;
+  height:8px !important;
+  background:linear-gradient(to bottom,rgba(255,255,255,.98),rgba(255,255,255,0)) !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit{
+  background:#fff !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action{
+  background:#fff !important;
+}
+
+/* Keep book/document identity and analysis tools deliberately small. The art
+   lives outside; the text gets the square footage. */
+html[data-msg-experience-theme="explorer"] .reader-page-panel :is(.reader-book-cover,.reader-document-cover,.book-cover-thumb,.reader-cover){
+  max-width:64px !important;
+  max-height:84px !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel :is(.reader-document-meta,.reader-title-meta,.reader-source-meta){
+  font-size:.78rem !important;
+}
+html[data-msg-experience-theme="explorer"] .reader-page-panel #read-anything-article-summary-action button{
+  min-height:0 !important;
+  padding:.11rem .16rem !important;
+  font-size:.66rem !important;
+}
+
+/* Home uses the same actual scenery rather than a second fake painted layer. */
+html[data-msg-experience-theme="explorer"] .explorer-home::before,
+html[data-msg-experience-theme="explorer"] .explorer-home::after{
+  display:none !important;
+  content:none !important;
+}
+html[data-msg-experience-theme="explorer"] .explorer-home-hero{
+  background:rgba(255,255,255,.91) !important;
+  border-color:rgba(44,82,69,.24) !important;
+  box-shadow:0 18px 42px rgba(20,51,43,.16) !important;
+}
+html[data-msg-experience-theme="explorer"] .explorer-home-section,
+html[data-msg-experience-theme="explorer"] .explorer-home-expedition{
+  background:rgba(255,255,255,.94) !important;
+  border-color:rgba(44,82,69,.20) !important;
+}
+
+@media(max-width:1180px){
+  html[data-msg-experience-theme="explorer"] .explorer-world-art__left,
+  html[data-msg-experience-theme="explorer"] .explorer-world-art__right{width:150px;opacity:.82}
+  html[data-msg-experience-theme="explorer"] .explorer-world-art::after{
+    background:linear-gradient(90deg,transparent 0 9%,rgba(238,243,231,.58) 18%,rgba(238,243,231,.58) 82%,transparent 91%);
+  }
+}
+@media(max-width:860px){
+  html[data-msg-experience-theme="explorer"] .explorer-world-art__left,
+  html[data-msg-experience-theme="explorer"] .explorer-world-art__right{display:none}
+  html[data-msg-experience-theme="explorer"] .explorer-world-art__top{height:64px}
+  html[data-msg-experience-theme="explorer"] .explorer-world-art::after{display:none}
+}
