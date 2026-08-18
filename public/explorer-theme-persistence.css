@@ -1,0 +1,131 @@
+/* Explorer global theme persistence v1.0
+   Keeps the Explorer palette active on non-Reader pages reached from the top navigation.
+   Presentation only: no route, data, Reader, or interaction logic. */
+
+html[data-msg-experience-theme="explorer"] {
+  --msg-navy: #123f3d;
+  --msg-navy-deep: #0b302f;
+  --msg-blue: #2e6f63;
+  --msg-blue-strong: #245c53;
+  --msg-blue-hover: #1d4e47;
+  --msg-blue-soft: #e7f0e8;
+  --msg-blue-soft-2: #f5f1df;
+  --msg-blue-soft-3: #d8e7d9;
+  --msg-blue-border: #9fbea9;
+  --msg-blue-border-soft: #c7d7c7;
+  --msg-gold: #d3ad58;
+  --msg-gold-bright: #edcf7c;
+  --msg-gold-soft: #f7edd0;
+  --msg-ink: #173e37;
+  --msg-muted: #61766d;
+  --msg-surface: #fffdf6;
+  --msg-page: #e8e1cf;
+  --accent: #2e6f63;
+  --ui-accent: #2e6f63;
+  --panel: #fffdf6;
+  --surface: #fffdf6;
+  --page: #e8e1cf;
+  --ink: #173e37;
+  --muted: #61766d;
+  --border: #c7d7c7;
+}
+
+/* Top-level non-Reader pages should never fall back to the blue/default page surface. */
+html[data-msg-experience-theme="explorer"] #app > :is(
+  .platform-page,
+  .panel:not(.reader-page-panel),
+  .hero,
+  .music-simple-page,
+  .music-library,
+  .symposium-page,
+  .notebook-page,
+  .profile-page,
+  .help-page,
+  .about-page,
+  .learn-page,
+  .library-page
+) {
+  color: #173e37 !important;
+  background: linear-gradient(180deg,rgba(255,253,246,.97),rgba(246,241,222,.97)) !important;
+  border-color: rgba(144,119,66,.34) !important;
+}
+
+/* Common cards and sections across Library / Learn / Notebook / Music / Profile / About / Symposium. */
+html[data-msg-experience-theme="explorer"] #app :is(
+  .panel,.card,.panel-card,.source-card,.record-card,.platform-card,.platform-book-card,
+  .unified-book-card,.progress-book-card,.vocabulary-card,.analytics-card,.annual-goal-card,
+  .profile-preset-card,.profile-feature-card,.music-card,.music-primary-section,.music-secondary-section,
+  .music-book-details,.music-browse-details,.symposium-panel,.app-section-card
+):not(.reader-page-panel):not(.reader-page-panel *) {
+  color: #173e37 !important;
+  background: linear-gradient(145deg,rgba(255,253,247,.985),rgba(246,241,222,.97)) !important;
+  border-color: rgba(144,119,66,.30) !important;
+  box-shadow: 0 8px 22px rgba(39,69,52,.09), inset 0 1px rgba(255,255,255,.86) !important;
+}
+
+html[data-msg-experience-theme="explorer"] #app :is(h1,h2,h3,strong):not(.reader-page-panel *) {
+  color: #173e37 !important;
+}
+html[data-msg-experience-theme="explorer"] #app :is(.muted,small):not(.reader-page-panel *) {
+  color: #61766d !important;
+}
+
+/* Primary / secondary controls retain the Explorer green + ivory/brass language on every page. */
+html[data-msg-experience-theme="explorer"] #app :is(.primary,button.primary):not(.reader-page-panel *) {
+  background: linear-gradient(180deg,#36796c,#285f56) !important;
+  border-color: #245c53 !important;
+  color: #fffdf3 !important;
+}
+html[data-msg-experience-theme="explorer"] #app :is(.secondary,button.secondary):not(.reader-page-panel *) {
+  background: linear-gradient(180deg,#fffaf0,#eee2bd) !important;
+  border-color: #bba05c !important;
+  color: #214c43 !important;
+}
+html[data-msg-experience-theme="explorer"] #app :is(.primary,button.primary):not(.reader-page-panel *):hover,
+html[data-msg-experience-theme="explorer"] #app :is(.primary,button.primary):not(.reader-page-panel *):focus-visible {
+  background: linear-gradient(180deg,#3d8274,#2b655a) !important;
+}
+html[data-msg-experience-theme="explorer"] #app :is(.secondary,button.secondary):not(.reader-page-panel *):hover,
+html[data-msg-experience-theme="explorer"] #app :is(.secondary,button.secondary):not(.reader-page-panel *):focus-visible {
+  background: linear-gradient(180deg,#fffdf4,#e8d8a9) !important;
+}
+
+html[data-msg-experience-theme="explorer"] #app :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea):not(.reader-page-panel *) {
+  background: rgba(255,253,246,.98) !important;
+  border-color: #b7c8b7 !important;
+  color: #173e37 !important;
+}
+html[data-msg-experience-theme="explorer"] #app :is(input,select,textarea):not(.reader-page-panel *):focus {
+  border-color: #2e6f63 !important;
+  outline-color: rgba(46,111,99,.28) !important;
+}
+
+/* Generic selected states: no blue fallback. */
+html[data-msg-experience-theme="explorer"] #app :is(.active,.is-active,.selected,[aria-selected="true"]):not(.reader-page-panel *) {
+  border-color: #2e6f63 !important;
+}
+
+/* Keep common section headings warm/green rather than default blue. */
+html[data-msg-experience-theme="explorer"] #app .section-heading:not(.reader-page-panel *) {
+  background: linear-gradient(90deg,rgba(231,240,232,.96),rgba(250,244,222,.82)) !important;
+  border-bottom-color: rgba(144,119,66,.24) !important;
+}
+
+/* Music page specifically has several hard-coded default-blue surfaces. */
+html[data-msg-experience-theme="explorer"] #app .music-current-book:not(.reader-page-panel *) {
+  background: #edf3e7 !important;
+  border-color: #b8cbb8 !important;
+}
+html[data-msg-experience-theme="explorer"] #app .music-step:not(.reader-page-panel *) {
+  background: #2e6f63 !important;
+  color: #fff !important;
+}
+html[data-msg-experience-theme="explorer"] #app .music-quick-button:not(.reader-page-panel *) {
+  background: #f5f1df !important;
+  border-color: #c7d7c7 !important;
+  color: #173e37 !important;
+}
+html[data-msg-experience-theme="explorer"] #app .music-quick-button:not(.reader-page-panel *):is(:hover,:focus-visible,[aria-pressed="true"],.is-active) {
+  background: #e7f0e8 !important;
+  border-color: #2e6f63 !important;
+}

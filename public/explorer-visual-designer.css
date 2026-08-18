@@ -1,4 +1,4 @@
-/* Explorer Visual Designer v2.0 — shell-first fine tuning.
+/* Explorer Visual Designer v2.1 — expanded layout controls.
    Editor chrome only. No Reader engine/timing/pagination styles. */
 
 #msg-explorer-design-launcher,
@@ -74,7 +74,9 @@ html:not([data-msg-experience-theme="explorer"]) #msg-explorer-visual-designer {
 .msg-vd-check input { accent-color:#2e6f63; }
 .msg-vd-file-row { display:flex; gap:4px; grid-column:1/-1; }
 .msg-vd-file-row button { flex:1; min-height:26px; border:1px solid #bea76e; border-radius:5px; background:#fbf4df; color:#28554b; font-size:8px; font-weight:800; cursor:pointer; }
-.msg-vd-selected { outline:2px solid #d19e38 !important; outline-offset:2px !important; }
+.msg-vd-selected { outline:1px dashed rgba(46,111,99,.72) !important; outline-offset:2px !important; }
+/* Top controls do not need a large selection rectangle; the Inspector already shows the selection. */
+.reader-pane-controls.msg-vd-selected { outline:0 !important; outline-offset:0 !important; }
 body.msg-vd-design-mode .explorer-world-art__left,
 body.msg-vd-design-mode .explorer-world-art__right,
 body.msg-vd-design-mode .explorer-world-art__top { pointer-events:auto !important; cursor:move !important; }

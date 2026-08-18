@@ -21,68 +21,73 @@
 
   const STYLE_CONTROLS = {
     shell: [
-      range('width','Shell width',78,100,1,'%', '.reader-page-panel','width'),
-      range('marginTop','Top spacing',0,45,1,'px','.reader-page-panel','margin-top'),
-      range('paddingX','Side padding',6,40,1,'paddingX','.reader-page-panel','padding'),
-      range('paddingY','Top / bottom padding',6,34,1,'paddingY','.reader-page-panel','padding'),
+      range('width','Shell width',55,110,1,'%', '.reader-page-panel','width'),
+      range('moveY','Move shell up / down',-150,150,1,'translateY','.reader-page-panel','transform'),
+      range('marginTop','Top margin',-100,160,1,'px','.reader-page-panel','margin-top'),
+      range('marginBottom','Bottom gap',0,180,1,'px','.reader-page-panel','margin-bottom'),
+      range('paddingX','Side padding',0,100,1,'paddingX','.reader-page-panel','padding'),
+      range('paddingY','Top / bottom padding',0,100,1,'paddingY','.reader-page-panel','padding'),
       color('background','Shell color','.reader-page-panel','background'),
       color('borderColor','Border color','.reader-page-panel','border-color'),
-      range('borderWidth','Border width',0,5,1,'px','.reader-page-panel','border-width'),
-      range('radius','Corner radius',0,30,1,'px','.reader-page-panel','border-radius'),
-      range('shadow','Shadow',0,50,1,'shadow','.reader-page-panel','box-shadow')
+      range('borderWidth','Border width',0,12,1,'px','.reader-page-panel','border-width'),
+      range('radius','Corner radius',0,80,1,'px','.reader-page-panel','border-radius'),
+      range('shadow','Shadow',0,100,1,'shadow','.reader-page-panel','box-shadow')
     ],
     title: [
-      range('marginTop','Top spacing',-10,35,1,'px','.reader-page-panel > .reader-title-row','margin-top'),
-      range('marginBottom','Bottom spacing',0,30,1,'px','.reader-page-panel > .reader-title-row','margin-bottom'),
-      range('fontSize','Title size',16,36,1,'px','.reader-title-copy h1','font-size'),
+      range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel > .reader-title-row','margin-top'),
+      range('marginBottom','Bottom spacing',-80,150,1,'px','.reader-page-panel > .reader-title-row','margin-bottom'),
+      range('fontSize','Title size',10,72,1,'px','.reader-title-copy h1','font-size'),
       color('titleColor','Title color','.reader-title-copy h1','color')
     ],
     controls: [
-      range('marginTop','Top spacing',0,30,1,'px','.reader-page-panel > .reader-pane-controls','margin-top'),
-      range('marginBottom','Bottom spacing',0,30,1,'px','.reader-page-panel > .reader-pane-controls','margin-bottom'),
-      range('gap','Button spacing',2,22,1,'px','.reader-page-panel .reader-pane-buttons','gap'),
-      range('minHeight','Row height',28,58,1,'px','.reader-page-panel > .reader-pane-controls','min-height')
+      range('marginTop','Top spacing',-100,160,1,'px','.reader-page-panel > .reader-pane-controls','margin-top'),
+      range('marginBottom','Bottom spacing',-100,180,1,'px','.reader-page-panel > .reader-pane-controls','margin-bottom'),
+      range('gap','Button spacing',0,80,1,'px','.reader-page-panel .reader-pane-buttons','gap'),
+      range('minHeight','Row height',20,160,1,'px','.reader-page-panel > .reader-pane-controls','min-height')
     ],
     topics: [
-      range('width','Pane width',180,430,2,'navWidth','#reader-layout','--navigation-width'),
+      range('width','Pane width',120,700,2,'navWidth','#reader-layout','--navigation-width'),
+      range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel .navigation-pane','margin-top'),
+      range('height','Pane height',240,1200,5,'px','.reader-page-panel .navigation-pane','height'),
+      range('marginBottom','Bottom spacing',-80,180,1,'px','.reader-page-panel .navigation-pane','margin-bottom'),
       color('background','Background','.reader-page-panel .navigation-pane','background'),
       color('borderColor','Border color','.reader-page-panel .navigation-pane','border-color'),
-      range('radius','Corner radius',0,24,1,'px','.reader-page-panel .navigation-pane','border-radius'),
-      range('shadow','Shadow',0,35,1,'shadow','.reader-page-panel .navigation-pane','box-shadow')
+      range('radius','Corner radius',0,80,1,'px','.reader-page-panel .navigation-pane','border-radius'),
+      range('shadow','Shadow',0,100,1,'shadow','.reader-page-panel .navigation-pane','box-shadow')
     ],
     reader: [
-      range('marginTop','Top spacing',0,24,1,'px','.reader-page-panel #reader-frame','margin-top'),
+      range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel #reader-frame','margin-top'),
       color('background','Frame color','.reader-page-panel #reader-frame','background'),
       color('borderColor','Border color','.reader-page-panel #reader-frame','border-color'),
-      range('borderWidth','Border width',0,5,1,'px','.reader-page-panel #reader-frame','border-width'),
-      range('radius','Corner radius',0,24,1,'px','.reader-page-panel #reader-frame','border-radius'),
-      range('shadow','Shadow',0,35,1,'shadow','.reader-page-panel #reader-frame','box-shadow')
+      range('borderWidth','Border width',0,12,1,'px','.reader-page-panel #reader-frame','border-width'),
+      range('radius','Corner radius',0,80,1,'px','.reader-page-panel #reader-frame','border-radius'),
+      range('shadow','Shadow',0,100,1,'shadow','.reader-page-panel #reader-frame','box-shadow')
     ],
     footer: [
-      range('marginTop','Top spacing',0,24,1,'px','.reader-page-panel .reader-viewer-footer','margin-top'),
-      range('paddingY','Vertical padding',0,18,1,'paddingY','.reader-page-panel .reader-viewer-footer','padding')
+      range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel .reader-viewer-footer','margin-top'),
+      range('paddingY','Vertical padding',0,80,1,'paddingY','.reader-page-panel .reader-viewer-footer','padding')
     ],
     playback: [
-      range('marginTop','Top spacing',0,36,1,'px','.reader-page-panel .playback-controls','margin-top'),
-      range('marginBottom','Bottom spacing',0,30,1,'px','.reader-page-panel .playback-controls','margin-bottom')
+      range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel .playback-controls','margin-top'),
+      range('marginBottom','Bottom spacing',-100,150,1,'px','.reader-page-panel .playback-controls','margin-bottom')
     ],
     companion: [
-      range('width','Pane width',260,560,5,'wordWidth','#reader-layout','--word-panel-width'),
+      range('width','Pane width',180,800,5,'wordWidth','#reader-layout','--word-panel-width'),
       color('background','Main body','.reader-page-panel .mark-companion-panel .askmark-premium','background'),
       color('headerBackground','Header','.reader-page-panel .mark-companion-panel .askmark-hero','background'),
       color('composerBackground','Composer','.reader-page-panel .mark-companion-panel .askmark-composer','background'),
       color('borderColor','Frame border','.reader-page-panel .mark-companion-panel','border-color'),
-      range('radius','Corner radius',0,24,1,'px','.reader-page-panel .mark-companion-panel','border-radius'),
-      range('shadow','Shadow',0,35,1,'shadow','.reader-page-panel .mark-companion-panel','box-shadow')
+      range('radius','Corner radius',0,80,1,'px','.reader-page-panel .mark-companion-panel','border-radius'),
+      range('shadow','Shadow',0,100,1,'shadow','.reader-page-panel .mark-companion-panel','box-shadow')
     ]
   };
 
   const ART_CONTROLS = [
-    range('x','Move left / right',-350,350,2,'px',null,null),
-    range('y','Move up / down',-350,350,2,'px',null,null),
-    range('width','Artwork width',90,600,2,'px',null,null),
-    range('scale','Scale',50,180,1,'%',null,null),
-    range('opacity','Opacity',10,100,1,'%',null,null),
+    range('x','Move left / right',-800,800,2,'px',null,null),
+    range('y','Move up / down',-800,800,2,'px',null,null),
+    range('width','Artwork width',50,900,2,'px',null,null),
+    range('scale','Scale',25,250,1,'%',null,null),
+    range('opacity','Opacity',0,100,1,'%',null,null),
     check('visible','Show artwork'),
     text('src','Image URL'),
     fileControl('imageFile','Replace with image')
@@ -308,6 +313,7 @@
     if(control.unit==='shadow')return estimateShadow(computed.boxShadow);
     if(control.unit==='paddingY')return parseFloat(computed.paddingTop)||0;
     if(control.unit==='paddingX')return parseFloat(computed.paddingLeft)||0;
+    if(control.unit==='translateY')return 0;
     if(control.unit==='%'){
       const parent=el.parentElement;
       if(parent?.clientWidth)return clamp(Math.round((el.getBoundingClientRect().width/parent.clientWidth)*100),control.min,control.max);
@@ -358,6 +364,9 @@
     if(control.unit==='paddingX'){
       node.style.setProperty('padding-left',`${value}px`,'important');
       node.style.setProperty('padding-right',`${value}px`,'important');return;
+    }
+    if(control.unit==='translateY'){
+      node.style.setProperty('transform',`translate3d(0,${value}px,0)`,'important');return;
     }
     if(control.type==='color'){
       node.style.setProperty(control.prop,String(value),'important');return;
@@ -413,6 +422,7 @@
         const node=document.querySelector(control.selector||target.selector||'');if(!node)return;
         if(control.unit==='paddingY'){node.style.removeProperty('padding-top');node.style.removeProperty('padding-bottom');}
         else if(control.unit==='paddingX'){node.style.removeProperty('padding-left');node.style.removeProperty('padding-right');}
+        else if(control.unit==='translateY'){node.style.removeProperty('transform');}
         else{node.style.removeProperty(control.prop);if(control.prop==='width'&&control.unit==='%'){node.style.removeProperty('margin-left');node.style.removeProperty('margin-right');}}
       });
     }
@@ -473,11 +483,11 @@
 
   function formatValue(control,value){
     if(control.unit==='shadow')return String(Math.round(Number(value)||0));
-    if(control.unit==='navWidth'||control.unit==='wordWidth'||control.unit==='paddingY'||control.unit==='paddingX')return `${Math.round(Number(value)||0)}px`;
+    if(control.unit==='navWidth'||control.unit==='wordWidth'||control.unit==='paddingY'||control.unit==='paddingX'||control.unit==='translateY')return `${Math.round(Number(value)||0)}px`;
     return `${Math.round(Number(value)||0)}${control.unit||''}`;
   }
   function clamp(value,min,max){return Math.min(max,Math.max(min,value));}
-  function estimateShadow(value){if(!value||value==='none')return 0;const nums=value.match(/-?\d+(?:\.\d+)?px/g)?.map(item=>Math.abs(parseFloat(item)))||[];return clamp(Math.round(Math.max(...nums,0)),0,50);}
+  function estimateShadow(value){if(!value||value==='none')return 0;const nums=value.match(/-?\d+(?:\.\d+)?px/g)?.map(item=>Math.abs(parseFloat(item)))||[];return clamp(Math.round(Math.max(...nums,0)),0,100);}
   function normalizeColor(value){
     const text=String(value||'').trim();if(/^#[0-9a-f]{6}$/i.test(text))return text;
     const match=text.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);if(!match)return'#ffffff';

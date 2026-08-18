@@ -1,13 +1,13 @@
-Explorer Reader Shell Spacing v1.0.1
+Explorer Designer v2.1 — expanded layout control + global Explorer theme persistence
 
-Upload/extract at the repository ROOT.
-
-Changed files:
-- public/explorer-reader-shell.css
-- public/index.html
+Upload/extract this ZIP at the repository ROOT so the included public/ paths replace/add files under public/.
 
 What changed:
-- The command row now reserves 40px of height so Contents / Ask Beth cannot protrude into the pane row.
-- Increased the clear ivory gap below the command row from 8px to 14px.
-- Added a 2px pane-row separation for a continuous clean line across My Topics / Reader / Companion.
-- No Reader JS, pagination, timing, mode, Topic Feed, or companion logic changed.
+- Designer storage key/version stays V2, so existing saved Explorer V2 settings remain compatible.
+- Reader shell: new Move shell up/down and Bottom gap controls; much larger ranges.
+- My Topics: new Top spacing, Pane height, and Bottom spacing controls; much larger width range.
+- Larger min/max ranges across title, top controls, Reader spacing, page controls, playback, companion, and scenery.
+- Removed the large gold Designer selection outline from Top controls; other selection outlines are subtle green dashed lines.
+- Added explorer-theme-persistence.css so pages opened from My Library / Learn / Notebook / Music & Focus / Profile / About / Symposium retain Explorer green/ivory/brass styling instead of falling back to the original blue scheme.
+- No Reader engine/timing/pagination/mode JavaScript changed.
+- No MutationObserver added.
