@@ -529,20 +529,17 @@
 
   function applyAll(){
     if(!isExplorer()){
-      clearAppliedDesignerStylesPreserveConfig();
-      syncDesignerAvailability();
-      syncExplorerReaderFooterGap();
+      TARGETS.forEach(releaseTargetStyles);
+      document.documentElement.style.removeProperty('--msg-vd-reader-page-color');
+      document.querySelectorAll(`[${MANAGED_ATTR}]`).forEach(node=>node.removeAttribute(MANAGED_ATTR));
       return;
     }
     TARGETS.forEach(applyTarget);
     markSelectableElements();
     applySelectionOutline();
-    syncDesignerAvailability();
-    window.requestAnimationFrame(syncExplorerReaderFooterGap);
   }
-
   function applyTarget(target){
-    if(!target)return;
+    if(!target||!isExplorer())return;
     const values=config.targets[target.id];
     if(!values)return;
     const el=targetElement(target);
@@ -562,81 +559,23 @@
   }
 
   function syncShellFlowFootprint(node,values){
-    if(!node)return;
+    if(!node||!isExplorer())return;
     const moveY=Number(values?.moveY)||0;
     const requestedGap=Number(values?.marginBottom)||0;
-    node.style.setProperty('transform',`translate3d(0,${moveY}px,0)`,'important');
-    node.style.setProperty('margin-bottom',`${requestedGap+moveY}px`,'important');
-  }
+    const appNode=node.closest('#app.app-shell')||document.querySelector('#app.app-shell');
 
-  function removeManagedControlStyle(target,control){
-    if(control.type==='select')return;
-    const selector=String(control.selector||target?.selector||'').trim();
-    if(!selector)return;
-    let node=null;
-    try{node=document.querySelector(selector);}catch{return;}
-    if(!node)return;
-    if(control.unit==='paddingY'){
-      node.style.removeProperty('padding-top');
-      node.style.removeProperty('padding-bottom');
-      return;
-    }
-    if(control.unit==='paddingX'){
-      node.style.removeProperty('padding-left');
-      node.style.removeProperty('padding-right');
-      return;
-    }
-    if(control.unit==='translateY'){
-      node.style.removeProperty('transform');
-      return;
-    }
-    node.style.removeProperty(control.prop);
-    if(control.prop==='width'&&control.unit==='%'){
-      node.style.removeProperty('margin-left');
-      node.style.removeProperty('margin-right');
-    }
-  }
+    // IMPORTANT: shell movement is normal-flow spacing, not transform movement.
+    // A transform leaves its old layout box behind and created the blank wall.
+    node.style.removeProperty('transform');
+    node.style.setProperty('margin-bottom',`${requestedGap}px`,'important');
 
-  function clearAppliedDesignerStylesPreserveConfig(){
-    TARGETS.forEach(target=>{
-      const el=targetElement(target);
-      if(target.art){
-        if(!el)return;
-        ['width','transform','transform-origin','opacity','display'].forEach(prop=>el.style.removeProperty(prop));
-        const original=el.dataset.msgVdOriginalSrc;
-        if(original)el.setAttribute('src',original);
-        return;
-      }
-      (STYLE_CONTROLS[target.id]||[]).forEach(control=>removeManagedControlStyle(target,control));
-    });
-    document.documentElement.style.removeProperty('--msg-vd-reader-page-color');
-    const shell=targetElement(targetById('shell'));
-    if(shell) shell.style.removeProperty('margin-bottom');
-    clearSelectionOutline();
-    clearSelectableMarks();
-  }
-
-  function syncDesignerAvailability(){
-    if(!launcher)return;
-    launcher.hidden=!isExplorer();
-    if(!isExplorer()&&panel&&!panel.hidden)closeDesigner();
-  }
-
-  function syncExplorerReaderFooterGap(){
-    const footer=document.querySelector('.site-footer');
-    if(!footer)return;
-    const panelNode=document.querySelector('#app .reader-page-panel');
-    if(!isExplorer()||!panelNode){
-      footer.style.removeProperty('margin-top');
-      delete footer.dataset.msgExplorerReaderFooterPullup;
-      return;
+    if(appNode){
+      // Desktop base .app-shell margin is 1rem (16px). moveY is an offset from
+      // that normal-flow baseline, so -10 => 6px, +20 => 36px, -30 => -14px.
+      const base=window.matchMedia('(max-width:520px)').matches?8:16;
+      appNode.style.setProperty('margin-top',`${base+moveY}px`,'important');
+      appNode.style.setProperty('margin-bottom','0px','important');
     }
-    const previous=Math.max(0,Number(footer.dataset.msgExplorerReaderFooterPullup)||0);
-    const panelBottom=panelNode.getBoundingClientRect().bottom;
-    const naturalFooterTop=footer.getBoundingClientRect().top+previous;
-    const gap=Math.max(0,Math.round(naturalFooterTop-panelBottom));
-    footer.dataset.msgExplorerReaderFooterPullup=String(gap);
-    footer.style.setProperty('margin-top',`${-gap}px`,'important');
   }
 
   function applyStyleControl(node,control,value){
@@ -655,9 +594,7 @@
       node.style.setProperty('padding-left',`${value}px`,'important');
       node.style.setProperty('padding-right',`${value}px`,'important');return;
     }
-    if(control.unit==='translateY'){
-      node.style.setProperty('transform',`translate3d(0,${value}px,0)`,'important');return;
-    }
+    if(control.unit==='translateY'){ return; }
     if(control.type==='color'){
       node.style.setProperty(control.prop,String(value),'important');
       if(control.key==='pageBackground'){
@@ -705,7 +642,7 @@
     renderInspector();markDirty('Original artwork restored.');
   }
 
-  function clearTargetStyles(target){
+  function releaseTargetStyles(target){
     if(!target)return;
     const el=targetElement(target);
     if(target.art&&el){
@@ -714,16 +651,31 @@
     }else{
       (STYLE_CONTROLS[target.id]||[]).forEach(control=>{
         if(control.type==='select')return;
-        const selector=String(control.selector||target.selector||'').trim();if(!selector)return;
-        let node=null;try{node=document.querySelector(selector);}catch{return;}if(!node)return;
+        const selector=String(control.selector||target.selector||'').trim();
+        if(!selector)return;
+        let node=null;
+        try{node=document.querySelector(selector);}catch{return;}
+        if(!node)return;
         if(control.unit==='paddingY'){node.style.removeProperty('padding-top');node.style.removeProperty('padding-bottom');}
         else if(control.unit==='paddingX'){node.style.removeProperty('padding-left');node.style.removeProperty('padding-right');}
         else if(control.unit==='translateY'){node.style.removeProperty('transform');}
         else{node.style.removeProperty(control.prop);if(control.prop==='width'&&control.unit==='%'){node.style.removeProperty('margin-left');node.style.removeProperty('margin-right');}}
       });
     }
+    if(target.id==='shell'){
+      const appNode=document.querySelector('#app.app-shell');
+      appNode?.style.removeProperty('margin-top');
+      appNode?.style.removeProperty('margin-bottom');
+      el?.style.removeProperty('transform');
+    }
+    if(target.id==='reader')document.documentElement.style.removeProperty('--msg-vd-reader-page-color');
+  }
+  function clearTargetStyles(target){
+    if(!target)return;
+    releaseTargetStyles(target);
     delete config.targets[target.id];
   }
+
   function resetSelected(){
     const target=targetById(selectedId);if(!target)return;pushUndoSnapshot();clearTargetStyles(target);renderInspector();markDirty(`${target.label} reset.`);window.dispatchEvent(new Event('resize'));
   }
@@ -800,9 +752,9 @@
     document.addEventListener('pointerup',onPointerUp,true);
     document.addEventListener('pointercancel',onPointerUp,true);
     document.addEventListener('marksetgo:document-available',scheduleApply);
+    document.addEventListener('marksetgo:experience-profile-changed',scheduleApply);
     window.addEventListener('pageshow',scheduleApply);
     window.addEventListener('resize',()=>{
-      window.requestAnimationFrame(syncExplorerReaderFooterGap);
       if(panel&&!panel.hidden){
         refreshLayers();
         const rect=panel.getBoundingClientRect();
@@ -815,14 +767,7 @@
         }
       }
     });
-    document.addEventListener('click',event=>{
-      if(!(event.target instanceof Element))return;
-      if(event.target.closest('[data-action],[data-read],[data-topic-read],.visual-theme-option,[data-experience-theme],[data-visual-theme]'))scheduleApply();
-    },true);
-    document.addEventListener('change',event=>{
-      if(event.target instanceof Element) scheduleApply();
-    },true);
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden)scheduleApply();});
+    document.addEventListener('click',event=>{if(event.target instanceof Element&&event.target.closest('[data-action],[data-read],[data-topic-read],[data-profile-appearance]'))scheduleApply();},true);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
