@@ -1,0 +1,143 @@
+/* Explorer global theme persistence v1.1 — Designer palette presets
+   Keeps the Explorer palette active on non-Reader pages reached from the top navigation.
+   Presentation only: no route, data, Reader, or interaction logic. */
+
+html[data-msg-experience-theme="explorer"] {
+  /* Designer-editable Explorer palette. */
+  --explorer-global-page: #e8e1cf;
+  --explorer-global-surface: #fffdf6;
+  --explorer-global-accent: #2e6f63;
+  --explorer-global-accent-dark: #245c53;
+  --explorer-global-soft: #e7f0e8;
+  --explorer-global-soft-2: #f5f1df;
+  --explorer-global-border: #c7d7c7;
+  --explorer-global-gold: #d3ad58;
+  --explorer-global-ink: #173e37;
+  --explorer-global-muted: #61766d;
+
+  --msg-navy: var(--explorer-global-accent-dark);
+  --msg-navy-deep: #0b302f;
+  --msg-blue: var(--explorer-global-accent);
+  --msg-blue-strong: var(--explorer-global-accent-dark);
+  --msg-blue-hover: var(--explorer-global-accent-dark);
+  --msg-blue-soft: var(--explorer-global-soft);
+  --msg-blue-soft-2: var(--explorer-global-soft-2);
+  --msg-blue-soft-3: var(--explorer-global-soft);
+  --msg-blue-border: var(--explorer-global-border);
+  --msg-blue-border-soft: var(--explorer-global-border);
+  --msg-gold: var(--explorer-global-gold);
+  --msg-gold-bright: var(--explorer-global-gold);
+  --msg-gold-soft: #f7edd0;
+  --msg-ink: var(--explorer-global-ink);
+  --msg-muted: var(--explorer-global-muted);
+  --msg-surface: var(--explorer-global-surface);
+  --msg-page: var(--explorer-global-page);
+  --accent: var(--explorer-global-accent);
+  --ui-accent: var(--explorer-global-accent);
+  --panel: var(--explorer-global-surface);
+  --surface: var(--explorer-global-surface);
+  --page: var(--explorer-global-page);
+  --ink: var(--explorer-global-ink);
+  --muted: var(--explorer-global-muted);
+  --border: var(--explorer-global-border);
+}
+
+/* Top-level non-Reader pages should never fall back to the blue/default page surface. */
+html[data-msg-experience-theme="explorer"] #app > :is(
+  .platform-page,
+  .panel:not(.reader-page-panel),
+  .hero,
+  .music-simple-page,
+  .music-library,
+  .symposium-page,
+  .notebook-page,
+  .profile-page,
+  .help-page,
+  .about-page,
+  .learn-page,
+  .library-page
+) {
+  color: var(--explorer-global-ink) !important;
+  background: var(--explorer-global-surface) !important;
+  border-color: var(--explorer-global-border) !important;
+}
+
+/* Common cards and sections across Library / Learn / Notebook / Music / Profile / About / Symposium. */
+html[data-msg-experience-theme="explorer"] #app :is(
+  .panel,.card,.panel-card,.source-card,.record-card,.platform-card,.platform-book-card,
+  .unified-book-card,.progress-book-card,.vocabulary-card,.analytics-card,.annual-goal-card,
+  .profile-preset-card,.profile-feature-card,.music-card,.music-primary-section,.music-secondary-section,
+  .music-book-details,.music-browse-details,.symposium-panel,.app-section-card
+):not(.reader-page-panel):not(.reader-page-panel *) {
+  color: var(--explorer-global-ink) !important;
+  background: var(--explorer-global-surface) !important;
+  border-color: var(--explorer-global-border) !important;
+  box-shadow: 0 8px 22px rgba(39,69,52,.09), inset 0 1px rgba(255,255,255,.86) !important;
+}
+
+html[data-msg-experience-theme="explorer"] #app :is(h1,h2,h3,strong):not(.reader-page-panel *) {
+  color: var(--explorer-global-ink) !important;
+}
+html[data-msg-experience-theme="explorer"] #app :is(.muted,small):not(.reader-page-panel *) {
+  color: var(--explorer-global-muted) !important;
+}
+
+/* Primary / secondary controls retain the Explorer green + ivory/brass language on every page. */
+html[data-msg-experience-theme="explorer"] #app :is(.primary,button.primary):not(.reader-page-panel *) {
+  background: var(--explorer-global-accent) !important;
+  border-color: var(--explorer-global-accent-dark) !important;
+  color: #fffdf3 !important;
+}
+html[data-msg-experience-theme="explorer"] #app :is(.secondary,button.secondary):not(.reader-page-panel *) {
+  background: var(--explorer-global-soft-2) !important;
+  border-color: var(--explorer-global-gold) !important;
+  color: var(--explorer-global-ink) !important;
+}
+html[data-msg-experience-theme="explorer"] #app :is(.primary,button.primary):not(.reader-page-panel *):hover,
+html[data-msg-experience-theme="explorer"] #app :is(.primary,button.primary):not(.reader-page-panel *):focus-visible {
+  background: var(--explorer-global-accent-dark) !important;
+}
+html[data-msg-experience-theme="explorer"] #app :is(.secondary,button.secondary):not(.reader-page-panel *):hover,
+html[data-msg-experience-theme="explorer"] #app :is(.secondary,button.secondary):not(.reader-page-panel *):focus-visible {
+  background: var(--explorer-global-soft) !important;
+}
+
+html[data-msg-experience-theme="explorer"] #app :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea):not(.reader-page-panel *) {
+  background: var(--explorer-global-surface) !important;
+  border-color: var(--explorer-global-border) !important;
+  color: var(--explorer-global-ink) !important;
+}
+html[data-msg-experience-theme="explorer"] #app :is(input,select,textarea):not(.reader-page-panel *):focus {
+  border-color: var(--explorer-global-accent) !important;
+  outline-color: color-mix(in srgb,var(--explorer-global-accent) 28%,transparent) !important;
+}
+
+/* Generic selected states: no blue fallback. */
+html[data-msg-experience-theme="explorer"] #app :is(.active,.is-active,.selected,[aria-selected="true"]):not(.reader-page-panel *) {
+  border-color: var(--explorer-global-accent) !important;
+}
+
+/* Keep common section headings warm/green rather than default blue. */
+html[data-msg-experience-theme="explorer"] #app .section-heading:not(.reader-page-panel *) {
+  background: linear-gradient(90deg,rgba(231,240,232,.96),rgba(250,244,222,.82)) !important;
+  border-bottom-color: rgba(144,119,66,.24) !important;
+}
+
+/* Music page specifically has several hard-coded default-blue surfaces. */
+html[data-msg-experience-theme="explorer"] #app .music-current-book:not(.reader-page-panel *) {
+  background: var(--explorer-global-soft) !important;
+  border-color: var(--explorer-global-border) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .music-step:not(.reader-page-panel *) {
+  background: var(--explorer-global-accent) !important;
+  color: #fff !important;
+}
+html[data-msg-experience-theme="explorer"] #app .music-quick-button:not(.reader-page-panel *) {
+  background: var(--explorer-global-soft-2) !important;
+  border-color: var(--explorer-global-border) !important;
+  color: var(--explorer-global-ink) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .music-quick-button:not(.reader-page-panel *):is(:hover,:focus-visible,[aria-pressed="true"],.is-active) {
+  background: var(--explorer-global-soft) !important;
+  border-color: var(--explorer-global-accent) !important;
+}

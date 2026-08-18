@@ -1,0 +1,107 @@
+/* Explorer Visual Designer v2.2.3 — draggable panel + expanded layout controls.
+   Editor chrome only. No Reader engine/timing/pagination styles. */
+
+#msg-explorer-design-launcher,
+#msg-explorer-visual-designer {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+html:not([data-msg-experience-theme="explorer"]) #msg-explorer-design-launcher,
+html:not([data-msg-experience-theme="explorer"]) #msg-explorer-visual-designer { display:none !important; }
+
+#msg-explorer-design-launcher {
+  position:fixed;
+  right:16px;
+  bottom:16px;
+  z-index:12030;
+  min-height:34px;
+  padding:6px 12px;
+  border:1px solid #c8a45b;
+  border-radius:999px;
+  background:linear-gradient(180deg,#285f56,#174c45);
+  color:#fff5d9;
+  box-shadow:0 7px 20px rgba(24,54,48,.26);
+  font-size:11px;
+  font-weight:800;
+  cursor:pointer;
+}
+#msg-explorer-design-launcher:hover,
+#msg-explorer-design-launcher:focus-visible { background:linear-gradient(180deg,#337567,#1d554c); outline:2px solid rgba(239,208,130,.7); outline-offset:2px; }
+
+#msg-explorer-visual-designer {
+  position:fixed;
+  top:56px;
+  right:12px;
+  z-index:12040;
+  width:min(310px,calc(100vw - 24px));
+  max-height:min(650px,calc(100vh - 80px));
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr) auto auto;
+  overflow:hidden;
+  border:1px solid #b68e43;
+  border-radius:12px;
+  background:#fffdf6;
+  color:#173e37;
+  box-shadow:0 20px 55px rgba(16,42,37,.32);
+}
+#msg-explorer-visual-designer[hidden] { display:none !important; }
+.msg-vd-head { display:flex; align-items:center; gap:7px; padding:9px 10px; border-bottom:1px solid rgba(145,111,49,.22); background:linear-gradient(180deg,#fff8e6,#eee0bb); cursor:grab; touch-action:none; user-select:none; }
+.msg-vd-head:active, body.msg-vd-panel-dragging .msg-vd-head { cursor:grabbing; }
+.msg-vd-drag-grip { flex:0 0 auto; color:#8b713d; font-size:15px; line-height:1; letter-spacing:-5px; opacity:.82; transform:rotate(90deg); }
+.msg-vd-head-copy { min-width:0; flex:1; }
+.msg-vd-head-copy strong { display:block; font:800 13px/1.1 Georgia,serif; color:#174c45; }
+.msg-vd-head-copy small { display:block; margin-top:2px; color:#786a4e; font-size:9px; }
+.msg-vd-head button { width:27px; cursor:pointer; touch-action:auto; user-select:auto; height:27px; padding:0; border:1px solid rgba(137,104,43,.3); border-radius:7px; background:#fffaf0; color:#174c45; font-weight:900; cursor:pointer; }
+.msg-vd-toolbar { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; padding:7px; border-bottom:1px solid rgba(145,111,49,.17); background:#faf6e9; }
+.msg-vd-toolbar button { min-height:28px; padding:4px 3px; border:1px solid rgba(112,91,52,.25); border-radius:6px; background:#fffdf7; color:#214c43; font-size:9px; font-weight:750; cursor:pointer; }
+.msg-vd-toolbar button:hover:not(:disabled){background:#f1e7ca}.msg-vd-toolbar button:disabled{opacity:.42;cursor:default}
+.msg-vd-scroll { min-height:0; overflow:auto; overscroll-behavior:contain; }
+.msg-vd-section { padding:8px 9px; border-bottom:1px solid rgba(116,91,43,.12); }
+.msg-vd-section-title { display:flex; align-items:center; justify-content:space-between; gap:7px; margin:0 0 6px; color:#705b34; font-size:8px; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+.msg-vd-section-title span:last-child { color:#9a8967; font-weight:700; letter-spacing:0; text-transform:none; }
+.msg-vd-layers { display:grid; grid-template-columns:1fr 1fr; gap:4px; }
+.msg-vd-layer { min-height:29px; padding:5px 7px; border:1px solid rgba(45,91,79,.16); border-radius:6px; background:#fff; color:#31554c; text-align:left; font-size:9px; font-weight:700; cursor:pointer; }
+.msg-vd-layer:hover { border-color:rgba(167,126,53,.5); background:#fcf6e5; }
+.msg-vd-layer.is-selected { border-color:#a87c30; background:#f1e2b9; box-shadow:inset 3px 0 #285f56; }
+.msg-vd-layer.is-primary-layer { grid-column:1 / -1; font-weight:850; background:#fff8e5; }
+.msg-vd-layer.is-primary-layer.is-selected { background:#ead7a5; }
+.msg-vd-layer:disabled { opacity:.36; cursor:default; }
+.msg-vd-control { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px 7px; align-items:center; margin:0 0 7px; }
+.msg-vd-control:last-child { margin-bottom:0; }
+.msg-vd-control > label { color:#3c534c; font-size:9px; font-weight:750; }
+.msg-vd-control-output { min-width:40px; color:#856a37; text-align:right; font-size:8px; font-variant-numeric:tabular-nums; }
+.msg-vd-control input[type="range"] { grid-column:1/-1; width:100%; accent-color:#2e6f63; }
+.msg-vd-control input[type="color"] { width:38px; height:25px; padding:2px; border:1px solid #c2ae7b; border-radius:5px; background:#fff; cursor:pointer; }
+.msg-vd-control input[type="text"] { grid-column:1/-1; width:100%; min-height:28px; padding:4px 6px; border:1px solid #c9b98d; border-radius:5px; background:#fff; color:#263f38; font-size:9px; }
+.msg-vd-check { display:flex; align-items:center; gap:5px; color:#3c534c; font-size:9px; font-weight:700; }
+.msg-vd-check input { accent-color:#2e6f63; }
+.msg-vd-file-row { display:flex; gap:4px; grid-column:1/-1; }
+.msg-vd-file-row button { flex:1; min-height:26px; border:1px solid #bea76e; border-radius:5px; background:#fbf4df; color:#28554b; font-size:8px; font-weight:800; cursor:pointer; }
+.msg-vd-selected { outline:1px dashed rgba(46,111,99,.72) !important; outline-offset:2px !important; }
+/* Top controls do not need a large selection rectangle; the Inspector already shows the selection. */
+.reader-pane-controls.msg-vd-selected { outline:0 !important; outline-offset:0 !important; }
+body.msg-vd-design-mode .explorer-world-art__left,
+body.msg-vd-design-mode .explorer-world-art__right,
+body.msg-vd-design-mode .explorer-world-art__top { pointer-events:auto !important; cursor:move !important; }
+body.msg-vd-design-mode [data-msg-vd-selectable="1"] { cursor:crosshair; }
+body.msg-vd-preview-mode .msg-vd-selected { outline:0 !important; }
+.msg-vd-status { min-height:30px; display:flex; align-items:center; padding:6px 9px; border-top:1px solid rgba(145,111,49,.17); background:#f8f3e5; color:#665f4f; font-size:8px; }
+.msg-vd-status::before { content:"●"; margin-right:6px; color:#b48a3c; font-size:7px; }
+.msg-vd-status.is-saved::before { color:#2e6f63; }
+.msg-vd-bottom-actions { display:grid; grid-template-columns:1fr 1fr; gap:5px; padding:7px 9px 9px; background:#f8f3e5; }
+.msg-vd-bottom-actions button { min-height:29px; border:1px solid #b99b5d; border-radius:6px; background:#fffaf0; color:#28544b; font-size:9px; font-weight:800; cursor:pointer; }
+.msg-vd-bottom-actions .msg-vd-save { background:linear-gradient(180deg,#327467,#245b52); border-color:#245b52; color:#fff8df; }
+.msg-vd-bottom-actions .msg-vd-danger { color:#7d3a2c; }
+@media(max-width:720px){#msg-explorer-visual-designer{top:8px;right:8px;width:min(310px,calc(100vw - 16px));max-height:calc(100vh - 16px)}#msg-explorer-design-launcher{right:10px;bottom:10px}}
+
+/* v2.2 — palette preset control. */
+.msg-vd-control select {
+  min-width:132px; min-height:27px; padding:3px 24px 3px 6px;
+  border:1px solid #c9b98d; border-radius:5px; background:#fff; color:#263f38; font-size:9px;
+}
+.msg-vd-layer[data-vd-layer="theme"] { grid-column:1 / -1; font-weight:850; background:#f3ead1; }
+
+
+/* v2.2.3 — the Designer itself can be moved out of the way.
+   Drag the parchment header; JS clamps the panel to the viewport and saves its position. */
+body.msg-vd-panel-dragging { user-select:none !important; }
+body.msg-vd-panel-dragging #msg-explorer-visual-designer { transition:none !important; }
