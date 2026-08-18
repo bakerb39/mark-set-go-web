@@ -481,3 +481,15 @@ html[data-msg-experience-theme="explorer"]
 > .topic-feed-story-meta-overlay {
   display: none !important;
 }
+
+/* v1.0.8 — OPAQUE FIRST-PAGE HEADER BAND WHILE SCROLLING
+   Once the topic article scrolls, the compact external header becomes a solid
+   white band exactly as wide as the first-page header. The lower white shadow
+   provides a small buffer so article text disappears cleanly underneath. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  z-index: 20 !important;
+  background: var(--msg-vd-reader-page-color, #ffffff) !important;
+  background-image: none !important;
+  box-shadow: 0 7px 0 var(--msg-vd-reader-page-color, #ffffff) !important;
+}
