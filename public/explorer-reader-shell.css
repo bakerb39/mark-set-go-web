@@ -209,7 +209,7 @@ html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-
   html[data-msg-experience-theme="explorer"] #app .reader-page-panel {
     width: 100% !important;
     margin-top: 3px !important;
-    margin-bottom: 0 !important;
+    margin-bottom: -10px !important;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
     transform: translate3d(0,-10px,0) !important;
@@ -363,4 +363,55 @@ html[data-msg-experience-theme="explorer"] body:has(#app .reader-page-panel) > .
 html[data-msg-experience-theme="explorer"] .music-dock {
   position: fixed !important;
   z-index: 9999 !important;
+}
+
+
+/* v1.0.6 — TRUE LOCAL TOPIC ACTION OCCLUSION
+   Keep the external header transparent. Only the compact action cluster from
+   Summarize through Create Post gets an opaque footprint, so scrolling article
+   text disappears under those controls without creating a bar across the page. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {
+  position: relative !important;
+  z-index: 3 !important;
+  isolation: isolate !important;
+  display: inline-flex !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: .08rem !important;
+  margin: .08rem 0 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: -3px -5px !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  border-radius: 3px !important;
+  background: var(--msg-vd-reader-page-color, #ffffff) !important;
+  box-shadow: none !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, span[aria-hidden="true"]) {
+  position: relative !important;
+  z-index: 1 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* The Source/share row leaves once the document starts moving; the compact
+   action cluster above remains as the only local text ceiling. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay {
+  display: none !important;
 }

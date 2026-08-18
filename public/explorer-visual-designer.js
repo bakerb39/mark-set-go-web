@@ -193,7 +193,11 @@
   }
   function isExplorer(){return document.documentElement.dataset.msgExperienceTheme==='explorer';}
   function targetById(id){return TARGETS.find(t=>t.id===id)||null;}
-  function targetElement(target){return document.querySelector(target?.selector||'');}
+  function targetElement(target){
+    const selector=String(target?.selector||'').trim();
+    if(!selector)return null;
+    try{return document.querySelector(selector);}catch{return null;}
+  }
   function controlsForTarget(target){return target?.art?ART_CONTROLS:(STYLE_CONTROLS[target?.id]||[]);}
 
   function ensureUI(){
@@ -479,7 +483,10 @@
       if(control.key==='visible')return getComputedStyle(el).display!=='none';
       if(control.key==='src')return el?.getAttribute('src')||'';
     }
-    const el=document.querySelector(control.selector||target.selector||'');
+    const selector=String(control.selector||target.selector||'').trim();
+    if(!selector)return control.min??'';
+    let el=null;
+    try{el=document.querySelector(selector);}catch{return control.min??'';}
     if(!el)return control.min??'';
     const computed=getComputedStyle(el);
     if(control.type==='color')return control.prop==='background' ? computed.backgroundColor : (computed.getPropertyValue(control.prop)||'#ffffff');
@@ -522,6 +529,7 @@
 
   function applyAll(){TARGETS.forEach(applyTarget);markSelectableElements();applySelectionOutline();}
   function applyTarget(target){
+    if(!target)return;
     const values=config.targets[target.id];
     if(!values)return;
     const el=targetElement(target);
@@ -531,9 +539,23 @@
     controls.forEach(control=>{
       if(control.type==='select')return;
       if(!Object.prototype.hasOwnProperty.call(values,control.key))return;
-      const node=document.querySelector(control.selector||target.selector||'');
+      const selector=String(control.selector||target.selector||'').trim();
+      if(!selector)return;
+      let node=null;
+      try{node=document.querySelector(selector);}catch{return;}
       if(node)applyStyleControl(node,control,values[control.key]);
     });
+    if(target.id==='shell')syncShellFlowFootprint(el,values);
+  }
+
+  function syncShellFlowFootprint(node,values){
+    if(!node)return;
+    const moveY=Number(values?.moveY)||0;
+    const requestedGap=Number(values?.marginBottom)||0;
+    // translateY changes only painting, not layout. Offset the layout footprint by
+    // the same amount so lifting the shell does not leave a ghost strip below it.
+    node.style.setProperty('transform',`translate3d(0,${moveY}px,0)`,'important');
+    node.style.setProperty('margin-bottom',`${requestedGap+moveY}px`,'important');
   }
 
   function applyStyleControl(node,control,value){
@@ -556,7 +578,11 @@
       node.style.setProperty('transform',`translate3d(0,${value}px,0)`,'important');return;
     }
     if(control.type==='color'){
-      node.style.setProperty(control.prop,String(value),'important');return;
+      node.style.setProperty(control.prop,String(value),'important');
+      if(control.key==='pageBackground'){
+        document.documentElement.style.setProperty('--msg-vd-reader-page-color',String(value),'important');
+      }
+      return;
     }
     const suffix=control.unit==='%'?'%':'px';
     node.style.setProperty(control.prop,`${value}${suffix}`,'important');
