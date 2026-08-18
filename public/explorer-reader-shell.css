@@ -494,34 +494,37 @@ html[data-msg-experience-theme="explorer"]
   box-shadow: 0 7px 0 var(--msg-vd-reader-page-color, #ffffff) !important;
 }
 
-/* v1.0.9 — UNIFIED TOPIC HEADER BAND
-   Treat SOURCE/date/View original/social icons + Summarize/Analyze/Create Post
-   as one opaque header unit. Keep the whole header visible while scrolling and
-   give it a small white buffer underneath so article text disappears below it. */
+/* v1.0.10 — WHOLE TOPIC HEADER OCCLUSION, WITHOUT RE-LAYOUT
+   Preserve the existing header geometry exactly. The SOURCE/date/View Original
+   row, social icons, and Summarize/Analyze/Create Post remain where they already
+   are. A white layer is painted behind the complete existing header only when
+   scrolling, with a small white buffer below it. */
 html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external {
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
   position: relative !important;
   z-index: 20 !important;
-  box-sizing: border-box !important;
-  background: var(--msg-vd-reader-page-color, #ffffff) !important;
-  background-image: none !important;
-  padding-top: 3px !important;
-  padding-bottom: 8px !important;
-  box-shadow: 0 6px 0 var(--msg-vd-reader-page-color, #ffffff) !important;
+  isolation: isolate !important;
 }
 
-/* Keep the SOURCE/date/View original/social row as part of the same band. */
+/* Keep the SOURCE/social row visible. Do not force flex/grid geometry. */
 html[data-msg-experience-theme="explorer"]
 #reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
 > .topic-feed-story-meta-overlay {
-  display: flex !important;
+  display: revert !important;
 }
 
-/* The parent header now owns the complete opaque footprint. */
+/* Paint behind the ENTIRE existing header without changing its size/position. */
 html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external
-> #read-anything-article-summary-action::before {
-  content: none !important;
-  display: none !important;
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled::after {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: -3px 0 -8px 0 !important;
+  z-index: -1 !important;
+  pointer-events: none !important;
+  background: var(--msg-vd-reader-page-color, #ffffff) !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
 }
 
