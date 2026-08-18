@@ -110,6 +110,69 @@
     return panel?.querySelector('.mark-selection-card blockquote')?.textContent?.trim() || '';
   }
 
+  function currentWholeArticleReader() {
+    const current = window.MarkSetGoCurrentReaderDocument?.get?.() || {};
+    const source = current.source || {};
+    const type = String(source.type || '').toLowerCase();
+    if (!['topic-feed', 'bookmarklet', 'website'].includes(type)) return null;
+    if (source.fullArticle === false || source.captureType === 'selection') return null;
+    const articleText = String(current.text || '').trim();
+    if (articleText.length < 40) return null;
+    return {
+      current,
+      source,
+      type,
+      articleText,
+      title: String(current.title || getBookContext().title || 'Current article'),
+      sourceUrl: String(source.url || '')
+    };
+  }
+
+  function ensureWholeArticleConversationContext() {
+    const live = currentWholeArticleReader();
+    if (!live) return null;
+
+    const existing = window.MSGInvestorArticleContext;
+    const sameArticle = Boolean(
+      existing?.articleText &&
+      String(existing.title || '') === live.title &&
+      String(existing.sourceUrl || '') === live.sourceUrl
+    );
+    if (sameArticle) return existing;
+
+    const wordCount = Math.max(1, live.articleText.split(/\s+/).filter(Boolean).length);
+    const context = {
+      companion: companionConfig(),
+      selection: {
+        text: 'Whole article',
+        selection: 'Whole article',
+        before: '',
+        after: '',
+        title: live.title,
+        chapter: 'Whole article',
+        documentId: String(live.current.documentId || ''),
+        startIndex: 0,
+        endIndex: wordCount,
+        syntheticWholeArticle: true
+      },
+      articleText: live.articleText,
+      title: live.title,
+      sourceUrl: live.sourceUrl,
+      history: [],
+      autoWholeArticleContext: true,
+      updatedAt: new Date().toISOString()
+    };
+    window.MSGInvestorArticleContext = context;
+    return context;
+  }
+
+  function companionOpeningPrompt() {
+    if (currentWholeArticleReader()) {
+      return 'Ask me anything about this article. I’ll use the whole article by default; highlight a passage only when you want to focus on that specific passage.';
+    }
+    return 'Highlight a passage or ask me about the book. I can explain ideas, summarize, compare viewpoints, quiz you, or save an insight.';
+  }
+
   function readerFirstName() {
     return window.MarkSetGoAuth?.getFirstName?.() ||
       String(window.MarkSetGoAuth?.session?.account?.displayName || '').trim().split(/\s+/)[0] || '';
@@ -157,7 +220,7 @@
                 <img src="${companionAvatar()}" alt="${companionName()}">
                 <div>
                   <span>${companionName()}</span>
-                  <p><strong data-askmark-personal-greeting>${greeting()}</strong> Highlight a passage or ask me about the book. I can explain ideas, summarize, compare viewpoints, quiz you, or save an insight.</p>
+                  <p><strong data-askmark-personal-greeting>${greeting()}</strong> ${companionOpeningPrompt()}</p>
                 </div>
               </article>
             </div>
@@ -449,13 +512,15 @@
   }
 
   function activeWholeArticleConversation() {
-    const context = window.MSGInvestorArticleContext;
-    if (!context?.articleText) return null;
-    if (String(context.articleText).trim().length < 40) return null;
+    // A real user highlight always wins. Topic/news questions use the complete
+    // article only when the reader has not deliberately selected a passage.
+    if (getSelectionText()) return null;
 
-    // A real user highlight deliberately takes priority over Analyze mode.
-    if (context.highlightOverride) return null;
-
+    let context = window.MSGInvestorArticleContext;
+    if (!context?.articleText || String(context.articleText).trim().length < 40) {
+      context = ensureWholeArticleConversationContext();
+    }
+    if (!context?.articleText || String(context.articleText).trim().length < 40) return null;
     return context;
   }
 
@@ -580,6 +645,11 @@
 
 
   function runSelectionAction(action, question = '') {
+    if (action === 'ask' && String(question || '').trim() && activeWholeArticleConversation()) {
+      void runWholeArticleFollowup(String(question).trim());
+      return;
+    }
+
     const panel = getLegacySelectionPanel();
     const text = getSelectionText();
     if (!text) {

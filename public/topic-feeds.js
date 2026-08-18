@@ -532,46 +532,41 @@
     });
   }
 
-  let topicFeedStoryHeaderObserver = null;
   let topicFeedStoryHeaderReader = null;
   let topicFeedStoryHeaderReflowTimer = 0;
 
   function topicFeedStoryHeaderParts(reader = document.querySelector('#reader')) {
     if (!reader) return {};
+    const frame = reader.closest('#reader-frame') || reader.parentElement;
+    if (!frame) return {};
 
-    // Clean up the previous nested-overlay implementation if this script is
-    // hot-reloaded in a browser session. Preserve the existing action-row node.
-    const legacyOverlay = reader.querySelector(':scope > [data-topic-feed-story-header]');
-    if (legacyOverlay) {
-      const legacyAction = legacyOverlay.querySelector('#read-anything-article-summary-action');
-      if (legacyAction) reader.prepend(legacyAction);
-      legacyOverlay.remove();
+    // Retire every old implementation that inserted metadata/spacer/action DOM
+    // inside #reader. Animated modes own that DOM and may replace it at any time.
+    reader.querySelectorAll(':scope > [data-topic-feed-story-header], :scope > [data-topic-feed-story-header-spacer], :scope > [data-topic-feed-story-meta-overlay]').forEach((node) => node.remove());
+
+    let overlay = frame.querySelector(':scope > [data-topic-feed-story-header-external]');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'topic-feed-story-header-external';
+      overlay.dataset.topicFeedStoryHeaderExternal = '1';
+      overlay.setAttribute('aria-label', 'Article source and actions');
+      frame.appendChild(overlay);
     }
 
-    let spacer = reader.querySelector(':scope > [data-topic-feed-story-header-spacer]');
-    if (!spacer) {
-      spacer = document.createElement('div');
-      spacer.className = 'topic-feed-story-header-spacer';
-      spacer.dataset.topicFeedStoryHeaderSpacer = '1';
-      spacer.setAttribute('aria-hidden', 'true');
-      reader.prepend(spacer);
-    }
-
-    let meta = reader.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
+    let meta = overlay.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
     if (!meta) {
       meta = document.createElement('div');
       meta.className = 'topic-feed-story-meta-overlay';
       meta.dataset.topicFeedStoryMetaOverlay = '1';
-      reader.appendChild(meta);
+      overlay.appendChild(meta);
     }
 
-    reader.classList.add('topic-feed-story-header-managed');
+    const actionRow = document.querySelector('#read-anything-article-summary-action');
+    if (actionRow && actionRow.parentElement !== overlay) overlay.appendChild(actionRow);
 
-    return {
-      spacer,
-      meta,
-      actionRow: document.querySelector('#read-anything-article-summary-action')
-    };
+    reader.classList.add('topic-feed-story-header-managed');
+    topicFeedStoryHeaderReader = reader;
+    return { frame, overlay, meta, actionRow };
   }
 
   function scheduleTopicFeedStoryBookReflow() {
@@ -579,12 +574,7 @@
     topicFeedStoryHeaderReflowTimer = window.setTimeout(() => {
       const reader = document.querySelector('#reader');
       if (!reader?.classList.contains('book-pages-layout')) return;
-
-      // Use the Reader's own resize/reflow path after the reserved first-page
-      // header height changes.
-      window.requestAnimationFrame(() => {
-        window.dispatchEvent(new Event('resize'));
-      });
+      window.requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
     }, 70);
   }
 
@@ -594,9 +584,8 @@
     const reader = document.querySelector('#reader');
     if (!reader) return;
 
-    const { spacer, meta } = topicFeedStoryHeaderParts(reader);
-    const actionRow = document.querySelector('#read-anything-article-summary-action');
-    if (!spacer || !meta) return;
+    const { frame, overlay, meta, actionRow } = topicFeedStoryHeaderParts(reader);
+    if (!frame || !overlay || !meta) return;
 
     const styles = getComputedStyle(reader);
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
@@ -605,89 +594,58 @@
     const columnGap = Number.parseFloat(styles.columnGap) || 0;
     const fontSize = Number.parseFloat(styles.fontSize) || 14;
     const usableWidth = Math.max(1, reader.clientWidth - paddingLeft - paddingRight);
-
     const headerWidth = reader.classList.contains('book-pages-layout')
       ? Math.max(1, (usableWidth - columnGap) / 2)
       : usableWidth;
 
-    meta.style.left = `${paddingLeft}px`;
-    meta.style.top = `${paddingTop}px`;
-    meta.style.width = `${headerWidth}px`;
+    const frameRect = frame.getBoundingClientRect();
+    const readerRect = reader.getBoundingClientRect();
+    overlay.style.left = `${Math.max(0, readerRect.left - frameRect.left + paddingLeft)}px`;
+    overlay.style.top = `${Math.max(0, readerRect.top - frameRect.top + paddingTop)}px`;
+    overlay.style.width = `${headerWidth}px`;
 
-    if (actionRow && actionRow.parentElement === reader) {
-      // Legacy fallback only. Current builds keep article actions outside #reader.
-      actionRow.style.setProperty('position', 'absolute', 'important');
-      actionRow.style.setProperty('left', `${paddingLeft}px`, 'important');
-      actionRow.style.setProperty('width', `${headerWidth}px`, 'important');
-      actionRow.style.setProperty('box-sizing', 'border-box', 'important');
-      actionRow.style.setProperty('margin', '0', 'important');
-      actionRow.style.setProperty('padding', '0', 'important');
-      actionRow.style.setProperty('break-inside', 'auto', 'important');
-      actionRow.style.setProperty('page-break-inside', 'auto', 'important');
-      actionRow.style.setProperty('z-index', '8', 'important');
+    if (actionRow?.isConnected) {
+      actionRow.style.removeProperty('position');
+      actionRow.style.removeProperty('left');
+      actionRow.style.removeProperty('top');
+      actionRow.style.removeProperty('width');
+      actionRow.style.removeProperty('z-index');
     }
 
     window.requestAnimationFrame(() => {
-      if (!reader.isConnected || !meta.isConnected) return;
+      if (!reader.isConnected || !overlay.isConnected) return;
+      const overlayHeight = Math.ceil(overlay.getBoundingClientRect().height || 0);
+      const actionGap = Math.max(5, Math.round(fontSize * .35));
+      const reserve = Math.max(fontSize * 2, overlayHeight + actionGap + fontSize);
+      const previous = Number.parseFloat(reader.style.getPropertyValue('--topic-feed-story-header-reserve')) || 0;
 
-      const metaHeight = Math.ceil(meta.getBoundingClientRect().height || 0);
-      const actionGap = Math.max(5, Math.round(fontSize * 0.35));
-
-      if (actionRow?.isConnected && actionRow.parentElement === reader) {
-        actionRow.style.setProperty(
-          'top',
-          `${paddingTop + metaHeight + actionGap}px`,
-          'important'
-        );
-      }
-
-      window.requestAnimationFrame(() => {
-        if (!reader.isConnected || !spacer.isConnected) return;
-
-        const actionHeight = actionRow?.isConnected && actionRow.parentElement === reader
-          ? Math.ceil(actionRow.getBoundingClientRect().height || 0)
-          : 0;
-
-        // Source/share + small gap + actions + exactly one body-text line.
-        const requiredHeight = Math.max(
-          fontSize * 2,
-          metaHeight + actionGap + actionHeight + fontSize
-        );
-        const previousHeight = Number.parseFloat(spacer.style.height) || 0;
-
-        spacer.style.width = '100%';
-        spacer.style.maxWidth = `${headerWidth}px`;
-
-        if (Math.abs(requiredHeight - previousHeight) > 1) {
-          spacer.style.height = `${Math.ceil(requiredHeight)}px`;
-          scheduleTopicFeedStoryBookReflow();
-        }
-      });
+      reader.style.setProperty('--topic-feed-story-header-reserve', `${Math.ceil(reserve)}px`);
+      reader.style.setProperty('--topic-feed-story-header-width', `${Math.ceil(headerWidth)}px`);
+      if (Math.abs(previous - reserve) > 1) scheduleTopicFeedStoryBookReflow();
     });
   }
 
   function keepTopicFeedArticleActionsInHeader() {
     if (!isTopicFeedReaderActive()) return;
-
     const reader = document.querySelector('#reader');
-    const actionRow = document.querySelector('#read-anything-article-summary-action');
-    if (!reader || !actionRow) {
-      positionTopicFeedStoryHeader();
-      return;
-    }
-
-    // Article actions are intentionally outside #reader so animated reading
-    // modes never rebuild or reposition them. Keep only the story metadata
-    // geometry inside the Reader.
+    if (!reader) return;
+    topicFeedStoryHeaderParts(reader);
     positionTopicFeedStoryHeader();
   }
 
   function observeTopicFeedStoryHeader() {
+    // Name retained for call-site compatibility. This is deliberately finite
+    // and event-driven; no MutationObserver watches the Reader.
     const reader = document.querySelector('#reader');
     if (!reader) return;
     topicFeedStoryHeaderReader = reader;
     window.requestAnimationFrame(() => keepTopicFeedArticleActionsInHeader());
   }
+
+  document.addEventListener('marksetgo:article-actions-updated', () => {
+    if (!isTopicFeedReaderActive()) return;
+    window.setTimeout(keepTopicFeedArticleActionsInHeader, 0);
+  });
 
   function topicFeedSourceCredit(topic, article, payload) {
     const sourceName = String(article?.sourceName || 'Topic Feed').trim();
@@ -712,7 +670,7 @@
         document.querySelector('.reader, .interactive-reader');
       if (!reader) return false;
 
-      reader.querySelectorAll('[data-topic-feed-source-credit]').forEach((node) => node.remove());
+      (reader.closest('#reader-frame') || document).querySelectorAll('[data-topic-feed-source-credit]').forEach((node) => node.remove());
 
       const credit = document.createElement('div');
       credit.className = 'topic-feed-reader-credit';
@@ -820,8 +778,8 @@
 
       meta.replaceChildren(credit);
 
-      // Read Anything keeps Summarize / Analyze as a direct child of #reader.
-      // We preserve that contract and position it visually below this source row.
+      // Source metadata and article actions share one external page-one
+      // overlay. Neither is a child of #reader, so animated modes stay isolated.
       keepTopicFeedArticleActionsInHeader();
       observeTopicFeedStoryHeader();
       positionTopicFeedStoryHeader();

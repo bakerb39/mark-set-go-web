@@ -1096,8 +1096,78 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   function isWholeArticleDocument() {
-    const type = String(activeImportedDocument?.source?.type || '').toLowerCase();
-    return ['topic-feed', 'bookmarklet', 'website'].includes(type);
+    const source = activeImportedDocument?.source || {};
+    const type = String(source.type || '').toLowerCase();
+    if (!['topic-feed', 'bookmarklet', 'website'].includes(type)) return false;
+    if (source.fullArticle === false) return false;
+    if (source.captureType === 'selection') return false;
+    return true;
+  }
+
+  function syncWholeArticleQuestionContext() {
+    const existing = window.MSGInvestorArticleContext;
+    if (!activeImportedDocument || !isWholeArticleDocument()) {
+      // Only clear context that this automatic article bridge created. An
+      // explicit Analyze result is cleared by openDocument() when navigation
+      // changes, so books retain their normal highlight-first Ask behavior.
+      if (existing?.autoWholeArticleContext) window.MSGInvestorArticleContext = null;
+      return null;
+    }
+
+    const articleText = String(
+      activeImportedDocument.versions?.original ||
+      activeImportedDocument.originalText ||
+      ''
+    ).trim();
+    if (articleText.length < 40) return null;
+
+    const title = activeImportedDocument.baseTitle || activeImportedDocument.title || 'Current article';
+    const sourceUrl = activeImportedDocument.source?.url || '';
+    const sameArticle = Boolean(
+      existing?.articleText &&
+      String(existing.title || '') === String(title) &&
+      String(existing.sourceUrl || '') === String(sourceUrl)
+    );
+    const companion = activeArticleCompanionIdentity();
+    const wordCount = Math.max(1, articleText.split(/\s+/).filter(Boolean).length);
+    const previousSelection = sameArticle ? existing?.selection : null;
+
+    const context = {
+      ...(sameArticle ? existing : {}),
+      companion,
+      selection: previousSelection || {
+        text: 'Whole article',
+        selection: 'Whole article',
+        before: '',
+        after: '',
+        title,
+        chapter: 'Whole article',
+        documentId: String(activeImportedDocument.source?.readerDocumentId || ''),
+        startIndex: 0,
+        endIndex: wordCount,
+        syntheticWholeArticle: true
+      },
+      articleText,
+      title,
+      sourceUrl,
+      history: sameArticle && Array.isArray(existing?.history) ? existing.history : [],
+      autoWholeArticleContext: sameArticle ? Boolean(existing?.autoWholeArticleContext) : true,
+      updatedAt: new Date().toISOString()
+    };
+
+    // Preserve an explicit Analyze context if one already exists for this same
+    // article. Otherwise this automatic bridge simply gives normal chat the
+    // complete article instead of demanding a highlight.
+    if (sameArticle && existing?.analysis) {
+      context.analysis = existing.analysis;
+      context.autoWholeArticleContext = Boolean(existing.autoWholeArticleContext);
+    }
+
+    window.MSGInvestorArticleContext = context;
+    document.dispatchEvent(new CustomEvent('marksetgo:whole-article-context-ready', {
+      detail: { title, sourceUrl, sourceType: activeImportedDocument.source?.type || '' }
+    }));
+    return context;
   }
 
   function activeArticleCompanionIdentity() {
@@ -1696,13 +1766,12 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     const reader = document.querySelector('#app #reader');
     const readerFrame = reader?.closest('#reader-frame');
-    const documentColumn = readerFrame?.parentElement;
-    if (!reader || !readerFrame || !documentColumn) return;
+    if (!reader || !readerFrame) return;
 
-    // Article-level actions look like part of the document, but are deliberately
-    // NOT children of #reader. They occupy their own row immediately above the
-    // Reader frame, so the text is pushed down visually without changing Reader
-    // width, height, pagination columns, animation DOM, or word geometry.
+    // Article-level actions belong visually on the document but must never be
+    // children of #reader. Keep them inside the document frame as a sibling of
+    // the animated text. Topic Feed may then place this same node in its
+    // page-one metadata overlay without cloning or rebuilding it.
     let actionRow = existing;
 
     if (!actionRow) {
@@ -1790,10 +1859,15 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       );
 
       actionRow.append(summaryLink, separator, investorLink, postSeparator, createPostLink);
-      documentColumn.insertBefore(actionRow, readerFrame);
-    } else if (actionRow.parentElement !== documentColumn || actionRow.nextElementSibling !== readerFrame) {
-      documentColumn.insertBefore(actionRow, readerFrame);
+      readerFrame.insertBefore(actionRow, reader);
+    } else if (!actionRow.closest('[data-topic-feed-story-header-external]') &&
+               (actionRow.parentElement !== readerFrame || actionRow.nextElementSibling !== reader)) {
+      readerFrame.insertBefore(actionRow, reader);
     }
+
+    document.dispatchEvent(new CustomEvent('marksetgo:article-actions-updated', {
+      detail: { wholeArticle: true, sourceType: activeImportedDocument?.source?.type || '' }
+    }));
 
     const link = actionRow.querySelector('[data-action="summarize-whole-article"]');
     if (!link) return;
@@ -1909,6 +1983,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
   function scheduleFormatControlAttach() {
     document.querySelector('#read-anything-format-control')?.remove();
+    syncWholeArticleQuestionContext();
     document.dispatchEvent(new CustomEvent('marksetgo:transform-state', { detail: { version: activeImportedVersion, label: versionLabel(activeImportedVersion), active: Boolean(activeImportedDocument) } }));
     [0, 100, 350, 800].forEach((delay) => window.setTimeout(() => {
       installDisplayFormatControl();

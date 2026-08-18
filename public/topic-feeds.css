@@ -606,3 +606,82 @@
 .topic-reader-nav-head + .topic-reader-topic{
   margin-top:2px;
 }
+
+
+/* v2.1.22 — Reader-isolated Topic Feed document header.
+   Source/share + Summarize/Analyze/Create Post remain visually on page one,
+   but no metadata/action/spacer DOM is allowed inside #reader. */
+#reader-frame > .topic-feed-story-header-external{
+  position:absolute;
+  z-index:12;
+  box-sizing:border-box;
+  display:block;
+  pointer-events:auto;
+  color:inherit;
+}
+#reader-frame > .topic-feed-story-header-external > .topic-feed-story-meta-overlay{
+  position:static !important;
+  inset:auto !important;
+  width:100% !important;
+  box-sizing:border-box;
+}
+#reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit{
+  margin:0 !important;
+  padding:0 0 .46em !important;
+  border-bottom:1px solid rgba(77,101,124,.15);
+}
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action{
+  position:static !important;
+  inset:auto !important;
+  display:block !important;
+  width:100% !important;
+  box-sizing:border-box !important;
+  margin:.42em 0 0 !important;
+  padding:0 !important;
+  break-inside:auto !important;
+  page-break-inside:auto !important;
+}
+
+/* Reserve the source/action header in the first article flow WITHOUT inserting
+   an element that Flash/Pac-Man/Pointing Guide can delete or animate. */
+#reader.topic-feed-story-header-managed:not(.flash):not(.digital-sign-mode)::before{
+  content:"";
+  display:block;
+  width:min(100%,var(--topic-feed-story-header-width,100%));
+  height:var(--topic-feed-story-header-reserve,0px);
+  margin:0;
+  padding:0;
+  border:0;
+  pointer-events:none;
+  break-inside:auto !important;
+  page-break-inside:auto !important;
+  -webkit-column-break-inside:auto !important;
+}
+#reader.topic-feed-story-header-managed.flash::before,
+#reader.topic-feed-story-header-managed.digital-sign-mode::before{
+  display:none !important;
+}
+
+/* Retire all old Reader-child story-header pieces if cached DOM survives. */
+#reader > .topic-feed-story-header-overlay,
+#reader > .topic-feed-story-meta-overlay,
+#reader > .topic-feed-story-header-spacer,
+#reader > #read-anything-article-summary-action{
+  /* The action row is immediately re-homed by topic-feeds.js. Do not give old
+     absolute-layout rules a chance to affect Reader geometry meanwhile. */
+  position:static;
+}
+
+/* News/article structural headings remain visibly headings. This is scoped to
+   Topic Feed Reader documents only; book typography is untouched. */
+#reader.topic-feed-story-header-managed .reader-group.document-structure{
+  font-weight:750 !important;
+  opacity:1 !important;
+}
+#reader.topic-feed-story-header-managed .reader-group.structure-section{
+  font-size:1.08em !important;
+  font-weight:750 !important;
+  line-height:1.3 !important;
+  margin-top:1.1em !important;
+  margin-bottom:.42em !important;
+}
