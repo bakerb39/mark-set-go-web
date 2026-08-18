@@ -2,11 +2,12 @@
 
 (() => {
   const STORAGE_KEY = 'markSetGoExplorerVisualDesignerV1';
-  const CONFIG_VERSION = 1;
+  const CONFIG_VERSION = 1; // v1.1 remains backward-compatible with saved v1 designs
   const MANAGED_ATTR = 'data-msg-vd-selectable';
 
   const TARGETS = [
     { id:'workspace', label:'Workspace', virtual:true, group:'Environment' },
+    { id:'backdrop', label:'Antique Reader Backdrop', selector:'.msg-vd-antique-backdrop', group:'Environment', backdrop:true },
     { id:'title', label:'Reader title', selector:'.reader-page-panel > .reader-title-row', group:'Reader' },
     { id:'controls', label:'Top controls', selector:'.reader-page-panel > .reader-pane-controls', group:'Reader' },
     { id:'topics', label:'My Topics', selector:'.reader-page-panel .navigation-pane', group:'Panes' },
@@ -61,8 +62,10 @@
     ],
     companion: [
       range('width','Pane width',260,560,5,'wordWidth','#reader-layout','--word-panel-width'),
-      color('background','Background','.reader-page-panel .mark-companion-panel','background'),
-      color('borderColor','Border color','.reader-page-panel .mark-companion-panel','border-color'),
+      color('background','Main body','.reader-page-panel .mark-companion-panel .askmark-premium','background-color'),
+      color('headerBackground','Header','.reader-page-panel .mark-companion-panel .askmark-hero','background'),
+      color('composerBackground','Composer','.reader-page-panel .mark-companion-panel .askmark-composer','background'),
+      color('borderColor','Frame border','.reader-page-panel .mark-companion-panel','border-color'),
       range('radius','Corner radius',0,28,1,'px','.reader-page-panel .mark-companion-panel','border-radius'),
       range('shadow','Shadow',0,40,1,'shadow','.reader-page-panel .mark-companion-panel','box-shadow')
     ]
@@ -77,6 +80,20 @@
     check('visible','Show artwork'),
     text('src','Image URL'),
     fileControl('imageFile','Replace with image')
+  ];
+
+  const BACKDROP_CONTROLS = [
+    range('x','Move left / right',-500,500,2,'px',null,null),
+    range('y','Move up / down',-450,450,2,'px',null,null),
+    range('width','Backdrop width',40,140,1,'%',null,null),
+    range('height','Backdrop height',35,140,1,'%',null,null),
+    range('opacity','Opacity',0,100,1,'%',null,null),
+    color('color','Antique tint',null,null),
+    range('borderWidth','Border width',0,8,1,'px',null,null),
+    color('borderColor','Border color',null,null),
+    range('radius','Corner radius',0,60,1,'px',null,null),
+    range('shadow','Shadow',0,60,1,'shadow',null,null),
+    check('visible','Show backdrop')
   ];
 
   const WORKSPACE_CONTROLS = [
@@ -95,6 +112,7 @@
   let undoStack = [];
   let editBaseline = null;
   let dragState = null;
+  let backdropHandle = null;
 
   function range(key,label,min,max,step,unit,selector,prop) {
     return { type:'range', key,label,min,max,step,unit,selector,prop };
@@ -123,9 +141,69 @@
   }
 
   function targetById(id) { return TARGETS.find((item) => item.id === id) || null; }
-  function targetElement(target) { return target?.virtual ? document.documentElement : document.querySelector(target?.selector || ''); }
+  function targetElement(target) {
+    if (target?.virtual) return document.documentElement;
+    if (target?.backdrop) return ensureBackdrop();
+    return document.querySelector(target?.selector || '');
+  }
+
+  function ensureBackdrop() {
+    const world = document.querySelector('.explorer-world-art');
+    if (!world) return null;
+    let backdrop = world.querySelector('.msg-vd-antique-backdrop');
+    if (!backdrop) {
+      backdrop = document.createElement('div');
+      backdrop.className = 'msg-vd-antique-backdrop';
+      backdrop.setAttribute('aria-hidden','true');
+      world.insertBefore(backdrop,world.firstChild);
+    }
+    world.classList.add('msg-vd-designer-backdrop-active');
+    return backdrop;
+  }
+
+  function ensureBackdropHandle() {
+    if (backdropHandle) return backdropHandle;
+    backdropHandle = document.createElement('div');
+    backdropHandle.id = 'msg-vd-backdrop-handle';
+    backdropHandle.dataset.vdBackdropHandle = '1';
+    backdropHandle.hidden = true;
+    backdropHandle.setAttribute('aria-label','Drag Antique Reader Backdrop');
+    backdropHandle.title = 'Drag to move the Antique Reader Backdrop';
+    document.body.appendChild(backdropHandle);
+    return backdropHandle;
+  }
+
+  function hideBackdropHandle() {
+    if (backdropHandle) backdropHandle.hidden = true;
+  }
+
+  function syncBackdropHandle() {
+    const handle = ensureBackdropHandle();
+    const backdrop = ensureBackdrop();
+    const shouldShow = Boolean(
+      backdrop &&
+      isExplorer() &&
+      selectedId === 'backdrop' &&
+      document.body.classList.contains('msg-vd-design-mode') &&
+      !document.body.classList.contains('msg-vd-preview-mode') &&
+      panel && !panel.hidden &&
+      getComputedStyle(backdrop).display !== 'none'
+    );
+    if (!shouldShow) {
+      handle.hidden = true;
+      return;
+    }
+    const rect = backdrop.getBoundingClientRect();
+    handle.hidden = false;
+    handle.style.left = `${Math.round(rect.left)}px`;
+    handle.style.top = `${Math.round(rect.top)}px`;
+    handle.style.width = `${Math.max(1,Math.round(rect.width))}px`;
+    handle.style.height = `${Math.max(1,Math.round(rect.height))}px`;
+  }
 
   function ensureUI() {
+    ensureBackdrop();
+    ensureBackdropHandle();
     if (!launcher) {
       launcher = document.createElement('button');
       launcher.id = 'msg-explorer-design-launcher';
@@ -206,6 +284,7 @@
     document.body.classList.remove('msg-vd-design-mode','msg-vd-preview-mode');
     clearSelectionOutline();
     clearSelectableMarks();
+    hideBackdropHandle();
   }
 
   function togglePreview() {
@@ -214,10 +293,12 @@
       panel.hidden = true;
       launcher.textContent = '✦ Edit';
       clearSelectionOutline();
+      hideBackdropHandle();
     } else {
       panel.hidden = false;
       launcher.textContent = '✦ Designing';
       applySelectionOutline();
+      syncBackdropHandle();
     }
   }
 
@@ -262,17 +343,20 @@
 
   function clearSelectionOutline() {
     document.querySelectorAll('.msg-vd-selected').forEach((el) => el.classList.remove('msg-vd-selected'));
+    hideBackdropHandle();
   }
   function applySelectionOutline() {
     if (document.body.classList.contains('msg-vd-preview-mode')) return;
     const target = targetById(selectedId);
     const element = targetElement(target);
     if (element && !target?.virtual) element.classList.add('msg-vd-selected');
+    if (target?.backdrop) syncBackdropHandle();
   }
 
   function controlsForTarget(target) {
     if (!target) return [];
     if (target.virtual) return WORKSPACE_CONTROLS;
+    if (target.backdrop) return BACKDROP_CONTROLS;
     if (target.art) return ART_CONTROLS;
     return STYLE_CONTROLS[target.id] || [];
   }
@@ -357,6 +441,22 @@
     const bucket = target.virtual ? config.globals : (config.targets[target.id] ||= {});
     if (Object.prototype.hasOwnProperty.call(bucket,control.key)) return bucket[control.key];
 
+    if (target.backdrop) {
+      const el = targetElement(target);
+      const parent = el?.parentElement;
+      const computed = el ? getComputedStyle(el) : null;
+      if (control.key === 'x' || control.key === 'y') return 0;
+      if (control.key === 'width') return parent?.clientWidth ? Math.round((el.getBoundingClientRect().width / parent.clientWidth) * 100) : 100;
+      if (control.key === 'height') return parent?.clientHeight ? Math.round((el.getBoundingClientRect().height / parent.clientHeight) * 100) : 100;
+      if (control.key === 'opacity') return Math.round((parseFloat(computed?.opacity) || 1) * 100);
+      if (control.key === 'color') return '#f6edd6';
+      if (control.key === 'borderWidth') return parseFloat(computed?.borderTopWidth) || 0;
+      if (control.key === 'borderColor') return normalizeColor(computed?.borderTopColor || '#a9823c');
+      if (control.key === 'radius') return parseFloat(computed?.borderTopLeftRadius) || 0;
+      if (control.key === 'shadow') return estimateShadow(computed?.boxShadow || 'none');
+      if (control.key === 'visible') return computed?.display !== 'none';
+    }
+
     if (target.art) {
       const el = targetElement(target);
       if (control.key === 'x' || control.key === 'y') return 0;
@@ -414,10 +514,12 @@
   }
 
   function applyAll() {
+    ensureBackdrop();
     applyGlobals();
     TARGETS.filter((target) => !target.virtual).forEach(applyTarget);
     markSelectableElements();
     applySelectionOutline();
+    syncBackdropHandle();
   }
 
   function applyGlobals() {
@@ -434,6 +536,12 @@
     if (!values) return;
     const el = targetElement(target);
     if (!el) return;
+
+    if (target.backdrop) {
+      applyBackdrop(el,values);
+      syncBackdropHandle();
+      return;
+    }
 
     if (target.art) {
       applyArt(target,el,values);
@@ -474,6 +582,31 @@
       if (control.prop === 'width' && control.unit === '%') {
         node.style.setProperty('margin-left','auto','important');
         node.style.setProperty('margin-right','auto','important');
+      }
+    }
+  }
+
+  function applyBackdrop(el,values) {
+    const x = Number(values.x ?? 0);
+    const y = Number(values.y ?? 0);
+    el.style.setProperty('transform',`translate3d(${x}px,${y}px,0)`,'important');
+    if (Object.prototype.hasOwnProperty.call(values,'width')) el.style.setProperty('width',`${values.width}%`,'important');
+    if (Object.prototype.hasOwnProperty.call(values,'height')) el.style.setProperty('height',`${values.height}%`,'important');
+    if (Object.prototype.hasOwnProperty.call(values,'opacity')) el.style.setProperty('opacity',String(Number(values.opacity)/100),'important');
+    if (Object.prototype.hasOwnProperty.call(values,'visible')) el.style.setProperty('display',values.visible === false ? 'none' : 'block','important');
+    if (Object.prototype.hasOwnProperty.call(values,'borderWidth')) el.style.setProperty('border-width',`${values.borderWidth}px`,'important');
+    if (Object.prototype.hasOwnProperty.call(values,'borderColor')) el.style.setProperty('border-color',String(values.borderColor),'important');
+    if (Object.prototype.hasOwnProperty.call(values,'radius')) el.style.setProperty('border-radius',`${values.radius}px`,'important');
+    if (Object.prototype.hasOwnProperty.call(values,'shadow')) {
+      const amount = Number(values.shadow) || 0;
+      el.style.setProperty('box-shadow',amount <= 0 ? 'none' : `0 ${Math.max(2,Math.round(amount*.28))}px ${amount}px rgba(65,48,26,.24)`,'important');
+    }
+    if (values.color) {
+      const rgb = hexToRgb(values.color);
+      if (rgb) {
+        el.style.setProperty('background',
+          `linear-gradient(90deg,transparent 0 14%,rgba(${rgb.r},${rgb.g},${rgb.b},.42) 21%,rgba(${rgb.r},${rgb.g},${rgb.b},.78) 31%,rgba(${rgb.r},${rgb.g},${rgb.b},.78) 69%,rgba(${rgb.r},${rgb.g},${rgb.b},.42) 79%,transparent 86%),linear-gradient(180deg,rgba(255,249,233,.18),rgba(114,84,49,.16))`,
+          'important');
       }
     }
   }
@@ -537,9 +670,11 @@
       ['--msg-vd-workspace-color','--msg-vd-world-color','--msg-vd-accent-color','--msg-vd-overlay-opacity'].forEach((prop) => document.documentElement.style.removeProperty(prop));
       return;
     }
-    const controls = target.art ? ART_CONTROLS : (STYLE_CONTROLS[target.id] || []);
+    const controls = target.backdrop ? BACKDROP_CONTROLS : (target.art ? ART_CONTROLS : (STYLE_CONTROLS[target.id] || []));
     const el = targetElement(target);
-    if (target.art && el) {
+    if (target.backdrop && el) {
+      ['width','height','transform','opacity','display','background','border-width','border-color','border-radius','box-shadow'].forEach((prop) => el.style.removeProperty(prop));
+    } else if (target.art && el) {
       ['width','transform','transform-origin','opacity','display'].forEach((prop) => el.style.removeProperty(prop));
       const original = el.dataset.msgVdOriginalSrc;
       if (original) el.setAttribute('src',original);
@@ -561,6 +696,7 @@
       });
     }
     delete config.targets[target.id];
+    if (target.backdrop) syncBackdropHandle();
   }
 
   function resetSelected() {
@@ -662,6 +798,7 @@
 
   function findTargetFromClick(element) {
     if (!(element instanceof Element)) return null;
+    if (element.closest('#msg-vd-backdrop-handle')) return targetById('backdrop');
     return TARGETS.find((target) => !target.virtual && element.closest(target.selector)) || null;
   }
 
@@ -678,7 +815,9 @@
   function onPointerDown(event) {
     if (!document.body.classList.contains('msg-vd-design-mode') || document.body.classList.contains('msg-vd-preview-mode')) return;
     if (!(event.target instanceof Element)) return;
-    const target = TARGETS.find((candidate) => candidate.art && event.target.closest(candidate.selector));
+    const target = event.target.closest('#msg-vd-backdrop-handle')
+      ? targetById('backdrop')
+      : TARGETS.find((candidate) => candidate.art && event.target.closest(candidate.selector));
     if (!target) return;
     event.preventDefault();
     event.stopPropagation();
@@ -702,13 +841,15 @@
     values.x = Math.round(dragState.baseX + event.clientX - dragState.startX);
     values.y = Math.round(dragState.baseY + event.clientY - dragState.startY);
     applyTarget(dragState.target);
+    if (dragState.target.backdrop) syncBackdropHandle();
     if (selectedId === dragState.target.id) renderInspector();
-    markDirty('Artwork moved. Save when positioned correctly.');
+    markDirty(dragState.target.backdrop ? 'Antique Reader Backdrop moved. Save when positioned correctly.' : 'Artwork moved. Save when positioned correctly.');
   }
 
   function onPointerUp(event) {
     if (!dragState || event.pointerId !== dragState.pointerId) return;
     dragState = null;
+    syncBackdropHandle();
     updateUndoState();
   }
 
@@ -724,6 +865,12 @@
     const nums = value.match(/-?\d+(?:\.\d+)?px/g)?.map((item) => Math.abs(parseFloat(item))) || [];
     return clamp(Math.round(Math.max(...nums,0)),0,45);
   }
+  function hexToRgb(value) {
+    const hex = normalizeColor(value).replace('#','');
+    if (!/^[0-9a-f]{6}$/i.test(hex)) return null;
+    return { r:parseInt(hex.slice(0,2),16), g:parseInt(hex.slice(2,4),16), b:parseInt(hex.slice(4,6),16) };
+  }
+
   function normalizeColor(value) {
     const text = String(value || '').trim();
     if (/^#[0-9a-f]{6}$/i.test(text)) return text;
@@ -744,6 +891,7 @@
     [0,80,260,700].forEach((delay) => window.setTimeout(() => {
       applyAll();
       if (panel && !panel.hidden) refreshLayers();
+      syncBackdropHandle();
     },delay));
   }
 
@@ -757,7 +905,7 @@
     document.addEventListener('pointercancel',onPointerUp,true);
     document.addEventListener('marksetgo:document-available',scheduleApply);
     window.addEventListener('pageshow',scheduleApply);
-    window.addEventListener('resize',() => { if (panel && !panel.hidden) refreshLayers(); });
+    window.addEventListener('resize',() => { if (panel && !panel.hidden) refreshLayers(); syncBackdropHandle(); });
 
     // The app rebuilds views after explicit navigation. Reapply only after those
     // user events; there is intentionally no MutationObserver watching the Reader.

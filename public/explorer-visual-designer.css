@@ -1,4 +1,4 @@
-/* Explorer Visual Designer v1.0
+/* Explorer Visual Designer v1.1
    Editor chrome only. The Reader engine/timing/pagination DOM is not restyled here. */
 
 #msg-explorer-design-launcher,
@@ -176,4 +176,74 @@ html[data-msg-experience-theme="explorer"][style*="--msg-vd-accent-color"] #app 
 
 html[data-msg-experience-theme="explorer"][style*="--msg-vd-overlay-opacity"] .explorer-world-art::after {
   opacity: var(--msg-vd-overlay-opacity) !important;
+}
+
+
+/* v1.1 — the antique Reader backdrop is a real movable Designer layer.
+   It replaces the Explorer ::after paint with an equivalent DOM layer so the
+   user can drag/resize it without touching Reader geometry or code. */
+html[data-msg-experience-theme="explorer"] .explorer-world-art.msg-vd-designer-backdrop-active::after {
+  display:none !important;
+  content:none !important;
+}
+html[data-msg-experience-theme="explorer"] .msg-vd-antique-backdrop {
+  position:absolute;
+  z-index:0;
+  left:0;
+  top:0;
+  width:100%;
+  height:100%;
+  box-sizing:border-box;
+  pointer-events:none;
+  border:0 solid #a9823c;
+  background:
+    linear-gradient(90deg,
+      transparent 0 14%,
+      rgba(232,221,195,.42) 21%,
+      rgba(246,237,214,.76) 31%,
+      rgba(246,237,214,.76) 69%,
+      rgba(232,221,195,.42) 79%,
+      transparent 86%),
+    linear-gradient(180deg,rgba(247,237,214,.18),rgba(171,148,109,.16));
+}
+#msg-vd-backdrop-handle {
+  position:fixed;
+  z-index:12035;
+  box-sizing:border-box;
+  border:2px dashed #d09b35;
+  border-radius:5px;
+  background:rgba(229,196,117,.055);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.7);
+  cursor:move;
+  pointer-events:auto;
+}
+#msg-vd-backdrop-handle::before {
+  content:"Antique Reader Backdrop — drag to move";
+  position:absolute;
+  top:7px;
+  left:50%;
+  transform:translateX(-50%);
+  padding:5px 9px;
+  border:1px solid #b98a36;
+  border-radius:999px;
+  background:#fff9e7;
+  color:#31554c;
+  box-shadow:0 3px 10px rgba(43,55,38,.14);
+  font:800 10px/1 Inter,ui-sans-serif,system-ui,sans-serif;
+  white-space:nowrap;
+  pointer-events:none;
+}
+#msg-vd-backdrop-handle[hidden] { display:none !important; }
+html:not([data-msg-experience-theme="explorer"]) #msg-vd-backdrop-handle { display:none !important; }
+.msg-vd-layer[data-vd-layer="backdrop"] {
+  grid-column:1 / -1;
+  border-color:rgba(168,124,48,.38);
+  background:#fff9e9;
+}
+.msg-vd-layer[data-vd-layer="backdrop"].is-selected {
+  background:#edddb2;
+}
+@media(max-width:860px){
+  html[data-msg-experience-theme="explorer"] .msg-vd-antique-backdrop{display:none !important}
+  #msg-vd-backdrop-handle{display:none !important}
 }
