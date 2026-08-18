@@ -6,8 +6,7 @@
   const MANAGED_ATTR = 'data-msg-vd-selectable';
 
   const TARGETS = [
-    { id:'workspace', label:'Workspace', virtual:true, group:'Environment' },
-    { id:'surface', label:'Center Work Surface', selector:'.msg-vd-center-work-surface', group:'Environment', surface:true },
+    { id:'surface', label:'Work Surface', selector:'.msg-vd-center-work-surface', group:'Environment', surface:true },
     { id:'title', label:'Reader title', selector:'.reader-page-panel > .reader-title-row', group:'Reader' },
     { id:'controls', label:'Top controls', selector:'.reader-page-panel > .reader-pane-controls', group:'Reader' },
     { id:'topics', label:'My Topics', selector:'.reader-page-panel .navigation-pane', group:'Panes' },
@@ -83,12 +82,12 @@
   ];
 
   const SURFACE_CONTROLS = [
-    range('x','Move left / right',-500,500,2,'px',null,null),
-    range('y','Move up / down',-450,450,2,'px',null,null),
-    range('width','Surface width',35,140,1,'%',null,null),
-    range('height','Surface height',20,160,1,'%',null,null),
-    range('opacity','Opacity',0,100,1,'%',null,null),
+    range('y','Move up / down',-320,320,2,'px',null,null),
+    range('height','Surface height',10,60,1,'%',null,null),
     color('color','Surface color',null,null),
+    range('x','Move left / right',-320,320,2,'px',null,null),
+    range('width','Surface width',50,110,1,'%',null,null),
+    range('opacity','Opacity',0,100,1,'%',null,null),
     range('borderWidth','Border width',0,8,1,'px',null,null),
     color('borderColor','Border color',null,null),
     range('radius','Corner radius',0,60,1,'px',null,null),
@@ -96,10 +95,7 @@
     check('visible','Show surface')
   ];
 
-  const WORKSPACE_CONTROLS = [
-    colorVar('workspaceColor','Page background','--msg-vd-workspace-color'),
-    colorVar('accentColor','Primary accent','--msg-vd-accent-color')
-  ];
+  const WORKSPACE_CONTROLS = [];
 
   let launcher = null;
   let panel = null;
@@ -133,6 +129,9 @@
       delete raw.globals.worldColor;
       delete raw.globals.overlayOpacity;
       delete raw.targets.backdrop;
+      // v1.4 changes the work surface from a full-page layer to a bottom floor band.
+      // Drop only the obsolete surface geometry; preserve every other Designer edit.
+      delete raw.targets.surface;
       return raw;
     } catch { return blankConfig(); }
   }
@@ -168,8 +167,8 @@
     surfaceHandle.id = 'msg-vd-surface-handle';
     surfaceHandle.dataset.vdSurfaceHandle = '1';
     surfaceHandle.hidden = true;
-    surfaceHandle.setAttribute('aria-label','Drag Center Work Surface');
-    surfaceHandle.title = 'Drag to move the Center Work Surface';
+    surfaceHandle.setAttribute('aria-label','Drag Work Surface');
+    surfaceHandle.title = 'Drag to move the Work Surface';
     document.body.appendChild(surfaceHandle);
     return surfaceHandle;
   }
@@ -275,8 +274,8 @@
     document.body.classList.add('msg-vd-design-mode');
     document.body.classList.remove('msg-vd-preview-mode');
     markSelectableElements();
-    if (!selectedId) selectTarget('reader');
-    setStatus('Design mode is live. Click a layer or the page.', false);
+    selectTarget('surface');
+    setStatus('Work Surface selected. Drag the outlined floor or use Move up / down.', false);
   }
 
   function closeDesigner() {
@@ -450,7 +449,7 @@
       if (control.key === 'width') return parent?.clientWidth ? Math.round((el.getBoundingClientRect().width / parent.clientWidth) * 100) : 100;
       if (control.key === 'height') return parent?.clientHeight ? Math.round((el.getBoundingClientRect().height / parent.clientHeight) * 100) : 100;
       if (control.key === 'opacity') return Math.round((parseFloat(computed?.opacity) || 1) * 100);
-      if (control.key === 'color') return '#d9c8a7';
+      if (control.key === 'color') return '#d6c39f';
       if (control.key === 'borderWidth') return parseFloat(computed?.borderTopWidth) || 0;
       if (control.key === 'borderColor') return normalizeColor(computed?.borderTopColor || '#a9823c');
       if (control.key === 'radius') return parseFloat(computed?.borderTopLeftRadius) || 0;
@@ -844,7 +843,7 @@
     applyTarget(dragState.target);
     if (dragState.target.surface) syncSurfaceHandle();
     if (selectedId === dragState.target.id) renderInspector();
-    markDirty(dragState.target.surface ? 'Center Work Surface moved. Save when positioned correctly.' : 'Artwork moved. Save when positioned correctly.');
+    markDirty(dragState.target.surface ? 'Work Surface moved. Its top edge should move with your pointer.' : 'Artwork moved. Save when positioned correctly.');
   }
 
   function onPointerUp(event) {
