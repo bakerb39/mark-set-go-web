@@ -216,3 +216,34 @@ html[data-msg-experience-layout="explorer"]
   z-index:41 !important;
   pointer-events:auto !important;
 }
+
+/* v2.9.3 — illustrated non-Explorer scene frame.
+   Keep Explorer's native 43px geometry untouched. Other illustrated themes
+   sit behind the opaque sticky header and fill the viewport directly, which
+   prevents a header-to-scenery gap after scrolling. A 2px overscan prevents
+   fractional-pixel seams at the viewport edges and floor. */
+html[data-msg-experience-layout="explorer"]:not([data-msg-experience-theme="explorer"])
+.explorer-world-art {
+  inset: 0 !important;
+}
+
+html[data-msg-experience-layout="explorer"]:not([data-msg-experience-theme="explorer"])
+.explorer-world-art__top {
+  left: -2px !important;
+  top: -2px !important;
+  width: calc(100% + 4px) !important;
+}
+
+html[data-msg-experience-layout="explorer"]:not([data-msg-experience-theme="explorer"])
+.explorer-world-art__left {
+  left: -2px !important;
+  top: -2px !important;
+  height: calc(100% + 4px) !important;
+}
+
+html[data-msg-experience-layout="explorer"]:not([data-msg-experience-theme="explorer"])
+.explorer-world-art__right {
+  right: -2px !important;
+  top: -2px !important;
+  height: calc(100% + 4px) !important;
+}
