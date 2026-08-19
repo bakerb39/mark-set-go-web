@@ -3,55 +3,6 @@
    Additive theme layer. Does not alter Reader timing, pagination, DOM word structure,
    workspace behavior, or the existing Explorer Designer. */
 
-html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) {
-  --msg-theme-page: #f3efe5;
-  --msg-theme-surface: #fffdf7;
-  --msg-theme-accent: #245c53;
-  --msg-theme-accent-dark: #173f39;
-  --msg-theme-soft: #e8efe8;
-  --msg-theme-soft-2: #f4ecd8;
-  --msg-theme-border: #cbb98e;
-  --msg-theme-gold: #c5a152;
-  --msg-theme-ink: #20322d;
-  --msg-theme-muted: #6d766f;
-  --msg-theme-shadow: rgba(29, 46, 40, .18);
-
-  /*
-   * v2.4.0 — feed the existing application design-system tokens.
-   * No new palette values are introduced here. Every value resolves to
-   * the theme's already-defined --msg-theme-* palette.
-   */
-  --msg-navy: var(--msg-theme-accent-dark);
-  --msg-navy-deep: var(--msg-theme-accent-dark);
-
-  --msg-blue: var(--msg-theme-accent);
-  --msg-blue-strong: var(--msg-theme-accent-dark);
-  --msg-blue-hover: var(--msg-theme-accent-dark);
-  --msg-blue-soft: var(--msg-theme-soft);
-  --msg-blue-soft-2: var(--msg-theme-soft-2);
-  --msg-blue-soft-3: var(--msg-theme-soft);
-  --msg-blue-border: var(--msg-theme-border);
-  --msg-blue-border-soft: var(--msg-theme-border);
-
-  --msg-gold: var(--msg-theme-gold);
-  --msg-gold-bright: var(--msg-theme-gold);
-  --msg-gold-soft: var(--msg-theme-soft-2);
-
-  --msg-ink: var(--msg-theme-ink);
-  --msg-muted: var(--msg-theme-muted);
-  --msg-surface: var(--msg-theme-surface);
-  --msg-page: var(--msg-theme-page);
-
-  --accent: var(--msg-theme-accent);
-  --ui-accent: var(--msg-theme-accent);
-  --panel: var(--msg-theme-surface);
-  --surface: var(--msg-theme-surface);
-  --page: var(--msg-theme-page);
-  --ink: var(--msg-theme-ink);
-  --muted: var(--msg-theme-muted);
-  --border: var(--msg-theme-border);
-}
-
 html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) body {
   background: var(--msg-theme-page) !important;
   color: var(--msg-theme-ink);
@@ -103,6 +54,32 @@ html[data-msg-experience-theme="scholar"] {
   --msg-theme-ink:#33291f;
   --msg-theme-muted:#756454;
   --msg-theme-shadow:rgba(55,35,23,.22);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
 }
 html[data-msg-experience-theme="scholar"] .mark-companion-panel .askmark-hero {
   background:#4d2630 !important;
@@ -121,6 +98,32 @@ html[data-msg-experience-theme="patriotic"] {
   --msg-theme-ink:#1f2d3f;
   --msg-theme-muted:#667383;
   --msg-theme-shadow:rgba(21,43,72,.18);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
 }
 html[data-msg-experience-theme="patriotic"] .site-header {
   box-shadow: inset 0 -2px #9b2335 !important;
@@ -139,6 +142,32 @@ html[data-msg-experience-theme="artistic"] {
   --msg-theme-ink:#3c3137;
   --msg-theme-muted:#7b6871;
   --msg-theme-shadow:rgba(66,41,58,.18);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
 }
 
 /* Modern */
@@ -154,6 +183,32 @@ html[data-msg-experience-theme="modern"] {
   --msg-theme-ink:#18242c;
   --msg-theme-muted:#67747c;
   --msg-theme-shadow:rgba(20,32,41,.13);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
 }
 html[data-msg-experience-theme="modern"] .reader-page-panel,
 html[data-msg-experience-theme="modern"] :is(.navigation-pane,#reader-frame,.mark-companion-panel) {
@@ -173,6 +228,32 @@ html[data-msg-experience-theme="galactic"] {
   --msg-theme-ink:#14202a;
   --msg-theme-muted:#697b89;
   --msg-theme-shadow:rgba(0,0,0,.34);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
 }
 html[data-msg-experience-theme="galactic"] .site-header {
   border-bottom:1px solid #83b9d2 !important;
@@ -192,6 +273,32 @@ html[data-msg-experience-theme="expedition"] {
   --msg-theme-ink:#3b2c20;
   --msg-theme-muted:#74624e;
   --msg-theme-shadow:rgba(55,38,22,.24);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
 }
 
 /* Theme chooser */
