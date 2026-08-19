@@ -84,7 +84,7 @@ html[data-msg-experience-layout="explorer"] #app .reader-page-panel > .reader-pa
 html[data-msg-experience-layout="explorer"] #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar {display: flex !important;align-items: center !important;justify-content: space-between !important;gap: 8px !important;min-height: 58px !important;margin: 5px 0 30px !important;padding: 0 !important;}
 html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-layout {margin: 0 !important;margin-top: 2px !important;padding: 0 !important;}
 html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-viewer-footer {min-height: 1.8rem !important;margin: 0 !important;padding: .35rem .15rem 0 !important;}
-html[data-msg-experience-layout="explorer"] #app .reader-page-panel .playback-controls {margin: 8px 0 0 !important;padding: 0 !important;gap: 8px !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .playback-controls {position:relative !important;z-index:40 !important;margin: 8px 0 0 !important;padding: 0 !important;gap: 8px !important;}
 html[data-msg-experience-layout="explorer"] #app .reader-page-panel .playback-controls .status {margin-left: .25rem !important;}
 html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-pane-buttons > .reader-topright-media-stack {margin-left: auto !important;}
 @media  (min-width: 861px) {
@@ -95,7 +95,7 @@ html[data-msg-experience-layout="explorer"] #app .reader-page-panel > .reader-pa
 html[data-msg-experience-layout="explorer"] #app .reader-page-panel .navigation-pane {height: 790px !important;margin-top: 7px !important;margin-bottom: -80px !important;}
 html[data-msg-experience-layout="explorer"] #app .reader-page-panel #reader-frame {margin-top: 7px !important;}
 html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-viewer-footer {margin-top: -24px !important;padding-top: 29px !important;padding-bottom: 29px !important;}
-html[data-msg-experience-layout="explorer"] #app .reader-page-panel .playback-controls {margin-top: -57px !important;margin-bottom: 19px !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .playback-controls {position:relative !important;z-index:40 !important;margin-top: -57px !important;margin-bottom: 19px !important;}
 }
 @media  (max-width: 860px) {
 html[data-msg-experience-layout="explorer"] #app > .reader-page-panel,
@@ -206,4 +206,13 @@ html[data-msg-experience-layout="explorer"]
 #read-anything-article-summary-action::before {
   content:none !important;
   display:none !important;
+}
+
+/* Playback controls are intentionally pulled upward over the Reader footer.
+   Keep their exact geometry, but make the controls themselves the top hit target. */
+html[data-msg-experience-layout="explorer"]
+#app .reader-page-panel .playback-controls > :is(button,#start-reader,#pause-reader,#reset-reader) {
+  position:relative !important;
+  z-index:41 !important;
+  pointer-events:auto !important;
 }
