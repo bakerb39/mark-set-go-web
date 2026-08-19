@@ -15,6 +15,41 @@ html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) {
   --msg-theme-ink: #20322d;
   --msg-theme-muted: #6d766f;
   --msg-theme-shadow: rgba(29, 46, 40, .18);
+
+  /*
+   * v2.4.0 — feed the existing application design-system tokens.
+   * No new palette values are introduced here. Every value resolves to
+   * the theme's already-defined --msg-theme-* palette.
+   */
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
 }
 
 html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) body {
