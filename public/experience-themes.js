@@ -17,34 +17,34 @@
 
   const ART = {
     scholar:{
-      top:'/assets/themes/scholar/scholar-top.png?v=2.1.0',
-      left:'/assets/themes/scholar/scholar-left.png?v=2.1.0',
-      right:'/assets/themes/scholar/scholar-right.png?v=2.1.0'
+      top:'/assets/themes/scholar/scholar-top.png?v=2.2.0',
+      left:'/assets/themes/scholar/scholar-left.png?v=2.2.0',
+      right:'/assets/themes/scholar/scholar-right.png?v=2.2.0'
     },
     patriotic:{
-      top:'/assets/themes/patriotic/patriotic-top.png?v=2.1.0',
-      left:'/assets/themes/patriotic/patriotic-left.png?v=2.1.0',
-      right:'/assets/themes/patriotic/patriotic-right.png?v=2.1.0'
+      top:'/assets/themes/patriotic/patriotic-top.png?v=2.2.0',
+      left:'/assets/themes/patriotic/patriotic-left.png?v=2.2.0',
+      right:'/assets/themes/patriotic/patriotic-right.png?v=2.2.0'
     },
     artistic:{
-      top:'/assets/themes/artistic/artistic-top.png?v=2.1.0',
-      left:'/assets/themes/artistic/artistic-left.png?v=2.1.0',
-      right:'/assets/themes/artistic/artistic-right.png?v=2.1.0'
+      top:'/assets/themes/artistic/artistic-top.png?v=2.2.0',
+      left:'/assets/themes/artistic/artistic-left.png?v=2.2.0',
+      right:'/assets/themes/artistic/artistic-right.png?v=2.2.0'
     },
     modern:{
-      top:'/assets/themes/modern/modern-top.png?v=2.1.0',
-      left:'/assets/themes/modern/modern-left.png?v=2.1.0',
-      right:'/assets/themes/modern/modern-right.png?v=2.1.0'
+      top:'/assets/themes/modern/modern-top.png?v=2.2.0',
+      left:'/assets/themes/modern/modern-left.png?v=2.2.0',
+      right:'/assets/themes/modern/modern-right.png?v=2.2.0'
     },
     galactic:{
-      top:'/assets/themes/galactic/galactic-top.png?v=2.1.0',
-      left:'/assets/themes/galactic/galactic-left.png?v=2.1.0',
-      right:'/assets/themes/galactic/galactic-right.png?v=2.1.0'
+      top:'/assets/themes/galactic/galactic-top.png?v=2.2.0',
+      left:'/assets/themes/galactic/galactic-left.png?v=2.2.0',
+      right:'/assets/themes/galactic/galactic-right.png?v=2.2.0'
     },
     expedition:{
-      top:'/assets/themes/expedition/expedition-top.png?v=2.1.0',
-      left:'/assets/themes/expedition/expedition-left.png?v=2.1.0',
-      right:'/assets/themes/expedition/expedition-right.png?v=2.1.0'
+      top:'/assets/themes/expedition/expedition-top.png?v=2.2.0',
+      left:'/assets/themes/expedition/expedition-left.png?v=2.2.0',
+      right:'/assets/themes/expedition/expedition-right.png?v=2.2.0'
     }
   };
 
@@ -88,22 +88,19 @@
     const root=document.documentElement;
     const nodes=scenery();
 
-    /*
-     * v2.1.0 — VISUAL THEME + SHARED EXPLORER MECHANICS
-     *
-     * data-msg-experience-theme  = visual identity
-     * data-msg-experience-layout = shared Explorer behavior/layout
-     */
-    root.dataset.msgExperienceTheme=key;
+    /* Every theme uses Explorer mechanics; visual identity remains independent. */
     root.dataset.msgExperienceLayout='explorer';
     delete root.dataset.msgExperienceVariant;
 
-    document.body?.classList.add('msg-experience-themed');
-
     if(key==='classic'){
+      delete root.dataset.msgExperienceTheme;
+      document.body?.classList.remove('msg-experience-themed');
       Object.values(nodes).forEach(node=>{if(node) node.style.display='none';});
     }else{
+      root.dataset.msgExperienceTheme=key;
+      document.body?.classList.add('msg-experience-themed');
       Object.values(nodes).forEach(node=>{if(node) node.style.removeProperty('display');});
+
       if(key==='explorer') setScenery(nodes,original);
       else setScenery(nodes,ART[key]);
     }

@@ -1,0 +1,199 @@
+/*
+Shared Explorer mechanics.
+Generated from the existing Explorer Reader shell by copying ONLY layout/flow
+properties. No theme colors, gradients, borders, shadows, fonts, or control
+materials are included here. The Topic Feed white occlusion band is retained
+verbatim because it is part of the working scroll/header behavior.
+*/
+
+/* Exact Explorer scenery geometry shared by all illustrated themes. */
+html[data-msg-experience-layout="explorer"] .explorer-world-art{
+  display:block;
+  position:fixed;
+  inset:43px 0 0;
+  z-index:0;
+  overflow:hidden;
+  line-height:0;
+}
+html[data-msg-experience-layout="explorer"] .explorer-world-art__top{
+  position:absolute;
+  z-index:1;
+  top:0;
+  left:0;
+  width:100%;
+  height:auto;
+  min-height:0;
+  max-height:none;
+  margin-bottom:0;
+  padding-bottom:0;
+  vertical-align:top;
+  object-fit:cover;
+  object-position:center top;
+}
+html[data-msg-experience-layout="explorer"] .explorer-world-art__left,
+html[data-msg-experience-layout="explorer"] .explorer-world-art__right{
+  position:absolute;
+  z-index:2;
+  top:0;
+  width:clamp(175px,16vw,300px);
+  height:100%;
+  object-fit:cover;
+}
+html[data-msg-experience-layout="explorer"] .explorer-world-art__left{
+  left:0;
+  object-position:right bottom;
+}
+html[data-msg-experience-layout="explorer"] .explorer-world-art__right{
+  right:0;
+  object-position:left bottom;
+}
+@media(max-width:1180px){
+  html[data-msg-experience-layout="explorer"] .explorer-world-art__left,
+  html[data-msg-experience-layout="explorer"] .explorer-world-art__right{width:150px}
+}
+@media(max-width:860px){
+  html[data-msg-experience-layout="explorer"] .explorer-world-art__left,
+  html[data-msg-experience-layout="explorer"] .explorer-world-art__right{display:none}
+  html[data-msg-experience-layout="explorer"] .explorer-world-art__top{height:64px}
+}
+
+html[data-msg-experience-layout="explorer"] .msg-vd-center-work-surface,
+#msg-vd-surface-handle {display: none !important;}
+html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel) .explorer-world-art::after,
+html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel) .explorer-world-art.msg-vd-designer-surface-active::after {display: none !important;content: none !important;}
+html[data-msg-experience-layout="explorer"] .app-shell:has(.reader-page-panel) {padding: 0 !important;min-height: 0 !important;height: auto !important;margin-bottom: 0 !important;isolation: auto !important;}
+html[data-msg-experience-layout="explorer"] #app > .reader-page-panel,
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel {position: relative !important;box-sizing: border-box !important;width: 100% !important;margin: 0 !important;padding: 6px 16px 6px !important;overflow: visible !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel::before,
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel::after {display: none !important;content: none !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel > .reader-title-row {min-height: 0 !important;margin: 0 0 4px !important;padding: 0 !important;gap: 8px !important;align-items: flex-start !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-title-copy h1 {margin: 0 0 2px !important;line-height: 1.12 !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-title-links {margin: 0 !important;line-height: 1.15 !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel > .reader-toolbar {margin: 0 !important;padding: 0 !important;min-height: 0 !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel > .reader-pane-controls,
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar {display: flex !important;align-items: center !important;justify-content: space-between !important;gap: 8px !important;min-height: 58px !important;margin: 5px 0 30px !important;padding: 0 !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-layout {margin: 0 !important;margin-top: 2px !important;padding: 0 !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-viewer-footer {min-height: 1.8rem !important;margin: 0 !important;padding: .35rem .15rem 0 !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .playback-controls {margin: 8px 0 0 !important;padding: 0 !important;gap: 8px !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .playback-controls .status {margin-left: .25rem !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-pane-buttons > .reader-topright-media-stack {margin-left: auto !important;}
+@media  (min-width: 861px) {
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel {width: 100% !important;margin-top: 3px !important;margin-bottom: 0 !important;padding-top: 0 !important;padding-bottom: 0 !important;transform: none !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel > .reader-title-row {margin-top: 14px !important;margin-bottom: -1px !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel > .reader-pane-controls,
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar {min-height: 58px !important;margin-top: 6px !important;margin-bottom: 30px !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .navigation-pane {height: 790px !important;margin-top: 7px !important;margin-bottom: -80px !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel #reader-frame {margin-top: 7px !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-viewer-footer {margin-top: -24px !important;padding-top: 29px !important;padding-bottom: 29px !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel .playback-controls {margin-top: -57px !important;margin-bottom: 19px !important;}
+}
+@media  (max-width: 860px) {
+html[data-msg-experience-layout="explorer"] #app > .reader-page-panel,
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel {padding: 10px !important;}
+}
+html[data-msg-experience-layout="explorer"] body:has(#app .reader-page-panel) #app.app-shell,
+html[data-msg-experience-layout="explorer"] .app-shell:has(.reader-page-panel) {min-height: 0 !important;height: auto !important;margin-bottom: 0 !important;}
+html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel) .explorer-world-art::before,
+html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel) .explorer-world-art::after {content: none !important;display: none !important;}
+html[data-msg-experience-layout="explorer"] #reader-frame > .topic-feed-story-header-external::after {content: none !important;display: none !important;}
+html[data-msg-experience-layout="explorer"] #reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled > .topic-feed-story-meta-overlay {display: none !important;}
+html[data-msg-experience-layout="explorer"] #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action .read-anything-inline-article-summary {position: relative !important;z-index: 2 !important;}
+html[data-msg-experience-layout="explorer"] #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action > span[aria-hidden="true"] {position: relative !important;z-index: 2 !important;}
+html[data-msg-experience-layout="explorer"] body:has(#app .reader-page-panel) #app.app-shell,
+html[data-msg-experience-layout="explorer"] #app.app-shell:has(.reader-page-panel) {flex: 0 0 auto !important;min-height: 0 !important;height: auto !important;margin-bottom: 0 !important;}
+html[data-msg-experience-layout="explorer"] body:has(#app .reader-page-panel) > .site-footer {flex: 0 0 auto !important;margin-top: 0 !important;}
+html[data-msg-experience-layout="explorer"] .music-dock {position: fixed !important;z-index: 9999 !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {position: relative !important;z-index: 3 !important;isolation: isolate !important;display: inline-flex !important;width: max-content !important;max-width: 100% !important;align-items: center !important;flex-wrap: wrap !important;gap: .08rem !important;margin: .08rem 0 0 !important;padding: 0 !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before {content: "" !important;position: absolute !important;inset: -3px -5px !important;z-index: 0 !important;pointer-events: none !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, span[aria-hidden="true"]) {position: relative !important;z-index: 1 !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay {display: none !important;}
+@media  (min-width: 861px) {
+html[data-msg-experience-layout="explorer"] body:has(#app .reader-page-panel) #app.app-shell {margin-top: 6px !important;margin-bottom: 0 !important;}
+html[data-msg-experience-layout="explorer"] #app .reader-page-panel {transform: none !important;margin-bottom: 0 !important;}
+}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {position: relative !important;z-index: 3 !important;isolation: isolate !important;display: flex !important;width: 100% !important;max-width: 100% !important;min-width: 0 !important;align-items: center !important;flex-wrap: wrap !important;gap: .08rem !important;margin: .08rem 0 0 !important;padding: 0 !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before {content: "" !important;position: absolute !important;inset: -3px 0 !important;z-index: 0 !important;pointer-events: none !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, span[aria-hidden="true"]) {position: relative !important;z-index: 1 !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay {display: none !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {z-index: 20 !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external {z-index: 30 !important;padding-bottom: 8px !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+.topic-feed-story-meta-overlay {display: block !important;visibility: visible !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external
+#read-anything-article-summary-action {display: flex !important;visibility: visible !important;position: relative !important;z-index: 31 !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external
+.topic-feed-reader-credit,
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external
+.topic-feed-story-meta-overlay {position: relative !important;z-index: 31 !important;}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external
+#read-anything-article-summary-action::before {content: none !important;display: none !important;}
+html[data-msg-experience-layout="explorer"] .explorer-world-art__top {display: block !important;height: auto !important;min-height: 0 !important;max-height: none !important;margin-bottom: 0 !important;padding-bottom: 0 !important;vertical-align: top !important;}
+html[data-msg-experience-layout="explorer"] .explorer-world-art {line-height: 0 !important;}
+
+
+/* Exact Explorer Topic Feed header/scroll behavior, shared by layout gate. */
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  z-index:20 !important;
+  background:var(--msg-vd-reader-page-color,#ffffff) !important;
+  background-image:none !important;
+  box-shadow:0 7px 0 var(--msg-vd-reader-page-color,#ffffff) !important;
+}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external {
+  z-index:30 !important;
+  background:var(--msg-vd-reader-page-color,#ffffff) !important;
+  background-image:none !important;
+  padding-bottom:8px !important;
+  box-shadow:0 6px 0 var(--msg-vd-reader-page-color,#ffffff) !important;
+}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+.topic-feed-story-meta-overlay {
+  display:block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external
+#read-anything-article-summary-action {
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  position:relative !important;
+  z-index:31 !important;
+}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external
+.topic-feed-reader-credit,
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external
+.topic-feed-story-meta-overlay {
+  position:relative !important;
+  z-index:31 !important;
+}
+html[data-msg-experience-layout="explorer"]
+#reader-frame > .topic-feed-story-header-external
+#read-anything-article-summary-action::before {
+  content:none !important;
+  display:none !important;
+}
