@@ -426,3 +426,33 @@ html[data-msg-experience-theme="expedition"] #app.app-shell {
     width: min(130px, 15vw) !important;
   }
 }
+
+
+/* v1.3.2 — SHORTER TOP PANORAMA + ZERO READER GAP
+   Side scenery positioning from v1.3.1 is intentionally preserved. */
+html[data-msg-experience-theme="patriotic"] .explorer-world-art,
+html[data-msg-experience-theme="scholar"] .explorer-world-art,
+html[data-msg-experience-theme="artistic"] .explorer-world-art,
+html[data-msg-experience-theme="modern"] .explorer-world-art,
+html[data-msg-experience-theme="galactic"] .explorer-world-art,
+html[data-msg-experience-theme="expedition"] .explorer-world-art {
+  height: 128px !important;
+}
+
+html[data-msg-experience-theme="patriotic"] .explorer-world-art__top,
+html[data-msg-experience-theme="scholar"] .explorer-world-art__top,
+html[data-msg-experience-theme="artistic"] .explorer-world-art__top,
+html[data-msg-experience-theme="modern"] .explorer-world-art__top,
+html[data-msg-experience-theme="galactic"] .explorer-world-art__top,
+html[data-msg-experience-theme="expedition"] .explorer-world-art__top {
+  height: 128px !important;
+}
+
+html[data-msg-experience-theme="patriotic"] #app.app-shell,
+html[data-msg-experience-theme="scholar"] #app.app-shell,
+html[data-msg-experience-theme="artistic"] #app.app-shell,
+html[data-msg-experience-theme="modern"] #app.app-shell,
+html[data-msg-experience-theme="galactic"] #app.app-shell,
+html[data-msg-experience-theme="expedition"] #app.app-shell {
+  margin-top: 0 !important;
+}
