@@ -399,142 +399,34 @@ html[data-msg-experience-theme="expedition"] {
 
 
 /* ==========================================================================
-   v1.9.1 — CLASSIC TOPIC-FEED HEADER PRESENTATION ON THEMED MODES
+   v1.9.2 — CLASSIC-ONLY TOPIC FEED FLOW FIX
 
-   Keep each themed mode's working article-flow / spacing behavior.
-   Only normalize the visible Topic Feed header presentation to the Classic
-   appearance defined by topic-feeds.css.
+   The illustrated themes are intentionally untouched.
+   Classic keeps its existing header presentation, but gets a guaranteed clean
+   break between the external article header/actions and the first paragraph.
 
-   IMPORTANT:
-   - no Reader geometry changes
-   - no story-header reserve/spacing changes
-   - no Explorer scenery changes
-   - no MutationObserver
+   No Explorer/theme geometry changes.
    ========================================================================== */
 
-:is(
-  html[data-msg-experience-theme="explorer"],
-  html[data-msg-experience-theme="scholar"],
-  html[data-msg-experience-theme="patriotic"],
-  html[data-msg-experience-theme="artistic"],
-  html[data-msg-experience-theme="modern"],
-  html[data-msg-experience-theme="galactic"],
-  html[data-msg-experience-theme="expedition"]
-) #reader-frame > .topic-feed-story-header-external {
-  color: inherit !important;
+/* Classic is the state with NO data-msg-experience-theme attribute. */
+html:not([data-msg-experience-theme])
+#reader.topic-feed-story-header-managed:not(.flash):not(.digital-sign-mode)::before {
+  /* Preserve the existing JS-calculated header reserve and add one clean
+     reading-line of separation before article text begins. */
+  margin-bottom: 1.05em !important;
 }
 
-/* Classic publisher/source line. */
-:is(
-  html[data-msg-experience-theme="explorer"],
-  html[data-msg-experience-theme="scholar"],
-  html[data-msg-experience-theme="patriotic"],
-  html[data-msg-experience-theme="artistic"],
-  html[data-msg-experience-theme="modern"],
-  html[data-msg-experience-theme="galactic"],
-  html[data-msg-experience-theme="expedition"]
-) #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit {
-  margin: 0 !important;
-  padding: 0 0 .46em !important;
-  border-bottom: 1px solid rgba(77,101,124,.15) !important;
-  background: transparent !important;
-  color: #6d7e8e !important;
-  font-size: .72em !important;
-  line-height: 1.35 !important;
-  letter-spacing: .005em !important;
-  box-shadow: none !important;
+/* Keep the Classic header itself exactly where topic-feeds.css puts it.
+   This only prevents any inherited/legacy negative spacing from collapsing
+   the header-to-body gap. */
+html:not([data-msg-experience-theme])
+#reader-frame > .topic-feed-story-header-external {
+  margin-bottom: 0 !important;
 }
 
-:is(
-  html[data-msg-experience-theme="explorer"],
-  html[data-msg-experience-theme="scholar"],
-  html[data-msg-experience-theme="patriotic"],
-  html[data-msg-experience-theme="artistic"],
-  html[data-msg-experience-theme="modern"],
-  html[data-msg-experience-theme="galactic"],
-  html[data-msg-experience-theme="expedition"]
-) #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit-label {
-  color: #8795a3 !important;
-}
-
-:is(
-  html[data-msg-experience-theme="explorer"],
-  html[data-msg-experience-theme="scholar"],
-  html[data-msg-experience-theme="patriotic"],
-  html[data-msg-experience-theme="artistic"],
-  html[data-msg-experience-theme="modern"],
-  html[data-msg-experience-theme="galactic"],
-  html[data-msg-experience-theme="expedition"]
-) #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit strong {
-  color: #40566b !important;
-}
-
-:is(
-  html[data-msg-experience-theme="explorer"],
-  html[data-msg-experience-theme="scholar"],
-  html[data-msg-experience-theme="patriotic"],
-  html[data-msg-experience-theme="artistic"],
-  html[data-msg-experience-theme="modern"],
-  html[data-msg-experience-theme="galactic"],
-  html[data-msg-experience-theme="expedition"]
-) #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit-separator {
-  color: #a8b2bc !important;
-}
-
-:is(
-  html[data-msg-experience-theme="explorer"],
-  html[data-msg-experience-theme="scholar"],
-  html[data-msg-experience-theme="patriotic"],
-  html[data-msg-experience-theme="artistic"],
-  html[data-msg-experience-theme="modern"],
-  html[data-msg-experience-theme="galactic"],
-  html[data-msg-experience-theme="expedition"]
-) #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit a {
-  color: #1769aa !important;
-  font-weight: 650 !important;
-  text-decoration: none !important;
-}
-
-/* Classic social-share chips. */
-:is(
-  html[data-msg-experience-theme="explorer"],
-  html[data-msg-experience-theme="scholar"],
-  html[data-msg-experience-theme="patriotic"],
-  html[data-msg-experience-theme="artistic"],
-  html[data-msg-experience-theme="modern"],
-  html[data-msg-experience-theme="galactic"],
-  html[data-msg-experience-theme="expedition"]
-) #reader-frame > .topic-feed-story-header-external
-  .topic-feed-reader-share .topic-feed-share-button {
-  width: 24px !important;
-  height: 24px !important;
-  display: grid !important;
-  place-items: center !important;
-  border: 1px solid rgba(58,83,108,.16) !important;
-  border-radius: 6px !important;
-  background: rgba(255,255,255,.86) !important;
-  color: #53697d !important;
-  box-shadow: 0 1px 2px rgba(24,45,65,.04) !important;
-}
-
-/* Preserve the Classic action-row layout exactly. Do NOT touch the header
-   reserve variable or article-flow pseudo-element. */
-:is(
-  html[data-msg-experience-theme="explorer"],
-  html[data-msg-experience-theme="scholar"],
-  html[data-msg-experience-theme="patriotic"],
-  html[data-msg-experience-theme="artistic"],
-  html[data-msg-experience-theme="modern"],
-  html[data-msg-experience-theme="galactic"],
-  html[data-msg-experience-theme="expedition"]
-) #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {
-  position: static !important;
-  inset: auto !important;
-  display: block !important;
-  width: 100% !important;
-  box-sizing: border-box !important;
-  margin: .42em 0 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
+html:not([data-msg-experience-theme])
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  margin-top: .42em !important;
+  margin-bottom: 0 !important;
 }
