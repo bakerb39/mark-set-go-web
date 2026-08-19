@@ -1,26 +1,31 @@
 'use strict';
 
 (() => {
-  const KEY = 'markSetGoExperienceThemeV1';
-  const THEMES = new Set([
-    'classic','explorer','patriotic','scholar','artistic','modern','galactic','expedition'
+  const PROFILE_KEY = 'markSetGoExperienceProfileV1';
+  const APPEARANCES = new Set([
+    'default','explorer','patriotic','scholar','artistic','modern','galactic','expedition'
   ]);
-  const ROOT_CLASSES = [...THEMES].map(key => `msg-theme-${key}`);
+  const ROOT_CLASSES = [
+    'msg-theme-classic','msg-theme-explorer','msg-theme-patriotic','msg-theme-scholar',
+    'msg-theme-artistic','msg-theme-modern','msg-theme-galactic','msg-theme-expedition'
+  ];
 
-  let selected = 'classic';
+  let appearance = 'default';
   try {
-    const saved = localStorage.getItem(KEY);
-    if (saved && THEMES.has(saved)) selected = saved;
+    const profile = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+    if (profile && APPEARANCES.has(String(profile.appearance || ''))) {
+      appearance = String(profile.appearance);
+    }
   } catch {}
 
   const root = document.documentElement;
   root.classList.remove(...ROOT_CLASSES);
-  root.classList.add(`msg-theme-${selected}`);
+  root.classList.add(appearance === 'default' ? 'msg-theme-classic' : `msg-theme-${appearance}`);
   root.dataset.msgExperienceLayout = 'explorer';
 
-  if (selected === 'classic') {
+  if (appearance === 'default') {
     delete root.dataset.msgExperienceTheme;
   } else {
-    root.dataset.msgExperienceTheme = selected;
+    root.dataset.msgExperienceTheme = appearance;
   }
 })();

@@ -1,50 +1,51 @@
-
 'use strict';
 
 (() => {
-  const KEY = 'markSetGoExperienceThemeV1';
-
   const THEMES = {
-    classic:{label:'Classic',description:'The original Mark, Set, Go! appearance.'},
-    explorer:{label:'Explorer',description:'Maps, natural history, expedition scenery, green and brass.'},
-    patriotic:{label:'Patriotic',description:'American history, navy, ivory, restrained red and brass.'},
-    scholar:{label:'Scholar',description:'Old library, manuscripts, walnut, burgundy and parchment.'},
-    artistic:{label:'Artistic',description:'Studio and gallery atmosphere with warm creative color.'},
-    modern:{label:'Modern',description:'Clean architecture, restrained geometry and minimal surfaces.'},
-    galactic:{label:'Galactic',description:'Original space-opera atmosphere with stars and luminous instruments.'},
-    expedition:{label:'Expedition',description:'Original archaeology-adventure atmosphere with maps, ruins and field journals.'}
+    classic:{label:'Classic',description:'The original Mark, Set, Go! appearance.',appearance:'default'},
+    explorer:{label:'Explorer',description:'Maps, natural history, expedition scenery, green and brass.',appearance:'explorer'},
+    patriotic:{label:'Patriotic',description:'American history, navy, ivory, restrained red and brass.',appearance:'patriotic'},
+    scholar:{label:'Scholar',description:'Old library, manuscripts, walnut, burgundy and parchment.',appearance:'scholar'},
+    artistic:{label:'Artistic',description:'Studio and gallery atmosphere with warm creative color.',appearance:'artistic'},
+    modern:{label:'Modern',description:'Clean architecture, restrained geometry and minimal surfaces.',appearance:'modern'},
+    galactic:{label:'Galactic',description:'Original space-opera atmosphere with stars and luminous instruments.',appearance:'galactic'},
+    expedition:{label:'Expedition',description:'Original archaeology-adventure atmosphere with maps, ruins and field journals.',appearance:'expedition'}
   };
+
+  const APPEARANCE_TO_THEME = Object.fromEntries(
+    Object.entries(THEMES).map(([theme,value]) => [value.appearance,theme])
+  );
 
   const ART = {
     scholar:{
-      top:'/assets/themes/scholar/scholar-top.png?v=2.3.0',
-      left:'/assets/themes/scholar/scholar-left.png?v=2.3.0',
-      right:'/assets/themes/scholar/scholar-right.png?v=2.3.0'
+      top:'/assets/themes/scholar/scholar-top.png?v=2.5.0',
+      left:'/assets/themes/scholar/scholar-left.png?v=2.5.0',
+      right:'/assets/themes/scholar/scholar-right.png?v=2.5.0'
     },
     patriotic:{
-      top:'/assets/themes/patriotic/patriotic-top.png?v=2.3.0',
-      left:'/assets/themes/patriotic/patriotic-left.png?v=2.3.0',
-      right:'/assets/themes/patriotic/patriotic-right.png?v=2.3.0'
+      top:'/assets/themes/patriotic/patriotic-top.png?v=2.5.0',
+      left:'/assets/themes/patriotic/patriotic-left.png?v=2.5.0',
+      right:'/assets/themes/patriotic/patriotic-right.png?v=2.5.0'
     },
     artistic:{
-      top:'/assets/themes/artistic/artistic-top.png?v=2.3.0',
-      left:'/assets/themes/artistic/artistic-left.png?v=2.3.0',
-      right:'/assets/themes/artistic/artistic-right.png?v=2.3.0'
+      top:'/assets/themes/artistic/artistic-top.png?v=2.5.0',
+      left:'/assets/themes/artistic/artistic-left.png?v=2.5.0',
+      right:'/assets/themes/artistic/artistic-right.png?v=2.5.0'
     },
     modern:{
-      top:'/assets/themes/modern/modern-top.png?v=2.3.0',
-      left:'/assets/themes/modern/modern-left.png?v=2.3.0',
-      right:'/assets/themes/modern/modern-right.png?v=2.3.0'
+      top:'/assets/themes/modern/modern-top.png?v=2.5.0',
+      left:'/assets/themes/modern/modern-left.png?v=2.5.0',
+      right:'/assets/themes/modern/modern-right.png?v=2.5.0'
     },
     galactic:{
-      top:'/assets/themes/galactic/galactic-top.png?v=2.3.0',
-      left:'/assets/themes/galactic/galactic-left.png?v=2.3.0',
-      right:'/assets/themes/galactic/galactic-right.png?v=2.3.0'
+      top:'/assets/themes/galactic/galactic-top.png?v=2.5.0',
+      left:'/assets/themes/galactic/galactic-left.png?v=2.5.0',
+      right:'/assets/themes/galactic/galactic-right.png?v=2.5.0'
     },
     expedition:{
-      top:'/assets/themes/expedition/expedition-top.png?v=2.3.0',
-      left:'/assets/themes/expedition/expedition-left.png?v=2.3.0',
-      right:'/assets/themes/expedition/expedition-right.png?v=2.3.0'
+      top:'/assets/themes/expedition/expedition-top.png?v=2.5.0',
+      left:'/assets/themes/expedition/expedition-left.png?v=2.5.0',
+      right:'/assets/themes/expedition/expedition-right.png?v=2.5.0'
     }
   };
 
@@ -81,10 +82,12 @@
     if(nodes.right && art?.right) nodes.right.src=art.right;
   }
 
-  function apply(theme,save=true){
-    const key=THEMES[theme] ? theme : 'classic';
-    rememberOriginal();
+  function themeFromAppearance(appearance){
+    return APPEARANCE_TO_THEME[String(appearance || 'default')] || 'classic';
+  }
 
+  function syncVisualState(appearance){
+    const key=themeFromAppearance(appearance);
     const root=document.documentElement;
     const nodes=scenery();
     const themeClasses=Object.keys(THEMES).map(name=>`msg-theme-${name}`);
@@ -92,33 +95,30 @@
     root.classList.remove(...themeClasses);
     root.classList.add(`msg-theme-${key}`);
     root.dataset.msgExperienceLayout='explorer';
-    delete root.dataset.msgExperienceVariant;
 
-    if(key==='classic'){
-      delete root.dataset.msgExperienceTheme;
-      document.body?.classList.remove('msg-experience-themed');
-    }else{
-      root.dataset.msgExperienceTheme=key;
-      document.body?.classList.add('msg-experience-themed');
+    if(key==='explorer') setScenery(nodes,original);
+    else if(key!=='classic') setScenery(nodes,ART[key]);
 
-      if(key==='explorer') setScenery(nodes,original);
-      else setScenery(nodes,ART[key]);
-    }
-
-    if(save){
-      try{localStorage.setItem(KEY,key);}catch{}
-    }
     refreshPressed(key);
-    window.dispatchEvent(new CustomEvent('msg:experience-theme-changed',{detail:{theme:key}}));
+    return key;
   }
 
   function current(){
-    try{
-      const saved=localStorage.getItem(KEY);
-      if(saved && THEMES[saved]) return saved;
-    }catch{}
-    const active=document.documentElement.dataset.msgExperienceTheme;
-    return THEMES[active] ? active : 'classic';
+    const profile=window.MarkSetGoExperienceProfile?.get?.();
+    return themeFromAppearance(profile?.appearance || 'default');
+  }
+
+  function apply(theme){
+    const key=THEMES[theme] ? theme : 'classic';
+    const profileApi=window.MarkSetGoExperienceProfile;
+    if(!profileApi?.get || !profileApi?.save) return;
+
+    const currentProfile=profileApi.get();
+    profileApi.save({
+      preset:currentProfile.preset,
+      appearance:THEMES[key].appearance,
+      features:{...(currentProfile.features || {})}
+    });
   }
 
   function ensureLauncher(){
@@ -163,7 +163,7 @@
     dialog.addEventListener('click',e=>{if(e.target===dialog) close();});
     dialog.querySelectorAll('[data-msg-theme]').forEach(btn=>{
       btn.addEventListener('click',()=>{
-        apply(btn.dataset.msgTheme,true);
+        apply(btn.dataset.msgTheme);
         close();
       });
     });
@@ -195,7 +195,13 @@
     rememberOriginal();
     ensureLauncher();
     ensureDialog();
-    apply(current(),false);
+
+    const profile=window.MarkSetGoExperienceProfile?.get?.();
+    syncVisualState(profile?.appearance || 'default');
+
+    document.addEventListener('marksetgo:experience-profile-changed',event=>{
+      syncVisualState(event.detail?.profile?.appearance || 'default');
+    });
   }
 
   window.MarkSetGoExperienceThemes={apply,current,themes:{...THEMES}};
