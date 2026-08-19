@@ -17,34 +17,34 @@
 
   const ART = {
     scholar:{
-      top:'/assets/themes/scholar/scholar-top.png?v=1.9.0',
-      left:'/assets/themes/scholar/scholar-left.png?v=1.9.0',
-      right:'/assets/themes/scholar/scholar-right.png?v=1.9.0'
+      top:'/assets/themes/scholar/scholar-top.png?v=2.0.0',
+      left:'/assets/themes/scholar/scholar-left.png?v=2.0.0',
+      right:'/assets/themes/scholar/scholar-right.png?v=2.0.0'
     },
     patriotic:{
-      top:'/assets/themes/patriotic/patriotic-top.png?v=1.9.0',
-      left:'/assets/themes/patriotic/patriotic-left.png?v=1.9.0',
-      right:'/assets/themes/patriotic/patriotic-right.png?v=1.9.0'
+      top:'/assets/themes/patriotic/patriotic-top.png?v=2.0.0',
+      left:'/assets/themes/patriotic/patriotic-left.png?v=2.0.0',
+      right:'/assets/themes/patriotic/patriotic-right.png?v=2.0.0'
     },
     artistic:{
-      top:'/assets/themes/artistic/artistic-top.png?v=1.9.0',
-      left:'/assets/themes/artistic/artistic-left.png?v=1.9.0',
-      right:'/assets/themes/artistic/artistic-right.png?v=1.9.0'
+      top:'/assets/themes/artistic/artistic-top.png?v=2.0.0',
+      left:'/assets/themes/artistic/artistic-left.png?v=2.0.0',
+      right:'/assets/themes/artistic/artistic-right.png?v=2.0.0'
     },
     modern:{
-      top:'/assets/themes/modern/modern-top.png?v=1.9.0',
-      left:'/assets/themes/modern/modern-left.png?v=1.9.0',
-      right:'/assets/themes/modern/modern-right.png?v=1.9.0'
+      top:'/assets/themes/modern/modern-top.png?v=2.0.0',
+      left:'/assets/themes/modern/modern-left.png?v=2.0.0',
+      right:'/assets/themes/modern/modern-right.png?v=2.0.0'
     },
     galactic:{
-      top:'/assets/themes/galactic/galactic-top.png?v=1.9.0',
-      left:'/assets/themes/galactic/galactic-left.png?v=1.9.0',
-      right:'/assets/themes/galactic/galactic-right.png?v=1.9.0'
+      top:'/assets/themes/galactic/galactic-top.png?v=2.0.0',
+      left:'/assets/themes/galactic/galactic-left.png?v=2.0.0',
+      right:'/assets/themes/galactic/galactic-right.png?v=2.0.0'
     },
     expedition:{
-      top:'/assets/themes/expedition/expedition-top.png?v=1.9.0',
-      left:'/assets/themes/expedition/expedition-left.png?v=1.9.0',
-      right:'/assets/themes/expedition/expedition-right.png?v=1.9.0'
+      top:'/assets/themes/expedition/expedition-top.png?v=2.0.0',
+      left:'/assets/themes/expedition/expedition-left.png?v=2.0.0',
+      right:'/assets/themes/expedition/expedition-right.png?v=2.0.0'
     }
   };
 
@@ -88,25 +88,30 @@
     const root=document.documentElement;
     const nodes=scenery();
 
-    if(key==='classic'){
-      delete root.dataset.msgExperienceTheme;
-      delete root.dataset.msgExperienceVariant;
-      document.body?.classList.remove('msg-experience-themed');
-      Object.values(nodes).forEach(node=>{if(node) node.style.display='none';});
+    /*
+     * v2.0.0 — EVERY THEME IS EXPLORER.
+     *
+     * The structural theme is ALWAYS "explorer".
+     * Theme selection changes artwork ONLY.
+     * No alternate layout, Reader, header, spacing, palette, or Designer code.
+     */
+    root.dataset.msgExperienceTheme='explorer';
+    root.dataset.msgExperienceVariant=key;
+    document.body?.classList.add('msg-experience-themed');
+
+    Object.values(nodes).forEach(node=>{
+      if(node) node.style.removeProperty('display');
+    });
+
+    if(key==='explorer'){
+      setScenery(nodes,original);
+    }else if(key==='classic'){
+      /* Classic keeps the exact Explorer engine but has no scenic artwork. */
+      Object.values(nodes).forEach(node=>{
+        if(node) node.style.display='none';
+      });
     }else{
-      /*
-       * v1.9.0 STRUCTURAL ISOLATION
-       * Keep the real selected theme name so Explorer-only Reader/header rules
-       * do not leak into the other illustrated themes.
-       */
-      root.dataset.msgExperienceTheme=key;
-      delete root.dataset.msgExperienceVariant;
-
-      document.body?.classList.add('msg-experience-themed');
-      Object.values(nodes).forEach(node=>{if(node) node.style.removeProperty('display');});
-
-      if(key==='explorer') setScenery(nodes,original);
-      else setScenery(nodes,ART[key]);
+      setScenery(nodes,ART[key]);
     }
 
     if(save){
@@ -121,8 +126,8 @@
       const saved=localStorage.getItem(KEY);
       if(saved && THEMES[saved]) return saved;
     }catch{}
-    const active=document.documentElement.dataset.msgExperienceTheme;
-    return THEMES[active] ? active : 'classic';
+    const variant=document.documentElement.dataset.msgExperienceVariant;
+    return THEMES[variant] ? variant : 'explorer';
   }
 
   function ensureLauncher(){
