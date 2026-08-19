@@ -18,34 +18,34 @@
 
   const ART = {
     scholar:{
-      top:'/assets/themes/scholar/scholar-top.png?v=2.5.0',
-      left:'/assets/themes/scholar/scholar-left.png?v=2.5.0',
-      right:'/assets/themes/scholar/scholar-right.png?v=2.5.0'
+      top:'/assets/themes/scholar/scholar-top.png?v=20260819-art-v1',
+      left:'/assets/themes/scholar/scholar-left.png?v=20260819-art-v1',
+      right:'/assets/themes/scholar/scholar-right.png?v=20260819-art-v1'
     },
     patriotic:{
-      top:'/assets/themes/patriotic/patriotic-top.png?v=2.5.0',
-      left:'/assets/themes/patriotic/patriotic-left.png?v=2.5.0',
-      right:'/assets/themes/patriotic/patriotic-right.png?v=2.5.0'
+      top:'/assets/themes/patriotic/patriotic-top.png?v=20260819-art-v1',
+      left:'/assets/themes/patriotic/patriotic-left.png?v=20260819-art-v1',
+      right:'/assets/themes/patriotic/patriotic-right.png?v=20260819-art-v1'
     },
     artistic:{
-      top:'/assets/themes/artistic/artistic-top.png?v=2.5.0',
-      left:'/assets/themes/artistic/artistic-left.png?v=2.5.0',
-      right:'/assets/themes/artistic/artistic-right.png?v=2.5.0'
+      top:'/assets/themes/artistic/artistic-top.png?v=20260819-art-v1',
+      left:'/assets/themes/artistic/artistic-left.png?v=20260819-art-v1',
+      right:'/assets/themes/artistic/artistic-right.png?v=20260819-art-v1'
     },
     modern:{
-      top:'/assets/themes/modern/modern-top.png?v=2.5.0',
-      left:'/assets/themes/modern/modern-left.png?v=2.5.0',
-      right:'/assets/themes/modern/modern-right.png?v=2.5.0'
+      top:'/assets/themes/modern/modern-top.png?v=20260819-art-v1',
+      left:'/assets/themes/modern/modern-left.png?v=20260819-art-v1',
+      right:'/assets/themes/modern/modern-right.png?v=20260819-art-v1'
     },
     galactic:{
-      top:'/assets/themes/galactic/galactic-top.png?v=2.5.0',
-      left:'/assets/themes/galactic/galactic-left.png?v=2.5.0',
-      right:'/assets/themes/galactic/galactic-right.png?v=2.5.0'
+      top:'/assets/themes/galactic/galactic-top.png?v=20260819-art-v1',
+      left:'/assets/themes/galactic/galactic-left.png?v=20260819-art-v1',
+      right:'/assets/themes/galactic/galactic-right.png?v=20260819-art-v1'
     },
     expedition:{
-      top:'/assets/themes/expedition/expedition-top.png?v=2.5.0',
-      left:'/assets/themes/expedition/expedition-left.png?v=2.5.0',
-      right:'/assets/themes/expedition/expedition-right.png?v=2.5.0'
+      top:'/assets/themes/expedition/expedition-top.png?v=20260819-art-v1',
+      left:'/assets/themes/expedition/expedition-left.png?v=20260819-art-v1',
+      right:'/assets/themes/expedition/expedition-right.png?v=20260819-art-v1'
     }
   };
 
