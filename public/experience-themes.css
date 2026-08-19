@@ -1,4 +1,3 @@
-
 /* Mark, Set, Go! Experience Themes v1.0.0
    Additive theme layer. Does not alter Reader timing, pagination, DOM word structure,
    workspace behavior, or the existing Explorer Designer. */
@@ -455,4 +454,100 @@ html[data-msg-experience-theme="modern"] #app.app-shell,
 html[data-msg-experience-theme="galactic"] #app.app-shell,
 html[data-msg-experience-theme="expedition"] #app.app-shell {
   margin-top: 0 !important;
+}
+
+
+/* v1.3.3 — EXPLORER-STYLE SCENERY FLOW
+   The top artwork is now a positioned decoration rather than a tall document
+   block. The Reader gets its own independent vertical placement.
+   Side-art placement from v1.3.1 remains fixed at the header. */
+
+html[data-msg-experience-theme="patriotic"] .explorer-world-art,
+html[data-msg-experience-theme="scholar"] .explorer-world-art,
+html[data-msg-experience-theme="artistic"] .explorer-world-art,
+html[data-msg-experience-theme="modern"] .explorer-world-art,
+html[data-msg-experience-theme="galactic"] .explorer-world-art,
+html[data-msg-experience-theme="expedition"] .explorer-world-art {
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  height: 104px !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  line-height: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Top panorama no longer determines the Reader's normal-flow position. */
+html[data-msg-experience-theme="patriotic"] .explorer-world-art__top,
+html[data-msg-experience-theme="scholar"] .explorer-world-art__top,
+html[data-msg-experience-theme="artistic"] .explorer-world-art__top,
+html[data-msg-experience-theme="modern"] .explorer-world-art__top,
+html[data-msg-experience-theme="galactic"] .explorer-world-art__top,
+html[data-msg-experience-theme="expedition"] .explorer-world-art__top {
+  position: absolute !important;
+  top: 0 !important;
+  left: 50% !important;
+  width: min(1120px,72vw) !important;
+  height: 120px !important;
+  max-width: none !important;
+  margin: 0 !important;
+  transform: translateX(-50%) !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  z-index: 0 !important;
+}
+
+/* The Reader is positioned independently and pulled up under the panorama. */
+html[data-msg-experience-theme="patriotic"] #app.app-shell,
+html[data-msg-experience-theme="scholar"] #app.app-shell,
+html[data-msg-experience-theme="artistic"] #app.app-shell,
+html[data-msg-experience-theme="modern"] #app.app-shell,
+html[data-msg-experience-theme="galactic"] #app.app-shell,
+html[data-msg-experience-theme="expedition"] #app.app-shell {
+  margin-top: -2px !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* Keep side scenery attached directly beneath the site header. */
+html[data-msg-experience-theme="patriotic"] .explorer-world-art__left,
+html[data-msg-experience-theme="scholar"] .explorer-world-art__left,
+html[data-msg-experience-theme="artistic"] .explorer-world-art__left,
+html[data-msg-experience-theme="modern"] .explorer-world-art__left,
+html[data-msg-experience-theme="galactic"] .explorer-world-art__left,
+html[data-msg-experience-theme="expedition"] .explorer-world-art__left,
+html[data-msg-experience-theme="patriotic"] .explorer-world-art__right,
+html[data-msg-experience-theme="scholar"] .explorer-world-art__right,
+html[data-msg-experience-theme="artistic"] .explorer-world-art__right,
+html[data-msg-experience-theme="modern"] .explorer-world-art__right,
+html[data-msg-experience-theme="galactic"] .explorer-world-art__right,
+html[data-msg-experience-theme="expedition"] .explorer-world-art__right {
+  top: 30px !important;
+  bottom: auto !important;
+  height: calc(100vh - 30px) !important;
+  max-height: calc(100vh - 30px) !important;
+}
+
+@media (max-width:900px) {
+  html[data-msg-experience-theme="patriotic"] .explorer-world-art,
+  html[data-msg-experience-theme="scholar"] .explorer-world-art,
+  html[data-msg-experience-theme="artistic"] .explorer-world-art,
+  html[data-msg-experience-theme="modern"] .explorer-world-art,
+  html[data-msg-experience-theme="galactic"] .explorer-world-art,
+  html[data-msg-experience-theme="expedition"] .explorer-world-art {
+    height: 82px !important;
+  }
+
+  html[data-msg-experience-theme="patriotic"] .explorer-world-art__top,
+  html[data-msg-experience-theme="scholar"] .explorer-world-art__top,
+  html[data-msg-experience-theme="artistic"] .explorer-world-art__top,
+  html[data-msg-experience-theme="modern"] .explorer-world-art__top,
+  html[data-msg-experience-theme="galactic"] .explorer-world-art__top,
+  html[data-msg-experience-theme="expedition"] .explorer-world-art__top {
+    width: min(1000px,88vw) !important;
+    height: 96px !important;
+  }
 }
