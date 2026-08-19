@@ -6179,6 +6179,12 @@ function applyExperienceProfile(profile = getExperienceProfile()) {
 
 rootEl.dataset.experienceAppearance=normalized.appearance || 'default';
 
+if(normalized.appearance && normalized.appearance !== 'default') {
+  rootEl.dataset.msgExperienceTheme=normalized.appearance;
+} else {
+  delete rootEl.dataset.msgExperienceTheme;
+}
+
 Object.entries(features).forEach(([key,enabled]) => {
 
   document.querySelectorAll('[data-feature-gate]').forEach((element) => {
