@@ -11,6 +11,7 @@ html[data-msg-experience-layout="explorer"] .explorer-world-art{
   position:fixed;
   inset:43px 0 0;
   z-index:0;
+  pointer-events:none;
   overflow:hidden;
   line-height:0;
 }
@@ -46,6 +47,16 @@ html[data-msg-experience-layout="explorer"] .explorer-world-art__right{
   right:0;
   object-position:left bottom;
 }
+
+
+/* Decorative scenery never owns application pointer input.
+   Explorer Visual Designer explicitly re-enables these images in design mode. */
+html[data-msg-experience-layout="explorer"] .explorer-world-art__top,
+html[data-msg-experience-layout="explorer"] .explorer-world-art__left,
+html[data-msg-experience-layout="explorer"] .explorer-world-art__right {
+  pointer-events:none;
+}
+
 @media(max-width:1180px){
   html[data-msg-experience-layout="explorer"] .explorer-world-art__left,
   html[data-msg-experience-layout="explorer"] .explorer-world-art__right{width:150px}
