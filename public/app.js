@@ -6177,16 +6177,9 @@ function applyExperienceProfile(profile = getExperienceProfile()) {
   const rootEl=document.documentElement;
   const features=normalized.features || {};
 
-  rootEl.dataset.experienceAppearance=normalized.appearance || 'default';
-  if(normalized.appearance && normalized.appearance !== 'default') {
-    rootEl.dataset.msgExperienceTheme=normalized.appearance;
-  } else {
-    delete rootEl.dataset.msgExperienceTheme;
-  }
+rootEl.dataset.experienceAppearance=normalized.appearance || 'default';
 
-  Object.entries(features).forEach(([key,enabled]) => {
-    rootEl.dataset[`feature${key.charAt(0).toUpperCase()}${key.slice(1)}`]=enabled ? 'on' : 'off';
-  });
+Object.entries(features).forEach(([key,enabled]) => {
 
   document.querySelectorAll('[data-feature-gate]').forEach((element) => {
     const key=element.getAttribute('data-feature-gate');
