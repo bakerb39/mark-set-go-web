@@ -80,6 +80,12 @@ html[data-msg-experience-theme="scholar"] {
   --muted: var(--msg-theme-muted);
   --border: var(--msg-theme-border);
 
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
+
 }
 html[data-msg-experience-theme="scholar"] .mark-companion-panel .askmark-hero {
   background:#4d2630 !important;
@@ -123,6 +129,12 @@ html[data-msg-experience-theme="patriotic"] {
   --ink: var(--msg-theme-ink);
   --muted: var(--msg-theme-muted);
   --border: var(--msg-theme-border);
+
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
 
 }
 html[data-msg-experience-theme="patriotic"] .site-header {
@@ -168,6 +180,12 @@ html[data-msg-experience-theme="artistic"] {
   --muted: var(--msg-theme-muted);
   --border: var(--msg-theme-border);
 
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
+
 }
 
 /* Modern */
@@ -208,6 +226,12 @@ html[data-msg-experience-theme="modern"] {
   --ink: var(--msg-theme-ink);
   --muted: var(--msg-theme-muted);
   --border: var(--msg-theme-border);
+
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
 
 }
 html[data-msg-experience-theme="modern"] .reader-page-panel,
@@ -254,6 +278,12 @@ html[data-msg-experience-theme="galactic"] {
   --muted: var(--msg-theme-muted);
   --border: var(--msg-theme-border);
 
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
+
 }
 html[data-msg-experience-theme="galactic"] .site-header {
   border-bottom:1px solid #83b9d2 !important;
@@ -298,6 +328,12 @@ html[data-msg-experience-theme="expedition"] {
   --ink: var(--msg-theme-ink);
   --muted: var(--msg-theme-muted);
   --border: var(--msg-theme-border);
+
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
 
 }
 
@@ -367,3 +403,51 @@ html:is(
 ) .explorer-world-art {
   display: block;
 }
+
+/* v2.8.0 — shared Reader utility colors belong to the active experience theme.
+   Explorer is excluded because its native Reader shell remains authoritative.
+   Classic has no experience-theme attribute and therefore keeps the base app styling. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-font-control {
+  border-color: var(--msg-blue-border) !important;
+  background: var(--msg-blue-strong) !important;
+  color: #fff !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-font-control > button {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #fff !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-font-control > span {
+  color: rgba(255,255,255,.72) !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button {
+  border-color: var(--msg-blue-border) !important;
+  background: var(--msg-blue-strong) !important;
+  color: #fff !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle:hover,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle:focus-visible,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle[aria-expanded="true"],
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button:hover,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button:focus-visible {
+  border-color: var(--msg-blue) !important;
+  background: var(--msg-blue) !important;
+}
+
+/* Ask Mark's existing header/body CSS already consumes --ask-* tokens.
+   Each theme now supplies those tokens in its own palette block above. */
