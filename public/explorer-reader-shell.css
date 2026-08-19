@@ -548,3 +548,22 @@ html[data-msg-experience-theme="explorer"]
   display: none !important;
 }
 
+/* v1.0.12 — TOP PANORAMA FOOTPRINT TEST
+   The panorama is scenery; do not let its image box reserve extra vertical space
+   below the visible artwork. This targets ONLY the top panorama image and does
+   not move the Reader shell, title, left scenery, or right scenery. */
+html[data-msg-experience-theme="explorer"] .explorer-world-art__top {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+  vertical-align: top !important;
+}
+
+/* Collapse any line-box/baseline space created around the panorama image itself. */
+html[data-msg-experience-theme="explorer"] .explorer-world-art {
+  line-height: 0 !important;
+}
+
