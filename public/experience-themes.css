@@ -551,3 +551,114 @@ html[data-msg-experience-theme="expedition"] .explorer-world-art__right {
     height: 96px !important;
   }
 }
+
+
+/* v1.3.4 — COMPACT EXPLORER-LIKE COMPOSITION
+   This intentionally makes a large, visible geometry change.
+   The scenery strip no longer reserves a tall block above the Reader. */
+:is(
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) .explorer-world-art {
+  height: 62px !important;
+  min-height: 62px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: relative !important;
+  overflow: visible !important;
+}
+
+/* Panorama floats through the compact scenery strip instead of pushing Reader down. */
+:is(
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) .explorer-world-art__top {
+  position: absolute !important;
+  top: 0 !important;
+  left: 50% !important;
+  width: min(1080px, 70vw) !important;
+  height: 92px !important;
+  max-width: none !important;
+  margin: 0 !important;
+  transform: translateX(-50%) !important;
+  object-fit: cover !important;
+  object-position: center 45% !important;
+}
+
+/* Side artwork now begins at the very top of the page, behind the header,
+   so its visible scenery reaches upward the same way Explorer does. */
+:is(
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) :is(.explorer-world-art__left,.explorer-world-art__right) {
+  top: 0 !important;
+  bottom: auto !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  width: min(250px, 16vw) !important;
+  object-fit: cover !important;
+  object-position: top center !important;
+}
+
+/* Remove the normal application gap after the scenery strip. */
+:is(
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) #app.app-shell {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* The Reader shell itself had independent spacing, so control it directly. */
+:is(
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) #app.app-shell > .reader-page-panel {
+  margin-top: 0 !important;
+}
+
+@media (max-width:900px) {
+  :is(
+    html[data-msg-experience-theme="patriotic"],
+    html[data-msg-experience-theme="scholar"],
+    html[data-msg-experience-theme="artistic"],
+    html[data-msg-experience-theme="modern"],
+    html[data-msg-experience-theme="galactic"],
+    html[data-msg-experience-theme="expedition"]
+  ) .explorer-world-art {
+    height: 48px !important;
+    min-height: 48px !important;
+  }
+
+  :is(
+    html[data-msg-experience-theme="patriotic"],
+    html[data-msg-experience-theme="scholar"],
+    html[data-msg-experience-theme="artistic"],
+    html[data-msg-experience-theme="modern"],
+    html[data-msg-experience-theme="galactic"],
+    html[data-msg-experience-theme="expedition"]
+  ) .explorer-world-art__top {
+    height: 72px !important;
+    width: min(900px, 84vw) !important;
+  }
+}
