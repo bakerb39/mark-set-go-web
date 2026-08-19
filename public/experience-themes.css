@@ -329,3 +329,100 @@ html[data-msg-experience-theme="expedition"] .site-footer {
     opacity:.5 !important;
   }
 }
+
+
+/* v1.3.1 — tighten panorama + raise side scenery
+   Matches the Explorer composition more closely:
+   - shorter top scenery band
+   - app begins sooner
+   - left/right scenery starts just under the site header instead of growing up from the bottom
+   Presentation only. */
+html[data-msg-experience-theme="patriotic"] .explorer-world-art,
+html[data-msg-experience-theme="scholar"] .explorer-world-art,
+html[data-msg-experience-theme="artistic"] .explorer-world-art,
+html[data-msg-experience-theme="modern"] .explorer-world-art,
+html[data-msg-experience-theme="galactic"] .explorer-world-art,
+html[data-msg-experience-theme="expedition"] .explorer-world-art {
+  min-height: 0 !important;
+  height: 158px !important;
+  overflow: visible !important;
+}
+
+html[data-msg-experience-theme="patriotic"] .explorer-world-art__top,
+html[data-msg-experience-theme="scholar"] .explorer-world-art__top,
+html[data-msg-experience-theme="artistic"] .explorer-world-art__top,
+html[data-msg-experience-theme="modern"] .explorer-world-art__top,
+html[data-msg-experience-theme="galactic"] .explorer-world-art__top,
+html[data-msg-experience-theme="expedition"] .explorer-world-art__top {
+  width: min(1120px, 72vw) !important;
+  height: 158px !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+}
+
+/* Raise the side scenery to begin immediately beneath the navigation header. */
+html[data-msg-experience-theme="patriotic"] .explorer-world-art__left,
+html[data-msg-experience-theme="scholar"] .explorer-world-art__left,
+html[data-msg-experience-theme="artistic"] .explorer-world-art__left,
+html[data-msg-experience-theme="modern"] .explorer-world-art__left,
+html[data-msg-experience-theme="galactic"] .explorer-world-art__left,
+html[data-msg-experience-theme="expedition"] .explorer-world-art__left,
+html[data-msg-experience-theme="patriotic"] .explorer-world-art__right,
+html[data-msg-experience-theme="scholar"] .explorer-world-art__right,
+html[data-msg-experience-theme="artistic"] .explorer-world-art__right,
+html[data-msg-experience-theme="modern"] .explorer-world-art__right,
+html[data-msg-experience-theme="galactic"] .explorer-world-art__right,
+html[data-msg-experience-theme="expedition"] .explorer-world-art__right {
+  top: 50px !important;
+  bottom: auto !important;
+  width: min(245px, 16vw) !important;
+  max-height: calc(100vh - 50px) !important;
+  height: calc(100vh - 50px) !important;
+  object-fit: cover !important;
+}
+
+/* Keep the reader closer to the panorama, matching Explorer's tighter vertical rhythm. */
+html[data-msg-experience-theme="patriotic"] #app.app-shell,
+html[data-msg-experience-theme="scholar"] #app.app-shell,
+html[data-msg-experience-theme="artistic"] #app.app-shell,
+html[data-msg-experience-theme="modern"] #app.app-shell,
+html[data-msg-experience-theme="galactic"] #app.app-shell,
+html[data-msg-experience-theme="expedition"] #app.app-shell {
+  margin-top: 6px !important;
+}
+
+@media (max-width: 900px) {
+  html[data-msg-experience-theme="patriotic"] .explorer-world-art,
+  html[data-msg-experience-theme="scholar"] .explorer-world-art,
+  html[data-msg-experience-theme="artistic"] .explorer-world-art,
+  html[data-msg-experience-theme="modern"] .explorer-world-art,
+  html[data-msg-experience-theme="galactic"] .explorer-world-art,
+  html[data-msg-experience-theme="expedition"] .explorer-world-art {
+    height: 120px !important;
+  }
+
+  html[data-msg-experience-theme="patriotic"] .explorer-world-art__top,
+  html[data-msg-experience-theme="scholar"] .explorer-world-art__top,
+  html[data-msg-experience-theme="artistic"] .explorer-world-art__top,
+  html[data-msg-experience-theme="modern"] .explorer-world-art__top,
+  html[data-msg-experience-theme="galactic"] .explorer-world-art__top,
+  html[data-msg-experience-theme="expedition"] .explorer-world-art__top {
+    width: min(1000px, 88vw) !important;
+    height: 120px !important;
+  }
+
+  html[data-msg-experience-theme="patriotic"] .explorer-world-art__left,
+  html[data-msg-experience-theme="scholar"] .explorer-world-art__left,
+  html[data-msg-experience-theme="artistic"] .explorer-world-art__left,
+  html[data-msg-experience-theme="modern"] .explorer-world-art__left,
+  html[data-msg-experience-theme="galactic"] .explorer-world-art__left,
+  html[data-msg-experience-theme="expedition"] .explorer-world-art__left,
+  html[data-msg-experience-theme="patriotic"] .explorer-world-art__right,
+  html[data-msg-experience-theme="scholar"] .explorer-world-art__right,
+  html[data-msg-experience-theme="artistic"] .explorer-world-art__right,
+  html[data-msg-experience-theme="modern"] .explorer-world-art__right,
+  html[data-msg-experience-theme="galactic"] .explorer-world-art__right,
+  html[data-msg-experience-theme="expedition"] .explorer-world-art__right {
+    width: min(130px, 15vw) !important;
+  }
+}
