@@ -8,7 +8,6 @@ verbatim because it is part of the working scroll/header behavior.
 
 /* Exact Explorer scenery geometry shared by all illustrated themes. */
 html[data-msg-experience-layout="explorer"] .explorer-world-art{
-  display:block;
   position:fixed;
   inset:43px 0 0;
   z-index:0;

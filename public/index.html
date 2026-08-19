@@ -2,23 +2,11 @@
 
 <html lang="en">
 <head>
-<script>
-(function(){
-  var selected='classic';
-  try{selected=localStorage.getItem('markSetGoExperienceThemeV1')||'classic';}catch(e){}
-  document.documentElement.dataset.msgExperienceLayout='explorer';
-  if(selected==='classic'){
-    delete document.documentElement.dataset.msgExperienceTheme;
-  }else{
-    document.documentElement.dataset.msgExperienceTheme=selected;
-  }
-})();
-</script>
-
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
+<script src="/experience-theme-bootstrap.js?v=2.3.0-external-only"></script>
 <link href="/styles.css?v=reader-annotations-v8-reconciled" rel="stylesheet"/>
 <link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
 <link href="/workspace-experiment.css?v=0.5.1-controls-above-reader" rel="stylesheet"/>
@@ -37,8 +25,8 @@
 <link href="/explorer-theme-persistence.css?v=1.1.0-designer-presets" rel="stylesheet"/>
 
 <link href="/explorer-reader-shell.css?v=1.0.11-complete-topic-header" rel="stylesheet"/>
-<link href="/explorer-reader-shell-shared-mechanics.css?v=2.2.0-separated" rel="stylesheet"/>
-<link href="/experience-themes.css?v=2.2.0-separated" rel="stylesheet"/>
+<link href="/explorer-reader-shell-shared-mechanics.css?v=2.3.0-external-only" rel="stylesheet"/>
+<link href="/experience-themes.css?v=2.3.0-external-only" rel="stylesheet"/>
 <link href="/explorer-visual-designer.css?v=2.2.3-draggable-panel" rel="stylesheet"/>
   <script defer src="/workspace-experiment.js?v=0.5.1-home-fullwidth"></script>
 <script defer src="/debug-bootstrap.js?v=9.6.2"></script>
@@ -54,8 +42,7 @@
   <script defer src="/cloud-data.js?v=8.1.2"></script>
   <script defer src="/app.js?v=20260817-explorer-polish-home-v1"></script>
 <script defer src="/music-save-reliability.js?v=2.0.1-no-mo"></script>
-<script>window.addEventListener("DOMContentLoaded",()=>window.MarkSetGoExperienceProfile?.apply?.());</script>
-  <script defer src="/cloud-preferences.js?v=8.1.3-no-mo"></script>
+<script defer src="/cloud-preferences.js?v=8.1.3-no-mo"></script>
   <script defer src="/cloud-library.js?v=9.2.37-no-mo"></script>
   <script defer src="/cloud-document.js?v=9.2.18-cloud-remove-unified"></script>
   <script defer src="/cloud-productivity.js?v=9.2.19-no-mo"></script>
@@ -76,7 +63,7 @@
   <script defer src="/developer-data.js?v=9.6.4"></script>
   <script defer src="/developer-tools.js?v=9.6.6"></script>
   <script defer src="/explorer-visual-designer.js?v=2.3.1-profile-scoped-normal-flow"></script>
-  <script defer src="/experience-themes.js?v=2.2.0-separated"></script>
+  <script defer src="/experience-themes.js?v=2.3.0-external-only"></script>
 </head>
 <body>
 <header class="site-header">

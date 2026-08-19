@@ -207,3 +207,21 @@ html[data-msg-experience-theme="expedition"] {
 .msg-theme-choice strong{display:block;font-size:14px;margin-bottom:3px}
 .msg-theme-choice small{display:block;color:#6f756e;line-height:1.3}
 @media(max-width:600px){.msg-theme-grid{grid-template-columns:1fr}}
+
+/* v2.3.0 — theme state owns scenery visibility.
+   Shared Explorer mechanics intentionally contain no scenery display declaration. */
+html.msg-theme-classic .explorer-world-art {
+  display: none;
+}
+
+html:is(
+  .msg-theme-explorer,
+  .msg-theme-patriotic,
+  .msg-theme-scholar,
+  .msg-theme-artistic,
+  .msg-theme-modern,
+  .msg-theme-galactic,
+  .msg-theme-expedition
+) .explorer-world-art {
+  display: block;
+}
