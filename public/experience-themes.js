@@ -43,9 +43,9 @@
       right:'/assets/themes/galactic/galactic-right.png?v=20260819-art-v1'
     },
     expedition:{
-      top:'/assets/themes/expedition/expedition-top.png?v=20260819-art-v1',
-      left:'/assets/themes/expedition/expedition-left.png?v=20260819-art-v1',
-      right:'/assets/themes/expedition/expedition-right.png?v=20260819-art-v1'
+      top:'/assets/themes/expedition/expedition-top.png?v=20260819-art-v2',
+      left:'/assets/themes/expedition/expedition-left.png?v=20260819-art-v2',
+      right:'/assets/themes/expedition/expedition-right.png?v=20260819-art-v2'
     }
   };
 
