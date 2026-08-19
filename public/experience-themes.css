@@ -56,7 +56,7 @@ html[data-msg-experience-theme] :is(.reader-side-toggle,.mark-pane-button,#pause
 }
 
 /* Scholar */
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="scholar"] {
+html[data-msg-experience-theme="scholar"] {
   --msg-theme-page:#d8cfbb;
   --msg-theme-surface:#fff9ea;
   --msg-theme-accent:#5a2330;
@@ -69,12 +69,12 @@ html[data-msg-experience-theme="explorer"][data-msg-experience-variant="scholar"
   --msg-theme-muted:#756454;
   --msg-theme-shadow:rgba(55,35,23,.22);
 }
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="scholar"] .mark-companion-panel .askmark-hero {
+html[data-msg-experience-theme="scholar"] .mark-companion-panel .askmark-hero {
   background:#4d2630 !important;
 }
 
 /* Patriotic */
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="patriotic"] {
+html[data-msg-experience-theme="patriotic"] {
   --msg-theme-page:#e7e9ed;
   --msg-theme-surface:#fffdf8;
   --msg-theme-accent:#17365f;
@@ -87,12 +87,12 @@ html[data-msg-experience-theme="explorer"][data-msg-experience-variant="patrioti
   --msg-theme-muted:#667383;
   --msg-theme-shadow:rgba(21,43,72,.18);
 }
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="patriotic"] .site-header {
+html[data-msg-experience-theme="patriotic"] .site-header {
   box-shadow: inset 0 -2px #9b2335 !important;
 }
 
 /* Artistic */
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="artistic"] {
+html[data-msg-experience-theme="artistic"] {
   --msg-theme-page:#e6ddd6;
   --msg-theme-surface:#fffaf4;
   --msg-theme-accent:#6d3f63;
@@ -107,7 +107,7 @@ html[data-msg-experience-theme="explorer"][data-msg-experience-variant="artistic
 }
 
 /* Modern */
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="modern"] {
+html[data-msg-experience-theme="modern"] {
   --msg-theme-page:#e9edf0;
   --msg-theme-surface:#ffffff;
   --msg-theme-accent:#263746;
@@ -120,13 +120,13 @@ html[data-msg-experience-theme="explorer"][data-msg-experience-variant="modern"]
   --msg-theme-muted:#67747c;
   --msg-theme-shadow:rgba(20,32,41,.13);
 }
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="modern"] .reader-page-panel,
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="modern"] :is(.navigation-pane,#reader-frame,.mark-companion-panel) {
+html[data-msg-experience-theme="modern"] .reader-page-panel,
+html[data-msg-experience-theme="modern"] :is(.navigation-pane,#reader-frame,.mark-companion-panel) {
   border-radius:6px !important;
 }
 
 /* Galactic — original space-opera look, no franchise artwork/logos/characters. */
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="galactic"] {
+html[data-msg-experience-theme="galactic"] {
   --msg-theme-page:#060a12;
   --msg-theme-surface:#f8fbff;
   --msg-theme-accent:#17253f;
@@ -139,13 +139,13 @@ html[data-msg-experience-theme="explorer"][data-msg-experience-variant="galactic
   --msg-theme-muted:#697b89;
   --msg-theme-shadow:rgba(0,0,0,.34);
 }
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="galactic"] .site-header {
+html[data-msg-experience-theme="galactic"] .site-header {
   border-bottom:1px solid #83b9d2 !important;
   box-shadow:0 0 18px rgba(94,187,224,.18) !important;
 }
 
 /* Expedition — original archaeological-adventure look. */
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant="expedition"] {
+html[data-msg-experience-theme="expedition"] {
   --msg-theme-page:#c8b58d;
   --msg-theme-surface:#fff6df;
   --msg-theme-accent:#66452c;
@@ -210,27 +210,331 @@ html[data-msg-experience-theme="explorer"][data-msg-experience-variant="expediti
 
 
 /* ==========================================================================
-   v1.6.0 — ONE LAYOUT ENGINE
+   v1.9.0 — SHARED EXPLORER GEOMETRY ONLY
 
-   IMPORTANT:
-   Illustrated themes no longer implement their own scenery or Reader geometry.
-
-   experience-themes.js keeps data-msg-experience-theme="explorer" for
-   Explorer, Patriotic, Scholar, Artistic, Modern, Galactic and Expedition.
-   Therefore the ACTUAL working Explorer CSS owns:
-     - scenery positioning
-     - top panorama placement
-     - side artwork placement
-     - app-shell flow
-     - Reader shell placement
-     - responsive behavior
-     - Explorer Designer geometry
-
-   This file now supplies palette/identity only.
+   The six added illustrated themes keep their own theme names.
+   We copy only the scenery/app placement geometry that worked in Explorer.
+   Explorer-only Reader/topic/header behavior is NOT shared.
    ========================================================================== */
 
-/* Keep per-theme artwork identities available to CSS without replacing the
-   Explorer layout selector that the stable layout depends on. */
-html[data-msg-experience-theme="explorer"][data-msg-experience-variant] {
-  --msg-experience-layout-engine: explorer;
+:is(
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) .explorer-world-art {
+  display:block !important;
+  position:fixed !important;
+  inset:43px 0 0 !important;
+  z-index:0 !important;
+  overflow:hidden !important;
+  pointer-events:none !important;
+  line-height:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+}
+
+:is(
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) .explorer-world-art::after {
+  content:"" !important;
+  position:absolute !important;
+  inset:0 !important;
+  background:linear-gradient(
+    90deg,
+    transparent 0 16%,
+    rgba(255,255,255,.20) 28%,
+    rgba(255,255,255,.20) 72%,
+    transparent 84%
+  ) !important;
+  pointer-events:none !important;
+}
+
+:is(
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) .explorer-world-art__top {
+  display:block !important;
+  position:absolute !important;
+  z-index:1 !important;
+  top:0 !important;
+  left:0 !important;
+  width:100% !important;
+  height:78px !important;
+  max-width:none !important;
+  object-fit:cover !important;
+  object-position:center top !important;
+  opacity:.98 !important;
+  transform:none !important;
+  margin:0 !important;
+}
+
+:is(
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) :is(.explorer-world-art__left,.explorer-world-art__right) {
+  display:block !important;
+  position:absolute !important;
+  z-index:2 !important;
+  top:0 !important;
+  bottom:auto !important;
+  width:clamp(175px,16vw,300px) !important;
+  height:100% !important;
+  max-height:none !important;
+  object-fit:cover !important;
+  opacity:1 !important;
+  transform:none !important;
+  filter:saturate(.96) contrast(1.02) !important;
+}
+
+:is(
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) .explorer-world-art__left {
+  left:0 !important;
+  right:auto !important;
+  object-position:right bottom !important;
+}
+
+:is(
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) .explorer-world-art__right {
+  right:0 !important;
+  left:auto !important;
+  object-position:left bottom !important;
+}
+
+/* Match the working Explorer app-shell flow WITHOUT activating
+   explorer-reader-shell.css for these themes. */
+@media (min-width:861px) {
+  :is(
+    html[data-msg-experience-theme="scholar"],
+    html[data-msg-experience-theme="patriotic"],
+    html[data-msg-experience-theme="artistic"],
+    html[data-msg-experience-theme="modern"],
+    html[data-msg-experience-theme="galactic"],
+    html[data-msg-experience-theme="expedition"]
+  ) body:has(#app .reader-page-panel) #app.app-shell {
+    margin-top:6px !important;
+    margin-bottom:0 !important;
+    flex:0 0 auto !important;
+    min-height:0 !important;
+    height:auto !important;
+  }
+
+  :is(
+    html[data-msg-experience-theme="scholar"],
+    html[data-msg-experience-theme="patriotic"],
+    html[data-msg-experience-theme="artistic"],
+    html[data-msg-experience-theme="modern"],
+    html[data-msg-experience-theme="galactic"],
+    html[data-msg-experience-theme="expedition"]
+  ) #app .reader-page-panel {
+    transform:none !important;
+    margin-bottom:0 !important;
+  }
+}
+
+@media (max-width:1180px) {
+  :is(
+    html[data-msg-experience-theme="scholar"],
+    html[data-msg-experience-theme="patriotic"],
+    html[data-msg-experience-theme="artistic"],
+    html[data-msg-experience-theme="modern"],
+    html[data-msg-experience-theme="galactic"],
+    html[data-msg-experience-theme="expedition"]
+  ) :is(.explorer-world-art__left,.explorer-world-art__right) {
+    width:150px !important;
+    opacity:.82 !important;
+  }
+}
+
+@media (max-width:860px) {
+  :is(
+    html[data-msg-experience-theme="scholar"],
+    html[data-msg-experience-theme="patriotic"],
+    html[data-msg-experience-theme="artistic"],
+    html[data-msg-experience-theme="modern"],
+    html[data-msg-experience-theme="galactic"],
+    html[data-msg-experience-theme="expedition"]
+  ) :is(.explorer-world-art__left,.explorer-world-art__right) {
+    display:none !important;
+  }
+
+  :is(
+    html[data-msg-experience-theme="scholar"],
+    html[data-msg-experience-theme="patriotic"],
+    html[data-msg-experience-theme="artistic"],
+    html[data-msg-experience-theme="modern"],
+    html[data-msg-experience-theme="galactic"],
+    html[data-msg-experience-theme="expedition"]
+  ) .explorer-world-art__top {
+    height:64px !important;
+  }
+}
+
+
+/* ==========================================================================
+   v1.9.1 — CLASSIC TOPIC-FEED HEADER PRESENTATION ON THEMED MODES
+
+   Keep each themed mode's working article-flow / spacing behavior.
+   Only normalize the visible Topic Feed header presentation to the Classic
+   appearance defined by topic-feeds.css.
+
+   IMPORTANT:
+   - no Reader geometry changes
+   - no story-header reserve/spacing changes
+   - no Explorer scenery changes
+   - no MutationObserver
+   ========================================================================== */
+
+:is(
+  html[data-msg-experience-theme="explorer"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) #reader-frame > .topic-feed-story-header-external {
+  color: inherit !important;
+}
+
+/* Classic publisher/source line. */
+:is(
+  html[data-msg-experience-theme="explorer"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit {
+  margin: 0 !important;
+  padding: 0 0 .46em !important;
+  border-bottom: 1px solid rgba(77,101,124,.15) !important;
+  background: transparent !important;
+  color: #6d7e8e !important;
+  font-size: .72em !important;
+  line-height: 1.35 !important;
+  letter-spacing: .005em !important;
+  box-shadow: none !important;
+}
+
+:is(
+  html[data-msg-experience-theme="explorer"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit-label {
+  color: #8795a3 !important;
+}
+
+:is(
+  html[data-msg-experience-theme="explorer"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit strong {
+  color: #40566b !important;
+}
+
+:is(
+  html[data-msg-experience-theme="explorer"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit-separator {
+  color: #a8b2bc !important;
+}
+
+:is(
+  html[data-msg-experience-theme="explorer"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit a {
+  color: #1769aa !important;
+  font-weight: 650 !important;
+  text-decoration: none !important;
+}
+
+/* Classic social-share chips. */
+:is(
+  html[data-msg-experience-theme="explorer"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) #reader-frame > .topic-feed-story-header-external
+  .topic-feed-reader-share .topic-feed-share-button {
+  width: 24px !important;
+  height: 24px !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 1px solid rgba(58,83,108,.16) !important;
+  border-radius: 6px !important;
+  background: rgba(255,255,255,.86) !important;
+  color: #53697d !important;
+  box-shadow: 0 1px 2px rgba(24,45,65,.04) !important;
+}
+
+/* Preserve the Classic action-row layout exactly. Do NOT touch the header
+   reserve variable or article-flow pseudo-element. */
+:is(
+  html[data-msg-experience-theme="explorer"],
+  html[data-msg-experience-theme="scholar"],
+  html[data-msg-experience-theme="patriotic"],
+  html[data-msg-experience-theme="artistic"],
+  html[data-msg-experience-theme="modern"],
+  html[data-msg-experience-theme="galactic"],
+  html[data-msg-experience-theme="expedition"]
+) #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {
+  position: static !important;
+  inset: auto !important;
+  display: block !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: .42em 0 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
