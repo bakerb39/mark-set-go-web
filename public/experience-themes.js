@@ -3,79 +3,59 @@
 
 (() => {
   const KEY = 'markSetGoExperienceThemeV1';
+
   const THEMES = {
-    classic: {
-      label:'Classic',
-      description:'The original Mark, Set, Go! appearance.'
-    },
-    explorer: {
-      label:'Explorer',
-      description:'Maps, natural history, expedition scenery, green and brass.'
-    },
-    patriotic: {
-      label:'Patriotic',
-      description:'American history, navy, ivory, restrained red and brass.'
-    },
-    scholar: {
-      label:'Scholar',
-      description:'Old library, manuscripts, walnut, burgundy and parchment.'
-    },
-    artistic: {
-      label:'Artistic',
-      description:'Studio and gallery atmosphere with warm creative color.'
-    },
-    modern: {
-      label:'Modern',
-      description:'Clean architecture, restrained geometry and minimal surfaces.'
-    },
-    galactic: {
-      label:'Galactic',
-      description:'Original space-opera atmosphere with stars and luminous instruments.'
-    },
-    expedition: {
-      label:'Expedition',
-      description:'Original archaeology-adventure atmosphere with maps, ruins and field journals.'
-    }
+    classic:{label:'Classic',description:'The original Mark, Set, Go! appearance.'},
+    explorer:{label:'Explorer',description:'Maps, natural history, expedition scenery, green and brass.'},
+    patriotic:{label:'Patriotic',description:'American history, navy, ivory, restrained red and brass.'},
+    scholar:{label:'Scholar',description:'Old library, manuscripts, walnut, burgundy and parchment.'},
+    artistic:{label:'Artistic',description:'Studio and gallery atmosphere with warm creative color.'},
+    modern:{label:'Modern',description:'Clean architecture, restrained geometry and minimal surfaces.'},
+    galactic:{label:'Galactic',description:'Original space-opera atmosphere with stars and luminous instruments.'},
+    expedition:{label:'Expedition',description:'Original archaeology-adventure atmosphere with maps, ruins and field journals.'}
   };
 
   const ART = {
-    scholar: {
-      top:'/assets/themes/scholar/scholar-top.svg?v=1.2.0',
-      left:'/assets/themes/scholar/scholar-left.svg?v=1.2.0',
-      right:'/assets/themes/scholar/scholar-right.svg?v=1.2.0'
+    scholar:{
+      top:'/assets/themes/scholar/scholar-top.png?v=1.3.0',
+      left:'/assets/themes/scholar/scholar-left.png?v=1.3.0',
+      right:'/assets/themes/scholar/scholar-right.png?v=1.3.0'
     },
-    patriotic: {
-      top:'/assets/themes/patriotic/patriotic-top.svg?v=1.2.0',
-      left:'/assets/themes/patriotic/patriotic-left.svg?v=1.2.0',
-      right:'/assets/themes/patriotic/patriotic-right.svg?v=1.2.0'
+    patriotic:{
+      top:'/assets/themes/patriotic/patriotic-top.png?v=1.3.0',
+      left:'/assets/themes/patriotic/patriotic-left.png?v=1.3.0',
+      right:'/assets/themes/patriotic/patriotic-right.png?v=1.3.0'
     },
-    artistic: {
-      top:'/assets/themes/artistic/artistic-top.svg?v=1.2.0',
-      left:'/assets/themes/artistic/artistic-left.svg?v=1.2.0',
-      right:'/assets/themes/artistic/artistic-right.svg?v=1.2.0'
+    artistic:{
+      top:'/assets/themes/artistic/artistic-top.png?v=1.3.0',
+      left:'/assets/themes/artistic/artistic-left.png?v=1.3.0',
+      right:'/assets/themes/artistic/artistic-right.png?v=1.3.0'
     },
-    modern: {
-      top:'/assets/themes/modern/modern-top.svg?v=1.2.0',
-      left:'/assets/themes/modern/modern-left.svg?v=1.2.0',
-      right:'/assets/themes/modern/modern-right.svg?v=1.2.0'
+    modern:{
+      top:'/assets/themes/modern/modern-top.png?v=1.3.0',
+      left:'/assets/themes/modern/modern-left.png?v=1.3.0',
+      right:'/assets/themes/modern/modern-right.png?v=1.3.0'
     },
-    galactic: {
-      top:'/assets/themes/galactic/galactic-top.svg?v=1.2.0',
-      left:'/assets/themes/galactic/galactic-left.svg?v=1.2.0',
-      right:'/assets/themes/galactic/galactic-right.svg?v=1.2.0'
+    galactic:{
+      top:'/assets/themes/galactic/galactic-top.png?v=1.3.0',
+      left:'/assets/themes/galactic/galactic-left.png?v=1.3.0',
+      right:'/assets/themes/galactic/galactic-right.png?v=1.3.0'
     },
-    expedition: {
-      top:'/assets/themes/expedition/expedition-top.svg?v=1.2.0',
-      left:'/assets/themes/expedition/expedition-left.svg?v=1.2.0',
-      right:'/assets/themes/expedition/expedition-right.svg?v=1.2.0'
+    expedition:{
+      top:'/assets/themes/expedition/expedition-top.png?v=1.3.0',
+      left:'/assets/themes/expedition/expedition-left.png?v=1.3.0',
+      right:'/assets/themes/expedition/expedition-right.png?v=1.3.0'
     }
   };
 
   let original = null;
   let dialog = null;
 
-  function esc(s){ return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
+  function esc(s){
+    return String(s).replace(/[&<>"']/g,c=>({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
 
   function scenery(){
     return {
@@ -95,34 +75,34 @@
     };
   }
 
-  function apply(theme, save=true){
-    const key = THEMES[theme] ? theme : 'classic';
+  function setScenery(nodes,art){
+    if(nodes.top && art?.top) nodes.top.src=art.top;
+    if(nodes.left && art?.left) nodes.left.src=art.left;
+    if(nodes.right && art?.right) nodes.right.src=art.right;
+  }
+
+  function apply(theme,save=true){
+    const key=THEMES[theme] ? theme : 'classic';
     rememberOriginal();
+
     const root=document.documentElement;
     const nodes=scenery();
 
     if(key==='classic'){
       delete root.dataset.msgExperienceTheme;
       document.body?.classList.remove('msg-experience-themed');
-      Object.values(nodes).forEach(node=>{ if(node) node.style.display='none'; });
+      Object.values(nodes).forEach(node=>{if(node) node.style.display='none';});
     }else{
       root.dataset.msgExperienceTheme=key;
       document.body?.classList.add('msg-experience-themed');
-      Object.values(nodes).forEach(node=>{ if(node) node.style.removeProperty('display'); });
+      Object.values(nodes).forEach(node=>{if(node) node.style.removeProperty('display');});
 
-      if(key==='explorer'){
-        if(nodes.top && original?.top) nodes.top.src=original.top;
-        if(nodes.left && original?.left) nodes.left.src=original.left;
-        if(nodes.right && original?.right) nodes.right.src=original.right;
-      }else if(ART[key]){
-        if(nodes.top) nodes.top.src=ART[key].top;
-        if(nodes.left) nodes.left.src=ART[key].left;
-        if(nodes.right) nodes.right.src=ART[key].right;
-      }
+      if(key==='explorer') setScenery(nodes,original);
+      else setScenery(nodes,ART[key]);
     }
 
     if(save){
-      try{ localStorage.setItem(KEY,key); }catch{}
+      try{localStorage.setItem(KEY,key);}catch{}
     }
     refreshPressed(key);
     window.dispatchEvent(new CustomEvent('msg:experience-theme-changed',{detail:{theme:key}}));
@@ -142,6 +122,7 @@
     if(launcher) return launcher;
     const profile=document.querySelector('.top-level-nav-button[data-action="profile-preferences"]');
     if(!profile?.parentElement) return null;
+
     launcher=document.createElement('button');
     launcher.id='msg-theme-launcher';
     launcher.type='button';
@@ -154,6 +135,7 @@
 
   function ensureDialog(){
     if(dialog) return dialog;
+
     dialog=document.createElement('div');
     dialog.id='msg-theme-dialog';
     dialog.hidden=true;
@@ -166,20 +148,25 @@
         <div class="msg-theme-grid">
           ${Object.entries(THEMES).map(([key,t])=>`
             <button type="button" class="msg-theme-choice" data-msg-theme="${esc(key)}" aria-pressed="false">
-              <strong>${esc(t.label)}</strong><small>${esc(t.description)}</small>
+              <strong>${esc(t.label)}</strong>
+              <small>${esc(t.description)}</small>
             </button>`).join('')}
         </div>
       </section>`;
+
     document.body.appendChild(dialog);
     dialog.querySelector('.msg-theme-close')?.addEventListener('click',close);
-    dialog.addEventListener('click',e=>{ if(e.target===dialog) close(); });
+    dialog.addEventListener('click',e=>{if(e.target===dialog) close();});
     dialog.querySelectorAll('[data-msg-theme]').forEach(btn=>{
       btn.addEventListener('click',()=>{
         apply(btn.dataset.msgTheme,true);
         close();
       });
     });
-    document.addEventListener('keydown',e=>{ if(e.key==='Escape' && !dialog.hidden) close(); });
+    document.addEventListener('keydown',e=>{
+      if(e.key==='Escape' && !dialog.hidden) close();
+    });
+
     return dialog;
   }
 
@@ -188,13 +175,17 @@
       btn.setAttribute('aria-pressed',String(btn.dataset.msgTheme===key));
     });
   }
+
   function open(){
     ensureDialog();
     refreshPressed();
     dialog.hidden=false;
     dialog.querySelector(`[data-msg-theme="${current()}"]`)?.focus();
   }
-  function close(){ if(dialog) dialog.hidden=true; }
+
+  function close(){
+    if(dialog) dialog.hidden=true;
+  }
 
   function init(){
     rememberOriginal();
@@ -204,6 +195,10 @@
   }
 
   window.MarkSetGoExperienceThemes={apply,current,themes:{...THEMES}};
-  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true});
-  else init();
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',init,{once:true});
+  }else{
+    init();
+  }
 })();
