@@ -6036,30 +6036,6 @@ const EXPERIENCE_APPEARANCES = Object.freeze({
   explorer:{
     label:'Explorer / Discovery',
     description:'Sage green, parchment, brass, maps, mountains, and waterfall scenery.'
-  },
-  patriotic:{
-    label:'Patriotic',
-    description:'American history, navy, ivory, restrained red and brass.'
-  },
-  scholar:{
-    label:'Scholar',
-    description:'Old library, manuscripts, walnut, burgundy and parchment.'
-  },
-  artistic:{
-    label:'Artistic',
-    description:'Studio and gallery atmosphere with warm creative color.'
-  },
-  modern:{
-    label:'Modern',
-    description:'Clean architecture, restrained geometry and minimal surfaces.'
-  },
-  galactic:{
-    label:'Galactic',
-    description:'Original space-opera atmosphere with stars and luminous instruments.'
-  },
-  expedition:{
-    label:'Expedition',
-    description:'Original archaeology-adventure atmosphere with maps, ruins and field journals.'
   }
 });
 
