@@ -40,34 +40,34 @@
 
   const ART = {
     scholar: {
-      top:'/assets/themes/scholar/scholar-top.svg?v=1.1.0',
-      left:'/assets/themes/scholar/scholar-left.svg?v=1.1.0',
-      right:'/assets/themes/scholar/scholar-right.svg?v=1.1.0'
+      top:'/assets/themes/scholar/scholar-top.svg?v=1.2.0',
+      left:'/assets/themes/scholar/scholar-left.svg?v=1.2.0',
+      right:'/assets/themes/scholar/scholar-right.svg?v=1.2.0'
     },
     patriotic: {
-      top:'/assets/themes/patriotic/patriotic-top.svg?v=1.1.0',
-      left:'/assets/themes/patriotic/patriotic-left.svg?v=1.1.0',
-      right:'/assets/themes/patriotic/patriotic-right.svg?v=1.1.0'
+      top:'/assets/themes/patriotic/patriotic-top.svg?v=1.2.0',
+      left:'/assets/themes/patriotic/patriotic-left.svg?v=1.2.0',
+      right:'/assets/themes/patriotic/patriotic-right.svg?v=1.2.0'
     },
     artistic: {
-      top:'/assets/themes/artistic/artistic-top.svg?v=1.1.0',
-      left:'/assets/themes/artistic/artistic-left.svg?v=1.1.0',
-      right:'/assets/themes/artistic/artistic-right.svg?v=1.1.0'
+      top:'/assets/themes/artistic/artistic-top.svg?v=1.2.0',
+      left:'/assets/themes/artistic/artistic-left.svg?v=1.2.0',
+      right:'/assets/themes/artistic/artistic-right.svg?v=1.2.0'
     },
     modern: {
-      top:'/assets/themes/modern/modern-top.svg?v=1.1.0',
-      left:'/assets/themes/modern/modern-left.svg?v=1.1.0',
-      right:'/assets/themes/modern/modern-right.svg?v=1.1.0'
+      top:'/assets/themes/modern/modern-top.svg?v=1.2.0',
+      left:'/assets/themes/modern/modern-left.svg?v=1.2.0',
+      right:'/assets/themes/modern/modern-right.svg?v=1.2.0'
     },
     galactic: {
-      top:'/assets/themes/galactic/galactic-top.svg?v=1.1.0',
-      left:'/assets/themes/galactic/galactic-left.svg?v=1.1.0',
-      right:'/assets/themes/galactic/galactic-right.svg?v=1.1.0'
+      top:'/assets/themes/galactic/galactic-top.svg?v=1.2.0',
+      left:'/assets/themes/galactic/galactic-left.svg?v=1.2.0',
+      right:'/assets/themes/galactic/galactic-right.svg?v=1.2.0'
     },
     expedition: {
-      top:'/assets/themes/expedition/expedition-top.svg?v=1.1.0',
-      left:'/assets/themes/expedition/expedition-left.svg?v=1.1.0',
-      right:'/assets/themes/expedition/expedition-right.svg?v=1.1.0'
+      top:'/assets/themes/expedition/expedition-top.svg?v=1.2.0',
+      left:'/assets/themes/expedition/expedition-left.svg?v=1.2.0',
+      right:'/assets/themes/expedition/expedition-right.svg?v=1.2.0'
     }
   };
 
