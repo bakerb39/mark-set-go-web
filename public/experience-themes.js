@@ -17,34 +17,34 @@
 
   const ART = {
     scholar:{
-      top:'/assets/themes/scholar/scholar-top.png?v=2.0.0',
-      left:'/assets/themes/scholar/scholar-left.png?v=2.0.0',
-      right:'/assets/themes/scholar/scholar-right.png?v=2.0.0'
+      top:'/assets/themes/scholar/scholar-top.png?v=2.1.0',
+      left:'/assets/themes/scholar/scholar-left.png?v=2.1.0',
+      right:'/assets/themes/scholar/scholar-right.png?v=2.1.0'
     },
     patriotic:{
-      top:'/assets/themes/patriotic/patriotic-top.png?v=2.0.0',
-      left:'/assets/themes/patriotic/patriotic-left.png?v=2.0.0',
-      right:'/assets/themes/patriotic/patriotic-right.png?v=2.0.0'
+      top:'/assets/themes/patriotic/patriotic-top.png?v=2.1.0',
+      left:'/assets/themes/patriotic/patriotic-left.png?v=2.1.0',
+      right:'/assets/themes/patriotic/patriotic-right.png?v=2.1.0'
     },
     artistic:{
-      top:'/assets/themes/artistic/artistic-top.png?v=2.0.0',
-      left:'/assets/themes/artistic/artistic-left.png?v=2.0.0',
-      right:'/assets/themes/artistic/artistic-right.png?v=2.0.0'
+      top:'/assets/themes/artistic/artistic-top.png?v=2.1.0',
+      left:'/assets/themes/artistic/artistic-left.png?v=2.1.0',
+      right:'/assets/themes/artistic/artistic-right.png?v=2.1.0'
     },
     modern:{
-      top:'/assets/themes/modern/modern-top.png?v=2.0.0',
-      left:'/assets/themes/modern/modern-left.png?v=2.0.0',
-      right:'/assets/themes/modern/modern-right.png?v=2.0.0'
+      top:'/assets/themes/modern/modern-top.png?v=2.1.0',
+      left:'/assets/themes/modern/modern-left.png?v=2.1.0',
+      right:'/assets/themes/modern/modern-right.png?v=2.1.0'
     },
     galactic:{
-      top:'/assets/themes/galactic/galactic-top.png?v=2.0.0',
-      left:'/assets/themes/galactic/galactic-left.png?v=2.0.0',
-      right:'/assets/themes/galactic/galactic-right.png?v=2.0.0'
+      top:'/assets/themes/galactic/galactic-top.png?v=2.1.0',
+      left:'/assets/themes/galactic/galactic-left.png?v=2.1.0',
+      right:'/assets/themes/galactic/galactic-right.png?v=2.1.0'
     },
     expedition:{
-      top:'/assets/themes/expedition/expedition-top.png?v=2.0.0',
-      left:'/assets/themes/expedition/expedition-left.png?v=2.0.0',
-      right:'/assets/themes/expedition/expedition-right.png?v=2.0.0'
+      top:'/assets/themes/expedition/expedition-top.png?v=2.1.0',
+      left:'/assets/themes/expedition/expedition-left.png?v=2.1.0',
+      right:'/assets/themes/expedition/expedition-right.png?v=2.1.0'
     }
   };
 
@@ -89,29 +89,23 @@
     const nodes=scenery();
 
     /*
-     * v2.0.0 — EVERY THEME IS EXPLORER.
+     * v2.1.0 — VISUAL THEME + SHARED EXPLORER MECHANICS
      *
-     * The structural theme is ALWAYS "explorer".
-     * Theme selection changes artwork ONLY.
-     * No alternate layout, Reader, header, spacing, palette, or Designer code.
+     * data-msg-experience-theme  = visual identity
+     * data-msg-experience-layout = shared Explorer behavior/layout
      */
-    root.dataset.msgExperienceTheme='explorer';
-    root.dataset.msgExperienceVariant=key;
+    root.dataset.msgExperienceTheme=key;
+    root.dataset.msgExperienceLayout='explorer';
+    delete root.dataset.msgExperienceVariant;
+
     document.body?.classList.add('msg-experience-themed');
 
-    Object.values(nodes).forEach(node=>{
-      if(node) node.style.removeProperty('display');
-    });
-
-    if(key==='explorer'){
-      setScenery(nodes,original);
-    }else if(key==='classic'){
-      /* Classic keeps the exact Explorer engine but has no scenic artwork. */
-      Object.values(nodes).forEach(node=>{
-        if(node) node.style.display='none';
-      });
+    if(key==='classic'){
+      Object.values(nodes).forEach(node=>{if(node) node.style.display='none';});
     }else{
-      setScenery(nodes,ART[key]);
+      Object.values(nodes).forEach(node=>{if(node) node.style.removeProperty('display');});
+      if(key==='explorer') setScenery(nodes,original);
+      else setScenery(nodes,ART[key]);
     }
 
     if(save){
@@ -126,8 +120,8 @@
       const saved=localStorage.getItem(KEY);
       if(saved && THEMES[saved]) return saved;
     }catch{}
-    const variant=document.documentElement.dataset.msgExperienceVariant;
-    return THEMES[variant] ? variant : 'explorer';
+    const active=document.documentElement.dataset.msgExperienceTheme;
+    return THEMES[active] ? active : 'classic';
   }
 
   function ensureLauncher(){
