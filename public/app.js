@@ -13222,63 +13222,7 @@ function realignTopicFeedDocumentToc(text, toc) {
   return aligned;
 }
 
-// The top-level application is the sole owner of Reader creation.
-// Workspace pages call this explicit same-origin API instead of creating a
-// second Reader inside the iframe.
-if (window.parent === window) {
-  window.MarkSetGoReaderOwner = Object.freeze({
-    openText(title, text, source = { type: 'text' }) {
-      const readableText = String(text || '');
-      if (!readableText.trim()) return false;
-      renderReaderWithText(
-        String(title || 'Untitled'),
-        readableText,
-        source && typeof source === 'object' ? source : { type: 'text' }
-      );
-      return true;
-    },
-
-    openDocument(documentRecord = {}) {
-      const record = documentRecord && typeof documentRecord === 'object'
-        ? documentRecord
-        : {};
-
-      // Use the real top-level Read Anything importer whenever it is ready so
-      // its normal history/format/source behavior is preserved.
-      const importer = window.MarkSetGoReadAnything?.openDocument;
-      if (typeof importer === 'function') return importer(record);
-
-      // Safe fallback if an imported-document caller becomes ready slightly
-      // before Read Anything finishes loading.
-      const readableText = String(record.text || '');
-      if (!readableText.trim()) return false;
-      renderReaderWithText(
-        String(record.title || 'Untitled'),
-        readableText,
-        record.source && typeof record.source === 'object'
-          ? record.source
-          : { type: 'text' }
-      );
-      return true;
-    }
-  });
-}
-
 function renderReaderWithText(title, text, source = { type: 'text' }) {
-  if (window.parent !== window) {
-    try {
-      if (
-        window.parent.location.origin === window.location.origin &&
-        typeof window.parent.MarkSetGoReaderOwner?.openText === 'function'
-      ) {
-        window.parent.MarkSetGoReaderOwner.openText(title, text, source);
-      }
-    } catch (error) {
-      console.warn('Workspace could not hand text to the outer Reader.', error);
-    }
-    return;
-  }
-
   app.dataset.viewKey = 'reader';
 
   const READER_CLICK_CONTROLS_KEY = 'msg_reader_click_controls_v1';
@@ -19176,6 +19120,29 @@ function renderBibleGuides() {
 }
 
 
+
+
+function openBibleDocumentInReader(title, text, source) {
+  const workspaceParams = new URLSearchParams(location.search);
+  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+
+  if (isWorkspacePane) {
+    try {
+      const handoff = window.parent.MSGWorkspaceReaderHandoff;
+      if (typeof handoff?.openText === 'function') {
+        handoff.openText(title, text, source);
+        return true;
+      }
+    } catch (error) {
+      console.warn('Workspace could not hand Bible text to the outer Reader.', error);
+    }
+    return false;
+  }
+
+  renderReaderWithText(title, text, source);
+  return true;
+}
+
 async function renderBibleStudy() {
   stopReader();
   app.innerHTML = `
@@ -19577,7 +19544,7 @@ async function renderBibleStudy() {
       }
 
       const title = `${selectedBook} — ${chapters[0]?.translation?.shortName || selectedTranslation}`;
-      renderReaderWithText(title, fullText, {
+      openBibleDocumentInReader(title, fullText, {
         type:'bible-book',
         translation:selectedTranslation,
         book:bookSelect.value,
@@ -19611,7 +19578,7 @@ async function renderBibleStudy() {
       chapterNumber: Number(chapterSelect.value),
       includeChapterHeading: true
     });
-    renderReaderWithText(`${heading} — ${chapterPayload.translation?.shortName || translationSelect.value}`, bibleDoc.text, {
+    openBibleDocumentInReader(`${heading} — ${chapterPayload.translation?.shortName || translationSelect.value}`, bibleDoc.text, {
       type:'bible',
       translation:translationSelect.value,
       book:bookSelect.value,
