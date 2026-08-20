@@ -629,55 +629,6 @@ function registerModernGuideLibraryItem({
 
 const MODERN_GUIDE_ACTIONS_KEY = 'markSetGoModernGuideActionsV1';
 
-function readModernGuideLibrary() {
-  try {
-    const value = JSON.parse(localStorage.getItem(MODERN_GUIDE_LIBRARY_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeModernGuideLibrary(items) {
-  const normalized = Array.isArray(items) ? items : [];
-  localStorage.setItem(MODERN_GUIDE_LIBRARY_KEY, JSON.stringify(normalized));
-  return normalized;
-}
-
-function registerModernGuideLibraryItem({
-  documentId = state?.documentId || '',
-  title = state?.title || '',
-  source = state?.source || null,
-  text = state?.currentText || ''
-} = {}) {
-  if (!documentId || !title || source?.type !== 'modern-guide') return null;
-
-  const items = readModernGuideLibrary();
-  const existingIndex = items.findIndex((item) => String(item.documentId || '') === String(documentId));
-  const now = new Date().toISOString();
-  const existing = existingIndex >= 0 ? items[existingIndex] : {};
-
-  const record = {
-    ...existing,
-    documentId,
-    title,
-    originalTitle: source?.originalTitle || existing.originalTitle || title.replace(/\s+—\s+Mark,\s*Set,\s*Go!\s+Guide$/i,''),
-    author: source?.originalAuthor || existing.author || '',
-    source,
-    wordCount: Array.isArray(state?.words) && state.words.length ? state.words.length : splitWords(text || '').length,
-    firstOpenedAt: existing.firstOpenedAt || now,
-    lastOpenedAt: now,
-    customGuide: Boolean(source?.customGuide),
-    buyUrl: source?.buyUrl || existing.buyUrl || ''
-  };
-
-  if (existingIndex >= 0) items[existingIndex] = record;
-  else items.unshift(record);
-
-  writeModernGuideLibrary(items.slice(0, 200));
-  return record;
-}
-
 function readModernGuideActions() {
   try {
     const value = JSON.parse(localStorage.getItem(MODERN_GUIDE_ACTIONS_KEY) || '[]');
@@ -1324,10 +1275,11 @@ async function playYouTubeSearch(query, title = 'YouTube search') {
   const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
   if (isWorkspacePane) {
     try {
-      const handoff = window.parent.MSGWorkspaceReaderHandoff;
-      if (typeof handoff?.playYouTubeSearch === 'function') {
-        return handoff.playYouTubeSearch(cleanQuery, title);
-      }
+      window.parent.postMessage({
+        type:'msg-workspace-music-search',
+        query:cleanQuery,
+        title:String(title || 'YouTube search')
+      }, window.location.origin);
     } catch (error) {
       console.warn('Workspace could not hand music search to the outer player.', error);
     }
@@ -1381,10 +1333,10 @@ function playMusic(choiceOrParsed) {
   const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
   if (isWorkspacePane) {
     try {
-      const handoff = window.parent.MSGWorkspaceReaderHandoff;
-      if (typeof handoff?.playMusic === 'function') {
-        return handoff.playMusic(choiceOrParsed);
-      }
+      window.parent.postMessage({
+        type:'msg-workspace-music-play',
+        choice:choiceOrParsed && typeof choiceOrParsed === 'object' ? choiceOrParsed : {}
+      }, window.location.origin);
     } catch (error) {
       console.warn('Workspace could not hand music playback to the outer player.', error);
     }
@@ -11330,13 +11282,30 @@ function bindUnifiedLibraryActions(container) {
         const file = new File([blob], `${provider}-${id}.${format}`, { type: format === 'epub' ? 'application/epub+zip' : 'application/pdf' });
         const parsed = format === 'epub' ? await parseEpubFile(file) : await parsePdfFile(file);
         parsed.source = { ...(parsed.source || {}), type: provider, provider, id, remoteFormat: format };
-        renderReaderWithText(parsed.title, parsed.text, parsed.source);
+        const workspaceParams = new URLSearchParams(location.search);
+        const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+        if (isWorkspacePane) {
+          const handoff = window.parent.MSGWorkspaceReaderHandoff;
+          if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
+          handoff.openText(parsed.title, parsed.text, parsed.source);
+        } else {
+          renderReaderWithText(parsed.title, parsed.text, parsed.source);
+        }
         return;
       }
       const book = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}&format=${encodeURIComponent(format)}`);
       const fullTitle = `${book.title}${book.author ? ` — ${book.author}` : ''}`;
       const normalized = normalizeImportedBookText(book.text, { title:book.title, author:book.author });
-      renderReaderWithText(fullTitle, normalized.text, { type: provider, id, sourceUrl: book.sourceUrl, remoteFormat: format === 'best' ? 'text' : format, documentToc: normalized.toc, cleanup: normalized.report });
+      const editionSource = { type: provider, id, sourceUrl: book.sourceUrl, remoteFormat: format === 'best' ? 'text' : format, documentToc: normalized.toc, cleanup: normalized.report };
+      const workspaceParams = new URLSearchParams(location.search);
+      const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+      if (isWorkspacePane) {
+        const handoff = window.parent.MSGWorkspaceReaderHandoff;
+        if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
+        handoff.openText(fullTitle, normalized.text, editionSource);
+      } else {
+        renderReaderWithText(fullTitle, normalized.text, editionSource);
+      }
     } catch (error) {
       window.alert(error.message);
       button.disabled = false; button.textContent = original;
