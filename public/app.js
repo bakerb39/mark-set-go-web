@@ -11038,15 +11038,25 @@ function bindBrowseSearchLocalActions(container) {
       const response = await fetch(`/texts/modern-guides/${encodeURIComponent(guide.id)}-guide.txt`, { cache:'no-store' });
       if (!response.ok) throw new Error(`Could not load the ${guide.title} guide.`);
       const text = await response.text();
-      renderReaderWithText(`${guide.title} — Mark, Set, Go! Guide`, text, {
+      const guideTitle = `${guide.title} — Mark, Set, Go! Guide`;
+      const guideSource = {
         type:'modern-guide',
         id:guide.id,
-        title:`${guide.title} — Mark, Set, Go! Guide`,
+        title:guideTitle,
         originalTitle:guide.title,
         originalAuthor:guide.author,
         buyUrl:guide.buyUrl,
         subtitle:`An independent reading guide to ${guide.title}`
-      });
+      };
+      if (window.parent !== window) {
+        const handoff = window.parent.MSGWorkspaceReaderHandoff;
+        if (typeof handoff?.openText !== 'function') {
+          throw new Error('The main Reader handoff is not ready.');
+        }
+        handoff.openText(guideTitle, text, guideSource);
+      } else {
+        renderReaderWithText(guideTitle, text, guideSource);
+      }
     } catch (error) {
       window.alert(error?.message || 'The guide could not be opened.');
     }
@@ -11062,7 +11072,16 @@ function bindBrowseSearchLocalActions(container) {
     if (item.action.type === 'source') {
       try {
         const loaded = await loadLocalText(item.action.key);
-        renderReaderWithText(loaded.title, loaded.text, { type:'local-library', id:item.action.key, title:loaded.title });
+        const source = { type:'local-library', id:item.action.key, title:loaded.title };
+        if (window.parent !== window) {
+          const handoff = window.parent.MSGWorkspaceReaderHandoff;
+          if (typeof handoff?.openText !== 'function') {
+            throw new Error('The main Reader handoff is not ready.');
+          }
+          handoff.openText(loaded.title, loaded.text, source);
+        } else {
+          renderReaderWithText(loaded.title, loaded.text, source);
+        }
       } catch (error) {
         window.alert(error?.message || 'That text could not be opened.');
       }
@@ -11273,8 +11292,7 @@ function bindUnifiedLibraryActions(container) {
         const file = new File([blob], `${provider}-${id}.${format}`, { type: format === 'epub' ? 'application/epub+zip' : 'application/pdf' });
         const parsed = format === 'epub' ? await parseEpubFile(file) : await parsePdfFile(file);
         parsed.source = { ...(parsed.source || {}), type: provider, provider, id, remoteFormat: format };
-        const workspaceParams = new URLSearchParams(location.search);
-        const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+        const isWorkspacePane = window.parent !== window;
         if (isWorkspacePane) {
           const handoff = window.parent.MSGWorkspaceReaderHandoff;
           if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
@@ -18316,8 +18334,7 @@ async function loadGreatBookEdition(item, status, button) {
           verifiedPrimaryText: true
         };
 
-        const workspaceParams = new URLSearchParams(location.search);
-        const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+        const isWorkspacePane = window.parent !== window;
         if (isWorkspacePane) {
           const handoff = window.parent.MSGWorkspaceReaderHandoff;
           if (typeof handoff?.openText !== 'function') {
