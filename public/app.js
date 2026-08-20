@@ -574,25 +574,16 @@ function readModernGuideLibrary() {
 }
 
 function writeModernGuideLibrary(items) {
+  // Modern Guides are already discoverable from the canonical saved-document
+  // and reading-progress records. Do not maintain a second localStorage cache:
+  // that duplicate registry previously exhausted the browser storage quota.
   const compact = (Array.isArray(items) ? items : [])
     .map(compactModernGuideLibraryItem)
     .filter((item) => item.documentId && item.title)
     .slice(0, 50);
 
-  try {
-    if (!compact.length) {
-      localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY);
-      return [];
-    }
-    localStorage.setItem(MODERN_GUIDE_LIBRARY_KEY, JSON.stringify(compact));
-    return compact;
-  } catch (error) {
-    // The registry is only a lightweight cache. Existing document/progress
-    // storage remains authoritative, so never break the Reader on quota errors.
-    try { localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY); } catch {}
-    console.warn('Modern Guide cache was skipped because browser storage is full.', error);
-    return compact;
-  }
+  try { localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY); } catch {}
+  return compact;
 }
 
 function registerModernGuideLibraryItem({
@@ -18315,7 +18306,7 @@ async function loadGreatBookEdition(item, status, button) {
 
         const title = loaded.title || candidate.title || item.title;
         const author = loaded.author || candidate.author || item.author || '';
-        renderReaderWithText(`${title}${author ? ` — ${author}` : ''}`, text, {
+        const editionSource = {
           type: candidate.provider,
           id: candidate.id,
           sourceUrl: loaded.sourceUrl || candidate.externalUrl || '',
@@ -18323,7 +18314,19 @@ async function loadGreatBookEdition(item, status, button) {
           greatBooksTitle: item.title,
           greatBooksAuthor: item.author,
           verifiedPrimaryText: true
-        });
+        };
+
+        const workspaceParams = new URLSearchParams(location.search);
+        const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+        if (isWorkspacePane) {
+          const handoff = window.parent.MSGWorkspaceReaderHandoff;
+          if (typeof handoff?.openText !== 'function') {
+            throw new Error('The main Reader handoff is not ready.');
+          }
+          handoff.openText(`${title}${author ? ` — ${author}` : ''}`, text, editionSource);
+        } else {
+          renderReaderWithText(`${title}${author ? ` — ${author}` : ''}`, text, editionSource);
+        }
         return;
       } catch (error) {
         failed.push(`${provider}: ${error.message}`);
