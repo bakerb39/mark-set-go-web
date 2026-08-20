@@ -13222,24 +13222,43 @@ function realignTopicFeedDocumentToc(text, toc) {
   return aligned;
 }
 
+// Workspace Reader ownership bridge.
+window.addEventListener('message', (event) => {
+  if (window.parent !== window) return;
+  if (event.origin !== window.location.origin) return;
+  if (!event.source || event.source === window) return;
+  if (event.data?.type !== 'msg-workspace-render-reader') return;
+
+  const payload = event.data?.document || {};
+  const title = String(payload.title || 'Untitled');
+  const text = String(payload.text || '');
+  const source = payload.source && typeof payload.source === 'object'
+    ? payload.source
+    : { type: 'text' };
+
+  if (!text) return;
+  renderReaderWithText(title, text, source);
+});
+
 function renderReaderWithText(title, text, source = { type: 'text' }) {
-  // Workspace owns only secondary pages, never a second Reader. All features
-  // that eventually call renderReaderWithText (Bible Study, Read Anything,
-  // Topic Feeds, public-library reads, guides, feeds, etc.) must hand their
-  // document to the already-mounted outer Reader.
+  // A Workspace iframe is a secondary page surface only. Send any attempt to
+  // build a Reader back to the outer app, where this same app.js closure can
+  // legally call its private renderReaderWithText() function.
   const workspaceParams = new URLSearchParams(location.search);
   const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
 
   if (isWorkspacePane) {
     try {
-      if (
-        parent.location.origin === location.origin &&
-        typeof parent.renderReaderWithText === 'function'
-      ) {
-        parent.renderReaderWithText(title, text, source);
-      }
+      window.parent.postMessage({
+        type: 'msg-workspace-render-reader',
+        document: {
+          title: String(title || 'Untitled'),
+          text: String(text || ''),
+          source: source && typeof source === 'object' ? source : { type: 'text' }
+        }
+      }, window.location.origin);
     } catch (error) {
-      console.warn('Workspace could not delegate text to the outer Reader.', error);
+      console.warn('Workspace could not hand the document to the outer Reader.', error);
     }
     return;
   }
