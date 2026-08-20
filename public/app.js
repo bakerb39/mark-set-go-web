@@ -13223,6 +13223,27 @@ function realignTopicFeedDocumentToc(text, toc) {
 }
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
+  // Workspace owns only secondary pages, never a second Reader. All features
+  // that eventually call renderReaderWithText (Bible Study, Read Anything,
+  // Topic Feeds, public-library reads, guides, feeds, etc.) must hand their
+  // document to the already-mounted outer Reader.
+  const workspaceParams = new URLSearchParams(location.search);
+  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+
+  if (isWorkspacePane) {
+    try {
+      if (
+        parent.location.origin === location.origin &&
+        typeof parent.renderReaderWithText === 'function'
+      ) {
+        parent.renderReaderWithText(title, text, source);
+      }
+    } catch (error) {
+      console.warn('Workspace could not delegate text to the outer Reader.', error);
+    }
+    return;
+  }
+
   app.dataset.viewKey = 'reader';
 
   const READER_CLICK_CONTROLS_KEY = 'msg_reader_click_controls_v1';
@@ -22253,64 +22274,6 @@ function renderMyLibraryHub() {
   };
 
   const openStoredDocument = async (documentId, wordIndex = null) => {
-    // Workspace panes must never build their own Reader. If My Library is
-    // rendered inside the secondary workspace iframe, hand the selected
-    // document to the outer application's real Library/Reader path and stop
-    // here before any local Reader state or DOM is touched.
-    const workspaceParams = new URLSearchParams(location.search);
-    const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
-
-    if (isWorkspacePane) {
-      const id = String(documentId || '').trim();
-      if (!id) return;
-
-      try {
-        if (parent.location.origin === location.origin && parent.document?.body) {
-          const parentDocument = parent.document;
-
-          // Open the outer app's own My Library renderer. The synthetic control
-          // is attached to body rather than the workspace navigation chrome, so
-          // it is handled by the normal outer-app router.
-          const route = parentDocument.createElement('button');
-          route.type = 'button';
-          route.hidden = true;
-          route.dataset.action = 'my-library';
-          parentDocument.body.appendChild(route);
-          route.click();
-          route.remove();
-
-          // My Library owns openStoredDocument as a renderer-local function.
-          // Wait for its real bound document control, then invoke that control
-          // in the OUTER app. Because the outer URL is not a workspace-pane URL,
-          // this guard does not recurse.
-          let attempt = 0;
-          const openInOuterReader = () => {
-            const candidates = [...parentDocument.querySelectorAll('#app [data-library-document]')];
-            const target = candidates.find(
-              (button) => String(button.dataset.libraryDocument || '') === id
-            );
-
-            if (target) {
-              target.click();
-              return;
-            }
-
-            attempt += 1;
-            if (attempt < 40) parent.setTimeout(openInOuterReader, 25);
-          };
-
-          openInOuterReader();
-          return;
-        }
-      } catch (error) {
-        console.warn('Workspace could not delegate My Library document to the outer Reader.', error);
-      }
-
-      // If the iframe cannot safely reach the outer app, do not fall through
-      // and create a second Reader in the workspace pane.
-      return;
-    }
-
     let data = null;
     try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
 
