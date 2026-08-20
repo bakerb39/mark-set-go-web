@@ -22006,15 +22006,26 @@ function renderBrowseHub() {
       const response = await fetch(`/texts/modern-guides/${encodeURIComponent(guideId)}-guide.txt`, { cache:'no-store' });
       if (!response.ok) throw new Error(`Could not load the ${guide.title} guide.`);
       const text = await response.text();
-      renderReaderWithText(`${guide.title} — Mark, Set, Go! Guide`, text, {
+      const guideTitle = `${guide.title} — Mark, Set, Go! Guide`;
+      const guideSource = {
         type: 'modern-guide',
         id: guide.id,
-        title: `${guide.title} — Mark, Set, Go! Guide`,
+        title: guideTitle,
         originalTitle: guide.title,
         originalAuthor: guide.author,
         buyUrl: guide.buyUrl,
         subtitle: `An independent reading guide to ${guide.title}`
-      });
+      };
+
+      if (window.parent !== window) {
+        const handoff = window.parent.MSGWorkspaceReaderHandoff;
+        if (typeof handoff?.openText !== 'function') {
+          throw new Error('The main Reader handoff is not ready.');
+        }
+        handoff.openText(guideTitle, text, guideSource);
+      } else {
+        renderReaderWithText(guideTitle, text, guideSource);
+      }
     } catch (error) {
       window.alert(error?.message || 'The guide could not be opened.');
     }
