@@ -596,7 +596,7 @@ body:has(> #app[data-view-key="reader"])
    Reader view is excluded and keeps its immersive artwork treatment. */
 html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
 body:not(:has(> #app[data-view-key="reader"])) {
-  background: var(--msg-theme-page) !important;
+  background: var(--msg-theme-surface) !important;
   background-image: none !important;
 }
 
@@ -610,3 +610,8 @@ body:not(:has(> #app[data-view-key="reader"]))
   background: transparent;
 }
 
+
+
+/* v2.10.5 — CLEAN NORMAL-PAGE CANVAS
+   Normal application pages use the theme surface color, not the scenic page
+   color. Expedition therefore uses ivory/cream rather than tan behind content. */
