@@ -1,0 +1,586 @@
+
+/* Mark, Set, Go! Experience Themes v1.0.0
+   Additive theme layer. Does not alter Reader timing, pagination, DOM word structure,
+   workspace behavior, or the existing Explorer Designer. */
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) body {
+  background: var(--msg-theme-page) !important;
+  color: var(--msg-theme-ink);
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) .site-header {
+  background: linear-gradient(180deg, var(--msg-theme-accent), var(--msg-theme-accent-dark)) !important;
+  border-bottom-color: color-mix(in srgb, var(--msg-theme-gold) 72%, transparent) !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) .reader-page-panel {
+  background: var(--msg-theme-surface) !important;
+  border-color: color-mix(in srgb, var(--msg-theme-border) 72%, transparent) !important;
+  box-shadow: 0 18px 46px var(--msg-theme-shadow) !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) .reader-title-copy h1,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) .page-title,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) h1,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) h2 {
+  color: var(--msg-theme-accent-dark);
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) :is(.navigation-pane,#reader-frame,.mark-companion-panel) {
+  border-color: color-mix(in srgb, var(--msg-theme-border) 55%, transparent) !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) :is(#start-reader,#fs-start) {
+  background: linear-gradient(180deg,var(--msg-theme-accent),var(--msg-theme-accent-dark)) !important;
+  border-color: var(--msg-theme-accent-dark) !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"]) :is(.reader-side-toggle,.mark-pane-button,#pause-reader,#reset-reader,#fs-pause,#fs-reset) {
+  background: linear-gradient(180deg,var(--msg-theme-surface),var(--msg-theme-soft-2)) !important;
+  border-color: color-mix(in srgb, var(--msg-theme-gold) 65%, transparent) !important;
+  color: var(--msg-theme-accent-dark) !important;
+}
+
+/* Scholar */
+html[data-msg-experience-theme="scholar"] {
+  --msg-theme-page:#d8cfbb;
+  --msg-theme-surface:#fff9ea;
+  --msg-theme-accent:#5a2330;
+  --msg-theme-accent-dark:#32151c;
+  --msg-theme-soft:#e8dfc8;
+  --msg-theme-soft-2:#efe3c5;
+  --msg-theme-border:#9d7a4e;
+  --msg-theme-gold:#b38b42;
+  --msg-theme-ink:#33291f;
+  --msg-theme-muted:#756454;
+  --msg-theme-shadow:rgba(55,35,23,.22);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
+
+}
+html[data-msg-experience-theme="scholar"] .mark-companion-panel .askmark-hero {
+  background:#4d2630 !important;
+}
+
+/* Patriotic */
+html[data-msg-experience-theme="patriotic"] {
+  --msg-theme-page:#e7e9ed;
+  --msg-theme-surface:#fffdf8;
+  --msg-theme-accent:#17365f;
+  --msg-theme-accent-dark:#0d2341;
+  --msg-theme-soft:#e7edf6;
+  --msg-theme-soft-2:#f5e9df;
+  --msg-theme-border:#8a99ae;
+  --msg-theme-gold:#c7a44d;
+  --msg-theme-ink:#1f2d3f;
+  --msg-theme-muted:#667383;
+  --msg-theme-shadow:rgba(21,43,72,.18);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
+
+}
+html[data-msg-experience-theme="patriotic"] .site-header {
+  box-shadow: inset 0 -2px #9b2335 !important;
+}
+
+/* Artistic */
+html[data-msg-experience-theme="artistic"] {
+  --msg-theme-page:#e6ddd6;
+  --msg-theme-surface:#fffaf4;
+  --msg-theme-accent:#6d3f63;
+  --msg-theme-accent-dark:#41233b;
+  --msg-theme-soft:#eee3ef;
+  --msg-theme-soft-2:#f1e7d7;
+  --msg-theme-border:#a48a8e;
+  --msg-theme-gold:#bd8d52;
+  --msg-theme-ink:#3c3137;
+  --msg-theme-muted:#7b6871;
+  --msg-theme-shadow:rgba(66,41,58,.18);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
+
+}
+
+/* Modern */
+html[data-msg-experience-theme="modern"] {
+  --msg-theme-page:#e9edf0;
+  --msg-theme-surface:#ffffff;
+  --msg-theme-accent:#263746;
+  --msg-theme-accent-dark:#111b24;
+  --msg-theme-soft:#edf2f5;
+  --msg-theme-soft-2:#f4f6f7;
+  --msg-theme-border:#aebbc4;
+  --msg-theme-gold:#9aa6ae;
+  --msg-theme-ink:#18242c;
+  --msg-theme-muted:#67747c;
+  --msg-theme-shadow:rgba(20,32,41,.13);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
+
+}
+html[data-msg-experience-theme="modern"] .reader-page-panel,
+html[data-msg-experience-theme="modern"] :is(.navigation-pane,#reader-frame,.mark-companion-panel) {
+  border-radius:6px !important;
+}
+
+/* Galactic — original space-opera look, no franchise artwork/logos/characters. */
+html[data-msg-experience-theme="galactic"] {
+  --msg-theme-page:#060a12;
+  --msg-theme-surface:#f8fbff;
+  --msg-theme-accent:#17253f;
+  --msg-theme-accent-dark:#07101e;
+  --msg-theme-soft:#e8f4fb;
+  --msg-theme-soft-2:#e9edf4;
+  --msg-theme-border:#7089a2;
+  --msg-theme-gold:#d8bd65;
+  --msg-theme-ink:#14202a;
+  --msg-theme-muted:#697b89;
+  --msg-theme-shadow:rgba(0,0,0,.34);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
+
+}
+html[data-msg-experience-theme="galactic"] .site-header {
+  border-bottom:1px solid #83b9d2 !important;
+  box-shadow:0 0 18px rgba(94,187,224,.18) !important;
+}
+
+/* Expedition — original archaeological-adventure look. */
+html[data-msg-experience-theme="expedition"] {
+  --msg-theme-page:#c8b58d;
+  --msg-theme-surface:#fff6df;
+  --msg-theme-accent:#66452c;
+  --msg-theme-accent-dark:#3d281a;
+  --msg-theme-soft:#e8d8b5;
+  --msg-theme-soft-2:#ead3a2;
+  --msg-theme-border:#8d6a3d;
+  --msg-theme-gold:#b68232;
+  --msg-theme-ink:#3b2c20;
+  --msg-theme-muted:#74624e;
+  --msg-theme-shadow:rgba(55,38,22,.24);
+  --msg-navy: var(--msg-theme-accent-dark);
+  --msg-navy-deep: var(--msg-theme-accent-dark);
+  --msg-blue: var(--msg-theme-accent);
+  --msg-blue-strong: var(--msg-theme-accent-dark);
+  --msg-blue-hover: var(--msg-theme-accent-dark);
+  --msg-blue-soft: var(--msg-theme-soft);
+  --msg-blue-soft-2: var(--msg-theme-soft-2);
+  --msg-blue-soft-3: var(--msg-theme-soft);
+  --msg-blue-border: var(--msg-theme-border);
+  --msg-blue-border-soft: var(--msg-theme-border);
+  --msg-gold: var(--msg-theme-gold);
+  --msg-gold-bright: var(--msg-theme-gold);
+  --msg-gold-soft: var(--msg-theme-soft-2);
+  --msg-ink: var(--msg-theme-ink);
+  --msg-muted: var(--msg-theme-muted);
+  --msg-surface: var(--msg-theme-surface);
+  --msg-page: var(--msg-theme-page);
+  --accent: var(--msg-theme-accent);
+  --ui-accent: var(--msg-theme-accent);
+  --panel: var(--msg-theme-surface);
+  --surface: var(--msg-theme-surface);
+  --page: var(--msg-theme-page);
+  --ink: var(--msg-theme-ink);
+  --muted: var(--msg-theme-muted);
+  --border: var(--msg-theme-border);
+
+  --ask-navy-950: var(--msg-theme-accent-dark);
+  --ask-navy-900: var(--msg-theme-accent-dark);
+  --ask-navy-800: var(--msg-theme-accent);
+  --ask-gold: var(--msg-theme-gold);
+  --ask-gold-soft: var(--msg-theme-soft-2);
+
+}
+
+/* Theme chooser */
+#msg-theme-launcher {
+  border:1px solid rgba(255,255,255,.25);
+  border-radius:7px;
+  background:rgba(255,255,255,.08);
+  color:inherit;
+  font:inherit;
+  cursor:pointer;
+}
+#msg-theme-dialog {
+  position:fixed;
+  inset:0;
+  z-index:13000;
+  display:grid;
+  place-items:center;
+  padding:20px;
+  background:rgba(7,12,16,.42);
+}
+#msg-theme-dialog[hidden]{display:none!important}
+.msg-theme-card{
+  width:min(640px,calc(100vw - 32px));
+  max-height:min(720px,calc(100vh - 32px));
+  overflow:auto;
+  border:1px solid #b7a06e;
+  border-radius:14px;
+  background:#fffdf7;
+  box-shadow:0 24px 70px rgba(0,0,0,.3);
+  color:#24322e;
+}
+.msg-theme-head{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:14px 16px;border-bottom:1px solid #ded3b8;
+}
+.msg-theme-head h2{margin:0;font:700 20px/1.1 Georgia,serif;color:#173f39}
+.msg-theme-close{border:0;background:transparent;font-size:24px;cursor:pointer;color:#5f5546}
+.msg-theme-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;padding:14px;
+}
+.msg-theme-choice{
+  min-height:88px;padding:12px;border:1px solid #d2c5a5;border-radius:10px;
+  background:#fff;cursor:pointer;text-align:left;color:#28342f;
+}
+.msg-theme-choice:hover,.msg-theme-choice[aria-pressed="true"]{
+  border-color:#876b35;box-shadow:inset 0 0 0 1px #b7954b;background:#fff9e9;
+}
+.msg-theme-choice strong{display:block;font-size:14px;margin-bottom:3px}
+.msg-theme-choice small{display:block;color:#6f756e;line-height:1.3}
+@media(max-width:600px){.msg-theme-grid{grid-template-columns:1fr}}
+
+/* v2.3.0 — theme state owns scenery visibility.
+   Shared Explorer mechanics intentionally contain no scenery display declaration. */
+html.msg-theme-classic .explorer-world-art {
+  display: none;
+}
+
+html:is(
+  .msg-theme-explorer,
+  .msg-theme-patriotic,
+  .msg-theme-scholar,
+  .msg-theme-artistic,
+  .msg-theme-modern,
+  .msg-theme-galactic,
+  .msg-theme-expedition
+) .explorer-world-art {
+  display: block;
+}
+
+/* v2.8.0 — shared Reader utility colors belong to the active experience theme.
+   Explorer is excluded because its native Reader shell remains authoritative.
+   Classic has no experience-theme attribute and therefore keeps the base app styling. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-font-control {
+  border-color: var(--msg-blue-border) !important;
+  background: var(--msg-blue-strong) !important;
+  color: #fff !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-font-control > button {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: #fff !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-font-control > span {
+  color: rgba(255,255,255,.72) !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button {
+  border-color: var(--msg-blue-border) !important;
+  background: var(--msg-blue-strong) !important;
+  color: #fff !important;
+}
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle:hover,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle:focus-visible,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > .reader-topright-music-toggle[aria-expanded="true"],
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button:hover,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+#app .reader-pane-controls .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button:focus-visible {
+  border-color: var(--msg-blue) !important;
+  background: var(--msg-blue) !important;
+}
+
+/* Ask Mark's existing header/body CSS already consumes --ask-* tokens.
+   Each theme now supplies those tokens in its own palette block above. */
+
+/* v2.10.0 — GLOBAL THEME CONTAINMENT
+   Themes remain visible throughout the application, but scenery is decoration
+   only and normal application pages retain their native document flow.
+
+   This block intentionally changes no page heights, margins, transforms,
+   scrolling, grid/flex geometry, or content positioning. */
+
+/* Illustrated scenery is always a background layer. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+.explorer-world-art {
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+/* The real application and shared footer always paint above scenery.
+   position:relative establishes stacking without removing either from flow. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body > #app.app-shell,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body > .site-footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Header remains the top application chrome. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body > .site-header {
+  z-index: 1000;
+}
+
+/* Normal pages keep their existing structure. Theme them through surfaces,
+   borders, ink and shadows only — never through layout geometry. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(#app .reader-page-panel))
+#app > :is(.platform-page,.panel,.hero) {
+  background-color: var(--msg-theme-surface) !important;
+  color: var(--msg-theme-ink);
+  border-color: color-mix(in srgb, var(--msg-theme-border) 48%, transparent) !important;
+}
+
+/* Common page cards may inherit the palette without changing size or flow. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(#app .reader-page-panel))
+#app :is(
+  .card,
+  .panel-card,
+  .source-card,
+  .record-card,
+  .platform-card,
+  .platform-book-card,
+  .unified-book-card,
+  .progress-book-card,
+  .vocabulary-card,
+  .analytics-card,
+  .annual-goal-card,
+  .profile-preset-card,
+  .profile-feature-card,
+  .business-card-wide
+) {
+  background-color: var(--msg-theme-surface);
+  color: var(--msg-theme-ink);
+  border-color: color-mix(in srgb, var(--msg-theme-border) 42%, transparent);
+}
+
+/* Form fields stay readable across dark/light theme families.
+   No dimensions or placement are changed here. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(#app .reader-page-panel))
+#app :is(input,select,textarea) {
+  background-color: var(--msg-theme-surface);
+  color: var(--msg-theme-ink);
+  border-color: color-mix(in srgb, var(--msg-theme-border) 55%, transparent);
+}
+
+/* Preserve each page's native overflow/scroll ownership.
+   Decorative scenery must never become a hit target. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(#app .reader-page-panel))
+.explorer-world-art,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(#app .reader-page-panel))
+.explorer-world-art * {
+  pointer-events: none !important;
+}
+
+/* v2.10.2 — NORMAL PAGE SCENERY VIA ACTUAL APP VIEW STATE
+   app.js owns the canonical current view in #app[data-view-key].
+   Reader explicitly uses data-view-key="reader". Do not infer visibility from
+   whether a reader node happens to remain mounted somewhere in the DOM. */
+
+/* Every non-Reader view keeps the theme but drops the immersive top panorama. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+.explorer-world-art__top {
+  display: none !important;
+}
+
+/* Keep the side scenery as a frame, never as content. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+.explorer-world-art,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+.explorer-world-art * {
+  pointer-events: none !important;
+}
+
+/* Normal application center surface. Paint only — no geometry changes. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+> #app.app-shell {
+  position: relative;
+  z-index: 1;
+  background-color: var(--msg-theme-page);
+}
+
+/* Opaque top-level page surfaces keep artwork from bleeding through content. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+> #app > :is(.platform-page,.panel,.hero) {
+  background: var(--msg-theme-surface) !important;
+  color: var(--msg-theme-ink);
+  border-color: color-mix(in srgb, var(--msg-theme-border) 48%, transparent) !important;
+}
+
+/* Reader view keeps the current immersive scene untouched. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:has(> #app[data-view-key="reader"])
+.explorer-world-art__top {
+  display: block !important;
+}
+
