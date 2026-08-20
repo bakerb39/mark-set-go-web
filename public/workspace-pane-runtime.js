@@ -1,4 +1,4 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v0.5.0 */
+/* Mark, Set, Go! lightweight workspace pane runtime v0.9.0 */
 (() => {
   'use strict';
 
@@ -11,7 +11,6 @@
   // No second page-routing table lives here. The lightweight pane replays the
   // app's own data-action / data-read / data-test navigation event, so module-
   // owned pages and future menu destinations work without workspace exceptions.
-
 
   function sendParent(type, extra = {}) {
     try { parent.postMessage({ type, ...extra }, location.origin); } catch {}
@@ -69,9 +68,6 @@
     const doc = parentReaderDocument();
     if (!doc) return;
 
-    // The workspace Music page is intentionally lightweight, so its local
-    // ReaderEngine has no active book. Reflect the one real Reader in the
-    // parent window instead of showing the misleading "No book open" state.
     const current = page.querySelector('.music-current-book');
     if (current) {
       const label = current.querySelector(':scope > span');
@@ -154,9 +150,6 @@
   }
 
   function renderRequested() {
-    // The pane is stripped of Clerk/cloud startup, but navigation itself should
-    // be identical to the main application. This one path covers Help, Topic
-    // Feeds, Great Books, Bible Study, tests, and future internal destinations.
     fallbackRoute();
     if (mode === 'action' && value === 'profile-preferences') installWorkspaceToggle();
     if (mode === 'action' && value === 'music') installMusicReadingSuggestions();
@@ -166,12 +159,72 @@
     }));
   }
 
+  function openParentLibraryDocument(documentId) {
+    const id = String(documentId || '').trim();
+    if (!id) return false;
+
+    let parentDocument = null;
+    try {
+      if (parent.location.origin !== location.origin) return false;
+      parentDocument = parent.document;
+    } catch {
+      return false;
+    }
+    if (!parentDocument?.body) return false;
+
+    // Route the OUTER app to its own My Library renderer. This synthetic control
+    // lives outside the site header/footer, so Workspace top-nav interception
+    // does not redirect it back into this pane.
+    const route = parentDocument.createElement('button');
+    route.type = 'button';
+    route.hidden = true;
+    route.dataset.action = 'my-library';
+    parentDocument.body.appendChild(route);
+    route.click();
+    route.remove();
+
+    // The real outer Library renderer binds data-library-document to its private
+    // openStoredDocument(). Wait for that exact button, then click it there.
+    let attempt = 0;
+    const clickBoundOuterDocument = () => {
+      const candidates = [...parentDocument.querySelectorAll('#app [data-library-document]')];
+      const target = candidates.find(
+        (button) => String(button.dataset.libraryDocument || '') === id
+      );
+
+      if (target) {
+        target.click();
+        return;
+      }
+
+      attempt += 1;
+      if (attempt < 30) parent.setTimeout(clickBoundOuterDocument, 25);
+    };
+
+    clickBoundOuterDocument();
+    return true;
+  }
 
   // Never let a secondary page manufacture another Reader. Reader-bound actions
   // belong to the already-mounted Reader in the outer application.
   document.addEventListener('click', (event) => {
-    const clickedLink = event.target.closest?.('a[href]');
-    const suggestedMusic = event.target.closest?.('.book-music-link')
+    const targetElement = event.target instanceof Element
+      ? event.target
+      : event.target?.parentElement;
+
+    // My Library Resume/Open controls are renderer-local data-library-document
+    // buttons, not data-read actions. Intercept them here during CAPTURE before
+    // the iframe's own target listener can call its private openStoredDocument().
+    const libraryDocument = targetElement?.closest?.('[data-library-document]');
+    if (libraryDocument?.dataset.libraryDocument) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openParentLibraryDocument(libraryDocument.dataset.libraryDocument);
+      return;
+    }
+
+    const clickedLink = targetElement?.closest?.('a[href]');
+    const suggestedMusic = targetElement?.closest?.('.book-music-link')
       || (clickedLink?.closest?.('.book-music-recommendations') ? clickedLink : null);
     if (suggestedMusic?.href) {
       try {
@@ -192,26 +245,21 @@
       } catch {}
     }
 
-    const readerAction = event.target.closest?.('[data-action="reader"]');
+    const readerAction = targetElement?.closest?.('[data-action="reader"]');
     if (!readerAction) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     sendParent('msg-workspace-return-reader');
   }, true);
 
-  // Companion state is stored on the same origin, but the selector runs inside
-  // this iframe. Mirror a workspace selection into the outer app immediately so
-  // Reader/Notebook companion surfaces update without waiting for a reload.
   window.addEventListener('msg:companion-changed', (event) => {
-    const next=String(event.detail?.id || event.detail?.companion || '').toLowerCase();
+    const next = String(event.detail?.id || event.detail?.companion || '').toLowerCase();
     if (!next) return;
     try {
       if (parent?.MSGCompanion?.id !== next) parent?.MSGCompanion?.set?.(next);
     } catch {}
   });
 
-  // Forward Topic Feed comma/period navigation to the outer Reader while focus
-  // happens to be inside this pane.
   document.addEventListener('keydown', (event) => {
     if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key !== ',' && event.key !== '.') return;
@@ -220,6 +268,9 @@
     sendParent('msg-workspace-topic-feed-key', { key: event.key });
   }, true);
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderRequested, { once: true });
-  else renderRequested();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderRequested, { once: true });
+  } else {
+    renderRequested();
+  }
 })();
