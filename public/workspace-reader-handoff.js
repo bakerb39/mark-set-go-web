@@ -32,6 +32,24 @@
         return false;
       }
       return importer(documentRecord);
+    },
+
+    playMusic(choiceOrParsed) {
+      if (typeof window.playMusic !== 'function') {
+        console.warn('Main music player is not ready.');
+        return false;
+      }
+      window.playMusic(choiceOrParsed);
+      return true;
+    },
+
+    playYouTubeSearch(query, title = 'YouTube search') {
+      if (typeof window.playYouTubeSearch !== 'function') {
+        console.warn('Main music search is not ready.');
+        return false;
+      }
+      window.playYouTubeSearch(String(query || ''), String(title || 'YouTube search'));
+      return true;
     }
   });
 })();

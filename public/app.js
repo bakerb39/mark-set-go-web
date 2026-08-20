@@ -1320,6 +1320,19 @@ function parseYouTubeInput(rawValue) {
 
 async function playYouTubeSearch(query, title = 'YouTube search') {
   const cleanQuery = String(query || '').trim();
+  const workspaceParams = new URLSearchParams(location.search);
+  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+  if (isWorkspacePane) {
+    try {
+      const handoff = window.parent.MSGWorkspaceReaderHandoff;
+      if (typeof handoff?.playYouTubeSearch === 'function') {
+        return handoff.playYouTubeSearch(cleanQuery, title);
+      }
+    } catch (error) {
+      console.warn('Workspace could not hand music search to the outer player.', error);
+    }
+    return;
+  }
   if (!cleanQuery) return;
   musicNowTitle.textContent = title;
   musicNowSource.textContent = 'Searching YouTube…';
@@ -1364,6 +1377,20 @@ function playMusicSearchCandidate(index) {
 }
 
 function playMusic(choiceOrParsed) {
+  const workspaceParams = new URLSearchParams(location.search);
+  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+  if (isWorkspacePane) {
+    try {
+      const handoff = window.parent.MSGWorkspaceReaderHandoff;
+      if (typeof handoff?.playMusic === 'function') {
+        return handoff.playMusic(choiceOrParsed);
+      }
+    } catch (error) {
+      console.warn('Workspace could not hand music playback to the outer player.', error);
+    }
+    return;
+  }
+
   musicSearchState = choiceOrParsed?.search || null;
   if (musicNextButton) musicNextButton.hidden = !musicSearchState?.videoIds?.length;
   const isChoice = Boolean(choiceOrParsed?.youtubeId);
@@ -21640,14 +21667,25 @@ function renderDrmFreeBookFinder(initial={}) {
           const response=await fetch(`/api/library/read?provider=${encodeURIComponent(button.dataset.drmReadProvider||'')}&id=${encodeURIComponent(button.dataset.drmReadId||'')}&format=best`);
           const data=await response.json();
           if(!response.ok) throw new Error(data.error||'The book could not be opened.');
-          renderReaderWithText(data.title||'DRM-Free Book',data.text||'',{
+          const drmFreeSource = {
             type:'drm-free-library',
             provider:button.dataset.drmReadProvider||'',
             id:button.dataset.drmReadId||'',
             title:data.title||'DRM-Free Book',
             author:data.author||'',
             sourceUrl:data.sourceUrl||''
-          });
+          };
+          const workspaceParams = new URLSearchParams(location.search);
+          const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+          if (isWorkspacePane) {
+            const handoff = window.parent.MSGWorkspaceReaderHandoff;
+            if (typeof handoff?.openText !== 'function') {
+              throw new Error('The main Reader handoff is not ready.');
+            }
+            handoff.openText(data.title||'DRM-Free Book',data.text||'',drmFreeSource);
+          } else {
+            renderReaderWithText(data.title||'DRM-Free Book',data.text||'',drmFreeSource);
+          }
         }catch(error){
           window.alert(error?.message||'The book could not be opened.');
           button.disabled=false;
