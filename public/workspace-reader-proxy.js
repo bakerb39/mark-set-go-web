@@ -1,6 +1,6 @@
-/* Mark, Set, Go! Workspace Reader API proxy v0.10.1
-   Secondary pages may use the normal Read Anything API, but openDocument()
-   must always execute in the outer application so it opens the one real Reader.
+/* Mark, Set, Go! Workspace Reader API proxy v0.10.3
+   Imported documents opened from a Workspace page belong to the top-level
+   Reader, never to the secondary iframe.
 */
 (() => {
   'use strict';
@@ -16,10 +16,11 @@
     openDocument(documentRecord) {
       try {
         if (window.parent.location.origin !== window.location.origin) return false;
-        const outerApi = window.parent.MarkSetGoReadAnything;
-        if (typeof outerApi?.openDocument !== 'function') return false;
-        return outerApi.openDocument(documentRecord);
-      } catch {
+        const owner = window.parent.MarkSetGoReaderOwner;
+        if (typeof owner?.openDocument !== 'function') return false;
+        return owner.openDocument(documentRecord);
+      } catch (error) {
+        console.warn('Workspace could not hand the document to the outer Reader.', error);
         return false;
       }
     }

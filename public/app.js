@@ -13222,43 +13222,59 @@ function realignTopicFeedDocumentToc(text, toc) {
   return aligned;
 }
 
-// Workspace Reader ownership bridge.
-window.addEventListener('message', (event) => {
-  if (window.parent !== window) return;
-  if (event.origin !== window.location.origin) return;
-  if (!event.source || event.source === window) return;
-  if (event.data?.type !== 'msg-workspace-render-reader') return;
+// The top-level application is the sole owner of Reader creation.
+// Workspace pages call this explicit same-origin API instead of creating a
+// second Reader inside the iframe.
+if (window.parent === window) {
+  window.MarkSetGoReaderOwner = Object.freeze({
+    openText(title, text, source = { type: 'text' }) {
+      const readableText = String(text || '');
+      if (!readableText.trim()) return false;
+      renderReaderWithText(
+        String(title || 'Untitled'),
+        readableText,
+        source && typeof source === 'object' ? source : { type: 'text' }
+      );
+      return true;
+    },
 
-  const payload = event.data?.document || {};
-  const title = String(payload.title || 'Untitled');
-  const text = String(payload.text || '');
-  const source = payload.source && typeof payload.source === 'object'
-    ? payload.source
-    : { type: 'text' };
+    openDocument(documentRecord = {}) {
+      const record = documentRecord && typeof documentRecord === 'object'
+        ? documentRecord
+        : {};
 
-  if (!text) return;
-  renderReaderWithText(title, text, source);
-});
+      // Use the real top-level Read Anything importer whenever it is ready so
+      // its normal history/format/source behavior is preserved.
+      const importer = window.MarkSetGoReadAnything?.openDocument;
+      if (typeof importer === 'function') return importer(record);
+
+      // Safe fallback if an imported-document caller becomes ready slightly
+      // before Read Anything finishes loading.
+      const readableText = String(record.text || '');
+      if (!readableText.trim()) return false;
+      renderReaderWithText(
+        String(record.title || 'Untitled'),
+        readableText,
+        record.source && typeof record.source === 'object'
+          ? record.source
+          : { type: 'text' }
+      );
+      return true;
+    }
+  });
+}
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
-  // A Workspace iframe is a secondary page surface only. Send any attempt to
-  // build a Reader back to the outer app, where this same app.js closure can
-  // legally call its private renderReaderWithText() function.
-  const workspaceParams = new URLSearchParams(location.search);
-  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
-
-  if (isWorkspacePane) {
+  if (window.parent !== window) {
     try {
-      window.parent.postMessage({
-        type: 'msg-workspace-render-reader',
-        document: {
-          title: String(title || 'Untitled'),
-          text: String(text || ''),
-          source: source && typeof source === 'object' ? source : { type: 'text' }
-        }
-      }, window.location.origin);
+      if (
+        window.parent.location.origin === window.location.origin &&
+        typeof window.parent.MarkSetGoReaderOwner?.openText === 'function'
+      ) {
+        window.parent.MarkSetGoReaderOwner.openText(title, text, source);
+      }
     } catch (error) {
-      console.warn('Workspace could not hand the document to the outer Reader.', error);
+      console.warn('Workspace could not hand text to the outer Reader.', error);
     }
     return;
   }
@@ -22293,6 +22309,64 @@ function renderMyLibraryHub() {
   };
 
   const openStoredDocument = async (documentId, wordIndex = null) => {
+    // Workspace panes must never build their own Reader. If My Library is
+    // rendered inside the secondary workspace iframe, hand the selected
+    // document to the outer application's real Library/Reader path and stop
+    // here before any local Reader state or DOM is touched.
+    const workspaceParams = new URLSearchParams(location.search);
+    const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+
+    if (isWorkspacePane) {
+      const id = String(documentId || '').trim();
+      if (!id) return;
+
+      try {
+        if (parent.location.origin === location.origin && parent.document?.body) {
+          const parentDocument = parent.document;
+
+          // Open the outer app's own My Library renderer. The synthetic control
+          // is attached to body rather than the workspace navigation chrome, so
+          // it is handled by the normal outer-app router.
+          const route = parentDocument.createElement('button');
+          route.type = 'button';
+          route.hidden = true;
+          route.dataset.action = 'my-library';
+          parentDocument.body.appendChild(route);
+          route.click();
+          route.remove();
+
+          // My Library owns openStoredDocument as a renderer-local function.
+          // Wait for its real bound document control, then invoke that control
+          // in the OUTER app. Because the outer URL is not a workspace-pane URL,
+          // this guard does not recurse.
+          let attempt = 0;
+          const openInOuterReader = () => {
+            const candidates = [...parentDocument.querySelectorAll('#app [data-library-document]')];
+            const target = candidates.find(
+              (button) => String(button.dataset.libraryDocument || '') === id
+            );
+
+            if (target) {
+              target.click();
+              return;
+            }
+
+            attempt += 1;
+            if (attempt < 40) parent.setTimeout(openInOuterReader, 25);
+          };
+
+          openInOuterReader();
+          return;
+        }
+      } catch (error) {
+        console.warn('Workspace could not delegate My Library document to the outer Reader.', error);
+      }
+
+      // If the iframe cannot safely reach the outer app, do not fall through
+      // and create a second Reader in the workspace pane.
+      return;
+    }
+
     let data = null;
     try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
 
