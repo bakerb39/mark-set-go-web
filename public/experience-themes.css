@@ -565,7 +565,7 @@ body:not(:has(> #app[data-view-key="reader"]))
 > #app.app-shell {
   position: relative;
   z-index: 1;
-  background-color: var(--msg-theme-page);
+  background: transparent;
 }
 
 /* Opaque top-level page surfaces keep artwork from bleeding through content. */
@@ -584,3 +584,8 @@ body:has(> #app[data-view-key="reader"])
   display: block !important;
 }
 
+
+
+/* v2.10.3 — NORMAL PAGE CENTER SURFACE
+   Do not paint the theme page color behind normal-page content.
+   Individual pages/cards already own their opaque themed surfaces. */
