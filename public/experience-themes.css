@@ -451,3 +451,136 @@ html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
 
 /* Ask Mark's existing header/body CSS already consumes --ask-* tokens.
    Each theme now supplies those tokens in its own palette block above. */
+
+/* v2.10.0 — GLOBAL THEME CONTAINMENT
+   Themes remain visible throughout the application, but scenery is decoration
+   only and normal application pages retain their native document flow.
+
+   This block intentionally changes no page heights, margins, transforms,
+   scrolling, grid/flex geometry, or content positioning. */
+
+/* Illustrated scenery is always a background layer. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+.explorer-world-art {
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+/* The real application and shared footer always paint above scenery.
+   position:relative establishes stacking without removing either from flow. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body > #app.app-shell,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body > .site-footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Header remains the top application chrome. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body > .site-header {
+  z-index: 1000;
+}
+
+/* Normal pages keep their existing structure. Theme them through surfaces,
+   borders, ink and shadows only — never through layout geometry. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(#app .reader-page-panel))
+#app > :is(.platform-page,.panel,.hero) {
+  background-color: var(--msg-theme-surface) !important;
+  color: var(--msg-theme-ink);
+  border-color: color-mix(in srgb, var(--msg-theme-border) 48%, transparent) !important;
+}
+
+/* Common page cards may inherit the palette without changing size or flow. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(#app .reader-page-panel))
+#app :is(
+  .card,
+  .panel-card,
+  .source-card,
+  .record-card,
+  .platform-card,
+  .platform-book-card,
+  .unified-book-card,
+  .progress-book-card,
+  .vocabulary-card,
+  .analytics-card,
+  .annual-goal-card,
+  .profile-preset-card,
+  .profile-feature-card,
+  .business-card-wide
+) {
+  background-color: var(--msg-theme-surface);
+  color: var(--msg-theme-ink);
+  border-color: color-mix(in srgb, var(--msg-theme-border) 42%, transparent);
+}
+
+/* Form fields stay readable across dark/light theme families.
+   No dimensions or placement are changed here. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(#app .reader-page-panel))
+#app :is(input,select,textarea) {
+  background-color: var(--msg-theme-surface);
+  color: var(--msg-theme-ink);
+  border-color: color-mix(in srgb, var(--msg-theme-border) 55%, transparent);
+}
+
+/* Preserve each page's native overflow/scroll ownership.
+   Decorative scenery must never become a hit target. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(#app .reader-page-panel))
+.explorer-world-art,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(#app .reader-page-panel))
+.explorer-world-art * {
+  pointer-events: none !important;
+}
+
+/* v2.10.2 — NORMAL PAGE SCENERY VIA ACTUAL APP VIEW STATE
+   app.js owns the canonical current view in #app[data-view-key].
+   Reader explicitly uses data-view-key="reader". Do not infer visibility from
+   whether a reader node happens to remain mounted somewhere in the DOM. */
+
+/* Every non-Reader view keeps the theme but drops the immersive top panorama. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+.explorer-world-art__top {
+  display: none !important;
+}
+
+/* Keep the side scenery as a frame, never as content. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+.explorer-world-art,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+.explorer-world-art * {
+  pointer-events: none !important;
+}
+
+/* Normal application center surface. Paint only — no geometry changes. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+> #app.app-shell {
+  position: relative;
+  z-index: 1;
+  background-color: var(--msg-theme-page);
+}
+
+/* Opaque top-level page surfaces keep artwork from bleeding through content. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+> #app > :is(.platform-page,.panel,.hero) {
+  background: var(--msg-theme-surface) !important;
+  color: var(--msg-theme-ink);
+  border-color: color-mix(in srgb, var(--msg-theme-border) 48%, transparent) !important;
+}
+
+/* Reader view keeps the current immersive scene untouched. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:has(> #app[data-view-key="reader"])
+.explorer-world-art__top {
+  display: block !important;
+}
+
