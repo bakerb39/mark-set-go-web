@@ -1,6 +1,11 @@
-/* Mark, Set, Go! Workspace Reader Delegation v0.8.0
-   Secondary panes never open a second Reader.
-   Reader-owned operations are delegated to the parent application.
+/* Mark, Set, Go! Workspace Reader Delegation v0.8.1
+   EARLY CAPTURE VERSION
+
+   This script is loaded before app.js in workspace-pane.html and listens on
+   window during capture, so Reader-owned clicks are intercepted before any
+   iframe app handlers can receive them.
+
+   No MutationObserver.
 */
 (() => {
   'use strict';
@@ -16,10 +21,11 @@
     }
   }
 
-  function closestDelegatedRoute(target) {
-    if (!(target instanceof Element)) return null;
+  function delegatedRoute(target) {
+    const element = target instanceof Element ? target : target?.parentElement;
+    if (!element) return null;
 
-    const libraryDocument = target.closest('[data-library-document]');
+    const libraryDocument = element.closest('[data-library-document]');
     if (libraryDocument?.dataset.libraryDocument) {
       return {
         type: 'msg-workspace-open-library-document',
@@ -27,23 +33,34 @@
       };
     }
 
-    const route = target.closest('[data-read],[data-test],[data-action="reader"]');
+    const route = element.closest('[data-read],[data-test],[data-action="reader"]');
     if (!route) return null;
 
     if (route.dataset.read) {
-      return { type:'msg-workspace-reader-route', mode:'read', value:String(route.dataset.read) };
+      return {
+        type: 'msg-workspace-reader-route',
+        mode: 'read',
+        value: String(route.dataset.read)
+      };
     }
+
     if (route.dataset.test) {
-      return { type:'msg-workspace-reader-route', mode:'test', value:String(route.dataset.test) };
+      return {
+        type: 'msg-workspace-reader-route',
+        mode: 'test',
+        value: String(route.dataset.test)
+      };
     }
+
     if (route.dataset.action === 'reader') {
-      return { type:'msg-workspace-return-reader' };
+      return { type: 'msg-workspace-return-reader' };
     }
+
     return null;
   }
 
-  document.addEventListener('click', (event) => {
-    const route = closestDelegatedRoute(event.target);
+  window.addEventListener('click', (event) => {
+    const route = delegatedRoute(event.target);
     if (!route) return;
 
     event.preventDefault();
