@@ -620,3 +620,62 @@ body:not(:has(> #app[data-view-key="reader"]))
 /* v2.10.6 — NEUTRAL NORMAL-PAGE CANVAS
    The space behind ordinary application pages is neutral white.
    Theme personality stays in header, side scenery, cards, controls and borders. */
+
+/* v2.11.0 — NORMAL PAGES USE ONE FULL BACKGROUND IMAGE
+   On non-Reader views, the theme panorama becomes the continuous fixed
+   background instead of being treated as a top banner plus side scenery.
+   Reader view is intentionally untouched. */
+
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+.explorer-world-art {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+/* The panorama paints the full viewport background. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+.explorer-world-art__top {
+  display: block !important;
+  position: absolute !important;
+  inset: -2px !important;
+  width: calc(100% + 4px) !important;
+  height: calc(100% + 4px) !important;
+  max-height: none !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  opacity: 1 !important;
+}
+
+/* Side pieces are unnecessary on normal pages once the panorama owns the
+   complete background; removing them also eliminates seams and tan gaps. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+.explorer-world-art__left,
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+.explorer-world-art__right {
+  display: none !important;
+}
+
+/* Do not paint a separate body/page canvas over the background image. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"])) {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* The application content remains above the background image and in normal
+   document flow. Individual page/card surfaces remain opaque. */
+html[data-msg-experience-theme]:not([data-msg-experience-theme="explorer"])
+body:not(:has(> #app[data-view-key="reader"]))
+> #app.app-shell {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
