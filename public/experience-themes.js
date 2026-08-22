@@ -101,7 +101,11 @@
      * branches; their own CSS sources decide how they look.
      */
     const appearanceKey=THEMES[key].appearance;
-    root.dataset.msgExperienceTheme=appearanceKey;
+    if(appearanceKey==='default'){
+      delete root.dataset.msgExperienceTheme;
+    }else{
+      root.dataset.msgExperienceTheme=appearanceKey;
+    }
 
     if(ART[appearanceKey]) setScenery(nodes,ART[appearanceKey]);
 
@@ -210,9 +214,11 @@
     const profile=window.MarkSetGoExperienceProfile?.get?.();
     syncVisualState(profile?.appearance || 'default');
 
+    // Run before Explorer Designer's normal listener so it sees the NEW theme
+    // and releases Explorer-owned inline colors/layout when leaving Explorer.
     document.addEventListener('marksetgo:experience-profile-changed',event=>{
       syncVisualState(event.detail?.profile?.appearance || 'default');
-    });
+    }, { capture:true });
   }
 
   window.MarkSetGoExperienceThemes={apply,current,themes:{...THEMES}};

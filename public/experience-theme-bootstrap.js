@@ -14,6 +14,10 @@
   const root=document.documentElement;
   root.dataset.experienceAppearance=appearance;
   root.dataset.msgExperienceLayout='explorer';
-  root.dataset.msgExperienceTheme=appearance;
+  if(appearance==='default'){
+    delete root.dataset.msgExperienceTheme;
+  }else{
+    root.dataset.msgExperienceTheme=appearance;
+  }
   root.classList.add(`msg-theme-${appearance === 'default' ? 'classic' : appearance}`);
 })();
