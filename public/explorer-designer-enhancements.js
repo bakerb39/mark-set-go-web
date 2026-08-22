@@ -1,21 +1,21 @@
-/* Mark, Set, Go! Explorer Designer enhancements v3.8
-   SAFE Complete UI controls + reliable Export.
-   IMPORTANT: Complete UI settings are opt-in and do not alter layout on load.
+/* Mark, Set, Go! Explorer Designer enhancements v3.9
+   - Complete UI width + scale only
+   - Removes obsolete Reader scenery controls
+   - Reliable Export + Copy JSON
    No MutationObserver.
 */
 (() => {
   'use strict';
 
   const DESIGN_STORAGE_KEY = 'markSetGoExplorerVisualDesignerV2';
-  const UI_STORAGE_KEY = 'markSetGoExplorerCompleteUIV2';
+  const UI_STORAGE_KEY = 'markSetGoExplorerCompleteUIV3';
   const EXPORT_NAME = 'mark-set-go-explorer-design-v2.json';
+  const OBSOLETE_SCENERY_KEYS = new Set(['left-art', 'right-art', 'top-art']);
 
   let uiConfig = {
     enabled: false,
     width: 100,
-    scale: 100,
-    background: '#fffdf6',
-    transparent: false
+    scale: 100
   };
 
   function designerPanel() {
@@ -36,9 +36,7 @@
   function loadUiConfig() {
     try {
       const parsed = JSON.parse(localStorage.getItem(UI_STORAGE_KEY) || 'null');
-      if (parsed && typeof parsed === 'object') {
-        uiConfig = { ...uiConfig, ...parsed };
-      }
+      if (parsed && typeof parsed === 'object') uiConfig = { ...uiConfig, ...parsed };
     } catch {}
   }
 
@@ -49,16 +47,9 @@
   function clearCompleteUiStyles() {
     const shell = appShell();
     if (!shell) return;
-
-    [
-      'width',
-      'max-width',
-      'margin-left',
-      'margin-right',
-      'zoom',
-      'background',
-      'background-image'
-    ].forEach(prop => shell.style.removeProperty(prop));
+    ['width','max-width','margin-left','margin-right','zoom'].forEach(prop => {
+      shell.style.removeProperty(prop);
+    });
   }
 
   function applyCompleteUi() {
@@ -77,18 +68,7 @@
     shell.style.setProperty('max-width', 'none', 'important');
     shell.style.setProperty('margin-left', 'auto', 'important');
     shell.style.setProperty('margin-right', 'auto', 'important');
-
-    // Use zoom only after the user explicitly enables Complete UI control.
     shell.style.setProperty('zoom', String(scale / 100), 'important');
-
-    if (uiConfig.transparent) {
-      shell.style.setProperty('background', 'transparent', 'important');
-      shell.style.setProperty('background-image', 'none', 'important');
-    } else {
-      shell.style.setProperty('background', String(uiConfig.background || '#fffdf6'), 'important');
-      shell.style.setProperty('background-image', 'none', 'important');
-    }
-
     return true;
   }
 
@@ -123,22 +103,6 @@
                  data-vd-complete-control="scale">
         </div>
 
-        <div class="msg-vd-control">
-          <label>Backdrop color</label>
-          <input type="color"
-                 value="${String(uiConfig.background || '#fffdf6')}"
-                 data-vd-complete-control="background">
-        </div>
-
-        <div class="msg-vd-control">
-          <label class="msg-vd-check">
-            <input type="checkbox"
-                   ${uiConfig.transparent ? 'checked' : ''}
-                   data-vd-complete-control="transparent">
-            Transparent app backdrop
-          </label>
-        </div>
-
         <div class="msg-vd-complete-actions">
           <button type="button" data-vd-complete-reset>Reset Complete UI</button>
         </div>
@@ -153,10 +117,7 @@
     section.querySelectorAll('[data-vd-complete-control]').forEach(input => {
       input.addEventListener('input', () => {
         const key = input.dataset.vdCompleteControl;
-
-        if (input.type === 'checkbox') uiConfig[key] = Boolean(input.checked);
-        else if (input.type === 'range') uiConfig[key] = Number(input.value);
-        else uiConfig[key] = input.value;
+        uiConfig[key] = Number(input.value);
 
         const output = section.querySelector(`[data-vd-complete-output="${key}"]`);
         if (output) output.textContent = `${Math.round(Number(uiConfig[key]) || 0)}%`;
@@ -167,13 +128,7 @@
     });
 
     section.querySelector('[data-vd-complete-reset]')?.addEventListener('click', () => {
-      uiConfig = {
-        enabled: false,
-        width: 100,
-        scale: 100,
-        background: '#fffdf6',
-        transparent: false
-      };
+      uiConfig = { enabled:false, width:100, scale:100 };
       try { localStorage.removeItem(UI_STORAGE_KEY); } catch {}
       clearCompleteUiStyles();
       section.replaceWith(createCompleteUiSection());
@@ -196,10 +151,41 @@
     return true;
   }
 
+  function removeObsoleteSceneryControls() {
+    const panel = designerPanel();
+    if (!panel) return false;
+
+    const labels = ['Left scenery', 'Right scenery', 'Top panorama'];
+    panel.querySelectorAll('[data-vd-layer]').forEach(button => {
+      const text = String(button.textContent || '').trim();
+      if (labels.includes(text)) button.remove();
+    });
+
+    return true;
+  }
+
+  function scrubObsoleteSceneryFromSavedDesign() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(DESIGN_STORAGE_KEY) || 'null');
+      if (!parsed?.targets || typeof parsed.targets !== 'object') return;
+      let changed = false;
+
+      for (const key of OBSOLETE_SCENERY_KEYS) {
+        if (Object.prototype.hasOwnProperty.call(parsed.targets, key)) {
+          delete parsed.targets[key];
+          changed = true;
+        }
+      }
+
+      if (changed) localStorage.setItem(DESIGN_STORAGE_KEY, JSON.stringify(parsed));
+    } catch {}
+  }
+
   /* ---------------- reliable export ---------------- */
 
   function saveLiveDesignerState() {
     designerPanel()?.querySelector('[data-vd-save]')?.click();
+    scrubObsoleteSceneryFromSavedDesign();
   }
 
   function readCurrentConfig() {
@@ -212,6 +198,10 @@
 
     if (!design || typeof design !== 'object') {
       throw new Error('Could not read the current Explorer design.');
+    }
+
+    if (design.targets && typeof design.targets === 'object') {
+      for (const key of OBSOLETE_SCENERY_KEYS) delete design.targets[key];
     }
 
     return {
@@ -272,7 +262,6 @@
             accept: { 'application/json': ['.json'] }
           }]
         });
-
         const writable = await handle.createWritable();
         await writable.write(text);
         await writable.close();
@@ -290,7 +279,6 @@
       const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
-
       anchor.href = url;
       anchor.download = EXPORT_NAME;
       anchor.style.display = 'none';
@@ -336,7 +324,6 @@
         copyJson();
       });
     }
-
     return true;
   }
 
@@ -344,7 +331,6 @@
     const exportButton = event.target instanceof Element
       ? event.target.closest('#msg-explorer-visual-designer [data-vd-export]')
       : null;
-
     if (!exportButton) return;
 
     event.preventDefault();
@@ -355,12 +341,11 @@
   function installAll() {
     installCompleteUiSection();
     installExportControls();
+    removeObsoleteSceneryControls();
   }
 
   function installSoon() {
-    [0, 40, 120, 350, 900].forEach(delay => {
-      window.setTimeout(installAll, delay);
-    });
+    [0,40,120,350,900].forEach(delay => window.setTimeout(installAll, delay));
   }
 
   document.addEventListener('click', event => {
@@ -369,17 +354,13 @@
   }, true);
 
   loadUiConfig();
+  scrubObsoleteSceneryFromSavedDesign();
 
-  // Critical safety behavior: only reapply if the user explicitly enabled this
-  // V2 Complete UI control in a previous session.
-  if (uiConfig.enabled) {
-    window.setTimeout(applyCompleteUi, 0);
-  } else {
-    clearCompleteUiStyles();
-  }
+  if (uiConfig.enabled) window.setTimeout(applyCompleteUi, 0);
+  else clearCompleteUiStyles();
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', installSoon, { once: true });
+    document.addEventListener('DOMContentLoaded', installSoon, { once:true });
   } else {
     installSoon();
   }
@@ -387,11 +368,6 @@
   window.MSGExplorerDesignerEnhancements = Object.freeze({
     export: exportJson,
     copy: copyJson,
-    applyCompleteUi,
-    resetCompleteUi: () => {
-      uiConfig.enabled = false;
-      try { localStorage.removeItem(UI_STORAGE_KEY); } catch {}
-      clearCompleteUiStyles();
-    }
+    applyCompleteUi
   });
 })();

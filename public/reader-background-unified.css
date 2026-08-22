@@ -1,0 +1,46 @@
+/* Mark, Set, Go! Reader background unification v3.9
+   Reader mode uses the same base page background as the rest of the app.
+   The Explorer left/top/right scenery is removed while Reader is active.
+   No Reader geometry changes.
+*/
+
+html:has(#app .reader-page-panel) body {
+  background: var(--page) !important;
+  background-image: none !important;
+}
+
+/* Explorer Reader no longer has its own scenic environment. */
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel)
+.explorer-world-art,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel)
+.explorer-world-art__left,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel)
+.explorer-world-art__right,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel)
+.explorer-world-art__top {
+  display: none !important;
+}
+
+/* Remove any pseudo-layer the Explorer scenery container may have painted. */
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel)
+.explorer-world-art::before,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel)
+.explorer-world-art::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+
+/* The outer application shell should expose the normal page background,
+   exactly like other app pages. */
+html:has(#app .reader-page-panel) #app.app-shell,
+html:has(#app .reader-page-panel) .msg-workspace-primary {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* Reader card remains its own surface/card. */
+html:has(#app .reader-page-panel) .reader-page-panel {
+  background: var(--surface) !important;
+  background-image: none !important;
+}
