@@ -11437,9 +11437,18 @@ function showMarkToolbar(selectionData, rect) {
   state.markSelection=selectionData;
   persistMarkSelectionHighlight(selectionData);
   bar.hidden=false;
-  const width=bar.offsetWidth||540;
-  bar.style.left=`${Math.max(8,Math.min(window.innerWidth-width-8,rect.left+rect.width/2-width/2))}px`;
-  bar.style.top=`${Math.max(8,rect.top-52)}px`;
+  // The passage toolbar can wrap in narrow Reader/workspace panes. Measure the
+  // rendered toolbar after it is shown so every action, including Chat and
+  // Symposium, remains inside the visible viewport instead of extending offscreen.
+  const width=Math.min(bar.offsetWidth||540,Math.max(0,window.innerWidth-16));
+  const height=bar.offsetHeight||42;
+  const left=Math.max(8,Math.min(window.innerWidth-width-8,rect.left+rect.width/2-width/2));
+  const aboveTop=rect.top-height-8;
+  const belowTop=(Number(rect.bottom)||rect.top)+8;
+  const maxTop=Math.max(8,window.innerHeight-height-8);
+  const top=aboveTop>=8 ? aboveTop : Math.min(maxTop,belowTop);
+  bar.style.left=`${left}px`;
+  bar.style.top=`${Math.max(8,top)}px`;
 }
 function hideMarkToolbar(){ const bar=app.querySelector('#mark-selection-toolbar'); if(bar) bar.hidden=true; }
 function openMarkPanel(tab='selection'){
