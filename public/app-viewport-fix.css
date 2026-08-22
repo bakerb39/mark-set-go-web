@@ -195,129 +195,79 @@ html.msg-workspace-pane-document .msg-chat-messages {
 }
 
 
-/* v1.3 — lift Reader transport controls without changing the bottom edge.
-   Keep the progress/status line where it was; reclaim a little room above it
-   by moving the Start / Pause / Reset row upward. */
-@media (min-width: 901px) {
-  body:has(#app #reader) #reader .controls:has(#start-reader, #pause-reader, #reset-reader),
-  body:has(#app #reader) #reader :is(
-    .reader-controls,
-    .reader-playback-controls,
-    .reader-transport-controls
-  ):has(#start-reader, #pause-reader, #reset-reader) {
-    transform: translateY(-7px);
-    margin-bottom: -7px;
-  }
+/* v1.3 — structural Reader footer correction.
+   IMPORTANT: do not translate individual Start/Pause/Reset buttons.
+   Explorer already positions .playback-controls with a negative top margin.
+   Work with the actual footer/playback rows instead. */
 
-  /* Fallback for reader builds where those controls are not wrapped by one of
-     the named rows above. Move the buttons together but leave the status text
-     untouched. */
+@media (min-width: 901px) {
+  /* Explicitly neutralize the experimental per-button lifts from any cached
+     earlier stylesheet that may still be present. */
   body:has(#app #reader) #start-reader,
   body:has(#app #reader) #pause-reader,
   body:has(#app #reader) #reset-reader {
+    top: auto !important;
+    transform: none !important;
+  }
+
+  body:has(#app #reader) .playback-controls {
+    transform: none !important;
+  }
+
+  /*
+   * Explorer desktop: paginator + playback should read as one compact bottom
+   * control zone inside the Reader card.
+   *
+   * The theme's native values were:
+   *   footer padding top/bottom: 29px
+   *   playback margin-top: -57px
+   * Those consume too much vertical room in the viewport shell.
+   */
+  html[data-msg-experience-theme="explorer"] body:has(#app #reader)
+  #app .reader-page-panel .reader-viewer-footer {
+    margin-top: -18px !important;
+    padding: 10px 12px 12px !important;
+    min-height: 58px !important;
+    overflow: visible !important;
     position: relative;
-    top: -7px;
-  }
-}
-
-
-/* v1.4 — Reader bottom composition
-   Pull transport controls up near the paginator, preserve bottom status copy,
-   and finish the lower Reader surface with rounded corners instead of a clipped
-   strip / background bleed. */
-@media (min-width: 901px) {
-
-  /* Lift Start / Pause / Reset substantially farther than v1.3. */
-  body:has(#app #reader) #reader .controls:has(#start-reader, #pause-reader, #reset-reader),
-  body:has(#app #reader) #reader :is(
-    .reader-controls,
-    .reader-playback-controls,
-    .reader-transport-controls
-  ):has(#start-reader, #pause-reader, #reset-reader) {
-    transform: translateY(-28px) !important;
-    margin-bottom: -28px !important;
-    position: relative;
-    z-index: 5;
+    z-index: 3;
   }
 
-  body:has(#app #reader) #start-reader,
-  body:has(#app #reader) #pause-reader,
-  body:has(#app #reader) #reset-reader {
-    top: -28px !important;
-    z-index: 5;
-  }
-
-  /*
-   * Give the visible Reader shell a deliberate lower edge matching the rounded
-   * treatment at the top. Several theme/reader builds use different shell
-   * classes, so target the stable Reader and the known enclosing panels.
-   */
-  body:has(#app #reader) :is(
-    #reader,
-    .reader-page-panel,
-    .reader-viewer,
-    .reader-shell,
-    .reader-main-panel
-  ) {
-    border-bottom-left-radius: 18px !important;
-    border-bottom-right-radius: 18px !important;
-  }
-
-  /*
-   * Prevent the page/theme background from peeking through immediately below
-   * the Reader controls. Keep the bottom area on the Reader's own surface.
-   */
-  body:has(#app #reader) #reader,
-  body:has(#app #reader) .reader-page-panel {
-    background-clip: padding-box;
-    overflow: hidden;
-  }
-
-  /*
-   * The text/status line belongs inside the Reader surface. Reserve a clean
-   * footer band for it instead of letting the viewport crop it.
-   */
-  body:has(#app #reader) #reader .status,
-  body:has(#app #reader) :is(
-    .reader-status,
-    .reader-progress,
-    .reader-viewer-footer,
-    .reader-controls-footer
-  ) {
+  html[data-msg-experience-theme="explorer"] body:has(#app #reader)
+  #app .reader-page-panel .playback-controls {
+    /* Bring Start/Pause/Reset into the paginator's band without moving the
+       buttons independently or pushing them below the card. */
+    margin-top: -48px !important;
+    margin-bottom: 8px !important;
+    padding: 0 0 0 0 !important;
+    min-height: 40px !important;
     position: relative;
     z-index: 4;
-    min-height: 26px !important;
-    padding-bottom: 6px !important;
-    margin-bottom: 0 !important;
     overflow: visible !important;
   }
 
-  /*
-   * Keep the outer application footer visually separate from the Reader.
-   * The Reader itself should end cleanly before About / Contact / Privacy / Terms.
-   */
-  body:has(#app #reader) > footer {
-    margin-top: 0 !important;
-    background: var(--msg-theme-accent-dark, var(--msg-navy-deep, #40141c));
-    position: relative;
-    z-index: 1;
+  /* Keep the progress copy readable in the same finished lower surface. */
+  html[data-msg-experience-theme="explorer"] body:has(#app #reader)
+  #app .reader-page-panel .playback-controls .status {
+    min-height: 20px !important;
+    line-height: 1.3 !important;
+    margin: 0 0 0 .35rem !important;
+    padding: 0 !important;
+    overflow: visible !important;
   }
 
-  /* Remove any exposed page strip between Reader and footer. */
-  body:has(#app #reader) > #app.app-shell {
-    padding-bottom: 0 !important;
+  /* The Reader card itself owns the rounded lower corners. */
+  html[data-msg-experience-theme="explorer"] body:has(#app #reader)
+  #app .reader-page-panel {
+    border-bottom-left-radius: 16px !important;
+    border-bottom-right-radius: 16px !important;
+    overflow: visible !important;
+    padding-bottom: 8px !important;
   }
-}
 
-/* Undo the earlier 7px-only lift so v1.4 is the single source of truth. */
-@media (min-width: 901px) {
-  body:has(#app #reader) #reader .controls:has(#start-reader, #pause-reader, #reset-reader),
-  body:has(#app #reader) #reader :is(
-    .reader-controls,
-    .reader-playback-controls,
-    .reader-transport-controls
-  ):has(#start-reader, #pause-reader, #reset-reader) {
-    transform: translateY(-28px) !important;
-    margin-bottom: -28px !important;
+  /* Do not let the compact outer site footer overlap the Reader card. */
+  html[data-msg-experience-theme="explorer"] body:has(#app #reader) > footer {
+    position: relative !important;
+    z-index: 0 !important;
   }
 }
