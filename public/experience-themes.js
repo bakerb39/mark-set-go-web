@@ -17,6 +17,11 @@
   );
 
   const ART = {
+    explorer:{
+      top:'/assets/explorer/explorer-top.png?v=1.0.0',
+      left:'/assets/explorer/explorer-left.png?v=1.0.0',
+      right:'/assets/explorer/explorer-right.png?v=1.0.0'
+    },
     scholar:{
       top:'/assets/themes/scholar/scholar-top.png?v=20260819-art-v1',
       left:'/assets/themes/scholar/scholar-left.png?v=20260819-art-v1',
@@ -49,7 +54,6 @@
     }
   };
 
-  let original = null;
   let dialog = null;
 
   function esc(s){
@@ -63,16 +67,6 @@
       top:document.querySelector('.explorer-world-art__top'),
       left:document.querySelector('.explorer-world-art__left'),
       right:document.querySelector('.explorer-world-art__right')
-    };
-  }
-
-  function rememberOriginal(){
-    if(original) return;
-    const nodes=scenery();
-    original={
-      top:nodes.top?.getAttribute('src')||'',
-      left:nodes.left?.getAttribute('src')||'',
-      right:nodes.right?.getAttribute('src')||''
     };
   }
 
@@ -102,21 +96,14 @@
     root.dataset.msgExperienceLayout='explorer';
 
     /*
-     * v5.8: experience-theme CSS is keyed to this attribute.
-     * Classic/default intentionally has no theme attribute so the original
-     * Mark, Set, Go! CSS becomes authoritative again.
+     * One profile pipeline for every appearance. The saved appearance value is
+     * always exposed to CSS. Default and Explorer are no longer special JS
+     * branches; their own CSS sources decide how they look.
      */
-    if(key==='classic'){
-      delete root.dataset.msgExperienceTheme;
-    }else{
-      root.dataset.msgExperienceTheme=key;
-    }
+    const appearanceKey=THEMES[key].appearance;
+    root.dataset.msgExperienceTheme=appearanceKey;
 
-    if(key==='explorer'){
-      setScenery(nodes,original);
-    }else if(key!=='classic'){
-      setScenery(nodes,ART[key]);
-    }
+    if(ART[appearanceKey]) setScenery(nodes,ART[appearanceKey]);
 
     refreshPressed(key);
     return key;
@@ -138,6 +125,12 @@
       appearance:THEMES[key].appearance,
       features:{...(currentProfile.features || {})}
     });
+
+    /*
+     * Apply the visual state immediately as well as listening for the profile
+     * event. Theme rendering must not depend on event delivery/timing.
+     */
+    syncVisualState(THEMES[key].appearance);
   }
 
   function ensureLauncher(){
@@ -211,7 +204,6 @@
   }
 
   function init(){
-    rememberOriginal();
     ensureLauncher();
     ensureDialog();
 
