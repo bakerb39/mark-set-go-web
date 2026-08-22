@@ -575,3 +575,19 @@ html[data-msg-experience-theme]:is(
   position:relative !important;
   z-index:1 !important;
 }
+
+
+/* ==========================================================================\n   TOPIC FEED ACTION LABEL SURFACE — authoritative source rule\n   ========================================================================== */
+/*
+ * The action words themselves never own an opaque fill. The occlusion footprint
+ * behind #read-anything-article-summary-action may mask scrolling document text,
+ * but Summarize / Analyze / Create Post remain visually plain text links.
+ */
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, a, button, span[aria-hidden="true"]) {
+  background:transparent !important;
+  background-color:transparent !important;
+  background-image:none !important;
+  box-shadow:none !important;
+}

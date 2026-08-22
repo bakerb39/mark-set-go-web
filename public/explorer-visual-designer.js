@@ -1,775 +1,210 @@
 'use strict';
 
+/*
+ * Mark, Set, Go! Explorer Visual Designer v3.1
+ *
+ * SOURCE RULES:
+ * - The application's default Reader layout lives in CSS.
+ * - Designer layout values are OPTIONAL overrides only.
+ * - No layout value is baked into the Designer's default configuration.
+ * - "Default Layout" removes every Designer layout override and exposes the
+ *   current CSS baseline immediately.
+ * - Leaving Explorer releases Designer-owned inline colors/layout so other
+ *   experience themes can style the complete UI normally.
+ * - Returning to Explorer reapplies only values the user explicitly saved.
+ * - No scenery controls. No MutationObserver.
+ */
+
 (() => {
-  const STORAGE_KEY = 'markSetGoExplorerVisualDesignerV2';
+  const STORAGE_KEY = 'markSetGoExplorerVisualDesignerV4';
   const PANEL_POSITION_KEY = 'markSetGoExplorerVisualDesignerPanelPositionV1';
-  const CONFIG_VERSION = 2;
-  const MANAGED_ATTR = 'data-msg-vd-selectable';
+  const CONFIG_VERSION = 4;
 
-  const THEME_PRESETS = {
-    explorer: {
-      page:'#e8e1cf', surface:'#fffdf6', accent:'#2e6f63', accentDark:'#245c53',
-      soft:'#e7f0e8', soft2:'#f5f1df', border:'#c7d7c7', gold:'#d3ad58', ink:'#173e37', muted:'#61766d'
-    },
-    antique: {
-      page:'#d6c4a4', surface:'#fff8e7', accent:'#765b35', accentDark:'#5b432b',
-      soft:'#efe1c2', soft2:'#f6ead1', border:'#c7aa75', gold:'#b8873f', ink:'#3b2b1e', muted:'#756550'
-    }
-  };
+  const PRESETS = Object.freeze({
+    explorer:Object.freeze({
+      page:'#e8e1cf',surface:'#fffdf6',accent:'#2e6f63',accentDark:'#245c53',
+      soft:'#e7f0e8',soft2:'#f5f1df',border:'#c7d7c7',gold:'#d3ad58',ink:'#173e37',muted:'#61766d'
+    }),
+    antique:Object.freeze({
+      page:'#d6c4a4',surface:'#fff8e7',accent:'#765b35',accentDark:'#5b432b',
+      soft:'#efe1c2',soft2:'#f6ead1',border:'#c7aa75',gold:'#b8873f',ink:'#3b2b1e',muted:'#756550'
+    })
+  });
 
-  /* Baked from the user's latest exported design JSON (2026-08-18).
-     Reset returns to these exact layout choices. */
-  const DEFAULT_CONFIG = {
-      "version": 2,
-      "targets": {
-          "controls": {
-              "minHeight": 58,
-              "marginBottom": 30,
-              "marginTop": 6
-          },
-          "reader": {
-              "marginTop": 7,
-              "background": "#ffffff",
-              "pageBackground": "#ffffff"
-          },
-          "playback": {
-              "marginBottom": 19,
-              "marginTop": -57
-          },
-          "shell": {
-              "paddingY": 0,
-              "width": 100,
-              "marginTop": 3,
-              "moveY": -10,
-              "marginBottom": 0
-          },
-          "companion": {
-              "headerBackground": "#317165"
-          },
-          "footer": {
-              "marginTop": -24,
-              "paddingY": 29
-          },
-          "topics": {
-              "marginBottom": -80,
-              "height": 790,
-              "marginTop": 7
-          },
-          "title": {
-              "marginTop": 14,
-              "marginBottom": -1
-          }
-      }
-  };
+  const COLOR_VARS = Object.freeze({
+    page:'--explorer-global-page',surface:'--explorer-global-surface',accent:'--explorer-global-accent',
+    accentDark:'--explorer-global-accent-dark',soft:'--explorer-global-soft',soft2:'--explorer-global-soft-2',
+    gold:'--explorer-global-gold',border:'--explorer-global-border',ink:'--explorer-global-ink',muted:'--explorer-global-muted'
+  });
 
-  const TARGETS = [
-    { id:'theme', label:'Global Explorer Theme', selector:'html', group:'Theme' },
-    { id:'shell', label:'Reader shell', selector:'.reader-page-panel', group:'Layout' },
-    { id:'title', label:'Reader title', selector:'.reader-page-panel > .reader-title-row', group:'Layout' },
-    { id:'controls', label:'Top controls', selector:'.reader-page-panel > .reader-pane-controls', group:'Layout' },
-    { id:'topics', label:'My Topics', selector:'.reader-page-panel .navigation-pane', group:'Panes' },
-    { id:'reader', label:'Reading page', selector:'.reader-page-panel #reader-frame', group:'Panes' },
-    { id:'footer', label:'Page controls', selector:'.reader-page-panel .reader-viewer-footer', group:'Layout' },
-    { id:'playback', label:'Start / Pause', selector:'.reader-page-panel .playback-controls', group:'Layout' },
-    { id:'companion', label:'Companion pane', selector:'.reader-page-panel .mark-companion-panel', group:'Panes' },
-    { id:'left-art', label:'Left scenery', selector:'.explorer-world-art__left', group:'Scenery', art:true },
-    { id:'right-art', label:'Right scenery', selector:'.explorer-world-art__right', group:'Scenery', art:true },
-    { id:'top-art', label:'Top panorama', selector:'.explorer-world-art__top', group:'Scenery', art:true }
-  ];
+  const LAYERS = Object.freeze({
+    shell:{label:'Reader shell',selector:'.reader-page-panel',controls:[
+      r('width','Width',55,110,1,'%','width'),r('marginTop','Top margin',-80,120,1,'px','margin-top'),
+      r('marginBottom','Bottom gap',0,120,1,'px','margin-bottom'),r('paddingX','Side padding',0,80,1,'paddingX','padding'),
+      r('paddingY','Top / bottom padding',0,60,1,'paddingY','padding'),r('radius','Corner radius',0,50,1,'px','border-radius')
+    ]},
+    title:{label:'Reader title',selector:'.reader-page-panel > .reader-title-row',controls:[
+      r('marginTop','Top spacing',-40,100,1,'px','margin-top'),r('marginBottom','Bottom spacing',-40,100,1,'px','margin-bottom')
+    ]},
+    controls:{label:'Top controls',selector:'.reader-page-panel > .reader-pane-controls',controls:[
+      r('marginTop','Top spacing',-40,100,1,'px','margin-top'),r('marginBottom','Bottom spacing',-40,120,1,'px','margin-bottom'),
+      r('minHeight','Row height',24,120,1,'px','min-height')
+    ]},
+    topics:{label:'My Topics',selector:'.reader-page-panel .navigation-pane',controls:[
+      r('width','Pane width',140,600,2,'navWidth','--navigation-width'),r('marginTop','Top spacing',-30,100,1,'px','margin-top')
+    ]},
+    reader:{label:'Reading page',selector:'.reader-page-panel #reader-frame',controls:[
+      r('marginTop','Top spacing',-30,100,1,'px','margin-top'),r('radius','Corner radius',0,40,1,'px','border-radius')
+    ]},
+    footer:{label:'Page controls',selector:'.reader-page-panel .reader-viewer-footer',controls:[
+      r('height','Footer height',36,90,1,'footerHeight','--msg-reader-footer-height')
+    ]},
+    playback:{label:'Start / Pause',selector:'.reader-page-panel .playback-controls',controls:[
+      r('height','Row height',34,80,1,'px','height'),r('marginTop','Top spacing',0,40,1,'px','margin-top')
+    ]},
+    companion:{label:'Companion pane',selector:'.reader-page-panel .mark-companion-panel',controls:[
+      r('width','Pane width',220,700,5,'wordWidth','--word-panel-width'),r('marginTop','Top spacing',-30,100,1,'px','margin-top')
+    ]}
+  });
 
-  const STYLE_CONTROLS = {
-    theme: [
-      selectControl('preset','Theme preset',[['explorer','Explorer Green'],['antique','Antique Parchment'],['custom','Custom']]),
-      color('page','Page background','html','--explorer-global-page'),
-      color('surface','Page / card surface','html','--explorer-global-surface'),
-      color('accent','Primary accent','html','--explorer-global-accent'),
-      color('accentDark','Dark accent','html','--explorer-global-accent-dark'),
-      color('soft','Soft accent','html','--explorer-global-soft'),
-      color('soft2','Warm secondary','html','--explorer-global-soft-2'),
-      color('gold','Brass / gold','html','--explorer-global-gold'),
-      color('border','Borders','html','--explorer-global-border'),
-      color('ink','Text','html','--explorer-global-ink'),
-      color('muted','Muted text','html','--explorer-global-muted')
-    ],
-    shell: [
-      range('width','Shell width',55,110,1,'%', '.reader-page-panel','width'),
-      range('moveY','Move shell up / down',-150,150,1,'translateY','.reader-page-panel','transform'),
-      range('marginTop','Top margin',-100,160,1,'px','.reader-page-panel','margin-top'),
-      range('marginBottom','Bottom gap',0,180,1,'px','.reader-page-panel','margin-bottom'),
-      range('paddingX','Side padding',0,100,1,'paddingX','.reader-page-panel','padding'),
-      range('paddingY','Top / bottom padding',0,100,1,'paddingY','.reader-page-panel','padding'),
-      color('background','Shell color','.reader-page-panel','background'),
-      color('borderColor','Border color','.reader-page-panel','border-color'),
-      range('borderWidth','Border width',0,12,1,'px','.reader-page-panel','border-width'),
-      range('radius','Corner radius',0,80,1,'px','.reader-page-panel','border-radius'),
-      range('shadow','Shadow',0,100,1,'shadow','.reader-page-panel','box-shadow')
-    ],
-    title: [
-      range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel > .reader-title-row','margin-top'),
-      range('marginBottom','Bottom spacing',-80,150,1,'px','.reader-page-panel > .reader-title-row','margin-bottom'),
-      range('fontSize','Title size',10,72,1,'px','.reader-title-copy h1','font-size'),
-      color('titleColor','Title color','.reader-title-copy h1','color')
-    ],
-    controls: [
-      range('marginTop','Top spacing',-100,160,1,'px','.reader-page-panel > .reader-pane-controls','margin-top'),
-      range('marginBottom','Bottom spacing',-100,180,1,'px','.reader-page-panel > .reader-pane-controls','margin-bottom'),
-      range('gap','Button spacing',0,80,1,'px','.reader-page-panel .reader-pane-buttons','gap'),
-      range('minHeight','Row height',20,160,1,'px','.reader-page-panel > .reader-pane-controls','min-height')
-    ],
-    topics: [
-      range('width','Pane width',120,700,2,'navWidth','#reader-layout','--navigation-width'),
-      range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel .navigation-pane','margin-top'),
-      range('height','Pane height',240,1200,5,'px','.reader-page-panel .navigation-pane','height'),
-      range('marginBottom','Bottom spacing',-80,180,1,'px','.reader-page-panel .navigation-pane','margin-bottom'),
-      color('background','Background','.reader-page-panel .navigation-pane','background'),
-      color('borderColor','Border color','.reader-page-panel .navigation-pane','border-color'),
-      range('radius','Corner radius',0,80,1,'px','.reader-page-panel .navigation-pane','border-radius'),
-      range('shadow','Shadow',0,100,1,'shadow','.reader-page-panel .navigation-pane','box-shadow')
-    ],
-    reader: [
-      range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel #reader-frame','margin-top'),
-      color('background','Frame color','.reader-page-panel #reader-frame','background'),
-      color('pageBackground','Actual reading page color','.reader-page-panel #reader','background'),
-      color('borderColor','Border color','.reader-page-panel #reader-frame','border-color'),
-      range('borderWidth','Border width',0,12,1,'px','.reader-page-panel #reader-frame','border-width'),
-      range('radius','Corner radius',0,80,1,'px','.reader-page-panel #reader-frame','border-radius'),
-      range('shadow','Shadow',0,100,1,'shadow','.reader-page-panel #reader-frame','box-shadow')
-    ],
-    footer: [
-      range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel .reader-viewer-footer','margin-top'),
-      range('paddingY','Vertical padding',0,80,1,'paddingY','.reader-page-panel .reader-viewer-footer','padding')
-    ],
-    playback: [
-      range('marginTop','Top spacing',-100,150,1,'px','.reader-page-panel .playback-controls','margin-top'),
-      range('marginBottom','Bottom spacing',-100,150,1,'px','.reader-page-panel .playback-controls','margin-bottom')
-    ],
-    companion: [
-      range('width','Pane width',180,800,5,'wordWidth','#reader-layout','--word-panel-width'),
-      color('background','Main body','.reader-page-panel .mark-companion-panel .askmark-premium','background'),
-      color('headerBackground','Header','.reader-page-panel .mark-companion-panel .askmark-hero','background'),
-      color('composerBackground','Composer','.reader-page-panel .mark-companion-panel .askmark-composer','background'),
-      color('borderColor','Frame border','.reader-page-panel .mark-companion-panel','border-color'),
-      range('radius','Corner radius',0,80,1,'px','.reader-page-panel .mark-companion-panel','border-radius'),
-      range('shadow','Shadow',0,100,1,'shadow','.reader-page-panel .mark-companion-panel','box-shadow')
-    ]
-  };
-
-  const ART_CONTROLS = [
-    range('x','Move left / right',-800,800,2,'px',null,null),
-    range('y','Move up / down',-800,800,2,'px',null,null),
-    range('width','Artwork width',50,900,2,'px',null,null),
-    range('scale','Scale',25,250,1,'%',null,null),
-    range('opacity','Opacity',0,100,1,'%',null,null),
-    check('visible','Show artwork'),
-    text('src','Image URL'),
-    fileControl('imageFile','Replace with image')
-  ];
-
-  let launcher = null;
-  let panel = null;
-  let selectedId = null;
-  let config = loadConfig();
-  let undoStack = [];
-  let editBaseline = null;
-  let dragState = null;
-  let panelDragState = null;
-
-  function range(key,label,min,max,step,unit,selector,prop){return{type:'range',key,label,min,max,step,unit,selector,prop};}
-  function color(key,label,selector,prop){return{type:'color',key,label,selector,prop};}
-  function selectControl(key,label,options){return{type:'select',key,label,options};}
-  function check(key,label){return{type:'check',key,label};}
-  function text(key,label){return{type:'text',key,label};}
-  function fileControl(key,label){return{type:'file',key,label};}
-  function clone(value){return JSON.parse(JSON.stringify(value||{}));}
-  function blankConfig(){return clone(DEFAULT_CONFIG);}
-
-  function loadConfig(){
-    try{
-      const raw=JSON.parse(localStorage.getItem(STORAGE_KEY)||'null');
-      if(!raw||raw.version!==CONFIG_VERSION)return blankConfig();
-      raw.targets||={};
-      return raw;
-    }catch{return blankConfig();}
-  }
+  function r(key,label,min,max,step,unit,prop){return{key,label,min,max,step,unit,prop};}
+  function clone(v){return JSON.parse(JSON.stringify(v||{}));}
   function isExplorer(){return document.documentElement.dataset.msgExperienceTheme==='explorer';}
-  function targetById(id){return TARGETS.find(t=>t.id===id)||null;}
-  function targetElement(target){
-    const selector=String(target?.selector||'').trim();
-    if(!selector)return null;
-    try{return document.querySelector(selector);}catch{return null;}
+  function defaultConfig(){return{version:CONFIG_VERSION,preset:'explorer',colors:clone(PRESETS.explorer),layout:{}};}
+  function sanitize(raw){
+    const out=defaultConfig();
+    if(!raw||Number(raw.version)!==CONFIG_VERSION)return out;
+    out.preset=['explorer','antique','custom'].includes(String(raw.preset))?String(raw.preset):'explorer';
+    for(const [k,fallback] of Object.entries(PRESETS.explorer)){
+      const v=String(raw.colors?.[k]||'');out.colors[k]=/^#[0-9a-f]{6}$/i.test(v)?v:fallback;
+    }
+    if(raw.layout&&typeof raw.layout==='object'){
+      for(const [id,layer] of Object.entries(LAYERS)){
+        const src=raw.layout[id];if(!src||typeof src!=='object')continue;
+        const dst={};
+        for(const c of layer.controls){
+          if(!Object.prototype.hasOwnProperty.call(src,c.key))continue;
+          const n=Number(src[c.key]);if(Number.isFinite(n))dst[c.key]=Math.min(c.max,Math.max(c.min,n));
+        }
+        if(Object.keys(dst).length)out.layout[id]=dst;
+      }
+    }
+    return out;
   }
-  function controlsForTarget(target){return target?.art?ART_CONTROLS:(STYLE_CONTROLS[target?.id]||[]);}
+  function loadConfig(){try{return sanitize(JSON.parse(localStorage.getItem(STORAGE_KEY)||'null'));}catch{return defaultConfig();}}
+
+  let config=loadConfig(),panel=null,launcher=null,panelDrag=null,selected='shell';
+
+  function target(id){const def=LAYERS[id];if(!def)return null;try{return document.querySelector(def.selector);}catch{return null;}}
+  function layoutRoot(){return document.querySelector('#reader-layout');}
+  function computedValue(id,c){
+    const saved=config.layout[id]?.[c.key];if(Number.isFinite(saved))return saved;
+    const node=target(id);if(!node)return c.min;
+    if(c.unit==='navWidth'||c.unit==='wordWidth'){
+      const root=layoutRoot();const n=parseFloat(getComputedStyle(root).getPropertyValue(c.prop));return Number.isFinite(n)?n:c.min;
+    }
+    if(c.unit==='footerHeight'){
+      const shell=document.querySelector('.reader-page-panel');const n=parseFloat(getComputedStyle(shell).getPropertyValue(c.prop));return Number.isFinite(n)?n:52;
+    }
+    if(c.unit==='paddingX')return parseFloat(getComputedStyle(node).paddingLeft)||0;
+    if(c.unit==='paddingY')return parseFloat(getComputedStyle(node).paddingTop)||0;
+    const n=parseFloat(getComputedStyle(node).getPropertyValue(c.prop));return Number.isFinite(n)?n:c.min;
+  }
+
+  function applyColors(){
+    const root=document.documentElement;
+    if(!isExplorer()){for(const v of Object.values(COLOR_VARS))root.style.removeProperty(v);return;}
+    for(const [k,v] of Object.entries(COLOR_VARS))root.style.setProperty(v,config.colors[k]);
+  }
+
+  function applyOneLayout(id){
+    if(!isExplorer())return;
+    const def=LAYERS[id],values=config.layout[id];if(!def||!values)return;
+    const node=target(id);if(!node)return;
+    for(const c of def.controls){
+      if(!Object.prototype.hasOwnProperty.call(values,c.key))continue;
+      const value=values[c.key];
+      if(c.unit==='navWidth'||c.unit==='wordWidth'){layoutRoot()?.style.setProperty(c.prop,`${value}px`,'important');continue;}
+      if(c.unit==='footerHeight'){document.querySelector('.reader-page-panel')?.style.setProperty(c.prop,`${value}px`,'important');continue;}
+      if(c.unit==='paddingX'){node.style.setProperty('padding-left',`${value}px`,'important');node.style.setProperty('padding-right',`${value}px`,'important');continue;}
+      if(c.unit==='paddingY'){node.style.setProperty('padding-top',`${value}px`,'important');node.style.setProperty('padding-bottom',`${value}px`,'important');continue;}
+      if(c.key==='width'&&id==='shell'){node.style.setProperty('width',`${value}%`,'important');node.style.setProperty('margin-left','auto','important');node.style.setProperty('margin-right','auto','important');continue;}
+      node.style.setProperty(c.prop,`${value}px`,'important');
+      if(id==='playback'&&c.key==='height'){node.style.setProperty('min-height',`${value}px`,'important');node.style.setProperty('max-height',`${value}px`,'important');node.style.setProperty('flex-basis',`${value}px`,'important');}
+    }
+  }
+  function applyLayout(){if(!isExplorer()){releaseLayout();return;}for(const id of Object.keys(LAYERS))applyOneLayout(id);}
+
+  function releaseLayer(id){
+    const def=LAYERS[id],node=target(id);if(!def||!node)return;
+    for(const c of def.controls){
+      if(c.unit==='navWidth'||c.unit==='wordWidth'){layoutRoot()?.style.removeProperty(c.prop);continue;}
+      if(c.unit==='footerHeight'){document.querySelector('.reader-page-panel')?.style.removeProperty(c.prop);continue;}
+      if(c.unit==='paddingX'){node.style.removeProperty('padding-left');node.style.removeProperty('padding-right');continue;}
+      if(c.unit==='paddingY'){node.style.removeProperty('padding-top');node.style.removeProperty('padding-bottom');continue;}
+      node.style.removeProperty(c.prop);
+      if(id==='shell'&&c.key==='width'){node.style.removeProperty('margin-left');node.style.removeProperty('margin-right');}
+      if(id==='playback'&&c.key==='height'){node.style.removeProperty('min-height');node.style.removeProperty('max-height');node.style.removeProperty('flex-basis');}
+    }
+  }
+  function releaseLayout(){for(const id of Object.keys(LAYERS))releaseLayer(id);}
+  function applyAll(){applyColors();applyLayout();}
 
   function ensureUI(){
-    if(!launcher){
-      launcher=document.createElement('button');
-      launcher.id='msg-explorer-design-launcher';
-      launcher.type='button';
-      launcher.textContent='✦ Design';
-      launcher.title='Fine-tune the Explorer Reader layout';
-      launcher.addEventListener('click',openDesigner);
-      document.body.appendChild(launcher);
-    }
+    if(!launcher){launcher=document.getElementById('msg-explorer-design-launcher')||document.body.appendChild(Object.assign(document.createElement('button'),{id:'msg-explorer-design-launcher',type:'button',textContent:'✦ Design',title:'Customize Explorer appearance and layout'}));launcher.addEventListener('click',openDesigner);}
     if(!panel){
-      panel=document.createElement('aside');
-      panel.id='msg-explorer-visual-designer';
-      panel.hidden=true;
-      panel.setAttribute('aria-label','Explorer visual designer');
-      panel.innerHTML=`
-        <div class="msg-vd-head" data-vd-drag-handle title="Drag to move the Designer">
-          <span class="msg-vd-drag-grip" aria-hidden="true">⋮⋮</span>
-          <div class="msg-vd-head-copy"><strong>Explorer Designer</strong><small>Drag this header to move · fine-tune the Reader composition</small></div>
-          <button type="button" data-vd-preview title="Preview without editor outlines">◉</button>
-          <button type="button" data-vd-close aria-label="Close designer">×</button>
-        </div>
-        <div class="msg-vd-toolbar">
-          <button type="button" data-vd-undo disabled>Undo</button>
-          <button type="button" data-vd-reset-selected disabled>Reset layer</button>
-          <button type="button" data-vd-export>Export</button>
-          <button type="button" data-vd-import>Import</button>
-          <input type="file" accept="application/json" data-vd-import-file hidden>
-        </div>
-        <div class="msg-vd-scroll">
-          <section class="msg-vd-section">
-            <div class="msg-vd-section-title"><span>Layers</span><span>click page or choose</span></div>
-            <div class="msg-vd-layers" data-vd-layers></div>
-          </section>
-          <section class="msg-vd-section">
-            <div class="msg-vd-section-title"><span>Inspector</span><span data-vd-selection-name>Reader shell</span></div>
-            <div data-vd-inspector></div>
-          </section>
-        </div>
-        <div class="msg-vd-status" data-vd-status>Changes are live but not saved yet.</div>
-        <div class="msg-vd-bottom-actions">
-          <button type="button" class="msg-vd-danger" data-vd-reset-all>Reset Explorer</button>
-          <button type="button" class="msg-vd-save" data-vd-save>Save design</button>
-        </div>`;
-      document.body.appendChild(panel);
-      bindUI();
+      panel=document.getElementById('msg-explorer-visual-designer');
+      if(!panel){panel=document.createElement('aside');panel.id='msg-explorer-visual-designer';panel.hidden=true;panel.setAttribute('aria-label','Explorer visual designer');panel.innerHTML=`
+        <div class="msg-vd-head" data-vd-drag-handle title="Drag to move the Designer"><span class="msg-vd-drag-grip" aria-hidden="true">⋮⋮</span><div class="msg-vd-head-copy"><strong>Explorer Designer</strong><small>Optional overrides · Default Layout always returns to CSS baseline</small></div><button type="button" data-vd-close aria-label="Close designer">×</button></div>
+        <div class="msg-vd-toolbar"><button type="button" data-vd-preset="explorer">Explorer Green</button><button type="button" data-vd-preset="antique">Antique Parchment</button><button type="button" data-vd-export>Export</button><button type="button" data-vd-copy>Copy JSON</button></div>
+        <div class="msg-vd-scroll"><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Layers</span><span>choose a layout area</span></div><div data-vd-layers></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Inspector</span><span data-vd-selected-name></span></div><div data-vd-inspector></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Explorer colors</span><span>theme variables</span></div><div data-vd-colors></div></section></div>
+        <div class="msg-vd-status" data-vd-status>Default Layout is the application's CSS baseline.</div>
+        <div class="msg-vd-bottom-actions"><button type="button" class="msg-vd-danger" data-vd-default-layout>Default Layout</button><button type="button" data-vd-reset-layer>Reset layer</button><button type="button" class="msg-vd-save" data-vd-save>Save design</button></div>`;document.body.appendChild(panel);}
+      panel.querySelector('[data-vd-close]')?.addEventListener('click',closeDesigner);
+      panel.querySelector('[data-vd-save]')?.addEventListener('click',saveConfig);
+      panel.querySelector('[data-vd-default-layout]')?.addEventListener('click',defaultLayout);
+      panel.querySelector('[data-vd-reset-layer]')?.addEventListener('click',resetLayer);
+      panel.querySelector('[data-vd-export]')?.addEventListener('click',exportConfig);
+      panel.querySelector('[data-vd-copy]')?.addEventListener('click',copyConfig);
+      panel.querySelectorAll('[data-vd-preset]').forEach(b=>b.addEventListener('click',()=>applyPreset(b.dataset.vdPreset)));
+      bindPanelDragging();
     }
-    refreshLayers();
+    render();syncVisibility();
   }
 
-  function bindUI(){
-    panel.querySelector('[data-vd-close]')?.addEventListener('click',closeDesigner);
-    panel.querySelector('[data-vd-preview]')?.addEventListener('click',togglePreview);
-    panel.querySelector('[data-vd-undo]')?.addEventListener('click',undo);
-    panel.querySelector('[data-vd-reset-selected]')?.addEventListener('click',resetSelected);
-    panel.querySelector('[data-vd-reset-all]')?.addEventListener('click',resetAll);
-    panel.querySelector('[data-vd-save]')?.addEventListener('click',save);
-    panel.querySelector('[data-vd-export]')?.addEventListener('click',exportConfig);
-    panel.querySelector('[data-vd-import]')?.addEventListener('click',()=>panel.querySelector('[data-vd-import-file]')?.click());
-    panel.querySelector('[data-vd-import-file]')?.addEventListener('change',importConfig);
-    bindPanelDragging();
-  }
-
-  function panelPositionBounds(left,top){
-    if(!panel)return{left:8,top:8};
-    const rect=panel.getBoundingClientRect();
-    const margin=8;
-    const maxLeft=Math.max(margin,window.innerWidth-rect.width-margin);
-    const maxTop=Math.max(margin,window.innerHeight-rect.height-margin);
-    return{
-      left:Math.round(clamp(Number(left)||margin,margin,maxLeft)),
-      top:Math.round(clamp(Number(top)||margin,margin,maxTop))
-    };
-  }
-
-  function loadPanelPosition(){
-    try{
-      const saved=JSON.parse(localStorage.getItem(PANEL_POSITION_KEY)||'null');
-      if(!saved||!Number.isFinite(Number(saved.left))||!Number.isFinite(Number(saved.top)))return null;
-      return{left:Number(saved.left),top:Number(saved.top)};
-    }catch{return null;}
-  }
-
-  function savePanelPosition(){
-    if(!panel||panel.hidden)return;
-    const rect=panel.getBoundingClientRect();
-    const position=panelPositionBounds(rect.left,rect.top);
-    try{localStorage.setItem(PANEL_POSITION_KEY,JSON.stringify(position));}catch{}
-  }
-
-  function applyPanelPosition(position=loadPanelPosition()){
-    if(!panel||!position)return;
-    const bounded=panelPositionBounds(position.left,position.top);
-    panel.style.setProperty('left',`${bounded.left}px`,'important');
-    panel.style.setProperty('top',`${bounded.top}px`,'important');
-    panel.style.setProperty('right','auto','important');
-    panel.style.setProperty('bottom','auto','important');
-  }
-
-  function bindPanelDragging(){
-    const handle=panel?.querySelector('[data-vd-drag-handle]');
-    if(!handle||handle.dataset.vdDragBound==='1')return;
-    handle.dataset.vdDragBound='1';
-
-    handle.addEventListener('pointerdown',event=>{
-      if(event.target instanceof Element&&event.target.closest('button,input,select,a'))return;
-      if(!panel||panel.hidden)return;
-      const rect=panel.getBoundingClientRect();
-      panelDragState={
-        pointerId:event.pointerId,
-        startX:event.clientX,
-        startY:event.clientY,
-        left:rect.left,
-        top:rect.top
-      };
-      handle.setPointerCapture?.(event.pointerId);
-      document.body.classList.add('msg-vd-panel-dragging');
-      event.preventDefault();
-    });
-
-    handle.addEventListener('pointermove',event=>{
-      if(!panelDragState||event.pointerId!==panelDragState.pointerId||!panel)return;
-      const next=panelPositionBounds(
-        panelDragState.left+(event.clientX-panelDragState.startX),
-        panelDragState.top+(event.clientY-panelDragState.startY)
-      );
-      panel.style.setProperty('left',`${next.left}px`,'important');
-      panel.style.setProperty('top',`${next.top}px`,'important');
-      panel.style.setProperty('right','auto','important');
-      panel.style.setProperty('bottom','auto','important');
-    });
-
-    const finish=event=>{
-      if(!panelDragState||event.pointerId!==panelDragState.pointerId)return;
-      panelDragState=null;
-      document.body.classList.remove('msg-vd-panel-dragging');
-      savePanelPosition();
-    };
-    handle.addEventListener('pointerup',finish);
-    handle.addEventListener('pointercancel',finish);
-
-    handle.addEventListener('dblclick',event=>{
-      if(event.target instanceof Element&&event.target.closest('button,input,select,a'))return;
-      try{localStorage.removeItem(PANEL_POSITION_KEY);}catch{}
-      panel.style.removeProperty('left');
-      panel.style.removeProperty('top');
-      panel.style.removeProperty('right');
-      panel.style.removeProperty('bottom');
-    });
-  }
-
-  function openDesigner(){
-    ensureUI();
-    panel.hidden=false;
-    window.requestAnimationFrame(()=>applyPanelPosition());
-    launcher.textContent='✦ Designing';
-    document.body.classList.add('msg-vd-design-mode');
-    document.body.classList.remove('msg-vd-preview-mode');
-    markSelectableElements();
-    selectTarget(selectedId||'shell');
-    setStatus('Reader shell selected. Adjust the composition, then Save.',false);
-  }
-  function closeDesigner(){
-    panel.hidden=true;
-    launcher.textContent='✦ Design';
-    document.body.classList.remove('msg-vd-design-mode','msg-vd-preview-mode');
-    clearSelectionOutline();
-    clearSelectableMarks();
-  }
-  function togglePreview(){
-    const preview=document.body.classList.toggle('msg-vd-preview-mode');
-    if(preview){panel.hidden=true;launcher.textContent='✦ Edit';clearSelectionOutline();}
-    else{panel.hidden=false;window.requestAnimationFrame(()=>applyPanelPosition());launcher.textContent='✦ Designing';applySelectionOutline();}
-  }
-
-  function markSelectableElements(){
-    TARGETS.forEach(target=>{const el=targetElement(target);if(el)el.setAttribute(MANAGED_ATTR,'1');});
-  }
-  function clearSelectableMarks(){document.querySelectorAll(`[${MANAGED_ATTR}]`).forEach(el=>el.removeAttribute(MANAGED_ATTR));}
-  function clearSelectionOutline(){document.querySelectorAll('.msg-vd-selected').forEach(el=>el.classList.remove('msg-vd-selected'));}
-  function applySelectionOutline(){
-    if(document.body.classList.contains('msg-vd-preview-mode'))return;
-    const el=targetElement(targetById(selectedId));
-    if(el)el.classList.add('msg-vd-selected');
-  }
-
-  function refreshLayers(){
+  const colorLabels={page:'Page background',surface:'Page / card surface',accent:'Primary accent',accentDark:'Dark accent',soft:'Soft accent',soft2:'Warm secondary',gold:'Brass / gold',border:'Borders',ink:'Text',muted:'Muted text'};
+  function render(){
     if(!panel)return;
-    const host=panel.querySelector('[data-vd-layers]');
-    if(!host)return;
-    host.innerHTML=TARGETS.map(target=>{
-      const exists=Boolean(targetElement(target));
-      return `<button type="button" class="msg-vd-layer ${target.id===selectedId?'is-selected':''} ${target.id==='shell'?'is-primary-layer':''}" data-vd-layer="${target.id}" ${exists?'':'disabled'}>${target.label}</button>`;
-    }).join('');
-    host.querySelectorAll('[data-vd-layer]').forEach(button=>button.addEventListener('click',()=>selectTarget(button.dataset.vdLayer)));
+    const layers=panel.querySelector('[data-vd-layers]');
+    layers.innerHTML=Object.entries(LAYERS).map(([id,d])=>`<button type="button" data-vd-layer="${id}" class="${selected===id?'is-selected':''}">${d.label}</button>`).join('');
+    layers.querySelectorAll('[data-vd-layer]').forEach(b=>b.addEventListener('click',()=>{selected=b.dataset.vdLayer;render();}));
+    panel.querySelector('[data-vd-selected-name]').textContent=LAYERS[selected]?.label||'';
+    const inspector=panel.querySelector('[data-vd-inspector]'),def=LAYERS[selected];
+    inspector.innerHTML=def.controls.map(c=>{const v=Math.round(computedValue(selected,c));return`<div class="msg-vd-control"><label>${c.label}</label><output data-vd-out="${c.key}">${v}${c.unit==='%'?'%':'px'}</output><input type="range" min="${c.min}" max="${c.max}" step="${c.step}" value="${v}" data-vd-layout="${c.key}"></div>`;}).join('');
+    inspector.querySelectorAll('[data-vd-layout]').forEach(input=>input.addEventListener('input',()=>{const c=def.controls.find(x=>x.key===input.dataset.vdLayout);if(!c)return;(config.layout[selected]||={})[c.key]=Number(input.value);applyOneLayout(selected);inspector.querySelector(`[data-vd-out="${c.key}"]`).textContent=`${Math.round(Number(input.value))}${c.unit==='%'?'%':'px'}`;setStatus('Layout override is live. Save when ready.',false);}));
+    const colors=panel.querySelector('[data-vd-colors]');colors.innerHTML=Object.keys(COLOR_VARS).map(k=>`<div class="msg-vd-control"><label>${colorLabels[k]}</label><input type="color" value="${config.colors[k]}" data-vd-color="${k}"></div>`).join('');
+    colors.querySelectorAll('[data-vd-color]').forEach(input=>input.addEventListener('input',()=>{config.colors[input.dataset.vdColor]=input.value;config.preset='custom';applyColors();setStatus('Color override is live. Save when ready.',false);}));
   }
 
-  function selectTarget(id){
-    const target=targetById(id);
-    if(!target)return;
-    const el=targetElement(target);
-    if(!el){setStatus(`${target.label} is not visible on this page.`,false);return;}
-    clearSelectionOutline();
-    selectedId=id;
-    applySelectionOutline();
-    refreshLayers();
-    renderInspector();
-    panel.querySelector('[data-vd-reset-selected]')?.removeAttribute('disabled');
-  }
+  function defaultLayout(){releaseLayout();config.layout={};render();setStatus('Default Layout restored from the application CSS.',true);window.dispatchEvent(new Event('resize'));}
+  function resetLayer(){releaseLayer(selected);delete config.layout[selected];render();setStatus(`${LAYERS[selected].label} returned to Default Layout.`,true);window.dispatchEvent(new Event('resize'));}
+  function applyPreset(name){if(!PRESETS[name])return;config.preset=name;config.colors=clone(PRESETS[name]);applyColors();render();setStatus('Color preset applied. Layout was not changed.',false);}
+  function saveConfig(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(config));setStatus('Explorer design saved.',true);}catch{setStatus('Could not save Explorer design.',false);}}
+  function exportConfig(){const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mark-set-go-explorer-design-v4.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus('Design JSON exported.',true);}
+  async function copyConfig(){try{await navigator.clipboard.writeText(JSON.stringify(config,null,2));setStatus('Design JSON copied.',true);}catch{setStatus('Clipboard copy unavailable.',false);}}
+  function setStatus(msg,saved){const n=panel?.querySelector('[data-vd-status]');if(n){n.textContent=msg;n.classList.toggle('is-saved',Boolean(saved));}}
 
-  function renderInspector(){
-    if(!panel)return;
-    const target=targetById(selectedId)||targetById('shell');
-    const host=panel.querySelector('[data-vd-inspector]');
-    const name=panel.querySelector('[data-vd-selection-name]');
-    if(!target||!host)return;
-    if(name)name.textContent=target.label;
-    const controls=controlsForTarget(target);
-    host.innerHTML=controls.map(control=>controlMarkup(target,control)).join('');
-    bindInspectorControls(target,controls,host);
-  }
+  function openDesigner(){if(!isExplorer())return;ensureUI();panel.hidden=false;launcher.textContent='✦ Designing';applyPanelPosition();}
+  function closeDesigner(){if(!panel)return;panel.hidden=true;if(launcher)launcher.textContent='✦ Design';savePanelPosition();}
+  function syncVisibility(){if(!launcher)return;launcher.hidden=!isExplorer();if(!isExplorer()&&panel)panel.hidden=true;}
+  function onThemeChanged(){if(isExplorer())applyAll();else{for(const v of Object.values(COLOR_VARS))document.documentElement.style.removeProperty(v);releaseLayout();}syncVisibility();}
 
-  function controlMarkup(target,control){
-    const value=controlValue(target,control);
-    if(control.type==='range')return `<div class="msg-vd-control"><label>${control.label}</label><output class="msg-vd-control-output" data-vd-output="${control.key}">${formatValue(control,value)}</output><input type="range" min="${control.min}" max="${control.max}" step="${control.step}" value="${value}" data-vd-control="${control.key}"></div>`;
-    if(control.type==='color')return `<div class="msg-vd-control"><label>${control.label}</label><input type="color" value="${normalizeColor(value)}" data-vd-control="${control.key}"></div>`;
-    if(control.type==='select')return `<div class="msg-vd-control"><label>${control.label}</label><select data-vd-control="${control.key}">${control.options.map(([v,l])=>`<option value="${v}" ${String(value)===v?'selected':''}>${l}</option>`).join('')}</select></div>`;
-    if(control.type==='check')return `<div class="msg-vd-control"><label class="msg-vd-check"><input type="checkbox" ${value!==false?'checked':''} data-vd-control="${control.key}">${control.label}</label></div>`;
-    if(control.type==='text')return `<div class="msg-vd-control"><label>${control.label}</label><input type="text" value="${escapeAttr(value||'')}" placeholder="/assets/explorer/... or https://..." data-vd-control="${control.key}"></div>`;
-    if(control.type==='file')return `<div class="msg-vd-control"><label>${control.label}</label><div class="msg-vd-file-row"><button type="button" data-vd-file-pick>Choose image…</button><button type="button" data-vd-image-original>Use original</button><input type="file" accept="image/*" data-vd-image-file hidden></div></div>`;
-    return '';
-  }
+  function panelBounds(left,top){if(!panel)return{left:8,top:8};const r=panel.getBoundingClientRect(),m=8;return{left:Math.round(Math.min(Math.max(left,m),Math.max(m,innerWidth-r.width-m))),top:Math.round(Math.min(Math.max(top,m),Math.max(m,innerHeight-r.height-m)))}};
+  function loadPanelPosition(){try{const v=JSON.parse(localStorage.getItem(PANEL_POSITION_KEY)||'null');return v&&Number.isFinite(Number(v.left))&&Number.isFinite(Number(v.top))?{left:Number(v.left),top:Number(v.top)}:null;}catch{return null;}}
+  function applyPanelPosition(){if(!panel||panel.hidden)return;const p=loadPanelPosition();if(!p)return;const b=panelBounds(p.left,p.top);panel.style.left=`${b.left}px`;panel.style.top=`${b.top}px`;panel.style.right='auto';panel.style.bottom='auto';}
+  function savePanelPosition(){if(!panel||panel.hidden)return;const r=panel.getBoundingClientRect(),b=panelBounds(r.left,r.top);try{localStorage.setItem(PANEL_POSITION_KEY,JSON.stringify(b));}catch{}}
+  function bindPanelDragging(){const h=panel?.querySelector('[data-vd-drag-handle]');if(!h||h.dataset.vdDragBound==='1')return;h.dataset.vdDragBound='1';h.addEventListener('pointerdown',e=>{if(e.target instanceof Element&&e.target.closest('button,input,a'))return;if(panel.hidden)return;const r=panel.getBoundingClientRect();panelDrag={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top};h.setPointerCapture?.(e.pointerId);e.preventDefault();});h.addEventListener('pointermove',e=>{if(!panelDrag||e.pointerId!==panelDrag.id)return;const b=panelBounds(panelDrag.left+e.clientX-panelDrag.x,panelDrag.top+e.clientY-panelDrag.y);panel.style.left=`${b.left}px`;panel.style.top=`${b.top}px`;panel.style.right='auto';panel.style.bottom='auto';});const done=e=>{if(!panelDrag||e.pointerId!==panelDrag.id)return;panelDrag=null;savePanelPosition();};h.addEventListener('pointerup',done);h.addEventListener('pointercancel',done);}
 
-  function bindInspectorControls(target,controls,host){
-    controls.forEach(control=>{
-      if(control.type==='file')return;
-      const input=host.querySelector(`[data-vd-control="${control.key}"]`);
-      if(!input)return;
-      input.addEventListener('focus',beginEdit);
-      input.addEventListener('pointerdown',beginEdit);
-      const eventName=control.type==='text'?'change':'input';
-      input.addEventListener(eventName,()=>{
-        const value=inputValue(control,input);
-        if(target.id==='theme' && control.key==='preset'){
-          applyThemePreset(value);
-          renderInspector();
-        }else{
-          setControlValue(target,control,value);
-          if(target.id==='theme' && control.type==='color'){
-            (config.targets.theme||={}).preset='custom';
-            const presetSelect=host.querySelector('[data-vd-control="preset"]');
-            if(presetSelect)presetSelect.value='custom';
-          }
-        }
-        const output=host.querySelector(`[data-vd-output="${control.key}"]`);
-        if(output)output.textContent=formatValue(control,value);
-        markDirty();
-      });
-      input.addEventListener('change',commitEdit);
-    });
-    const fileInput=host.querySelector('[data-vd-image-file]');
-    host.querySelector('[data-vd-file-pick]')?.addEventListener('click',()=>fileInput?.click());
-    fileInput?.addEventListener('change',event=>replaceImageFile(target,event));
-    host.querySelector('[data-vd-image-original]')?.addEventListener('click',()=>restoreOriginalImage(target));
-  }
-
-  function beginEdit(){if(!editBaseline)editBaseline=clone(config);}
-  function commitEdit(){if(!editBaseline)return;undoStack.push(editBaseline);editBaseline=null;updateUndoState();}
-  function pushUndoSnapshot(){undoStack.push(clone(config));updateUndoState();}
-
-  function controlValue(target,control){
-    const bucket=config.targets[target.id]||{};
-    if(Object.prototype.hasOwnProperty.call(bucket,control.key))return bucket[control.key];
-    if(target.id==='theme' && control.key==='preset')return 'explorer';
-    if(target.art){
-      const el=targetElement(target);
-      if(control.key==='x'||control.key==='y')return 0;
-      if(control.key==='scale')return 100;
-      if(control.key==='opacity')return Math.round((parseFloat(getComputedStyle(el).opacity)||1)*100);
-      if(control.key==='width')return Math.round(el?.getBoundingClientRect().width||250);
-      if(control.key==='visible')return getComputedStyle(el).display!=='none';
-      if(control.key==='src')return el?.getAttribute('src')||'';
-    }
-    const selector=String(control.selector||target.selector||'').trim();
-    if(!selector)return control.min??'';
-    let el=null;
-    try{el=document.querySelector(selector);}catch{return control.min??'';}
-    if(!el)return control.min??'';
-    const computed=getComputedStyle(el);
-    if(control.type==='color')return control.prop==='background' ? computed.backgroundColor : (computed.getPropertyValue(control.prop)||'#ffffff');
-    if(control.unit==='navWidth'||control.unit==='wordWidth'){
-      const raw=getComputedStyle(document.querySelector(control.selector)).getPropertyValue(control.prop).trim();
-      const n=parseFloat(raw);return Number.isFinite(n)?clamp(n,control.min,control.max):control.min;
-    }
-    if(control.unit==='shadow')return estimateShadow(computed.boxShadow);
-    if(control.unit==='paddingY')return parseFloat(computed.paddingTop)||0;
-    if(control.unit==='paddingX')return parseFloat(computed.paddingLeft)||0;
-    if(control.unit==='translateY')return 0;
-    if(control.unit==='%'){
-      const parent=el.parentElement;
-      if(parent?.clientWidth)return clamp(Math.round((el.getBoundingClientRect().width/parent.clientWidth)*100),control.min,control.max);
-    }
-    const n=parseFloat(computed.getPropertyValue(control.prop));
-    return Number.isFinite(n)?clamp(n,control.min,control.max):control.min;
-  }
-
-  function inputValue(control,input){
-    if(control.type==='check')return Boolean(input.checked);
-    if(control.type==='range')return Number(input.value);
-    return input.value;
-  }
-
-  function applyThemePreset(name){
-    const preset=THEME_PRESETS[name];
-    const bucket=config.targets.theme||={};
-    bucket.preset=name;
-    if(!preset)return;
-    Object.assign(bucket,preset);
-    applyTarget(targetById('theme'));
-  }
-
-  function setControlValue(target,control,value){
-    const bucket=config.targets[target.id]||={};
-    bucket[control.key]=value;
-    applyTarget(target);
-  }
-
-  function applyAll(){
-    if(!isExplorer()){
-      TARGETS.forEach(releaseTargetStyles);
-      document.documentElement.style.removeProperty('--msg-vd-reader-page-color');
-      document.querySelectorAll(`[${MANAGED_ATTR}]`).forEach(node=>node.removeAttribute(MANAGED_ATTR));
-      return;
-    }
-    TARGETS.forEach(applyTarget);
-    markSelectableElements();
-    applySelectionOutline();
-  }
-  function applyTarget(target){
-    if(!target||!isExplorer())return;
-    const values=config.targets[target.id];
-    if(!values)return;
-    const el=targetElement(target);
-    if(!el)return;
-    if(target.art){applyArt(target,el,values);return;}
-    const controls=STYLE_CONTROLS[target.id]||[];
-    controls.forEach(control=>{
-      if(control.type==='select')return;
-      if(!Object.prototype.hasOwnProperty.call(values,control.key))return;
-      const selector=String(control.selector||target.selector||'').trim();
-      if(!selector)return;
-      let node=null;
-      try{node=document.querySelector(selector);}catch{return;}
-      if(node)applyStyleControl(node,control,values[control.key]);
-    });
-    if(target.id==='shell')syncShellFlowFootprint(el,values);
-  }
-
-  function syncShellFlowFootprint(node,values){
-    if(!node||!isExplorer())return;
-    const moveY=Number(values?.moveY)||0;
-    const requestedGap=Number(values?.marginBottom)||0;
-    const appNode=node.closest('#app.app-shell')||document.querySelector('#app.app-shell');
-
-    // IMPORTANT: shell movement is normal-flow spacing, not transform movement.
-    // A transform leaves its old layout box behind and created the blank wall.
-    node.style.removeProperty('transform');
-    node.style.setProperty('margin-bottom',`${requestedGap}px`,'important');
-
-    if(appNode){
-      // Desktop base .app-shell margin is 1rem (16px). moveY is an offset from
-      // that normal-flow baseline, so -10 => 6px, +20 => 36px, -30 => -14px.
-      const base=window.matchMedia('(max-width:520px)').matches?8:16;
-      appNode.style.setProperty('margin-top',`${base+moveY}px`,'important');
-      appNode.style.setProperty('margin-bottom','0px','important');
-    }
-  }
-
-  function applyStyleControl(node,control,value){
-    if(control.unit==='navWidth'||control.unit==='wordWidth'){
-      node.style.setProperty(control.prop,`${value}px`,'important');return;
-    }
-    if(control.unit==='shadow'){
-      const amount=Number(value)||0;
-      node.style.setProperty('box-shadow',amount<=0?'none':`0 ${Math.max(3,Math.round(amount*.35))}px ${amount}px rgba(35,48,41,.22)`,'important');return;
-    }
-    if(control.unit==='paddingY'){
-      node.style.setProperty('padding-top',`${value}px`,'important');
-      node.style.setProperty('padding-bottom',`${value}px`,'important');return;
-    }
-    if(control.unit==='paddingX'){
-      node.style.setProperty('padding-left',`${value}px`,'important');
-      node.style.setProperty('padding-right',`${value}px`,'important');return;
-    }
-    if(control.unit==='translateY'){ return; }
-    if(control.type==='color'){
-      node.style.setProperty(control.prop,String(value),'important');
-      if(control.key==='pageBackground'){
-        document.documentElement.style.setProperty('--msg-vd-reader-page-color',String(value),'important');
-      }
-      return;
-    }
-    const suffix=control.unit==='%'?'%':'px';
-    node.style.setProperty(control.prop,`${value}${suffix}`,'important');
-    if(control.prop==='width'&&control.unit==='%'){
-      node.style.setProperty('margin-left','auto','important');
-      node.style.setProperty('margin-right','auto','important');
-    }
-  }
-
-  function applyArt(target,el,values){
-    const x=Number(values.x??0),y=Number(values.y??0),scale=Number(values.scale??100)/100;
-    if(Object.prototype.hasOwnProperty.call(values,'width'))el.style.setProperty('width',`${values.width}px`,'important');
-    el.style.setProperty('transform',`translate3d(${x}px,${y}px,0) scale(${scale})`,'important');
-    el.style.setProperty('transform-origin',target.id==='left-art'?'left bottom':target.id==='right-art'?'right bottom':'center top','important');
-    if(Object.prototype.hasOwnProperty.call(values,'opacity'))el.style.setProperty('opacity',String(Number(values.opacity)/100),'important');
-    if(Object.prototype.hasOwnProperty.call(values,'visible'))el.style.setProperty('display',values.visible===false?'none':'block','important');
-    if(values.src){
-      if(!el.dataset.msgVdOriginalSrc)el.dataset.msgVdOriginalSrc=el.getAttribute('src')||'';
-      if(el.getAttribute('src')!==values.src)el.setAttribute('src',values.src);
-    }
-  }
-
-  function replaceImageFile(target,event){
-    const file=event.target.files?.[0];
-    if(!file||!target?.art)return;
-    if(file.size>1800000){setStatus('Use an image under about 1.8 MB for browser-saved replacements.',false);event.target.value='';return;}
-    pushUndoSnapshot();
-    const reader=new FileReader();
-    reader.addEventListener('load',()=>{
-      const bucket=config.targets[target.id]||={};bucket.src=String(reader.result||'');applyTarget(target);renderInspector();markDirty('Image replaced locally. Save to keep it.');
-    });
-    reader.readAsDataURL(file);
-  }
-  function restoreOriginalImage(target){
-    if(!target?.art)return;
-    pushUndoSnapshot();
-    const el=targetElement(target),bucket=config.targets[target.id]||={};delete bucket.src;
-    const original=el?.dataset.msgVdOriginalSrc;if(el&&original)el.setAttribute('src',original);
-    renderInspector();markDirty('Original artwork restored.');
-  }
-
-  function releaseTargetStyles(target){
-    if(!target)return;
-    const el=targetElement(target);
-    if(target.art&&el){
-      ['width','transform','transform-origin','opacity','display'].forEach(prop=>el.style.removeProperty(prop));
-      const original=el.dataset.msgVdOriginalSrc;if(original)el.setAttribute('src',original);
-    }else{
-      (STYLE_CONTROLS[target.id]||[]).forEach(control=>{
-        if(control.type==='select')return;
-        const selector=String(control.selector||target.selector||'').trim();
-        if(!selector)return;
-        let node=null;
-        try{node=document.querySelector(selector);}catch{return;}
-        if(!node)return;
-        if(control.unit==='paddingY'){node.style.removeProperty('padding-top');node.style.removeProperty('padding-bottom');}
-        else if(control.unit==='paddingX'){node.style.removeProperty('padding-left');node.style.removeProperty('padding-right');}
-        else if(control.unit==='translateY'){node.style.removeProperty('transform');}
-        else{node.style.removeProperty(control.prop);if(control.prop==='width'&&control.unit==='%'){node.style.removeProperty('margin-left');node.style.removeProperty('margin-right');}}
-      });
-    }
-    if(target.id==='shell'){
-      const appNode=document.querySelector('#app.app-shell');
-      appNode?.style.removeProperty('margin-top');
-      appNode?.style.removeProperty('margin-bottom');
-      el?.style.removeProperty('transform');
-    }
-    if(target.id==='reader')document.documentElement.style.removeProperty('--msg-vd-reader-page-color');
-  }
-  function clearTargetStyles(target){
-    if(!target)return;
-    releaseTargetStyles(target);
-    delete config.targets[target.id];
-  }
-
-  function resetSelected(){
-    const target=targetById(selectedId);if(!target)return;pushUndoSnapshot();clearTargetStyles(target);renderInspector();markDirty(`${target.label} reset.`);window.dispatchEvent(new Event('resize'));
-  }
-  function resetAll(){
-    if(!window.confirm('Reset all Explorer Designer v2 changes in this browser?'))return;
-    pushUndoSnapshot();TARGETS.forEach(clearTargetStyles);config=blankConfig();localStorage.removeItem(STORAGE_KEY);selectTarget('shell');setStatus('Explorer Designer overrides reset to the restored shell.',false);window.dispatchEvent(new Event('resize'));
-  }
-  function undo(){
-    const previous=undoStack.pop();if(!previous)return;TARGETS.forEach(clearTargetStyles);config=clone(previous);applyAll();renderInspector();refreshLayers();updateUndoState();setStatus('Undid the last design change.',false);window.dispatchEvent(new Event('resize'));
-  }
-  function save(){
-    try{localStorage.setItem(STORAGE_KEY,JSON.stringify(config));setStatus('Saved in this browser.',true);}catch{setStatus('Could not save. Large local images may exceed browser storage.',false);}
-  }
-  function exportConfig(){
-    const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-    a.href=url;a.download='mark-set-go-explorer-design-v2.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus('Design JSON exported.',true);
-  }
-  function importConfig(event){
-    const file=event.target.files?.[0];if(!file)return;const reader=new FileReader();
-    reader.addEventListener('load',()=>{try{const next=JSON.parse(String(reader.result||'{}'));if(next.version!==CONFIG_VERSION||typeof next.targets!=='object')throw new Error();pushUndoSnapshot();TARGETS.forEach(clearTargetStyles);config=next;applyAll();renderInspector();refreshLayers();markDirty('Imported design is live. Save when ready.');}catch{setStatus('That is not a valid Explorer Designer v2 export.',false);}});
-    reader.readAsText(file);event.target.value='';
-  }
-
-  function markDirty(message='Changes are live but not saved yet.'){setStatus(message,false);window.requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));}
-  function setStatus(message,saved){const node=panel?.querySelector('[data-vd-status]');if(!node)return;node.textContent=message;node.classList.toggle('is-saved',Boolean(saved));}
-  function updateUndoState(){const button=panel?.querySelector('[data-vd-undo]');if(button)button.disabled=undoStack.length===0;}
-
-  function findTargetFromClick(element){
-    if(!(element instanceof Element))return null;
-    const specific=TARGETS.filter(t=>t.id!=='shell').find(target=>element.closest(target.selector));
-    return specific||(element.closest('.reader-page-panel')?targetById('shell'):null);
-  }
-  function onDocumentClick(event){
-    if(!document.body.classList.contains('msg-vd-design-mode')||document.body.classList.contains('msg-vd-preview-mode'))return;
-    if(event.target instanceof Element&&event.target.closest('#msg-explorer-visual-designer,#msg-explorer-design-launcher'))return;
-    const target=findTargetFromClick(event.target);if(!target)return;
-    event.preventDefault();event.stopPropagation();selectTarget(target.id);
-  }
-  function onPointerDown(event){
-    if(!document.body.classList.contains('msg-vd-design-mode')||document.body.classList.contains('msg-vd-preview-mode'))return;
-    if(!(event.target instanceof Element))return;
-    const target=TARGETS.find(candidate=>candidate.art&&event.target.closest(candidate.selector));if(!target)return;
-    event.preventDefault();event.stopPropagation();selectTarget(target.id);pushUndoSnapshot();
-    const values=config.targets[target.id]||={};
-    dragState={target,pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,baseX:Number(values.x??0),baseY:Number(values.y??0)};
-    event.target.setPointerCapture?.(event.pointerId);
-  }
-  function onPointerMove(event){
-    if(!dragState||event.pointerId!==dragState.pointerId)return;
-    const values=config.targets[dragState.target.id]||={};values.x=Math.round(dragState.baseX+event.clientX-dragState.startX);values.y=Math.round(dragState.baseY+event.clientY-dragState.startY);applyTarget(dragState.target);if(selectedId===dragState.target.id)renderInspector();markDirty('Scenery moved. Save when positioned correctly.');
-  }
-  function onPointerUp(event){if(!dragState||event.pointerId!==dragState.pointerId)return;dragState=null;updateUndoState();}
-
-  function formatValue(control,value){
-    if(control.unit==='shadow')return String(Math.round(Number(value)||0));
-    if(control.unit==='navWidth'||control.unit==='wordWidth'||control.unit==='paddingY'||control.unit==='paddingX'||control.unit==='translateY')return `${Math.round(Number(value)||0)}px`;
-    return `${Math.round(Number(value)||0)}${control.unit||''}`;
-  }
-  function clamp(value,min,max){return Math.min(max,Math.max(min,value));}
-  function estimateShadow(value){if(!value||value==='none')return 0;const nums=value.match(/-?\d+(?:\.\d+)?px/g)?.map(item=>Math.abs(parseFloat(item)))||[];return clamp(Math.round(Math.max(...nums,0)),0,100);}
-  function normalizeColor(value){
-    const text=String(value||'').trim();if(/^#[0-9a-f]{6}$/i.test(text))return text;
-    const match=text.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);if(!match)return'#ffffff';
-    return'#'+[match[1],match[2],match[3]].map(n=>clamp(Number(n),0,255).toString(16).padStart(2,'0')).join('');
-  }
-  function escapeAttr(value){return String(value).replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
-
-  function scheduleApply(){[0,80,260,700].forEach(delay=>window.setTimeout(()=>{applyAll();if(panel&&!panel.hidden)refreshLayers();},delay));}
-  function init(){
-    ensureUI();applyAll();
-    document.addEventListener('click',onDocumentClick,true);
-    document.addEventListener('pointerdown',onPointerDown,true);
-    document.addEventListener('pointermove',onPointerMove,true);
-    document.addEventListener('pointerup',onPointerUp,true);
-    document.addEventListener('pointercancel',onPointerUp,true);
-    document.addEventListener('marksetgo:document-available',scheduleApply);
-    document.addEventListener('marksetgo:experience-profile-changed',scheduleApply);
-    window.addEventListener('pageshow',scheduleApply);
-    window.addEventListener('resize',()=>{
-      if(panel&&!panel.hidden){
-        refreshLayers();
-        const rect=panel.getBoundingClientRect();
-        const bounded=panelPositionBounds(rect.left,rect.top);
-        if(Math.abs(rect.left-bounded.left)>1||Math.abs(rect.top-bounded.top)>1){
-          panel.style.setProperty('left',`${bounded.left}px`,'important');
-          panel.style.setProperty('top',`${bounded.top}px`,'important');
-          panel.style.setProperty('right','auto','important');
-          savePanelPosition();
-        }
-      }
-    });
-    document.addEventListener('click',event=>{if(event.target instanceof Element&&event.target.closest('[data-action],[data-read],[data-topic-read],[data-profile-appearance]'))scheduleApply();},true);
-  }
-
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});
-  else init();
+  function init(){ensureUI();onThemeChanged();document.addEventListener('marksetgo:experience-profile-changed',onThemeChanged);window.addEventListener('pageshow',onThemeChanged);}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
