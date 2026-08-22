@@ -1,0 +1,205 @@
+/* Mark, Set, Go! stable Reader + composed immersive background v4.4
+   BACKGROUND ONLY. This file does NOT change Reader geometry.
+
+   - reuses existing left/center/right theme artwork
+   - paints it as one fixed full-screen layer behind the entire app
+   - no separate scenery panes
+   - no Reader height/width/grid changes
+*/
+
+/* -------------------------------------------------------------------------
+   Existing full-theme artwork
+   ------------------------------------------------------------------------- */
+html[data-msg-experience-theme="patriotic"] {
+  --msg-scene-left: url('/assets/themes/patriotic/patriotic-left.png');
+  --msg-scene-center: url('/assets/themes/patriotic/patriotic-top.png');
+  --msg-scene-right: url('/assets/themes/patriotic/patriotic-right.png');
+  --msg-scene-base: #d9e6f2;
+}
+
+html[data-msg-experience-theme="scholar"] {
+  --msg-scene-left: url('/assets/themes/scholar/scholar-left.png');
+  --msg-scene-center: url('/assets/themes/scholar/scholar-top.png');
+  --msg-scene-right: url('/assets/themes/scholar/scholar-right.png');
+  --msg-scene-base: #d8c8a5;
+}
+
+html[data-msg-experience-theme="artistic"] {
+  --msg-scene-left: url('/assets/themes/artistic/artistic-left.png');
+  --msg-scene-center: url('/assets/themes/artistic/artistic-top.png');
+  --msg-scene-right: url('/assets/themes/artistic/artistic-right.png');
+  --msg-scene-base: #ddc7d8;
+}
+
+html[data-msg-experience-theme="modern"] {
+  --msg-scene-left: url('/assets/themes/modern/modern-left.png');
+  --msg-scene-center: url('/assets/themes/modern/modern-top.png');
+  --msg-scene-right: url('/assets/themes/modern/modern-right.png');
+  --msg-scene-base: #cdd8e2;
+}
+
+html[data-msg-experience-theme="galactic"] {
+  --msg-scene-left: url('/assets/themes/galactic/galactic-left.png');
+  --msg-scene-center: url('/assets/themes/galactic/galactic-top.png');
+  --msg-scene-right: url('/assets/themes/galactic/galactic-right.png');
+  --msg-scene-base: #0d1224;
+}
+
+html[data-msg-experience-theme="expedition"] {
+  --msg-scene-left: url('/assets/themes/expedition/expedition-left.png');
+  --msg-scene-center: url('/assets/themes/expedition/expedition-top.png');
+  --msg-scene-right: url('/assets/themes/expedition/expedition-right.png');
+  --msg-scene-base: #c9b28a;
+}
+
+/*
+ * One visual background layer.
+ *
+ * The center/top panorama fills the viewport. The existing detailed side
+ * artwork is overlaid at left/right without becoming independent DOM/layout
+ * panels. This preserves the detail the original immersive themes had.
+ */
+html:is(
+  [data-msg-experience-theme="patriotic"],
+  [data-msg-experience-theme="scholar"],
+  [data-msg-experience-theme="artistic"],
+  [data-msg-experience-theme="modern"],
+  [data-msg-experience-theme="galactic"],
+  [data-msg-experience-theme="expedition"]
+) body::before {
+  content: "" !important;
+  display: block !important;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+
+  background-color: var(--msg-scene-base, #dfe7ed) !important;
+  background-image:
+    var(--msg-scene-left),
+    var(--msg-scene-right),
+    var(--msg-scene-center) !important;
+  background-position:
+    left bottom,
+    right bottom,
+    center center !important;
+  background-repeat:
+    no-repeat,
+    no-repeat,
+    no-repeat !important;
+  background-size:
+    min(34vw, 620px) auto,
+    min(34vw, 620px) auto,
+    cover !important;
+}
+
+/* All actual application UI sits above the single background layer. */
+html:is(
+  [data-msg-experience-theme="patriotic"],
+  [data-msg-experience-theme="scholar"],
+  [data-msg-experience-theme="artistic"],
+  [data-msg-experience-theme="modern"],
+  [data-msg-experience-theme="galactic"],
+  [data-msg-experience-theme="expedition"]
+) body {
+  position: relative !important;
+  background: var(--msg-scene-base, #dfe7ed) !important;
+  background-image: none !important;
+}
+
+html:is(
+  [data-msg-experience-theme="patriotic"],
+  [data-msg-experience-theme="scholar"],
+  [data-msg-experience-theme="artistic"],
+  [data-msg-experience-theme="modern"],
+  [data-msg-experience-theme="galactic"],
+  [data-msg-experience-theme="expedition"]
+) :is(.site-header, #app, .site-footer) {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* Outer app/workspace surfaces do not cover the scene. Content cards retain
+   their own backgrounds as defined by the existing theme CSS. */
+html:is(
+  [data-msg-experience-theme="patriotic"],
+  [data-msg-experience-theme="scholar"],
+  [data-msg-experience-theme="artistic"],
+  [data-msg-experience-theme="modern"],
+  [data-msg-experience-theme="galactic"],
+  [data-msg-experience-theme="expedition"]
+) :is(
+  #app.app-shell,
+  .msg-workspace-shell,
+  .msg-workspace-primary
+) {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+/* Old scenery DOM remains retired. Its image assets are now part of the single
+   background layer above. */
+html:is(
+  [data-msg-experience-theme="patriotic"],
+  [data-msg-experience-theme="scholar"],
+  [data-msg-experience-theme="artistic"],
+  [data-msg-experience-theme="modern"],
+  [data-msg-experience-theme="galactic"],
+  [data-msg-experience-theme="expedition"]
+) :is(
+  .explorer-world-art,
+  .explorer-world-art__left,
+  .explorer-world-art__right,
+  .explorer-world-art__top
+) {
+  display: none !important;
+}
+
+/* Explorer already has one true full-background asset. */
+html[data-msg-experience-theme="explorer"] body::before {
+  content: "" !important;
+  display: block !important;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  background:
+    linear-gradient(180deg, rgba(229,240,226,.06), rgba(220,232,220,.16)),
+    url('/explorer-landscape.svg') center center / cover no-repeat !important;
+}
+
+html[data-msg-experience-theme="explorer"] body {
+  position: relative !important;
+  background: #dce8dc !important;
+  background-image: none !important;
+}
+
+html[data-msg-experience-theme="explorer"] :is(.site-header, #app, .site-footer) {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+html[data-msg-experience-theme="explorer"] :is(
+  #app.app-shell,
+  .msg-workspace-shell,
+  .msg-workspace-primary
+) {
+  background: transparent !important;
+  background-image: none !important;
+}
+
+html[data-msg-experience-theme="explorer"] :is(
+  .explorer-world-art,
+  .explorer-world-art__left,
+  .explorer-world-art__right,
+  .explorer-world-art__top
+) {
+  display: none !important;
+}
+
+/* Do not alter Reader geometry here. Intentionally empty of reader-layout,
+   navigation-pane, reader-center-column, word-panel, or playback sizing rules. */

@@ -91,7 +91,7 @@
     ensureLink('/reader-background-unified.css');
     ensureLink('/reader-height-corners-fix.css');
     ensureLink('/symposium-workspace-fix.css');
-    ensureLink('/reader-immersive-background-boundary-fix.css');
+    ensureLink('/immersive-background-composed.css');
     ensureScript('/msg-chat.js');
     ensureScript('/profile-theme-fix.js');
     ensureScript('/workspace-chat-layout-fix.js');
