@@ -94,10 +94,29 @@
 
     root.classList.remove(...themeClasses);
     root.classList.add(`msg-theme-${key}`);
+
+    /*
+     * Reader mechanics are shared by every appearance. This attribute selects
+     * mechanics only; visual colors MUST come from data-msg-experience-theme.
+     */
     root.dataset.msgExperienceLayout='explorer';
 
-    if(key==='explorer') setScenery(nodes,original);
-    else if(key!=='classic') setScenery(nodes,ART[key]);
+    /*
+     * v5.8: experience-theme CSS is keyed to this attribute.
+     * Classic/default intentionally has no theme attribute so the original
+     * Mark, Set, Go! CSS becomes authoritative again.
+     */
+    if(key==='classic'){
+      delete root.dataset.msgExperienceTheme;
+    }else{
+      root.dataset.msgExperienceTheme=key;
+    }
+
+    if(key==='explorer'){
+      setScenery(nodes,original);
+    }else if(key!=='classic'){
+      setScenery(nodes,ART[key]);
+    }
 
     refreshPressed(key);
     return key;

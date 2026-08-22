@@ -177,7 +177,7 @@ html[data-msg-experience-theme]:is(
 
   /* Reader shell width remains 100% OF THE EXISTING app shell. */
   html[data-msg-experience-layout="explorer"] #app .reader-page-panel {
-    --msg-reader-footer-height:46px;
+    --msg-reader-footer-height:52px;
 
     display:flex !important;
     flex-direction:column !important;
@@ -315,7 +315,7 @@ html[data-msg-experience-theme]:is(
     min-height:var(--msg-reader-footer-height) !important;
     max-height:var(--msg-reader-footer-height) !important;
     margin:0 !important;
-    padding:6px 2px 4px !important;
+    padding:5px 2px 5px !important;
     overflow:visible !important;
   }
 
