@@ -64,7 +64,7 @@
   content: "" !important;
   display: block !important;
   position: absolute !important;
-  inset: -4px -8px -5px -8px !important;
+  inset: 0 -8px -5px -8px !important;
   z-index: 0 !important;
   pointer-events: none !important;
   border: 0 !important;
