@@ -110,3 +110,38 @@
     overflow-y: auto;
   }
 }
+
+
+/* v1.1 — preserve the Reader progress/status line above the viewport edge.
+   The viewport shell remains fixed-height; this only reserves a little internal
+   bottom breathing room so text such as "0 of 705 words" is never clipped. */
+@media (min-width: 901px) {
+  body:has(#app #reader) #reader {
+    padding-bottom: 14px !important;
+  }
+
+  body:has(#app #reader) #reader .status {
+    flex: 0 0 auto;
+    min-height: 1.45rem !important;
+    line-height: 1.35 !important;
+    margin-top: .35rem !important;
+    margin-bottom: .35rem !important;
+    padding-bottom: 2px;
+    overflow: visible !important;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* Some reader builds place the status/progress line directly under the
+     control row rather than inside the text scroller. Keep that row visible. */
+  body:has(#app #reader) :is(
+    .reader-viewer-footer,
+    .reader-controls-footer,
+    .reader-status,
+    .reader-progress
+  ) {
+    flex: 0 0 auto;
+    min-height: 24px;
+    overflow: visible !important;
+  }
+}
