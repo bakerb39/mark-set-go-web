@@ -128,7 +128,7 @@
             <h2>Your display name</h2>
             <p>This is the name other readers will see in Mark, Set, Go! Chat.</p>
             <input data-msg-name-input maxlength="80" autocomplete="name" required>
-            <div><button class="primary" type="submit">Continue</button></div>
+            <div><button class="primary" data-msg-name-continue type="button">Continue</button></div>
           </form>
         </dialog>
 
@@ -193,15 +193,42 @@
       }
     });
 
-    q('[data-msg-name-form]').addEventListener('submit', event => {
-      event.preventDefault();
-      const name = q('[data-msg-name-input]').value.trim().slice(0, 80);
-      if (!name) return;
+    const saveIdentity = () => {
+      const input = q('[data-msg-name-input]');
+      const dialog = q('[data-msg-name-dialog]');
+      const name = String(input?.value || '').trim().slice(0, 80);
+
+      if (!name) {
+        input?.focus();
+        return false;
+      }
+
       state.displayName = name;
-      localStorage.setItem(`${STORE}displayName`, name);
-      q('[data-msg-name]').textContent = name;
-      q('[data-msg-name-dialog]').close();
+      try { localStorage.setItem(`${STORE}displayName`, name); } catch {}
+
+      const nameLabel = q('[data-msg-name]');
+      if (nameLabel) nameLabel.textContent = name;
+
+      if (dialog?.open) dialog.close();
       renderMessages();
+
+      const composer = q('[data-msg-input]');
+      if (composer && !composer.disabled) composer.focus();
+
+      return true;
+    };
+
+    q('[data-msg-name-continue]')?.addEventListener('click', saveIdentity);
+
+    q('[data-msg-name-input]')?.addEventListener('keydown', event => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      saveIdentity();
+    });
+
+    q('[data-msg-name-form]')?.addEventListener('submit', event => {
+      event.preventDefault();
+      saveIdentity();
     });
 
     q('[data-msg-conversation-form]').addEventListener('submit', createConversation);

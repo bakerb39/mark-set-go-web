@@ -1,36 +1,32 @@
-# Mark, Set, Go! workspace theme parent-sync v1.5
+# Mark, Set, Go! Chat display-name fix v1.6
 
-This fixes the problem where choosing a theme from Profile while Profile is open
-in the workspace changed only the right-side frame.
+This fixes the case where entering a display name and clicking Continue appears
+to do nothing.
 
 ## Cause
 
-Profile is rendered inside a same-origin workspace iframe. The theme control was
-saving/applying the profile inside that iframe only. The Reader is in the parent
-window, so its document never received the change.
+The Continue button depended on the <dialog> form submit path. In the workspace
+environment that path was not behaving reliably.
 
 ## Fix
 
-`profile-theme-fix.js` now:
-1. Detects when it is running in a workspace pane.
-2. Applies the selected theme to `window.parent` first.
-3. Mirrors the theme to the iframe.
-4. Has a postMessage fallback handled by the outer app.
+Continue is now an explicit type="button" with its own click handler.
 
-`workspace-pane.html` now actually loads `profile-theme-fix.js`.
+Clicking Continue now directly:
+- reads and trims the display name
+- saves it to msgchat.displayName
+- updates the visible "Chatting as" label
+- closes the dialog
+- returns focus to the message composer when available
 
-`workspace-pane-cache-refresh.js` is bumped so the new pane is not hidden by the
-old iframe cache.
+Pressing Enter in the display-name field also uses the same function.
 
-## Replace/upload
+## Replace
 
-Inside public/:
-- profile-theme-fix.js
-- workspace-pane.html
-- workspace-pane-cache-refresh.js
-- button-feedback.js
+Only this file is required if v1.5 is already deployed:
 
-The other files are included for completeness but do not need replacing if v1.4
-is already deployed.
+- public/msg-chat.js
+
+Other files are included only for convenience.
 
 No MutationObserver is used.
