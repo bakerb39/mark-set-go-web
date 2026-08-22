@@ -6123,28 +6123,30 @@ function normalizeExperienceProfile(value = {}) {
 
 let activeExperienceProfile=null;
 
-function getExperienceProfile() {
-  if (activeExperienceProfile) {
-    return normalizeExperienceProfile(activeExperienceProfile);
-  }
-
+function readPersistedExperienceProfile() {
   try {
     const saved=JSON.parse(localStorage.getItem(PROFILE_EXPERIENCE_KEY)||'null');
-    activeExperienceProfile=normalizeExperienceProfile(saved || { preset:'full' });
+    return saved ? normalizeExperienceProfile(saved) : null;
   } catch {
-    activeExperienceProfile=normalizeExperienceProfile({ preset:'full' });
+    return null;
   }
+}
+
+function getExperienceProfile() {
+  // The persisted profile is authoritative. This prevents a stale runtime caller
+  // from leaving activeExperienceProfile on a different appearance than the one
+  // the user actually saved.
+  const persisted=readPersistedExperienceProfile();
+  if(persisted) activeExperienceProfile=persisted;
+  else if(!activeExperienceProfile) activeExperienceProfile=normalizeExperienceProfile({ preset:'full' });
   return normalizeExperienceProfile(activeExperienceProfile);
 }
 
 function saveExperienceProfile(profile) {
   const normalized=normalizeExperienceProfile(profile);
 
-  // Apply the choice immediately. Persistence failure must never make the
-  // preset buttons appear broken (localStorage may already be near quota).
-  activeExperienceProfile=normalized;
-  applyExperienceProfile(normalized);
-
+  // Persist first, then apply from the authoritative stored value. That keeps
+  // localStorage, the in-memory profile, and the DOM on the same appearance.
   let persisted=true;
   try {
     localStorage.setItem(PROFILE_EXPERIENCE_KEY, JSON.stringify(normalized));
@@ -6153,19 +6155,25 @@ function saveExperienceProfile(profile) {
     console.warn('Experience profile could not be persisted in localStorage.', error);
   }
 
+  activeExperienceProfile=normalized;
+  applyExperienceProfile();
+
   document.dispatchEvent(new CustomEvent('marksetgo:experience-profile-changed', {
-    detail:{ profile:normalized, persisted }
+    detail:{ profile:normalizeExperienceProfile(activeExperienceProfile), persisted }
   }));
 
-  return { ...normalized, persisted };
+  return { ...normalizeExperienceProfile(activeExperienceProfile), persisted };
 }
 
 function experienceFeatureEnabled(feature) {
   return getExperienceProfile().features?.[feature] !== false;
 }
 
-function applyExperienceProfile(profile = getExperienceProfile()) {
-  const normalized=normalizeExperienceProfile(profile);
+function applyExperienceProfile() {
+  // Never let an arbitrary runtime object overwrite the user's saved profile.
+  // External callers may ask for an apply, but the current persisted choice is
+  // what gets applied.
+  const normalized=getExperienceProfile();
   activeExperienceProfile=normalized;
 
   const rootEl=document.documentElement;
