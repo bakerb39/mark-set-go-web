@@ -401,38 +401,82 @@ html[data-msg-experience-theme]:is(
 
 
 /* ==========================================================================
-   FUNCTIONAL TOPIC-FEED HEADER BEHAVIOR
+   FUNCTIONAL TOPIC-FEED ARTICLE HEADER
+   Keep SOURCE + Summarize / Analyze / Create Post visible above the article.
+   The article body scrolls beneath it.
    ========================================================================== */
 
+#reader-frame {
+  display:flex !important;
+  flex-direction:column !important;
+}
+
+/*
+ * The injected topic-feed header is a fixed-height row inside the Reader frame,
+ * never part of the text scroller.
+ */
 #reader-frame > .topic-feed-story-header-external {
+  flex:0 0 auto !important;
   position:relative !important;
   z-index:30 !important;
+
+  display:block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+
+  width:100% !important;
+  min-width:0 !important;
+  max-width:100% !important;
+
+  margin:0 !important;
+  padding:8px 12px 10px !important;
+
   background:var(--msg-vd-reader-page-color,#ffffff) !important;
   background-image:none !important;
-  padding-bottom:8px !important;
   box-shadow:0 6px 0 var(--msg-vd-reader-page-color,#ffffff) !important;
+
+  overflow:visible !important;
 }
 
-#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
-  z-index:20 !important;
-  box-shadow:0 7px 0 var(--msg-vd-reader-page-color,#ffffff) !important;
+/* The Reader article consumes the remaining height below that header. */
+#reader-frame > #reader.interactive-reader {
+  flex:1 1 auto !important;
+  height:auto !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:auto !important;
 }
 
+/* Keep all article metadata/action descendants visible. */
 #reader-frame > .topic-feed-story-header-external
-#read-anything-article-summary-action {
+:is(
+  .topic-feed-reader-credit,
+  .topic-feed-story-meta-overlay,
+  #read-anything-article-summary-action,
+  .read-anything-inline-article-summary
+) {
   display:flex !important;
   visibility:visible !important;
   opacity:1 !important;
   position:relative !important;
   z-index:31 !important;
+}
+
+/* The SOURCE/action line can wrap instead of being clipped. */
+#reader-frame > .topic-feed-story-header-external
+#read-anything-article-summary-action {
   width:100% !important;
   max-width:100% !important;
   min-width:0 !important;
+
   align-items:center !important;
   flex-wrap:wrap !important;
   gap:.08rem !important;
+
   margin:.08rem 0 0 !important;
   padding:0 !important;
+
+  overflow:visible !important;
 }
 
 #reader-frame > .topic-feed-story-header-external
@@ -441,6 +485,22 @@ html[data-msg-experience-theme]:is(
   display:none !important;
 }
 
+/*
+ * When topic-feed JS marks the header "scrolled", retain the same visible row.
+ * Do not switch it to an overlay that steals article space.
+ */
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  flex:0 0 auto !important;
+  position:relative !important;
+  top:auto !important;
+  z-index:30 !important;
+  display:block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
+
+/* Shared floating music player remains above Reader surfaces. */
 .music-dock {
+  position:fixed !important;
   z-index:9999 !important;
 }
