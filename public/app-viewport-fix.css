@@ -271,3 +271,27 @@ html.msg-workspace-pane-document .msg-chat-messages {
     z-index: 0 !important;
   }
 }
+
+
+/* v1.4 — compact Reader title area
+   Reduce title height so wrapped headlines do not consume so much vertical
+   space above the Reader controls. */
+@media (min-width: 901px) {
+  body:has(#app #reader) .reader-title-copy h1 {
+    font-size: 23px !important;
+    line-height: 1.08 !important;
+    margin-top: 0 !important;
+    margin-bottom: 1px !important;
+  }
+
+  body:has(#app #reader) .reader-title-row {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  body:has(#app #reader) .reader-title-links {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    line-height: 1.1 !important;
+  }
+}
