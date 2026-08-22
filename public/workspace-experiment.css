@@ -692,3 +692,37 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
   min-height:36px;
   padding:7px 12px;
 }
+
+/* v0.5.3 — Chat owns a wider secondary workspace column.
+   This is the previously working Chat width, consolidated into the real
+   workspace stylesheet instead of a separate correction file. */
+@media (min-width:1100px) {
+  #app > .msg-workspace-shell:not(.is-closed):has(
+    .msg-workspace-page-frame[src*="msgWorkspaceValue=msg-chat"]
+  ) {
+    --msg-secondary-width:clamp(620px,42vw,760px) !important;
+    grid-template-columns:
+      minmax(560px,1fr)
+      8px
+      minmax(620px,var(--msg-secondary-width)) !important;
+    column-gap:0;
+  }
+
+  #app > .msg-workspace-shell:not(.is-closed):has(
+    .msg-workspace-page-frame[src*="msgWorkspaceValue=msg-chat"]
+  ) > .msg-workspace-secondary {
+    margin-right:10px !important;
+  }
+}
+
+@media (min-width:901px) and (max-width:1099px) {
+  #app > .msg-workspace-shell:not(.is-closed):has(
+    .msg-workspace-page-frame[src*="msgWorkspaceValue=msg-chat"]
+  ) {
+    --msg-secondary-width:520px !important;
+    grid-template-columns:
+      minmax(440px,1fr)
+      8px
+      minmax(520px,var(--msg-secondary-width)) !important;
+  }
+}
