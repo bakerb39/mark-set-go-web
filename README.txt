@@ -1,17 +1,12 @@
-Mark, Set, Go! compact music + Ask Mark X fix
+Replace only public/button-feedback.js.
 
-Replace these four files in /public:
-- app.js
-- index.html
-- ask-mark-hub.js
-- reader-music-quick.js
+Adds BB Chat as a top-level menu option immediately before Profile.
+Opens BB Chat inside the reading app shell.
+Removes any top-level Themes/Themes & Appearance menu entry.
+Theme controls inside Profile are untouched.
+No MutationObserver is used.
 
-Changes:
-1. Ask Mark X now uses a canonical app-level close function and a capture-phase fallback.
-2. Compact music menu adds:
-   - Suggested for this reading
-   - Reading mood
-   - Other result (cycles YouTube search recommendations)
-3. Cache-busting versions were updated in index.html.
+Default BB Chat URL:
+https://quick-notes-chat.onrender.com
 
-After replacing, hard refresh the browser (Ctrl+Shift+R).
+If Render assigned a different URL, change DEFAULT_BB_CHAT_URL in the file.
