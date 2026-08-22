@@ -574,25 +574,16 @@ function readModernGuideLibrary() {
 }
 
 function writeModernGuideLibrary(items) {
+  // Modern Guides are already discoverable from the canonical saved-document
+  // and reading-progress records. Do not maintain a second localStorage cache:
+  // that duplicate registry previously exhausted the browser storage quota.
   const compact = (Array.isArray(items) ? items : [])
     .map(compactModernGuideLibraryItem)
     .filter((item) => item.documentId && item.title)
     .slice(0, 50);
 
-  try {
-    if (!compact.length) {
-      localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY);
-      return [];
-    }
-    localStorage.setItem(MODERN_GUIDE_LIBRARY_KEY, JSON.stringify(compact));
-    return compact;
-  } catch (error) {
-    // The registry is only a lightweight cache. Existing document/progress
-    // storage remains authoritative, so never break the Reader on quota errors.
-    try { localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY); } catch {}
-    console.warn('Modern Guide cache was skipped because browser storage is full.', error);
-    return compact;
-  }
+  try { localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY); } catch {}
+  return compact;
 }
 
 function registerModernGuideLibraryItem({
@@ -628,55 +619,6 @@ function registerModernGuideLibraryItem({
 }
 
 const MODERN_GUIDE_ACTIONS_KEY = 'markSetGoModernGuideActionsV1';
-
-function readModernGuideLibrary() {
-  try {
-    const value = JSON.parse(localStorage.getItem(MODERN_GUIDE_LIBRARY_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeModernGuideLibrary(items) {
-  const normalized = Array.isArray(items) ? items : [];
-  localStorage.setItem(MODERN_GUIDE_LIBRARY_KEY, JSON.stringify(normalized));
-  return normalized;
-}
-
-function registerModernGuideLibraryItem({
-  documentId = state?.documentId || '',
-  title = state?.title || '',
-  source = state?.source || null,
-  text = state?.currentText || ''
-} = {}) {
-  if (!documentId || !title || source?.type !== 'modern-guide') return null;
-
-  const items = readModernGuideLibrary();
-  const existingIndex = items.findIndex((item) => String(item.documentId || '') === String(documentId));
-  const now = new Date().toISOString();
-  const existing = existingIndex >= 0 ? items[existingIndex] : {};
-
-  const record = {
-    ...existing,
-    documentId,
-    title,
-    originalTitle: source?.originalTitle || existing.originalTitle || title.replace(/\s+—\s+Mark,\s*Set,\s*Go!\s+Guide$/i,''),
-    author: source?.originalAuthor || existing.author || '',
-    source,
-    wordCount: Array.isArray(state?.words) && state.words.length ? state.words.length : splitWords(text || '').length,
-    firstOpenedAt: existing.firstOpenedAt || now,
-    lastOpenedAt: now,
-    customGuide: Boolean(source?.customGuide),
-    buyUrl: source?.buyUrl || existing.buyUrl || ''
-  };
-
-  if (existingIndex >= 0) items[existingIndex] = record;
-  else items.unshift(record);
-
-  writeModernGuideLibrary(items.slice(0, 200));
-  return record;
-}
 
 function readModernGuideActions() {
   try {
@@ -1320,6 +1262,20 @@ function parseYouTubeInput(rawValue) {
 
 async function playYouTubeSearch(query, title = 'YouTube search') {
   const cleanQuery = String(query || '').trim();
+  const workspaceParams = new URLSearchParams(location.search);
+  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+  if (isWorkspacePane) {
+    try {
+      window.parent.postMessage({
+        type:'msg-workspace-music-search',
+        query:cleanQuery,
+        title:String(title || 'YouTube search')
+      }, window.location.origin);
+    } catch (error) {
+      console.warn('Workspace could not hand music search to the outer player.', error);
+    }
+    return;
+  }
   if (!cleanQuery) return;
   musicNowTitle.textContent = title;
   musicNowSource.textContent = 'Searching YouTube…';
@@ -1364,6 +1320,20 @@ function playMusicSearchCandidate(index) {
 }
 
 function playMusic(choiceOrParsed) {
+  const workspaceParams = new URLSearchParams(location.search);
+  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+  if (isWorkspacePane) {
+    try {
+      window.parent.postMessage({
+        type:'msg-workspace-music-play',
+        choice:choiceOrParsed && typeof choiceOrParsed === 'object' ? choiceOrParsed : {}
+      }, window.location.origin);
+    } catch (error) {
+      console.warn('Workspace could not hand music playback to the outer player.', error);
+    }
+    return;
+  }
+
   musicSearchState = choiceOrParsed?.search || null;
   if (musicNextButton) musicNextButton.hidden = !musicSearchState?.videoIds?.length;
   const isChoice = Boolean(choiceOrParsed?.youtubeId);
@@ -4964,12 +4934,69 @@ function renderCurrentReader() {
 
 function renderHome() {
   stopReader();
+  app.dataset.viewKey = 'home';
 
   let resumeMeta = null;
   try { resumeMeta = JSON.parse(localStorage.getItem(READER_SESSION_META_KEY) || 'null'); } catch {}
   const resumePercent = resumeMeta?.totalWords
     ? Math.min(100, Math.max(0, Math.round((Number(resumeMeta.index) || 0) / Number(resumeMeta.totalWords) * 100)))
     : null;
+
+  const bindHomeReaderActions = () => {
+    app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));
+
+    app.querySelector('#resume-last-reading')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      if (button.disabled) return;
+      const original = button.innerHTML;
+      button.disabled = true;
+      button.textContent = 'Loading saved reading…';
+      try {
+        const saved = await readReaderSession();
+        if (!saved?.title || !saved?.currentText) {
+          await clearReaderSession();
+          window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
+          button.disabled = false;
+          button.innerHTML = original;
+          return;
+        }
+
+        if (!applyReaderSessionSnapshot(saved, { resumePlayback: false })) {
+          await clearReaderSession();
+          window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
+          button.disabled = false;
+          button.innerHTML = original;
+        }
+      } catch (error) {
+        console.error('Resume reading failed:', error);
+        window.alert('The saved reading session could not be opened. You can still reopen the book from Library or Reading Progress.');
+        button.disabled = false;
+        button.innerHTML = original;
+      }
+    });
+
+    app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
+      await clearReaderSession();
+      clearActiveReaderPane();
+      renderHome();
+    });
+
+    app.querySelectorAll('[data-home-resume-document]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const documentId = button.dataset.homeResumeDocument;
+        if (!documentId) return;
+        let data = null;
+        try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+        if (!data?.text) {
+          renderReadingList();
+          return;
+        }
+        renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
+        const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
+        requestAnimationFrame(() => jumpToWordIndex(record?.lastWord || 0));
+      });
+    });
+  };
 
   app.innerHTML = `
     <section class="home-simple">
@@ -5037,41 +5064,7 @@ function renderHome() {
 
     </section>`;
 
-  app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));
-  app.querySelector('#resume-last-reading')?.addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    const original = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Loading saved reading…';
-    try {
-      const saved = await readReaderSession();
-      if (!saved?.title || !saved?.currentText) {
-        await clearReaderSession();
-        window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
-        button.disabled = false;
-        button.textContent = original;
-        return;
-      }
-
-      if (!applyReaderSessionSnapshot(saved, { resumePlayback: false })) {
-        await clearReaderSession();
-        window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
-        button.disabled = false;
-        button.textContent = original;
-      }
-    } catch (error) {
-      console.error('Resume reading failed:', error);
-      window.alert('The saved reading session could not be opened. You can still reopen the book from Library or Reading Progress.');
-      button.disabled = false;
-      button.textContent = original;
-    }
-  });
-  app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
-    await clearReaderSession();
-    clearActiveReaderPane();
-    renderHome();
-  });
-
+  bindHomeReaderActions();
 }
 
 const WPM_TEST_OPTIONS = [
@@ -5175,16 +5168,13 @@ function renderProfilePreferences() {
         </div>
         <div class="visual-theme-grid" role="group" aria-label="Experience style">
           ${Object.entries(EXPERIENCE_APPEARANCES).map(([key,appearance])=>`
-            <button class="profile-preset-option visual-theme-option ${key==='explorer'?'visual-theme-option-explorer':''} ${current.appearance===key?'active':''}" type="button" data-profile-appearance="${escapeHtml(key)}" aria-pressed="${current.appearance===key}">
+            <button class="profile-preset-option visual-theme-option ${current.appearance===key?'active':''}" type="button" data-profile-appearance="${escapeHtml(key)}" aria-pressed="${current.appearance===key}">
               <span class="profile-preset-check" aria-hidden="true">${current.appearance===key?'✓':''}</span>
-              ${key==='explorer'
-                ? '<span class="visual-theme-preview visual-theme-preview-explorer" aria-hidden="true"><span class="visual-theme-compass">✦</span></span>'
-                : '<span class="visual-theme-preview visual-theme-preview-default" aria-hidden="true"><span></span><span></span><span></span></span>'}
+              <span class="visual-theme-preview visual-theme-preview-default" aria-hidden="true"><span></span><span></span><span></span></span>
               <strong>${escapeHtml(appearance.label)}</strong>
               <small>${escapeHtml(appearance.description)}</small>
             </button>`).join('')}
         </div>
-        <p class="visual-theme-note">Explorer styles the surrounding application. The reading canvas itself stays optimized for readability.</p>
       </section>
 
       <section class="profile-feature-card">
@@ -5213,16 +5203,6 @@ function renderProfilePreferences() {
   const reflectPresetSelection=(selectedKey='')=>{
     app.querySelectorAll('[data-profile-preset]').forEach((button)=>{
       const active=button.dataset.profilePreset===selectedKey;
-      button.classList.toggle('active',active);
-      button.setAttribute('aria-pressed',String(active));
-      const check=button.querySelector('.profile-preset-check');
-      if(check) check.textContent=active ? '✓' : '';
-    });
-  };
-
-  const reflectAppearanceControls=(selectedKey='default')=>{
-    app.querySelectorAll('[data-profile-appearance]').forEach((button)=>{
-      const active=button.dataset.profileAppearance===selectedKey;
       button.classList.toggle('active',active);
       button.setAttribute('aria-pressed',String(active));
       const check=button.querySelector('.profile-preset-check');
@@ -5280,22 +5260,14 @@ function renderProfilePreferences() {
     });
   });
 
+  // Every Profile appearance button gets the same direct click handler.
+  // There is no Default/Explorer special case: all eight call the one theme engine.
   app.querySelectorAll('[data-profile-appearance]').forEach((button)=>{
     button.addEventListener('click',(event)=>{
       event.preventDefault();
-      const key=button.dataset.profileAppearance;
-      const appearance=EXPERIENCE_APPEARANCES[key];
-      if(!appearance) return;
-
-      const saved=saveExperienceProfile({
-        preset:current.preset,
-        appearance:key,
-        features:{...current.features}
-      });
-
-      current=normalizeExperienceProfile(saved);
-      reflectAppearanceControls(current.appearance);
-      announceSave(saved,`${appearance.label} appearance`);
+      const key=String(button.dataset.profileAppearance || '').trim();
+      if(!EXPERIENCE_APPEARANCES[key]) return;
+      window.MarkSetGoExperienceThemes?.apply?.(key);
     });
   });
 
@@ -5303,10 +5275,9 @@ function renderProfilePreferences() {
   const onProfileChange=(event)=>{
     current=normalizeExperienceProfile(event.detail?.profile || getExperienceProfile());
     reflectPresetSelection(current.preset === 'custom' ? '' : current.preset);
-    reflectAppearanceControls(current.appearance);
     reflectFeatureControls(current);
   };
-  document.addEventListener('marksetgo:experience-profile-changed',onProfileChange,{once:true});
+  document.addEventListener('marksetgo:experience-profile-changed',onProfileChange);
 }
 
 function renderReadingSkillsHub() {
@@ -5889,6 +5860,30 @@ const EXPERIENCE_APPEARANCES = Object.freeze({
   explorer:{
     label:'Explorer / Discovery',
     description:'Sage green, parchment, brass, maps, mountains, and waterfall scenery.'
+  },
+  patriotic:{
+    label:'Patriotic',
+    description:'American history, navy, ivory, restrained red and brass.'
+  },
+  scholar:{
+    label:'Scholar',
+    description:'Old library, manuscripts, walnut, burgundy and parchment.'
+  },
+  artistic:{
+    label:'Artistic',
+    description:'Studio and gallery atmosphere with warm creative color.'
+  },
+  modern:{
+    label:'Modern',
+    description:'Clean architecture, restrained geometry and minimal surfaces.'
+  },
+  galactic:{
+    label:'Galactic',
+    description:'Original space-opera atmosphere with stars and luminous instruments.'
+  },
+  expedition:{
+    label:'Expedition',
+    description:'Original archaeology-adventure atmosphere with maps, ruins and field journals.'
   }
 });
 
@@ -6029,13 +6024,6 @@ function applyExperienceProfile(profile = getExperienceProfile()) {
 
   const rootEl=document.documentElement;
   const features=normalized.features || {};
-
-  rootEl.dataset.experienceAppearance=normalized.appearance || 'default';
-  if(normalized.appearance && normalized.appearance !== 'default') {
-    rootEl.dataset.msgExperienceTheme=normalized.appearance;
-  } else {
-    delete rootEl.dataset.msgExperienceTheme;
-  }
 
   Object.entries(features).forEach(([key,enabled]) => {
     rootEl.dataset[`feature${key.charAt(0).toUpperCase()}${key.slice(1)}`]=enabled ? 'on' : 'off';
@@ -9325,15 +9313,76 @@ function saveBookmarks(bookmarks) {
   setBookmarkCookie(trimmed);
 }
 
+async function migrateLegacyTopicFeedDocumentsToIndexedDb() {
+  const keys = [];
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(DOCUMENT_STORAGE_PREFIX)) keys.push(key);
+    }
+  } catch {
+    return;
+  }
+
+  for (const key of keys) {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch {}
+    if (saved?.source?.type !== 'topic-feed' || !saved?.text) continue;
+
+    const documentId = key.slice(DOCUMENT_STORAGE_PREFIX.length);
+    if (!documentId) continue;
+
+    const stored = await cacheReadingBook({
+      key: `reader-document:${documentId}`,
+      type: 'reader-document',
+      documentId,
+      title: saved.title || '',
+      text: saved.text,
+      source: saved.source || {},
+      savedAt: new Date().toISOString()
+    });
+    if (stored) {
+      try { localStorage.removeItem(key); } catch {}
+    }
+  }
+}
+
+// Reclaim quota consumed by Topic Feed article bodies saved by older builds.
+// Removal occurs only after the existing IndexedDB reading-library store has
+// accepted the article, so this is a migration rather than a destructive purge.
+window.setTimeout(() => { void migrateLegacyTopicFeedDocumentsToIndexedDb(); }, 0);
+
 function persistCurrentDocument() {
   if (!state.documentId || !state.currentText) return false;
   const key = `${DOCUMENT_STORAGE_PREFIX}${state.documentId}`;
-  try {
-    const next = {
+  const next = {
+    title: state.title,
+    text: state.currentText,
+    source: state.source
+  };
+
+  // Topic Feed article bodies are already durable in the Topic Feed/server
+  // pipeline. Do not duplicate those potentially large bodies in localStorage.
+  // Keep a durable browser copy in the existing IndexedDB library instead,
+  // and remove any legacy localStorage copy so it cannot consume the shared
+  // per-origin quota used by the rest of the app.
+  if (state.source?.type === 'topic-feed') {
+    void cacheReadingBook({
+      key: `reader-document:${state.documentId}`,
+      type: 'reader-document',
+      documentId: state.documentId,
       title: state.title,
       text: state.currentText,
-      source: state.source
-    };
+      source: state.source,
+      savedAt: new Date().toISOString()
+    }).then((stored) => {
+      if (!stored) return;
+      try { localStorage.removeItem(key); } catch {}
+    });
+    return true;
+  }
+
+  try {
     const existingRaw = localStorage.getItem(key);
     let shouldWrite = !existingRaw;
     if (existingRaw) {
@@ -9751,7 +9800,17 @@ function renderNavigationPane() {
   pane.querySelectorAll('[data-toc-index]').forEach((button) => {
     button.addEventListener('click', () => jumpToWordIndex(button.dataset.tocIndex));
   });
-  pane.querySelector('#add-bookmark')?.addEventListener('click', addBookmark);
+  // Bookmark creation belongs to the Reader's native addBookmark() implementation.
+  // Bind once to the stable navigation pane so the native button may be moved by
+  // Topic Feeds without losing its click path when the pane contents are rebuilt.
+  if (pane.dataset.nativeBookmarkHandler !== '1') {
+    pane.dataset.nativeBookmarkHandler = '1';
+    pane.addEventListener('click', (event) => {
+      const button = event.target instanceof Element ? event.target.closest('#add-bookmark') : null;
+      if (!button || !pane.contains(button)) return;
+      addBookmark();
+    });
+  }
   pane.querySelectorAll('[data-open-bookmark]').forEach((button) => {
     button.addEventListener('click', () => openBookmark(button.dataset.openBookmark));
   });
@@ -10897,15 +10956,25 @@ function bindBrowseSearchLocalActions(container) {
       const response = await fetch(`/texts/modern-guides/${encodeURIComponent(guide.id)}-guide.txt`, { cache:'no-store' });
       if (!response.ok) throw new Error(`Could not load the ${guide.title} guide.`);
       const text = await response.text();
-      renderReaderWithText(`${guide.title} — Mark, Set, Go! Guide`, text, {
+      const guideTitle = `${guide.title} — Mark, Set, Go! Guide`;
+      const guideSource = {
         type:'modern-guide',
         id:guide.id,
-        title:`${guide.title} — Mark, Set, Go! Guide`,
+        title:guideTitle,
         originalTitle:guide.title,
         originalAuthor:guide.author,
         buyUrl:guide.buyUrl,
         subtitle:`An independent reading guide to ${guide.title}`
-      });
+      };
+      if (window.parent !== window) {
+        const handoff = window.parent.MSGWorkspaceReaderHandoff;
+        if (typeof handoff?.openText !== 'function') {
+          throw new Error('The main Reader handoff is not ready.');
+        }
+        handoff.openText(guideTitle, text, guideSource);
+      } else {
+        renderReaderWithText(guideTitle, text, guideSource);
+      }
     } catch (error) {
       window.alert(error?.message || 'The guide could not be opened.');
     }
@@ -10921,7 +10990,16 @@ function bindBrowseSearchLocalActions(container) {
     if (item.action.type === 'source') {
       try {
         const loaded = await loadLocalText(item.action.key);
-        renderReaderWithText(loaded.title, loaded.text, { type:'local-library', id:item.action.key, title:loaded.title });
+        const source = { type:'local-library', id:item.action.key, title:loaded.title };
+        if (window.parent !== window) {
+          const handoff = window.parent.MSGWorkspaceReaderHandoff;
+          if (typeof handoff?.openText !== 'function') {
+            throw new Error('The main Reader handoff is not ready.');
+          }
+          handoff.openText(loaded.title, loaded.text, source);
+        } else {
+          renderReaderWithText(loaded.title, loaded.text, source);
+        }
       } catch (error) {
         window.alert(error?.message || 'That text could not be opened.');
       }
@@ -11132,13 +11210,29 @@ function bindUnifiedLibraryActions(container) {
         const file = new File([blob], `${provider}-${id}.${format}`, { type: format === 'epub' ? 'application/epub+zip' : 'application/pdf' });
         const parsed = format === 'epub' ? await parseEpubFile(file) : await parsePdfFile(file);
         parsed.source = { ...(parsed.source || {}), type: provider, provider, id, remoteFormat: format };
-        renderReaderWithText(parsed.title, parsed.text, parsed.source);
+        const isWorkspacePane = window.parent !== window;
+        if (isWorkspacePane) {
+          const handoff = window.parent.MSGWorkspaceReaderHandoff;
+          if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
+          handoff.openText(parsed.title, parsed.text, parsed.source);
+        } else {
+          renderReaderWithText(parsed.title, parsed.text, parsed.source);
+        }
         return;
       }
       const book = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}&format=${encodeURIComponent(format)}`);
       const fullTitle = `${book.title}${book.author ? ` — ${book.author}` : ''}`;
       const normalized = normalizeImportedBookText(book.text, { title:book.title, author:book.author });
-      renderReaderWithText(fullTitle, normalized.text, { type: provider, id, sourceUrl: book.sourceUrl, remoteFormat: format === 'best' ? 'text' : format, documentToc: normalized.toc, cleanup: normalized.report });
+      const editionSource = { type: provider, id, sourceUrl: book.sourceUrl, remoteFormat: format === 'best' ? 'text' : format, documentToc: normalized.toc, cleanup: normalized.report };
+      const workspaceParams = new URLSearchParams(location.search);
+      const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+      if (isWorkspacePane) {
+        const handoff = window.parent.MSGWorkspaceReaderHandoff;
+        if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
+        handoff.openText(fullTitle, normalized.text, editionSource);
+      } else {
+        renderReaderWithText(fullTitle, normalized.text, editionSource);
+      }
     } catch (error) {
       window.alert(error.message);
       button.disabled = false; button.textContent = original;
@@ -11426,7 +11520,7 @@ function renderMarkResult(result, action){
 
   panels.forEach(panel=>{
     panel.hidden=false;
-    panel.innerHTML=`<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<button type="button" class="secondary" data-save-mark-response data-mark-save-id="${escapeHtml(saveId)}">Save to notebook</button>`;
+    panel.innerHTML=`<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<div class="mark-response-share-actions"><button type="button" class="secondary" data-save-mark-response data-mark-save-id="${escapeHtml(saveId)}">Save to notebook</button><button type="button" class="secondary" data-mark-share-response="chat">💬 Send to Chat</button><button type="button" class="secondary" data-mark-share-response="symposium">🏛 Discuss in Symposium</button></div>`;
 
     panel.querySelector('[data-save-mark-response]')?.addEventListener('click',(event)=>{
       const button=event.currentTarget;
@@ -11439,6 +11533,21 @@ function renderMarkResult(result, action){
         window.setTimeout(()=>{ if(!button.disabled) button.textContent='Save to notebook'; },2200);
       }
     });
+
+    panel.querySelectorAll('[data-mark-share-response]').forEach((button)=>button.addEventListener('click',()=>{
+      const payload={
+        type:'ask-mark-response',
+        title:`${result.heading || action}${selected?.title ? ` · ${selected.title}` : ''}`,
+        text:String(result.response || '').trim(),
+        context:selected?.text || '',
+        sourceLabel:currentCompanionIdentity().ask || 'Ask Mark',
+        documentId:selected?.documentId || state.documentId || '',
+        chapter:selected?.chapter || '',
+        startIndex:Number(selected?.startIndex) || 0
+      };
+      if(button.dataset.markShareResponse==='symposium') window.MSGContentShare?.toSymposium?.(payload);
+      else window.MSGContentShare?.toChat?.(payload);
+    }));
   });
   notifyAskMarkLegacyUpdated('response');
 }
@@ -12293,6 +12402,23 @@ function bindMarkCompanion(reader){
   state.readerWritingResizeObserver = new ResizeObserver(scheduleWritingPosition);
   state.readerWritingResizeObserver.observe(reader);
 
+  toolbar.querySelectorAll('[data-msg-share-selection]').forEach((button)=>button.addEventListener('click',()=>{
+    const selected = state.markSelection ? {...state.markSelection} : (state.markPersistentSelection ? {...state.markPersistentSelection} : null);
+    if (!selected?.text) return;
+    const payload = {
+      type:'passage',
+      title:selected.title || state.title || 'Reader passage',
+      text:selected.text,
+      sourceLabel:'Reader',
+      sourceUrl:state.source?.url || state.source?.sourceUrl || '',
+      documentId:selected.documentId || state.documentId || '',
+      chapter:selected.chapter || currentTocTitle() || '',
+      startIndex:Number(selected.startIndex) || 0
+    };
+    if (button.dataset.msgShareSelection === 'symposium') window.MSGContentShare?.toSymposium?.(payload);
+    else window.MSGContentShare?.toChat?.(payload);
+  }));
+
   toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
     openMarkPanel('selection');
     renderMarkSelectionCard();
@@ -13052,6 +13178,23 @@ function realignTopicFeedDocumentToc(text, toc) {
 }
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
+  // A Workspace iframe is a secondary control/content surface only. It must
+  // never own a second Reader. Send every readable document through the one
+  // established outer-Reader handoff. This central guard covers Modern Guides,
+  // Classic/Bible guides, generated guides, Free Books, and any future feature
+  // that reaches the canonical Reader renderer.
+  if (window.parent !== window) {
+    try {
+      const handoff = window.parent.MSGWorkspaceReaderHandoff;
+      if (typeof handoff?.openText === 'function') {
+        return handoff.openText(title, text, source);
+      }
+    } catch (error) {
+      console.warn('Workspace could not hand text to the main Reader.', error);
+    }
+    return false;
+  }
+
   app.dataset.viewKey = 'reader';
 
   const READER_CLICK_CONTROLS_KEY = 'msg_reader_click_controls_v1';
@@ -13451,7 +13594,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
 
       <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-reader-drawing-toggle aria-expanded="false">✐ Draw</button><div class="reader-drawing-editor" data-reader-drawing-editor hidden><div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div><label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div></div><button type="button" data-reader-workspace-toggle aria-expanded="false">▣ Space</button><div class="reader-workspace-editor" data-reader-workspace-editor hidden><strong>Insert workspace</strong><label>Height <select data-reader-workspace-height><option value="180">Small</option><option value="280" selected>Medium</option><option value="420">Large</option><option value="600">Extra large</option></select></label><div><button type="button" data-reader-workspace-cancel>Cancel</button><button type="button" data-reader-workspace-insert>Insert</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-reader-drawing-toggle aria-expanded="false">✐ Draw</button><div class="reader-drawing-editor" data-reader-drawing-editor hidden><div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div><label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div></div><button type="button" data-reader-workspace-toggle aria-expanded="false">▣ Space</button><div class="reader-workspace-editor" data-reader-workspace-editor hidden><strong>Insert workspace</strong><label>Height <select data-reader-workspace-height><option value="180">Small</option><option value="280" selected>Medium</option><option value="420">Large</option><option value="600">Extra large</option></select></label><div><button type="button" data-reader-workspace-cancel>Cancel</button><button type="button" data-reader-workspace-insert>Insert</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-msg-share-selection="chat">💬 Chat</button><button type="button" data-msg-share-selection="symposium">🏛 Symposium</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
@@ -15077,6 +15220,12 @@ function startManualPaceHeldDirection(direction) {
   // If both are physically held, the most recently pressed key wins.
   session.direction = next;
   session.paused = false;
+
+  // A quick key tap must still move one chunk. Previously the first movement
+  // was delayed until the WPM timer fired, so releasing the key before that
+  // timer made Manual Pace appear completely unresponsive. Holding the arrow
+  // continues from this immediate first step on the normal WPM clock.
+  manualPaceStep(next, 1, { fromTimer:false });
   scheduleManualPaceMotion();
 
   const wpm = manualPaceWpm();
@@ -18142,7 +18291,7 @@ async function loadGreatBookEdition(item, status, button) {
 
         const title = loaded.title || candidate.title || item.title;
         const author = loaded.author || candidate.author || item.author || '';
-        renderReaderWithText(`${title}${author ? ` — ${author}` : ''}`, text, {
+        const editionSource = {
           type: candidate.provider,
           id: candidate.id,
           sourceUrl: loaded.sourceUrl || candidate.externalUrl || '',
@@ -18150,7 +18299,18 @@ async function loadGreatBookEdition(item, status, button) {
           greatBooksTitle: item.title,
           greatBooksAuthor: item.author,
           verifiedPrimaryText: true
-        });
+        };
+
+        const isWorkspacePane = window.parent !== window;
+        if (isWorkspacePane) {
+          const handoff = window.parent.MSGWorkspaceReaderHandoff;
+          if (typeof handoff?.openText !== 'function') {
+            throw new Error('The main Reader handoff is not ready.');
+          }
+          handoff.openText(`${title}${author ? ` — ${author}` : ''}`, text, editionSource);
+        } else {
+          renderReaderWithText(`${title}${author ? ` — ${author}` : ''}`, text, editionSource);
+        }
         return;
       } catch (error) {
         failed.push(`${provider}: ${error.message}`);
@@ -18943,6 +19103,29 @@ function renderBibleGuides() {
 }
 
 
+
+
+function openBibleDocumentInReader(title, text, source) {
+  const workspaceParams = new URLSearchParams(location.search);
+  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+
+  if (isWorkspacePane) {
+    try {
+      const handoff = window.parent.MSGWorkspaceReaderHandoff;
+      if (typeof handoff?.openText === 'function') {
+        handoff.openText(title, text, source);
+        return true;
+      }
+    } catch (error) {
+      console.warn('Workspace could not hand Bible text to the outer Reader.', error);
+    }
+    return false;
+  }
+
+  renderReaderWithText(title, text, source);
+  return true;
+}
+
 async function renderBibleStudy() {
   stopReader();
   app.innerHTML = `
@@ -19344,7 +19527,7 @@ async function renderBibleStudy() {
       }
 
       const title = `${selectedBook} — ${chapters[0]?.translation?.shortName || selectedTranslation}`;
-      renderReaderWithText(title, fullText, {
+      openBibleDocumentInReader(title, fullText, {
         type:'bible-book',
         translation:selectedTranslation,
         book:bookSelect.value,
@@ -19378,7 +19561,7 @@ async function renderBibleStudy() {
       chapterNumber: Number(chapterSelect.value),
       includeChapterHeading: true
     });
-    renderReaderWithText(`${heading} — ${chapterPayload.translation?.shortName || translationSelect.value}`, bibleDoc.text, {
+    openBibleDocumentInReader(`${heading} — ${chapterPayload.translation?.shortName || translationSelect.value}`, bibleDoc.text, {
       type:'bible',
       translation:translationSelect.value,
       book:bookSelect.value,
@@ -21440,14 +21623,25 @@ function renderDrmFreeBookFinder(initial={}) {
           const response=await fetch(`/api/library/read?provider=${encodeURIComponent(button.dataset.drmReadProvider||'')}&id=${encodeURIComponent(button.dataset.drmReadId||'')}&format=best`);
           const data=await response.json();
           if(!response.ok) throw new Error(data.error||'The book could not be opened.');
-          renderReaderWithText(data.title||'DRM-Free Book',data.text||'',{
+          const drmFreeSource = {
             type:'drm-free-library',
             provider:button.dataset.drmReadProvider||'',
             id:button.dataset.drmReadId||'',
             title:data.title||'DRM-Free Book',
             author:data.author||'',
             sourceUrl:data.sourceUrl||''
-          });
+          };
+          const workspaceParams = new URLSearchParams(location.search);
+          const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+          if (isWorkspacePane) {
+            const handoff = window.parent.MSGWorkspaceReaderHandoff;
+            if (typeof handoff?.openText !== 'function') {
+              throw new Error('The main Reader handoff is not ready.');
+            }
+            handoff.openText(data.title||'DRM-Free Book',data.text||'',drmFreeSource);
+          } else {
+            renderReaderWithText(data.title||'DRM-Free Book',data.text||'',drmFreeSource);
+          }
         }catch(error){
           window.alert(error?.message||'The book could not be opened.');
           button.disabled=false;
@@ -21779,15 +21973,26 @@ function renderBrowseHub() {
       const response = await fetch(`/texts/modern-guides/${encodeURIComponent(guideId)}-guide.txt`, { cache:'no-store' });
       if (!response.ok) throw new Error(`Could not load the ${guide.title} guide.`);
       const text = await response.text();
-      renderReaderWithText(`${guide.title} — Mark, Set, Go! Guide`, text, {
+      const guideTitle = `${guide.title} — Mark, Set, Go! Guide`;
+      const guideSource = {
         type: 'modern-guide',
         id: guide.id,
-        title: `${guide.title} — Mark, Set, Go! Guide`,
+        title: guideTitle,
         originalTitle: guide.title,
         originalAuthor: guide.author,
         buyUrl: guide.buyUrl,
         subtitle: `An independent reading guide to ${guide.title}`
-      });
+      };
+
+      if (window.parent !== window) {
+        const handoff = window.parent.MSGWorkspaceReaderHandoff;
+        if (typeof handoff?.openText !== 'function') {
+          throw new Error('The main Reader handoff is not ready.');
+        }
+        handoff.openText(guideTitle, text, guideSource);
+      } else {
+        renderReaderWithText(guideTitle, text, guideSource);
+      }
     } catch (error) {
       window.alert(error?.message || 'The guide could not be opened.');
     }
@@ -22076,6 +22281,64 @@ function renderMyLibraryHub() {
   };
 
   const openStoredDocument = async (documentId, wordIndex = null) => {
+    // Workspace panes must never build their own Reader. If My Library is
+    // rendered inside the secondary workspace iframe, hand the selected
+    // document to the outer application's real Library/Reader path and stop
+    // here before any local Reader state or DOM is touched.
+    const workspaceParams = new URLSearchParams(location.search);
+    const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+
+    if (isWorkspacePane) {
+      const id = String(documentId || '').trim();
+      if (!id) return;
+
+      try {
+        if (parent.location.origin === location.origin && parent.document?.body) {
+          const parentDocument = parent.document;
+
+          // Open the outer app's own My Library renderer. The synthetic control
+          // is attached to body rather than the workspace navigation chrome, so
+          // it is handled by the normal outer-app router.
+          const route = parentDocument.createElement('button');
+          route.type = 'button';
+          route.hidden = true;
+          route.dataset.action = 'my-library';
+          parentDocument.body.appendChild(route);
+          route.click();
+          route.remove();
+
+          // My Library owns openStoredDocument as a renderer-local function.
+          // Wait for its real bound document control, then invoke that control
+          // in the OUTER app. Because the outer URL is not a workspace-pane URL,
+          // this guard does not recurse.
+          let attempt = 0;
+          const openInOuterReader = () => {
+            const candidates = [...parentDocument.querySelectorAll('#app [data-library-document]')];
+            const target = candidates.find(
+              (button) => String(button.dataset.libraryDocument || '') === id
+            );
+
+            if (target) {
+              target.click();
+              return;
+            }
+
+            attempt += 1;
+            if (attempt < 40) parent.setTimeout(openInOuterReader, 25);
+          };
+
+          openInOuterReader();
+          return;
+        }
+      } catch (error) {
+        console.warn('Workspace could not delegate My Library document to the outer Reader.', error);
+      }
+
+      // If the iframe cannot safely reach the outer app, do not fall through
+      // and create a second Reader in the workspace pane.
+      return;
+    }
+
     let data = null;
     try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
 
@@ -23428,6 +23691,7 @@ function ensureSymposiumStyles() {
     }
     .symposium-selection-toolbar [data-symposium-copy-selection]{background:#eaf0f6;color:#17304e}
     .symposium-selection-toolbar [data-symposium-save-selection]{background:#0c2340;color:#f2ca60}
+    .symposium-selection-toolbar [data-symposium-chat-selection]{background:#173c66;color:#fff}
 
     .symposium-empty{margin:auto;text-align:center;max-width:520px;color:#718095;padding:44px}.symposium-empty .symposium-empty-icon{font-size:3rem;display:block;margin-bottom:12px}.symposium-empty h2{color:#0c2340;margin:.25rem 0 .5rem;font-family:Georgia,serif}
     .symposium-turn{display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px;align-items:start}.symposium-turn.user{grid-template-columns:minmax(0,1fr) 48px}.symposium-turn.user .symposium-turn-body{order:1;background:#eef5fc}.symposium-turn.user .symposium-avatar{order:2;background:#405c7a}.symposium-turn.moderator .symposium-avatar{background:linear-gradient(145deg,#80631a,#513d0d);color:white}.symposium-turn-body{border:1px solid #dde6ef;border-radius:16px;padding:13px 15px;background:white;box-shadow:0 5px 16px rgba(38,67,98,.05)}.symposium-turn-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}.symposium-turn-head strong{color:#0c2340}.symposium-turn-head span{font-size:.76rem;color:#7a899b}.symposium-turn-body p{margin:0;line-height:1.58;color:#30465f;white-space:pre-wrap}.symposium-turn-tools{margin-top:8px;display:flex;gap:6px}.symposium-turn-tools button{border:0;background:transparent;color:#315d8b;font-size:.78rem;cursor:pointer;padding:2px 0}
@@ -23503,7 +23767,7 @@ function symposiumTurnHtml({name, monogram='?', field='', text='', kind='partici
       <div class="symposium-turn-head"><strong>${symposiumEscape(name)}</strong><span>${symposiumEscape(field)}</span></div>
       <p>${symposiumEscape(text)}</p>
       ${sourceLabel ? `<span class="symposium-source-pill">${symposiumEscape(sourceLabel)}</span>` : ''}
-      ${safeKind !== 'user' ? `<div class="symposium-turn-tools"><button type="button" data-symposium-speak-last>🔊 Speak</button></div>` : ''}
+      <div class="symposium-turn-tools"><button type="button" data-symposium-share-turn>💬 Chat</button>${safeKind !== 'user' ? '<button type="button" data-symposium-speak-last>🔊 Speak</button>' : ''}</div>
     </div>
   </article>`;
 }
@@ -23576,7 +23840,12 @@ function renderSymposium() {
   ensureSymposiumStyles();
   app.dataset.viewKey = 'symposium';
   const readingContext = currentSymposiumReadingContext();
-  const defaultTopic = state?.title ? `Explore the central ideas in ${state.title}` : '';
+  const sharedHandoff = window.MSGContentShare?.takeSymposiumHandoff?.() || null;
+  const sharedContextText = String(sharedHandoff?.symposiumContext || '').trim();
+  const sharedContextLabel = sharedHandoff ? `Shared from ${sharedHandoff.sourceLabel || 'app content'}` : '';
+  const defaultTopic = sharedHandoff?.symposiumTopic || (state?.title ? `Explore the central ideas in ${state.title}` : '');
+  const initialContextText = sharedContextText || readingContext.text;
+  const initialContextLabel = sharedContextText ? sharedContextLabel : readingContext.label;
   const defaultChecked = new Set(['socrates','aristotle','einstein','lovelace']);
 
   app.innerHTML = `
@@ -23611,11 +23880,12 @@ function renderSymposium() {
             <div>
               <label>Reading context</label>
               <div class="symposium-context-choice">
+                ${sharedContextText ? '<button type="button" data-symposium-context="shared">Use shared content</button>' : ''}
                 <button type="button" data-symposium-context="reading" ${readingContext.text ? '' : 'disabled'}>Use current reading</button>
                 <button type="button" data-symposium-context="none">Topic only</button>
               </div>
-              <input id="symposium-context" type="hidden" value="${symposiumEscape(readingContext.text)}">
-              <p class="symposium-hint" id="symposium-context-label">${symposiumEscape(readingContext.label)}${readingContext.text ? ` · ${splitWords(readingContext.text).length.toLocaleString()} words available` : ''}</p>
+              <input id="symposium-context" type="hidden" value="${symposiumEscape(initialContextText)}">
+              <p class="symposium-hint" id="symposium-context-label">${symposiumEscape(initialContextLabel)}${initialContextText ? ` · ${splitWords(initialContextText).length.toLocaleString()} words available` : ''}</p>
             </div>
 
             <label>Output
@@ -23664,7 +23934,7 @@ function renderSymposium() {
         <main class="symposium-panel symposium-stage">
           <div class="symposium-stage-toolbar">
             <span class="symposium-stage-status" id="symposium-stage-status">Ready to convene</span>
-            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
+            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
           </div>
           <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
             <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
@@ -23672,6 +23942,7 @@ function renderSymposium() {
           <div class="symposium-selection-toolbar" id="symposium-selection-toolbar" hidden role="toolbar" aria-label="Selected Symposium text actions">
             <button type="button" data-symposium-copy-selection>Copy</button>
             <button type="button" data-symposium-save-selection>Save to Notebook</button>
+            <button type="button" data-symposium-chat-selection>💬 Chat</button>
           </div>
           <div class="symposium-participate">
             <label for="symposium-reader-input">Join the discussion</label>
@@ -23688,6 +23959,7 @@ function renderSymposium() {
   const statusEl = root.querySelector('#symposium-stage-status');
   const nextButton = root.querySelector('#symposium-next');
   const saveButton = root.querySelector('#symposium-save');
+  const chatButton = root.querySelector('#symposium-chat');
   const readerButton = root.querySelector('#symposium-reader-submit');
   const startButton = root.querySelector('#symposium-start');
   const rosterEl = root.querySelector('#symposium-roster');
@@ -23837,6 +24109,19 @@ function renderSymposium() {
     }
   });
 
+  selectionToolbar?.querySelector('[data-symposium-chat-selection]')?.addEventListener('click', () => {
+    const selected = symposiumSelection;
+    if (!selected?.text) return;
+    window.MSGContentShare?.toChat?.({
+      type:'symposium-excerpt',
+      title:`Symposium · ${selected.topic || session.topic || 'Discussion'}`,
+      text:selected.text,
+      sourceLabel:selected.speaker || 'Symposium',
+      chapter:selected.speaker || '',
+      metadata:{ topic:selected.topic || session.topic || '' }
+    });
+  });
+
   transcriptEl.addEventListener('pointerup', () => {
     window.setTimeout(showSymposiumSelectionToolbar, 0);
   });
@@ -23900,7 +24185,10 @@ function renderSymposium() {
   };
 
   root.querySelectorAll('[data-symposium-context]').forEach((button)=>button.addEventListener('click',()=>{
-    if (button.dataset.symposiumContext === 'reading') {
+    if (button.dataset.symposiumContext === 'shared' && sharedContextText) {
+      root.querySelector('#symposium-context').value = sharedContextText;
+      root.querySelector('#symposium-context-label').textContent = `${sharedContextLabel} · ${splitWords(sharedContextText).length.toLocaleString()} words available`;
+    } else if (button.dataset.symposiumContext === 'reading') {
       root.querySelector('#symposium-context').value = readingContext.text;
       root.querySelector('#symposium-context-label').textContent = `${readingContext.label} · ${splitWords(readingContext.text).length.toLocaleString()} words available`;
     } else {
@@ -24007,7 +24295,7 @@ function renderSymposium() {
     session.pendingReaderContribution = '';
     transcriptEl.innerHTML = '';
     appendTurn({ name:'Athena', monogram:'A', field:'Moderator', text:await moderatorOpening(), kind:'moderator', sourceLabel:'Moderator · decorum & evidence' }, true);
-    nextButton.disabled = false; saveButton.disabled = false; readerButton.disabled = false;
+    nextButton.disabled = false; saveButton.disabled = false; if (chatButton) chatButton.disabled = false; readerButton.disabled = false;
     await runSpeaker(session.people[0]);
     session.nextIndex = session.people.length > 1 ? 1 : 0;
   });
@@ -24043,10 +24331,31 @@ function renderSymposium() {
   });
 
   transcriptEl.addEventListener('click',(event)=>{
+    const shareButton = event.target.closest('[data-symposium-share-turn]');
+    if (shareButton) {
+      const body = shareButton.closest('.symposium-turn-body');
+      const name = body?.querySelector('.symposium-turn-head strong')?.textContent?.trim() || 'Symposium';
+      const field = body?.querySelector('.symposium-turn-head span')?.textContent?.trim() || '';
+      const text = body?.querySelector('p')?.textContent?.trim() || '';
+      window.MSGContentShare?.toChat?.({ type:'symposium-turn', title:`${name} · ${session.topic || 'Symposium'}`, text, sourceLabel:'Symposium', chapter:field, metadata:{ topic:session.topic || '' } });
+      return;
+    }
     const button = event.target.closest('[data-symposium-speak-last]');
     if (!button) return;
     const body = button.closest('.symposium-turn-body');
     symposiumSpeak(body?.querySelector('p')?.textContent || '', body?.querySelector('strong')?.textContent || 'Speaker');
+  });
+
+  chatButton?.addEventListener('click',()=>{
+    if (!session.transcript.length) return;
+    const text = session.transcript.map((turn)=>`${turn.name}${turn.field ? ` (${turn.field})` : ''}: ${turn.text}`).join('\n\n');
+    window.MSGContentShare?.toChat?.({
+      type:'symposium-transcript',
+      title:`Symposium · ${session.topic || 'Discussion'}`,
+      text,
+      sourceLabel:'Symposium',
+      metadata:{ mode:session.mode, participants:session.people.map((person)=>person.name).join(', ') }
+    });
   });
 
   root.querySelector('#symposium-stop-speech').addEventListener('click',()=>window.speechSynthesis?.cancel?.());

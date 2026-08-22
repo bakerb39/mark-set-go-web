@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.3.2
+ * Mark, Set, Go! Workspace Experiment v0.5.0
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -10,11 +10,142 @@
 
   const PARAMS = new URLSearchParams(window.location.search);
   const IS_WORKSPACE_PANE = PARAMS.get('msgWorkspacePane') === '1';
+  const WORKSPACE_PREF_KEY = 'msg-workspace-optin-v1';
+
+  function readWorkspacePreference() {
+    try { return localStorage.getItem(WORKSPACE_PREF_KEY) === '1'; }
+    catch { return false; }
+  }
+
+  function writeWorkspacePreference(enabled) {
+    try { localStorage.setItem(WORKSPACE_PREF_KEY, enabled ? '1' : '0'); } catch {}
+  }
+
+  function installProfileWorkspaceToggle(rootDocument = document) {
+    const page = rootDocument.querySelector('.profile-preferences-page');
+    if (!page) return false;
+
+    let card = page.querySelector('.msg-workspace-profile-card');
+    if (!card) {
+      card = rootDocument.createElement('section');
+      card.className = 'profile-feature-card msg-workspace-profile-card';
+      card.innerHTML = `
+        <div class="section-heading">
+          <div>
+            <span class="source-category">Workspace</span>
+            <h2>Workspace</h2>
+            <p>Choose how other sections open while you are reading.</p>
+          </div>
+        </div>
+        <label class="msg-workspace-profile-toggle" for="msg-workspace-profile-toggle">
+          <span class="msg-workspace-profile-copy">
+            <strong>Open pages in workspace</strong>
+            <small>Keep the Reader open and open other sections beside it.</small>
+          </span>
+          <span class="msg-workspace-switch-wrap">
+            <input id="msg-workspace-profile-toggle" type="checkbox" role="switch" aria-label="Open pages in workspace">
+            <span class="msg-workspace-switch" aria-hidden="true"></span>
+          </span>
+        </label>`;
+
+      const cards = [...page.querySelectorAll(':scope > .profile-feature-card')];
+      const markCard = cards.find((node) => /Personalized coaching/i.test(node.textContent || ''));
+      if (markCard) page.insertBefore(card, markCard);
+      else page.appendChild(card);
+    }
+
+    const toggle = card.querySelector('#msg-workspace-profile-toggle');
+    if (!toggle) return false;
+    toggle.checked = readWorkspacePreference();
+
+    if (toggle.dataset.workspaceBound !== '1') {
+      toggle.dataset.workspaceBound = '1';
+      toggle.addEventListener('change', () => {
+        const enabled = Boolean(toggle.checked);
+        writeWorkspacePreference(enabled);
+        if (window.parent && window.parent !== window) {
+          try {
+            window.parent.postMessage({ type:'msg-workspace-preference', enabled }, window.location.origin);
+          } catch {}
+        } else if (!enabled) {
+          try { window.MSGWorkspaceExperiment?.close?.(); } catch {}
+        }
+      });
+    }
+    return true;
+  }
 
   function initializeWorkspacePaneDocument() {
     document.documentElement.classList.add('msg-workspace-pane-document');
+    window.MSGWorkspacePane = true;
+    window.__MSG_WORKSPACE_PANE__ = true;
     const mode = PARAMS.get('msgWorkspaceMode') || 'action';
     const value = PARAMS.get('msgWorkspaceValue') || 'home';
+
+    function renderRequestedPageDirectly() {
+      if (mode !== 'action') return false;
+
+      // Use the app's actual renderer directly when one exists. This avoids
+      // replaying the full top-navigation pipeline inside a workspace pane,
+      // which can invoke Reader continuity/navigation behavior that belongs to
+      // the outer app rather than this secondary view.
+      try {
+        switch (value) {
+          case 'home': if (typeof renderHome === 'function') { renderHome(); return true; } break;
+          case 'browse': if (typeof renderBrowseHub === 'function') { renderBrowseHub(); return true; } break;
+          case 'my-library': if (typeof renderMyLibraryHub === 'function') { renderMyLibraryHub(); return true; } break;
+          case 'profile-preferences': if (typeof renderProfilePreferences === 'function') { renderProfilePreferences(); return true; } break;
+          case 'my-links': if (typeof renderMyLinks === 'function') { renderMyLinks(); return true; } break;
+          case 'mark-notebook': if (typeof renderGlobalNotebook === 'function') { renderGlobalNotebook(); return true; } break;
+          case 'music': if (typeof renderMusicLibrary === 'function') { renderMusicLibrary(); return true; } break;
+          case 'about': if (typeof renderAbout === 'function') { renderAbout(); return true; } break;
+          case 'contact': if (typeof renderContact === 'function') { renderContact(); return true; } break;
+          case 'privacy': if (typeof renderPrivacy === 'function') { renderPrivacy(); return true; } break;
+          case 'terms': if (typeof renderTerms === 'function') { renderTerms(); return true; } break;
+          case 'help': if (typeof renderHelp === 'function') { renderHelp(); return true; } break;
+          case 'my-reading':
+          case 'reading-list': if (typeof renderReadingList === 'function') { renderReadingList(); return true; } break;
+          case 'progress-dashboard':
+          case 'progress-awards': if (typeof renderProgressDashboard === 'function') { renderProgressDashboard(); return true; } break;
+          case 'action-center': if (typeof renderActionCenter === 'function') { renderActionCenter(); return true; } break;
+          case 'vocabulary-builder': if (typeof renderVocabularyBuilder === 'function') { renderVocabularyBuilder(); return true; } break;
+          case 'reading-skills': if (typeof renderReadingSkillsHub === 'function') { renderReadingSkillsHub(); return true; } break;
+          case 'comprehension-library': if (typeof renderComprehensionLibrary === 'function') { renderComprehensionLibrary(); return true; } break;
+          case 'mnemonics': if (typeof renderMnemonicsPage === 'function') { renderMnemonicsPage(); return true; } break;
+          case 'language-learning': if (typeof renderLanguageLearningPage === 'function') { renderLanguageLearningPage(); return true; } break;
+          case 'learning-courses': if (typeof renderLearningCoursesPage === 'function') { renderLearningCoursesPage(); return true; } break;
+          case 'library-bookmarks': if (typeof renderLibraryRecords === 'function') { renderLibraryRecords('bookmarks'); return true; } break;
+          case 'library-notes': if (typeof renderLibraryRecords === 'function') { renderLibraryRecords('notes'); return true; } break;
+          case 'drm-free-books': if (typeof renderDrmFreeBookFinder === 'function') { renderDrmFreeBookFinder(); return true; } break;
+          case 'ai-center': if (typeof renderAiCenter === 'function') { renderAiCenter(); return true; } break;
+          case 'knowledge-graph': if (typeof renderKnowledgeGraph === 'function') { renderKnowledgeGraph(); return true; } break;
+        }
+      } catch (error) {
+        console.warn('Workspace direct renderer failed; using normal page routing.', error);
+      }
+      return false;
+    }
+
+    // A workspace page is a secondary view, not a fresh app launch. Topic Feeds
+    // normally checks the server for its once-daily auto-open during startup; if
+    // that runs inside every iframe it replaces Library/Profile/etc. with a new
+    // Reader moments after the requested page appears. Suppress only that one
+    // startup endpoint inside workspace panes. Manual Topic Feed actions and all
+    // other fetches continue through the normal path.
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = (input, init) => {
+      const rawUrl = typeof input === 'string' ? input : (input?.url || '');
+      try {
+        const requested = new URL(rawUrl, window.location.href);
+        if (requested.pathname === '/api/topic-feeds/daily-open') {
+          return Promise.resolve(new Response(JSON.stringify({ workspacePane: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+      } catch {}
+      return nativeFetch(input, init);
+    };
 
     // Keyboard focus lives inside this iframe while a workspace page is active.
     // Forward only the Topic Feed story shortcuts to the outer Reader; ordinary
@@ -32,20 +163,46 @@
       } catch {}
     }, true);
 
+    // A page inside the workspace should never create a second Reader when its
+    // own Back/Return-to-Reader control is used. Hand that request to the outer
+    // workspace instead, which simply closes the secondary pane.
+    document.addEventListener('click', (event) => {
+      const returnReader = event.target.closest?.('[data-action="reader"]');
+      if (!returnReader) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      try {
+        window.parent?.postMessage?.({ type:'msg-workspace-return-reader' }, window.location.origin);
+      } catch {}
+    }, true);
+
     const openRequestedPage = () => {
-      // Let every deferred app/module script finish installing its delegated
-      // navigation handlers before firing the synthetic navigation request.
+      // Let every deferred app/module script finish installing before opening the
+      // requested secondary page. Prefer its renderer directly; only pages owned
+      // by independent modules fall back to the app's existing click route.
       window.setTimeout(() => {
-        const trigger = document.createElement('button');
-        trigger.type = 'button';
-        trigger.hidden = true;
-        if (mode === 'read') trigger.dataset.read = value;
-        else if (mode === 'test') trigger.dataset.test = value;
-        else trigger.dataset.action = value;
-        document.body.appendChild(trigger);
-        trigger.click();
-        trigger.remove();
-        document.documentElement.classList.add('msg-workspace-pane-ready');
+        const renderedDirectly = renderRequestedPageDirectly();
+        if (!renderedDirectly) {
+          const trigger = document.createElement('button');
+          trigger.type = 'button';
+          trigger.hidden = true;
+          if (mode === 'read') trigger.dataset.read = value;
+          else if (mode === 'test') trigger.dataset.test = value;
+          else trigger.dataset.action = value;
+          document.body.appendChild(trigger);
+          trigger.click();
+          trigger.remove();
+        }
+
+        if (mode === 'action' && value === 'profile-preferences') {
+          window.setTimeout(() => installProfileWorkspaceToggle(document), 0);
+        }
+
+        // Reveal only after the requested page has had a paint. The app's Home
+        // bootstrap never flashes in the right pane.
+        window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+          document.documentElement.classList.add('msg-workspace-pane-ready');
+        }));
       }, 0);
     };
 
@@ -67,7 +224,39 @@
   const PANELS = new Map();
   const PANEL_ORDER = [];
   let activePanelKey = '';
-  let secondaryWidth = Math.max(420, Math.min(760, Math.round(window.innerWidth * 0.42)));
+  const MIN_SECONDARY_WIDTH = 360;
+  let secondaryWidth = MIN_SECONDARY_WIDTH;
+  function dockReaderTopControlsForWorkspace() {
+    const shell = workspaceShell();
+    if (!shell || shell.classList.contains('is-closed')) return;
+    const primary = shell.querySelector('.msg-workspace-primary');
+    const footer = primary?.querySelector('.reader-viewer-footer');
+    const wpm = primary?.querySelector('.viewer-wpm-control');
+
+    // WPM has one permanent home: the Reader footer.
+    if (footer && wpm && wpm.parentElement !== footer) footer.appendChild(wpm);
+
+    // Text size + Music + Full screen are owned by reader-music-quick.js as one
+    // literal sibling group. Ask that controller to sync; do not move controls
+    // independently in the workspace layer.
+    try { window.MSGMusicController?.syncControls?.(); } catch {}
+  }
+
+  function restoreReaderTopControlsAfterWorkspace() {
+    // No DOM restoration is needed. The shared Reader control group remains in
+    // .reader-pane-controls whether the workspace is open or closed.
+  }
+
+  function workspaceYouTubeSearch(query, title = 'Suggested music') {
+    const cleanQuery = String(query || '').trim();
+    if (!cleanQuery) return false;
+    const controller = window.MSGMusicController;
+    if (controller && typeof controller.search === 'function') {
+      return controller.search(cleanQuery, String(title || 'Suggested music'));
+    }
+    console.warn('Music controller is not ready yet.');
+    return false;
+  }
 
   const escapeWorkspaceHtml = (value) => String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -84,12 +273,8 @@
     return APP.querySelector(':scope > .msg-workspace-shell');
   }
 
-  function workspaceCheckbox() {
-    return document.querySelector('#msg-workspace-optin');
-  }
-
   function workspaceEnabled() {
-    return Boolean(workspaceCheckbox()?.checked);
+    return readWorkspacePreference();
   }
 
   function isTopicFeedReaderActive() {
@@ -141,6 +326,31 @@
     return advanceTopicFeedStory(key === '.' ? 1 : -1);
   }
 
+  // Suggested-music links can appear in either the outer app or a lightweight
+  // workspace page. In the outer app, route them straight into the one shared
+  // music player instead of opening a separate YouTube tab.
+  document.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : event.target?.parentElement;
+    const clickedLink = target?.closest?.('a[href]');
+    const link = target?.closest?.('.book-music-link')
+      || (clickedLink?.closest?.('.book-music-recommendations') ? clickedLink : null);
+    if (!link?.href) return;
+    try {
+      const url = new URL(link.href, window.location.href);
+      const query = url.searchParams.get('search_query') || url.searchParams.get('q') || '';
+      const label = String(link.textContent || 'Suggested music').replace(/^\s*♫\s*/, '').trim();
+      const isSuggestion = Boolean(query) && (
+        link.classList.contains('book-music-link')
+        || Boolean(link.closest('.book-music-recommendations'))
+        || /reading mood|adaptation score|film or tv score|music score/i.test(label)
+      );
+      if (!isSuggestion) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      workspaceYouTubeSearch(query, label || 'Suggested music');
+    } catch {}
+  }, true);
+
   document.addEventListener('keydown', (event) => {
     if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key !== ',' && event.key !== '.') return;
@@ -153,8 +363,38 @@
 
   window.addEventListener('message', (event) => {
     if (event.origin !== window.location.origin) return;
-    if (event.data?.type !== 'msg-workspace-topic-feed-key') return;
-    handleTopicFeedStoryShortcut(String(event.data.key || ''));
+    if (event.data?.type === 'msg-workspace-topic-feed-key') {
+      handleTopicFeedStoryShortcut(String(event.data.key || ''));
+      return;
+    }
+    if (event.data?.type === 'msg-workspace-return-reader') {
+      closeWorkspacePanel();
+      return;
+    }
+    if (event.data?.type === 'msg-workspace-music-search') {
+      const query = String(event.data.query || '').trim();
+      const title = String(event.data.title || 'Suggested music').trim();
+      if (query) workspaceYouTubeSearch(query, title);
+      return;
+    }
+    if (event.data?.type === 'msg-workspace-music-play') {
+      const choice = event.data.choice;
+      if (choice && typeof window.playMusic === 'function') {
+        window.playMusic(choice);
+      }
+      return;
+    }
+    if (event.data?.type === 'msg-workspace-preference') {
+      writeWorkspacePreference(Boolean(event.data.enabled));
+      installProfileWorkspaceToggle(document);
+      if (!event.data.enabled) closeWorkspacePanel();
+    }
+  });
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== WORKSPACE_PREF_KEY) return;
+    installProfileWorkspaceToggle(document);
+    if (event.newValue !== '1') closeWorkspacePanel();
   });
 
   function humanize(value) {
@@ -221,11 +461,12 @@
     const move = (event) => {
       if (pointerId == null || event.pointerId !== pointerId) return;
       const rect = shell.getBoundingClientRect();
-      const minSecondary = 360;
+      const minSecondary = MIN_SECONDARY_WIDTH;
       const minPrimary = 520;
       const proposed = Math.round(rect.right - event.clientX);
       secondaryWidth = Math.max(minSecondary, Math.min(proposed, Math.max(minSecondary, rect.width - minPrimary - 8)));
       shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
+      dockReaderTopControlsForWorkspace();
     };
 
     const finish = (event) => {
@@ -280,6 +521,7 @@
     if (!shell) return;
     detachActivePanel();
     activePanelKey = '';
+    restoreReaderTopControlsAfterWorkspace();
     shell.classList.add('is-closed');
     renderWorkspaceTabs(shell);
     window.speechSynthesis?.cancel?.();
@@ -295,8 +537,11 @@
 
     if (activePanelKey !== key) detachActivePanel();
     activePanelKey = key;
+    const wasClosed = shell.classList.contains('is-closed');
+    if (wasClosed) secondaryWidth = MIN_SECONDARY_WIDTH;
     shell.classList.remove('is-closed');
     shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
+    window.requestAnimationFrame(dockReaderTopControlsForWorkspace);
     if (!record.node.isConnected) body.appendChild(record.node);
     renderWorkspaceTabs(shell);
     return true;
@@ -328,11 +573,12 @@
   }
 
   function panelUrl(mode, value) {
-    const url = new URL(window.location.href);
-    url.hash = '';
-    url.searchParams.set('msgWorkspacePane', '1');
+    const url = new URL('/workspace-pane.html', window.location.origin);
     url.searchParams.set('msgWorkspaceMode', mode);
     url.searchParams.set('msgWorkspaceValue', value);
+    // Keep the pane document/runtime in lockstep with the router and prevent an
+    // older cached pane from reviving the former hand-maintained page list.
+    url.searchParams.set('msgWorkspaceBuild', '0.5.0');
     return url.toString();
   }
 
@@ -504,20 +750,6 @@
     if (!nav) return false;
     const symposium = document.querySelector('[data-action="symposium"]');
 
-    // Use a neutral span wrapper rather than a bare <label>. The site's main
-    // header has broad label styling in some builds, which can suppress a
-    // direct-child label even though the workspace script itself loaded.
-    let control = document.querySelector('.msg-workspace-optin');
-    if (!control) {
-      control = document.createElement('span');
-      control.className = 'msg-workspace-optin';
-      control.title = 'When checked, menu pages open beside the Reader instead of replacing it.';
-      control.setAttribute('role', 'group');
-      control.setAttribute('aria-label', 'Open pages in workspace');
-      control.innerHTML = '<input id="msg-workspace-optin" type="checkbox" aria-label="Open in workspace"><span>Open in workspace</span>';
-      nav.appendChild(control);
-    }
-
     let button = document.querySelector('[data-msg-workspace-open="browser"]');
     if (!button) {
       button = document.createElement('button');
@@ -529,12 +761,8 @@
       nav.appendChild(button);
     }
 
-    // Keep the opt-in visibly between Symposium and Web.
-    if (symposium) {
-      if (symposium.nextSibling !== control) nav.insertBefore(control, symposium.nextSibling);
-      if (control.nextSibling !== button) nav.insertBefore(button, control.nextSibling);
-    }
-    return Boolean(symposium && control.isConnected && button.isConnected);
+    if (symposium && symposium.nextSibling !== button) nav.insertBefore(button, symposium.nextSibling);
+    return Boolean(symposium && button.isConnected);
   }
 
   function navigationDescriptor(element) {
@@ -549,24 +777,7 @@
     return Boolean(element?.closest?.('.site-header, .site-footer'));
   }
 
-  document.addEventListener('change', (event) => {
-    if (!event.target.matches?.('#msg-workspace-optin')) return;
-    if (!event.target.checked) closeWorkspacePanel();
-  }, true);
-
   document.addEventListener('click', (event) => {
-    const optinControl = event.target.closest?.('.msg-workspace-optin');
-    if (optinControl && !event.target.matches?.('#msg-workspace-optin')) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      const checkbox = optinControl.querySelector('#msg-workspace-optin');
-      if (checkbox) {
-        checkbox.checked = !checkbox.checked;
-        checkbox.dispatchEvent(new Event('change', { bubbles:true }));
-      }
-      return;
-    }
-
     const close = event.target.closest?.('[data-msg-workspace-close]');
     if (close) {
       event.preventDefault();
@@ -599,7 +810,8 @@
         window.alert('Open something in the Reader first to use Web in the workspace.');
         return;
       }
-      if (workspaceCheckbox()) workspaceCheckbox().checked = true;
+      writeWorkspacePreference(true);
+      installProfileWorkspaceToggle(document);
       showWorkspacePanel('browser');
       return;
     }
@@ -607,8 +819,20 @@
     const navTarget = event.target.closest?.('[data-action], [data-read], [data-test]');
     if (!navTarget || !isTopLevelNavigation(navTarget)) return;
 
+    if (navTarget.dataset.action === 'profile-preferences' && (!workspaceEnabled() || !hasReader())) {
+      window.setTimeout(() => installProfileWorkspaceToggle(document), 0);
+    }
+
     const descriptor = navigationDescriptor(navTarget);
     if (!descriptor) return;
+
+    // Home / the Mark, Set, Go! brand is the intentional exception to the
+    // workspace: it is the app's full-width welcome/start page. Close any
+    // secondary pane, then allow the normal app.js Home route to run.
+    if (descriptor.mode === 'action' && descriptor.value === 'home') {
+      closeWorkspacePanel();
+      return;
+    }
 
     // Reader means "return focus to Reader" when a workspace is already open.
     if (descriptor.mode === 'action' && descriptor.value === 'reader' && workspaceShell() && !workspaceShell().classList.contains('is-closed')) {
@@ -644,19 +868,30 @@
   [1200, 3000, 6000].forEach((delay) => window.setTimeout(ensureWorkspaceControls, delay));
   window.addEventListener('pageshow', ensureWorkspaceControls);
 
+  document.addEventListener('marksetgo:document-available', () => {
+    window.setTimeout(dockReaderTopControlsForWorkspace, 0);
+  });
+
   window.MSGWorkspaceExperiment = Object.freeze({
     open: showWorkspacePanel,
     openPage: openAppPage,
     close: closeWorkspacePanel,
     browser: () => showWorkspacePanel('browser'),
     symposium: () => showWorkspacePanel('symposium'),
-    enabled: workspaceEnabled
+    musicSearch: (query, title) => workspaceYouTubeSearch(query, title),
+    enabled: workspaceEnabled,
+    setEnabled: (enabled) => { writeWorkspacePreference(Boolean(enabled)); installProfileWorkspaceToggle(document); if (!enabled) closeWorkspacePanel(); }
   });
 
 function renderSymposiumWorkspace(rootHost) {
   ensureSymposiumStyles();
   const readingContext = currentSymposiumReadingContext();
-  const defaultTopic = state?.title ? `Explore the central ideas in ${state.title}` : '';
+  const sharedHandoff = window.MSGContentShare?.takeSymposiumHandoff?.() || null;
+  const sharedContextText = String(sharedHandoff?.symposiumContext || '').trim();
+  const sharedContextLabel = sharedHandoff ? `Shared from ${sharedHandoff.sourceLabel || 'app content'}` : '';
+  const defaultTopic = sharedHandoff?.symposiumTopic || (state?.title ? `Explore the central ideas in ${state.title}` : '');
+  const initialContextText = sharedContextText || readingContext.text;
+  const initialContextLabel = sharedContextText ? sharedContextLabel : readingContext.label;
   const defaultChecked = new Set(['socrates','aristotle','einstein','lovelace']);
 
   rootHost.innerHTML = `
@@ -691,11 +926,12 @@ function renderSymposiumWorkspace(rootHost) {
             <div>
               <label>Reading context</label>
               <div class="symposium-context-choice">
+                ${sharedContextText ? '<button type="button" data-symposium-context="shared">Use shared content</button>' : ''}
                 <button type="button" data-symposium-context="reading" ${readingContext.text ? '' : 'disabled'}>Use current reading</button>
                 <button type="button" data-symposium-context="none">Topic only</button>
               </div>
-              <input id="symposium-context" type="hidden" value="${symposiumEscape(readingContext.text)}">
-              <p class="symposium-hint" id="symposium-context-label">${symposiumEscape(readingContext.label)}${readingContext.text ? ` · ${splitWords(readingContext.text).length.toLocaleString()} words available` : ''}</p>
+              <input id="symposium-context" type="hidden" value="${symposiumEscape(initialContextText)}">
+              <p class="symposium-hint" id="symposium-context-label">${symposiumEscape(initialContextLabel)}${initialContextText ? ` · ${splitWords(initialContextText).length.toLocaleString()} words available` : ''}</p>
             </div>
 
             <label>Output
@@ -722,7 +958,7 @@ function renderSymposiumWorkspace(rootHost) {
         <main class="symposium-panel symposium-stage">
           <div class="symposium-stage-toolbar">
             <span class="symposium-stage-status" id="symposium-stage-status">Ready to convene</span>
-            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
+            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
           </div>
           <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
             <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
@@ -741,6 +977,7 @@ function renderSymposiumWorkspace(rootHost) {
   const statusEl = root.querySelector('#symposium-stage-status');
   const nextButton = root.querySelector('#symposium-next');
   const saveButton = root.querySelector('#symposium-save');
+  const chatButton = root.querySelector('#symposium-chat');
   const readerButton = root.querySelector('#symposium-reader-submit');
   const startButton = root.querySelector('#symposium-start');
   const rosterEl = root.querySelector('#symposium-roster');
@@ -763,7 +1000,10 @@ function renderSymposiumWorkspace(rootHost) {
   };
 
   root.querySelectorAll('[data-symposium-context]').forEach((button)=>button.addEventListener('click',()=>{
-    if (button.dataset.symposiumContext === 'reading') {
+    if (button.dataset.symposiumContext === 'shared' && sharedContextText) {
+      root.querySelector('#symposium-context').value = sharedContextText;
+      root.querySelector('#symposium-context-label').textContent = `${sharedContextLabel} · ${splitWords(sharedContextText).length.toLocaleString()} words available`;
+    } else if (button.dataset.symposiumContext === 'reading') {
       root.querySelector('#symposium-context').value = readingContext.text;
       root.querySelector('#symposium-context-label').textContent = `${readingContext.label} · ${splitWords(readingContext.text).length.toLocaleString()} words available`;
     } else {
@@ -824,7 +1064,7 @@ function renderSymposiumWorkspace(rootHost) {
     session.pendingReaderContribution = '';
     transcriptEl.innerHTML = '';
     appendTurn({ name:'Athena', monogram:'A', field:'Moderator', text:await moderatorOpening(), kind:'moderator', sourceLabel:'Moderator · decorum & evidence' }, true);
-    nextButton.disabled = false; saveButton.disabled = false; readerButton.disabled = false;
+    nextButton.disabled = false; saveButton.disabled = false; if (chatButton) chatButton.disabled = false; readerButton.disabled = false;
     await runSpeaker(session.people[0]);
     session.nextIndex = session.people.length > 1 ? 1 : 0;
   });
@@ -860,10 +1100,31 @@ function renderSymposiumWorkspace(rootHost) {
   });
 
   transcriptEl.addEventListener('click',(event)=>{
+    const shareButton = event.target.closest('[data-symposium-share-turn]');
+    if (shareButton) {
+      const body = shareButton.closest('.symposium-turn-body');
+      const name = body?.querySelector('.symposium-turn-head strong')?.textContent?.trim() || 'Symposium';
+      const field = body?.querySelector('.symposium-turn-head span')?.textContent?.trim() || '';
+      const text = body?.querySelector('p')?.textContent?.trim() || '';
+      window.MSGContentShare?.toChat?.({ type:'symposium-turn', title:`${name} · ${session.topic || 'Symposium'}`, text, sourceLabel:'Symposium', chapter:field, metadata:{ topic:session.topic || '' } });
+      return;
+    }
     const button = event.target.closest('[data-symposium-speak-last]');
     if (!button) return;
     const body = button.closest('.symposium-turn-body');
     symposiumSpeak(body?.querySelector('p')?.textContent || '', body?.querySelector('strong')?.textContent || 'Speaker');
+  });
+
+  chatButton?.addEventListener('click',()=>{
+    if (!session.transcript.length) return;
+    const text = session.transcript.map((turn)=>`${turn.name}${turn.field ? ` (${turn.field})` : ''}: ${turn.text}`).join('\n\n');
+    window.MSGContentShare?.toChat?.({
+      type:'symposium-transcript',
+      title:`Symposium · ${session.topic || 'Discussion'}`,
+      text,
+      sourceLabel:'Symposium',
+      metadata:{ mode:session.mode, participants:session.people.map((person)=>person.name).join(', ') }
+    });
   });
 
   root.querySelector('#symposium-stop-speech').addEventListener('click',()=>window.speechSynthesis?.cancel?.());

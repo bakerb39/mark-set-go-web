@@ -1,0 +1,23 @@
+.msg-content-share-dialog{width:min(620px,calc(100vw - 28px));border:0;border-radius:18px;padding:0;box-shadow:0 24px 70px rgba(12,35,64,.28);color:#10233f}
+.msg-content-share-dialog::backdrop{background:rgba(12,28,46,.55)}
+.msg-content-share-form{padding:20px;display:grid;gap:14px}
+.msg-content-share-heading{display:flex;justify-content:space-between;gap:14px;align-items:flex-start}
+.msg-content-share-heading span{display:block;color:#8a6500;font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.msg-content-share-heading h2{margin:3px 0 0;color:#0c2340;font-size:1.35rem}
+.msg-content-share-close{border:0;background:transparent;color:#53657a;font-size:1.65rem;line-height:1;cursor:pointer}
+.msg-content-share-preview{padding:12px 14px;border:1px solid #d9e3ee;border-radius:12px;background:#f8fbff;display:grid;gap:4px}
+.msg-content-share-preview>span{color:#6c7e91;font-size:.72rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.msg-content-share-preview>strong{color:#173c66}
+.msg-content-share-preview>p{margin:0;color:#53657a;line-height:1.45;max-height:118px;overflow:auto;white-space:pre-wrap}
+.msg-content-share-form label{display:grid;gap:6px;font-size:.84rem;font-weight:800;color:#24476e}
+.msg-content-share-form label>span{font-weight:500;color:#718095}
+.msg-content-share-form input,.msg-content-share-form select,.msg-content-share-form textarea{width:100%;box-sizing:border-box;border:1px solid #cbd7e5;border-radius:10px;padding:9px 11px;background:white;color:#10233f;font:inherit}
+.msg-content-share-form textarea{resize:vertical;line-height:1.4}
+.msg-content-share-status{min-height:1.2em;margin:0;color:#53657a;font-size:.82rem}
+.msg-content-share-actions{display:flex;justify-content:flex-end;gap:8px}
+.msg-content-selection-toolbar{position:fixed;z-index:10080;display:flex;gap:5px;padding:5px;border:1px solid #c7d2df;border-radius:10px;background:white;box-shadow:0 8px 24px rgba(12,35,64,.2)}
+.msg-content-selection-toolbar[hidden]{display:none!important}
+.msg-content-selection-toolbar button{border:0;border-radius:8px;padding:7px 10px;background:#eef3f8;color:#17304e;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap}
+.msg-content-selection-toolbar button:last-child{background:#0c2340;color:#f2ca60}
+.mark-response-share-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+.mark-response-share-actions button{margin:0}

@@ -22,6 +22,39 @@ module.exports = function installMarkSetGoChat(app, { query, databaseConfigured 
     return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
   }
 
+  function normalizeSharedContent(value) {
+    let source = value;
+    if (typeof source === 'string') {
+      try { source = JSON.parse(source); } catch { source = {}; }
+    }
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return {};
+
+    const output = {};
+    const textFields = {
+      type: 60, title: 300, text: 12000, context: 12000, sourceLabel: 180,
+      sourceUrl: 2000, documentId: 240, chapter: 300, createdAt: 80
+    };
+    for (const [key, max] of Object.entries(textFields)) {
+      const value = clean(source[key], max);
+      if (value) output[key] = value;
+    }
+    if (Number.isFinite(Number(source.startIndex)) && Number(source.startIndex) >= 0) {
+      output.startIndex = Number(source.startIndex);
+    }
+    if (source.metadata && typeof source.metadata === 'object' && !Array.isArray(source.metadata)) {
+      const metadata = {};
+      for (const [key, raw] of Object.entries(source.metadata).slice(0, 20)) {
+        const safeKey = clean(key, 80);
+        if (!safeKey) continue;
+        const safeValue = clean(typeof raw === 'string' ? raw : JSON.stringify(raw), 1000);
+        if (safeValue) metadata[safeKey] = safeValue;
+      }
+      if (Object.keys(metadata).length) output.metadata = metadata;
+    }
+    if (Object.keys(output).length) output.version = 1;
+    return output;
+  }
+
   function normalizeReactions(value) {
     let source = value;
     if (typeof source === 'string') {
@@ -63,7 +96,8 @@ module.exports = function installMarkSetGoChat(app, { query, databaseConfigured 
       reactions: normalizeReactions(row.reactions),
       image_data: row.image_data ? Buffer.from(row.image_data).toString('base64') : null,
       image_mime: row.image_mime || null,
-      image_name: row.image_name || null
+      image_name: row.image_name || null,
+      shared_content: normalizeSharedContent(row.shared_content)
     };
   }
 
@@ -95,8 +129,14 @@ module.exports = function installMarkSetGoChat(app, { query, databaseConfigured 
           reactions JSONB NOT NULL DEFAULT '{}'::jsonb,
           image_data BYTEA,
           image_mime VARCHAR(80),
-          image_name VARCHAR(255)
+          image_name VARCHAR(255),
+          shared_content JSONB NOT NULL DEFAULT '{}'::jsonb
         )
+      `);
+
+      await query(`
+        ALTER TABLE msgchat_messages
+        ADD COLUMN IF NOT EXISTS shared_content JSONB NOT NULL DEFAULT '{}'::jsonb
       `);
 
       await query(`
@@ -159,6 +199,8 @@ module.exports = function installMarkSetGoChat(app, { query, databaseConfigured 
           SELECT CASE
             WHEN m2.deleted_at IS NOT NULL THEN 'Message deleted'
             WHEN NULLIF(m2.body, '') IS NOT NULL THEN LEFT(m2.body, 100)
+            WHEN m2.shared_content IS NOT NULL AND m2.shared_content <> '{}'::jsonb THEN
+              LEFT(COALESCE(NULLIF(m2.shared_content->>'title', ''), NULLIF(m2.shared_content->>'text', ''), 'Shared content'), 100)
             WHEN m2.image_data IS NOT NULL THEN '📷 Photo'
             ELSE ''
           END
@@ -244,16 +286,18 @@ module.exports = function installMarkSetGoChat(app, { query, databaseConfigured 
     const body = clean(req.body?.body, 4000);
     const image = parseImageDataUrl(req.body?.imageData);
     const imageName = clean(req.body?.imageName, 255);
+    const sharedContent = normalizeSharedContent(req.body?.sharedContent);
+    const hasSharedContent = Object.keys(sharedContent).length > 0;
 
     if (!conversationId || !sender) return res.status(400).json({ error: 'Conversation and display name are required.' });
-    if (!body && !image) return res.status(400).json({ error: 'Enter a message or attach a photo.' });
+    if (!body && !image && !hasSharedContent) return res.status(400).json({ error: 'Enter a message, attach a photo, or share app content.' });
 
     const result = await query(`
       INSERT INTO msgchat_messages
-        (conversation_id, sender, body, image_data, image_mime, image_name)
-      VALUES ($1, $2, $3, $4, $5, $6)
+        (conversation_id, sender, body, image_data, image_mime, image_name, shared_content)
+      VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
       RETURNING *
-    `, [conversationId, sender, body, image?.buffer || null, image?.mime || null, imageName || null]);
+    `, [conversationId, sender, body, image?.buffer || null, image?.mime || null, imageName || null, JSON.stringify(sharedContent)]);
 
     res.status(201).json(serializeMessage(result.rows[0]));
   }));
@@ -286,7 +330,7 @@ module.exports = function installMarkSetGoChat(app, { query, databaseConfigured 
 
     const result = await query(`
       UPDATE msgchat_messages
-      SET body = '', image_data = NULL, image_mime = NULL, image_name = NULL,
+      SET body = '', image_data = NULL, image_mime = NULL, image_name = NULL, shared_content = '{}'::jsonb,
           reactions = '{}'::jsonb, deleted_at = NOW(), updated_at = NOW()
       WHERE id = $1 AND conversation_id = $2 AND sender = $3 AND deleted_at IS NULL
       RETURNING *
