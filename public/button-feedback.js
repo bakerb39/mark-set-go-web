@@ -91,6 +91,7 @@
     ensureScript('/msg-chat.js');
     ensureScript('/profile-theme-fix.js');
     ensureScript('/workspace-chat-layout-fix.js');
+    ensureScript('/explorer-designer-enhancements.js');
     removeOldTopLevelItems();
     ensureChatButton();
   }
