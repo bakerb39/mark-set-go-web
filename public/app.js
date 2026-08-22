@@ -6172,11 +6172,6 @@ function applyExperienceProfile(profile = getExperienceProfile()) {
   const features=normalized.features || {};
 
   rootEl.dataset.experienceAppearance=normalized.appearance || 'default';
-  if(normalized.appearance && normalized.appearance !== 'default') {
-    rootEl.dataset.msgExperienceTheme=normalized.appearance;
-  } else {
-    delete rootEl.dataset.msgExperienceTheme;
-  }
 
   Object.entries(features).forEach(([key,enabled]) => {
     rootEl.dataset[`feature${key.charAt(0).toUpperCase()}${key.slice(1)}`]=enabled ? 'on' : 'off';
@@ -9892,11 +9887,11 @@ function renderNavigationPane() {
   pane.querySelectorAll('[data-toc-index]').forEach((button) => {
     button.addEventListener('click', () => jumpToWordIndex(button.dataset.tocIndex));
   });
-  // Bind bookmark creation once on the stable navigation pane rather than on
-  // the transient button node. Topic Feeds may move/rebuild #add-bookmark, but
-  // every click still reaches the Reader's native addBookmark() implementation.
-  if (pane.dataset.nativeBookmarkDelegation !== '1') {
-    pane.dataset.nativeBookmarkDelegation = '1';
+  // Bookmark creation belongs to the Reader's native addBookmark() implementation.
+  // Bind once to the stable navigation pane so the native button may be moved by
+  // Topic Feeds without losing its click path when the pane contents are rebuilt.
+  if (pane.dataset.nativeBookmarkHandler !== '1') {
+    pane.dataset.nativeBookmarkHandler = '1';
     pane.addEventListener('click', (event) => {
       const button = event.target instanceof Element ? event.target.closest('#add-bookmark') : null;
       if (!button || !pane.contains(button)) return;
@@ -13238,6 +13233,23 @@ function realignTopicFeedDocumentToc(text, toc) {
 }
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
+  // A Workspace iframe is a secondary control/content surface only. It must
+  // never own a second Reader. Send every readable document through the one
+  // established outer-Reader handoff. This central guard covers Modern Guides,
+  // Classic/Bible guides, generated guides, Free Books, and any future feature
+  // that reaches the canonical Reader renderer.
+  if (window.parent !== window) {
+    try {
+      const handoff = window.parent.MSGWorkspaceReaderHandoff;
+      if (typeof handoff?.openText === 'function') {
+        return handoff.openText(title, text, source);
+      }
+    } catch (error) {
+      console.warn('Workspace could not hand text to the main Reader.', error);
+    }
+    return false;
+  }
+
   app.dataset.viewKey = 'reader';
 
   const READER_CLICK_CONTROLS_KEY = 'msg_reader_click_controls_v1';
