@@ -529,11 +529,18 @@ html[data-msg-experience-theme]:is(
   z-index:3 !important;
   isolation:isolate !important;
 
-  display:inline-flex !important;
-  width:max-content !important;
+  /*
+   * The labels stay compact at the left, but the action ROW owns the complete
+   * readable header width. This gives the scrolling mask a real full-width
+   * footprint instead of ending immediately after Create Post.
+   */
+  display:flex !important;
+  width:100% !important;
+  min-width:0 !important;
   max-width:100% !important;
 
   align-items:center !important;
+  justify-content:flex-start !important;
   flex-wrap:wrap !important;
   gap:.08rem !important;
 
@@ -562,11 +569,17 @@ html[data-msg-experience-theme]:is(
   content:"" !important;
   display:block !important;
   position:absolute !important;
-  inset:-4px -8px -5px -8px !important;
+
+  /*
+   * Full-width, scroll-only occlusion band. It has only a small vertical
+   * buffer; the action labels themselves remain transparent.
+   */
+  inset:-4px 0 -6px 0 !important;
+
   z-index:0 !important;
   pointer-events:none !important;
   border:0 !important;
-  border-radius:3px !important;
+  border-radius:0 !important;
   background:var(--msg-vd-reader-page-color,#ffffff) !important;
   background-image:none !important;
   box-shadow:none !important;
