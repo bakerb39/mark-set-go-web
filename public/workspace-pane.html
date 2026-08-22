@@ -17,6 +17,7 @@
 <link href="/experience-theme-layout.css?v=20260822-v7.18-topic-action-band" rel="stylesheet">
 <link href="/explorer-theme.css?v=1.1.1-workspace-profile" rel="stylesheet">
 <link href="/companion-persona-safe.css?v=9.7.1-workspace-profile" rel="stylesheet">
+<link href="/msg-chat.css?v=20260822-v7.20-chat-pane-loader" rel="stylesheet">
 <script>
   // This is a secondary view only. Do not boot a second authenticated app.
   window.__MSG_WORKSPACE_PANE__ = true;
@@ -48,6 +49,8 @@
 <script defer src="/workspace-reader-proxy.js?v=0.11.0-bible-topic"></script>
 <script>window.addEventListener("DOMContentLoaded",()=>window.MarkSetGoExperienceProfile?.apply?.());</script>
 <script defer src="/topic-feeds.js?v=20260822-v7.18-topic-action-band"></script>
+<!-- Chat must load before workspace-pane-runtime routes msg-chat. -->
+<script defer src="/msg-chat.js?v=20260822-v7.20-chat-pane-loader"></script>
 <!-- Render the requested lightweight page before Profile extensions initialize. -->
 <script defer src="/workspace-pane-runtime.js?v=0.11.8-theme-stack"></script>
 <script defer src="/companion-persona-safe.js?v=9.7.5-workspace-profile"></script>
