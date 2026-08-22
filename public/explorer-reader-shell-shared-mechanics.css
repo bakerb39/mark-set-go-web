@@ -358,21 +358,30 @@ html[data-msg-experience-theme]:is(
    * Playback is the actual shell bottom. Normal flow only.
    */
   #app .reader-page-panel .playback-controls {
-    flex:0 0 auto !important;
+    flex:0 0 48px !important;
     position:relative !important;
     z-index:4 !important;
-    min-height:38px !important;
+    min-height:48px !important;
+    max-height:48px !important;
     margin:4px 0 0 !important;
-    padding:0 !important;
+    padding:4px 0 6px !important;
     gap:8px !important;
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
     overflow:visible !important;
   }
 
   #app .reader-page-panel .playback-controls .status {
+    flex:1 1 auto !important;
+    min-width:0 !important;
     min-height:20px !important;
     margin:0 0 0 .35rem !important;
     padding:0 !important;
-    overflow:visible !important;
+    line-height:1.3 !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
   }
 }
 
@@ -420,6 +429,7 @@ html[data-msg-experience-theme]:is(
  * never part of the text scroller.
  */
 #reader-frame > .topic-feed-story-header-external {
+  order:-1 !important;
   flex:0 0 auto !important;
   position:relative !important;
   z-index:30 !important;
@@ -444,6 +454,7 @@ html[data-msg-experience-theme]:is(
 
 /* The Reader article consumes the remaining height below that header. */
 #reader-frame > #reader.interactive-reader {
+  order:0 !important;
   flex:1 1 auto !important;
   height:auto !important;
   min-height:0 !important;
@@ -464,6 +475,19 @@ html[data-msg-experience-theme]:is(
   opacity:1 !important;
   position:relative !important;
   z-index:31 !important;
+}
+
+#reader-frame > .topic-feed-story-header-external
+:is(
+  [data-action="summarize"],
+  [data-action="analyze"],
+  [data-action="create-post"],
+  .read-anything-inline-action,
+  .topic-feed-article-action
+) {
+  display:inline-flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
 }
 
 /* The SOURCE/action line can wrap instead of being clipped. */
