@@ -1,22 +1,66 @@
-/* Mark, Set, Go! Topic Feed header stability v7.21
-   Feature-owned occlusion for the current Reader DOM.
-   Keeps scrolling prose from colliding with Summarize / Analyze / Create Post. */
+/* Mark, Set, Go! Topic Feed permanent header/band v7.22
+   The article scrolls; this header never does. */
 
-#reader.topic-feed-story-header-managed > #read-anything-article-summary-action {
+#reader-frame {
+  position: relative;
+}
+
+#reader-frame > .topic-feed-story-header-external {
   position: absolute !important;
+  z-index: 30 !important;
+  box-sizing: border-box !important;
+  overflow: visible !important;
+  pointer-events: auto !important;
+
+  /* This is the permanent opaque ceiling. It does not switch on/off and it is
+     outside #reader, so scrolling can never translate it with the prose. */
+  background: var(--msg-vd-reader-page-color, var(--msg-theme-surface, #ffffff)) !important;
+  background-image: none !important;
+  box-shadow: 0 7px 0 var(--msg-vd-reader-page-color, var(--msg-theme-surface, #ffffff)) !important;
+  padding: 0 0 6px !important;
+  margin: 0 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+#reader-frame > .topic-feed-story-header-external > .topic-feed-story-meta-overlay {
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
+
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {
+  position: relative !important;
+  inset: auto !important;
+  z-index: 3 !important;
   isolation: isolate !important;
-  display: inline-flex !important;
+  display: flex !important;
   width: max-content !important;
   max-width: 100% !important;
+  min-width: 0 !important;
   align-items: center !important;
+  justify-content: flex-start !important;
   flex-wrap: wrap !important;
   gap: .08rem !important;
+  margin: .08rem 0 0 !important;
+  padding: 0 !important;
   background: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
 }
 
-#reader.topic-feed-story-header-managed > #read-anything-article-summary-action::before {
+/* Compact opaque footprint immediately behind the action labels. It is part of
+   the permanent external header, so it cannot scroll or jump. */
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before {
   content: "" !important;
   display: block !important;
   position: absolute !important;
@@ -30,12 +74,32 @@
   box-shadow: none !important;
 }
 
-#reader.topic-feed-story-header-managed > #read-anything-article-summary-action
-:is(.read-anything-inline-article-summary, a, button, span[aria-hidden="true"]) {
+/* Hover/focus may underline the labels, but must never fade, hide, recolor to
+   transparent, or move them. */
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, a, button, span[aria-hidden="true"]),
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, a, button, span[aria-hidden="true"]):hover,
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, a, button, span[aria-hidden="true"]):focus,
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, a, button, span[aria-hidden="true"]):focus-visible {
   position: relative !important;
   z-index: 1 !important;
+  opacity: 1 !important;
+  visibility: visible !important;
   background: transparent !important;
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
+  transform: none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+button.read-anything-inline-article-summary,
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+button.read-anything-inline-article-summary:hover,
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+button.read-anything-inline-article-summary:focus {
+  color: #1769aa !important;
 }

@@ -520,13 +520,31 @@
   function topicFeedStoryHeaderParts(reader = document.querySelector('#reader')) {
     if (!reader) return {};
 
-    // Clean up the previous nested-overlay implementation if this script is
-    // hot-reloaded in a browser session. Preserve the existing action-row node.
-    const legacyOverlay = reader.querySelector(':scope > [data-topic-feed-story-header]');
-    if (legacyOverlay) {
-      const legacyAction = legacyOverlay.querySelector('#read-anything-article-summary-action');
-      if (legacyAction) reader.prepend(legacyAction);
-      legacyOverlay.remove();
+    const readerFrame = reader.closest('#reader-frame');
+    if (!readerFrame) return {};
+
+    let header = readerFrame.querySelector(':scope > [data-topic-feed-story-header-external]');
+    if (!header) {
+      header = document.createElement('div');
+      header.className = 'topic-feed-story-header-external';
+      header.dataset.topicFeedStoryHeaderExternal = '1';
+      header.setAttribute('aria-label', 'Topic Feed article header');
+      readerFrame.insertBefore(header, reader);
+    }
+
+    // Recover nodes from the broken in-reader implementation without cloning
+    // them. The Reader action buttons keep their existing handlers when moved.
+    let meta = header.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
+    const inReaderMeta = reader.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
+    if (!meta && inReaderMeta) {
+      meta = inReaderMeta;
+      header.appendChild(meta);
+    }
+    if (!meta) {
+      meta = document.createElement('div');
+      meta.className = 'topic-feed-story-meta-overlay';
+      meta.dataset.topicFeedStoryMetaOverlay = '1';
+      header.appendChild(meta);
     }
 
     let spacer = reader.querySelector(':scope > [data-topic-feed-story-header-spacer]');
@@ -538,21 +556,16 @@
       reader.prepend(spacer);
     }
 
-    let meta = reader.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
-    if (!meta) {
-      meta = document.createElement('div');
-      meta.className = 'topic-feed-story-meta-overlay';
-      meta.dataset.topicFeedStoryMetaOverlay = '1';
-      reader.appendChild(meta);
+    const actionRow = document.querySelector('#read-anything-article-summary-action');
+    if (actionRow && actionRow.parentElement !== header) {
+      header.appendChild(actionRow);
     }
 
-    reader.classList.add('topic-feed-story-header-managed');
+    // Remove the later direct-child marker; this header is deliberately owned
+    // by #reader-frame so it cannot travel with the scrolling article.
+    reader.classList.remove('topic-feed-story-header-managed');
 
-    return {
-      spacer,
-      meta,
-      actionRow: document.querySelector('#read-anything-article-summary-action')
-    };
+    return { readerFrame, header, spacer, meta, actionRow };
   }
 
   function scheduleTopicFeedStoryBookReflow() {
@@ -560,9 +573,6 @@
     topicFeedStoryHeaderReflowTimer = window.setTimeout(() => {
       const reader = document.querySelector('#reader');
       if (!reader?.classList.contains('book-pages-layout')) return;
-
-      // Use the Reader's own resize/reflow path after the reserved first-page
-      // header height changes.
       window.requestAnimationFrame(() => {
         window.dispatchEvent(new Event('resize'));
       });
@@ -575,9 +585,8 @@
     const reader = document.querySelector('#reader');
     if (!reader) return;
 
-    const { spacer, meta } = topicFeedStoryHeaderParts(reader);
-    const actionRow = document.querySelector('#read-anything-article-summary-action');
-    if (!spacer || !meta) return;
+    const { readerFrame, header, spacer, meta, actionRow } = topicFeedStoryHeaderParts(reader);
+    if (!readerFrame || !header || !spacer || !meta) return;
 
     const styles = getComputedStyle(reader);
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
@@ -586,80 +595,46 @@
     const columnGap = Number.parseFloat(styles.columnGap) || 0;
     const fontSize = Number.parseFloat(styles.fontSize) || 14;
     const usableWidth = Math.max(1, reader.clientWidth - paddingLeft - paddingRight);
-
     const headerWidth = reader.classList.contains('book-pages-layout')
       ? Math.max(1, (usableWidth - columnGap) / 2)
       : usableWidth;
 
-    // This node is appended to #reader so it must be explicitly removed from
-    // normal document flow. Do not rely on theme/shell CSS for this ownership:
-    // if that CSS is missing or overridden, the Source/share row otherwise
-    // appears at the END of the article.
-    meta.style.setProperty('position', 'absolute', 'important');
-    meta.style.setProperty('left', `${paddingLeft}px`, 'important');
-    meta.style.setProperty('top', `${paddingTop}px`, 'important');
-    meta.style.setProperty('width', `${headerWidth}px`, 'important');
-    meta.style.setProperty('box-sizing', 'border-box', 'important');
-    meta.style.setProperty('z-index', '9', 'important');
+    // Anchor the header to the viewport/frame, never to #reader's scrollable
+    // content. Scrolling #reader therefore cannot move this band by one pixel.
+    const frameRect = readerFrame.getBoundingClientRect();
+    const readerRect = reader.getBoundingClientRect();
+    const left = Math.max(0, readerRect.left - frameRect.left + paddingLeft);
+    const top = Math.max(0, readerRect.top - frameRect.top + paddingTop);
 
-    if (actionRow) {
-      // Read Anything deliberately requires this node to remain a direct child
-      // of #reader. Leave it there and change only its visual placement.
-      actionRow.style.setProperty('position', 'absolute', 'important');
-      actionRow.style.setProperty('left', `${paddingLeft}px`, 'important');
-      // Keep the action ceiling only as wide as the labels themselves. The
-      // opaque occlusion band is supplied by experience-theme-layout.css with
-      // a small buffer around this compact row, so scrolling prose disappears
-      // underneath without creating a bar across the whole first page.
-      actionRow.style.setProperty('display', 'inline-flex', 'important');
-      actionRow.style.setProperty('width', 'max-content', 'important');
-      actionRow.style.setProperty('max-width', `${headerWidth}px`, 'important');
-      actionRow.style.setProperty('align-items', 'center', 'important');
-      actionRow.style.setProperty('flex-wrap', 'wrap', 'important');
-      actionRow.style.setProperty('box-sizing', 'border-box', 'important');
-      actionRow.style.setProperty('margin', '0', 'important');
-      actionRow.style.setProperty('padding', '0', 'important');
-      actionRow.style.setProperty('break-inside', 'auto', 'important');
-      actionRow.style.setProperty('page-break-inside', 'auto', 'important');
-      actionRow.style.setProperty('z-index', '8', 'important');
+    header.style.setProperty('left', `${left}px`, 'important');
+    header.style.setProperty('top', `${top}px`, 'important');
+    header.style.setProperty('width', `${headerWidth}px`, 'important');
+    header.style.setProperty('max-width', `${headerWidth}px`, 'important');
+
+    // Undo inline positioning left behind by the broken direct-child version.
+    if (actionRow?.isConnected) {
+      actionRow.style.removeProperty('left');
+      actionRow.style.removeProperty('top');
+      actionRow.style.removeProperty('position');
+      actionRow.style.removeProperty('max-width');
+      actionRow.style.removeProperty('z-index');
     }
 
     window.requestAnimationFrame(() => {
-      if (!reader.isConnected || !meta.isConnected) return;
+      if (!reader.isConnected || !header.isConnected || !spacer.isConnected) return;
 
-      const metaHeight = Math.ceil(meta.getBoundingClientRect().height || 0);
-      const actionGap = Math.max(5, Math.round(fontSize * 0.35));
+      const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
+      // Reserve the initial header footprint plus one text-line buffer. That
+      // spacer scrolls away with the article; the external header never does.
+      const requiredHeight = Math.max(fontSize * 2, headerHeight + fontSize);
+      const previousHeight = Number.parseFloat(spacer.style.height) || 0;
+      spacer.style.width = '100%';
+      spacer.style.maxWidth = `${headerWidth}px`;
 
-      if (actionRow?.isConnected) {
-        actionRow.style.setProperty(
-          'top',
-          `${paddingTop + metaHeight + actionGap}px`,
-          'important'
-        );
+      if (Math.abs(requiredHeight - previousHeight) > 1) {
+        spacer.style.height = `${Math.ceil(requiredHeight)}px`;
+        scheduleTopicFeedStoryBookReflow();
       }
-
-      window.requestAnimationFrame(() => {
-        if (!reader.isConnected || !spacer.isConnected) return;
-
-        const actionHeight = actionRow?.isConnected
-          ? Math.ceil(actionRow.getBoundingClientRect().height || 0)
-          : 0;
-
-        // Source/share + small gap + actions + exactly one body-text line.
-        const requiredHeight = Math.max(
-          fontSize * 2,
-          metaHeight + actionGap + actionHeight + fontSize
-        );
-        const previousHeight = Number.parseFloat(spacer.style.height) || 0;
-
-        spacer.style.width = '100%';
-        spacer.style.maxWidth = `${headerWidth}px`;
-
-        if (Math.abs(requiredHeight - previousHeight) > 1) {
-          spacer.style.height = `${Math.ceil(requiredHeight)}px`;
-          scheduleTopicFeedStoryBookReflow();
-        }
-      });
     });
   }
 
@@ -667,17 +642,16 @@
     if (!isTopicFeedReaderActive()) return;
 
     const reader = document.querySelector('#reader');
-    const actionRow = document.querySelector('#read-anything-article-summary-action');
-    if (!reader || !actionRow) {
-      positionTopicFeedStoryHeader();
-      return;
-    }
+    if (!reader) return;
 
-    // Read Anything may re-prepend the row. That is expected and no longer a
-    // conflict: direct-child ownership is preserved, while CSS positioning puts
-    // it beneath the source/share divider.
-    if (actionRow.parentElement !== reader) {
-      reader.prepend(actionRow);
+    const parts = topicFeedStoryHeaderParts(reader);
+    if (!parts.header) return;
+
+    const actionRow = document.querySelector('#read-anything-article-summary-action');
+    if (actionRow && actionRow.parentElement !== parts.header) {
+      // Moving the existing node preserves all Read Anything click/hover/focus
+      // handlers. Do not clone, rebuild, or hide these controls.
+      parts.header.appendChild(actionRow);
     }
 
     positionTopicFeedStoryHeader();
@@ -829,8 +803,8 @@
 
       meta.replaceChildren(credit);
 
-      // Read Anything keeps Summarize / Analyze as a direct child of #reader.
-      // We preserve that contract and position it visually below this source row.
+      // Keep the existing Read Anything action row in the permanent external
+      // header so it never moves with article scrolling.
       keepTopicFeedArticleActionsInHeader();
       positionTopicFeedStoryHeader();
 
@@ -1802,6 +1776,18 @@
   document.addEventListener('marksetgo:auth-changed', (event) => {
     if (event.detail?.authenticated) void hydrateCloudState();
     else cloudAuthenticated = false;
+  });
+
+  document.addEventListener('marksetgo:article-actions-updated', () => {
+    if (!isTopicFeedReaderActive()) return;
+    // Read Anything explicitly announces when it creates/rebuilds the row.
+    // Re-home that same node without observing DOM mutations.
+    [0, 40, 120].forEach((delay) => {
+      window.setTimeout(() => {
+        keepTopicFeedArticleActionsInHeader();
+        positionTopicFeedStoryHeader();
+      }, delay);
+    });
   });
 
   document.addEventListener('marksetgo:document-available', () => {

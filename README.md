@@ -1,23 +1,19 @@
-# Mark, Set, Go! v7.21 — stability consolidation
+# Mark, Set, Go! v7.22 — permanent Topic Feed header
 
-This is an overlay for the current app; it is **not** a rollback.
+Apply this overlay on top of v7.21.
 
-It preserves the v7.14 theme/workspace ownership model and the v7.15+ nonblocking Topic Feed behavior, while repairing the regressions introduced afterward.
+Changed only:
+- public/topic-feeds.js
+- public/topic-feed-header-stability.css
+- public/index.html (Topic Feed cache-bust + build marker only)
+- public/workspace-pane.html (Topic Feed cache-bust only)
 
-## Repairs
-- Restores Mark, Set, Go! Chat in both the main app and workspace pane.
-- Restores the Chat backend routes and existing `msgchat_*` database tables.
-- Restores the Topic Feed action occlusion band for the current direct-child action-row DOM.
-- Keeps Source/date/share at the top and retains publisher fallback text.
-- Removes all `MutationObserver` usage from `public/topic-feeds.js`; synchronization now uses explicit document events, user interactions, ResizeObserver, timers, and resize events.
-- Bumps the workspace pane cache token so existing panes reload the corrected loader stack.
+Behavior restored:
+- Source/date/View Original/share and Summarize/Analyze/Create Post live in a permanent external header owned by #reader-frame.
+- The article #reader scrolls underneath that header.
+- The opaque action band never moves with article text.
+- Summarize/Analyze/Create Post remain fully visible on hover/focus; hover only decorates the text.
+- No MutationObserver is used.
+- Existing Read Anything action nodes are MOVED, not cloned/rebuilt, preserving their click/hover handlers.
 
-## Deliberately untouched
-- `public/app.js`
-- Reader engine modules
-- bookmarks
-- v7.14 theme engine/CSS/background ownership
-- workspace experiment layout
-- music/ticker/companion code
-
-Build marker: `20260822-v7.21-stability-consolidation`
+No server, Chat, theme engine, workspace runtime, Reader engine, bookmarks, ticker, or feed-refresh code is changed by this overlay.
