@@ -1,36 +1,57 @@
-# Mark, Set, Go! Chat — workspace/theme correction v1.1
+# Mark, Set, Go! Chat — definitive branch upload v1.2
 
-This corrects the four issues in the feature/ask-mark-premium-phase-1 branch:
+Target branch:
+`feature/ask-mark-premium-phase-1`
 
-1. Removes the old standalone BB Chat iframe integration from button-feedback.js.
-2. Uses the name Mark, Set, Go! Chat.
-3. Lets the existing workspace-experiment.js open Chat in the right-side frame.
-4. Uses the actual --msg-theme-* variables defined by experience-themes.css.
-5. Removes the dynamically generated top-level Themes button, while leaving the
-   Profile theme controls intact.
+This package is intentionally designed around what is actually on that branch.
 
-## Replace / upload
+## Why the previous result still showed Themes and no Chat
 
-At repo root:
-- msg-chat-routes.js (if not already present)
+The new msg-chat.js / msg-chat.css files had been uploaded, but public/index.html
+never loaded them or created the menu entry.
 
-Under public/:
-- msg-chat.js
-- msg-chat.css
-- msg-chat-integration.js
-- button-feedback.js  <-- replace the current file; this removes the old BB Chat iframe hook
+At the same time, the existing public/button-feedback.js was still the OLD BB Chat
+iframe integration, and public/experience-themes.js was still generating a Themes
+launcher.
 
-Then follow INDEX-EDIT.txt and SERVER-EDIT.txt.
+## What to upload/replace
 
-## Why workspace now works
+Repository root:
+- `msg-chat-routes.js`
 
-The old button-feedback.js attached its own click handler to BB Chat and called
-stopPropagation, so workspace-experiment.js never got to route it.
+Inside `public/`:
+- `msg-chat.js`
+- `msg-chat.css`
+- `button-feedback.js`  **REPLACE the existing file**
 
-The corrected implementation uses an ordinary:
-data-action="msg-chat"
+You do NOT need to edit public/index.html for this version.
 
-The existing workspace layer already handles top-level data-action pages. Inside
-the workspace iframe, msg-chat.js renders into that pane.
+The replacement `button-feedback.js` is already loaded by your app. It now:
 
-No MutationObserver is used.
+- removes the obsolete BB Chat menu/integration
+- removes the top-level Themes launcher
+- creates **Mark, Set, Go! Chat** before Profile
+- loads `/msg-chat.css` and `/msg-chat.js`
+- leaves the Chat button as a normal `data-action="msg-chat"` navigation item
+  so the existing workspace system can open it in the right-side frame
+- uses NO MutationObserver
+
+## One unavoidable server wiring step
+
+Follow `SERVER-EDIT.txt`.
+
+The server cannot discover a new route module merely because the file exists.
+`server.js` needs one require line and one install line.
+
+## Expected behavior
+
+When a Reader is open and Profile > Open pages in workspace is enabled:
+- click **Mark, Set, Go! Chat**
+- Reader remains on the left
+- Chat opens in the right-side workspace frame
+
+When workspace is disabled or no Reader is open:
+- Chat opens as a normal Mark, Set, Go! page
+
+The chat CSS uses the real `--msg-theme-*` experience-theme variables so its
+colors follow Scholar, Patriotic, Artistic, Modern, Galactic, Expedition, etc.

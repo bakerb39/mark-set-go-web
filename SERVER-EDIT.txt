@@ -1,14 +1,30 @@
-SERVER.JS — only if you have not already installed the integrated chat API
+SERVER.JS — REQUIRED TWO-LINE WIRING
 
-Near the top, after:
+The new chat backend file (msg-chat-routes.js) is already designed for the
+existing Mark, Set, Go! Express server, but server.js must load it.
+
+Make exactly these two additions on:
+feature/ask-mark-premium-phase-1/server.js
+
+1) Near the top, immediately after:
+
 const { pool, checkDatabase, databaseConfigured, closeDatabase, query } = require('./db');
 
-add:
+ADD:
+
 const installMarkSetGoChat = require('./msg-chat-routes');
 
 
-Near the bottom, BEFORE:
+2) Near the bottom, immediately BEFORE the existing catch-all:
+
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-add:
+ADD:
+
 installMarkSetGoChat(app, { query, databaseConfigured });
+
+
+Do not put it after app.get('*'), because the catch-all would swallow requests
+that should go to /api/msg-chat/*.
+
+No other server.js changes are required.
