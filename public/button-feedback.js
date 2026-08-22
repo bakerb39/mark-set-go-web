@@ -21,14 +21,11 @@
 })();
 
 /*
- * Mark, Set, Go! Chat navigation bootstrap v1.2
- *
- * Replaces the obsolete BB Chat iframe integration that previously lived in
- * this file. No MutationObserver is used.
- *
- * IMPORTANT: this bootstrap deliberately does NOT attach a click handler to
- * the Chat navigation button. The existing workspace-experiment.js owns
- * top-level navigation when a Reader is open and workspace mode is enabled.
+ * Mark, Set, Go! Chat navigation/workspace bootstrap v1.3
+ * - Menu label is simply "Chat"
+ * - Page remains branded "Mark, Set, Go! Chat"
+ * - No MutationObserver
+ * - Explicitly opens Chat when this document is a workspace pane requesting msg-chat
  */
 (() => {
   'use strict';
@@ -38,33 +35,71 @@
   const OLD_BB_CHAT_BUTTON_ID = 'bb-chat-nav-button';
   const THEME_LAUNCHER_ID = 'msg-theme-launcher';
 
+  const params = new URLSearchParams(window.location.search);
+  const isWorkspacePane = params.get('msgWorkspacePane') === '1';
+  const workspaceMode = params.get('msgWorkspaceMode') || 'action';
+  const workspaceValue = params.get('msgWorkspaceValue') || '';
+
+  let chatScriptLoading = null;
+
   function mainNav() {
     return document.querySelector('.site-header nav[aria-label="Main navigation"]');
   }
 
-  function ensureAsset(tagName, selector, attributes) {
-    if (document.querySelector(selector)) return;
+  function ensureChatCss() {
+    if (document.querySelector('link[href^="/msg-chat.css"]')) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = '/msg-chat.css?v=1.3.0';
+    document.head.appendChild(link);
+  }
 
-    const node = document.createElement(tagName);
-    Object.entries(attributes).forEach(([name, value]) => {
-      if (name === 'textContent') node.textContent = value;
-      else node.setAttribute(name, value);
+  function ensureChatScript() {
+    if (window.MarkSetGoChat?.open) return Promise.resolve();
+
+    if (chatScriptLoading) return chatScriptLoading;
+
+    const existing = document.querySelector('script[src^="/msg-chat.js"]');
+    if (existing) {
+      chatScriptLoading = new Promise((resolve, reject) => {
+        if (window.MarkSetGoChat?.open) return resolve();
+
+        const done = () => resolve();
+        existing.addEventListener('load', done, { once: true });
+        existing.addEventListener('error', reject, { once: true });
+
+        // If the script already loaded before this listener was attached,
+        // poll briefly for the public API.
+        let tries = 0;
+        const timer = window.setInterval(() => {
+          tries += 1;
+          if (window.MarkSetGoChat?.open) {
+            window.clearInterval(timer);
+            resolve();
+          } else if (tries >= 50) {
+            window.clearInterval(timer);
+            resolve();
+          }
+        }, 20);
+      });
+      return chatScriptLoading;
+    }
+
+    chatScriptLoading = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = '/msg-chat.js?v=1.3.0';
+      script.async = false;
+      script.addEventListener('load', resolve, { once: true });
+      script.addEventListener('error', reject, { once: true });
+      document.head.appendChild(script);
     });
-    document.head.appendChild(node);
+
+    return chatScriptLoading;
   }
 
   function ensureChatAssets() {
-    ensureAsset(
-      'link',
-      'link[href^="/msg-chat.css"]',
-      { rel: 'stylesheet', href: '/msg-chat.css?v=1.2.0' }
-    );
-
-    ensureAsset(
-      'script',
-      'script[src^="/msg-chat.js"]',
-      { defer: '', src: '/msg-chat.js?v=1.2.0' }
-    );
+    ensureChatCss();
+    return ensureChatScript();
   }
 
   function removeObsoleteNavigation() {
@@ -74,13 +109,15 @@
     const nav = mainNav();
     if (!nav) return;
 
-    // Defensive cleanup for any old hard-coded Theme/BB Chat menu entry.
     [...nav.children].forEach((node) => {
       if (!(node instanceof Element)) return;
       if (node.id === CHAT_BUTTON_ID) return;
 
-      const summary = node.matches('details') ? node.querySelector(':scope > summary') : node;
-      const label = String(summary?.textContent || '')
+      const source = node.matches('details')
+        ? node.querySelector(':scope > summary')
+        : node;
+
+      const label = String(source?.textContent || '')
         .replace(/\s+/g, ' ')
         .trim();
 
@@ -103,7 +140,6 @@
       button.className = 'top-level-nav-button';
       button.type = 'button';
       button.dataset.action = CHAT_ACTION;
-      button.innerHTML = '<span class="nav-icon" aria-hidden="true">◫</span> Mark, Set, Go! Chat';
 
       const profile = nav.querySelector(':scope > [data-action="profile-preferences"]');
       const company = nav.querySelector(':scope > .company-menu');
@@ -114,24 +150,73 @@
     button.dataset.action = CHAT_ACTION;
     button.title = 'Open Mark, Set, Go! Chat';
     button.setAttribute('aria-label', 'Open Mark, Set, Go! Chat');
+    button.innerHTML = '<span class="nav-icon" aria-hidden="true">◫</span> Chat';
 
-    // Do NOT add click handling here. Workspace-experiment.js must see the
-    // ordinary data-action navigation event first.
+    // Intentionally no click handler.
+    // The existing workspace navigation system owns this event.
     return true;
   }
 
+  async function openRequestedWorkspaceChat() {
+    if (!isWorkspacePane || workspaceMode !== 'action' || workspaceValue !== CHAT_ACTION) {
+      return false;
+    }
+
+    // Hide the startup Home screen while the Chat module loads.
+    document.documentElement.classList.add('msg-chat-workspace-pending');
+
+    try {
+      await ensureChatAssets();
+
+      let tries = 0;
+      while (!window.MarkSetGoChat?.open && tries < 100) {
+        await new Promise(resolve => window.setTimeout(resolve, 20));
+        tries += 1;
+      }
+
+      if (window.MarkSetGoChat?.open) {
+        window.MarkSetGoChat.open();
+        document.documentElement.classList.remove('msg-chat-workspace-pending');
+        document.documentElement.classList.add('msg-workspace-pane-ready');
+        return true;
+      }
+    } catch (error) {
+      console.error('Unable to open Mark, Set, Go! Chat in workspace:', error);
+    }
+
+    document.documentElement.classList.remove('msg-chat-workspace-pending');
+    return false;
+  }
+
+  function ensurePendingStyle() {
+    if (document.getElementById('msg-chat-workspace-pending-style')) return;
+
+    const style = document.createElement('style');
+    style.id = 'msg-chat-workspace-pending-style';
+    style.textContent = `
+      html.msg-chat-workspace-pending #app {
+        visibility: hidden !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function syncNavigation() {
-    ensureChatAssets();
+    ensureChatCss();
     removeObsoleteNavigation();
     ensureChatButton();
   }
 
   function init() {
+    ensurePendingStyle();
     syncNavigation();
 
-    // experience-themes.js creates its historical top-level launcher during its
-    // own startup. Run a few bounded cleanup passes after startup. This is not
-    // an observer and does not run continuously.
+    // Explicitly handle the Chat workspace pane rather than relying on the
+    // generic fallback click to race a dynamically loaded module.
+    openRequestedWorkspaceChat();
+
+    // experience-themes.js historically creates the Themes launcher during
+    // startup. Remove it after startup with bounded passes, not an observer.
     [0, 30, 100, 300, 900, 1800].forEach((delay) => {
       window.setTimeout(syncNavigation, delay);
     });
@@ -145,7 +230,6 @@
 
   window.addEventListener('pageshow', syncNavigation);
 
-  // Changing themes must not recreate a top-level Themes launcher.
   document.addEventListener('marksetgo:experience-profile-changed', () => {
     window.setTimeout(syncNavigation, 0);
   });
