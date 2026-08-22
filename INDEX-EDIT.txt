@@ -1,27 +1,30 @@
-MARK, SET, GO! CHAT — PUBLIC/INDEX.HTML EDIT
+PUBLIC/INDEX.HTML — feature/ask-mark-premium-phase-1
 
-Make THREE small edits to the existing public/index.html.
+1. Make sure these are loaded in <head>:
 
-1) In <head>, add this stylesheet with the other CSS files:
+<link rel="stylesheet" href="/msg-chat.css?v=1.1.0">
 
-<link rel="stylesheet" href="/msg-chat.css?v=1.0.0">
+<script defer src="/msg-chat.js?v=1.1.0"></script>
 
-
-2) In <head>, add this script with the other deferred scripts:
-
-<script defer src="/msg-chat.js?v=1.0.0"></script>
+IMPORTANT: load this AFTER experience-themes.js:
+<script defer src="/msg-chat-integration.js?v=1.1.0"></script>
 
 
-3) In the main navigation, find the existing Profile button:
+2. Add this top-level navigation button immediately BEFORE Profile:
 
-<button class="top-level-nav-button" data-action="profile-preferences" type="button"><span class="nav-icon" aria-hidden="true">◉</span> Profile</button>
-
-Immediately BEFORE it add:
-
-<button class="top-level-nav-button" data-action="msg-chat" type="button"><span class="nav-icon" aria-hidden="true">◫</span> Chat</button>
+<button class="top-level-nav-button" data-action="msg-chat" type="button" title="Open Mark, Set, Go! Chat"><span class="nav-icon" aria-hidden="true">◫</span> Mark, Set, Go! Chat</button>
 
 
-THEMES:
-Your current GitHub index already has Profile as the theme/settings destination.
-Do not remove theme controls from Profile.
-If a separate top-level Themes button exists in a later version, remove only that top-level button/menu item.
+3. Do NOT add a custom click handler to this button.
+
+That is what allows workspace-experiment.js to intercept data-action="msg-chat" and
+open the chat in the existing right-side workspace frame when:
+- a Reader is open, and
+- Profile > Open pages in workspace is enabled.
+
+If workspace is off, msg-chat.js renders it as a normal full app page.
+
+
+4. Themes menu:
+msg-chat-integration.js removes the old top-level Themes launcher after
+experience-themes.js initializes. Theme selection remains in Profile.

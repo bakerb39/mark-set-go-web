@@ -66,8 +66,10 @@
   function renderPage() {
     const app = document.querySelector('#app');
     if (!app) return;
-    try { ReaderContinuity?.saveBeforeNavigation?.(); } catch {}
-    try { stopReader?.(); } catch {}
+    if (!window.MSGWorkspacePane && !window.__MSG_WORKSPACE_PANE__) {
+      try { ReaderContinuity?.saveBeforeNavigation?.(); } catch {}
+      try { stopReader?.(); } catch {}
+    }
     stopTimers();
 
     app.dataset.viewKey = 'msg-chat';

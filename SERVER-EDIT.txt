@@ -1,24 +1,14 @@
-MARK, SET, GO! CHAT — SERVER.JS EDIT
+SERVER.JS — only if you have not already installed the integrated chat API
 
-Make TWO small edits to the existing server.js in bakerb39/mark-set-go-web.
-
-1) Near the top, immediately after this existing line:
-
+Near the top, after:
 const { pool, checkDatabase, databaseConfigured, closeDatabase, query } = require('./db');
 
 add:
-
 const installMarkSetGoChat = require('./msg-chat-routes');
 
 
-2) Near the very bottom, immediately BEFORE this existing catch-all route:
-
+Near the bottom, BEFORE:
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 add:
-
 installMarkSetGoChat(app, { query, databaseConfigured });
-
-
-That is all that should be changed in server.js.
-Do not replace or alter the reader routes.
