@@ -1,5 +1,10 @@
-Verified:
-- Removed v7.25 rule that set .topic-feed-reader-credit border-bottom:0.
-- Removed v7.25 rule that put border-bottom on .topic-feed-story-meta-overlay.
-- Added no replacement divider CSS; original topic-feeds.css owns the line again.
-- No JavaScript files included.
+Verification:
+- node --check public/app.js: PASS
+- node --check public/topic-feeds.js: PASS
+- No server.js in package.
+- No CSS in package.
+- No Chat files in package.
+- No theme files in package.
+- No bookmark code changed.
+- persistCurrentDocument special handling is scoped only to source.type === 'topic-feed'.
+- Topic Feed local cache no longer persists feedText or prepared article body text.

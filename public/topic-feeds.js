@@ -106,43 +106,122 @@
     return normalizeState({ topics: [] });
   }
 
-  function compactStateForStorage(value) {
+  const LOCAL_CACHE_TARGET_CHARS = 220000;
+  const LOCAL_CACHE_EMERGENCY_CHARS = 70000;
+
+  function compactTopicSourceForStorage(source) {
     return {
-      preferences: normalizeState(value).preferences,
-      topics: (Array.isArray(value?.topics) ? value.topics : []).map((topic) => ({
-        ...topic,
-        sources: (Array.isArray(topic?.sources) ? topic.sources : []).slice(0, 30),
-        articles: (Array.isArray(topic?.articles) ? topic.articles : [])
-          .slice(0, 180)
-          .map((article) => ({
-            id: article.id,
-            cloudId: article.cloudId || '',
-            title: String(article.title || '').slice(0, 500),
-            url: String(article.url || '').slice(0, 4000),
-            summary: String(article.summary || '').slice(0, 1600),
-            published: article.published || '',
-            author: article.author || '',
-            sourceName: article.sourceName || '',
-            sourceUrl: article.sourceUrl || '',
-            sourceType: article.sourceType || '',
-            sourceClientId: article.sourceClientId || '',
-            sourceRank: Number(article.sourceRank) || 0,
-            feedMode: article.feedMode || '',
-            recommended: Boolean(article.recommended),
-            prepared: Boolean(article.prepared),
-            read: Boolean(article.read)
-          }))
-      }))
+      id: String(source?.id || '').slice(0, 180),
+      name: String(source?.name || '').slice(0, 240),
+      type: String(source?.type || 'website').slice(0, 40),
+      url: String(source?.url || '').slice(0, 1600),
+      origin: String(source?.origin || '').slice(0, 80),
+      recommendationKey: String(source?.recommendationKey || '').slice(0, 160)
     };
   }
 
+  function compactTopicArticleForStorage(article, { includeSummary = true } = {}) {
+    return {
+      id: String(article?.id || '').slice(0, 220),
+      cloudId: String(article?.cloudId || '').slice(0, 220),
+      title: String(article?.title || '').slice(0, 420),
+      url: String(article?.url || '').slice(0, 1600),
+      summary: includeSummary ? String(article?.summary || '').slice(0, 420) : '',
+      published: String(article?.published || '').slice(0, 80),
+      author: String(article?.author || '').slice(0, 220),
+      sourceName: String(article?.sourceName || '').slice(0, 220),
+      sourceUrl: String(article?.sourceUrl || '').slice(0, 1200),
+      sourceType: String(article?.sourceType || '').slice(0, 50),
+      sourceClientId: String(article?.sourceClientId || '').slice(0, 180),
+      sourceRank: Number(article?.sourceRank) || 0,
+      feedMode: String(article?.feedMode || '').slice(0, 50),
+      recommended: Boolean(article?.recommended),
+      prepared: Boolean(article?.prepared),
+      read: Boolean(article?.read)
+    };
+  }
+
+  function compactTopicMetadataForStorage(topic) {
+    return {
+      id: String(topic?.id || '').slice(0, 180),
+      name: String(topic?.name || '').slice(0, 240),
+      cadence: topic?.cadence === 'weekly' ? 'weekly' : 'daily',
+      maxRecommended: Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8)),
+      preferences: String(topic?.preferences || '').slice(0, 700),
+      lastRefresh: String(topic?.lastRefresh || '').slice(0, 80),
+      preparedAt: String(topic?.preparedAt || '').slice(0, 80),
+      lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : [])
+        .slice(0, 8)
+        .map((item) => String(item || '').slice(0, 300)),
+      sources: (Array.isArray(topic?.sources) ? topic.sources : [])
+        .slice(0, 30)
+        .map(compactTopicSourceForStorage),
+      articles: []
+    };
+  }
+
+  function compactStateForStorage(value, { targetChars = LOCAL_CACHE_TARGET_CHARS, includeSummaries = true } = {}) {
+    const normalized = normalizeState(value);
+    const topics = (Array.isArray(value?.topics) ? value.topics : []).map(compactTopicMetadataForStorage);
+    const result = { preferences: normalized.preferences, topics };
+
+    // localStorage is only a lightweight/offline index. Full Topic Feed state
+    // and prepared article bodies remain in the cloud/server path. Add recent
+    // article metadata only while the serialized cache stays under a fixed
+    // budget so this feature can never consume the app's entire local quota.
+    let used = JSON.stringify(result).length;
+    const sourceTopics = Array.isArray(value?.topics) ? value.topics : [];
+    let added = true;
+    let articleIndex = 0;
+
+    while (added && used < targetChars) {
+      added = false;
+      for (let topicIndex = 0; topicIndex < sourceTopics.length; topicIndex += 1) {
+        const article = sourceTopics[topicIndex]?.articles?.[articleIndex];
+        if (!article) continue;
+        const compact = compactTopicArticleForStorage(article, { includeSummary: includeSummaries });
+        const cost = JSON.stringify(compact).length + 1;
+        if (used + cost > targetChars) continue;
+        result.topics[topicIndex].articles.push(compact);
+        used += cost;
+        added = true;
+      }
+      articleIndex += 1;
+      if (articleIndex >= 80) break;
+    }
+
+    return result;
+  }
+
   function saveLocalState() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(compactStateForStorage(state)));
+    const write = (payload) => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       return true;
+    };
+
+    try {
+      return write(compactStateForStorage(state));
     } catch (error) {
-      console.warn('Topic Feed local cache could not be saved.', error);
-      return false;
+      const quota = error?.name === 'QuotaExceededError' || error?.name === 'NS_ERROR_DOM_QUOTA_REACHED';
+      if (!quota) {
+        console.warn('Topic Feed local cache could not be saved.', error);
+        return false;
+      }
+
+      // Self-heal an older oversized Topic Feed cache. Replacing this one key
+      // with a much smaller metadata-only snapshot frees quota immediately and
+      // leaves cloud state untouched.
+      try {
+        const emergency = compactStateForStorage(state, {
+          targetChars: LOCAL_CACHE_EMERGENCY_CHARS,
+          includeSummaries: false
+        });
+        try { localStorage.removeItem(STORAGE_KEY); } catch {}
+        return write(emergency);
+      } catch (retryError) {
+        console.warn('Topic Feed local cache could not be saved.', retryError);
+        return false;
+      }
     }
   }
 
@@ -1829,6 +1908,10 @@
     event.preventDefault();
     details.open = !details.open;
   });
+
+  // Rewrite any legacy oversized Topic Feed local cache using the bounded
+  // metadata format even before the next manual refresh.
+  window.setTimeout(() => { saveLocalState(); }, 250);
 
   window.addEventListener('DOMContentLoaded', () => {
     if (window.MarkSetGoAuth?.session?.authenticated) void hydrateCloudState();

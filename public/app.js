@@ -9313,15 +9313,76 @@ function saveBookmarks(bookmarks) {
   setBookmarkCookie(trimmed);
 }
 
+async function migrateLegacyTopicFeedDocumentsToIndexedDb() {
+  const keys = [];
+  try {
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key?.startsWith(DOCUMENT_STORAGE_PREFIX)) keys.push(key);
+    }
+  } catch {
+    return;
+  }
+
+  for (const key of keys) {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch {}
+    if (saved?.source?.type !== 'topic-feed' || !saved?.text) continue;
+
+    const documentId = key.slice(DOCUMENT_STORAGE_PREFIX.length);
+    if (!documentId) continue;
+
+    const stored = await cacheReadingBook({
+      key: `reader-document:${documentId}`,
+      type: 'reader-document',
+      documentId,
+      title: saved.title || '',
+      text: saved.text,
+      source: saved.source || {},
+      savedAt: new Date().toISOString()
+    });
+    if (stored) {
+      try { localStorage.removeItem(key); } catch {}
+    }
+  }
+}
+
+// Reclaim quota consumed by Topic Feed article bodies saved by older builds.
+// Removal occurs only after the existing IndexedDB reading-library store has
+// accepted the article, so this is a migration rather than a destructive purge.
+window.setTimeout(() => { void migrateLegacyTopicFeedDocumentsToIndexedDb(); }, 0);
+
 function persistCurrentDocument() {
   if (!state.documentId || !state.currentText) return false;
   const key = `${DOCUMENT_STORAGE_PREFIX}${state.documentId}`;
-  try {
-    const next = {
+  const next = {
+    title: state.title,
+    text: state.currentText,
+    source: state.source
+  };
+
+  // Topic Feed article bodies are already durable in the Topic Feed/server
+  // pipeline. Do not duplicate those potentially large bodies in localStorage.
+  // Keep a durable browser copy in the existing IndexedDB library instead,
+  // and remove any legacy localStorage copy so it cannot consume the shared
+  // per-origin quota used by the rest of the app.
+  if (state.source?.type === 'topic-feed') {
+    void cacheReadingBook({
+      key: `reader-document:${state.documentId}`,
+      type: 'reader-document',
+      documentId: state.documentId,
       title: state.title,
       text: state.currentText,
-      source: state.source
-    };
+      source: state.source,
+      savedAt: new Date().toISOString()
+    }).then((stored) => {
+      if (!stored) return;
+      try { localStorage.removeItem(key); } catch {}
+    });
+    return true;
+  }
+
+  try {
     const existingRaw = localStorage.getItem(key);
     let shouldWrite = !existingRaw;
     if (existingRaw) {
