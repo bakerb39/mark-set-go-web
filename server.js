@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 const AdmZip = require('adm-zip');
 const { pool, checkDatabase, databaseConfigured, closeDatabase, query } = require('./db');
+const installMarkSetGoChat = require('./msg-chat-routes');
 
 const CLERK_PUBLISHABLE_KEY = String(process.env.CLERK_PUBLISHABLE_KEY || '').trim();
 const CLERK_SECRET_KEY = String(process.env.CLERK_SECRET_KEY || '').trim();
@@ -6208,6 +6209,8 @@ app.post('/api/topic-feeds/fetch', async (req, res) => {
 });
 
 // SPA fallback must come after every API route so it cannot intercept API requests.
+installMarkSetGoChat(app, { query, databaseConfigured });
+
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 let server = null;
