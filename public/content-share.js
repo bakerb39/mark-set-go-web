@@ -288,11 +288,17 @@
       }
       if (!conversationId) throw new Error('Choose a conversation.');
 
+      const sharedMessageText = clean(
+        pendingChatContent.text || pendingChatContent.context || pendingChatContent.title || 'Shared content',
+        12000
+      );
+      const messageBody = clean([comment, sharedMessageText].filter(Boolean).join('\n\n'), 12000);
+
       await fetchJson(`/conversations/${encodeURIComponent(conversationId)}/messages`, {
         method:'POST',
         body:JSON.stringify({
           sender:name,
-          body:comment,
+          body:messageBody,
           sharedContent:pendingChatContent
         })
       });

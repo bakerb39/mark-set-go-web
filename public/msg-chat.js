@@ -370,16 +370,18 @@
     })[type] || 'Shared content';
   }
 
-  function renderSharedContent(content) {
+  function renderSharedContent(content, messageBody = '') {
     if (!sharedContentPresent(content)) return '';
     const title = content.title || 'Shared content';
     const text = String(content.text || content.context || '').trim();
+    const body = String(messageBody || '').trim();
+    const bodyAlreadyShowsText = Boolean(text && body && (body.includes(text) || text.includes(body)));
     const sourceUrl = safeSharedUrl(content.sourceUrl);
     const meta = [content.sourceLabel, content.chapter].filter(Boolean).join(' · ');
     return `<article class="msg-chat-shared-card">
       <span class="msg-chat-shared-type">${escapeHtml(sharedContentLabel(content.type))}</span>
       <strong>${escapeHtml(title)}</strong>
-      ${text ? `<p>${escapeHtml(text.slice(0, 1600))}${text.length > 1600 ? '…' : ''}</p>` : ''}
+      ${text && !bodyAlreadyShowsText ? `<p>${escapeHtml(text.slice(0, 1600))}${text.length > 1600 ? '…' : ''}</p>` : ''}
       ${meta ? `<small>${escapeHtml(meta)}</small>` : ''}
       <div class="msg-chat-shared-actions">
         ${sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Open source</a>` : ''}
@@ -431,7 +433,7 @@
     const bodyHtml = deleted
       ? '<div class="msg-chat-deleted">This message was deleted.</div>'
       : (message.body ? `<div class="msg-chat-bubble">${escapeHtml(message.body)}</div>` : '');
-    const sharedHtml = !deleted ? renderSharedContent(message.shared_content) : '';
+    const sharedHtml = !deleted ? renderSharedContent(message.shared_content, message.body) : '';
 
     article.innerHTML = `
       <div class="msg-chat-meta">
