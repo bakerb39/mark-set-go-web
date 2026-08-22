@@ -1,24 +1,24 @@
-/* Mark, Set, Go! Explorer Designer enhancements v3.7
-   - Reliable Export / Copy JSON
-   - Complete UI controls for Reader + workspace/right pane
-   - Background control for the outer app shell
+/* Mark, Set, Go! Explorer Designer enhancements v3.8
+   SAFE Complete UI controls + reliable Export.
+   IMPORTANT: Complete UI settings are opt-in and do not alter layout on load.
    No MutationObserver.
 */
 (() => {
   'use strict';
 
   const DESIGN_STORAGE_KEY = 'markSetGoExplorerVisualDesignerV2';
-  const UI_STORAGE_KEY = 'markSetGoExplorerCompleteUIV1';
+  const UI_STORAGE_KEY = 'markSetGoExplorerCompleteUIV2';
   const EXPORT_NAME = 'mark-set-go-explorer-design-v2.json';
 
-  const DEFAULT_UI = {
+  let uiConfig = {
+    enabled: false,
     width: 100,
     scale: 100,
     background: '#fffdf6',
     transparent: false
   };
 
-  function panel() {
+  function designerPanel() {
     return document.querySelector('#msg-explorer-visual-designer');
   }
 
@@ -26,8 +26,8 @@
     return document.querySelector('#app.app-shell');
   }
 
-  function status(message, saved = false) {
-    const node = panel()?.querySelector('[data-vd-status]');
+  function setStatus(message, saved = false) {
+    const node = designerPanel()?.querySelector('[data-vd-status]');
     if (!node) return;
     node.textContent = message;
     node.classList.toggle('is-saved', Boolean(saved));
@@ -36,39 +36,49 @@
   function loadUiConfig() {
     try {
       const parsed = JSON.parse(localStorage.getItem(UI_STORAGE_KEY) || 'null');
-      return { ...DEFAULT_UI, ...(parsed && typeof parsed === 'object' ? parsed : {}) };
-    } catch {
-      return { ...DEFAULT_UI };
-    }
+      if (parsed && typeof parsed === 'object') {
+        uiConfig = { ...uiConfig, ...parsed };
+      }
+    } catch {}
   }
 
-  function saveUiConfig(config) {
-    try { localStorage.setItem(UI_STORAGE_KEY, JSON.stringify(config)); } catch {}
+  function saveUiConfig() {
+    try { localStorage.setItem(UI_STORAGE_KEY, JSON.stringify(uiConfig)); } catch {}
   }
 
-  let uiConfig = loadUiConfig();
+  function clearCompleteUiStyles() {
+    const shell = appShell();
+    if (!shell) return;
+
+    [
+      'width',
+      'max-width',
+      'margin-left',
+      'margin-right',
+      'zoom',
+      'background',
+      'background-image'
+    ].forEach(prop => shell.style.removeProperty(prop));
+  }
 
   function applyCompleteUi() {
     const shell = appShell();
     if (!shell) return false;
 
+    if (!uiConfig.enabled) {
+      clearCompleteUiStyles();
+      return true;
+    }
+
     const width = Math.max(55, Math.min(100, Number(uiConfig.width) || 100));
     const scale = Math.max(70, Math.min(115, Number(uiConfig.scale) || 100));
 
-    shell.style.setProperty(
-      'width',
-      `min(${width}vw, calc(100vw - 24px))`,
-      'important'
-    );
+    shell.style.setProperty('width', `${width}%`, 'important');
     shell.style.setProperty('max-width', 'none', 'important');
     shell.style.setProperty('margin-left', 'auto', 'important');
     shell.style.setProperty('margin-right', 'auto', 'important');
 
-    /*
-     * Chromium/Edge support CSS zoom and it changes layout dimensions instead
-     * of leaving a transform-sized ghost box behind. That makes it a better
-     * whole-interface scale control for this app than transform:scale().
-     */
+    // Use zoom only after the user explicitly enables Complete UI control.
     shell.style.setProperty('zoom', String(scale / 100), 'important');
 
     if (uiConfig.transparent) {
@@ -82,15 +92,16 @@
     return true;
   }
 
-  function saveAndApplyUi() {
-    saveUiConfig(uiConfig);
+  function activateAndApply() {
+    uiConfig.enabled = true;
+    saveUiConfig();
     applyCompleteUi();
     window.dispatchEvent(new Event('resize'));
   }
 
-  function uiMarkup() {
+  function completeUiMarkup() {
     return `
-      <section class="msg-vd-section msg-vd-complete-ui-section" data-vd-complete-ui>
+      <section class="msg-vd-section" data-vd-complete-ui>
         <div class="msg-vd-section-title">
           <span>Complete UI</span>
           <span>Reader + workspace pane</span>
@@ -134,12 +145,15 @@
       </section>`;
   }
 
-  function bindCompleteUi(section) {
-    section.querySelectorAll('[data-vd-complete-control]').forEach(input => {
-      const key = input.dataset.vdCompleteControl;
-      const eventName = input.type === 'color' || input.type === 'checkbox' ? 'input' : 'input';
+  function createCompleteUiSection() {
+    const holder = document.createElement('div');
+    holder.innerHTML = completeUiMarkup().trim();
+    const section = holder.firstElementChild;
 
-      input.addEventListener(eventName, () => {
+    section.querySelectorAll('[data-vd-complete-control]').forEach(input => {
+      input.addEventListener('input', () => {
+        const key = input.dataset.vdCompleteControl;
+
         if (input.type === 'checkbox') uiConfig[key] = Boolean(input.checked);
         else if (input.type === 'range') uiConfig[key] = Number(input.value);
         else uiConfig[key] = input.value;
@@ -147,45 +161,45 @@
         const output = section.querySelector(`[data-vd-complete-output="${key}"]`);
         if (output) output.textContent = `${Math.round(Number(uiConfig[key]) || 0)}%`;
 
-        saveAndApplyUi();
-        status('Complete UI settings updated.', false);
+        activateAndApply();
+        setStatus('Complete UI settings updated.', false);
       });
     });
 
     section.querySelector('[data-vd-complete-reset]')?.addEventListener('click', () => {
-      uiConfig = { ...DEFAULT_UI };
-      saveAndApplyUi();
+      uiConfig = {
+        enabled: false,
+        width: 100,
+        scale: 100,
+        background: '#fffdf6',
+        transparent: false
+      };
+      try { localStorage.removeItem(UI_STORAGE_KEY); } catch {}
+      clearCompleteUiStyles();
       section.replaceWith(createCompleteUiSection());
-      status('Complete UI settings reset.', false);
+      window.dispatchEvent(new Event('resize'));
+      setStatus('Complete UI overrides removed.', false);
     });
-  }
 
-  function createCompleteUiSection() {
-    const wrapper = document.createElement('div');
-    wrapper.innerHTML = uiMarkup().trim();
-    const section = wrapper.firstElementChild;
-    bindCompleteUi(section);
     return section;
   }
 
   function installCompleteUiSection() {
-    const designer = panel();
-    if (!designer) return false;
-    if (designer.querySelector('[data-vd-complete-ui]')) return true;
+    const panel = designerPanel();
+    if (!panel) return false;
+    if (panel.querySelector('[data-vd-complete-ui]')) return true;
 
-    const scroll = designer.querySelector('.msg-vd-scroll');
+    const scroll = panel.querySelector('.msg-vd-scroll');
     if (!scroll) return false;
 
-    const section = createCompleteUiSection();
-    scroll.insertBefore(section, scroll.firstElementChild || null);
+    scroll.insertBefore(createCompleteUiSection(), scroll.firstElementChild || null);
     return true;
   }
 
   /* ---------------- reliable export ---------------- */
 
   function saveLiveDesignerState() {
-    const saveButton = panel()?.querySelector('[data-vd-save]');
-    if (saveButton) saveButton.click();
+    designerPanel()?.querySelector('[data-vd-save]')?.click();
   }
 
   function readCurrentConfig() {
@@ -200,10 +214,6 @@
       throw new Error('Could not read the current Explorer design.');
     }
 
-    /*
-     * Keep backward compatibility with the existing v2 import while also
-     * carrying the new outer-interface settings in the export.
-     */
     return {
       ...design,
       completeUI: { ...uiConfig }
@@ -220,7 +230,7 @@
 
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
-        status('Design JSON copied to clipboard.', true);
+        setStatus('Design JSON copied to clipboard.', true);
         return true;
       }
 
@@ -231,14 +241,15 @@
       textarea.style.left = '-9999px';
       document.body.appendChild(textarea);
       textarea.select();
+
       const copied = document.execCommand('copy');
       textarea.remove();
 
       if (!copied) throw new Error('Clipboard copy was blocked.');
-      status('Design JSON copied to clipboard.', true);
+      setStatus('Design JSON copied to clipboard.', true);
       return true;
     } catch (error) {
-      status(`Copy failed: ${error.message}`, false);
+      setStatus(`Copy failed: ${error.message}`, false);
       return false;
     }
   }
@@ -248,7 +259,7 @@
     try {
       text = currentConfigText();
     } catch (error) {
-      status(error.message, false);
+      setStatus(error.message, false);
       return false;
     }
 
@@ -261,14 +272,15 @@
             accept: { 'application/json': ['.json'] }
           }]
         });
+
         const writable = await handle.createWritable();
         await writable.write(text);
         await writable.close();
-        status(`Exported ${EXPORT_NAME}.`, true);
+        setStatus(`Exported ${EXPORT_NAME}.`, true);
         return true;
       } catch (error) {
         if (error?.name === 'AbortError') {
-          status('Export canceled.', false);
+          setStatus('Export canceled.', false);
           return false;
         }
       }
@@ -278,10 +290,12 @@
       const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement('a');
+
       anchor.href = url;
       anchor.download = EXPORT_NAME;
       anchor.style.display = 'none';
       document.body.appendChild(anchor);
+
       anchor.dispatchEvent(new MouseEvent('click', {
         bubbles: true,
         cancelable: true,
@@ -293,19 +307,19 @@
         URL.revokeObjectURL(url);
       }, 2500);
 
-      status(`Export requested for ${EXPORT_NAME}. If blocked, use Copy JSON.`, true);
+      setStatus(`Export requested for ${EXPORT_NAME}. If blocked, use Copy JSON.`, true);
       return true;
     } catch (error) {
-      status(`Download failed: ${error.message}. Use Copy JSON.`, false);
+      setStatus(`Download failed: ${error.message}. Use Copy JSON.`, false);
       return false;
     }
   }
 
   function installExportControls() {
-    const designer = panel();
-    if (!designer) return false;
+    const panel = designerPanel();
+    if (!panel) return false;
 
-    const exportButton = designer.querySelector('[data-vd-export]');
+    const exportButton = panel.querySelector('[data-vd-export]');
     const toolbar = exportButton?.parentElement;
     if (!exportButton || !toolbar) return false;
 
@@ -315,7 +329,6 @@
       copyButton.type = 'button';
       copyButton.dataset.vdCopyJson = '1';
       copyButton.textContent = 'Copy JSON';
-      copyButton.title = 'Copy the complete design JSON to the clipboard';
       exportButton.insertAdjacentElement('afterend', copyButton);
       copyButton.addEventListener('click', event => {
         event.preventDefault();
@@ -323,14 +336,15 @@
         copyJson();
       });
     }
+
     return true;
   }
 
-  /* Override old export before its bubbling listener. */
   document.addEventListener('click', event => {
     const exportButton = event.target instanceof Element
       ? event.target.closest('#msg-explorer-visual-designer [data-vd-export]')
       : null;
+
     if (!exportButton) return;
 
     event.preventDefault();
@@ -341,7 +355,6 @@
   function installAll() {
     installCompleteUiSection();
     installExportControls();
-    applyCompleteUi();
   }
 
   function installSoon() {
@@ -355,35 +368,30 @@
     if (target?.closest('#msg-explorer-design-launcher')) installSoon();
   }, true);
 
-  document.addEventListener('marksetgo:document-available', () => {
-    window.setTimeout(applyCompleteUi, 0);
-  });
+  loadUiConfig();
 
-  document.addEventListener('marksetgo:experience-profile-changed', () => {
+  // Critical safety behavior: only reapply if the user explicitly enabled this
+  // V2 Complete UI control in a previous session.
+  if (uiConfig.enabled) {
     window.setTimeout(applyCompleteUi, 0);
-  });
-
-  window.addEventListener('pageshow', () => {
-    window.setTimeout(() => {
-      installAll();
-      applyCompleteUi();
-    }, 0);
-  });
+  } else {
+    clearCompleteUiStyles();
+  }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      installSoon();
-      applyCompleteUi();
-    }, { once: true });
+    document.addEventListener('DOMContentLoaded', installSoon, { once: true });
   } else {
     installSoon();
-    applyCompleteUi();
   }
 
   window.MSGExplorerDesignerEnhancements = Object.freeze({
     export: exportJson,
     copy: copyJson,
     applyCompleteUi,
-    getCompleteUi: () => ({ ...uiConfig })
+    resetCompleteUi: () => {
+      uiConfig.enabled = false;
+      try { localStorage.removeItem(UI_STORAGE_KEY); } catch {}
+      clearCompleteUiStyles();
+    }
   });
 })();
