@@ -86,6 +86,7 @@
   function sync() {
     ensureLink('/msg-chat.css');
     ensureLink('/app-viewport-fix.css');
+    ensureLink('/workspace-nav-visibility-fix.css');
     ensureScript('/msg-chat.js');
     ensureScript('/profile-theme-fix.js');
     ensureScript('/workspace-chat-layout-fix.js');
