@@ -441,3 +441,52 @@ html.msg-workspace-pane-document .msg-chat-messages {
     background: var(--explorer-global-surface, #fffdf7) !important;
   }
 }
+
+
+/* v2.8 — correct Reader width + true bottom fill.
+   Keep the structural flex layout from v2.7, but stop over-expanding the Reader
+   horizontally and remove the artificial height subtraction that leaves a
+   visible strip below the card. */
+@media (min-width: 901px) {
+
+  /* Reader should feel spacious, not edge-to-edge. */
+  body:has(#app .reader-page-panel) #app.app-shell {
+    width: min(1500px, calc(100vw - 48px)) !important;
+    max-width: 1500px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+
+  /*
+   * The app row already represents the available viewport height.
+   * Do not subtract another 12px from the Reader card — that was creating the
+   * persistent lower strip.
+   */
+  body:has(#app .reader-page-panel) #app .reader-page-panel {
+    height: 100% !important;
+    max-height: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding-bottom: 10px !important;
+  }
+
+  /*
+   * Keep only the same small visual gutter above and below the app shell.
+   * The Reader card itself fills the shell.
+   */
+  body:has(#app .reader-page-panel) #app.app-shell {
+    height: calc(100% - 12px) !important;
+    max-height: calc(100% - 12px) !important;
+    margin-top: 6px !important;
+    margin-bottom: 6px !important;
+  }
+
+  /* Explorer-specific rules must not widen or shorten the structural shell. */
+  html[data-msg-experience-theme="explorer"]
+  body:has(#app .reader-page-panel) #app.app-shell {
+    width: min(1500px, calc(100vw - 48px)) !important;
+    max-width: 1500px !important;
+    height: calc(100% - 12px) !important;
+    max-height: calc(100% - 12px) !important;
+  }
+}
