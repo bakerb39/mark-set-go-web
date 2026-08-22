@@ -1,0 +1,81 @@
+/* Mark, Set, Go! workspace navigation visibility fix v3.3
+   Keeps workspace tab labels readable across Explorer and other experience themes.
+   Does not change Reader geometry, Chat width, or workspace sizing. */
+
+.msg-workspace-secondary .msg-workspace-panel-head {
+  background: var(
+    --explorer-global-surface,
+    var(--msg-theme-surface, var(--surface, #fffdf7))
+  ) !important;
+}
+
+.msg-workspace-secondary .msg-workspace-panel-tabs button,
+.msg-workspace-secondary .msg-workspace-close {
+  background: var(
+    --explorer-global-surface,
+    var(--msg-theme-surface, var(--surface, #fffdf7))
+  ) !important;
+
+  color: var(
+    --explorer-global-ink,
+    var(--msg-theme-ink, var(--ink, #173e37))
+  ) !important;
+
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none !important;
+  opacity: 1 !important;
+
+  border-color: var(
+    --explorer-global-border,
+    var(--msg-theme-border, var(--border, #c7d7c7))
+  ) !important;
+}
+
+.msg-workspace-secondary .msg-workspace-panel-tabs button:hover,
+.msg-workspace-secondary .msg-workspace-close:hover {
+  background: var(
+    --explorer-global-soft,
+    var(--msg-theme-soft, var(--soft, #e7f0e8))
+  ) !important;
+
+  color: var(
+    --explorer-global-ink,
+    var(--msg-theme-ink, var(--ink, #173e37))
+  ) !important;
+}
+
+.msg-workspace-secondary .msg-workspace-panel-tabs button.active,
+.msg-workspace-secondary .msg-workspace-panel-tabs button[aria-selected="true"] {
+  background: var(
+    --explorer-global-soft-2,
+    var(--msg-theme-soft-2, var(--soft-2, #f5f1df))
+  ) !important;
+
+  color: var(
+    --explorer-global-accent-dark,
+    var(--msg-theme-accent-dark, var(--ink, #245c53))
+  ) !important;
+
+  -webkit-text-fill-color: currentColor !important;
+
+  border-color: var(
+    --explorer-global-gold,
+    var(--msg-theme-gold, var(--border, #d3ad58))
+  ) !important;
+
+  box-shadow: inset 0 -2px var(
+    --explorer-global-gold,
+    var(--msg-theme-gold, #d3ad58)
+  ) !important;
+}
+
+/* Defensive: generic app/theme button rules sometimes dim disabled/inactive
+   workspace tabs. Preserve the label even when a tab is temporarily disabled. */
+.msg-workspace-secondary .msg-workspace-panel-tabs button:disabled {
+  opacity: .72 !important;
+  color: var(
+    --explorer-global-ink,
+    var(--msg-theme-ink, var(--ink, #173e37))
+  ) !important;
+  -webkit-text-fill-color: currentColor !important;
+}
