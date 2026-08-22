@@ -295,3 +295,54 @@ html.msg-workspace-pane-document .msg-chat-messages {
     line-height: 1.1 !important;
   }
 }
+
+
+/* v1.5 — finish the Reader bottom edge.
+   Do not move playback controls again. This only fixes the visual termination
+   of the Reader card and removes the exposed tan strip underneath it. */
+@media (min-width: 901px) {
+  body:has(#app #reader) #app.app-shell {
+    background: transparent !important;
+    padding-bottom: 0 !important;
+  }
+
+  body:has(#app #reader) #app .reader-page-panel {
+    position: relative !important;
+    border-bottom-left-radius: 16px !important;
+    border-bottom-right-radius: 16px !important;
+    padding-bottom: 12px !important;
+    margin-bottom: 6px !important;
+    background-clip: padding-box !important;
+    overflow: hidden !important;
+  }
+
+  /* Keep footer/playback content comfortably inside the rounded card. */
+  body:has(#app #reader) #app .reader-page-panel .reader-viewer-footer {
+    margin-bottom: 0 !important;
+    padding-bottom: 8px !important;
+  }
+
+  body:has(#app #reader) #app .reader-page-panel .playback-controls {
+    margin-bottom: 0 !important;
+  }
+
+  /*
+   * The exposed area directly beneath the rounded Reader should visually join
+   * the site footer, not reveal the Explorer/tan page background.
+   */
+  body:has(#app #reader) {
+    --msg-reader-bottom-backdrop:
+      var(--msg-theme-accent-dark, var(--msg-navy-deep, #3b1119));
+  }
+
+  body:has(#app #reader) > #app.app-shell {
+    box-shadow:
+      0 8px 0 0 var(--msg-reader-bottom-backdrop);
+  }
+
+  body:has(#app #reader) > footer {
+    margin-top: 0 !important;
+    border-top: 0 !important;
+    background: var(--msg-reader-bottom-backdrop) !important;
+  }
+}
