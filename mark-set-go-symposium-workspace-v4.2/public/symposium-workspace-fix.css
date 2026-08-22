@@ -1,0 +1,138 @@
+/* Mark, Set, Go! Symposium workspace v4.2
+   Symposium is a first-class wide workspace surface.
+   - opens at Chat-like width
+   - whole Symposium pane scrolls vertically
+   - transcript retains its own scroll for long sessions
+   - preserves two-column setup + stage when width allows
+   - no MutationObserver
+*/
+
+/* -------------------------------------------------------------------------
+   WIDE SYMPOSIUM WORKSPACE
+   ------------------------------------------------------------------------- */
+@media (min-width: 1100px) {
+  #app > .msg-workspace-shell:not(.is-closed):has(.msg-workspace-symposium) {
+    --msg-secondary-width: clamp(680px, 46vw, 860px) !important;
+    grid-template-columns:
+      minmax(560px, 1fr)
+      8px
+      minmax(680px, var(--msg-secondary-width)) !important;
+  }
+
+  #app > .msg-workspace-shell:not(.is-closed):has(.msg-workspace-symposium)
+  > .msg-workspace-secondary {
+    margin-right: 10px !important;
+  }
+}
+
+@media (min-width: 901px) and (max-width: 1099px) {
+  #app > .msg-workspace-shell:not(.is-closed):has(.msg-workspace-symposium) {
+    --msg-secondary-width: 600px !important;
+    grid-template-columns:
+      minmax(430px, 1fr)
+      8px
+      minmax(600px, var(--msg-secondary-width)) !important;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   SCROLL OWNERSHIP
+   The outer workspace body owns page scrolling. Symposium content itself must
+   not force the sticky workspace container taller than the viewport.
+   ------------------------------------------------------------------------- */
+.msg-workspace-secondary:has(.msg-workspace-symposium) {
+  min-height: 0 !important;
+  height: calc(100dvh - 24px) !important;
+  max-height: calc(100dvh - 24px) !important;
+  overflow: hidden !important;
+}
+
+.msg-workspace-secondary:has(.msg-workspace-symposium)
+.msg-workspace-panel-body {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  scrollbar-gutter: stable;
+}
+
+.msg-workspace-symposium {
+  min-height: 100% !important;
+  height: auto !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+
+.msg-workspace-symposium .symposium-page {
+  min-height: 0 !important;
+  height: auto !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+  padding-bottom: 18px !important;
+}
+
+/* -------------------------------------------------------------------------
+   RESTORE SYMPOSIUM'S DESIGNED COMPOSITION AT A USEFUL WIDTH
+   Existing workspace CSS collapses it to one column too aggressively.
+   ------------------------------------------------------------------------- */
+@media (min-width: 1100px) {
+  .msg-workspace-symposium .symposium-layout {
+    display: grid !important;
+    grid-template-columns: minmax(250px, .82fr) minmax(360px, 1.18fr) !important;
+    align-items: start !important;
+    gap: 12px !important;
+  }
+
+  .msg-workspace-symposium .symposium-hero {
+    grid-template-columns: minmax(0, 1.45fr) minmax(180px, .7fr) !important;
+  }
+
+  .msg-workspace-symposium .symposium-stage {
+    min-width: 0 !important;
+    min-height: 560px !important;
+  }
+}
+
+/* The stage remains usable in medium-width workspace mode. */
+@media (min-width: 901px) and (max-width: 1099px) {
+  .msg-workspace-symposium .symposium-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   TRANSCRIPT SCROLL
+   Long debates should not make the entire stage indefinitely tall. The page
+   can scroll between setup/stage, while the transcript itself scrolls through
+   the actual discussion.
+   ------------------------------------------------------------------------- */
+.msg-workspace-symposium .symposium-transcript {
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  min-height: 300px !important;
+  max-height: min(58dvh, 620px) !important;
+  scrollbar-gutter: stable;
+}
+
+/* Keep the participation composer reachable beneath the transcript. */
+.msg-workspace-symposium .symposium-participate {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* On smaller screens, use the workspace's stacked model and let the panel body
+   remain the vertical scroll owner. */
+@media (max-width: 900px) {
+  .msg-workspace-secondary:has(.msg-workspace-symposium) {
+    height: 48vh !important;
+    max-height: 48vh !important;
+    min-height: 360px !important;
+  }
+
+  .msg-workspace-symposium .symposium-layout {
+    grid-template-columns: 1fr !important;
+  }
+}
