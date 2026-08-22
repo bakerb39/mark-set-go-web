@@ -219,3 +219,105 @@ html.msg-workspace-pane-document .msg-chat-messages {
     top: -7px;
   }
 }
+
+
+/* v1.4 — Reader bottom composition
+   Pull transport controls up near the paginator, preserve bottom status copy,
+   and finish the lower Reader surface with rounded corners instead of a clipped
+   strip / background bleed. */
+@media (min-width: 901px) {
+
+  /* Lift Start / Pause / Reset substantially farther than v1.3. */
+  body:has(#app #reader) #reader .controls:has(#start-reader, #pause-reader, #reset-reader),
+  body:has(#app #reader) #reader :is(
+    .reader-controls,
+    .reader-playback-controls,
+    .reader-transport-controls
+  ):has(#start-reader, #pause-reader, #reset-reader) {
+    transform: translateY(-28px) !important;
+    margin-bottom: -28px !important;
+    position: relative;
+    z-index: 5;
+  }
+
+  body:has(#app #reader) #start-reader,
+  body:has(#app #reader) #pause-reader,
+  body:has(#app #reader) #reset-reader {
+    top: -28px !important;
+    z-index: 5;
+  }
+
+  /*
+   * Give the visible Reader shell a deliberate lower edge matching the rounded
+   * treatment at the top. Several theme/reader builds use different shell
+   * classes, so target the stable Reader and the known enclosing panels.
+   */
+  body:has(#app #reader) :is(
+    #reader,
+    .reader-page-panel,
+    .reader-viewer,
+    .reader-shell,
+    .reader-main-panel
+  ) {
+    border-bottom-left-radius: 18px !important;
+    border-bottom-right-radius: 18px !important;
+  }
+
+  /*
+   * Prevent the page/theme background from peeking through immediately below
+   * the Reader controls. Keep the bottom area on the Reader's own surface.
+   */
+  body:has(#app #reader) #reader,
+  body:has(#app #reader) .reader-page-panel {
+    background-clip: padding-box;
+    overflow: hidden;
+  }
+
+  /*
+   * The text/status line belongs inside the Reader surface. Reserve a clean
+   * footer band for it instead of letting the viewport crop it.
+   */
+  body:has(#app #reader) #reader .status,
+  body:has(#app #reader) :is(
+    .reader-status,
+    .reader-progress,
+    .reader-viewer-footer,
+    .reader-controls-footer
+  ) {
+    position: relative;
+    z-index: 4;
+    min-height: 26px !important;
+    padding-bottom: 6px !important;
+    margin-bottom: 0 !important;
+    overflow: visible !important;
+  }
+
+  /*
+   * Keep the outer application footer visually separate from the Reader.
+   * The Reader itself should end cleanly before About / Contact / Privacy / Terms.
+   */
+  body:has(#app #reader) > footer {
+    margin-top: 0 !important;
+    background: var(--msg-theme-accent-dark, var(--msg-navy-deep, #40141c));
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Remove any exposed page strip between Reader and footer. */
+  body:has(#app #reader) > #app.app-shell {
+    padding-bottom: 0 !important;
+  }
+}
+
+/* Undo the earlier 7px-only lift so v1.4 is the single source of truth. */
+@media (min-width: 901px) {
+  body:has(#app #reader) #reader .controls:has(#start-reader, #pause-reader, #reset-reader),
+  body:has(#app #reader) #reader :is(
+    .reader-controls,
+    .reader-playback-controls,
+    .reader-transport-controls
+  ):has(#start-reader, #pause-reader, #reset-reader) {
+    transform: translateY(-28px) !important;
+    margin-bottom: -28px !important;
+  }
+}
