@@ -37,8 +37,13 @@
   function ensureScript(src) {
     if (document.querySelector(`script[src^="${src}"]`)) return;
     const script = document.createElement('script');
-    script.src = `${src}?v=1.4.0`;
-    script.defer = true;
+    const version = src === '/profile-theme-fix.js'
+      ? '1.2.0-profile-recovery'
+      : src === '/msg-chat.js'
+        ? '1.6.0-chat'
+        : '1.5.0';
+    script.src = `${src}?v=${version}`;
+    script.async = false;
     document.head.appendChild(script);
   }
 

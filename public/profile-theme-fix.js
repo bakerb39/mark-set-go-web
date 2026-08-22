@@ -1,6 +1,5 @@
-/* Mark, Set, Go! Profile theme control fix v1.1.0
-   A theme selected inside the workspace Profile pane is applied to the OUTER
-   Mark, Set, Go! application first, then mirrored into the pane.
+/* Mark, Set, Go! Profile theme bridge v1.2.0
+   Robust parent/app synchronization for theme changes made from Profile.
    No MutationObserver. */
 (() => {
   'use strict';
@@ -10,22 +9,11 @@
     'artistic', 'modern', 'galactic', 'expedition'
   ]);
 
-  const APPEARANCE_TO_THEME = {
-    default: 'classic',
-    explorer: 'explorer',
-    patriotic: 'patriotic',
-    scholar: 'scholar',
-    artistic: 'artistic',
-    modern: 'modern',
-    galactic: 'galactic',
-    expedition: 'expedition'
-  };
-
-  function normalize(value) {
+  const normalize = (value) => {
     const raw = String(value || '').trim().toLowerCase();
-    if (KNOWN.has(raw)) return raw;
-    return APPEARANCE_TO_THEME[raw] || '';
-  }
+    if (raw === 'default') return 'classic';
+    return KNOWN.has(raw) ? raw : '';
+  };
 
   function themeFromControl(control) {
     if (!(control instanceof Element)) return '';
@@ -36,6 +24,7 @@
       control.getAttribute('data-experience-theme'),
       control.getAttribute('data-appearance'),
       control.getAttribute('value'),
+      control.value,
       control.dataset?.value
     ];
 
@@ -44,30 +33,30 @@
       if (theme) return theme;
     }
 
-    const label = String(control.textContent || '')
+    const text = String(control.textContent || '')
       .replace(/\s+/g, ' ')
       .trim()
       .toLowerCase();
 
     for (const theme of KNOWN) {
-      if (label === theme || label.startsWith(`${theme} `)) return theme;
+      if (text === theme || text.startsWith(`${theme} `)) return theme;
     }
 
     return '';
   }
 
-  function applyThroughWindow(targetWindow, theme) {
+  function applyTo(targetWindow, theme) {
     if (!targetWindow) return false;
 
     try {
-      const api = targetWindow.MarkSetGoExperienceThemes;
-      if (api && typeof api.apply === 'function') {
-        api.apply(theme);
+      const themes = targetWindow.MarkSetGoExperienceThemes;
+      if (typeof themes?.apply === 'function') {
+        themes.apply(theme);
         return true;
       }
 
       const profile = targetWindow.MarkSetGoExperienceProfile;
-      if (profile?.get && profile?.save) {
+      if (typeof profile?.get === 'function' && typeof profile?.save === 'function') {
         const current = profile.get() || {};
         profile.save({
           preset: current.preset,
@@ -77,71 +66,84 @@
         return true;
       }
     } catch (error) {
-      console.warn('Theme application failed in target window:', error);
+      console.warn('Unable to apply Mark, Set, Go! theme:', error);
     }
 
     return false;
   }
 
-  function applyTheme(theme) {
-    const key = normalize(theme);
-    if (!key) return false;
+  function applyTheme(value) {
+    const theme = normalize(value);
+    if (!theme) return false;
 
-    let outerApplied = false;
+    let parentApplied = false;
 
-    // Workspace panes are same-origin. The Reader lives in parent, so parent
-    // must own the persistent profile/theme change.
     if (window.parent && window.parent !== window) {
       try {
         if (window.parent.location.origin === window.location.origin) {
-          outerApplied = applyThroughWindow(window.parent, key);
+          parentApplied = applyTo(window.parent, theme);
         }
       } catch {}
     }
 
-    // Mirror the resulting choice into this document as well so the Profile
-    // pane visually follows the Reader immediately.
-    const localApplied = applyThroughWindow(window, key);
+    const localApplied = applyTo(window, theme);
 
-    // If parent is not directly available for some future reason, ask it to
-    // apply the theme through the workspace message bridge.
-    if (!outerApplied && window.parent && window.parent !== window) {
+    if (!parentApplied && window.parent && window.parent !== window) {
       try {
         window.parent.postMessage(
-          { type: 'msg-workspace-theme-change', theme: key },
+          { type: 'msg-workspace-theme-change', theme },
           window.location.origin
         );
       } catch {}
     }
 
-    return outerApplied || localApplied;
+    return parentApplied || localApplied;
   }
 
-  function handleControl(control) {
-    const theme = themeFromControl(control);
-    if (!theme) return false;
-    return applyTheme(theme);
+  function relevantControl(target) {
+    if (!(target instanceof Element)) return null;
+
+    return target.closest?.([
+      '[data-msg-theme]',
+      '[data-theme]',
+      '[data-experience-theme]',
+      '[data-appearance]',
+      'select[name*="appearance" i]',
+      'select[id*="appearance" i]',
+      'select[name*="theme" i]',
+      'select[id*="theme" i]',
+      'input[name*="appearance" i]',
+      'input[name*="theme" i]',
+      'button',
+      '[role="button"]'
+    ].join(','));
   }
-
-  document.addEventListener('click', (event) => {
-    const page = event.target.closest?.('.profile-preferences-page');
-    if (!page) return;
-
-    const control = event.target.closest?.(
-      '[data-msg-theme], [data-theme], [data-experience-theme], [data-appearance], button, [role="button"]'
-    );
-    if (!control || !page.contains(control)) return;
-
-    handleControl(control);
-  }, true);
 
   document.addEventListener('change', (event) => {
-    const target = event.target;
-    if (!(target instanceof Element)) return;
-    if (!target.closest('.profile-preferences-page')) return;
+    const control = relevantControl(event.target);
+    if (!control) return;
 
-    handleControl(target);
+    const theme = themeFromControl(control);
+    if (!theme) return;
+
+    applyTheme(theme);
   }, true);
+
+  document.addEventListener('click', (event) => {
+    const control = relevantControl(event.target);
+    if (!control) return;
+
+    const theme = themeFromControl(control);
+    if (!theme) return;
+
+    applyTheme(theme);
+  }, true);
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (event.data?.type !== 'msg-workspace-theme-change') return;
+    applyTo(window, normalize(event.data.theme));
+  });
 
   window.MarkSetGoProfileThemeFix = Object.freeze({
     apply: applyTheme
