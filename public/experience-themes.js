@@ -138,6 +138,12 @@
       appearance:THEMES[key].appearance,
       features:{...(currentProfile.features || {})}
     });
+
+    /*
+     * Apply the visual state immediately as well as listening for the profile
+     * event. Theme rendering must not depend on event delivery/timing.
+     */
+    syncVisualState(THEMES[key].appearance);
   }
 
   function ensureLauncher(){

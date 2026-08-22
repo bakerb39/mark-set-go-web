@@ -547,20 +547,28 @@ html[data-msg-experience-theme]:is(
 
 #reader-frame > .topic-feed-story-header-external
 > #read-anything-article-summary-action::before {
+  content:none !important;
+  display:none !important;
+}
+
+/*
+ * The band exists ONLY while the document is moving.
+ * It is the width of the compact action cluster plus a small buffer.
+ * On the white reading page it is visually invisible; its only job is to
+ * occlude article text passing underneath Summarize / Analyze / Create Post.
+ */
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> #read-anything-article-summary-action::before {
   content:"" !important;
+  display:block !important;
   position:absolute !important;
-
-  /* One continuous band, only as wide as the action strip + small buffer. */
   inset:-4px -8px -5px -8px !important;
-
   z-index:0 !important;
   pointer-events:none !important;
+  border:0 !important;
   border-radius:3px !important;
-
-  background:var(
-    --msg-vd-reader-page-color,
-    var(--msg-theme-surface, var(--surface, #ffffff))
-  ) !important;
+  background:var(--msg-vd-reader-page-color,#ffffff) !important;
+  background-image:none !important;
   box-shadow:none !important;
 }
 
@@ -577,7 +585,9 @@ html[data-msg-experience-theme]:is(
 }
 
 
-/* ==========================================================================\n   TOPIC FEED ACTION LABEL SURFACE — authoritative source rule\n   ========================================================================== */
+/* ==========================================================================
+   TOPIC FEED ACTION LABEL SURFACE — authoritative source rule
+   ========================================================================== */
 /*
  * The action words themselves never own an opaque fill. The occlusion footprint
  * behind #read-anything-article-summary-action may mask scrolling document text,
