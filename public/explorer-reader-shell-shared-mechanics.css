@@ -157,17 +157,11 @@ html[data-msg-experience-theme]:is(
     grid-template-rows:auto minmax(0,1fr) auto !important;
   }
 
+  /* The real .site-footer grid remains authoritative. Reader mode only
+     removes the normal gap before it. */
   body:has(#app .reader-page-panel) > .site-footer#msg-shared-bottom {
-    display:flex !important;
-    flex:0 0 auto !important;
-    min-height:34px !important;
-    height:34px !important;
-    margin:0 !important;
-    padding:5px 16px !important;
-    box-sizing:border-box !important;
-    align-items:center !important;
-    justify-content:center !important;
-    overflow:hidden !important;
+    margin-top:0 !important;
+    align-self:stretch !important;
   }
 
   body:has(#app .reader-page-panel) > #app.app-shell {
@@ -182,8 +176,8 @@ html[data-msg-experience-theme]:is(
   }
 
   /* Reader shell width remains 100% OF THE EXISTING app shell. */
-  #app .reader-page-panel {
-    --msg-reader-footer-height:52px;
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel {
+    --msg-reader-footer-height:46px;
 
     display:flex !important;
     flex-direction:column !important;
@@ -273,100 +267,122 @@ html[data-msg-experience-theme]:is(
     max-height:none !important;
     margin:0 !important;
     padding:0 !important;
-    align-items:start !important;
+    align-items:stretch !important;
     overflow:hidden !important;
   }
 
   /*
    * Center column explicitly separates the visible Reader frame and its footer.
    */
-  #app .reader-page-panel .reader-center-column {
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-center-column {
     display:grid !important;
     grid-template-rows:minmax(0,1fr) var(--msg-reader-footer-height) !important;
-    height:100% !important;
+    height:calc(100% - 7px) !important;
     min-height:0 !important;
-    max-height:100% !important;
+    max-height:calc(100% - 7px) !important;
+    margin-top:7px !important;
+    padding-top:0 !important;
+    gap:0 !important;
     overflow:hidden !important;
+    align-self:start !important;
   }
 
-  #app .reader-page-panel #reader-frame {
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel #reader-frame {
     grid-row:1 !important;
     height:100% !important;
     min-height:0 !important;
     max-height:100% !important;
-    margin:0 !important;
+    margin-top:0 !important;
+    margin-bottom:0 !important;
     overflow:hidden !important;
   }
 
-  #app .reader-page-panel #reader-frame > #reader.interactive-reader {
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel #reader-frame > #reader.interactive-reader {
     box-sizing:border-box !important;
     height:100% !important;
     min-height:0 !important;
     max-height:100% !important;
   }
 
-  #app .reader-page-panel .reader-viewer-footer {
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel .reader-viewer-footer {
     grid-row:2 !important;
     box-sizing:border-box !important;
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) !important;
+    align-items:center !important;
+    gap:.55rem !important;
     height:var(--msg-reader-footer-height) !important;
     min-height:var(--msg-reader-footer-height) !important;
     max-height:var(--msg-reader-footer-height) !important;
     margin:0 !important;
-    padding:8px 8px 8px !important;
-    display:flex !important;
-    align-items:center !important;
-    gap:10px !important;
+    padding:6px 2px 4px !important;
     overflow:visible !important;
   }
 
-  #app .reader-page-panel .reader-viewer-footer .book-page-controls-home {
-    flex:1 1 auto !important;
-    min-width:0 !important;
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel
+  .reader-viewer-footer .book-page-controls-home {
+    grid-column:2 !important;
     display:flex !important;
-    align-items:center !important;
     justify-content:center !important;
+    align-items:center !important;
+    min-width:0 !important;
     overflow:visible !important;
   }
 
-  #app .reader-page-panel .reader-viewer-footer .book-page-controls {
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel
+  .book-page-controls-home .book-page-controls {
     position:static !important;
+    left:auto !important;
+    bottom:auto !important;
     transform:none !important;
     margin:0 !important;
     max-width:100% !important;
   }
 
-  #app .reader-page-panel .reader-viewer-footer .viewer-wpm-badge,
-  #app .reader-page-panel .reader-viewer-footer .viewer-wpm-control {
-    flex:0 0 auto !important;
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel
+  .reader-viewer-footer .viewer-wpm-badge,
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel
+  .reader-viewer-footer .viewer-wpm-control {
+    grid-column:3 !important;
+    justify-self:end !important;
     position:static !important;
     inset:auto !important;
     transform:none !important;
-    margin:0 0 0 auto !important;
+    margin:0 !important;
   }
 
   /*
    * Side panes END AT THE READER FRAME, not below its footer.
    * This is the visible alignment the UI requires.
    */
-  #app .reader-page-panel #reader-layout > .navigation-pane,
-  #app .reader-page-panel #reader-layout > #word-panel,
-  #app .reader-page-panel #reader-layout > .mark-companion-panel {
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel
+  #reader-layout > .navigation-pane,
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel
+  #reader-layout > #word-panel,
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel
+  #reader-layout > .mark-companion-panel {
     box-sizing:border-box !important;
-    height:calc(100% - var(--msg-reader-footer-height)) !important;
+    height:calc(100% - var(--msg-reader-footer-height) - 7px) !important;
     min-height:0 !important;
-    max-height:calc(100% - var(--msg-reader-footer-height)) !important;
-    margin-top:0 !important;
+    max-height:calc(100% - var(--msg-reader-footer-height) - 7px) !important;
+    margin-top:7px !important;
     margin-bottom:0 !important;
     align-self:start !important;
   }
 
-  #app .reader-page-panel .navigation-pane {
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel .navigation-pane {
+    height:calc(100% - var(--msg-reader-footer-height) - 7px) !important;
+    max-height:calc(100% - var(--msg-reader-footer-height) - 7px) !important;
+    margin-top:7px !important;
+    margin-bottom:0 !important;
     overflow-x:hidden !important;
     overflow-y:auto !important;
   }
 
   /* Ask Mark/Beth is bounded exactly like My Topics. */
-  #app .reader-page-panel .mark-companion-panel {
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel .mark-companion-panel {
+    margin-top:7px !important;
+    margin-bottom:0 !important;
     overflow:hidden !important;
   }
 
@@ -394,14 +410,14 @@ html[data-msg-experience-theme]:is(
   /*
    * Playback is the actual shell bottom. Normal flow only.
    */
-  #app .reader-page-panel .playback-controls {
-    flex:0 0 48px !important;
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel .playback-controls {
+    flex:0 0 44px !important;
     position:relative !important;
     z-index:4 !important;
-    min-height:48px !important;
-    max-height:48px !important;
+    min-height:44px !important;
+    max-height:44px !important;
     margin:4px 0 0 !important;
-    padding:4px 0 6px !important;
+    padding:3px 0 5px !important;
     gap:8px !important;
     display:flex !important;
     flex-wrap:nowrap !important;
@@ -409,7 +425,7 @@ html[data-msg-experience-theme]:is(
     overflow:visible !important;
   }
 
-  #app .reader-page-panel .playback-controls .status {
+  html[data-msg-experience-layout="explorer"] #app .reader-page-panel .playback-controls .status {
     flex:1 1 auto !important;
     min-width:0 !important;
     min-height:20px !important;
@@ -451,154 +467,21 @@ html[data-msg-experience-theme]:is(
 
 
 /* ==========================================================================
-   FUNCTIONAL TOPIC-FEED ARTICLE HEADER
-   Keep SOURCE + Summarize / Analyze / Create Post visible above the article.
-   The article body scrolls beneath it.
+   TOPIC FEED HEADER
    ========================================================================== */
 
-#reader-frame {
-  display:flex !important;
-  flex-direction:column !important;
-}
-
 /*
- * The injected topic-feed header is a fixed-height row inside the Reader frame,
- * never part of the text scroller.
+ * Intentionally no layout rules here.
+ *
+ * Verified source ownership:
+ * - topic-feeds.js creates .topic-feed-story-header-external as a direct child
+ *   of #reader-frame and positions it from the actual Reader padding.
+ * - topic-feeds.css owns .topic-feed-reader-credit and positions
+ *   .topic-feed-reader-share at the credit's right edge.
+ * - read-anything.js owns #read-anything-article-summary-action.
+ *
+ * Do not turn #reader-frame into flex/grid and do not reorder these nodes.
  */
-#reader-frame > .topic-feed-story-header-external {
-  order:-1 !important;
-  flex:0 0 auto !important;
-  position:relative !important;
-  z-index:30 !important;
-
-  display:grid !important;
-  grid-template-columns:minmax(0,1fr) auto !important;
-  grid-template-rows:auto auto !important;
-  column-gap:10px !important;
-  row-gap:4px !important;
-  align-items:center !important;
-  visibility:visible !important;
-  opacity:1 !important;
-
-  width:100% !important;
-  min-width:0 !important;
-  max-width:100% !important;
-
-  margin:0 !important;
-  padding:8px 12px 10px !important;
-
-  background:var(--msg-vd-reader-page-color,#ffffff) !important;
-  background-image:none !important;
-  box-shadow:0 6px 0 var(--msg-vd-reader-page-color,#ffffff) !important;
-
-  overflow:visible !important;
-}
-
-/* The Reader article consumes the remaining height below that header. */
-#reader-frame > #reader.interactive-reader {
-  order:0 !important;
-  flex:1 1 auto !important;
-  height:auto !important;
-  min-height:0 !important;
-  max-height:none !important;
-  overflow:auto !important;
-}
-
-
-/* Metadata row: Source/View original left; social icons right. */
-#reader-frame > .topic-feed-story-header-external > .topic-feed-reader-credit {
-  grid-column:1 !important;
-  grid-row:1 !important;
-  justify-self:start !important;
-  align-self:center !important;
-  width:auto !important;
-  min-width:0 !important;
-}
-
-#reader-frame > .topic-feed-story-header-external > .topic-feed-story-meta-overlay {
-  grid-column:2 !important;
-  grid-row:1 !important;
-  justify-self:end !important;
-  align-self:center !important;
-  width:auto !important;
-  min-width:max-content !important;
-  margin:0 !important;
-}
-
-/* Article actions live directly beneath the metadata line. */
-#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {
-  grid-column:1 / -1 !important;
-  grid-row:2 !important;
-  justify-self:stretch !important;
-  align-self:start !important;
-}
-
-/* Keep all article metadata/action descendants visible. */
-#reader-frame > .topic-feed-story-header-external
-:is(
-  .topic-feed-reader-credit,
-  .topic-feed-story-meta-overlay,
-  #read-anything-article-summary-action,
-  .read-anything-inline-article-summary
-) {
-  display:flex !important;
-  visibility:visible !important;
-  opacity:1 !important;
-  position:relative !important;
-  z-index:31 !important;
-}
-
-#reader-frame > .topic-feed-story-header-external
-:is(
-  [data-action="summarize"],
-  [data-action="analyze"],
-  [data-action="create-post"],
-  .read-anything-inline-action,
-  .topic-feed-article-action
-) {
-  display:inline-flex !important;
-  visibility:visible !important;
-  opacity:1 !important;
-}
-
-/* The SOURCE/action line can wrap instead of being clipped. */
-#reader-frame > .topic-feed-story-header-external
-#read-anything-article-summary-action {
-  width:100% !important;
-  max-width:100% !important;
-  min-width:0 !important;
-
-  align-items:center !important;
-  flex-wrap:wrap !important;
-  gap:.08rem !important;
-
-  margin:.08rem 0 0 !important;
-  padding:0 !important;
-
-  overflow:visible !important;
-}
-
-#reader-frame > .topic-feed-story-header-external
-#read-anything-article-summary-action::before {
-  content:none !important;
-  display:none !important;
-}
-
-/*
- * When topic-feed JS marks the header "scrolled", retain the same visible row.
- * Do not switch it to an overlay that steals article space.
- */
-#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
-  flex:0 0 auto !important;
-  position:relative !important;
-  top:auto !important;
-  z-index:30 !important;
-  display:grid !important;
-  grid-template-columns:minmax(0,1fr) auto !important;
-  grid-template-rows:auto auto !important;
-  visibility:visible !important;
-  opacity:1 !important;
-}
 
 /* Shared floating music player remains above Reader surfaces. */
 .music-dock {
