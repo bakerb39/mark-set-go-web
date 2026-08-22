@@ -297,93 +297,147 @@ html.msg-workspace-pane-document .msg-chat-messages {
 }
 
 
-/* v1.5 — clean Reader bottom
-   In Reader mode, the application footer is unnecessary chrome and was stealing
-   the exact vertical space needed by playback/status + the rounded Reader edge.
-   Hide it only while Reader is active. Normal pages keep the footer. */
+/* v2.7 — STRUCTURAL Reader viewport layout
+   The Reader card owns the available app height. Its middle reader-layout grows,
+   and footer/playback stay in normal document flow at the bottom.
+   No button transforms, no negative bottom-gap painting. */
 @media (min-width: 901px) {
-  body:has(#app #reader) {
+
+  /* Reader mode gets the full application row; site footer is not part of the
+     reading workspace. Normal non-Reader pages retain the normal footer. */
+  body:has(#app .reader-page-panel) {
+    height: 100dvh !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+    display: grid !important;
     grid-template-rows: auto minmax(0, 1fr) !important;
   }
 
-  body:has(#app #reader) > footer {
+  body:has(#app .reader-page-panel) > footer {
     display: none !important;
   }
 
-  body:has(#app #reader) > #app.app-shell {
-    margin-bottom: 8px !important;
-    padding-bottom: 0 !important;
-  }
-
-  /* Let the Reader card finish naturally instead of clipping its lower edge. */
-  body:has(#app #reader) #app .reader-page-panel {
-    border-bottom-left-radius: 16px !important;
-    border-bottom-right-radius: 16px !important;
-    padding-bottom: 10px !important;
-    margin-bottom: 0 !important;
-    overflow: visible !important;
-  }
-
-  /* Keep paginator/playback/status inside the final Reader surface. */
-  body:has(#app #reader) #app .reader-page-panel .reader-viewer-footer {
-    overflow: visible !important;
-    padding-bottom: 10px !important;
-  }
-
-  body:has(#app #reader) #app .reader-page-panel .playback-controls {
-    overflow: visible !important;
-    margin-bottom: 4px !important;
-  }
-
-  body:has(#app #reader) #app .reader-page-panel .playback-controls .status,
-  body:has(#app #reader) #app .reader-page-panel .status {
-    min-height: 20px !important;
-    line-height: 1.3 !important;
-    overflow: visible !important;
-    position: relative;
-    z-index: 3;
-  }
-}
-
-
-/* v1.6 — extend Reader card to the bottom of the application viewport.
-   Explorer's reader-shell CSS forces .app-shell back to height:auto, leaving
-   the tan Explorer background visible below the otherwise-correct rounded card.
-   Override that only while Reader is active. */
-@media (min-width: 901px) {
+  /* Undo Explorer's height:auto shell recovery while the live Reader is open. */
   html[data-msg-experience-theme="explorer"]
-  body:has(#app #reader) > #app.app-shell,
-  html[data-msg-experience-theme="explorer"]
-  body:has(#app #reader) .app-shell:has(.reader-page-panel) {
-    height: calc(100% - 10px) !important;
-    min-height: 0 !important;
-    max-height: calc(100% - 10px) !important;
-    margin-top: 5px !important;
-    margin-bottom: 5px !important;
-    overflow: visible !important;
-  }
-
-  html[data-msg-experience-theme="explorer"]
-  body:has(#app #reader) #app > .reader-page-panel,
-  html[data-msg-experience-theme="explorer"]
-  body:has(#app #reader) #app .reader-page-panel {
+  body:has(#app .reader-page-panel) #app.app-shell,
+  body:has(#app .reader-page-panel) #app.app-shell {
+    width: min(1880px, calc(100vw - 24px)) !important;
+    max-width: none !important;
     height: 100% !important;
     min-height: 0 !important;
-    margin-bottom: 0 !important;
-    padding-bottom: 16px !important;
-    border-bottom-left-radius: 16px !important;
-    border-bottom-right-radius: 16px !important;
+    max-height: 100% !important;
+    margin: 6px auto !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    background: transparent !important;
+  }
+
+  /*
+   * This is the key change: make the Reader card a real viewport-filling column.
+   * Header/tool rows use their natural height, reader-layout gets the remainder,
+   * and bottom controls stay inside the rounded card.
+   */
+  body:has(#app .reader-page-panel) #app .reader-page-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    height: calc(100% - 12px) !important;
+    min-height: 0 !important;
+    max-height: calc(100% - 12px) !important;
+    margin: 0 !important;
+    padding-bottom: 10px !important;
     box-sizing: border-box !important;
+    overflow: hidden !important;
+    border-radius: 16px !important;
   }
 
-  /* Keep the bottom controls/status comfortably inside the now-extended card. */
-  html[data-msg-experience-theme="explorer"]
-  body:has(#app #reader) #app .reader-page-panel .reader-viewer-footer {
-    padding-bottom: 12px !important;
+  /* Natural top rows: never stretch and never get pushed offscreen. */
+  body:has(#app .reader-page-panel) #app .reader-page-panel > :is(
+    .reader-title-row,
+    .reader-toolbar,
+    .reader-pane-controls
+  ) {
+    flex: 0 0 auto !important;
+  }
+
+  /*
+   * The middle reading region is the only flexible row.
+   * Override Explorer's old fixed 790px navigation height so the entire Reader
+   * can truly fit the current viewport.
+   */
+  body:has(#app .reader-page-panel) #app .reader-page-panel > .reader-layout {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: hidden !important;
+    margin-bottom: 0 !important;
+  }
+
+  body:has(#app .reader-page-panel) #app .reader-page-panel .navigation-pane,
+  body:has(#app .reader-page-panel) #app .reader-page-panel .reader-center-column,
+  body:has(#app .reader-page-panel) #app .reader-page-panel #reader-frame {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
   }
 
   html[data-msg-experience-theme="explorer"]
-  body:has(#app #reader) #app .reader-page-panel .playback-controls {
-    margin-bottom: 6px !important;
+  body:has(#app .reader-page-panel) #app .reader-page-panel .navigation-pane {
+    height: 100% !important;
+    margin-bottom: 0 !important;
+  }
+
+  /*
+   * Bottom rows are normal flex items. This explicitly cancels the Explorer
+   * Designer baseline's -24px / -57px negative-margin positioning.
+   */
+  body:has(#app .reader-page-panel) #app .reader-page-panel .reader-viewer-footer {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    padding: 8px 12px 4px !important;
+    min-height: 44px !important;
+    overflow: visible !important;
+    position: relative !important;
+    transform: none !important;
+  }
+
+  body:has(#app .reader-page-panel) #app .reader-page-panel .playback-controls {
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    padding: 4px 12px 2px !important;
+    min-height: 40px !important;
+    overflow: visible !important;
+    position: relative !important;
+    transform: none !important;
+  }
+
+  body:has(#app .reader-page-panel) #app .reader-page-panel :is(
+    #start-reader,
+    #pause-reader,
+    #reset-reader
+  ) {
+    position: static !important;
+    top: auto !important;
+    transform: none !important;
+  }
+
+  body:has(#app .reader-page-panel) #app .reader-page-panel .playback-controls .status,
+  body:has(#app .reader-page-panel) #app .reader-page-panel .status {
+    min-height: 18px !important;
+    margin-top: 2px !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    line-height: 1.25 !important;
+    overflow: visible !important;
+  }
+
+  /*
+   * The area outside the rounded Reader card is intentionally only the small
+   * app-shell gutter. There is no large Explorer/tan floor to consume leftover
+   * height because the card itself fills the application row.
+   */
+  html[data-msg-experience-theme="explorer"]
+  body:has(#app .reader-page-panel) {
+    background: var(--explorer-global-surface, #fffdf7) !important;
   }
 }
