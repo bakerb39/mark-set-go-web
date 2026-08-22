@@ -274,3 +274,65 @@ html.msg-workspace-pane-document .msg-chat-main {
   .msg-chat-messages { min-height: 50vh; padding: 16px; }
   .msg-chat-composer { padding: 10px; gap: 7px; }
 }
+
+
+/* v1.2 — workspace width resilience.
+   The workspace-specific rule above has greater specificity than the generic
+   mobile rule, so narrow workspace panes could remain two-column and crush
+   both Chat columns. Match that specificity here. */
+@media (max-width: 620px) {
+  html.msg-workspace-pane-document .msg-chat-page {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto minmax(0, 1fr) !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-sidebar {
+    max-height: 190px;
+    padding: 10px 12px;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-brand-row {
+    padding-bottom: 7px;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-conversations {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-conversation {
+    min-width: 175px;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-main {
+    min-height: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-header {
+    min-height: 52px;
+    padding: 8px 10px;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-messages {
+    padding: 12px;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-composer {
+    grid-template-columns: minmax(0,1fr) auto;
+    padding: 8px;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-composer > .secondary {
+    grid-column: 2;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-dialog {
+    width: min(420px, calc(100% - 20px));
+  }
+}

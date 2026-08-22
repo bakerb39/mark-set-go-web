@@ -88,6 +88,7 @@
     ensureLink('/app-viewport-fix.css');
     ensureScript('/msg-chat.js');
     ensureScript('/profile-theme-fix.js');
+    ensureScript('/workspace-chat-layout-fix.js');
     removeOldTopLevelItems();
     ensureChatButton();
   }
