@@ -488,3 +488,90 @@ html[data-msg-experience-theme]:is(
   position:fixed !important;
   z-index:9999 !important;
 }
+
+
+/* ==========================================================================
+   TOPIC FEED SCROLL OCCLUSION — verified source selectors
+   ========================================================================== */
+
+/*
+ * topic-feeds.js creates .topic-feed-story-header-external directly under
+ * #reader-frame and toggles .topic-feed-story-header-scrolled after the Reader
+ * moves more than 6px.
+ *
+ * The metadata/share block is .topic-feed-story-meta-overlay.
+ * The action strip is #read-anything-article-summary-action.
+ *
+ * Keep the external overlay itself transparent. On scroll, source/share leaves
+ * and only the compact action strip remains. The action strip gets one opaque
+ * local band exactly around Summarize / Analyze / Create Post, so article text
+ * passes underneath invisibly instead of colliding with the labels.
+ */
+#reader-frame > .topic-feed-story-header-external {
+  background:transparent !important;
+  background-image:none !important;
+  box-shadow:none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external::after {
+  content:none !important;
+  display:none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay {
+  display:none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  position:relative !important;
+  z-index:3 !important;
+  isolation:isolate !important;
+
+  display:inline-flex !important;
+  width:max-content !important;
+  max-width:100% !important;
+
+  align-items:center !important;
+  flex-wrap:wrap !important;
+  gap:.08rem !important;
+
+  margin:.08rem 0 0 !important;
+  padding:0 !important;
+
+  background:transparent !important;
+  background-image:none !important;
+  box-shadow:none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action::before {
+  content:"" !important;
+  position:absolute !important;
+
+  /* One continuous band, only as wide as the action strip + small buffer. */
+  inset:-4px -8px -5px -8px !important;
+
+  z-index:0 !important;
+  pointer-events:none !important;
+  border-radius:3px !important;
+
+  background:var(
+    --msg-vd-reader-page-color,
+    var(--msg-theme-surface, var(--surface, #ffffff))
+  ) !important;
+  box-shadow:none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action
+:is(
+  .read-anything-inline-article-summary,
+  span[aria-hidden="true"],
+  a,
+  button
+) {
+  position:relative !important;
+  z-index:1 !important;
+}
