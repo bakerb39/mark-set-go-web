@@ -350,6 +350,66 @@
     if (scroll) host.scrollTop = host.scrollHeight;
   }
 
+  function sharedContentPresent(value) {
+    return Boolean(value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length);
+  }
+
+  function safeSharedUrl(value) {
+    try {
+      const parsed = new URL(String(value || ''), window.location.href);
+      return ['http:', 'https:'].includes(parsed.protocol) ? parsed.href : '';
+    } catch { return ''; }
+  }
+
+  function sharedContentLabel(type = '') {
+    return ({
+      passage:'Reader passage', selection:'Selected content', 'ask-mark-response':'Ask Mark response',
+      'symposium-turn':'Symposium turn', 'symposium-excerpt':'Symposium excerpt',
+      'symposium-transcript':'Symposium transcript', 'chat-message':'Chat message',
+      article:'Article', note:'Note', book:'Book'
+    })[type] || 'Shared content';
+  }
+
+  function renderSharedContent(content) {
+    if (!sharedContentPresent(content)) return '';
+    const title = content.title || 'Shared content';
+    const text = String(content.text || content.context || '').trim();
+    const sourceUrl = safeSharedUrl(content.sourceUrl);
+    const meta = [content.sourceLabel, content.chapter].filter(Boolean).join(' · ');
+    return `<article class="msg-chat-shared-card">
+      <span class="msg-chat-shared-type">${escapeHtml(sharedContentLabel(content.type))}</span>
+      <strong>${escapeHtml(title)}</strong>
+      ${text ? `<p>${escapeHtml(text.slice(0, 1600))}${text.length > 1600 ? '…' : ''}</p>` : ''}
+      ${meta ? `<small>${escapeHtml(meta)}</small>` : ''}
+      <div class="msg-chat-shared-actions">
+        ${sourceUrl ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">Open source</a>` : ''}
+        <button type="button" data-msg-discuss-symposium>Discuss in Symposium</button>
+      </div>
+    </article>`;
+  }
+
+  function messageSymposiumPayload(message) {
+    if (sharedContentPresent(message.shared_content)) {
+      return { ...message.shared_content, sourceLabel: message.shared_content.sourceLabel || `Chat · ${message.sender}` };
+    }
+    return {
+      type:'chat-message',
+      title:`Message from ${message.sender || 'Chat'}`,
+      text:String(message.body || '').trim(),
+      sourceLabel:'Mark, Set, Go! Chat',
+      metadata:{ conversationId:String(message.conversation_id || state.activeConversationId || ''), messageId:String(message.id || '') }
+    };
+  }
+
+  function discussMessageInSymposium(message) {
+    const share = window.MSGContentShare;
+    if (!share?.toSymposium) {
+      setStatus('Sharing is still loading. Try again.');
+      return;
+    }
+    share.toSymposium(messageSymposiumPayload(message));
+  }
+
   function messageNode(message) {
     const article = document.createElement('article');
     article.className = 'msg-chat-message';
@@ -371,6 +431,7 @@
     const bodyHtml = deleted
       ? '<div class="msg-chat-deleted">This message was deleted.</div>'
       : (message.body ? `<div class="msg-chat-bubble">${escapeHtml(message.body)}</div>` : '');
+    const sharedHtml = !deleted ? renderSharedContent(message.shared_content) : '';
 
     article.innerHTML = `
       <div class="msg-chat-meta">
@@ -385,9 +446,10 @@
             ${REACTIONS.map(emoji => `<button type="button" data-emoji="${emoji}">${emoji}</button>`).join('')}
           </div>
         </div>
+        ${(!sharedContentPresent(message.shared_content) && String(message.body || '').trim()) ? '<button type="button" data-msg-discuss-symposium title="Discuss this message in Symposium">Symposium</button>' : ''}
         ${currentUserOwns(message) ? '<button type="button" data-edit>Edit</button><button type="button" data-delete>Delete</button>' : ''}
       </div>` : ''}
-      <div class="msg-chat-content">${bodyHtml}${imageHtml}</div>
+      <div class="msg-chat-content">${bodyHtml}${sharedHtml}${imageHtml}</div>
       ${reactionHtml ? `<div class="msg-chat-reactions">${reactionHtml}</div>` : ''}`;
 
     const picker = article.querySelector('[data-picker]');
@@ -397,6 +459,13 @@
     });
     article.querySelectorAll('[data-picker] [data-emoji], .msg-chat-reaction-pill').forEach(button => {
       button.addEventListener('click', () => react(message, button.dataset.emoji));
+    });
+    article.querySelectorAll('[data-msg-discuss-symposium]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        discussMessageInSymposium(message);
+      });
     });
     article.querySelector('[data-edit]')?.addEventListener('click', () => beginEdit(message, article));
     article.querySelector('[data-delete]')?.addEventListener('click', () => deleteMessage(message));
@@ -575,6 +644,13 @@
     event.stopPropagation();
     renderPage();
   }, true);
+
+  document.addEventListener('marksetgo:content-shared-to-chat', async (event) => {
+    const conversationId = Number(event.detail?.conversationId || 0);
+    if (!document.querySelector('.msg-chat-page') || !conversationId) return;
+    await loadConversations(true);
+    if (state.activeConversationId === conversationId) await refreshMessages(true);
+  });
 
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && document.querySelector('.msg-chat-page')) {

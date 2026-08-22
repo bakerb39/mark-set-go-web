@@ -11437,9 +11437,18 @@ function showMarkToolbar(selectionData, rect) {
   state.markSelection=selectionData;
   persistMarkSelectionHighlight(selectionData);
   bar.hidden=false;
-  const width=bar.offsetWidth||540;
-  bar.style.left=`${Math.max(8,Math.min(window.innerWidth-width-8,rect.left+rect.width/2-width/2))}px`;
-  bar.style.top=`${Math.max(8,rect.top-52)}px`;
+  // The passage toolbar can wrap in narrow Reader/workspace panes. Measure the
+  // rendered toolbar after it is shown so every action, including Chat and
+  // Symposium, remains inside the visible viewport instead of extending offscreen.
+  const width=Math.min(bar.offsetWidth||540,Math.max(0,window.innerWidth-16));
+  const height=bar.offsetHeight||42;
+  const left=Math.max(8,Math.min(window.innerWidth-width-8,rect.left+rect.width/2-width/2));
+  const aboveTop=rect.top-height-8;
+  const belowTop=(Number(rect.bottom)||rect.top)+8;
+  const maxTop=Math.max(8,window.innerHeight-height-8);
+  const top=aboveTop>=8 ? aboveTop : Math.min(maxTop,belowTop);
+  bar.style.left=`${left}px`;
+  bar.style.top=`${Math.max(8,top)}px`;
 }
 function hideMarkToolbar(){ const bar=app.querySelector('#mark-selection-toolbar'); if(bar) bar.hidden=true; }
 function openMarkPanel(tab='selection'){
@@ -11520,7 +11529,7 @@ function renderMarkResult(result, action){
 
   panels.forEach(panel=>{
     panel.hidden=false;
-    panel.innerHTML=`<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<button type="button" class="secondary" data-save-mark-response data-mark-save-id="${escapeHtml(saveId)}">Save to notebook</button>`;
+    panel.innerHTML=`<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<div class="mark-response-share-actions"><button type="button" class="secondary" data-save-mark-response data-mark-save-id="${escapeHtml(saveId)}">Save to notebook</button><button type="button" class="secondary" data-mark-share-response="chat">💬 Send to Chat</button><button type="button" class="secondary" data-mark-share-response="symposium">🏛 Discuss in Symposium</button></div>`;
 
     panel.querySelector('[data-save-mark-response]')?.addEventListener('click',(event)=>{
       const button=event.currentTarget;
@@ -11533,6 +11542,21 @@ function renderMarkResult(result, action){
         window.setTimeout(()=>{ if(!button.disabled) button.textContent='Save to notebook'; },2200);
       }
     });
+
+    panel.querySelectorAll('[data-mark-share-response]').forEach((button)=>button.addEventListener('click',()=>{
+      const payload={
+        type:'ask-mark-response',
+        title:`${result.heading || action}${selected?.title ? ` · ${selected.title}` : ''}`,
+        text:String(result.response || '').trim(),
+        context:selected?.text || '',
+        sourceLabel:currentCompanionIdentity().ask || 'Ask Mark',
+        documentId:selected?.documentId || state.documentId || '',
+        chapter:selected?.chapter || '',
+        startIndex:Number(selected?.startIndex) || 0
+      };
+      if(button.dataset.markShareResponse==='symposium') window.MSGContentShare?.toSymposium?.(payload);
+      else window.MSGContentShare?.toChat?.(payload);
+    }));
   });
   notifyAskMarkLegacyUpdated('response');
 }
@@ -12386,6 +12410,23 @@ function bindMarkCompanion(reader){
   state.readerWritingResizeObserver?.disconnect?.();
   state.readerWritingResizeObserver = new ResizeObserver(scheduleWritingPosition);
   state.readerWritingResizeObserver.observe(reader);
+
+  toolbar.querySelectorAll('[data-msg-share-selection]').forEach((button)=>button.addEventListener('click',()=>{
+    const selected = state.markSelection ? {...state.markSelection} : (state.markPersistentSelection ? {...state.markPersistentSelection} : null);
+    if (!selected?.text) return;
+    const payload = {
+      type:'passage',
+      title:selected.title || state.title || 'Reader passage',
+      text:selected.text,
+      sourceLabel:'Reader',
+      sourceUrl:state.source?.url || state.source?.sourceUrl || '',
+      documentId:selected.documentId || state.documentId || '',
+      chapter:selected.chapter || currentTocTitle() || '',
+      startIndex:Number(selected.startIndex) || 0
+    };
+    if (button.dataset.msgShareSelection === 'symposium') window.MSGContentShare?.toSymposium?.(payload);
+    else window.MSGContentShare?.toChat?.(payload);
+  }));
 
   toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
     openMarkPanel('selection');
@@ -13562,7 +13603,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
 
       <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-reader-drawing-toggle aria-expanded="false">✐ Draw</button><div class="reader-drawing-editor" data-reader-drawing-editor hidden><div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div><label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div></div><button type="button" data-reader-workspace-toggle aria-expanded="false">▣ Space</button><div class="reader-workspace-editor" data-reader-workspace-editor hidden><strong>Insert workspace</strong><label>Height <select data-reader-workspace-height><option value="180">Small</option><option value="280" selected>Medium</option><option value="420">Large</option><option value="600">Extra large</option></select></label><div><button type="button" data-reader-workspace-cancel>Cancel</button><button type="button" data-reader-workspace-insert>Insert</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-reader-drawing-toggle aria-expanded="false">✐ Draw</button><div class="reader-drawing-editor" data-reader-drawing-editor hidden><div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div><label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div></div><button type="button" data-reader-workspace-toggle aria-expanded="false">▣ Space</button><div class="reader-workspace-editor" data-reader-workspace-editor hidden><strong>Insert workspace</strong><label>Height <select data-reader-workspace-height><option value="180">Small</option><option value="280" selected>Medium</option><option value="420">Large</option><option value="600">Extra large</option></select></label><div><button type="button" data-reader-workspace-cancel>Cancel</button><button type="button" data-reader-workspace-insert>Insert</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-msg-share-selection="chat">💬 Chat</button><button type="button" data-msg-share-selection="symposium">🏛 Symposium</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
@@ -23659,6 +23700,7 @@ function ensureSymposiumStyles() {
     }
     .symposium-selection-toolbar [data-symposium-copy-selection]{background:#eaf0f6;color:#17304e}
     .symposium-selection-toolbar [data-symposium-save-selection]{background:#0c2340;color:#f2ca60}
+    .symposium-selection-toolbar [data-symposium-chat-selection]{background:#173c66;color:#fff}
 
     .symposium-empty{margin:auto;text-align:center;max-width:520px;color:#718095;padding:44px}.symposium-empty .symposium-empty-icon{font-size:3rem;display:block;margin-bottom:12px}.symposium-empty h2{color:#0c2340;margin:.25rem 0 .5rem;font-family:Georgia,serif}
     .symposium-turn{display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px;align-items:start}.symposium-turn.user{grid-template-columns:minmax(0,1fr) 48px}.symposium-turn.user .symposium-turn-body{order:1;background:#eef5fc}.symposium-turn.user .symposium-avatar{order:2;background:#405c7a}.symposium-turn.moderator .symposium-avatar{background:linear-gradient(145deg,#80631a,#513d0d);color:white}.symposium-turn-body{border:1px solid #dde6ef;border-radius:16px;padding:13px 15px;background:white;box-shadow:0 5px 16px rgba(38,67,98,.05)}.symposium-turn-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}.symposium-turn-head strong{color:#0c2340}.symposium-turn-head span{font-size:.76rem;color:#7a899b}.symposium-turn-body p{margin:0;line-height:1.58;color:#30465f;white-space:pre-wrap}.symposium-turn-tools{margin-top:8px;display:flex;gap:6px}.symposium-turn-tools button{border:0;background:transparent;color:#315d8b;font-size:.78rem;cursor:pointer;padding:2px 0}
@@ -23734,7 +23776,7 @@ function symposiumTurnHtml({name, monogram='?', field='', text='', kind='partici
       <div class="symposium-turn-head"><strong>${symposiumEscape(name)}</strong><span>${symposiumEscape(field)}</span></div>
       <p>${symposiumEscape(text)}</p>
       ${sourceLabel ? `<span class="symposium-source-pill">${symposiumEscape(sourceLabel)}</span>` : ''}
-      ${safeKind !== 'user' ? `<div class="symposium-turn-tools"><button type="button" data-symposium-speak-last>🔊 Speak</button></div>` : ''}
+      <div class="symposium-turn-tools"><button type="button" data-symposium-share-turn>💬 Chat</button>${safeKind !== 'user' ? '<button type="button" data-symposium-speak-last>🔊 Speak</button>' : ''}</div>
     </div>
   </article>`;
 }
@@ -23807,7 +23849,12 @@ function renderSymposium() {
   ensureSymposiumStyles();
   app.dataset.viewKey = 'symposium';
   const readingContext = currentSymposiumReadingContext();
-  const defaultTopic = state?.title ? `Explore the central ideas in ${state.title}` : '';
+  const sharedHandoff = window.MSGContentShare?.takeSymposiumHandoff?.() || null;
+  const sharedContextText = String(sharedHandoff?.symposiumContext || '').trim();
+  const sharedContextLabel = sharedHandoff ? `Shared from ${sharedHandoff.sourceLabel || 'app content'}` : '';
+  const defaultTopic = sharedHandoff?.symposiumTopic || (state?.title ? `Explore the central ideas in ${state.title}` : '');
+  const initialContextText = sharedContextText || readingContext.text;
+  const initialContextLabel = sharedContextText ? sharedContextLabel : readingContext.label;
   const defaultChecked = new Set(['socrates','aristotle','einstein','lovelace']);
 
   app.innerHTML = `
@@ -23842,11 +23889,12 @@ function renderSymposium() {
             <div>
               <label>Reading context</label>
               <div class="symposium-context-choice">
+                ${sharedContextText ? '<button type="button" data-symposium-context="shared">Use shared content</button>' : ''}
                 <button type="button" data-symposium-context="reading" ${readingContext.text ? '' : 'disabled'}>Use current reading</button>
                 <button type="button" data-symposium-context="none">Topic only</button>
               </div>
-              <input id="symposium-context" type="hidden" value="${symposiumEscape(readingContext.text)}">
-              <p class="symposium-hint" id="symposium-context-label">${symposiumEscape(readingContext.label)}${readingContext.text ? ` · ${splitWords(readingContext.text).length.toLocaleString()} words available` : ''}</p>
+              <input id="symposium-context" type="hidden" value="${symposiumEscape(initialContextText)}">
+              <p class="symposium-hint" id="symposium-context-label">${symposiumEscape(initialContextLabel)}${initialContextText ? ` · ${splitWords(initialContextText).length.toLocaleString()} words available` : ''}</p>
             </div>
 
             <label>Output
@@ -23895,7 +23943,7 @@ function renderSymposium() {
         <main class="symposium-panel symposium-stage">
           <div class="symposium-stage-toolbar">
             <span class="symposium-stage-status" id="symposium-stage-status">Ready to convene</span>
-            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
+            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
           </div>
           <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
             <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
@@ -23903,6 +23951,7 @@ function renderSymposium() {
           <div class="symposium-selection-toolbar" id="symposium-selection-toolbar" hidden role="toolbar" aria-label="Selected Symposium text actions">
             <button type="button" data-symposium-copy-selection>Copy</button>
             <button type="button" data-symposium-save-selection>Save to Notebook</button>
+            <button type="button" data-symposium-chat-selection>💬 Chat</button>
           </div>
           <div class="symposium-participate">
             <label for="symposium-reader-input">Join the discussion</label>
@@ -23919,6 +23968,7 @@ function renderSymposium() {
   const statusEl = root.querySelector('#symposium-stage-status');
   const nextButton = root.querySelector('#symposium-next');
   const saveButton = root.querySelector('#symposium-save');
+  const chatButton = root.querySelector('#symposium-chat');
   const readerButton = root.querySelector('#symposium-reader-submit');
   const startButton = root.querySelector('#symposium-start');
   const rosterEl = root.querySelector('#symposium-roster');
@@ -24068,6 +24118,19 @@ function renderSymposium() {
     }
   });
 
+  selectionToolbar?.querySelector('[data-symposium-chat-selection]')?.addEventListener('click', () => {
+    const selected = symposiumSelection;
+    if (!selected?.text) return;
+    window.MSGContentShare?.toChat?.({
+      type:'symposium-excerpt',
+      title:`Symposium · ${selected.topic || session.topic || 'Discussion'}`,
+      text:selected.text,
+      sourceLabel:selected.speaker || 'Symposium',
+      chapter:selected.speaker || '',
+      metadata:{ topic:selected.topic || session.topic || '' }
+    });
+  });
+
   transcriptEl.addEventListener('pointerup', () => {
     window.setTimeout(showSymposiumSelectionToolbar, 0);
   });
@@ -24131,7 +24194,10 @@ function renderSymposium() {
   };
 
   root.querySelectorAll('[data-symposium-context]').forEach((button)=>button.addEventListener('click',()=>{
-    if (button.dataset.symposiumContext === 'reading') {
+    if (button.dataset.symposiumContext === 'shared' && sharedContextText) {
+      root.querySelector('#symposium-context').value = sharedContextText;
+      root.querySelector('#symposium-context-label').textContent = `${sharedContextLabel} · ${splitWords(sharedContextText).length.toLocaleString()} words available`;
+    } else if (button.dataset.symposiumContext === 'reading') {
       root.querySelector('#symposium-context').value = readingContext.text;
       root.querySelector('#symposium-context-label').textContent = `${readingContext.label} · ${splitWords(readingContext.text).length.toLocaleString()} words available`;
     } else {
@@ -24238,7 +24304,7 @@ function renderSymposium() {
     session.pendingReaderContribution = '';
     transcriptEl.innerHTML = '';
     appendTurn({ name:'Athena', monogram:'A', field:'Moderator', text:await moderatorOpening(), kind:'moderator', sourceLabel:'Moderator · decorum & evidence' }, true);
-    nextButton.disabled = false; saveButton.disabled = false; readerButton.disabled = false;
+    nextButton.disabled = false; saveButton.disabled = false; if (chatButton) chatButton.disabled = false; readerButton.disabled = false;
     await runSpeaker(session.people[0]);
     session.nextIndex = session.people.length > 1 ? 1 : 0;
   });
@@ -24274,10 +24340,31 @@ function renderSymposium() {
   });
 
   transcriptEl.addEventListener('click',(event)=>{
+    const shareButton = event.target.closest('[data-symposium-share-turn]');
+    if (shareButton) {
+      const body = shareButton.closest('.symposium-turn-body');
+      const name = body?.querySelector('.symposium-turn-head strong')?.textContent?.trim() || 'Symposium';
+      const field = body?.querySelector('.symposium-turn-head span')?.textContent?.trim() || '';
+      const text = body?.querySelector('p')?.textContent?.trim() || '';
+      window.MSGContentShare?.toChat?.({ type:'symposium-turn', title:`${name} · ${session.topic || 'Symposium'}`, text, sourceLabel:'Symposium', chapter:field, metadata:{ topic:session.topic || '' } });
+      return;
+    }
     const button = event.target.closest('[data-symposium-speak-last]');
     if (!button) return;
     const body = button.closest('.symposium-turn-body');
     symposiumSpeak(body?.querySelector('p')?.textContent || '', body?.querySelector('strong')?.textContent || 'Speaker');
+  });
+
+  chatButton?.addEventListener('click',()=>{
+    if (!session.transcript.length) return;
+    const text = session.transcript.map((turn)=>`${turn.name}${turn.field ? ` (${turn.field})` : ''}: ${turn.text}`).join('\n\n');
+    window.MSGContentShare?.toChat?.({
+      type:'symposium-transcript',
+      title:`Symposium · ${session.topic || 'Discussion'}`,
+      text,
+      sourceLabel:'Symposium',
+      metadata:{ mode:session.mode, participants:session.people.map((person)=>person.name).join(', ') }
+    });
   });
 
   root.querySelector('#symposium-stop-speech').addEventListener('click',()=>window.speechSynthesis?.cancel?.());

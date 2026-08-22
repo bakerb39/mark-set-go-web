@@ -274,3 +274,14 @@ html.msg-workspace-pane-document .msg-chat-main {
   .msg-chat-messages { min-height: 50vh; padding: 16px; }
   .msg-chat-composer { padding: 10px; gap: 7px; }
 }
+
+/* Shared app content + Symposium bridge */
+.msg-chat-shared-card{margin-top:8px;padding:12px 13px;border:1px solid #d7e2ed;border-left:4px solid #c99f37;border-radius:12px;background:#f9fbfd;text-align:left;display:grid;gap:6px;max-width:min(680px,100%)}
+.msg-chat-message.mine .msg-chat-shared-card{margin-left:auto}
+.msg-chat-shared-type{font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#8a6500}
+.msg-chat-shared-card>strong{color:#173c66;font-size:.94rem}
+.msg-chat-shared-card>p{margin:0;color:#40556d;line-height:1.48;white-space:pre-wrap;overflow-wrap:anywhere}
+.msg-chat-shared-card>small{color:#718095}
+.msg-chat-shared-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:3px}
+.msg-chat-shared-actions a,.msg-chat-shared-actions button{border:1px solid #cbd7e5;border-radius:8px;background:white;color:#24476e;padding:6px 9px;font:inherit;font-size:.75rem;font-weight:800;text-decoration:none;cursor:pointer}
+.msg-chat-shared-actions button{background:#0c2340;color:#f2ca60;border-color:#0c2340}

@@ -886,7 +886,12 @@
 function renderSymposiumWorkspace(rootHost) {
   ensureSymposiumStyles();
   const readingContext = currentSymposiumReadingContext();
-  const defaultTopic = state?.title ? `Explore the central ideas in ${state.title}` : '';
+  const sharedHandoff = window.MSGContentShare?.takeSymposiumHandoff?.() || null;
+  const sharedContextText = String(sharedHandoff?.symposiumContext || '').trim();
+  const sharedContextLabel = sharedHandoff ? `Shared from ${sharedHandoff.sourceLabel || 'app content'}` : '';
+  const defaultTopic = sharedHandoff?.symposiumTopic || (state?.title ? `Explore the central ideas in ${state.title}` : '');
+  const initialContextText = sharedContextText || readingContext.text;
+  const initialContextLabel = sharedContextText ? sharedContextLabel : readingContext.label;
   const defaultChecked = new Set(['socrates','aristotle','einstein','lovelace']);
 
   rootHost.innerHTML = `
@@ -921,11 +926,12 @@ function renderSymposiumWorkspace(rootHost) {
             <div>
               <label>Reading context</label>
               <div class="symposium-context-choice">
+                ${sharedContextText ? '<button type="button" data-symposium-context="shared">Use shared content</button>' : ''}
                 <button type="button" data-symposium-context="reading" ${readingContext.text ? '' : 'disabled'}>Use current reading</button>
                 <button type="button" data-symposium-context="none">Topic only</button>
               </div>
-              <input id="symposium-context" type="hidden" value="${symposiumEscape(readingContext.text)}">
-              <p class="symposium-hint" id="symposium-context-label">${symposiumEscape(readingContext.label)}${readingContext.text ? ` · ${splitWords(readingContext.text).length.toLocaleString()} words available` : ''}</p>
+              <input id="symposium-context" type="hidden" value="${symposiumEscape(initialContextText)}">
+              <p class="symposium-hint" id="symposium-context-label">${symposiumEscape(initialContextLabel)}${initialContextText ? ` · ${splitWords(initialContextText).length.toLocaleString()} words available` : ''}</p>
             </div>
 
             <label>Output
@@ -952,7 +958,7 @@ function renderSymposiumWorkspace(rootHost) {
         <main class="symposium-panel symposium-stage">
           <div class="symposium-stage-toolbar">
             <span class="symposium-stage-status" id="symposium-stage-status">Ready to convene</span>
-            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
+            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
           </div>
           <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
             <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
@@ -971,6 +977,7 @@ function renderSymposiumWorkspace(rootHost) {
   const statusEl = root.querySelector('#symposium-stage-status');
   const nextButton = root.querySelector('#symposium-next');
   const saveButton = root.querySelector('#symposium-save');
+  const chatButton = root.querySelector('#symposium-chat');
   const readerButton = root.querySelector('#symposium-reader-submit');
   const startButton = root.querySelector('#symposium-start');
   const rosterEl = root.querySelector('#symposium-roster');
@@ -993,7 +1000,10 @@ function renderSymposiumWorkspace(rootHost) {
   };
 
   root.querySelectorAll('[data-symposium-context]').forEach((button)=>button.addEventListener('click',()=>{
-    if (button.dataset.symposiumContext === 'reading') {
+    if (button.dataset.symposiumContext === 'shared' && sharedContextText) {
+      root.querySelector('#symposium-context').value = sharedContextText;
+      root.querySelector('#symposium-context-label').textContent = `${sharedContextLabel} · ${splitWords(sharedContextText).length.toLocaleString()} words available`;
+    } else if (button.dataset.symposiumContext === 'reading') {
       root.querySelector('#symposium-context').value = readingContext.text;
       root.querySelector('#symposium-context-label').textContent = `${readingContext.label} · ${splitWords(readingContext.text).length.toLocaleString()} words available`;
     } else {
@@ -1054,7 +1064,7 @@ function renderSymposiumWorkspace(rootHost) {
     session.pendingReaderContribution = '';
     transcriptEl.innerHTML = '';
     appendTurn({ name:'Athena', monogram:'A', field:'Moderator', text:await moderatorOpening(), kind:'moderator', sourceLabel:'Moderator · decorum & evidence' }, true);
-    nextButton.disabled = false; saveButton.disabled = false; readerButton.disabled = false;
+    nextButton.disabled = false; saveButton.disabled = false; if (chatButton) chatButton.disabled = false; readerButton.disabled = false;
     await runSpeaker(session.people[0]);
     session.nextIndex = session.people.length > 1 ? 1 : 0;
   });
@@ -1090,10 +1100,31 @@ function renderSymposiumWorkspace(rootHost) {
   });
 
   transcriptEl.addEventListener('click',(event)=>{
+    const shareButton = event.target.closest('[data-symposium-share-turn]');
+    if (shareButton) {
+      const body = shareButton.closest('.symposium-turn-body');
+      const name = body?.querySelector('.symposium-turn-head strong')?.textContent?.trim() || 'Symposium';
+      const field = body?.querySelector('.symposium-turn-head span')?.textContent?.trim() || '';
+      const text = body?.querySelector('p')?.textContent?.trim() || '';
+      window.MSGContentShare?.toChat?.({ type:'symposium-turn', title:`${name} · ${session.topic || 'Symposium'}`, text, sourceLabel:'Symposium', chapter:field, metadata:{ topic:session.topic || '' } });
+      return;
+    }
     const button = event.target.closest('[data-symposium-speak-last]');
     if (!button) return;
     const body = button.closest('.symposium-turn-body');
     symposiumSpeak(body?.querySelector('p')?.textContent || '', body?.querySelector('strong')?.textContent || 'Speaker');
+  });
+
+  chatButton?.addEventListener('click',()=>{
+    if (!session.transcript.length) return;
+    const text = session.transcript.map((turn)=>`${turn.name}${turn.field ? ` (${turn.field})` : ''}: ${turn.text}`).join('\n\n');
+    window.MSGContentShare?.toChat?.({
+      type:'symposium-transcript',
+      title:`Symposium · ${session.topic || 'Discussion'}`,
+      text,
+      sourceLabel:'Symposium',
+      metadata:{ mode:session.mode, participants:session.people.map((person)=>person.name).join(', ') }
+    });
   });
 
   root.querySelector('#symposium-stop-speech').addEventListener('click',()=>window.speechSynthesis?.cancel?.());
