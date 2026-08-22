@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Mark, Set, Go! Workspace</title>
+<script src="/experience-theme-bootstrap.js?v=20260822-v7.13-workspace-same-theme-stack"></script>
 <link href="/styles.css?v=reader-annotations-v8-reconciled" rel="stylesheet">
 <link href="/read-anything.css?v=8.8.0" rel="stylesheet">
 <link href="/workspace-experiment.css?v=0.5.1-controls-above-reader" rel="stylesheet">
@@ -12,13 +13,12 @@
 <link rel="stylesheet" href="/reader-music-quick.css?v=1.5.1-reading-suggestions">
 <link rel="stylesheet" href="/crypto-ticker.css?v=1.0.1-workspace-restore">
 <link href="/theme-system.css?v=9.2.41-reader-contrast-final" rel="stylesheet">
+<link href="/experience-themes.css?v=20260822-v7.13-workspace-same-theme-stack" rel="stylesheet">
+<link href="/experience-theme-layout.css?v=20260822-v7.13-workspace-same-theme-stack" rel="stylesheet">
 <link href="/explorer-theme.css?v=1.1.1-workspace-profile" rel="stylesheet">
 <link href="/companion-persona-safe.css?v=9.7.1-workspace-profile" rel="stylesheet">
-
-<!-- Chat is a first-class workspace page. -->
-<link href="/msg-chat.css?v=1.4.0" rel="stylesheet">
-
 <script>
+  // This is a secondary view only. Do not boot a second authenticated app.
   window.__MSG_WORKSPACE_PANE__ = true;
   window.MSGWorkspacePane = true;
   const nativeFetch = window.fetch.bind(window);
@@ -27,16 +27,12 @@
     try {
       const u = new URL(raw, location.href);
       if (u.pathname === '/api/topic-feeds/daily-open') {
-        return Promise.resolve(new Response(JSON.stringify({ workspacePane:true }), {
-          status:200,
-          headers:{'Content-Type':'application/json'}
-        }));
+        return Promise.resolve(new Response(JSON.stringify({ workspacePane:true }), {status:200, headers:{'Content-Type':'application/json'}}));
       }
     } catch {}
     return nativeFetch(input, init);
   };
 </script>
-
 <script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/SessionManager.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/ReaderEngine.js?v=3.2.1-stable-recovery"></script>
@@ -46,17 +42,14 @@
 <script defer src="/modules/pages/help-page.js?v=9.3.1-kindle-import"></script>
 <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
 <script src="/modern-guide-storage-guard.js?v=0.11.4-no-registry-write"></script>
-<script defer src="/app.js?v=20260820-modern-guide-outer-reader-1"></script>
+<script defer src="/app.js?v=20260822-v7.13-workspace-same-theme-stack"></script>
+<script defer src="/experience-themes.js?v=20260822-v7.13-workspace-same-theme-stack"></script>
 <script defer src="/read-anything.js?v=20260817-article-actions-on-document"></script>
 <script defer src="/workspace-reader-proxy.js?v=0.11.0-bible-topic"></script>
 <script>window.addEventListener("DOMContentLoaded",()=>window.MarkSetGoExperienceProfile?.apply?.());</script>
 <script defer src="/topic-feeds.js?v=2.1.20-reader-pane-refresh"></script>
-
-<!-- Must load before workspace-pane-runtime.js routes msg-chat. -->
-<script defer src="/msg-chat.js?v=1.4.0"></script>
-
-<script defer src="/profile-theme-fix.js?v=1.2.0-profile-recovery"></script>
-<script defer src="/workspace-pane-runtime.js?v=0.9.3-theme-parent-sync"></script>
+<!-- Render the requested lightweight page before Profile extensions initialize. -->
+<script defer src="/workspace-pane-runtime.js?v=0.11.8-theme-stack"></script>
 <script defer src="/companion-persona-safe.js?v=9.7.5-workspace-profile"></script>
 <script defer src="/crypto-ticker.js?v=1.0.2-workspace-profile"></script>
 <script defer src="/market-indexes.js?v=1.0.2-workspace-profile"></script>
@@ -64,20 +57,8 @@
 <body>
 <main id="app" class="app-shell" tabindex="-1" aria-live="polite"></main>
 <aside aria-label="Music player" class="music-dock" hidden id="music-dock">
-  <div class="music-dock-bar">
-    <div><strong id="music-now-title">Music</strong><span id="music-now-source">YouTube</span></div>
-    <div class="music-dock-actions">
-      <button aria-label="Try another result" id="music-next" type="button" hidden>↻</button>
-      <button aria-label="Minimize music player" id="music-minimize" type="button">—</button>
-      <button aria-label="Close music player" id="music-close" type="button">×</button>
-    </div>
-  </div>
-  <div class="music-player-wrap" id="music-player-wrap">
-    <iframe allow="autoplay; encrypted-media; picture-in-picture; clipboard-write"
-            allowfullscreen loading="lazy" id="music-player"
-            referrerpolicy="strict-origin-when-cross-origin"
-            title="Spotify or YouTube music player"></iframe>
-  </div>
+  <div class="music-dock-bar"><div><strong id="music-now-title">Music</strong><span id="music-now-source">YouTube</span></div><div class="music-dock-actions"><button aria-label="Try another result" id="music-next" type="button" hidden>↻</button><button aria-label="Minimize music player" id="music-minimize" type="button">—</button><button aria-label="Close music player" id="music-close" type="button">×</button></div></div>
+  <div class="music-player-wrap" id="music-player-wrap"><iframe allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen loading="lazy" id="music-player" referrerpolicy="strict-origin-when-cross-origin" title="Spotify or YouTube music player"></iframe></div>
 </aside>
 </body>
 </html>

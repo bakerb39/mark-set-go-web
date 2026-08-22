@@ -1,8 +1,10 @@
-/* Mark, Set, Go! Workspace pane cache refresh v0.11.6 */
+/* Mark, Set, Go! Workspace pane cache refresh 0.11.8-theme-stack
+   Forces workspace-pane.html to use the same theme/app stack as the outer app.
+*/
 (() => {
   'use strict';
 
-  const BUILD = '0.11.7-theme-sync';
+  const BUILD = '0.11.8-theme-stack';
 
   function refreshWorkspacePaneUrls() {
     document.querySelectorAll('iframe.msg-workspace-page-frame').forEach((frame) => {
