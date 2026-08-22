@@ -1,0 +1,500 @@
+/* Mark, Set, Go! — uniform experience layout v7.7
+   Identical Reader/layout mechanics for every experience theme. */
+
+html[data-msg-experience-theme] body:has(#app) {
+  background-color:var(--msg-theme-page,#eef1f4) !important;
+  background-image:var(--msg-scene-left),var(--msg-scene-right),var(--msg-scene-center) !important;
+  background-position:left bottom,right bottom,center center !important;
+  background-repeat:no-repeat,no-repeat,no-repeat !important;
+  background-size:min(31vw,520px) auto,min(31vw,520px) auto,cover !important;
+  background-attachment:fixed,fixed,fixed !important;
+}
+
+html[data-msg-experience-theme] :is(#app.app-shell,.msg-workspace-shell,.msg-workspace-primary) {
+  background:transparent !important;
+  background-image:none !important;
+}
+
+/* ==========================================================================
+   HEADER / MENUS
+   ========================================================================== */
+
+.site-header {
+  z-index:1000 !important;
+  overflow:visible !important;
+}
+.site-header nav,
+.site-header details,
+.site-header details[open],
+.site-header .menu-popover {
+  overflow:visible !important;
+}
+.site-header details[open],
+.site-header .menu-popover {
+  z-index:1100 !important;
+}
+
+
+/* ==========================================================================
+   DESKTOP READER — SINGLE AUTHORITATIVE GEOMETRY
+   ========================================================================== */
+
+@media (min-width:861px) {
+  /*
+   * Use the EXISTING app-shell width from styles.css / Designer.
+   * Do not set width here.
+   *
+   * Reader mode gets the available browser height below the header.
+   */
+  body:has(#app .reader-page-panel) {
+    height:100dvh !important;
+    min-height:0 !important;
+    overflow:hidden !important;
+    display:grid !important;
+    grid-template-rows:auto minmax(0,1fr) auto !important;
+  }
+
+  /* The real .site-footer grid remains authoritative. Reader mode only
+     removes the normal gap before it. */
+  body:has(#app .reader-page-panel) > .site-footer#msg-shared-bottom {
+    margin-top:0 !important;
+    align-self:stretch !important;
+  }
+
+  body:has(#app .reader-page-panel) > #app.app-shell {
+    min-height:0 !important;
+    height:auto !important;
+    max-height:none !important;
+    align-self:stretch !important;
+    margin-top:6px !important;
+    margin-bottom:6px !important;
+    padding:0 !important;
+    overflow:hidden !important;
+  }
+
+  /* Reader shell width remains 100% OF THE EXISTING app shell. */
+  html[data-msg-experience-theme] #app .reader-page-panel {
+    --msg-reader-footer-height:52px;
+
+    display:flex !important;
+    flex-direction:column !important;
+    box-sizing:border-box !important;
+
+    width:100% !important;
+    height:100% !important;
+    min-height:0 !important;
+    max-height:100% !important;
+
+    margin:0 !important;
+    padding:0 16px 10px !important;
+
+    border-radius:16px !important;
+    border-bottom-left-radius:16px !important;
+    border-bottom-right-radius:16px !important;
+    overflow:hidden !important;
+    background-clip:padding-box !important;
+  }
+
+  #app .reader-page-panel::before,
+  #app .reader-page-panel::after {
+    content:none !important;
+    display:none !important;
+  }
+
+  /* Previously approved title positioning. */
+  #app .reader-page-panel > .reader-title-row {
+    flex:0 0 auto !important;
+    min-height:0 !important;
+    margin-top:14px !important;
+    margin-bottom:-1px !important;
+    padding:0 !important;
+    gap:8px !important;
+    align-items:flex-start !important;
+  }
+
+  #app .reader-page-panel .reader-title-copy h1 {
+    margin:0 0 2px !important;
+    line-height:1.12 !important;
+  }
+
+  #app .reader-page-panel .reader-title-links {
+    margin:0 !important;
+    line-height:1.15 !important;
+  }
+
+  #app .reader-page-panel > .reader-toolbar {
+    flex:0 0 auto !important;
+    margin:0 !important;
+    padding:0 !important;
+    min-height:0 !important;
+  }
+
+  /* Restore approved Reader control placement. */
+  #app .reader-page-panel > .reader-pane-controls,
+  #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar {
+    flex:0 0 auto !important;
+    display:flex !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    gap:8px !important;
+    min-height:58px !important;
+    margin-top:6px !important;
+    margin-bottom:30px !important;
+    padding:0 !important;
+  }
+
+  #app .reader-page-panel > .reader-pane-controls > .reader-pane-buttons {
+    display:flex !important;
+    align-items:center !important;
+    gap:8px !important;
+  }
+
+  #app .reader-page-panel .reader-pane-buttons > .reader-topright-media-stack {
+    margin-left:auto !important;
+  }
+
+  /*
+   * The Reader layout consumes the remaining shell height.
+   */
+  #app .reader-page-panel > #reader-layout,
+  #app .reader-page-panel > .reader-layout {
+    flex:1 1 auto !important;
+    min-height:0 !important;
+    height:auto !important;
+    max-height:none !important;
+    margin:0 !important;
+    padding:0 !important;
+    align-items:stretch !important;
+    overflow:hidden !important;
+  }
+
+  /*
+   * Center column explicitly separates the visible Reader frame and its footer.
+   */
+  html[data-msg-experience-theme] #app .reader-page-panel .reader-center-column {
+    display:grid !important;
+    grid-template-rows:minmax(0,1fr) var(--msg-reader-footer-height) !important;
+    height:calc(100% - 7px) !important;
+    min-height:0 !important;
+    max-height:calc(100% - 7px) !important;
+    margin-top:7px !important;
+    padding-top:0 !important;
+    gap:0 !important;
+    overflow:hidden !important;
+    align-self:start !important;
+  }
+
+  html[data-msg-experience-theme] #app .reader-page-panel #reader-frame {
+    grid-row:1 !important;
+    height:100% !important;
+    min-height:0 !important;
+    max-height:100% !important;
+    margin-top:0 !important;
+    margin-bottom:0 !important;
+    overflow:hidden !important;
+  }
+
+  html[data-msg-experience-theme] #app .reader-page-panel #reader-frame > #reader.interactive-reader {
+    box-sizing:border-box !important;
+    height:100% !important;
+    min-height:0 !important;
+    max-height:100% !important;
+  }
+
+  html[data-msg-experience-theme] #app .reader-page-panel .reader-viewer-footer {
+    grid-row:2 !important;
+    box-sizing:border-box !important;
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) auto minmax(0,1fr) !important;
+    align-items:center !important;
+    gap:.55rem !important;
+    height:var(--msg-reader-footer-height) !important;
+    min-height:var(--msg-reader-footer-height) !important;
+    max-height:var(--msg-reader-footer-height) !important;
+    margin:0 !important;
+    padding:5px 2px 5px !important;
+    overflow:visible !important;
+  }
+
+  html[data-msg-experience-theme] #app .reader-page-panel
+  .reader-viewer-footer .book-page-controls-home {
+    grid-column:2 !important;
+    display:flex !important;
+    justify-content:center !important;
+    align-items:center !important;
+    min-width:0 !important;
+    overflow:visible !important;
+  }
+
+  html[data-msg-experience-theme] #app .reader-page-panel
+  .book-page-controls-home .book-page-controls {
+    position:static !important;
+    left:auto !important;
+    bottom:auto !important;
+    transform:none !important;
+    margin:0 !important;
+    max-width:100% !important;
+  }
+
+  html[data-msg-experience-theme] #app .reader-page-panel
+  .reader-viewer-footer .viewer-wpm-badge,
+  html[data-msg-experience-theme] #app .reader-page-panel
+  .reader-viewer-footer .viewer-wpm-control {
+    grid-column:3 !important;
+    justify-self:end !important;
+    position:static !important;
+    inset:auto !important;
+    transform:none !important;
+    margin:0 !important;
+  }
+
+  /*
+   * Side panes END AT THE READER FRAME, not below its footer.
+   * This is the visible alignment the UI requires.
+   */
+  html[data-msg-experience-theme] #app .reader-page-panel
+  #reader-layout > .navigation-pane,
+  html[data-msg-experience-theme] #app .reader-page-panel
+  #reader-layout > #word-panel,
+  html[data-msg-experience-theme] #app .reader-page-panel
+  #reader-layout > .mark-companion-panel {
+    box-sizing:border-box !important;
+    height:calc(100% - var(--msg-reader-footer-height) - 7px) !important;
+    min-height:0 !important;
+    max-height:calc(100% - var(--msg-reader-footer-height) - 7px) !important;
+    margin-top:7px !important;
+    margin-bottom:0 !important;
+    align-self:start !important;
+  }
+
+  html[data-msg-experience-theme] #app .reader-page-panel .navigation-pane {
+    height:calc(100% - var(--msg-reader-footer-height) - 7px) !important;
+    max-height:calc(100% - var(--msg-reader-footer-height) - 7px) !important;
+    margin-top:7px !important;
+    margin-bottom:0 !important;
+    overflow-x:hidden !important;
+    overflow-y:auto !important;
+  }
+
+  /* Ask Mark/Beth is bounded exactly like My Topics. */
+  html[data-msg-experience-theme] #app .reader-page-panel .mark-companion-panel {
+    margin-top:7px !important;
+    margin-bottom:0 !important;
+    overflow:hidden !important;
+  }
+
+  #app .reader-page-panel .mark-companion-panel > .reader-control-shell.mark-shell,
+  #app .reader-page-panel .mark-companion-panel .askmark-premium {
+    box-sizing:border-box !important;
+    height:100% !important;
+    min-height:0 !important;
+    max-height:100% !important;
+    overflow:hidden !important;
+  }
+
+  #app .reader-page-panel .mark-companion-panel .askmark-stage {
+    min-height:0 !important;
+    overflow:hidden !important;
+  }
+
+  #app .reader-page-panel .mark-companion-panel .askmark-view,
+  #app .reader-page-panel .mark-companion-panel .askmark-conversation {
+    min-height:0 !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+  }
+
+  /*
+   * Playback is the actual shell bottom. Normal flow only.
+   */
+  html[data-msg-experience-theme] #app .reader-page-panel .playback-controls {
+    flex:0 0 44px !important;
+    position:relative !important;
+    z-index:4 !important;
+    min-height:44px !important;
+    max-height:44px !important;
+    margin:4px 0 0 !important;
+    padding:3px 0 5px !important;
+    gap:8px !important;
+    display:flex !important;
+    flex-wrap:nowrap !important;
+    align-items:center !important;
+    overflow:visible !important;
+  }
+
+  html[data-msg-experience-theme] #app .reader-page-panel .playback-controls .status {
+    flex:1 1 auto !important;
+    min-width:0 !important;
+    min-height:20px !important;
+    margin:0 0 0 .35rem !important;
+    padding:0 !important;
+    line-height:1.3 !important;
+    white-space:nowrap !important;
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+  }
+}
+
+
+/* ==========================================================================
+   SMALL VIEWPORTS
+   ========================================================================== */
+
+@media (max-width:860px) {
+  body:has(#app .reader-page-panel) {
+    height:auto !important;
+    overflow-y:auto !important;
+    display:block !important;
+  }
+
+  #app .reader-page-panel {
+    height:auto !important;
+    max-height:none !important;
+    padding:10px !important;
+    overflow:visible !important;
+  }
+
+  #app .reader-page-panel .navigation-pane,
+  #app .reader-page-panel #word-panel,
+  #app .reader-page-panel .mark-companion-panel {
+    height:auto !important;
+    max-height:none !important;
+  }
+}
+
+
+/* ==========================================================================
+   TOPIC FEED HEADER
+   ========================================================================== */
+
+/*
+ * Intentionally no layout rules here.
+ *
+ * Verified source ownership:
+ * - topic-feeds.js creates .topic-feed-story-header-external as a direct child
+ *   of #reader-frame and positions it from the actual Reader padding.
+ * - topic-feeds.css owns .topic-feed-reader-credit and positions
+ *   .topic-feed-reader-share at the credit's right edge.
+ * - read-anything.js owns #read-anything-article-summary-action.
+ *
+ * Do not turn #reader-frame into flex/grid and do not reorder these nodes.
+ */
+
+/* Shared floating music player remains above Reader surfaces. */
+.music-dock {
+  position:fixed !important;
+  z-index:9999 !important;
+}
+
+
+/* ==========================================================================
+   TOPIC FEED SCROLL OCCLUSION — verified source selectors
+   ========================================================================== */
+
+/*
+ * topic-feeds.js creates .topic-feed-story-header-external directly under
+ * #reader-frame and toggles .topic-feed-story-header-scrolled after the Reader
+ * moves more than 6px.
+ *
+ * The metadata/share block is .topic-feed-story-meta-overlay.
+ * The action strip is #read-anything-article-summary-action.
+ *
+ * Keep the external overlay itself transparent. On scroll, source/share leaves
+ * and only the compact action strip remains. The action strip gets one opaque
+ * local band exactly around Summarize / Analyze / Create Post, so article text
+ * passes underneath invisibly instead of colliding with the labels.
+ */
+#reader-frame > .topic-feed-story-header-external {
+  background:transparent !important;
+  background-image:none !important;
+  box-shadow:none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external::after {
+  content:none !important;
+  display:none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay {
+  display:none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  position:relative !important;
+  z-index:3 !important;
+  isolation:isolate !important;
+
+  display:inline-flex !important;
+  width:max-content !important;
+  max-width:100% !important;
+
+  align-items:center !important;
+  flex-wrap:wrap !important;
+  gap:.08rem !important;
+
+  margin:.08rem 0 0 !important;
+  padding:0 !important;
+
+  background:transparent !important;
+  background-image:none !important;
+  box-shadow:none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action::before {
+  content:none !important;
+  display:none !important;
+}
+
+/*
+ * The band exists ONLY while the document is moving.
+ * It is the width of the compact action cluster plus a small buffer.
+ * On the white reading page it is visually invisible; its only job is to
+ * occlude article text passing underneath Summarize / Analyze / Create Post.
+ */
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> #read-anything-article-summary-action::before {
+  content:"" !important;
+  display:block !important;
+  position:absolute !important;
+  inset:-4px -8px -5px -8px !important;
+  z-index:0 !important;
+  pointer-events:none !important;
+  border:0 !important;
+  border-radius:3px !important;
+  background:var(--msg-theme-surface,#ffffff) !important;
+  background-image:none !important;
+  box-shadow:none !important;
+}
+
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action
+:is(
+  .read-anything-inline-article-summary,
+  span[aria-hidden="true"],
+  a,
+  button
+) {
+  position:relative !important;
+  z-index:1 !important;
+}
+
+
+/* ==========================================================================
+   TOPIC FEED ACTION LABEL SURFACE — authoritative source rule
+   ========================================================================== */
+/*
+ * The action words themselves never own an opaque fill. The occlusion footprint
+ * behind #read-anything-article-summary-action may mask scrolling document text,
+ * but Summarize / Analyze / Create Post remain visually plain text links.
+ */
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, a, button, span[aria-hidden="true"]) {
+  background:transparent !important;
+  background-color:transparent !important;
+  background-image:none !important;
+  box-shadow:none !important;
+}
