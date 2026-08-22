@@ -49,6 +49,28 @@
 
   function apply(value) {
     const theme = syncVisualState(value);
+
+    // A page opened in the secondary workspace runs in its own same-origin
+    // iframe. The outer application remains the authoritative experience owner.
+    // Forward every theme through the outer theme engine so Default follows the
+    // exact same path as Explorer, Patriotic, Scholar, and every other theme.
+    const workspaceParams = new URLSearchParams(window.location.search);
+    const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+
+    if (isWorkspacePane) {
+      try {
+        const parentThemes = window.parent.MarkSetGoExperienceThemes;
+        if (parentThemes && typeof parentThemes.apply === 'function') {
+          parentThemes.apply(theme);
+          return theme;
+        }
+      } catch (error) {
+        console.warn('Workspace could not apply experience theme to the outer app.', error);
+      }
+      // If parent delegation is unavailable, fall through to the normal local
+      // profile path instead of making workspace theme controls a no-op.
+    }
+
     const profileApi = window.MarkSetGoExperienceProfile;
     if (!profileApi?.get || !profileApi?.save) return theme;
 
