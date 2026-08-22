@@ -1,9 +1,8 @@
-Mark, Set, Go! v7.16 — Topic Feed Reader header/fallback cleanup
+Mark, Set, Go! v7.17 — Topic Feed header positioning fix
 
-Changes from v7.15 only:
-- Removes trailing Source/URL provenance from article text. Topic Feed header is the sole provenance/share location.
-- Re-applies the Topic Feed header after marksetgo:document-available so Reader rebuilds cannot discard Source/date/share or the Summarize/Analyze/Create Post row.
-- Extends header re-attachment retries for short/fallback documents.
-- Uses short feed text before summary/link-only fallback when publisher full text is blocked.
-- Client strips legacy trailing Source/URL blocks before opening the Reader, protecting against stale prepared payloads.
-- Preserves v7.15 nonblocking refresh behavior and v7.14 theme/workspace baseline.
+Changes from v7.16 only:
+- Fixes the actual Source/date/View original/share placement bug.
+- topic-feeds.js appends the metadata node to #reader; v7.16 relied on external CSS to make it absolute.
+- v7.17 explicitly sets that node to position:absolute !important at the calculated first-page top position.
+- This prevents the intended top header from falling into normal Reader flow at the end of the article.
+- No changes to article extraction, nonblocking refresh, themes, workspace ownership, bookmarks, Reader timing, or pagination.

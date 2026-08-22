@@ -591,9 +591,16 @@
       ? Math.max(1, (usableWidth - columnGap) / 2)
       : usableWidth;
 
-    meta.style.left = `${paddingLeft}px`;
-    meta.style.top = `${paddingTop}px`;
-    meta.style.width = `${headerWidth}px`;
+    // This node is appended to #reader so it must be explicitly removed from
+    // normal document flow. Do not rely on theme/shell CSS for this ownership:
+    // if that CSS is missing or overridden, the Source/share row otherwise
+    // appears at the END of the article.
+    meta.style.setProperty('position', 'absolute', 'important');
+    meta.style.setProperty('left', `${paddingLeft}px`, 'important');
+    meta.style.setProperty('top', `${paddingTop}px`, 'important');
+    meta.style.setProperty('width', `${headerWidth}px`, 'important');
+    meta.style.setProperty('box-sizing', 'border-box', 'important');
+    meta.style.setProperty('z-index', '9', 'important');
 
     if (actionRow) {
       // Read Anything deliberately requires this node to remain a direct child
