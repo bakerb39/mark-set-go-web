@@ -1,12 +1,8 @@
-/* Mark, Set, Go! Workspace pane cache refresh v0.11.5
-   The Workspace router currently hardcodes msgWorkspaceBuild=0.5.0.
-   Refresh only that generated iframe URL so the current workspace-pane.html
-   and its current scripts are actually loaded.
-*/
+/* Mark, Set, Go! Workspace pane cache refresh v0.11.6 */
 (() => {
   'use strict';
 
-  const BUILD = '0.11.5';
+  const BUILD = '0.11.6-chat';
 
   function refreshWorkspacePaneUrls() {
     document.querySelectorAll('iframe.msg-workspace-page-frame').forEach((frame) => {
@@ -25,8 +21,6 @@
     });
   }
 
-  // Register before workspace-experiment.js. Its capture handler creates the
-  // pane synchronously; the zero-delay task then refreshes the new iframe once.
   document.addEventListener('click', () => {
     window.setTimeout(refreshWorkspacePaneUrls, 0);
   }, true);

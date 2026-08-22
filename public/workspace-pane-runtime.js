@@ -1,4 +1,4 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v0.9.0 */
+/* Mark, Set, Go! lightweight workspace pane runtime v0.9.2 */
 (() => {
   'use strict';
 
@@ -7,10 +7,6 @@
   const value = params.get('msgWorkspaceValue') || 'home';
   const PREF_KEY = 'msg-workspace-optin-v1';
   const app = document.getElementById('app');
-
-  // No second page-routing table lives here. The lightweight pane replays the
-  // app's own data-action / data-read / data-test navigation event, so module-
-  // owned pages and future menu destinations work without workspace exceptions.
 
   function sendParent(type, extra = {}) {
     try { parent.postMessage({ type, ...extra }, location.origin); } catch {}
@@ -129,6 +125,7 @@
         <span class="msg-workspace-switch-wrap"><input id="msg-workspace-profile-toggle" type="checkbox" role="switch" aria-label="Open pages in workspace"><span class="msg-workspace-switch" aria-hidden="true"></span></span>
       </label>`;
     page.appendChild(card);
+
     const toggle = card.querySelector('input');
     try { toggle.checked = localStorage.getItem(PREF_KEY) === '1'; } catch {}
     toggle.addEventListener('change', () => {
@@ -150,9 +147,22 @@
   }
 
   function renderRequested() {
-    fallbackRoute();
+    // Chat is module-owned and is deliberately loaded in workspace-pane.html
+    // before this runtime. Open it directly instead of relying on a synthetic
+    // navigation click.
+    if (mode === 'action' && value === 'msg-chat') {
+      if (window.MarkSetGoChat?.open) {
+        window.MarkSetGoChat.open();
+      } else {
+        app.innerHTML = '<section class="platform-page"><h2>Chat could not load</h2><p>Refresh the page after deployment completes.</p></section>';
+      }
+    } else {
+      fallbackRoute();
+    }
+
     if (mode === 'action' && value === 'profile-preferences') installWorkspaceToggle();
     if (mode === 'action' && value === 'music') installMusicReadingSuggestions();
+
     requestAnimationFrame(() => requestAnimationFrame(() => {
       document.documentElement.classList.add('msg-workspace-pane-ready');
       sendParent('msg-workspace-pane-ready', { mode, value });
@@ -172,9 +182,6 @@
     }
     if (!parentDocument?.body) return false;
 
-    // Route the OUTER app to its own My Library renderer. This synthetic control
-    // lives outside the site header/footer, so Workspace top-nav interception
-    // does not redirect it back into this pane.
     const route = parentDocument.createElement('button');
     route.type = 'button';
     route.hidden = true;
@@ -183,8 +190,6 @@
     route.click();
     route.remove();
 
-    // The real outer Library renderer binds data-library-document to its private
-    // openStoredDocument(). Wait for that exact button, then click it there.
     let attempt = 0;
     const clickBoundOuterDocument = () => {
       const candidates = [...parentDocument.querySelectorAll('#app [data-library-document]')];
@@ -205,16 +210,11 @@
     return true;
   }
 
-  // Never let a secondary page manufacture another Reader. Reader-bound actions
-  // belong to the already-mounted Reader in the outer application.
   document.addEventListener('click', (event) => {
     const targetElement = event.target instanceof Element
       ? event.target
       : event.target?.parentElement;
 
-    // My Library Resume/Open controls are renderer-local data-library-document
-    // buttons, not data-read actions. Intercept them here during CAPTURE before
-    // the iframe's own target listener can call its private openStoredDocument().
     const libraryDocument = targetElement?.closest?.('[data-library-document]');
     if (libraryDocument?.dataset.libraryDocument) {
       event.preventDefault();
@@ -226,6 +226,7 @@
     const clickedLink = targetElement?.closest?.('a[href]');
     const suggestedMusic = targetElement?.closest?.('.book-music-link')
       || (clickedLink?.closest?.('.book-music-recommendations') ? clickedLink : null);
+
     if (suggestedMusic?.href) {
       try {
         const target = new URL(suggestedMusic.href, location.href);

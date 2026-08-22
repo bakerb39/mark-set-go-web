@@ -14,8 +14,11 @@
 <link href="/theme-system.css?v=9.2.41-reader-contrast-final" rel="stylesheet">
 <link href="/explorer-theme.css?v=1.1.1-workspace-profile" rel="stylesheet">
 <link href="/companion-persona-safe.css?v=9.7.1-workspace-profile" rel="stylesheet">
+
+<!-- Chat is a first-class workspace page. -->
+<link href="/msg-chat.css?v=1.4.0" rel="stylesheet">
+
 <script>
-  // This is a secondary view only. Do not boot a second authenticated app.
   window.__MSG_WORKSPACE_PANE__ = true;
   window.MSGWorkspacePane = true;
   const nativeFetch = window.fetch.bind(window);
@@ -24,12 +27,16 @@
     try {
       const u = new URL(raw, location.href);
       if (u.pathname === '/api/topic-feeds/daily-open') {
-        return Promise.resolve(new Response(JSON.stringify({ workspacePane:true }), {status:200, headers:{'Content-Type':'application/json'}}));
+        return Promise.resolve(new Response(JSON.stringify({ workspacePane:true }), {
+          status:200,
+          headers:{'Content-Type':'application/json'}
+        }));
       }
     } catch {}
     return nativeFetch(input, init);
   };
 </script>
+
 <script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/SessionManager.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/ReaderEngine.js?v=3.2.1-stable-recovery"></script>
@@ -44,8 +51,11 @@
 <script defer src="/workspace-reader-proxy.js?v=0.11.0-bible-topic"></script>
 <script>window.addEventListener("DOMContentLoaded",()=>window.MarkSetGoExperienceProfile?.apply?.());</script>
 <script defer src="/topic-feeds.js?v=2.1.20-reader-pane-refresh"></script>
-<!-- Render the requested lightweight page before Profile extensions initialize. -->
-<script defer src="/workspace-pane-runtime.js?v=0.9.1-reader-owner"></script>
+
+<!-- Must load before workspace-pane-runtime.js routes msg-chat. -->
+<script defer src="/msg-chat.js?v=1.4.0"></script>
+
+<script defer src="/workspace-pane-runtime.js?v=0.9.2-msg-chat"></script>
 <script defer src="/companion-persona-safe.js?v=9.7.5-workspace-profile"></script>
 <script defer src="/crypto-ticker.js?v=1.0.2-workspace-profile"></script>
 <script defer src="/market-indexes.js?v=1.0.2-workspace-profile"></script>
@@ -53,8 +63,20 @@
 <body>
 <main id="app" class="app-shell" tabindex="-1" aria-live="polite"></main>
 <aside aria-label="Music player" class="music-dock" hidden id="music-dock">
-  <div class="music-dock-bar"><div><strong id="music-now-title">Music</strong><span id="music-now-source">YouTube</span></div><div class="music-dock-actions"><button aria-label="Try another result" id="music-next" type="button" hidden>↻</button><button aria-label="Minimize music player" id="music-minimize" type="button">—</button><button aria-label="Close music player" id="music-close" type="button">×</button></div></div>
-  <div class="music-player-wrap" id="music-player-wrap"><iframe allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen loading="lazy" id="music-player" referrerpolicy="strict-origin-when-cross-origin" title="Spotify or YouTube music player"></iframe></div>
+  <div class="music-dock-bar">
+    <div><strong id="music-now-title">Music</strong><span id="music-now-source">YouTube</span></div>
+    <div class="music-dock-actions">
+      <button aria-label="Try another result" id="music-next" type="button" hidden>↻</button>
+      <button aria-label="Minimize music player" id="music-minimize" type="button">—</button>
+      <button aria-label="Close music player" id="music-close" type="button">×</button>
+    </div>
+  </div>
+  <div class="music-player-wrap" id="music-player-wrap">
+    <iframe allow="autoplay; encrypted-media; picture-in-picture; clipboard-write"
+            allowfullscreen loading="lazy" id="music-player"
+            referrerpolicy="strict-origin-when-cross-origin"
+            title="Spotify or YouTube music player"></iframe>
+  </div>
 </aside>
 </body>
 </html>
