@@ -30,7 +30,7 @@
     if (document.querySelector(`link[href^="${href}"]`)) return;
     const link = document.createElement('link');
     link.rel = 'stylesheet';
-    link.href = `${href}?v=1.4.0`;
+    link.href = `${href}?v=5.0.0`;
     document.head.appendChild(link);
   }
 
@@ -80,22 +80,24 @@
     button.innerHTML = '<span class="nav-icon" aria-hidden="true">◫</span> Chat';
     button.title = 'Open Mark, Set, Go! Chat';
     button.setAttribute('aria-label', 'Open Mark, Set, Go! Chat');
-    // No click handler: workspace-experiment.js must own normal navigation.
   }
 
   function sync() {
+    /*
+     * IMPORTANT:
+     * Reader layout/background fixes are no longer injected here.
+     * The real Reader mechanics live in
+     * explorer-reader-shell-shared-mechanics.css.
+     */
     ensureLink('/msg-chat.css');
-    ensureLink('/app-viewport-fix.css');
     ensureLink('/workspace-nav-visibility-fix.css');
-    ensureLink('/reader-chat-final-fixes.css');
-    ensureLink('/reader-background-unified.css');
-    ensureLink('/reader-height-corners-fix.css');
     ensureLink('/symposium-workspace-fix.css');
-    ensureLink('/immersive-background-composed.css');
+
     ensureScript('/msg-chat.js');
     ensureScript('/profile-theme-fix.js');
     ensureScript('/workspace-chat-layout-fix.js');
     ensureScript('/explorer-designer-enhancements.js');
+
     removeOldTopLevelItems();
     ensureChatButton();
   }
@@ -111,11 +113,7 @@
     init();
   }
 
-  /*
-   * Chat gets a wider first-open workspace width. The workspace core starts
-   * every pane at 360px; this bounded post-navigation adjustment gives Chat
-   * about twice that width while keeping the divider manually resizable.
-   */
+  /* Chat first-open width only; this does not affect Reader geometry. */
   document.addEventListener('click', (event) => {
     const chat = event.target.closest?.('[data-action="msg-chat"]');
     if (!chat) return;
