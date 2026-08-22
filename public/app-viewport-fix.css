@@ -193,3 +193,29 @@ html.msg-workspace-pane-document .msg-chat-messages {
   padding-top: 16px;
   padding-bottom: 16px;
 }
+
+
+/* v1.3 — lift Reader transport controls without changing the bottom edge.
+   Keep the progress/status line where it was; reclaim a little room above it
+   by moving the Start / Pause / Reset row upward. */
+@media (min-width: 901px) {
+  body:has(#app #reader) #reader .controls:has(#start-reader, #pause-reader, #reset-reader),
+  body:has(#app #reader) #reader :is(
+    .reader-controls,
+    .reader-playback-controls,
+    .reader-transport-controls
+  ):has(#start-reader, #pause-reader, #reset-reader) {
+    transform: translateY(-7px);
+    margin-bottom: -7px;
+  }
+
+  /* Fallback for reader builds where those controls are not wrapped by one of
+     the named rows above. Move the buttons together but leave the status text
+     untouched. */
+  body:has(#app #reader) #start-reader,
+  body:has(#app #reader) #pause-reader,
+  body:has(#app #reader) #reset-reader {
+    position: relative;
+    top: -7px;
+  }
+}
