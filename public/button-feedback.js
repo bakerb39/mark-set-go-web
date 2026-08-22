@@ -89,6 +89,7 @@
     ensureLink('/workspace-nav-visibility-fix.css');
     ensureLink('/reader-chat-final-fixes.css');
     ensureLink('/reader-background-unified.css');
+    ensureLink('/reader-height-corners-fix.css');
     ensureScript('/msg-chat.js');
     ensureScript('/profile-theme-fix.js');
     ensureScript('/workspace-chat-layout-fix.js');
