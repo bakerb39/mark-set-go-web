@@ -94,7 +94,19 @@
     ensureLink('/symposium-workspace-fix.css');
 
     ensureScript('/msg-chat.js');
-    ensureScript('/profile-theme-fix.js');
+    /*
+     * profile-theme-fix.js is intentionally NOT injected into the main
+     * document. MarkSetGoExperienceThemes.apply() is the single theme
+     * owner for this page (see app.js's [data-profile-appearance] click
+     * handler). profile-theme-fix.js installs its own document-wide,
+     * capture-phase click listener that pattern-matches button text
+     * against a hardcoded theme list -- it does not recognize "Default"
+     * (only the literal string "classic"), so it silently double-applies
+     * every theme except Default. That asymmetry was the root cause of
+     * the Explorer -> Default failure. The file is still served as-is
+     * for workspace-pane.html, which loads it directly for legitimate
+     * cross-window (iframe/parent) theme sync -- do not re-add it here.
+     */
     ensureScript('/workspace-chat-layout-fix.js');
     ensureScript('/explorer-designer-enhancements.js');
 
