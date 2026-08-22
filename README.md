@@ -1,19 +1,11 @@
-# Mark, Set, Go! v7.22 — permanent Topic Feed header
+Mark, Set, Go! v7.23 — Source divider left alignment
 
-Apply this overlay on top of v7.21.
+Overlay on v7.22.
 
-Changed only:
-- public/topic-feeds.js
-- public/topic-feed-header-stability.css
-- public/index.html (Topic Feed cache-bust + build marker only)
-- public/workspace-pane.html (Topic Feed cache-bust only)
+Change only:
+- Keep the Topic Feed Source-row divider the same visual length.
+- Anchor that divider at the LEFT edge beneath SOURCE/date/View original.
+- Do not move Source text, share icons, Summarize, Analyze, Create Post, or the permanent opaque header/band.
+- No JavaScript changes.
 
-Behavior restored:
-- Source/date/View Original/share and Summarize/Analyze/Create Post live in a permanent external header owned by #reader-frame.
-- The article #reader scrolls underneath that header.
-- The opaque action band never moves with article text.
-- Summarize/Analyze/Create Post remain fully visible on hover/focus; hover only decorates the text.
-- No MutationObserver is used.
-- Existing Read Anything action nodes are MOVED, not cloned/rebuilt, preserving their click/hover handlers.
-
-No server, Chat, theme engine, workspace runtime, Reader engine, bookmarks, ticker, or feed-refresh code is changed by this overlay.
+Build marker: 20260822-v7.23-source-divider-left

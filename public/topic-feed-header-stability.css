@@ -103,3 +103,26 @@ button.read-anything-inline-article-summary:hover,
 button.read-anything-inline-article-summary:focus {
   color: #1769aa !important;
 }
+
+/* v7.23 — Source divider alignment.
+   Keep the divider's existing visual length, but anchor it beneath the LEFT
+   side of the Source/date/original header instead of leaving the visible
+   segment stranded on the right. Do not move any text or share controls. */
+#reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit {
+  border-bottom: 0 !important;
+}
+
+#reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit::after {
+  content: "" !important;
+  position: absolute !important;
+  left: 0 !important;
+  right: auto !important;
+  bottom: 0 !important;
+  width: 69% !important;
+  height: 1px !important;
+  background: rgba(77, 101, 124, .14) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+  z-index: 1 !important;
+}

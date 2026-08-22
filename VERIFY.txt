@@ -1,10 +1,9 @@
-v7.22 verification
+v7.23 verification
 
-PASS: public/topic-feeds.js parses with node --check.
-PASS: public/topic-feeds.js contains no MutationObserver.
-PASS: action row is moved into [data-topic-feed-story-header-external], not cloned.
-PASS: external header is a direct child of #reader-frame, outside scrolling #reader.
-PASS: CSS permanently positions external header absolute relative to #reader-frame.
-PASS: CSS forces action labels opacity:1 and visibility:visible for normal/hover/focus states.
-PASS: old #reader.topic-feed-story-header-managed action-band selector is absent.
-PASS: index/workspace changes are cache-bust/build marker only relative to v7.21.
+PASS: Overlay contains no JavaScript file.
+PASS: Existing v7.22 permanent Topic Feed header/band rules are retained unchanged.
+PASS: Existing action hover/focus visibility rules are retained unchanged.
+PASS: Source credit native border-bottom is disabled only inside the permanent Topic Feed header.
+PASS: Replacement divider is left:0, right:auto, width:69%, preserving the prior visible length while shifting it left.
+PASS: Source/date/original text, share icons, and article actions are not repositioned.
+PASS: Build/cache marker updated to 20260822-v7.23-source-divider-left.
