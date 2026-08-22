@@ -637,9 +637,12 @@
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 72%;
-  border-bottom: 1px solid rgba(77,101,124,.15);
+  width: min(230px, 38%);
+  height: 1px;
+  background: rgba(77,101,124,.15);
+  border: 0;
   pointer-events: none;
+  z-index: 4;
 }
 #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action{
   position:static !important;
