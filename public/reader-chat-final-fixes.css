@@ -1,0 +1,101 @@
+/* Mark, Set, Go! Reader + Chat fixes v3.5
+   - Removes the persistent Explorer center/tan backdrop behind an active Reader.
+   - Gives Chat a deterministic wide workspace pane using CSS :has().
+   - Does not alter Reader designer geometry.
+   - No MutationObserver.
+*/
+
+/* -------------------------------------------------------------------------
+   1. EXPLORER READER BACKGROUND
+   ------------------------------------------------------------------------- */
+@media (min-width: 901px) {
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel) body {
+    background-color: var(--explorer-global-surface, #fffdf7) !important;
+    background-image: none !important;
+  }
+
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  #app.app-shell,
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  .app-shell:has(.reader-page-panel) {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  #app.app-shell::before,
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  .app-shell:has(.reader-page-panel)::before {
+    content: none !important;
+    display: none !important;
+    background: none !important;
+  }
+
+  /*
+   * The illustrated scenery is a separate fixed layer. Leave the actual image
+   * elements alone, but make sure the scenery container itself paints no tan
+   * center surface behind the Reader.
+   */
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  .explorer-world-art {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+  }
+
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  .explorer-world-art::before,
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  .explorer-world-art::after {
+    content: none !important;
+    display: none !important;
+    background: none !important;
+  }
+
+  /* The Reader card itself keeps the visible surface and rounded corners. */
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  #app .reader-page-panel {
+    background-color: var(--explorer-global-surface, #fffdf7) !important;
+    border-bottom-left-radius: 16px !important;
+    border-bottom-right-radius: 16px !important;
+    background-clip: padding-box !important;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   2. CHAT WORKSPACE WIDTH
+   ------------------------------------------------------------------------- */
+@media (min-width: 1100px) {
+  /*
+   * Detect the Chat iframe directly. This beats the workspace's 360px reset
+   * without waiting for JavaScript after the pane opens.
+   */
+  #app > .msg-workspace-shell:not(.is-closed):has(
+    .msg-workspace-page-frame[src*="msgWorkspaceValue=msg-chat"]
+  ) {
+    --msg-secondary-width: clamp(620px, 42vw, 760px) !important;
+    grid-template-columns:
+      minmax(560px, 1fr)
+      8px
+      minmax(620px, var(--msg-secondary-width)) !important;
+    column-gap: 0;
+  }
+
+  #app > .msg-workspace-shell:not(.is-closed):has(
+    .msg-workspace-page-frame[src*="msgWorkspaceValue=msg-chat"]
+  ) > .msg-workspace-secondary {
+    margin-right: 10px !important;
+  }
+}
+
+/* If the viewport cannot support wide Reader + Chat, allow Chat to collapse
+   gracefully instead of crushing a two-column Chat UI. */
+@media (min-width: 901px) and (max-width: 1099px) {
+  #app > .msg-workspace-shell:not(.is-closed):has(
+    .msg-workspace-page-frame[src*="msgWorkspaceValue=msg-chat"]
+  ) {
+    --msg-secondary-width: 520px !important;
+    grid-template-columns: minmax(440px, 1fr) 8px minmax(520px, var(--msg-secondary-width)) !important;
+  }
+}
