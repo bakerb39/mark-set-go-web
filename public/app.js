@@ -5270,33 +5270,8 @@ function renderProfilePreferences() {
     });
   });
 
-  app.querySelectorAll('[data-profile-appearance]').forEach((button)=>{
-    button.addEventListener('click',(event)=>{
-      event.preventDefault();
-      const key=button.dataset.profileAppearance;
-      const appearance=EXPERIENCE_APPEARANCES[key];
-      if(!appearance) return;
+  // Appearance buttons are owned exclusively by experience-themes.js.
 
-      const themeEngine=window.MarkSetGoExperienceThemes;
-      if(!themeEngine?.apply) {
-        console.error('Experience theme engine is unavailable; appearance was not changed.');
-        return;
-      }
-
-      // ONE visual theme path: use the same engine used by the Themes control.
-      // Do not save/apply appearance independently here.
-      themeEngine.apply(key);
-      current=normalizeExperienceProfile(getExperienceProfile());
-      reflectAppearanceControls(current.appearance);
-
-      let persisted=false;
-      try {
-        const stored=JSON.parse(localStorage.getItem(PROFILE_EXPERIENCE_KEY)||'null');
-        persisted=stored?.appearance===key;
-      } catch {}
-      announceSave({...current,persisted},`${appearance.label} appearance`);
-    });
-  });
 
   // Keep the page synchronized if the profile is changed by another app control.
   const onProfileChange=(event)=>{
@@ -5305,7 +5280,7 @@ function renderProfilePreferences() {
     reflectAppearanceControls(current.appearance);
     reflectFeatureControls(current);
   };
-  document.addEventListener('marksetgo:experience-profile-changed',onProfileChange,{once:true});
+  document.addEventListener('marksetgo:experience-profile-changed',onProfileChange);
 }
 
 function renderReadingSkillsHub() {

@@ -114,8 +114,18 @@
   }
 
   function refreshPressed(theme = current()) {
+    const selected = validTheme(theme);
+
     dialog?.querySelectorAll('[data-msg-theme]').forEach(button => {
-      button.setAttribute('aria-pressed', String(button.dataset.msgTheme === theme));
+      button.setAttribute('aria-pressed', String(button.dataset.msgTheme === selected));
+    });
+
+    document.querySelectorAll('[data-profile-appearance]').forEach(button => {
+      const active = button.dataset.profileAppearance === selected;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+      const check = button.querySelector('.profile-preset-check');
+      if (check) check.textContent = active ? '✓' : '';
     });
   }
 
@@ -134,6 +144,17 @@
     ensureLauncher();
     ensureDialog();
     syncVisualState(document.documentElement.dataset.msgExperienceTheme || storedTheme());
+
+    document.addEventListener('click', event => {
+      const button = event.target instanceof Element
+        ? event.target.closest('[data-profile-appearance]')
+        : null;
+      if (!button) return;
+      const requested = String(button.dataset.profileAppearance || '').trim();
+      if (!Object.prototype.hasOwnProperty.call(THEMES, requested)) return;
+      event.preventDefault();
+      apply(requested);
+    });
 
     document.addEventListener('marksetgo:experience-profile-changed', event => {
       syncVisualState(event.detail?.profile?.appearance);
