@@ -99,4 +99,20 @@
 
   window.addEventListener('pageshow', sync);
   document.addEventListener('marksetgo:experience-profile-changed', () => setTimeout(sync, 0));
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (event.data?.type !== 'msg-workspace-theme-change') return;
+    const theme = String(event.data.theme || '').trim();
+    if (!theme) return;
+    try {
+      if (window.MarkSetGoExperienceThemes?.apply) {
+        window.MarkSetGoExperienceThemes.apply(theme);
+      } else if (window.MarkSetGoProfileThemeFix?.apply) {
+        window.MarkSetGoProfileThemeFix.apply(theme);
+      }
+    } catch (error) {
+      console.warn('Unable to apply workspace theme change:', error);
+    }
+  });
 })();

@@ -2,7 +2,7 @@
 (() => {
   'use strict';
 
-  const BUILD = '0.11.6-chat';
+  const BUILD = '0.11.7-theme-sync';
 
   function refreshWorkspacePaneUrls() {
     document.querySelectorAll('iframe.msg-workspace-page-frame').forEach((frame) => {

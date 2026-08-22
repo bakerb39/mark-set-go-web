@@ -1,6 +1,7 @@
-/* Mark, Set, Go! Profile theme control fix v1.0.0
-   Makes existing Profile theme choices call the same experience-theme API
-   formerly used by the top-level Themes dialog. No MutationObserver. */
+/* Mark, Set, Go! Profile theme control fix v1.1.0
+   A theme selected inside the workspace Profile pane is applied to the OUTER
+   Mark, Set, Go! application first, then mirrored into the pane.
+   No MutationObserver. */
 (() => {
   'use strict';
 
@@ -23,8 +24,7 @@
   function normalize(value) {
     const raw = String(value || '').trim().toLowerCase();
     if (KNOWN.has(raw)) return raw;
-    if (APPEARANCE_TO_THEME[raw]) return APPEARANCE_TO_THEME[raw];
-    return '';
+    return APPEARANCE_TO_THEME[raw] || '';
   }
 
   function themeFromControl(control) {
@@ -56,28 +56,71 @@
     return '';
   }
 
+  function applyThroughWindow(targetWindow, theme) {
+    if (!targetWindow) return false;
+
+    try {
+      const api = targetWindow.MarkSetGoExperienceThemes;
+      if (api && typeof api.apply === 'function') {
+        api.apply(theme);
+        return true;
+      }
+
+      const profile = targetWindow.MarkSetGoExperienceProfile;
+      if (profile?.get && profile?.save) {
+        const current = profile.get() || {};
+        profile.save({
+          preset: current.preset,
+          appearance: theme === 'classic' ? 'default' : theme,
+          features: { ...(current.features || {}) }
+        });
+        return true;
+      }
+    } catch (error) {
+      console.warn('Theme application failed in target window:', error);
+    }
+
+    return false;
+  }
+
   function applyTheme(theme) {
     const key = normalize(theme);
     if (!key) return false;
 
-    const api = window.MarkSetGoExperienceThemes;
-    if (api && typeof api.apply === 'function') {
-      api.apply(key);
-      return true;
+    let outerApplied = false;
+
+    // Workspace panes are same-origin. The Reader lives in parent, so parent
+    // must own the persistent profile/theme change.
+    if (window.parent && window.parent !== window) {
+      try {
+        if (window.parent.location.origin === window.location.origin) {
+          outerApplied = applyThroughWindow(window.parent, key);
+        }
+      } catch {}
     }
 
-    const profile = window.MarkSetGoExperienceProfile;
-    if (profile?.get && profile?.save) {
-      const current = profile.get() || {};
-      profile.save({
-        preset: current.preset,
-        appearance: key === 'classic' ? 'default' : key,
-        features: { ...(current.features || {}) }
-      });
-      return true;
+    // Mirror the resulting choice into this document as well so the Profile
+    // pane visually follows the Reader immediately.
+    const localApplied = applyThroughWindow(window, key);
+
+    // If parent is not directly available for some future reason, ask it to
+    // apply the theme through the workspace message bridge.
+    if (!outerApplied && window.parent && window.parent !== window) {
+      try {
+        window.parent.postMessage(
+          { type: 'msg-workspace-theme-change', theme: key },
+          window.location.origin
+        );
+      } catch {}
     }
 
-    return false;
+    return outerApplied || localApplied;
+  }
+
+  function handleControl(control) {
+    const theme = themeFromControl(control);
+    if (!theme) return false;
+    return applyTheme(theme);
   }
 
   document.addEventListener('click', (event) => {
@@ -89,10 +132,7 @@
     );
     if (!control || !page.contains(control)) return;
 
-    const theme = themeFromControl(control);
-    if (!theme) return;
-
-    applyTheme(theme);
+    handleControl(control);
   }, true);
 
   document.addEventListener('change', (event) => {
@@ -100,11 +140,10 @@
     if (!(target instanceof Element)) return;
     if (!target.closest('.profile-preferences-page')) return;
 
-    const theme = themeFromControl(target);
-    if (!theme) return;
-
-    applyTheme(theme);
+    handleControl(target);
   }, true);
 
-  window.MarkSetGoProfileThemeFix = Object.freeze({ apply: applyTheme });
+  window.MarkSetGoProfileThemeFix = Object.freeze({
+    apply: applyTheme
+  });
 })();

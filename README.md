@@ -1,55 +1,36 @@
-# Mark, Set, Go! Chat + Profile Theme fix v1.4
+# Mark, Set, Go! workspace theme parent-sync v1.5
 
-This fixes two separate problems at their actual source.
+This fixes the problem where choosing a theme from Profile while Profile is open
+in the workspace changed only the right-side frame.
 
-## 1. Chat showed Home/front page inside the workspace
+## Cause
 
-The right-side workspace does NOT load public/index.html. It loads:
+Profile is rendered inside a same-origin workspace iframe. The theme control was
+saving/applying the profile inside that iframe only. The Reader is in the parent
+window, so its document never received the change.
 
-- public/workspace-pane.html
-- public/workspace-pane-runtime.js
+## Fix
 
-Those files did not load or route msg-chat.
+`profile-theme-fix.js` now:
+1. Detects when it is running in a workspace pane.
+2. Applies the selected theme to `window.parent` first.
+3. Mirrors the theme to the iframe.
+4. Has a postMessage fallback handled by the outer app.
 
-v1.4 fixes that directly:
-- workspace-pane.html now loads msg-chat.css and msg-chat.js
-- workspace-pane-runtime.js directly calls MarkSetGoChat.open() for msg-chat
-- workspace-pane-cache-refresh.js bumps the workspace pane build so the browser
-  does not keep serving the old pane
+`workspace-pane.html` now actually loads `profile-theme-fix.js`.
 
-## 2. Profile theme choices did nothing
+`workspace-pane-cache-refresh.js` is bumped so the new pane is not hidden by the
+old iframe cache.
 
-public/profile-theme-fix.js delegates Profile theme clicks/change events to the
-existing MarkSetGoExperienceThemes.apply() API.
+## Replace/upload
 
-It supports:
-- Classic
-- Explorer
-- Patriotic
-- Scholar
-- Artistic
-- Modern
-- Galactic
-- Expedition
-
-The top-level Themes menu remains removed.
-
-## Upload / replace
-
-Repository root:
-- msg-chat-routes.js (keep/replace with packaged version if convenient)
-
-Inside public/ REPLACE:
-- button-feedback.js
-- msg-chat.js
-- msg-chat.css
-- workspace-pane.html
-- workspace-pane-runtime.js
-- workspace-pane-cache-refresh.js
-
-Inside public/ ADD:
+Inside public/:
 - profile-theme-fix.js
+- workspace-pane.html
+- workspace-pane-cache-refresh.js
+- button-feedback.js
 
-If server.js has not yet been wired to msg-chat-routes.js, follow SERVER-EDIT.txt.
+The other files are included for completeness but do not need replacing if v1.4
+is already deployed.
 
 No MutationObserver is used.
