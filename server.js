@@ -4013,6 +4013,8 @@ async function prepareTopicArticle({
   if (cached) return { ...cached, cacheHit: true };
 
   const feedArticleText = usableFeedArticleText(feedText, summary);
+  const feedFallbackText = stripMarkup(feedText || '').trim();
+  const summaryFallbackText = stripMarkup(summary || '').trim();
   if (feedArticleText) {
     const payload = {
       title,
@@ -4022,10 +4024,7 @@ async function prepareTopicArticle({
       documentToc: [],
       importMethod: 'feed',
       publisherRestricted: false,
-      text: `${feedArticleText}
-
-Source: ${source}
-${originalUrl}`
+      text: feedArticleText
     };
     putCachedTopicArticle([originalUrl], title, payload);
     return payload;
@@ -4064,15 +4063,15 @@ ${originalUrl}`
       throw new Error('The feed did not provide a usable publisher article URL.');
     }
   } catch (error) {
-    const fallbackText = String(summary || '').trim() || `Full article text could not be imported from the publisher.\n\nOpen the original article to continue reading.`;
+    const fallbackText = feedFallbackText || summaryFallbackText || `Full article text could not be imported from the publisher.\n\nOpen the original article to continue reading.`;
     const payload = {
       title,
       fullArticle: false,
       sourceUrl: resolvedPublisherUrl || originalUrl,
       documentToc: [],
-      importMethod: summary ? 'summary-fallback' : 'link-fallback',
+      importMethod: feedFallbackText ? 'feed-fallback' : (summaryFallbackText ? 'summary-fallback' : 'link-fallback'),
       publisherRestricted: false,
-      text: `${fallbackText}\n\n${summary ? 'Full article text could not be imported from the publisher.\n\n' : ''}Source: ${source}\n${resolvedPublisherUrl || originalUrl}`,
+      text: fallbackText,
       warning: error?.message || 'A direct publisher article URL could not be resolved.'
     };
     putCachedTopicArticle([originalUrl], title, payload);
@@ -4089,7 +4088,7 @@ ${originalUrl}`
       documentToc: Array.isArray(article?.documentToc) ? article.documentToc : [],
       importMethod: article?.importMethod || 'html',
       publisherRestricted: false,
-      text: `${String(article?.text || '').trim()}\n\nSource: ${source}\n${articleUrl}`
+      text: String(article?.text || '').trim()
     };
     putCachedTopicArticle([originalUrl, articleUrl], title, payload);
     return payload;
@@ -4097,16 +4096,17 @@ ${originalUrl}`
     const restrictionMessage = error?.publisherRestricted
       ? 'The publisher blocks automated full-text import for this article. Open the original article to read it on the publisher site.'
       : 'Full article text could not be imported from the publisher.';
-    const fallbackText = String(summary || '').trim() || restrictionMessage;
+    const fallbackText = feedFallbackText || summaryFallbackText || restrictionMessage;
+    const appendRestriction = Boolean((feedFallbackText || summaryFallbackText) && restrictionMessage);
     const payload = {
       title,
       fullArticle: false,
       sourceUrl: articleUrl,
       repairedUrl: articleUrl !== originalUrl,
       documentToc: [],
-      importMethod: summary ? 'summary-fallback' : 'link-fallback',
+      importMethod: feedFallbackText ? 'feed-fallback' : (summaryFallbackText ? 'summary-fallback' : 'link-fallback'),
       publisherRestricted: Boolean(error?.publisherRestricted),
-      text: `${fallbackText}\n\n${summary ? `${restrictionMessage}\n\n` : ''}Source: ${source}\n${articleUrl}`,
+      text: `${fallbackText}${appendRestriction ? `\n\n${restrictionMessage}` : ''}`.trim(),
       warning: error?.message || 'The publisher did not expose readable article text.'
     };
     putCachedTopicArticle([originalUrl, articleUrl], title, payload);

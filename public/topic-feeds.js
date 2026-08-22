@@ -685,6 +685,20 @@
     topicFeedStoryHeaderObserver.observe(reader, { childList: true });
   }
 
+  let activeTopicFeedHeaderContext = null;
+
+  function stripTrailingTopicFeedProvenance(text) {
+    const raw = String(text || '').trim();
+    if (!raw) return '';
+    return raw.replace(/\n{2,}\s*Source:\s*[^\n]+\nhttps?:\/\/\S+\s*$/i, '').trim();
+  }
+
+  function refreshActiveTopicFeedHeader() {
+    const context = activeTopicFeedHeaderContext;
+    if (!context?.topic || !context?.article) return;
+    topicFeedSourceCredit(context.topic, context.article, context.payload || {});
+  }
+
   function topicFeedSourceCredit(topic, article, payload) {
     const sourceName = String(article?.sourceName || 'Topic Feed').trim();
     const originalUrl = String(payload?.sourceUrl || article?.url || '').trim();
@@ -827,7 +841,7 @@
 
     // The article action row may be installed just after openDocument(), so
     // retry long enough to place the credit beneath it rather than above it.
-    [0, 40, 100, 220, 480, 900].forEach((delay) => {
+    [0, 40, 100, 220, 480, 900, 1500, 2500].forEach((delay) => {
       window.setTimeout(() => {
         if (apply()) {
           keepTopicFeedArticleActionsInHeader();
@@ -848,10 +862,12 @@
       articleId: article.id || '',
       updatedAt: new Date().toISOString()
     };
+    activeTopicFeedHeaderContext = { topic, article, payload };
+    const readerText = stripTrailingTopicFeedProvenance(payload?.text);
     window.MarkSetGoReadAnything.openDocument({
       title: payload.title || article.title,
       author: article.author || article.sourceName,
-      text: payload.text,
+      text: readerText || String(article.feedText || article.summary || '').trim() || 'Open the original article to continue reading.',
       source: {
         type: 'topic-feed',
         url: payload.sourceUrl || article.url,
@@ -1787,6 +1803,11 @@
 
   document.addEventListener('marksetgo:document-available', () => {
     window.setTimeout(scheduleReaderNavigation, 40);
+    // openDocument() can rebuild the Reader after the first source/header pass.
+    // Re-attach the Topic Feed provenance/actions to the final Reader DOM.
+    [40, 140, 360, 820, 1600].forEach((delay) => {
+      window.setTimeout(refreshActiveTopicFeedHeader, delay);
+    });
   });
 
   document.addEventListener('click', (event) => {
