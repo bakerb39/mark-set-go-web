@@ -1,0 +1,112 @@
+/* Mark, Set, Go! application viewport shell v1.0
+   Keep Reader/workspace sessions inside one browser viewport.
+   Ordinary content pages retain normal document scrolling. */
+
+@media (min-width: 901px) {
+  /*
+   * Reader mode behaves like a desktop application:
+   * header + application + compact footer must fit inside 100dvh.
+   */
+  body:has(#app #reader),
+  body:has(#app > .msg-workspace-shell:not(.is-closed)) {
+    height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  body:has(#app #reader) > .site-header,
+  body:has(#app > .msg-workspace-shell:not(.is-closed)) > .site-header {
+    position: relative;
+    top: auto;
+  }
+
+  body:has(#app #reader) > #app.app-shell,
+  body:has(#app > .msg-workspace-shell:not(.is-closed)) > #app.app-shell {
+    min-height: 0 !important;
+    height: 100%;
+    max-height: 100%;
+    margin-top: 6px !important;
+    margin-bottom: 6px !important;
+    overflow: hidden;
+  }
+
+  body:has(#app #reader) > footer,
+  body:has(#app > .msg-workspace-shell:not(.is-closed)) > footer {
+    padding: 4px 12px !important;
+    min-height: 0;
+    font-size: .72rem;
+    line-height: 1.2;
+  }
+
+  /* The complete workspace fills only the app row, never 100vh again. */
+  #app > .msg-workspace-shell:not(.is-closed) {
+    height: 100%;
+    min-height: 0;
+    max-height: 100%;
+    align-items: stretch;
+  }
+
+  .msg-workspace-shell:not(.is-closed) > .msg-workspace-primary,
+  .msg-workspace-shell:not(.is-closed) > .msg-workspace-secondary {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+
+  .msg-workspace-shell:not(.is-closed) > .msg-workspace-primary {
+    overflow: hidden;
+  }
+
+  .msg-workspace-shell:not(.is-closed) > .msg-workspace-secondary {
+    position: relative !important;
+    top: auto !important;
+    align-self: stretch !important;
+  }
+
+  .msg-workspace-panel-body {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .msg-workspace-page-frame {
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-height: 0 !important;
+    border: 0;
+  }
+
+  /*
+   * Let the actual Reader occupy the available application row. Scrollable
+   * reader regions continue to own their own scrolling.
+   */
+  .msg-workspace-primary #reader,
+  body:has(#app #reader):not(:has(#app > .msg-workspace-shell:not(.is-closed))) #reader {
+    max-height: 100%;
+  }
+
+  /* Chat inside a workspace pane should use the pane height, not another vh. */
+  html.msg-workspace-pane-document,
+  html.msg-workspace-pane-document body,
+  html.msg-workspace-pane-document #app {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  html.msg-workspace-pane-document .msg-chat-page,
+  html.msg-workspace-pane-document .msg-chat-main {
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+  }
+}
+
+/* Smaller screens keep normal page scrolling / stacked workspace behavior. */
+@media (max-width: 900px) {
+  body {
+    overflow-y: auto;
+  }
+}

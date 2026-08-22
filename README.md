@@ -1,32 +1,41 @@
-# Mark, Set, Go! Chat display-name fix v1.6
+# Mark, Set, Go! viewport shell fix v1.7
 
-This fixes the case where entering a display name and clicking Continue appears
-to do nothing.
+This removes the unnecessary browser-level vertical scrollbar while a Reader or
+desktop workspace session is active.
 
-## Cause
+## Root cause
 
-The Continue button depended on the <dialog> form submit path. In the workspace
-environment that path was not behaving reliably.
+The base app has:
+- `.app-shell { min-height:650px; margin:2rem auto; }`
+- plus the sticky site header
+- plus the footer
 
-## Fix
+The workspace secondary pane also used:
+- `height: calc(100vh - 24px)`
 
-Continue is now an explicit type="button" with its own click handler.
+That pane was still inside the already-margined app shell below the header, so
+the total document was taller than the viewport.
 
-Clicking Continue now directly:
-- reads and trims the display name
-- saves it to msgchat.displayName
-- updates the visible "Chatting as" label
-- closes the dialog
-- returns focus to the message composer when available
+## New behavior
 
-Pressing Enter in the display-name field also uses the same function.
+On desktop (width > 900px), when Reader/workspace is active:
+- the whole browser document is exactly `100dvh`
+- header uses its natural height
+- footer becomes compact
+- the app gets the remaining height
+- the workspace fills that app height, not another 100vh
+- Reader, Chat, and side panes use internal scrolling as needed
+- no second browser/page scrollbar should appear
 
-## Replace
+Normal pages that genuinely need document scrolling are unchanged.
 
-Only this file is required if v1.5 is already deployed:
+## Replace/upload if v1.6 is already deployed
 
-- public/msg-chat.js
+Required:
+- public/app-viewport-fix.css
+- public/button-feedback.js
+- public/workspace-pane.html
 
-Other files are included only for convenience.
+The remaining files are included for convenience/current state.
 
 No MutationObserver is used.

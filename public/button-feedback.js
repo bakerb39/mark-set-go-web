@@ -80,6 +80,7 @@
 
   function sync() {
     ensureLink('/msg-chat.css');
+    ensureLink('/app-viewport-fix.css');
     ensureScript('/msg-chat.js');
     ensureScript('/profile-theme-fix.js');
     removeOldTopLevelItems();
