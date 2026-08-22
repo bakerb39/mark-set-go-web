@@ -98,6 +98,28 @@
     init();
   }
 
+  /*
+   * Chat gets a wider first-open workspace width. The workspace core starts
+   * every pane at 360px; this bounded post-navigation adjustment gives Chat
+   * about twice that width while keeping the divider manually resizable.
+   */
+  document.addEventListener('click', (event) => {
+    const chat = event.target.closest?.('[data-action="msg-chat"]');
+    if (!chat) return;
+
+    window.setTimeout(() => {
+      const shell = document.querySelector('#app > .msg-workspace-shell:not(.is-closed)');
+      if (!shell) return;
+
+      const shellWidth = shell.getBoundingClientRect().width || window.innerWidth;
+      const preferred = Math.min(760, Math.max(680, Math.floor(window.innerWidth * 0.46)));
+      const maxAllowed = Math.max(520, shellWidth - 560 - 8);
+      const width = Math.max(520, Math.min(preferred, maxAllowed));
+
+      shell.style.setProperty('--msg-secondary-width', `${Math.round(width)}px`);
+    }, 0);
+  }, true);
+
   window.addEventListener('pageshow', sync);
   document.addEventListener('marksetgo:experience-profile-changed', () => setTimeout(sync, 0));
 

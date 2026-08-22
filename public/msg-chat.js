@@ -138,7 +138,7 @@
             <input data-msg-conversation-input maxlength="120" placeholder="e.g. The Republic — Book VII" required>
             <div>
               <button class="secondary" data-msg-conversation-cancel type="button">Cancel</button>
-              <button class="primary" type="submit">Create</button>
+              <button class="primary" data-msg-conversation-create type="button">Create</button>
             </div>
           </form>
         </dialog>
@@ -231,7 +231,15 @@
       saveIdentity();
     });
 
-    q('[data-msg-conversation-form]').addEventListener('submit', createConversation);
+    q('[data-msg-conversation-create]')?.addEventListener('click', createConversation);
+
+    q('[data-msg-conversation-input]')?.addEventListener('keydown', event => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      createConversation();
+    });
+
+    q('[data-msg-conversation-form]')?.addEventListener('submit', createConversation);
     q('[data-msg-conversation-cancel]').addEventListener('click', () => q('[data-msg-conversation-dialog]').close());
   }
 
@@ -450,19 +458,48 @@
   }
 
   async function createConversation(event) {
-    event.preventDefault();
-    const title = q('[data-msg-conversation-input]').value.trim().slice(0, 120);
-    if (!title || !state.displayName) return;
+    event?.preventDefault?.();
+
+    const input = q('[data-msg-conversation-input]');
+    const dialog = q('[data-msg-conversation-dialog]');
+    const createButton = q('[data-msg-conversation-create]');
+    const title = String(input?.value || '').trim().slice(0, 120);
+
+    if (!title) {
+      input?.focus();
+      return false;
+    }
+
+    if (!state.displayName) {
+      setStatus('Choose a display name before creating a conversation.');
+      q('[data-msg-name-dialog]')?.showModal?.();
+      return false;
+    }
+
+    if (createButton) createButton.disabled = true;
+
     try {
       const { data } = await api('/conversations', {
         method: 'POST',
         body: JSON.stringify({ title, createdBy: state.displayName })
       });
-      q('[data-msg-conversation-input]').value = '';
-      q('[data-msg-conversation-dialog]').close();
+
+      if (input) input.value = '';
+      if (dialog?.open) dialog.close();
+
       state.activeConversationId = Number(data.id);
+      state.messages.clear();
+      state.lastMessageId = 0;
+      state.lastSyncAt = null;
+
       await loadConversations();
-    } catch (error) { setStatus(error.message); }
+      return true;
+    } catch (error) {
+      setStatus(error.message);
+      return false;
+    } finally {
+      if (createButton) createButton.disabled = false;
+    }
   }
 
   async function deleteConversation() {
