@@ -1,8 +1,8 @@
-Mark, Set, Go! v7.25 — plain full Source divider
+Mark, Set, Go! v7.26 — restore the original Topic Feed divider
 
-Overlay on v7.24.
+Overlay on v7.25.
 
-Only change:
-- The divider under the stationary Topic Feed Source/share row is a normal full-width border-bottom on .topic-feed-story-meta-overlay.
-- It begins under SOURCE and ends under the share-icon side of the first-page header.
-- No pseudo-element, gradient, calculated width, JavaScript, positioning, action-band, hover, Reader, Chat, theme, or workspace behavior changes.
+This removes only the v7.25 divider override. It does not add a replacement divider rule.
+The original working divider in topic-feeds.css is allowed to render again on .topic-feed-reader-credit.
+
+No JavaScript content changes. No header movement. No band changes. No Chat/theme/Reader changes.

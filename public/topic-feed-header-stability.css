@@ -103,19 +103,3 @@ button.read-anything-inline-article-summary:hover,
 button.read-anything-inline-article-summary:focus {
   color: #1769aa !important;
 }
-
-/* v7.25 — one ordinary divider on the stationary Source/share row.
-   No pseudo-element, no gradient, no calculated/short width. */
-#reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit {
-  border-bottom: 0 !important;
-}
-
-#reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit::after {
-  content: none !important;
-  display: none !important;
-}
-
-#reader-frame > .topic-feed-story-header-external > .topic-feed-story-meta-overlay {
-  background-image: none !important;
-  border-bottom: 1px solid rgba(77, 101, 124, .14) !important;
-}

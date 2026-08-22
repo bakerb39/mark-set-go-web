@@ -1,7 +1,5 @@
-v7.25 verification
-
-- topic-feed-reader-credit border disabled
-- credit pseudo divider disabled
-- meta overlay background divider disabled
-- exactly one full-width border-bottom on topic-feed-story-meta-overlay
-- no JavaScript files included
+Verified:
+- Removed v7.25 rule that set .topic-feed-reader-credit border-bottom:0.
+- Removed v7.25 rule that put border-bottom on .topic-feed-story-meta-overlay.
+- Added no replacement divider CSS; original topic-feeds.css owns the line again.
+- No JavaScript files included.
