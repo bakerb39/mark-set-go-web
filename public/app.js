@@ -9892,7 +9892,17 @@ function renderNavigationPane() {
   pane.querySelectorAll('[data-toc-index]').forEach((button) => {
     button.addEventListener('click', () => jumpToWordIndex(button.dataset.tocIndex));
   });
-  pane.querySelector('#add-bookmark')?.addEventListener('click', addBookmark);
+  // Bind bookmark creation once on the stable navigation pane rather than on
+  // the transient button node. Topic Feeds may move/rebuild #add-bookmark, but
+  // every click still reaches the Reader's native addBookmark() implementation.
+  if (pane.dataset.nativeBookmarkDelegation !== '1') {
+    pane.dataset.nativeBookmarkDelegation = '1';
+    pane.addEventListener('click', (event) => {
+      const button = event.target instanceof Element ? event.target.closest('#add-bookmark') : null;
+      if (!button || !pane.contains(button)) return;
+      addBookmark();
+    });
+  }
   pane.querySelectorAll('[data-open-bookmark]').forEach((button) => {
     button.addEventListener('click', () => openBookmark(button.dataset.openBookmark));
   });
