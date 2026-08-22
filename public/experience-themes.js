@@ -101,12 +101,6 @@
     document.body.appendChild(dialog);
     dialog.querySelector('.msg-theme-close')?.addEventListener('click', close);
     dialog.addEventListener('click', event => { if (event.target === dialog) close(); });
-    dialog.querySelectorAll('[data-msg-theme]').forEach(button => {
-      button.addEventListener('click', () => {
-        apply(button.dataset.msgTheme);
-        close();
-      });
-    });
     document.addEventListener('keydown', event => {
       if (event.key === 'Escape' && !dialog.hidden) close();
     });
@@ -145,16 +139,25 @@
     ensureDialog();
     syncVisualState(document.documentElement.dataset.msgExperienceTheme || storedTheme());
 
+    // One controller owns every theme-selection click. Capture phase ensures
+    // generic app handlers cannot swallow a theme click before it reaches us.
     document.addEventListener('click', event => {
       const button = event.target instanceof Element
-        ? event.target.closest('[data-profile-appearance]')
+        ? event.target.closest('[data-profile-appearance], [data-msg-theme]')
         : null;
       if (!button) return;
-      const requested = String(button.dataset.profileAppearance || '').trim();
+
+      const requested = String(
+        button.dataset.profileAppearance || button.dataset.msgTheme || ''
+      ).trim();
       if (!Object.prototype.hasOwnProperty.call(THEMES, requested)) return;
+
       event.preventDefault();
+      event.stopImmediatePropagation();
       apply(requested);
-    });
+
+      if (button.matches('[data-msg-theme]')) close();
+    }, true);
 
     document.addEventListener('marksetgo:experience-profile-changed', event => {
       syncVisualState(event.detail?.profile?.appearance);

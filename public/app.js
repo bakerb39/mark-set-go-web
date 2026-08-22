@@ -5210,16 +5210,6 @@ function renderProfilePreferences() {
     });
   };
 
-  const reflectAppearanceControls=(selectedKey='default')=>{
-    app.querySelectorAll('[data-profile-appearance]').forEach((button)=>{
-      const active=button.dataset.profileAppearance===selectedKey;
-      button.classList.toggle('active',active);
-      button.setAttribute('aria-pressed',String(active));
-      const check=button.querySelector('.profile-preset-check');
-      if(check) check.textContent=active ? '✓' : '';
-    });
-  };
-
   const reflectFeatureControls=(profile)=>{
     app.querySelectorAll('[data-profile-feature]').forEach((input)=>{
       input.checked=profile.features?.[input.dataset.profileFeature]!==false;
@@ -5277,7 +5267,6 @@ function renderProfilePreferences() {
   const onProfileChange=(event)=>{
     current=normalizeExperienceProfile(event.detail?.profile || getExperienceProfile());
     reflectPresetSelection(current.preset === 'custom' ? '' : current.preset);
-    reflectAppearanceControls(current.appearance);
     reflectFeatureControls(current);
   };
   document.addEventListener('marksetgo:experience-profile-changed',onProfileChange);
