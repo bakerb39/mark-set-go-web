@@ -344,3 +344,46 @@ html.msg-workspace-pane-document .msg-chat-messages {
     z-index: 3;
   }
 }
+
+
+/* v1.6 — extend Reader card to the bottom of the application viewport.
+   Explorer's reader-shell CSS forces .app-shell back to height:auto, leaving
+   the tan Explorer background visible below the otherwise-correct rounded card.
+   Override that only while Reader is active. */
+@media (min-width: 901px) {
+  html[data-msg-experience-theme="explorer"]
+  body:has(#app #reader) > #app.app-shell,
+  html[data-msg-experience-theme="explorer"]
+  body:has(#app #reader) .app-shell:has(.reader-page-panel) {
+    height: calc(100% - 10px) !important;
+    min-height: 0 !important;
+    max-height: calc(100% - 10px) !important;
+    margin-top: 5px !important;
+    margin-bottom: 5px !important;
+    overflow: visible !important;
+  }
+
+  html[data-msg-experience-theme="explorer"]
+  body:has(#app #reader) #app > .reader-page-panel,
+  html[data-msg-experience-theme="explorer"]
+  body:has(#app #reader) #app .reader-page-panel {
+    height: 100% !important;
+    min-height: 0 !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 16px !important;
+    border-bottom-left-radius: 16px !important;
+    border-bottom-right-radius: 16px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Keep the bottom controls/status comfortably inside the now-extended card. */
+  html[data-msg-experience-theme="explorer"]
+  body:has(#app #reader) #app .reader-page-panel .reader-viewer-footer {
+    padding-bottom: 12px !important;
+  }
+
+  html[data-msg-experience-theme="explorer"]
+  body:has(#app #reader) #app .reader-page-panel .playback-controls {
+    margin-bottom: 6px !important;
+  }
+}
