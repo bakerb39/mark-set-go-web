@@ -5260,8 +5260,16 @@ function renderProfilePreferences() {
     });
   });
 
-  // Appearance buttons are owned exclusively by experience-themes.js.
-
+  // Every Profile appearance button gets the same direct click handler.
+  // There is no Default/Explorer special case: all eight call the one theme engine.
+  app.querySelectorAll('[data-profile-appearance]').forEach((button)=>{
+    button.addEventListener('click',(event)=>{
+      event.preventDefault();
+      const key=String(button.dataset.profileAppearance || '').trim();
+      if(!EXPERIENCE_APPEARANCES[key]) return;
+      window.MarkSetGoExperienceThemes?.apply?.(key);
+    });
+  });
 
   // Keep the page synchronized if the profile is changed by another app control.
   const onProfileChange=(event)=>{
