@@ -607,7 +607,15 @@
       // of #reader. Leave it there and change only its visual placement.
       actionRow.style.setProperty('position', 'absolute', 'important');
       actionRow.style.setProperty('left', `${paddingLeft}px`, 'important');
-      actionRow.style.setProperty('width', `${headerWidth}px`, 'important');
+      // Keep the action ceiling only as wide as the labels themselves. The
+      // opaque occlusion band is supplied by experience-theme-layout.css with
+      // a small buffer around this compact row, so scrolling prose disappears
+      // underneath without creating a bar across the whole first page.
+      actionRow.style.setProperty('display', 'inline-flex', 'important');
+      actionRow.style.setProperty('width', 'max-content', 'important');
+      actionRow.style.setProperty('max-width', `${headerWidth}px`, 'important');
+      actionRow.style.setProperty('align-items', 'center', 'important');
+      actionRow.style.setProperty('flex-wrap', 'wrap', 'important');
       actionRow.style.setProperty('box-sizing', 'border-box', 'important');
       actionRow.style.setProperty('margin', '0', 'important');
       actionRow.style.setProperty('padding', '0', 'important');
