@@ -15,6 +15,20 @@ html[data-msg-experience-theme] :is(#app.app-shell,.msg-workspace-shell,.msg-wor
   background-image:none !important;
 }
 
+
+/* Workspace panes inherit the theme palette for their controls/content, but the
+   OUTER application owns the page-level scenic background. This lets the same
+   scene span behind the full workspace rather than restarting inside the iframe. */
+html.msg-workspace-pane-document[data-msg-experience-theme] body:has(#app) {
+  background-color:transparent !important;
+  background-image:none !important;
+  background-attachment:scroll !important;
+}
+
+html[data-msg-experience-theme] iframe.msg-workspace-page-frame {
+  background:transparent !important;
+}
+
 /* ==========================================================================
    HEADER / MENUS
    ========================================================================== */

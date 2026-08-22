@@ -47,17 +47,48 @@
     return theme;
   }
 
+  function isWorkspacePane() {
+    return window.parent !== window
+      && new URLSearchParams(window.location.search).has('msgWorkspaceMode');
+  }
+
+  function syncOuterTheme(theme) {
+    if (!isWorkspacePane()) return;
+    try {
+      if (window.parent.location.origin !== window.location.origin) return;
+      const parentThemes = window.parent.MarkSetGoExperienceThemes;
+      if (typeof parentThemes?.apply === 'function') {
+        parentThemes.apply(theme);
+        return;
+      }
+
+      // Startup fallback: keep the outer document visually synchronized even
+      // if its theme controller has not finished initializing yet.
+      const parentRoot = window.parent.document?.documentElement;
+      if (!parentRoot) return;
+      parentRoot.dataset.experienceAppearance = theme;
+      parentRoot.dataset.msgExperienceTheme = theme;
+    } catch (error) {
+      console.warn('Workspace could not synchronize theme with outer app.', error);
+    }
+  }
+
   function apply(value) {
     const theme = syncVisualState(value);
     const profileApi = window.MarkSetGoExperienceProfile;
-    if (!profileApi?.get || !profileApi?.save) return theme;
 
-    const profile = profileApi.get();
-    profileApi.save({
-      preset:profile.preset,
-      appearance:theme,
-      features:{...(profile.features || {})}
-    });
+    if (profileApi?.get && profileApi?.save) {
+      const profile = profileApi.get();
+      profileApi.save({
+        preset:profile.preset,
+        appearance:theme,
+        features:{...(profile.features || {})}
+      });
+    }
+
+    // A workspace pane is a secondary view. Finish the normal local theme path
+    // first, then make the OUTER app the owner of the page-level background.
+    syncOuterTheme(theme);
     return theme;
   }
 
