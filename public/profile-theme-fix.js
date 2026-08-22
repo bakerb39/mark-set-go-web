@@ -17,7 +17,6 @@
 
   function themeFromControl(control) {
     if (!(control instanceof Element)) return '';
-
     const candidates = [
       control.getAttribute('data-msg-theme'),
       control.getAttribute('data-theme'),
@@ -27,34 +26,28 @@
       control.value,
       control.dataset?.value
     ];
-
     for (const candidate of candidates) {
       const theme = normalize(candidate);
       if (theme) return theme;
     }
-
     const text = String(control.textContent || '')
       .replace(/\s+/g, ' ')
       .trim()
       .toLowerCase();
-
     for (const theme of KNOWN) {
       if (text === theme || text.startsWith(`${theme} `)) return theme;
     }
-
     return '';
   }
 
   function applyTo(targetWindow, theme) {
     if (!targetWindow) return false;
-
     try {
       const themes = targetWindow.MarkSetGoExperienceThemes;
       if (typeof themes?.apply === 'function') {
         themes.apply(theme);
         return true;
       }
-
       const profile = targetWindow.MarkSetGoExperienceProfile;
       if (typeof profile?.get === 'function' && typeof profile?.save === 'function') {
         const current = profile.get() || {};
@@ -68,16 +61,13 @@
     } catch (error) {
       console.warn('Unable to apply Mark, Set, Go! theme:', error);
     }
-
     return false;
   }
 
   function applyTheme(value) {
     const theme = normalize(value);
     if (!theme) return false;
-
     let parentApplied = false;
-
     if (window.parent && window.parent !== window) {
       try {
         if (window.parent.location.origin === window.location.origin) {
@@ -85,9 +75,7 @@
         }
       } catch {}
     }
-
     const localApplied = applyTo(window, theme);
-
     if (!parentApplied && window.parent && window.parent !== window) {
       try {
         window.parent.postMessage(
@@ -96,13 +84,11 @@
         );
       } catch {}
     }
-
     return parentApplied || localApplied;
   }
 
   function relevantControl(target) {
     if (!(target instanceof Element)) return null;
-
     return target.closest?.([
       '[data-msg-theme]',
       '[data-theme]',
@@ -122,20 +108,16 @@
   document.addEventListener('change', (event) => {
     const control = relevantControl(event.target);
     if (!control) return;
-
     const theme = themeFromControl(control);
     if (!theme) return;
-
     applyTheme(theme);
   }, true);
 
   document.addEventListener('click', (event) => {
     const control = relevantControl(event.target);
     if (!control) return;
-
     const theme = themeFromControl(control);
     if (!theme) return;
-
     applyTheme(theme);
   }, true);
 
@@ -145,7 +127,105 @@
     applyTo(window, normalize(event.data.theme));
   });
 
-  window.MarkSetGoProfileThemeFix = Object.freeze({
-    apply: applyTheme
-  });
+  window.MarkSetGoProfileThemeFix = Object.freeze({ apply: applyTheme });
+})();
+
+
+/* Topic Feed bookmark fallback.
+   Uses the Reader's established markSetGoReaderPageBookmarksV1 store and then
+   triggers the Reader's existing scroll-bound marker refresh. */
+(() => {
+  const READER_BOOKMARKS_KEY = 'markSetGoReaderPageBookmarksV1';
+
+  function currentReaderDocument() {
+    try {
+      return window.MarkSetGoCurrentReaderDocument?.get?.() || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function pageForReader(reader) {
+    if (!reader) return { pageNumber: 1, pageKey: 'scroll-page-1', side: 'single' };
+
+    if (reader.classList.contains('book-pages-layout')) {
+      const spreadWidth = Math.max(1, reader.clientWidth);
+      const spreadIndex = Math.max(0, Math.round((Number(reader.scrollLeft) || 0) / spreadWidth));
+      const pageNumber = spreadIndex * 2 + 1;
+      return { pageNumber, pageKey: `book-page-${pageNumber}`, side: 'left' };
+    }
+
+    const viewportHeight = Math.max(1, reader.clientHeight);
+    const pageNumber = Math.max(1, Math.floor((Number(reader.scrollTop) || 0) / viewportHeight) + 1);
+    return { pageNumber, pageKey: `scroll-page-${pageNumber}`, side: 'single' };
+  }
+
+  function addCurrentPageBookmark(button) {
+    const reader = document.querySelector('#reader');
+    const doc = currentReaderDocument();
+    const documentId = String(doc?.documentId || doc?.id || '').trim();
+    if (!reader || !documentId) return false;
+
+    const page = pageForReader(reader);
+    let items = [];
+    try {
+      const parsed = JSON.parse(localStorage.getItem(READER_BOOKMARKS_KEY) || '[]');
+      items = Array.isArray(parsed) ? parsed : [];
+    } catch {}
+
+    const exists = items.some((item) =>
+      String(item?.documentId || '') === documentId &&
+      String(item?.pageKey || '') === page.pageKey
+    );
+
+    if (!exists) {
+      items.push({
+        id: `bookmark-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        documentId,
+        title: String(doc?.title || document.querySelector('.reader-title-copy h1')?.textContent || 'Untitled'),
+        wordIndex: 0,
+        pageNumber: page.pageNumber,
+        pageKey: page.pageKey,
+        side: page.side,
+        createdAt: new Date().toISOString()
+      });
+      try {
+        localStorage.setItem(READER_BOOKMARKS_KEY, JSON.stringify(items));
+      } catch {
+        return false;
+      }
+    }
+
+    /* ReaderLegacyRuntime already refreshes page-bookmark markers on reader scroll. */
+    reader.dispatchEvent(new Event('scroll'));
+
+    if (button) {
+      const original = button.textContent;
+      button.textContent = exists ? '✓ Bookmarked' : '✓ Bookmark added';
+      window.setTimeout(() => {
+        if (button.isConnected) button.textContent = original || '＋ Bookmark';
+      }, 900);
+    }
+    return true;
+  }
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest?.('#add-bookmark.topic-reader-bookmark-button');
+    if (!button) return;
+
+    /* Let a working native listener win. This fallback runs at the end of the
+       same turn only when no bookmark appeared. */
+    const before = (() => {
+      try { return localStorage.getItem(READER_BOOKMARKS_KEY) || '[]'; }
+      catch { return '[]'; }
+    })();
+
+    window.setTimeout(() => {
+      const after = (() => {
+        try { return localStorage.getItem(READER_BOOKMARKS_KEY) || '[]'; }
+        catch { return '[]'; }
+      })();
+      if (after === before) addCurrentPageBookmark(button);
+    }, 0);
+  }, true);
 })();
