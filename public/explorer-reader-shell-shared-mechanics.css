@@ -50,14 +50,14 @@ html[data-msg-experience-theme="expedition"] {
 }
 
 /* Existing six illustrated themes: one composed environment, not UI panes. */
-html:is(
+html[data-msg-experience-layout="explorer"]:is(
   [data-msg-experience-theme="patriotic"],
   [data-msg-experience-theme="scholar"],
   [data-msg-experience-theme="artistic"],
   [data-msg-experience-theme="modern"],
   [data-msg-experience-theme="galactic"],
   [data-msg-experience-theme="expedition"]
-) body {
+) body:has(#app) {
   background-color:var(--msg-theme-page, var(--page, #eef1f4)) !important;
   background-image:
     var(--msg-scene-left),
@@ -70,7 +70,7 @@ html:is(
 }
 
 /* Explorer's existing complete landscape. */
-html[data-msg-experience-theme="explorer"] body {
+html[data-msg-experience-layout="explorer"][data-msg-experience-theme="explorer"] body:has(#app) {
   background-color:#dce8dc !important;
   background-image:url('/explorer-landscape.svg') !important;
   background-position:center center !important;
@@ -163,8 +163,9 @@ html[data-msg-experience-theme]:is(
 
   body:has(#app .reader-page-panel) > #app.app-shell {
     min-height:0 !important;
-    height:100% !important;
-    max-height:100% !important;
+    height:auto !important;
+    max-height:none !important;
+    align-self:stretch !important;
     margin-top:6px !important;
     margin-bottom:6px !important;
     padding:0 !important;
@@ -180,15 +181,18 @@ html[data-msg-experience-theme]:is(
     box-sizing:border-box !important;
 
     width:100% !important;
-    height:calc(100% - 12px) !important;
+    height:100% !important;
     min-height:0 !important;
-    max-height:calc(100% - 12px) !important;
+    max-height:100% !important;
 
     margin:0 !important;
     padding:0 16px 10px !important;
 
     border-radius:16px !important;
+    border-bottom-left-radius:16px !important;
+    border-bottom-right-radius:16px !important;
     overflow:hidden !important;
+    background-clip:padding-box !important;
   }
 
   #app .reader-page-panel::before,
