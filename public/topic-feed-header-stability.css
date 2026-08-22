@@ -104,27 +104,18 @@ button.read-anything-inline-article-summary:focus {
   color: #1769aa !important;
 }
 
-/* v7.24 — Source divider is painted by the full header container itself.
-   This guarantees that the line begins at the same LEFT edge as SOURCE.
-   Nothing in the Source row, share cluster, or action row is repositioned. */
+/* v7.25 — one ordinary divider on the stationary Source/share row.
+   No pseudo-element, no gradient, no calculated/short width. */
 #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit {
   border-bottom: 0 !important;
 }
 
-/* Disable the v7.23 credit pseudo-line completely. */
 #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit::after {
   content: none !important;
   display: none !important;
 }
 
 #reader-frame > .topic-feed-story-header-external > .topic-feed-story-meta-overlay {
-  /* Same short divider, now unambiguously anchored to the header's left edge. */
-  background-image: linear-gradient(
-    to right,
-    rgba(77, 101, 124, .14),
-    rgba(77, 101, 124, .14)
-  ) !important;
-  background-repeat: no-repeat !important;
-  background-position: left bottom !important;
-  background-size: min(230px, 38%) 1px !important;
+  background-image: none !important;
+  border-bottom: 1px solid rgba(77, 101, 124, .14) !important;
 }

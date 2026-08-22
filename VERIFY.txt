@@ -1,8 +1,7 @@
-v7.24 verification
+v7.25 verification
 
-- topic-feed-reader-credit border-bottom disabled
-- topic-feed-reader-credit::after disabled
-- divider painted on topic-feed-story-meta-overlay
-- background-position: left bottom
-- divider length: min(230px, 38%)
+- topic-feed-reader-credit border disabled
+- credit pseudo divider disabled
+- meta overlay background divider disabled
+- exactly one full-width border-bottom on topic-feed-story-meta-overlay
 - no JavaScript files included

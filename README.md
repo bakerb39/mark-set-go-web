@@ -1,9 +1,8 @@
-Mark, Set, Go! v7.24 — Source divider left-anchor fix
+Mark, Set, Go! v7.25 — plain full Source divider
 
-Overlay on v7.23.
+Overlay on v7.24.
 
 Only change:
-- The short divider under the Topic Feed Source row is no longer painted by .topic-feed-reader-credit.
-- It is painted by the full .topic-feed-story-meta-overlay, anchored at the left edge.
-- Source text, date, View original, share icons, action band, and article layout do not move.
-- No JavaScript changes.
+- The divider under the stationary Topic Feed Source/share row is a normal full-width border-bottom on .topic-feed-story-meta-overlay.
+- It begins under SOURCE and ends under the share-icon side of the first-page header.
+- No pseudo-element, gradient, calculated width, JavaScript, positioning, action-band, hover, Reader, Chat, theme, or workspace behavior changes.
