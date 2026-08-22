@@ -1,15 +1,20 @@
-After deploying these three files, open the Great Books page.
+Mark, Set, Go! v7.21 verification
 
-The Iliad row should show:
-Find & Import Edition | Study / Great Ideas | Classic Guide | Grokipedia
-
-To verify the deployed JavaScript itself, run this in DevTools Console:
-
-fetch('/app.js?v=' + Date.now(), {cache:'no-store'})
-  .then(r => r.text())
-  .then(t => console.log('Classic Guide code deployed:', t.includes("Iliad Homer") && t.includes("Classic Guide")));
-
-Expected:
-Classic Guide code deployed: true
-
-If it prints false, Render/GitHub is serving a different app.js than the one uploaded.
+Static checks completed before packaging:
+- server.js syntax: PASS
+- msg-chat-routes.js syntax: PASS
+- public/msg-chat.js syntax: PASS
+- public/topic-feeds.js syntax: PASS
+- public/workspace-pane-runtime.js syntax: PASS
+- public/workspace-pane-cache-refresh.js syntax: PASS
+- public/topic-feeds.js contains MutationObserver: NO
+- server Topic Feed refresh route uses prepare:false: YES
+- server scheduled Topic Feed refresh uses prepare:false: YES
+- Chat API routes installed before catch-all: YES
+- main index loads msg-chat.js/msg-chat.css: YES
+- workspace pane loads msg-chat.js/msg-chat.css before workspace-pane-runtime.js: YES
+- workspace pane runtime contains MarkSetGoChat.open path: YES
+- current-DOM Topic Feed action band CSS included: YES
+- Explorer Visual Designer references introduced by this package: NO
+- public/app.js included/changed: NO
+- Reader engine files included/changed: NO

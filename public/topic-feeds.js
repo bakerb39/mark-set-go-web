@@ -1,6 +1,8 @@
 (() => {
   'use strict';
 
+  // 20260822-v7.21-stability-consolidation: nonblocking feeds + explicit UI sync, no DOM mutation observers.
+
   const STORAGE_KEY = 'markSetGoTopicFeedsV1';
   const app = document.getElementById('app');
   const defaultTimezone = (() => {
@@ -513,8 +515,6 @@
     });
   }
 
-  let topicFeedStoryHeaderObserver = null;
-  let topicFeedStoryHeaderReader = null;
   let topicFeedStoryHeaderReflowTimer = 0;
 
   function topicFeedStoryHeaderParts(reader = document.querySelector('#reader')) {
@@ -683,22 +683,6 @@
     positionTopicFeedStoryHeader();
   }
 
-  function observeTopicFeedStoryHeader() {
-    const reader = document.querySelector('#reader');
-    if (!reader || reader === topicFeedStoryHeaderReader) return;
-
-    topicFeedStoryHeaderObserver?.disconnect?.();
-    topicFeedStoryHeaderReader = reader;
-
-    topicFeedStoryHeaderObserver = new MutationObserver(() => {
-      if (!isTopicFeedReaderActive()) return;
-      window.requestAnimationFrame(() => {
-        keepTopicFeedArticleActionsInHeader();
-      });
-    });
-
-    topicFeedStoryHeaderObserver.observe(reader, { childList: true });
-  }
 
   let activeTopicFeedHeaderContext = null;
 
@@ -848,7 +832,6 @@
       // Read Anything keeps Summarize / Analyze as a direct child of #reader.
       // We preserve that contract and position it visually below this source row.
       keepTopicFeedArticleActionsInHeader();
-      observeTopicFeedStoryHeader();
       positionTopicFeedStoryHeader();
 
       return true;
@@ -1370,10 +1353,8 @@
   let topicPaneUserIntentUntil = 0;
 
   function markTopicPaneUserIntent(open) {
-    // Save the user's intent BEFORE app.js changes the layout. The My Topics
-    // MutationObserver can run during the same click; without this guard it can
-    // see the old "open" preference and immediately reopen a panel the user
-    // just closed.
+    // Save the user's intent BEFORE app.js changes the layout so the explicit
+    // post-click synchronization cannot immediately undo a close/open choice.
     saveTopicReaderPanePreference(open);
     topicPaneUserIntentUntil = Date.now() + 220;
 
@@ -1411,14 +1392,11 @@
 
   let topicBookPageGeometryTimer = 0;
   let topicBookDividerResizeObserver = null;
-  let topicBookDividerClassObserver = null;
   let topicBookDividerFrame = null;
 
   function removeTopicBookDivider() {
     topicBookDividerResizeObserver?.disconnect?.();
     topicBookDividerResizeObserver = null;
-    topicBookDividerClassObserver?.disconnect?.();
-    topicBookDividerClassObserver = null;
 
     const frame = topicBookDividerFrame || document.querySelector('#reader-frame');
     frame?.querySelectorAll('[data-topic-feed-book-divider]').forEach((node) => node.remove());
@@ -1488,16 +1466,6 @@
         topicBookDividerResizeObserver.observe(reader);
       }
 
-      topicBookDividerClassObserver = new MutationObserver(() => {
-        window.requestAnimationFrame(() => {
-          positionTopicBookDivider();
-          positionTopicFeedStoryHeader();
-        });
-      });
-      topicBookDividerClassObserver.observe(reader, {
-        attributes: true,
-        attributeFilter: ['class', 'style']
-      });
     }
 
     positionTopicBookDivider();
@@ -1565,8 +1533,7 @@
     if (!isTopicFeedReaderActive()) return;
 
     // A real user click always wins over automatic restoration. This prevents
-    // the close/open flicker caused by decorateReaderNavigation() running from
-    // MutationObserver changes during the same interaction.
+    // explicit post-click synchronization from undoing the reader's choice.
     if (Date.now() < topicPaneUserIntentUntil) return;
 
     const layout = document.querySelector('#reader-layout');
@@ -1601,7 +1568,7 @@
       toggle.dataset.topicFeedStickyBound = '1';
 
       // Capture phase is deliberate: persist the desired state before app.js's
-      // own click handler changes classes and triggers MutationObserver work.
+      // own click handler changes the Reader layout.
       toggle.addEventListener('click', () => {
         if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
 
@@ -1808,8 +1775,29 @@
     navFrame = requestAnimationFrame(decorateReaderNavigation);
   }
 
-  const appObserver = app ? new MutationObserver(() => scheduleReaderNavigation()) : null;
-  if (appObserver && app) appObserver.observe(app, { childList:true, subtree:true });
+  // Keep Topic Feed navigation/header geometry synchronized through explicit
+  // app events and user interactions. Do not observe DOM mutations.
+  const scheduleTopicFeedUiSync = () => {
+    if (!isTopicFeedReaderActive()) return;
+    window.setTimeout(() => {
+      scheduleReaderNavigation();
+      keepTopicFeedArticleActionsInHeader();
+      positionTopicFeedStoryHeader();
+      ensureTopicBookDivider();
+    }, 0);
+  };
+
+  document.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest?.('#app')) return;
+    scheduleTopicFeedUiSync();
+  }, true);
+
+  document.addEventListener('change', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest?.('#app')) return;
+    scheduleTopicFeedUiSync();
+  }, true);
 
   document.addEventListener('marksetgo:auth-changed', (event) => {
     if (event.detail?.authenticated) void hydrateCloudState();

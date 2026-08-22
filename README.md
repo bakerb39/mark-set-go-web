@@ -1,19 +1,23 @@
-# v7.19 Chat backend hotfix
+# Mark, Set, Go! v7.21 — stability consolidation
 
-Backend-only repair for the v7.18 deployment.
+This is an overlay for the current app; it is **not** a rollback.
 
-Files changed:
-- `server.js` — two-line Chat route wiring only, relative to v7.18.
-- `msg-chat-routes.js` — restored integrated Chat backend.
+It preserves the v7.14 theme/workspace ownership model and the v7.15+ nonblocking Topic Feed behavior, while repairing the regressions introduced afterward.
 
-No `public/` files are included.
-No Topic Feed, Reader, theme, workspace, bookmark, or CSS files are changed.
+## Repairs
+- Restores Mark, Set, Go! Chat in both the main app and workspace pane.
+- Restores the Chat backend routes and existing `msgchat_*` database tables.
+- Restores the Topic Feed action occlusion band for the current direct-child action-row DOM.
+- Keeps Source/date/share at the top and retains publisher fallback text.
+- Removes all `MutationObserver` usage from `public/topic-feeds.js`; synchronization now uses explicit document events, user interactions, ResizeObserver, timers, and resize events.
+- Bumps the workspace pane cache token so existing panes reload the corrected loader stack.
 
-The route module restores:
-- conversations
-- messages
-- image messages
-- edit/delete
-- reactions
+## Deliberately untouched
+- `public/app.js`
+- Reader engine modules
+- bookmarks
+- v7.14 theme engine/CSS/background ownership
+- workspace experiment layout
+- music/ticker/companion code
 
-The module uses the existing `msgchat_conversations` and `msgchat_messages` PostgreSQL tables and creates them only if missing.
+Build marker: `20260822-v7.21-stability-consolidation`

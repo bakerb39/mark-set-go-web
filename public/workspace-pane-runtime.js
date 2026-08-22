@@ -1,4 +1,4 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v0.9.2 */
+/* Mark, Set, Go! lightweight workspace pane runtime v7.21 — Chat-aware, explicit routing */
 (() => {
   'use strict';
 

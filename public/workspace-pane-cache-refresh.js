@@ -1,10 +1,10 @@
-/* Mark, Set, Go! Workspace pane cache refresh 0.11.8-theme-stack
+/* Mark, Set, Go! Workspace pane cache refresh v7.21 stability consolidation
    Forces workspace-pane.html to use the same theme/app stack as the outer app.
 */
 (() => {
   'use strict';
 
-  const BUILD = '0.11.8-theme-stack';
+  const BUILD = '20260822-v7.21-stability-consolidation';
 
   function refreshWorkspacePaneUrls() {
     document.querySelectorAll('iframe.msg-workspace-page-frame').forEach((frame) => {
