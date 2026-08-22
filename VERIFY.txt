@@ -1,9 +1,8 @@
-v7.23 verification
+v7.24 verification
 
-PASS: Overlay contains no JavaScript file.
-PASS: Existing v7.22 permanent Topic Feed header/band rules are retained unchanged.
-PASS: Existing action hover/focus visibility rules are retained unchanged.
-PASS: Source credit native border-bottom is disabled only inside the permanent Topic Feed header.
-PASS: Replacement divider is left:0, right:auto, width:69%, preserving the prior visible length while shifting it left.
-PASS: Source/date/original text, share icons, and article actions are not repositioned.
-PASS: Build/cache marker updated to 20260822-v7.23-source-divider-left.
+- topic-feed-reader-credit border-bottom disabled
+- topic-feed-reader-credit::after disabled
+- divider painted on topic-feed-story-meta-overlay
+- background-position: left bottom
+- divider length: min(230px, 38%)
+- no JavaScript files included
