@@ -1,0 +1,70 @@
+/* Explorer Reader background fix v3.1
+   Background-only correction. Does NOT change Reader geometry, designer values,
+   paginator position, playback position, pane sizes, or title spacing.
+
+   Problem:
+   Explorer's base body/app-shell backgrounds remain visible underneath the
+   rounded Reader card, producing the persistent tan strip.
+
+   Solution:
+   In active Reader mode, remove the Explorer app-shell parchment/background
+   from the center application layer and use the Reader surface behind the card.
+   The fixed left/right/top scenery remains untouched.
+*/
+
+@media (min-width: 901px) {
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel) body {
+    background-color: var(--explorer-global-surface, #fffdf7) !important;
+    background-image: none !important;
+  }
+
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  #app.app-shell,
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  .app-shell:has(.reader-page-panel) {
+    background: transparent !important;
+    background-image: none !important;
+    box-shadow: none !important;
+  }
+
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  #app.app-shell::before,
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  .app-shell:has(.reader-page-panel)::before {
+    content: none !important;
+    display: none !important;
+    background: none !important;
+  }
+
+  /*
+   * Keep the scenic image layer itself transparent in the middle.
+   * Left/right/top image elements remain visible exactly where they already are.
+   */
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  .explorer-world-art {
+    background: transparent !important;
+    background-color: transparent !important;
+    background-image: none !important;
+  }
+
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  .explorer-world-art::before,
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  .explorer-world-art::after {
+    content: none !important;
+    display: none !important;
+    background: none !important;
+  }
+
+  /*
+   * Ensure the actual Reader card still owns its own visible rounded surface.
+   * This does not alter its size or placement.
+   */
+  html[data-msg-experience-layout="explorer"]:has(#app .reader-page-panel)
+  #app .reader-page-panel {
+    background: var(--explorer-global-surface, #fffdf7) !important;
+    background-image: none !important;
+    border-radius: 16px !important;
+    background-clip: padding-box !important;
+  }
+}
