@@ -1,30 +1,23 @@
 /*
- * Mark, Set, Go! — Shared immersive Reader mechanics v5.0
+ * Mark, Set, Go! — Shared immersive Reader mechanics v5.1
  *
  * AUTHORITATIVE LAYOUT FILE.
  *
- * This replaces the accumulated Explorer/immersive layout hacks with one model:
- *   header
- *   Reader shell
- *     title
- *     controls
- *     ONE bounded pane row
- *       My Topics | Reader | Ask companion
- *     footer
- *     playback
+ * Fixes v5.0 regressions:
+ * - does NOT force the app/Reader nearly full-screen wide
+ * - backgrounds key from the actual active theme attribute
+ * - restores approved Reader control spacing
+ * - side panes end level with the visible Reader frame
+ * - Ask Mark/Beth stays inside the same visible Reader-frame height
+ * - theme switching remains owned by experience-themes.js / experience-themes.css
  *
- * There are NO negative layout margins and NO fixed 790px side-pane height.
- * All three panes share one row height and scroll internally.
- *
- * The existing theme scenery is also composed as one full-page environment.
- * The old left/top/right DOM elements do not participate in layout.
+ * No separate Reader layout patch files are required.
  */
 
 /* ==========================================================================
-   IMMERSIVE BACKGROUND
+   IMMERSIVE BACKGROUNDS — KEYED TO THE ACTUAL ACTIVE THEME
    ========================================================================== */
 
-/* Existing theme image assets. */
 html[data-msg-experience-theme="patriotic"] {
   --msg-scene-left:url('/assets/themes/patriotic/patriotic-left.png');
   --msg-scene-center:url('/assets/themes/patriotic/patriotic-top.png');
@@ -56,11 +49,15 @@ html[data-msg-experience-theme="expedition"] {
   --msg-scene-right:url('/assets/themes/expedition/expedition-right.png');
 }
 
-/*
- * One fixed scene behind the application.
- * The side detail remains, but it is imagery — not a left/right layout pane.
- */
-html[data-msg-experience-layout="explorer"]:not([data-msg-experience-theme="explorer"]) body {
+/* Existing six illustrated themes: one composed environment, not UI panes. */
+html:is(
+  [data-msg-experience-theme="patriotic"],
+  [data-msg-experience-theme="scholar"],
+  [data-msg-experience-theme="artistic"],
+  [data-msg-experience-theme="modern"],
+  [data-msg-experience-theme="galactic"],
+  [data-msg-experience-theme="expedition"]
+) body {
   background-color:var(--msg-theme-page, var(--page, #eef1f4)) !important;
   background-image:
     var(--msg-scene-left),
@@ -68,10 +65,11 @@ html[data-msg-experience-layout="explorer"]:not([data-msg-experience-theme="expl
     var(--msg-scene-center) !important;
   background-position:left bottom, right bottom, center center !important;
   background-repeat:no-repeat, no-repeat, no-repeat !important;
-  background-size:min(34vw,620px) auto, min(34vw,620px) auto, cover !important;
+  background-size:min(31vw,520px) auto, min(31vw,520px) auto, cover !important;
   background-attachment:fixed, fixed, fixed !important;
 }
 
+/* Explorer's existing complete landscape. */
 html[data-msg-experience-theme="explorer"] body {
   background-color:#dce8dc !important;
   background-image:url('/explorer-landscape.svg') !important;
@@ -81,18 +79,40 @@ html[data-msg-experience-theme="explorer"] body {
   background-attachment:fixed !important;
 }
 
-/* Retire the old scenery DOM entirely. */
-html[data-msg-experience-layout="explorer"] .explorer-world-art,
-html[data-msg-experience-layout="explorer"] .explorer-world-art__left,
-html[data-msg-experience-layout="explorer"] .explorer-world-art__right,
-html[data-msg-experience-layout="explorer"] .explorer-world-art__top {
+/* Classic deliberately keeps the ordinary page background. */
+
+/* Old scenery DOM no longer participates visually or geometrically. */
+html[data-msg-experience-theme]:is(
+  [data-msg-experience-theme="explorer"],
+  [data-msg-experience-theme="patriotic"],
+  [data-msg-experience-theme="scholar"],
+  [data-msg-experience-theme="artistic"],
+  [data-msg-experience-theme="modern"],
+  [data-msg-experience-theme="galactic"],
+  [data-msg-experience-theme="expedition"]
+) :is(
+  .explorer-world-art,
+  .explorer-world-art__left,
+  .explorer-world-art__right,
+  .explorer-world-art__top
+) {
   display:none !important;
 }
 
-/* The app shell itself must never cover the background environment. */
-html[data-msg-experience-layout="explorer"] #app.app-shell,
-html[data-msg-experience-layout="explorer"] .msg-workspace-shell,
-html[data-msg-experience-layout="explorer"] .msg-workspace-primary {
+/* Only the outer app/workspace shell is transparent. Actual cards stay themed. */
+html[data-msg-experience-theme]:is(
+  [data-msg-experience-theme="explorer"],
+  [data-msg-experience-theme="patriotic"],
+  [data-msg-experience-theme="scholar"],
+  [data-msg-experience-theme="artistic"],
+  [data-msg-experience-theme="modern"],
+  [data-msg-experience-theme="galactic"],
+  [data-msg-experience-theme="expedition"]
+) :is(
+  #app.app-shell,
+  .msg-workspace-shell,
+  .msg-workspace-primary
+) {
   background:transparent !important;
   background-image:none !important;
 }
@@ -102,38 +122,33 @@ html[data-msg-experience-layout="explorer"] .msg-workspace-primary {
    HEADER / MENUS
    ========================================================================== */
 
-html[data-msg-experience-layout="explorer"] .site-header {
-  position:sticky !important;
-  top:0 !important;
+.site-header {
   z-index:1000 !important;
   overflow:visible !important;
 }
-
-html[data-msg-experience-layout="explorer"] .site-header nav,
-html[data-msg-experience-layout="explorer"] .site-header details,
-html[data-msg-experience-layout="explorer"] .site-header details[open],
-html[data-msg-experience-layout="explorer"] .site-header .menu-popover {
-  position:relative;
-  z-index:1010 !important;
+.site-header nav,
+.site-header details,
+.site-header details[open],
+.site-header .menu-popover {
   overflow:visible !important;
 }
-
-html[data-msg-experience-layout="explorer"] .site-header .menu-popover {
+.site-header details[open],
+.site-header .menu-popover {
   z-index:1100 !important;
 }
 
 
 /* ==========================================================================
-   DESKTOP READER APPLICATION
+   DESKTOP READER — SINGLE AUTHORITATIVE GEOMETRY
    ========================================================================== */
 
-@media (min-width: 861px) {
+@media (min-width:861px) {
   /*
-   * Reader mode is a bounded application view.
-   * The site footer is unnecessary while reading and used to steal vertical
-   * space from the Reader shell.
+   * Use the EXISTING app-shell width from styles.css / Designer.
+   * Do not set width here.
+   *
+   * Reader mode gets the available browser height below the header.
    */
-  html[data-msg-experience-layout="explorer"]
   body:has(#app .reader-page-panel) {
     height:100dvh !important;
     min-height:0 !important;
@@ -142,33 +157,24 @@ html[data-msg-experience-layout="explorer"] .site-header .menu-popover {
     grid-template-rows:auto minmax(0,1fr) !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   body:has(#app .reader-page-panel) > .site-footer {
     display:none !important;
   }
 
-  /*
-   * #app owns the browser space below the header.
-   */
-  html[data-msg-experience-layout="explorer"]
   body:has(#app .reader-page-panel) > #app.app-shell {
-    width:min(1880px, calc(100vw - 24px)) !important;
-    max-width:none !important;
-    height:100% !important;
     min-height:0 !important;
+    height:100% !important;
     max-height:100% !important;
-    margin:6px auto !important;
+    margin-top:6px !important;
+    margin-bottom:6px !important;
     padding:0 !important;
     overflow:hidden !important;
   }
 
-  /*
-   * The Reader card owns the complete visible boundary.
-   * Rounded corners are real clipping boundaries, not decorative radius values
-   * on an overflowing element.
-   */
-  html[data-msg-experience-layout="explorer"]
+  /* Reader shell width remains 100% OF THE EXISTING app shell. */
   #app .reader-page-panel {
+    --msg-reader-footer-height:38px;
+
     display:flex !important;
     flex-direction:column !important;
     box-sizing:border-box !important;
@@ -179,44 +185,39 @@ html[data-msg-experience-layout="explorer"] .site-header .menu-popover {
     max-height:calc(100% - 12px) !important;
 
     margin:0 !important;
-    padding:12px 16px 10px !important;
+    padding:0 16px 10px !important;
 
     border-radius:16px !important;
     overflow:hidden !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel::before,
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel::after {
     content:none !important;
     display:none !important;
   }
 
-  /* Natural-size top rows. */
-  html[data-msg-experience-layout="explorer"]
+  /* Previously approved title positioning. */
   #app .reader-page-panel > .reader-title-row {
     flex:0 0 auto !important;
     min-height:0 !important;
-    margin:0 0 4px !important;
+    margin-top:14px !important;
+    margin-bottom:-1px !important;
     padding:0 !important;
     gap:8px !important;
     align-items:flex-start !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel .reader-title-copy h1 {
     margin:0 0 2px !important;
-    line-height:1.1 !important;
+    line-height:1.12 !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel .reader-title-links {
     margin:0 !important;
     line-height:1.15 !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel > .reader-toolbar {
     flex:0 0 auto !important;
     margin:0 !important;
@@ -224,89 +225,66 @@ html[data-msg-experience-layout="explorer"] .site-header .menu-popover {
     min-height:0 !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
+  /* Restore approved Reader control placement. */
   #app .reader-page-panel > .reader-pane-controls,
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar {
     flex:0 0 auto !important;
     display:flex !important;
     align-items:center !important;
     justify-content:space-between !important;
     gap:8px !important;
-    min-height:50px !important;
-    margin:4px 0 8px !important;
+    min-height:58px !important;
+    margin-top:6px !important;
+    margin-bottom:30px !important;
     padding:0 !important;
   }
 
+  #app .reader-page-panel > .reader-pane-controls > .reader-pane-buttons {
+    display:flex !important;
+    align-items:center !important;
+    gap:8px !important;
+  }
+
+  #app .reader-page-panel .reader-pane-buttons > .reader-topright-media-stack {
+    margin-left:auto !important;
+  }
+
   /*
-   * ONE authoritative pane row.
-   * No pane can make this row taller.
+   * The Reader layout consumes the remaining shell height.
    */
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel > #reader-layout,
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel > .reader-layout {
     flex:1 1 auto !important;
     min-height:0 !important;
     height:auto !important;
     max-height:none !important;
-
     margin:0 !important;
     padding:0 !important;
-
-    align-items:stretch !important;
+    align-items:start !important;
     overflow:hidden !important;
   }
 
   /*
-   * Every working column gets exactly the row height.
+   * Center column explicitly separates the visible Reader frame and its footer.
    */
-  html[data-msg-experience-layout="explorer"]
-  #app .reader-page-panel #reader-layout > .navigation-pane,
-  html[data-msg-experience-layout="explorer"]
-  #app .reader-page-panel #reader-layout > .reader-center-column,
-  html[data-msg-experience-layout="explorer"]
-  #app .reader-page-panel #reader-layout > #word-panel,
-  html[data-msg-experience-layout="explorer"]
-  #app .reader-page-panel #reader-layout > .mark-companion-panel {
-    box-sizing:border-box !important;
+  #app .reader-page-panel .reader-center-column {
+    display:grid !important;
+    grid-template-rows:minmax(0,1fr) var(--msg-reader-footer-height) !important;
     height:100% !important;
     min-height:0 !important;
     max-height:100% !important;
-    margin-top:0 !important;
-    margin-bottom:0 !important;
-  }
-
-  /* My Topics scrolls INSIDE its card. */
-  html[data-msg-experience-layout="explorer"]
-  #app .reader-page-panel .navigation-pane {
-    overflow-x:hidden !important;
-    overflow-y:auto !important;
-  }
-
-  /*
-   * Reader center is itself a bounded flex column:
-   * frame grows, footer stays at bottom.
-   */
-  html[data-msg-experience-layout="explorer"]
-  #app .reader-page-panel .reader-center-column {
-    display:flex !important;
-    flex-direction:column !important;
-    min-height:0 !important;
     overflow:hidden !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel #reader-frame {
-    flex:1 1 auto !important;
-    height:auto !important;
+    grid-row:1 !important;
+    height:100% !important;
     min-height:0 !important;
-    max-height:none !important;
+    max-height:100% !important;
     margin:0 !important;
     overflow:hidden !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel #reader-frame > #reader.interactive-reader {
     box-sizing:border-box !important;
     height:100% !important;
@@ -314,17 +292,44 @@ html[data-msg-experience-layout="explorer"] .site-header .menu-popover {
     max-height:100% !important;
   }
 
+  #app .reader-page-panel .reader-viewer-footer {
+    grid-row:2 !important;
+    box-sizing:border-box !important;
+    height:var(--msg-reader-footer-height) !important;
+    min-height:var(--msg-reader-footer-height) !important;
+    max-height:var(--msg-reader-footer-height) !important;
+    margin:0 !important;
+    padding:6px 8px 2px !important;
+    overflow:visible !important;
+  }
+
   /*
-   * Ask Mark/Beth fills the row; it never sizes the row.
+   * Side panes END AT THE READER FRAME, not below its footer.
+   * This is the visible alignment the UI requires.
    */
-  html[data-msg-experience-layout="explorer"]
+  #app .reader-page-panel #reader-layout > .navigation-pane,
+  #app .reader-page-panel #reader-layout > #word-panel,
+  #app .reader-page-panel #reader-layout > .mark-companion-panel {
+    box-sizing:border-box !important;
+    height:calc(100% - var(--msg-reader-footer-height)) !important;
+    min-height:0 !important;
+    max-height:calc(100% - var(--msg-reader-footer-height)) !important;
+    margin-top:0 !important;
+    margin-bottom:0 !important;
+    align-self:start !important;
+  }
+
+  #app .reader-page-panel .navigation-pane {
+    overflow-x:hidden !important;
+    overflow-y:auto !important;
+  }
+
+  /* Ask Mark/Beth is bounded exactly like My Topics. */
   #app .reader-page-panel .mark-companion-panel {
     overflow:hidden !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel .mark-companion-panel > .reader-control-shell.mark-shell,
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel .mark-companion-panel .askmark-premium {
     box-sizing:border-box !important;
     height:100% !important;
@@ -333,15 +338,12 @@ html[data-msg-experience-layout="explorer"] .site-header .menu-popover {
     overflow:hidden !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel .mark-companion-panel .askmark-stage {
     min-height:0 !important;
     overflow:hidden !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel .mark-companion-panel .askmark-view,
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel .mark-companion-panel .askmark-conversation {
     min-height:0 !important;
     overflow-y:auto !important;
@@ -349,19 +351,8 @@ html[data-msg-experience-layout="explorer"] .site-header .menu-popover {
   }
 
   /*
-   * Bottom controls stay in normal flow.
-   * No -24px footer and no -57px playback overlap.
+   * Playback is the actual shell bottom. Normal flow only.
    */
-  html[data-msg-experience-layout="explorer"]
-  #app .reader-page-panel .reader-viewer-footer {
-    flex:0 0 auto !important;
-    min-height:34px !important;
-    margin:0 !important;
-    padding:6px 8px 2px !important;
-    overflow:visible !important;
-  }
-
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel .playback-controls {
     flex:0 0 auto !important;
     position:relative !important;
@@ -373,39 +364,36 @@ html[data-msg-experience-layout="explorer"] .site-header .menu-popover {
     overflow:visible !important;
   }
 
-  html[data-msg-experience-layout="explorer"]
   #app .reader-page-panel .playback-controls .status {
     min-height:20px !important;
     margin:0 0 0 .35rem !important;
     padding:0 !important;
     overflow:visible !important;
   }
-
-  html[data-msg-experience-layout="explorer"]
-  #app .reader-page-panel .reader-pane-buttons > .reader-topright-media-stack {
-    margin-left:auto !important;
-  }
 }
 
 
 /* ==========================================================================
-   MOBILE / SMALL VIEWPORT
+   SMALL VIEWPORTS
    ========================================================================== */
 
 @media (max-width:860px) {
-  html[data-msg-experience-layout="explorer"] body {
+  body:has(#app .reader-page-panel) {
+    height:auto !important;
     overflow-y:auto !important;
+    display:block !important;
   }
 
-  html[data-msg-experience-layout="explorer"] #app .reader-page-panel {
+  #app .reader-page-panel {
     height:auto !important;
     max-height:none !important;
     padding:10px !important;
     overflow:visible !important;
   }
 
-  html[data-msg-experience-layout="explorer"] #app .reader-page-panel .navigation-pane,
-  html[data-msg-experience-layout="explorer"] #app .reader-page-panel #word-panel {
+  #app .reader-page-panel .navigation-pane,
+  #app .reader-page-panel #word-panel,
+  #app .reader-page-panel .mark-companion-panel {
     height:auto !important;
     max-height:none !important;
   }
@@ -413,12 +401,9 @@ html[data-msg-experience-layout="explorer"] .site-header .menu-popover {
 
 
 /* ==========================================================================
-   TOPIC-FEED HEADER MECHANICS
-   These are retained because they are functional scroll/header behavior,
-   independent of Reader shell geometry.
+   FUNCTIONAL TOPIC-FEED HEADER BEHAVIOR
    ========================================================================== */
 
-html[data-msg-experience-layout="explorer"]
 #reader-frame > .topic-feed-story-header-external {
   position:relative !important;
   z-index:30 !important;
@@ -428,13 +413,11 @@ html[data-msg-experience-layout="explorer"]
   box-shadow:0 6px 0 var(--msg-vd-reader-page-color,#ffffff) !important;
 }
 
-html[data-msg-experience-layout="explorer"]
 #reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
   z-index:20 !important;
   box-shadow:0 7px 0 var(--msg-vd-reader-page-color,#ffffff) !important;
 }
 
-html[data-msg-experience-layout="explorer"]
 #reader-frame > .topic-feed-story-header-external
 #read-anything-article-summary-action {
   display:flex !important;
@@ -452,25 +435,12 @@ html[data-msg-experience-layout="explorer"]
   padding:0 !important;
 }
 
-html[data-msg-experience-layout="explorer"]
 #reader-frame > .topic-feed-story-header-external
 #read-anything-article-summary-action::before {
   content:none !important;
   display:none !important;
 }
 
-html[data-msg-experience-layout="explorer"]
-#reader-frame > .topic-feed-story-header-external
-.topic-feed-reader-credit,
-html[data-msg-experience-layout="explorer"]
-#reader-frame > .topic-feed-story-header-external
-.topic-feed-story-meta-overlay {
-  position:relative !important;
-  z-index:31 !important;
-}
-
-/* Shared floating music player remains above Reader surfaces. */
-html[data-msg-experience-layout="explorer"] .music-dock {
-  position:fixed !important;
+.music-dock {
   z-index:9999 !important;
 }
