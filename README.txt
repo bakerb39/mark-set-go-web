@@ -1,28 +1,16 @@
-Mark, Set, Go! v7.3 — CACHE RESET + THEME OWNER + NATIVE BOOKMARK
+Mark, Set, Go! v7.15 — nonblocking Topic Feed refresh
 
-WHY v7.1/v7.2 COULD LOOK LIKE THEY DID NOTHING
-The production server cached every static file for one hour, including index.html.
-A browser could therefore keep the old index, which kept requesting the old app.js/CSS URLs even after deployment.
+Baseline: v7.14 parent-background-owner. Theme/workspace behavior is otherwise unchanged.
 
-REPLACE THESE FILES
-- server.js
-- public/index.html
-- public/app.js
-- public/explorer-theme.css
+Changes:
+- /api/topic-feeds/refresh now refreshes feed/headline data with prepare:false.
+- scheduled morning refresh also avoids synchronous article extraction.
+- Reader article warming runs fire-and-forget after the refreshed edition renders.
+- background prefetch is bounded to 24 articles / 3 workers server-side; client warms up to 16 prioritized stories.
+- local refresh no longer awaits article prefetch.
+- old preparedAt is cleared when a new edition arrives.
+- publisher extraction failures fall back to feed summary/headline/source/link rather than failing the open action.
+- local article opens now pass feedText to the article preparation endpoint.
+- Topic Feed button now says Refresh latest rather than promising a blocking download.
 
-WHAT v7.3 DOES
-1. server.js now sends no-store/no-cache for public assets and SPA fallback HTML.
-2. index.html gives every theme-critical asset a new v7.3 URL so existing cached copies cannot win.
-3. app.js retains the v7.2 theme-owner fix: app.js does not write data-msg-experience-theme.
-4. app.js retains the native addBookmark() path and stable navigation-pane click binding.
-5. explorer-theme.css is the restored full Explorer stylesheet.
-
-FIRST LOAD AFTER DEPLOY
-The OLD cached index response may still be fresh in the browser. Open the app once with a unique query string (for example ?msgbuild=7.3) or use Ctrl+Shift+R. After v7.3 is loaded, the server no-cache policy prevents this stale-build problem on later deploys.
-
-NOT CHANGED
-- Workspace/Reader geometry
-- Topic Feed code
-- Reader modes/pagination
-- Bookmark storage key/path
-- No MutationObserver added
+No bookmark, Reader timing/pagination, theme, ticker, or workspace architecture changes.
