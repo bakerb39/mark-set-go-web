@@ -14832,6 +14832,17 @@ function scheduleBookPageReflow({ delay = 0, anchorIndex = null } = {}) {
             : Number(state.index) || 0
         );
         restoreBookPageWordAnchor(preservedWord);
+
+        // Book Pages can rebuild/reflow the visible word DOM when a side pane
+        // opens, closes, or changes width. Persistent Ask Mark / Reading
+        // Companion selections are stored by canonical word index, so restore
+        // their visual highlight only after the final page geometry is painted.
+        // Without this, Modern Guide “Discuss with reading companion” appears
+        // selected in normal mode but loses its highlight after Book Pages reflows.
+        if (state.markPersistentSelection) {
+          persistMarkSelectionHighlight(state.markPersistentSelection);
+        }
+
         pendingBookPageAnchorIndex = null;
         persistReaderSession();
       });
