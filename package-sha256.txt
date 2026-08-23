@@ -1,0 +1,3 @@
+8fac68b9c793a99d0844abe06376ccc1c76f0d4604618a6b7a05d5a2e02dbab1  output/public/reader-switcher.js
+5fb06192aa18307416d78235b4527dbd46df941ca3c7604ecbb15322d0a548d0  output/public/reader-switcher.css
+df4c2e3e45bd730e04cc685624230a2ee4e3c39e9948666e75cf7efdd88f1d26  output/public/index.html

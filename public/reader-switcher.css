@@ -1,0 +1,127 @@
+/* Mark, Set, Go! — non-workspace Reader switcher v1.0.0 */
+.reader-session-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 5px 0 7px;
+  border-bottom: 1px solid rgba(118, 137, 158, .22);
+}
+
+.reader-session-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.reader-session-tab-wrap {
+  display: inline-flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  min-width: 0;
+  border: 1px solid rgba(86, 112, 143, .28);
+  border-radius: 8px;
+  background: rgba(255,255,255,.72);
+  overflow: hidden;
+}
+
+.reader-session-tab-wrap.is-active {
+  border-color: rgba(30, 91, 162, .68);
+  box-shadow: 0 2px 7px rgba(18, 61, 112, .12);
+}
+
+.reader-session-tab,
+.reader-session-close,
+.reader-session-new {
+  min-height: 34px;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.reader-session-tab {
+  display: grid;
+  grid-template-columns: auto minmax(0, auto);
+  align-items: baseline;
+  gap: 7px;
+  max-width: 270px;
+  padding: 5px 9px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.reader-session-tab strong {
+  white-space: nowrap;
+  font-size: .78rem;
+  letter-spacing: .01em;
+}
+
+.reader-session-tab span {
+  min-width: 0;
+  max-width: 155px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .76rem;
+  opacity: .68;
+}
+
+.reader-session-tab.is-active {
+  background: rgba(47, 125, 225, .10);
+}
+
+.reader-session-close {
+  width: 30px;
+  padding: 0;
+  background: transparent;
+  border-left: 1px solid rgba(86, 112, 143, .18);
+  color: inherit;
+  opacity: .62;
+  font-size: 1rem;
+}
+
+.reader-session-close:hover,
+.reader-session-close:focus-visible {
+  opacity: 1;
+}
+
+.reader-session-new {
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border: 1px solid rgba(86, 112, 143, .28);
+  border-radius: 8px;
+  background: rgba(255,255,255,.78);
+  color: inherit;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.empty-reader-page > .reader-session-switcher {
+  margin-bottom: 14px;
+}
+
+@media (max-width: 760px) {
+  .reader-session-switcher {
+    align-items: stretch;
+  }
+  .reader-session-tab {
+    grid-template-columns: 1fr;
+    gap: 1px;
+    max-width: 180px;
+  }
+  .reader-session-tab span {
+    max-width: 120px;
+  }
+  .reader-session-new {
+    padding-inline: 8px;
+  }
+}
+
+/* v1.0.2 — switched Readers intentionally add NO shell-width override.
+   They inherit the exact same #app.app-shell width as the default Reader. */
