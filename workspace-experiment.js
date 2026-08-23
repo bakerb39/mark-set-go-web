@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.5.0
+ * Mark, Set, Go! Workspace Experiment v0.14.3
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -10,7 +10,12 @@
 
   const PARAMS = new URLSearchParams(window.location.search);
   const IS_WORKSPACE_PANE = PARAMS.get('msgWorkspacePane') === '1';
+  const IS_SECONDARY_READER_DOCUMENT = PARAMS.get('msgSecondaryReader') === '1';
   const WORKSPACE_PREF_KEY = 'msg-workspace-optin-v1';
+
+  // Reader 2 is a full copy of the main application Reader running in its own
+  // iframe. It must not install another workspace/router inside itself.
+  if (IS_SECONDARY_READER_DOCUMENT) return;
 
   function readWorkspacePreference() {
     try { return localStorage.getItem(WORKSPACE_PREF_KEY) === '1'; }
@@ -273,6 +278,13 @@
     return APP.querySelector(':scope > .msg-workspace-shell');
   }
 
+  function preferredSecondaryReaderWidth(shell = workspaceShell()) {
+    const available = Math.max(0, shell?.getBoundingClientRect?.().width || APP.getBoundingClientRect().width || 0);
+    if (!available) return MIN_SECONDARY_WIDTH;
+    const maxSecondary = Math.max(MIN_SECONDARY_WIDTH, available - 520 - 8);
+    return Math.max(MIN_SECONDARY_WIDTH, Math.min(Math.floor(available * 0.48), maxSecondary));
+  }
+
   function workspaceEnabled() {
     return readWorkspacePreference();
   }
@@ -516,11 +528,44 @@
       }).join('');
   }
 
+  function syncWorkspacePanelMode(shell, body, key = activePanelKey) {
+    if (!shell || !body) return;
+    const symposiumActive = key === 'tool:symposium';
+    shell.classList.toggle('msg-workspace-symposium-active', symposiumActive);
+    body.classList.toggle('msg-workspace-symposium-scroll-owner', symposiumActive);
+  }
+
+  function revealSymposiumStart(rootHost) {
+    const body = rootHost?.closest?.('.msg-workspace-panel-body') || panelBody();
+    const startButton = rootHost?.querySelector?.('#symposium-start');
+    if (!body || !startButton) return;
+
+    // Wait for the workspace width, saved-session list, and Symposium content to
+    // finish their layout before measuring. Adjust only the workspace scroll
+    // owner; never scroll the Reader/window just to expose this control.
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      if (!body.isConnected || !startButton.isConnected) return;
+      const bodyRect = body.getBoundingClientRect();
+      const buttonRect = startButton.getBoundingClientRect();
+      const topPad = 18;
+      const bottomPad = 24;
+      if (buttonRect.bottom > bodyRect.bottom - bottomPad) {
+        body.scrollTop += buttonRect.bottom - (bodyRect.bottom - bottomPad);
+      } else if (buttonRect.top < bodyRect.top + topPad) {
+        body.scrollTop -= (bodyRect.top + topPad) - buttonRect.top;
+      }
+
+      // The Symposium setup uses one vertical scroll owner. The participant
+      // roster deliberately does not create a nested wheel/scroll region.
+    }));
+  }
+
   function closeWorkspacePanel() {
     const shell = workspaceShell();
     if (!shell) return;
     detachActivePanel();
     activePanelKey = '';
+    syncWorkspacePanelMode(shell, panelBody(shell), '');
     restoreReaderTopControlsAfterWorkspace();
     shell.classList.add('is-closed');
     renderWorkspaceTabs(shell);
@@ -537,12 +582,20 @@
 
     if (activePanelKey !== key) detachActivePanel();
     activePanelKey = key;
+    syncWorkspacePanelMode(shell, body, key);
     const wasClosed = shell.classList.contains('is-closed');
-    if (wasClosed) secondaryWidth = MIN_SECONDARY_WIDTH;
+    if (wasClosed) {
+      if (key === 'page:reader:secondary') {
+        secondaryWidth = preferredSecondaryReaderWidth(shell);
+      } else {
+        secondaryWidth = MIN_SECONDARY_WIDTH;
+      }
+    }
     shell.classList.remove('is-closed');
     shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
     window.requestAnimationFrame(dockReaderTopControlsForWorkspace);
     if (!record.node.isConnected) body.appendChild(record.node);
+    syncWorkspacePanelMode(shell, body, key);
     renderWorkspaceTabs(shell);
     return true;
   }
@@ -573,19 +626,23 @@
   }
 
   function panelUrl(mode, value) {
-    const url = new URL('/workspace-pane.html', window.location.origin);
+    const secondaryReader = mode === 'reader' && value === 'secondary';
+    // Reader 2 intentionally uses index.html: that is the only way to guarantee
+    // it receives the same Reader, Ask Mark/companion stack, themes and feature
+    // scripts as Reader 1. Ordinary workspace pages keep the lightweight shell.
+    const url = new URL(secondaryReader ? '/index.html' : '/workspace-pane.html', window.location.origin);
     url.searchParams.set('msgWorkspaceMode', mode);
     url.searchParams.set('msgWorkspaceValue', value);
-    // Keep the pane document/runtime in lockstep with the router and prevent an
-    // older cached pane from reviving the former hand-maintained page list.
-    url.searchParams.set('msgWorkspaceBuild', '0.5.0');
+    if (secondaryReader) url.searchParams.set('msgSecondaryReader', '1');
+    url.searchParams.set('msgWorkspaceBuild', secondaryReader ? '0.13.0-full-reader' : '0.13.0');
     return url.toString();
   }
 
   function createAppPagePanel(mode, value, label) {
     const node = document.createElement('div');
-    node.className = 'msg-workspace-panel msg-workspace-app-page';
-    node.innerHTML = `<iframe class="msg-workspace-page-frame" title="${escapeWorkspaceHtml(label)}" src="${escapeWorkspaceHtml(panelUrl(mode, value))}" loading="eager"></iframe>`;
+    const secondaryReader = mode === 'reader' && value === 'secondary';
+    node.className = `msg-workspace-panel msg-workspace-app-page${secondaryReader ? ' msg-workspace-secondary-reader-page' : ''}`;
+    node.innerHTML = `<iframe class="msg-workspace-page-frame${secondaryReader ? ' msg-secondary-reader-frame' : ''}" title="${escapeWorkspaceHtml(label)}" src="${escapeWorkspaceHtml(panelUrl(mode, value))}" loading="eager"></iframe>`;
     return node;
   }
 
@@ -596,19 +653,88 @@
     return registerPanel(key, label || humanize(value), createAppPagePanel(mode, value, label || humanize(value)));
   }
 
-  function showWorkspacePanel(kind) {
+  function consumeWorkspaceSymposiumHandoff(suppliedHandoff = null) {
+    // toSymposium() stores the handoff for non-workspace routes too. When the
+    // workspace receives that same object directly, consume the stored copy so
+    // it cannot be replayed later as a stale topic.
+    const pending = window.MSGContentShare?.takeSymposiumHandoff?.() || null;
+    return suppliedHandoff || pending;
+  }
+
+  function applySymposiumWorkspaceHandoff(rootHost, suppliedHandoff = null) {
+    const handoff = consumeWorkspaceSymposiumHandoff(suppliedHandoff);
+    const root = rootHost?.querySelector?.('.symposium-page');
+    if (!handoff || !root) return false;
+
+    const topicText = String(handoff.symposiumTopic || handoff.title || '').trim();
+    const contextText = String(handoff.symposiumContext || handoff.context || handoff.text || '').trim();
+    const sourceLabel = String(handoff.sourceLabel || 'Reader').trim() || 'Reader';
+    const sharedLabel = `Shared from ${sourceLabel}`;
+
+    const topic = root.querySelector('#symposium-topic');
+    const context = root.querySelector('#symposium-context');
+    const contextLabel = root.querySelector('#symposium-context-label');
+    if (topicText && topic) topic.value = topicText;
+    if (context) context.value = contextText;
+    if (contextLabel) {
+      contextLabel.textContent = contextText
+        ? `${sharedLabel} · ${splitWords(contextText).length.toLocaleString()} words available`
+        : `${sharedLabel} · topic only`;
+    }
+
+    // Keep the newest shared passage available to the context-choice control.
+    root.__msgSymposiumShared = { text: contextText, label: sharedLabel };
+
+    // A Symposium opened manually may not yet have a Shared Content button.
+    // Add it only when needed; the delegated click handler below owns behavior.
+    const contextChoices = root.querySelector('.symposium-context-choice');
+    if (contextText && contextChoices && !contextChoices.querySelector('[data-symposium-context="shared"]')) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.symposiumContext = 'shared';
+      button.textContent = 'Use shared content';
+      contextChoices.prepend(button);
+    }
+
+    const status = root.querySelector('#symposium-stage-status');
+    if (status) status.textContent = 'New highlighted passage loaded · begin a new Symposium when ready';
+
+    const startButton = root.querySelector('#symposium-start');
+    if (startButton && !root.querySelector('#symposium-transcript .symposium-empty')) {
+      startButton.textContent = 'Begin New Symposium';
+    }
+
+    // A new handoff should leave the action the reader needs next visible.
+    // Do not use scrollIntoView() here: it can choose the window/Reader as the
+    // scroll target while the workspace is being reactivated. Reveal the Begin
+    // button inside the workspace's explicit scroll owner instead.
+    revealSymposiumStart(rootHost);
+    return true;
+  }
+
+  function showWorkspacePanel(kind, options = {}) {
     if (!hasReader()) return false;
     const key = `tool:${kind}`;
-    if (PANELS.has(key)) return activatePanel(key);
+    if (PANELS.has(key)) {
+      const record = PANELS.get(key);
+      const activated = activatePanel(key);
+      if (kind === 'symposium') {
+        const applied = applySymposiumWorkspaceHandoff(record?.node, options.handoff || null);
+        if (!applied) revealSymposiumStart(record?.node);
+      }
+      return activated;
+    }
 
     const node = document.createElement('div');
     node.className = `msg-workspace-panel msg-workspace-${kind}`;
-    if (kind === 'symposium') renderSymposiumWorkspace(node);
+    if (kind === 'symposium') renderSymposiumWorkspace(node, options.handoff || null);
     else if (kind === 'browser') renderBrowserWorkspace(node);
     else return false;
 
     const label = kind === 'browser' ? 'Web' : 'Symposium';
-    return registerPanel(key, label, node);
+    const opened = registerPanel(key, label, node);
+    if (opened && kind === 'symposium') revealSymposiumStart(node);
+    return opened;
   }
 
   function normalizeDirectUrl(value) {
@@ -749,6 +875,21 @@
     const nav = document.querySelector('.site-header nav');
     if (!nav) return false;
     const symposium = document.querySelector('[data-action="symposium"]');
+    const primaryReader = document.querySelector('.top-reader-return[data-action="reader"]');
+
+    let readerButton = document.querySelector('[data-msg-workspace-open="reader"]');
+    if (!readerButton) {
+      readerButton = document.createElement('button');
+      readerButton.type = 'button';
+      readerButton.dataset.msgWorkspaceOpen = 'reader';
+      readerButton.className = 'top-level-nav-button msg-secondary-reader-nav-link';
+      readerButton.innerHTML = '<span class="nav-icon" aria-hidden="true">▥</span> Reader 2';
+      readerButton.title = 'Open a second Reader beside the current Reader';
+      nav.appendChild(readerButton);
+    }
+    if (primaryReader && primaryReader.nextSibling !== readerButton) {
+      primaryReader.insertAdjacentElement('afterend', readerButton);
+    }
 
     let button = document.querySelector('[data-msg-workspace-open="browser"]');
     if (!button) {
@@ -762,7 +903,7 @@
     }
 
     if (symposium && symposium.nextSibling !== button) nav.insertBefore(button, symposium.nextSibling);
-    return Boolean(symposium && button.isConnected);
+    return Boolean(readerButton.isConnected && button.isConnected);
   }
 
   function navigationDescriptor(element) {
@@ -798,6 +939,22 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       activatePanel(tab.dataset.msgWorkspaceTab);
+      return;
+    }
+
+    const secondReader = event.target.closest?.('[data-msg-workspace-open="reader"]');
+    if (secondReader) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      try { closeMenus?.(); } catch {}
+      if (!hasReader()) {
+        window.alert('Open a text in the main Reader first, then use Reader 2 to read another text beside it.');
+        return;
+      }
+      writeWorkspacePreference(true);
+      installProfileWorkspaceToggle(document);
+      secondaryWidth = preferredSecondaryReaderWidth();
+      openAppPage('reader', 'secondary', 'Reader 2');
       return;
     }
 
@@ -877,16 +1034,16 @@
     openPage: openAppPage,
     close: closeWorkspacePanel,
     browser: () => showWorkspacePanel('browser'),
-    symposium: () => showWorkspacePanel('symposium'),
+    symposium: (handoff = null) => showWorkspacePanel('symposium', { handoff }),
     musicSearch: (query, title) => workspaceYouTubeSearch(query, title),
     enabled: workspaceEnabled,
     setEnabled: (enabled) => { writeWorkspacePreference(Boolean(enabled)); installProfileWorkspaceToggle(document); if (!enabled) closeWorkspacePanel(); }
   });
 
-function renderSymposiumWorkspace(rootHost) {
+function renderSymposiumWorkspace(rootHost, suppliedHandoff = null) {
   ensureSymposiumStyles();
   const readingContext = currentSymposiumReadingContext();
-  const sharedHandoff = window.MSGContentShare?.takeSymposiumHandoff?.() || null;
+  const sharedHandoff = consumeWorkspaceSymposiumHandoff(suppliedHandoff);
   const sharedContextText = String(sharedHandoff?.symposiumContext || '').trim();
   const sharedContextLabel = sharedHandoff ? `Shared from ${sharedHandoff.sourceLabel || 'app content'}` : '';
   const defaultTopic = sharedHandoff?.symposiumTopic || (state?.title ? `Explore the central ideas in ${state.title}` : '');
@@ -905,6 +1062,11 @@ function renderSymposiumWorkspace(rootHost) {
         <aside class="symposium-badge"><strong>Reader participates</strong><small>Listen, read, question, challenge, supply evidence, or enter your own argument at any point.</small></aside>
       </header>
 
+      <section class="symposium-saved-panel" aria-label="Saved Symposiums">
+        <div class="symposium-saved-head"><div><strong>Saved Symposiums</strong><small>Cloud-backed sessions you can reopen and continue later.</small></div><button type="button" id="symposium-refresh-sessions">Refresh</button></div>
+        <div class="symposium-saved-list" id="symposium-saved-list"><div class="symposium-saved-empty">Loading saved Symposiums…</div></div>
+      </section>
+
       <div class="symposium-layout">
         <aside class="symposium-panel">
           <div class="symposium-panel-head"><h2>Set the table</h2><p>Choose a format, topic, context, and participants.</p></div>
@@ -918,6 +1080,10 @@ function renderSymposiumWorkspace(rootHost) {
                 <label class="symposium-mode"><input type="radio" name="symposium-mode" value="explain"><span>Explain<small>Teach from many lenses</small></span></label>
               </div>
             </div>
+
+            <label>Session name
+              <input id="symposium-session-title" type="text" maxlength="240" placeholder="Optional — generated from the topic">
+            </label>
 
             <label>Topic or question
               <textarea id="symposium-topic" placeholder="Example: Is technological progress making us wiser?">${symposiumEscape(defaultTopic)}</textarea>
@@ -938,6 +1104,17 @@ function renderSymposiumWorkspace(rootHost) {
               <select id="symposium-output"><option value="write">Write</option><option value="both">Speak + write</option><option value="speak">Speak (transcript remains visible)</option></select>
             </label>
 
+            <!-- Keep the primary action above the long participant roster.
+                 The workspace renderer is separate from app.js, so this must
+                 stay in sync with the standalone Symposium renderer. -->
+            <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
+
+            <div class="symposium-add-participant-block">
+              <label>Add a participant</label>
+              <div class="symposium-custom-row"><input id="symposium-custom-person" placeholder="e.g., Hannah Arendt"><button type="button" id="symposium-add-person">Add</button></div>
+              <p class="symposium-hint">Custom participants join this session as an AI representation of their published ideas.</p>
+            </div>
+
             <div>
               <label>Participants <span style="font-weight:500;color:#718095">(choose 1–6)</span></label>
               <div class="symposium-roster" id="symposium-roster">
@@ -945,20 +1122,13 @@ function renderSymposiumWorkspace(rootHost) {
               </div>
             </div>
 
-            <div>
-              <label>Add a participant</label>
-              <div class="symposium-custom-row"><input id="symposium-custom-person" placeholder="e.g., Hannah Arendt"><button type="button" id="symposium-add-person">Add</button></div>
-              <p class="symposium-hint">Custom participants join this session as an AI representation of their published ideas.</p>
-            </div>
-
-            <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
           </div>
         </aside>
 
         <main class="symposium-panel symposium-stage">
           <div class="symposium-stage-toolbar">
             <span class="symposium-stage-status" id="symposium-stage-status">Ready to convene</span>
-            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
+            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save now</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
           </div>
           <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
             <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
@@ -981,7 +1151,10 @@ function renderSymposiumWorkspace(rootHost) {
   const readerButton = root.querySelector('#symposium-reader-submit');
   const startButton = root.querySelector('#symposium-start');
   const rosterEl = root.querySelector('#symposium-roster');
-  const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'' };
+  const session = { active:false, mode:'debate', topic:'', title:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'', startedAt:'', cloudId:'', clientSessionId:'', cloudWriteQueue:Promise.resolve(), cloudError:'', sourceContext:{} };
+  const symposiumCloud = createSymposiumCloudController({ root, session, transcriptEl, statusEl, nextButton, saveButton, chatButton, readerButton, startButton, rosterEl });
+  symposiumCloud.refreshSaved();
+  root.__msgSymposiumShared = { text: sharedContextText, label: sharedContextLabel };
 
   const scrollTranscript = () => { transcriptEl.scrollTop = transcriptEl.scrollHeight; };
   const shouldSpeak = () => session.output === 'both' || session.output === 'speak';
@@ -989,6 +1162,7 @@ function renderSymposiumWorkspace(rootHost) {
     if (transcriptEl.querySelector('.symposium-empty')) transcriptEl.innerHTML = '';
     session.transcript.push(turn);
     transcriptEl.insertAdjacentHTML('beforeend', symposiumTurnHtml(turn));
+    symposiumCloud.persistTurn(turn).catch(()=>{});
     scrollTranscript();
     if (speak && shouldSpeak()) symposiumSpeak(turn.text, turn.name);
   };
@@ -999,18 +1173,21 @@ function renderSymposiumWorkspace(rootHost) {
     if (label) statusEl.innerHTML = busy ? `${symposiumEscape(label)} <span class="symposium-loading"><i></i><i></i><i></i></span>` : symposiumEscape(label);
   };
 
-  root.querySelectorAll('[data-symposium-context]').forEach((button)=>button.addEventListener('click',()=>{
-    if (button.dataset.symposiumContext === 'shared' && sharedContextText) {
-      root.querySelector('#symposium-context').value = sharedContextText;
-      root.querySelector('#symposium-context-label').textContent = `${sharedContextLabel} · ${splitWords(sharedContextText).length.toLocaleString()} words available`;
+  root.addEventListener('click', (event) => {
+    const button = event.target.closest?.('[data-symposium-context]');
+    if (!button || !root.contains(button)) return;
+    const liveShared = root.__msgSymposiumShared || { text: sharedContextText, label: sharedContextLabel };
+    if (button.dataset.symposiumContext === 'shared' && liveShared.text) {
+      root.querySelector('#symposium-context').value = liveShared.text;
+      root.querySelector('#symposium-context-label').textContent = `${liveShared.label} · ${splitWords(liveShared.text).length.toLocaleString()} words available`;
     } else if (button.dataset.symposiumContext === 'reading') {
       root.querySelector('#symposium-context').value = readingContext.text;
       root.querySelector('#symposium-context-label').textContent = `${readingContext.label} · ${splitWords(readingContext.text).length.toLocaleString()} words available`;
-    } else {
+    } else if (button.dataset.symposiumContext === 'none') {
       root.querySelector('#symposium-context').value = '';
       root.querySelector('#symposium-context-label').textContent = 'Topic only · no reading passage supplied';
     }
-  }));
+  });
 
   rosterEl.addEventListener('change', (event)=>{
     if (!event.target.matches('[data-symposium-person]')) return;
@@ -1054,11 +1231,23 @@ function renderSymposiumWorkspace(rootHost) {
     if (!topic) { root.querySelector('#symposium-topic').focus(); return window.alert('Enter a topic or question for the Symposium.'); }
     if (!people.length) return window.alert('Choose at least one participant.');
     session.active = true;
+    startButton.disabled = true;
     session.mode = root.querySelector('[name="symposium-mode"]:checked')?.value || 'debate';
     session.topic = topic;
+    session.title = root.querySelector('#symposium-session-title')?.value.trim() || symposiumDefaultSessionTitle(topic);
     session.context = root.querySelector('#symposium-context').value || '';
     session.output = root.querySelector('#symposium-output').value || 'write';
     session.people = people;
+    session.startedAt = new Date().toISOString();
+    try {
+      await symposiumCloud.beginNew();
+    } catch (error) {
+      const proceed = window.confirm(`This Symposium cannot be saved to the cloud right now: ${error.message}
+
+Start a temporary session anyway?`);
+      if (!proceed) { session.active = false; startButton.disabled = false; return; }
+      statusEl.textContent = 'Temporary session · cloud save unavailable';
+    }
     session.transcript = [];
     session.nextIndex = 0;
     session.pendingReaderContribution = '';
@@ -1067,6 +1256,7 @@ function renderSymposiumWorkspace(rootHost) {
     nextButton.disabled = false; saveButton.disabled = false; if (chatButton) chatButton.disabled = false; readerButton.disabled = false;
     await runSpeaker(session.people[0]);
     session.nextIndex = session.people.length > 1 ? 1 : 0;
+    symposiumCloud.queueState().catch(()=>{});
   });
 
   nextButton.addEventListener('click', async ()=>{
@@ -1076,6 +1266,7 @@ function renderSymposiumWorkspace(rootHost) {
     const pending = session.pendingReaderContribution;
     session.pendingReaderContribution = '';
     await runSpeaker(person, pending);
+    symposiumCloud.queueState().catch(()=>{});
   });
 
   readerButton.addEventListener('click', async ()=>{
@@ -1093,6 +1284,7 @@ function renderSymposiumWorkspace(rootHost) {
     session.nextIndex = (session.nextIndex + 1) % session.people.length;
     session.pendingReaderContribution = '';
     await runSpeaker(person, readerContribution);
+    symposiumCloud.queueState().catch(()=>{});
   });
 
   root.querySelector('#symposium-reader-input').addEventListener('keydown',(event)=>{
@@ -1129,10 +1321,20 @@ function renderSymposiumWorkspace(rootHost) {
 
   root.querySelector('#symposium-stop-speech').addEventListener('click',()=>window.speechSynthesis?.cancel?.());
   root.querySelector('#symposium-clear').addEventListener('click',()=>{ window.speechSynthesis?.cancel?.(); renderSymposiumWorkspace(rootHost); });
-  saveButton.addEventListener('click',()=>{
+  saveButton.addEventListener('click', async ()=>{
     if (!session.transcript.length) return;
-    saveSymposiumSession({ mode:session.mode, topic:session.topic, participants:session.people.map((p)=>p.name), transcript:session.transcript });
-    const original = saveButton.textContent; saveButton.textContent = 'Saved ✓'; window.setTimeout(()=>saveButton.textContent=original,1300);
+    const original = saveButton.textContent;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving…';
+    try {
+      await symposiumCloud.saveNow();
+      saveButton.textContent = 'Saved ✓';
+    } catch (error) {
+      saveButton.textContent = 'Save failed';
+      statusEl.textContent = `Cloud save problem · ${error.message}`;
+    } finally {
+      window.setTimeout(() => { if (saveButton.isConnected) { saveButton.textContent = original; saveButton.disabled = !session.active; } }, 1300);
+    }
   });
 }
 

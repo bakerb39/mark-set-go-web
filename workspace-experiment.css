@@ -1,13 +1,17 @@
+/* Mark, Set, Go! Workspace Experiment v0.4.8 */
 /* Mark, Set, Go! workspace experiment */
 .msg-workspace-shell{
-  --msg-secondary-width: 520px;
+  --msg-secondary-width: 360px;
   display:grid;
-  grid-template-columns:minmax(0,1fr) 8px minmax(340px,var(--msg-secondary-width));
+  grid-template-columns:minmax(0,1fr) 8px minmax(360px,var(--msg-secondary-width));
   width:100%;
   min-width:0;
+  height:100%;
+  min-height:0;
+  max-height:100%;
   align-items:stretch;
 }
-.msg-workspace-primary{min-width:0;overflow:visible}
+.msg-workspace-primary{min-width:0;min-height:0;height:100%;max-height:100%;overflow:visible}
 .msg-workspace-divider{
   position:relative;
   cursor:col-resize;
@@ -27,7 +31,7 @@ body.msg-workspace-resizing .msg-workspace-divider::before{background:#17365d}
 body.msg-workspace-resizing{cursor:col-resize!important;user-select:none!important}
 .msg-workspace-secondary{
   min-width:0;
-  min-height:640px;
+  min-height:0;
   background:#fff;
   border:1px solid #dbe2ea;
   border-radius:12px;
@@ -35,10 +39,11 @@ body.msg-workspace-resizing{cursor:col-resize!important;user-select:none!importa
   box-shadow:0 8px 26px rgba(17,40,70,.10);
   display:flex;
   flex-direction:column;
-  position:sticky;
-  top:8px;
-  align-self:start;
-  height:calc(100vh - 24px);
+  position:relative;
+  top:auto;
+  align-self:stretch;
+  height:100%;
+  max-height:100%;
 }
 .msg-workspace-shell.is-closed{grid-template-columns:minmax(0,1fr) 0 0}
 .msg-workspace-shell.is-closed .msg-workspace-divider,
@@ -125,7 +130,7 @@ body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
 }
 
 .msg-workspace-shell:not(.is-closed){
-  grid-template-columns:minmax(640px,1fr) 8px minmax(420px,var(--msg-secondary-width));
+  grid-template-columns:minmax(640px,1fr) 8px minmax(360px,var(--msg-secondary-width));
 }
 
 /* Compact workspace chrome */
@@ -226,8 +231,20 @@ body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
   font-size:.72rem !important;
 }
 .msg-workspace-symposium .symposium-roster{
-  max-height:260px !important;
+  /* One scroll owner for Symposium: the workspace panel body. A nested roster
+     scrollbar trapped mouse-wheel input and hid the custom participant area. */
+  max-height:none !important;
+  height:auto !important;
+  overflow:visible !important;
+  overscroll-behavior:auto !important;
+  scrollbar-gutter:auto !important;
+  padding-right:0 !important;
   gap:5px !important;
+}
+
+.msg-workspace-symposium .symposium-add-participant-block{
+  position:relative;
+  z-index:1;
 }
 .msg-workspace-symposium .symposium-person{
   grid-template-columns:auto 32px 1fr !important;
@@ -353,7 +370,7 @@ body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
     width:calc(100vw - 16px) !important;
   }
   .msg-workspace-shell:not(.is-closed){
-    grid-template-columns:minmax(500px,1fr) 8px minmax(380px,var(--msg-secondary-width));
+    grid-template-columns:minmax(500px,1fr) 8px minmax(360px,var(--msg-secondary-width));
   }
 }
 
@@ -369,7 +386,7 @@ body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
   }
 }
 
-/* v0.3.2 — opt-in all-page workspace tabs */
+/* v0.3.4 — opt-in all-page workspace tabs */
 .site-header nav > .msg-workspace-optin,
 .msg-workspace-optin{
   display:inline-flex !important;
@@ -486,6 +503,12 @@ html.msg-workspace-pane-document body{
   background:#fff !important;
   overflow-x:hidden;
 }
+html.msg-workspace-pane-document:not(.msg-workspace-pane-ready) body{
+  visibility:hidden !important;
+}
+html.msg-workspace-pane-document.msg-workspace-pane-ready body{
+  visibility:visible !important;
+}
 html.msg-workspace-pane-document .site-header,
 html.msg-workspace-pane-document #msg-shared-bottom{
   display:none !important;
@@ -519,4 +542,199 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
 @media(max-width:1180px){
   .msg-workspace-optin span{display:none}
   .msg-workspace-optin{padding:4px}
+}
+
+/* v0.3.3: permanent checkbox row inside My Library menu. */
+.library-menu-root .menu-popover .msg-workspace-menu-option{
+  display:flex !important;
+  width:calc(100% - 16px) !important;
+  box-sizing:border-box !important;
+  align-items:center !important;
+  gap:10px !important;
+  margin:6px 8px 9px !important;
+  padding:9px 10px !important;
+  border:1px solid #c9d5e2 !important;
+  border-radius:9px !important;
+  background:#f7fafc !important;
+  color:#0b2d4f !important;
+  line-height:1.2 !important;
+  cursor:pointer !important;
+}
+.library-menu-root .menu-popover .msg-workspace-menu-option:hover{background:#eef5fb !important}
+.library-menu-root .menu-popover .msg-workspace-menu-option:has(input:checked){
+  background:#fff8df !important;
+  border-color:#d9a514 !important;
+  color:#0b2d4f !important;
+}
+.library-menu-root .menu-popover .msg-workspace-menu-option input{
+  display:block !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  flex:0 0 auto !important;
+  width:15px !important;
+  height:15px !important;
+  margin:0 !important;
+}
+.library-menu-root .menu-popover .msg-workspace-menu-copy{
+  display:grid !important;
+  gap:2px !important;
+  min-width:0 !important;
+  color:inherit !important;
+}
+.library-menu-root .menu-popover .msg-workspace-menu-copy strong{font-size:.78rem !important;font-weight:800 !important}
+.library-menu-root .menu-popover .msg-workspace-menu-copy small{display:block !important;font-size:.67rem !important;font-weight:500 !important;color:#64748b !important}
+
+
+/* Profile > Workspace preference (v0.3.4) */
+.msg-workspace-profile-card .section-heading{margin-bottom:.75rem}
+.msg-workspace-profile-toggle{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:1.25rem;
+  width:100%;
+  box-sizing:border-box;
+  padding:1rem 1.05rem;
+  border:1px solid rgba(148,163,184,.28);
+  border-radius:12px;
+  background:rgba(148,163,184,.045);
+  cursor:pointer;
+}
+.msg-workspace-profile-toggle:hover{background:rgba(148,163,184,.09)}
+.msg-workspace-profile-copy{display:grid;gap:.22rem;min-width:0}
+.msg-workspace-profile-copy strong{font-size:.96rem;line-height:1.25}
+.msg-workspace-profile-copy small{font-size:.78rem;line-height:1.4;color:#64748b;font-weight:500}
+.msg-workspace-switch-wrap{position:relative;display:inline-flex;flex:0 0 auto;width:46px;height:26px}
+.msg-workspace-switch-wrap input{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  margin:0;
+  opacity:0;
+  cursor:pointer;
+  z-index:2;
+}
+.msg-workspace-switch{
+  position:absolute;
+  inset:0;
+  border-radius:999px;
+  background:#cbd5e1;
+  box-shadow:inset 0 0 0 1px rgba(15,23,42,.12);
+  transition:background .16s ease;
+}
+.msg-workspace-switch::after{
+  content:'';
+  position:absolute;
+  width:20px;
+  height:20px;
+  left:3px;
+  top:3px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 1px 3px rgba(15,23,42,.28);
+  transition:transform .16s ease;
+}
+.msg-workspace-switch-wrap input:checked + .msg-workspace-switch{background:#0b2b4b}
+.msg-workspace-switch-wrap input:checked + .msg-workspace-switch::after{transform:translateX(20px)}
+.msg-workspace-switch-wrap input:focus-visible + .msg-workspace-switch{outline:3px solid rgba(59,130,246,.3);outline-offset:2px}
+.msg-workspace-pane-document .msg-workspace-profile-toggle{padding:.78rem .85rem}
+.msg-workspace-pane-document .msg-workspace-profile-copy strong{font-size:.82rem}
+.msg-workspace-pane-document .msg-workspace-profile-copy small{font-size:.68rem}
+@media(max-width:560px){
+  .msg-workspace-profile-toggle{align-items:flex-start;gap:.85rem}
+}
+
+
+/* v0.4.9 — Reader controls while a workspace pane is open.
+   WPM remains in its original footer. Only font resize + music + Full screen
+   share the Reader's upper-right flex row, so all three follow Reader width. */
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-pane-controls{
+  align-items:center !important;
+}
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack{
+  position:static !important;
+  inset:auto !important;
+  margin-left:auto !important;
+  display:inline-flex !important;
+  flex-direction:row !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  width:auto !important;
+  /* Move the one shared three-control div upward together. */
+  transform:none !important;
+  flex:0 0 auto !important;
+}
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .reader-topright-font-control,
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .reader-topright-music-toggle,
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack [data-reader-wpm-music-toggle],
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-topright-media-stack .viewer-fullscreen-button{
+  position:static !important;
+  inset:auto !important;
+  top:auto !important;
+  right:auto !important;
+  bottom:auto !important;
+  left:auto !important;
+  margin:0 !important;
+  transform:none !important;
+  flex:0 0 auto !important;
+}
+#app .msg-workspace-shell:not(.is-closed) .msg-workspace-primary .reader-viewer-footer .viewer-wpm-control{
+  position:static !important;
+  inset:auto !important;
+  margin-left:auto !important;
+  transform:none !important;
+}
+
+
+/* v0.4.9 — current-reading music suggestions in the lightweight Music pane. */
+.msg-workspace-pane-document .msg-workspace-reading-music-suggestions{
+  display:grid;
+  gap:8px;
+}
+.msg-workspace-pane-document .msg-workspace-reading-music-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:2px;
+}
+.msg-workspace-pane-document .msg-workspace-reading-music-actions button{
+  min-height:36px;
+  padding:7px 12px;
+}
+
+/* v0.5.3 — Chat owns a wider secondary workspace column.
+   This is the previously working Chat width, consolidated into the real
+   workspace stylesheet instead of a separate correction file. */
+@media (min-width:1100px) {
+  #app > .msg-workspace-shell:not(.is-closed):has(
+    .msg-workspace-page-frame[src*="msgWorkspaceValue=msg-chat"]
+  ) {
+    --msg-secondary-width:clamp(620px,42vw,760px) !important;
+    grid-template-columns:
+      minmax(560px,1fr)
+      8px
+      minmax(620px,var(--msg-secondary-width)) !important;
+    column-gap:0;
+  }
+
+  #app > .msg-workspace-shell:not(.is-closed):has(
+    .msg-workspace-page-frame[src*="msgWorkspaceValue=msg-chat"]
+  ) > .msg-workspace-secondary {
+    margin-right:10px !important;
+  }
+}
+
+@media (min-width:901px) and (max-width:1099px) {
+  #app > .msg-workspace-shell:not(.is-closed):has(
+    .msg-workspace-page-frame[src*="msgWorkspaceValue=msg-chat"]
+  ) {
+    --msg-secondary-width:520px !important;
+    grid-template-columns:
+      minmax(440px,1fr)
+      8px
+      minmax(520px,var(--msg-secondary-width)) !important;
+  }
 }

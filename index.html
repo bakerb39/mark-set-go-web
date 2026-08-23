@@ -2,57 +2,101 @@
 
 <html lang="en">
 <head>
+<!-- MSG repair v7.2: exact theme owner + native bookmark -->
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<link href="/styles.css?v=reader-annotations-v8-reconciled" rel="stylesheet"/>
+<meta name="msg-build" content="20260823-v7.32.4-symposium-single-scroll"/>
+<script>
+(() => {
+  const p = new URLSearchParams(location.search);
+  if (p.get('msgSecondaryReader') !== '1') return;
+  window.__MSG_SECONDARY_READER__ = true;
+  document.documentElement.classList.add('msg-secondary-reader-document');
+  // A second Reader is user-invoked. Do not let the daily Topic Feed startup
+  // replace its intentionally empty Reader before the user chooses text.
+  const nativeFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const raw = typeof input === 'string' ? input : (input?.url || '');
+    try {
+      const u = new URL(raw, location.href);
+      if (u.pathname === '/api/topic-feeds/daily-open') {
+        return Promise.resolve(new Response(JSON.stringify({secondaryReader:true}), {status:200,headers:{'Content-Type':'application/json'}}));
+      }
+    } catch {}
+    return nativeFetch(input, init);
+  };
+})();
+</script>
+<script src="/experience-theme-bootstrap.js?v=20260822-v9.3-unified-ui"></script>
+<link href="/styles.css?v=20260822-v7.28.1-share-toolbar" rel="stylesheet"/>
 <link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
-<link href="/ask-mark-hub.css?v=9.2.87-reader-tools-scroll-format" rel="stylesheet"/>
+<link href="/workspace-experiment.css?v=0.5.4-symposium-single-scroll" rel="stylesheet"/>
+<link href="/symposium-workspace-fix.css?v=4.4-explicit-scroll-owner" rel="stylesheet"/>
+<link href="/ask-mark-hub.css?v=9.2.88-hidden-splitter-fix" rel="stylesheet"/>
 <link href="/mobile-simple.css?v=8.5.9" rel="stylesheet"/>
-<link rel="stylesheet" href="/button-feedback.css?v=8.6.6">
-<link rel="stylesheet" href="/topic-feeds.css?v=2.1.17-clean-header">
-<link rel="stylesheet" href="/reader-music-quick.css?v=1.4.5-final-order">
+<script>if(window.__MSG_SECONDARY_READER__) document.querySelector('link[href^="/mobile-simple.css"]')?.remove();</script>
+<link rel="stylesheet" href="/button-feedback.css?v=8.6.8-reader-control-cluster">
+<link rel="stylesheet" href="/topic-feeds.css?v=2.1.22-reader-isolated-header">
+<link rel="stylesheet" href="/reader-music-quick.css?v=1.5.4-font-row-restore">
 <link rel="stylesheet" href="/crypto-ticker.css?v=1.0.0">
-<link href="/theme-system.css?v=9.2.41-reader-contrast-final" rel="stylesheet"/>
 <link href="/companion-persona-safe.css?v=9.7.0-unified-three" rel="stylesheet"/>
 <link href="/companion-chad.css?v=1.0.4-avatar-sync" rel="stylesheet"/>
 <link href="/app-help-mark.css?v=9.6.2" rel="stylesheet"/>
 <link href="/developer-tools.css?v=9.6.2" rel="stylesheet"/>
+<link href="/experience-themes.css?v=20260822-v7.30.1-palette-visible" rel="stylesheet"/>
+<link href="/experience-theme-layout.css?v=20260822-v7.14-parent-background-owner" rel="stylesheet"/>
+<link href="/topic-feed-header-stability.css?v=20260822-v7.31.1-small-title-hard-fix" rel="stylesheet"/>
+<link href="/msg-chat.css?v=20260822-v7.28-content-sharing" rel="stylesheet"/>
+<link href="/content-share.css?v=20260822-v1" rel="stylesheet"/>
+<link href="/explorer-visual-designer.css?v=20260822-v2.4-themed-controls" rel="stylesheet"/>
+<link href="/theme-system.css?v=20260822-v9.4.3-no-duplicate-divider-no-selection-popup" rel="stylesheet"/>
+<link href="/reader-theme-controls.css?v=20260823-v1-theme-aware-reader-utilities" rel="stylesheet"/>
+  <script defer src="/workspace-pane-cache-refresh.js?v=20260822-v7.21-stability-consolidation"></script>
+<script defer src="/workspace-experiment.js?v=0.14.3-symposium-single-scroll"></script>
+<script defer src="/workspace-parent-bridge.js?v=0.8.0-library-delegation"></script>
 <script defer src="/debug-bootstrap.js?v=9.6.2"></script>
 <script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/SessionManager.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/ReaderEngine.js?v=3.2.1-stable-recovery"></script>
 <script defer src="/reader/VirtualRenderer.js?v=pdf-structure-v4"></script>
   <script defer src="/modules/reading/digital-sign-mode.js?v=7.2.1"></script>
-  <script defer src="/modules/reading/pacman-mode.js?v=7.2.2"></script>
+  <script defer src="/modules/reading/pacman-mode.js?v=7.2.4-wpm-performance"></script>
   <script defer src="/modules/pages/help-page.js?v=9.3.1-kindle-import"></script>
   <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
-  <script defer src="/auth.js?v=9.0.3-auth-profile"></script>
-  <script defer src="/cloud-data.js?v=8.1.2"></script>
-  <script defer src="/app.js?v=20260816-compact-music-x-close-v1"></script>
-<script defer src="/music-save-reliability.js?v=2.0.0-indexeddb"></script>
-<script>window.addEventListener("DOMContentLoaded",()=>window.MarkSetGoExperienceProfile?.apply?.());</script>
-  <script defer src="/cloud-preferences.js?v=8.1.2"></script>
-  <script defer src="/cloud-library.js?v=9.2.36-cloud-delete"></script>
+  <script defer src="/auth.js?v=9.0.4-no-mutation-observer"></script>
+  <script defer src="/cloud-data.js?v=8.2.0-cloud-symposiums"></script>
+  <script src="/modern-guide-storage-guard.js?v=0.11.4-no-registry-write"></script>
+<script defer src="/app.js?v=20260823-v7.32.2-start-button-up"></script>
+<script defer src="/reader-tooltip-cleanup.js?v=20260822-v7.31.4-no-reader-help-tooltip"></script>
+<script defer src="/workspace-music-handoff.js?v=0.11.2-main-dock"></script>
+<script defer src="/music-save-reliability.js?v=2.0.1-no-mo"></script>
+<script defer src="/cloud-preferences.js?v=8.1.3-no-mo"></script>
+  <script defer src="/cloud-library.js?v=9.2.37-no-mo"></script>
   <script defer src="/cloud-document.js?v=9.2.18-cloud-remove-unified"></script>
-  <script defer src="/cloud-productivity.js?v=9.2.18-cloud-remove-unified"></script>
-  <script defer src="/document-manager.js?v=9.2.18-cloud-remove-unified"></script>
-  <script defer src="/read-anything.js?v=20260814-article-actions-resume-reconciled"></script>
-  <script defer src="/ask-mark-hub.js?v=20260816-x-close-v2"></script>
-  <script defer src="/app-walkthrough.js?v=9.4.6-right-click-restore"></script>
-    <script defer src="/topic-feeds.js?v=2.1.15-menu-click-fix"></script>
-    <script defer src="/reader-music-quick.js?v=20260816-suggested-results-v1"></script>
-    <script defer src="/crypto-ticker.js?v=1.0.0"></script>
-    <script defer src="/market-indexes.js?v=1.0.0"></script>
-<script defer src="/mobile-simple.js?v=8.5.9"></script>
+  <script defer src="/cloud-productivity.js?v=9.2.19-no-mo"></script>
+  <script defer src="/document-manager.js?v=9.2.19-no-mo"></script>
+  <script defer src="/read-anything.js?v=20260817-article-actions-on-document"></script>
+<script defer src="/workspace-reader-handoff.js?v=0.11.1-freebooks-music"></script>
+  <script defer src="/ask-mark-hub.js?v=9.6.7-topic-whole-article-chat"></script>
+  <script defer src="/app-walkthrough.js?v=9.4.7-no-mo"></script>
+  <script defer src="/msg-chat.js?v=20260822-v7.28.2-message-body"></script>
+  <script defer src="/content-share.js?v=20260822-v1.3-repeat-symposium-topic"></script>
+    <script defer src="/topic-feeds.js?v=20260822-v7.31-header-paper-sync"></script>
+    <script defer src="/reader-music-quick.js?v=1.5.6-reader-anchored-player"></script>
+    <script defer src="/crypto-ticker.js?v=1.0.1-no-mo"></script>
+    <script defer src="/market-indexes.js?v=1.0.1-no-observer"></script>
+<script defer src="/mobile-simple.js?v=8.5.11-secondary-reader-desktop"></script>
   <script defer src="/companion-persona-safe.js?v=9.7.4-beth-frontpage-badge"></script>
   <script defer src="/companion-chad.js?v=1.1.3-frontpage-badge"></script>
-  <script defer src="/companion-copy-sync.js?v=1.0.3-beth-ui-avatar"></script>
+  <script defer src="/companion-copy-sync.js?v=1.0.4-no-mo"></script>
 <script defer src="/app-help-knowledge.js?v=9.6.2"></script>
   <script defer src="/app-help-mark.js?v=9.6.5"></script>
   <script defer src="/developer-data.js?v=9.6.4"></script>
   <script defer src="/developer-tools.js?v=9.6.6"></script>
+  <script defer src="/experience-themes.js?v=20260822-v7.30-theme-swatches"></script>
+  <script defer src="/explorer-visual-designer.js?v=20260822-v3.2-profile-custom-theme"></script>
 </head>
 <body>
 <header class="site-header">
@@ -75,7 +119,7 @@
     <span class="menu-copy"><strong>My Reading</strong><small>Reading list, statuses, and saved editions</small></span>
   </button>
 
-  
+
 
   <button data-action="topic-feeds" type="button" role="menuitem">
     <span class="menu-icon icon-reading">☰</span>
@@ -105,7 +149,7 @@
         <span class="menu-icon">⇧</span>
         <span class="menu-copy"><strong>Read Anything</strong><small>Import a book, document, URL, or text</small></span>
       </button>
-      
+
     </div>
   </details>
 
@@ -204,6 +248,8 @@
 
 <button class="top-level-nav-button" data-action="music" data-feature-gate="music" type="button"><span class="nav-icon" aria-hidden="true">♫</span> Music &amp; Focus</button>
 
+<button class="top-level-nav-button" data-action="msg-chat" type="button"><span class="nav-icon" aria-hidden="true">◫</span> Chat</button>
+
 <button class="top-level-nav-button" data-action="profile-preferences" type="button"><span class="nav-icon" aria-hidden="true">◉</span> Profile</button>
 
 <details class="company-menu">
@@ -246,6 +292,6 @@
 </nav>
 <span class="site-footer-version">Early Access · v8.8.0</span>
 </footer>
-<script defer src="/button-feedback.js?v=8.6.6"></script>
+<script defer src="/button-feedback.js?v=8.6.8-visual-only"></script>
 </body>
 </html>
