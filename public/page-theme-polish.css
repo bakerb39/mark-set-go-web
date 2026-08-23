@@ -1,4 +1,4 @@
-/* Mark, Set, Go! v7.34.8 — continuous theme background + reliable standalone close.
+/* Mark, Set, Go! v7.34.9 — continuous theme background + panel-local Home close.
    Presentation/navigation chrome only. No Reader core, timing, pagination, or word DOM changes. */
 
 /* ONE CONTINUOUS THEME BACKGROUND
@@ -157,4 +157,48 @@ html.msg-secondary-reader-document #msg-standalone-page-close {
     width: 34px;
     height: 34px;
   }
+}
+
+
+/* v1.0.3 — Home close matches Reader 1 placement exactly.
+   Home gets a local X inside its own panel. The older standalone-page close
+   remains available for other non-frame pages but is suppressed while Home owns
+   its local control. */
+html[data-msg-experience-theme] #app .home-simple {
+  position: relative !important;
+}
+
+#app[data-view-key="home"] ~ #msg-standalone-page-close {
+  display: none !important;
+}
+
+#app .home-simple .msg-home-page-close {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 25;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--msg-theme-gold,var(--msg-gold,#d5a928)) 58%, var(--msg-theme-border,var(--msg-blue-border,#9fb4c7)));
+  border-radius: 8px;
+  background: linear-gradient(180deg,var(--msg-theme-surface,var(--msg-surface,#fff)),var(--msg-theme-soft-2,var(--msg-blue-soft-2,#f4f7fa)));
+  color: var(--msg-theme-accent-dark,var(--msg-navy-deep,#17365d));
+  box-shadow: 0 2px 7px rgba(15,35,60,.12);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#app .home-simple .msg-home-page-close:hover,
+#app .home-simple .msg-home-page-close:focus-visible {
+  border-color: var(--msg-theme-gold,var(--msg-gold,#d5a928));
+  box-shadow: 0 0 0 2px color-mix(in srgb,var(--msg-theme-gold,var(--msg-gold,#d5a928)) 26%,transparent),0 2px 7px rgba(15,35,60,.14);
+  outline: none;
 }

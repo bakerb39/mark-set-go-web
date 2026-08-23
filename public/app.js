@@ -4988,6 +4988,12 @@ function renderHome() {
   stopReader();
   app.dataset.viewKey = 'home';
 
+  // Home owns a local close control only in the top-level app. Workspace/frame
+  // pages rely on their outer pane chrome and must not get a duplicate X.
+  const showStandaloneHomeClose = window.parent === window
+    && !window.__MSG_WORKSPACE_PANE__
+    && !window.MSGWorkspacePane;
+
   let resumeMeta = null;
   try { resumeMeta = JSON.parse(localStorage.getItem(READER_SESSION_META_KEY) || 'null'); } catch {}
   const resumePercent = resumeMeta?.totalWords
@@ -5052,6 +5058,7 @@ function renderHome() {
 
   app.innerHTML = `
     <section class="home-simple">
+      ${showStandaloneHomeClose ? `<button class="msg-home-page-close" data-home-panel-close type="button" aria-label="Close Home" title="Close">×</button>` : ''}
       <header class="home-simple-brand">
         <h1><span class="home-speed-mark" aria-hidden="true">≡</span>Mark, Set, Go!</h1>
         <p class="home-simple-tagline">Read Faster. Understand Deeper. Remember Longer. Apply Daily.</p>
@@ -5115,6 +5122,15 @@ function renderHome() {
       </div>
 
     </section>`;
+
+  app.querySelector('[data-home-panel-close]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    // Closing Home is intentionally not navigation. Remove the Home surface and
+    // leave the current experience-theme background visible. Clicking the brand
+    // or Home navigation later simply renders Home again.
+    app.replaceChildren();
+  });
 
   bindHomeReaderActions();
 }
