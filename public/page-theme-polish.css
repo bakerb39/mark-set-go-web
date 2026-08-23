@@ -202,3 +202,19 @@ html[data-msg-experience-theme] #app .home-simple {
   box-shadow: 0 0 0 2px color-mix(in srgb,var(--msg-theme-gold,var(--msg-gold,#d5a928)) 26%,transparent),0 2px 7px rgba(15,35,60,.14);
   outline: none;
 }
+
+/* v1.0.4 — HOME OWNS ITS OWN CLOSE COMPLETELY.
+   While Home is visible, and after Home has been dismissed leaving #app empty,
+   the older global standalone close must not remain floating over the scenery. */
+#app:has(.home-simple) ~ #msg-standalone-page-close,
+#app:empty ~ #msg-standalone-page-close {
+  display: none !important;
+}
+
+/* v1.0.4 — the scenery assembly is retired in the main document once
+   single-theme-background.js has captured the active theme's center image. */
+html.msg-single-theme-background .explorer-world-art,
+html.msg-single-theme-background .explorer-world-art.msg-vd-designer-surface-active {
+  display: none !important;
+  visibility: hidden !important;
+}
