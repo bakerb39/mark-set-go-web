@@ -6,6 +6,8 @@
   const HANDOFF_KEY = 'msg.symposiumHandoff.v1';
   let pendingChatContent = null;
   let selectionPayload = null;
+  let pointerSelectionStart = null;
+  let keyboardSelectionStart = null;
 
   const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({
     '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
@@ -352,6 +354,31 @@
     if (clear) selectionPayload = null;
   }
 
+  function selectionSnapshot() {
+    const selection = window.getSelection?.();
+    if (!selection || selection.rangeCount === 0) return null;
+    return {
+      anchorNode: selection.anchorNode,
+      anchorOffset: selection.anchorOffset,
+      focusNode: selection.focusNode,
+      focusOffset: selection.focusOffset,
+      collapsed: selection.isCollapsed,
+      text: clean(selection.toString().replace(/\s+/g, ' '), 12000)
+    };
+  }
+
+  function selectionChangedSince(before) {
+    const after = selectionSnapshot();
+    if (!after || after.collapsed || !after.text) return false;
+    if (!before) return true;
+    return before.collapsed ||
+      after.anchorNode !== before.anchorNode ||
+      after.anchorOffset !== before.anchorOffset ||
+      after.focusNode !== before.focusNode ||
+      after.focusOffset !== before.focusOffset ||
+      after.text !== before.text;
+  }
+
   function captureGeneralSelection() {
     const selection = window.getSelection?.();
     if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return hideSelectionToolbar(true);
@@ -384,15 +411,39 @@
     toolbar.style.top = `${top}px`;
   }
 
-  document.addEventListener('pointerup', () => window.setTimeout(captureGeneralSelection, 0));
-  document.addEventListener('keyup', (event) => {
-    if (event.key === 'Shift' || event.key.startsWith('Arrow')) window.setTimeout(captureGeneralSelection, 0);
-  });
   document.addEventListener('pointerdown', (event) => {
     if (event.target.closest?.('#msg-content-selection-toolbar')) return;
-    hideSelectionToolbar();
+    pointerSelectionStart = selectionSnapshot();
+    hideSelectionToolbar(true);
   }, true);
-  window.addEventListener('scroll', () => hideSelectionToolbar(), true);
+
+  document.addEventListener('pointerup', (event) => {
+    if (event.target.closest?.('#msg-content-selection-toolbar')) return;
+    const before = pointerSelectionStart;
+    pointerSelectionStart = null;
+    window.setTimeout(() => {
+      if (!selectionChangedSince(before)) return hideSelectionToolbar(true);
+      captureGeneralSelection();
+    }, 0);
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.shiftKey && event.key.startsWith('Arrow')) {
+      keyboardSelectionStart = selectionSnapshot();
+    }
+  });
+
+  document.addEventListener('keyup', (event) => {
+    if (!event.key.startsWith('Arrow') || keyboardSelectionStart === null) return;
+    const before = keyboardSelectionStart;
+    keyboardSelectionStart = null;
+    window.setTimeout(() => {
+      if (!selectionChangedSince(before)) return hideSelectionToolbar(true);
+      captureGeneralSelection();
+    }, 0);
+  });
+
+  window.addEventListener('scroll', () => hideSelectionToolbar(true), true);
 
   window.MSGContentShare = Object.freeze({
     normalize: normalizeContent,
