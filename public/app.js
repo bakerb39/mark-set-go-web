@@ -23498,7 +23498,6 @@ function renderMyLinks(selectedId = '') {
    pagination, highlighting, or continuity behavior. It only reads bounded
    current-reading context when the user chooses to bring it into a session.
    ========================================================================== */
-const SYMPOSIUM_STORAGE_KEY = 'markSetGoSymposiumSessionsV1';
 const SYMPOSIUM_CUSTOM_PEOPLE_KEY = 'markSetGoSymposiumCustomPeopleV1';
 
 function loadSymposiumCustomPeople() {
@@ -23723,6 +23722,10 @@ function ensureSymposiumStyles() {
     .symposium-hero h1{font-family:Georgia,serif;font-size:clamp(2rem,4vw,3.35rem);line-height:1.02;margin:.45rem 0 .65rem;color:#0c2340}
     .symposium-hero p{max-width:820px;margin:0;color:#53657a;line-height:1.65}
     .symposium-badge{min-width:230px;padding:16px 18px;border-radius:18px;background:#0c2340;color:white}.symposium-badge strong{display:block;color:#f0c85a;font-size:1.05rem}.symposium-badge small{display:block;margin-top:6px;line-height:1.45;color:#d7e1ee}
+    .symposium-saved-panel{margin:0 0 22px;border:1px solid rgba(36,78,124,.16);border-radius:20px;background:rgba(255,255,255,.94);box-shadow:0 10px 28px rgba(30,58,92,.06);overflow:hidden}
+    .symposium-saved-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border-bottom:1px solid rgba(36,78,124,.1);background:#f8fbff}.symposium-saved-head strong{display:block;color:#0c2340}.symposium-saved-head small{display:block;color:#6a7a8e;margin-top:2px}.symposium-saved-head button{border:1px solid #cbd7e5;border-radius:9px;background:white;color:#24486f;padding:7px 10px;font-weight:750;cursor:pointer}
+    .symposium-saved-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;padding:12px}.symposium-saved-empty{grid-column:1/-1;padding:14px;color:#6d7c8f;font-size:.88rem}
+    .symposium-saved-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border:1px solid #dfe7f0;border-radius:13px;padding:11px;background:white;min-width:0}.symposium-saved-copy{display:grid;gap:3px;min-width:0}.symposium-saved-copy strong,.symposium-saved-copy span,.symposium-saved-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.symposium-saved-copy strong{color:#0c2340}.symposium-saved-copy span{color:#50647b;font-size:.84rem}.symposium-saved-copy small{color:#7c8998;font-size:.72rem}.symposium-saved-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.symposium-saved-actions button{border:1px solid #d4deea;border-radius:8px;background:#f8fbff;color:#24486f;padding:5px 7px;font-size:.72rem;font-weight:750;cursor:pointer}.symposium-saved-actions [data-symposium-resume]{background:#0c2340;color:#f2ca60;border-color:#0c2340}.symposium-saved-actions [data-symposium-delete]{color:#7a2630}
     .symposium-layout{display:grid;grid-template-columns:minmax(300px,390px) minmax(0,1fr);gap:22px;align-items:start}
     .symposium-panel{border:1px solid rgba(36,78,124,.16);border-radius:22px;background:white;box-shadow:0 12px 34px rgba(30,58,92,.06);overflow:hidden}
     .symposium-panel-head{padding:20px 22px 14px;border-bottom:1px solid rgba(36,78,124,.1);background:#f8fbff}.symposium-panel-head h2{margin:0 0 4px;font-size:1.15rem;color:#0c2340}.symposium-panel-head p{margin:0;color:#65758a;font-size:.9rem;line-height:1.45}
@@ -23889,13 +23892,312 @@ async function symposiumAskAi({person, mode, topic, context, transcript, userCon
   return text;
 }
 
-function saveSymposiumSession(session) {
-  try {
-    const existing = JSON.parse(localStorage.getItem(SYMPOSIUM_STORAGE_KEY) || '[]');
-    const sessions = Array.isArray(existing) ? existing : [];
-    sessions.unshift({ ...session, savedAt:new Date().toISOString() });
-    localStorage.setItem(SYMPOSIUM_STORAGE_KEY, JSON.stringify(sessions.slice(0,20)));
-  } catch (error) { console.warn('Symposium session could not be saved.', error); }
+function symposiumCloudApi() {
+  const api = window.MarkSetGoCloud?.symposium;
+  if (!api?.list || !api?.load || !api?.create || !api?.update || !api?.addTurn || !api?.remove) {
+    throw new Error('Cloud Symposium storage is not available.');
+  }
+  return api;
+}
+
+function symposiumClientId(prefix = 'symposium') {
+  const uuid = window.crypto?.randomUUID?.();
+  return uuid ? `${prefix}-${uuid}` : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,12)}`;
+}
+
+function symposiumDefaultSessionTitle(topic = '') {
+  const clean = String(topic || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return 'Untitled Symposium';
+  return clean.length > 84 ? `${clean.slice(0,81).trimEnd()}…` : clean;
+}
+
+function symposiumParticipantSnapshot(person = {}) {
+  return {
+    id:String(person.id || ''),
+    name:String(person.name || 'Participant'),
+    field:String(person.field || ''),
+    era:String(person.era || ''),
+    monogram:String(person.monogram || ''),
+    category:String(person.category || ''),
+    lens:String(person.lens || ''),
+    custom:Boolean(person.custom)
+  };
+}
+
+function symposiumSavedDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
+}
+
+function symposiumSavedSessionsHtml(sessions = []) {
+  if (!sessions.length) {
+    return '<div class="symposium-saved-empty">No saved Symposiums yet. Start one below and it will autosave to your account.</div>';
+  }
+  return sessions.map((item) => `
+    <article class="symposium-saved-item" data-symposium-saved-id="${symposiumEscape(item.id)}">
+      <div class="symposium-saved-copy">
+        <strong>${symposiumEscape(item.title || 'Untitled Symposium')}</strong>
+        <span>${symposiumEscape(item.topic || 'No topic')}</span>
+        <small>${Number(item.turnCount || 0).toLocaleString()} turns · Updated ${symposiumEscape(symposiumSavedDate(item.updatedAt || item.lastTurnAt || item.createdAt))}</small>
+      </div>
+      <div class="symposium-saved-actions">
+        <button type="button" data-symposium-resume="${symposiumEscape(item.id)}">Resume</button>
+        <button type="button" data-symposium-rename="${symposiumEscape(item.id)}">Rename</button>
+        <button type="button" data-symposium-delete="${symposiumEscape(item.id)}">Delete</button>
+      </div>
+    </article>`).join('');
+}
+
+function createSymposiumCloudController({
+  root,
+  session,
+  transcriptEl,
+  statusEl,
+  nextButton,
+  saveButton,
+  chatButton,
+  readerButton,
+  startButton,
+  rosterEl
+}) {
+  const savedListEl = root.querySelector('#symposium-saved-list');
+  const sessionTitleEl = root.querySelector('#symposium-session-title');
+  let refreshing = false;
+
+  const sourceContext = () => ({
+    documentId:String(state?.documentId || ''),
+    documentTitle:String(state?.title || ''),
+    contextLabel:String(root.querySelector('#symposium-context-label')?.textContent || '')
+  });
+
+  const payload = () => ({
+    clientSessionId: session.clientSessionId || symposiumClientId('symposium'),
+    title: String(sessionTitleEl?.value || session.title || symposiumDefaultSessionTitle(session.topic)).trim(),
+    topic: String(root.querySelector('#symposium-topic')?.value || session.topic || '').trim(),
+    mode: root.querySelector('[name="symposium-mode"]:checked')?.value || session.mode || 'debate',
+    contextText: String(root.querySelector('#symposium-context')?.value ?? session.context ?? ''),
+    contextLabel: String(root.querySelector('#symposium-context-label')?.textContent || ''),
+    outputMode: root.querySelector('#symposium-output')?.value || session.output || 'write',
+    participants: (session.people || []).map(symposiumParticipantSnapshot),
+    sourceContext: session.sourceContext && Object.keys(session.sourceContext).length ? session.sourceContext : sourceContext(),
+    status:'active',
+    nextSpeakerIndex: Math.max(0, Number(session.nextIndex) || 0),
+    startedAt: session.startedAt || new Date().toISOString()
+  });
+
+  const setCloudError = (error) => {
+    session.cloudError = error?.message || String(error || 'Cloud save failed.');
+    if (statusEl) statusEl.textContent = `Cloud save problem · ${session.cloudError}`;
+  };
+
+  const enqueue = (task) => {
+    session.cloudWriteQueue = (session.cloudWriteQueue || Promise.resolve())
+      .catch(()=>{})
+      .then(task)
+      .catch((error) => {
+        setCloudError(error);
+        throw error;
+      });
+    return session.cloudWriteQueue;
+  };
+
+  const refreshSaved = async () => {
+    if (!savedListEl || refreshing) return;
+    refreshing = true;
+    savedListEl.innerHTML = '<div class="symposium-saved-empty">Loading saved Symposiums…</div>';
+    try {
+      const result = await symposiumCloudApi().list(false);
+      savedListEl.innerHTML = symposiumSavedSessionsHtml(Array.isArray(result?.sessions) ? result.sessions : []);
+    } catch (error) {
+      const signedOut = Number(error?.status) === 401;
+      savedListEl.innerHTML = `<div class="symposium-saved-empty">${symposiumEscape(signedOut ? 'Sign in to save and resume Symposiums across sessions and devices.' : (error?.message || 'Saved Symposiums could not be loaded.'))}</div>`;
+    } finally {
+      refreshing = false;
+    }
+  };
+
+  const ensureRosterPerson = (person) => {
+    if (!person?.id) return;
+    if (!SYMPOSIUM_PARTICIPANTS.some((entry) => String(entry.id) === String(person.id))) {
+      SYMPOSIUM_PARTICIPANTS.push(symposiumParticipantSnapshot(person));
+    }
+    if (rosterEl.querySelector(`[data-symposium-person][value="${CSS.escape(String(person.id))}"]`)) return;
+    rosterEl.insertAdjacentHTML('afterbegin', `<label class="symposium-person"
+      data-symposium-category="${symposiumEscape(person.category || 'Saved session')}"
+      data-symposium-search="${symposiumEscape(symposiumPersonSearchText(person))}">
+      <input type="checkbox" data-symposium-person value="${symposiumEscape(person.id)}">
+      <span class="symposium-avatar">${symposiumEscape(person.monogram || '?')}</span>
+      <span><strong>${symposiumEscape(person.name || 'Participant')}</strong><small>${symposiumEscape(person.field || 'Saved participant')} · ${symposiumEscape(person.era || 'Saved session')}</small></span>
+    </label>`);
+  };
+
+  const applyParticipants = (people) => {
+    const participantList = Array.isArray(people) ? people.map(symposiumParticipantSnapshot) : [];
+    participantList.forEach(ensureRosterPerson);
+    const ids = new Set(participantList.map((person) => String(person.id)));
+    rosterEl.querySelectorAll('[data-symposium-person]').forEach((checkbox) => {
+      checkbox.checked = ids.has(String(checkbox.value));
+    });
+    return participantList;
+  };
+
+  const resume = async (sessionId) => {
+    if (!sessionId) return;
+    if (statusEl) statusEl.textContent = 'Loading saved Symposium…';
+    const result = await symposiumCloudApi().load(sessionId);
+    const record = result?.session;
+    if (!record) throw new Error('The saved Symposium could not be found.');
+    const turns = Array.isArray(result?.turns) ? result.turns : [];
+
+    session.cloudId = record.id;
+    session.sourceContext = record.sourceContext && typeof record.sourceContext === 'object' ? record.sourceContext : {};
+    session.clientSessionId = record.clientSessionId || symposiumClientId('symposium');
+    session.title = record.title || 'Untitled Symposium';
+    session.mode = record.mode || 'debate';
+    session.topic = record.topic || '';
+    session.context = record.contextText || '';
+    session.output = record.outputMode || 'write';
+    session.people = applyParticipants(record.participants);
+    session.transcript = turns.map((turn) => ({
+      name:turn.name || 'Speaker', monogram:turn.monogram || '', field:turn.field || '',
+      text:turn.text || '', kind:turn.kind || 'participant', sourceLabel:turn.sourceLabel || '',
+      metadata:turn.metadata || {}, clientTurnId:turn.clientTurnId || ''
+    }));
+    session.nextIndex = Math.max(0, Number(record.nextSpeakerIndex) || 0);
+    session.pendingReaderContribution = '';
+    session.startedAt = record.startedAt || record.createdAt || new Date().toISOString();
+    session.active = Boolean(session.topic && session.people.length && session.transcript.length);
+    session.cloudError = '';
+    session.cloudWriteQueue = Promise.resolve();
+
+    if (sessionTitleEl) sessionTitleEl.value = session.title;
+    const topicEl = root.querySelector('#symposium-topic'); if (topicEl) topicEl.value = session.topic;
+    const contextEl = root.querySelector('#symposium-context'); if (contextEl) contextEl.value = session.context;
+    const contextLabelEl = root.querySelector('#symposium-context-label');
+    if (contextLabelEl) contextLabelEl.textContent = record.contextLabel || (session.context ? `Saved reading context · ${splitWords(session.context).length.toLocaleString()} words available` : 'Topic only · no reading passage supplied');
+    const modeEl = root.querySelector(`[name="symposium-mode"][value="${CSS.escape(session.mode)}"]`); if (modeEl) modeEl.checked = true;
+    const outputEl = root.querySelector('#symposium-output'); if (outputEl) outputEl.value = session.output;
+
+    transcriptEl.innerHTML = session.transcript.length
+      ? session.transcript.map(symposiumTurnHtml).join('')
+      : '<div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>This saved Symposium has no transcript yet.</p></div>';
+    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    nextButton.disabled = !session.active;
+    readerButton.disabled = !session.active;
+    saveButton.disabled = false;
+    if (chatButton) chatButton.disabled = !session.transcript.length;
+    startButton.textContent = session.transcript.length ? 'Begin New Symposium' : 'Begin Symposium';
+    if (statusEl) statusEl.textContent = session.transcript.length
+      ? `Resumed from cloud · ${session.transcript.length} turns · autosave on`
+      : 'Saved setup loaded · begin when ready';
+  };
+
+  const beginNew = async () => {
+    session.clientSessionId = symposiumClientId('symposium');
+    session.cloudId = '';
+    session.sourceContext = sourceContext();
+    session.cloudError = '';
+    session.cloudWriteQueue = Promise.resolve();
+    if (!session.title) session.title = String(sessionTitleEl?.value || '').trim() || symposiumDefaultSessionTitle(session.topic);
+    if (sessionTitleEl && !sessionTitleEl.value.trim()) sessionTitleEl.value = session.title;
+    const created = await symposiumCloudApi().create(payload());
+    session.cloudId = created?.session?.id || '';
+    if (!session.cloudId) throw new Error('The cloud did not return a Symposium ID.');
+    if (statusEl) statusEl.textContent = 'Cloud autosave on';
+    refreshSaved();
+    return created.session;
+  };
+
+  const persistTurn = (turn) => {
+    if (!session.cloudId || !turn?.text) return Promise.resolve(null);
+    if (!turn.clientTurnId) turn.clientTurnId = symposiumClientId('turn');
+    return enqueue(() => symposiumCloudApi().addTurn(session.cloudId, {
+      clientTurnId: turn.clientTurnId,
+      name: turn.name || 'Speaker',
+      monogram: turn.monogram || '',
+      field: turn.field || '',
+      kind: turn.kind || 'participant',
+      text: turn.text || '',
+      sourceLabel: turn.sourceLabel || '',
+      metadata: turn.metadata || {}
+    }));
+  };
+
+  const queueState = () => {
+    if (!session.cloudId) return Promise.resolve(null);
+    const data = payload();
+    return enqueue(() => symposiumCloudApi().update(session.cloudId, {
+      title:data.title,
+      topic:data.topic,
+      mode:data.mode,
+      contextText:data.contextText,
+      contextLabel:data.contextLabel,
+      outputMode:data.outputMode,
+      participants:data.participants,
+      sourceContext:data.sourceContext,
+      nextSpeakerIndex:data.nextSpeakerIndex,
+      status:'active',
+      touchOpen:true
+    }));
+  };
+
+  const saveNow = async () => {
+    if (!session.transcript.length && !session.topic) return false;
+    if (!session.cloudId) {
+      await beginNew();
+      for (const turn of session.transcript) await persistTurn(turn);
+    }
+    await queueState();
+    await session.cloudWriteQueue;
+    session.cloudError = '';
+    if (statusEl) statusEl.textContent = `Saved to cloud · ${session.transcript.length} turns`;
+    await refreshSaved();
+    return true;
+  };
+
+  root.addEventListener('click', async (event) => {
+    const resumeButton = event.target.closest('[data-symposium-resume]');
+    const renameButton = event.target.closest('[data-symposium-rename]');
+    const deleteButton = event.target.closest('[data-symposium-delete]');
+    const refreshButton = event.target.closest('#symposium-refresh-sessions');
+    if (!resumeButton && !renameButton && !deleteButton && !refreshButton) return;
+
+    try {
+      if (refreshButton) return void refreshSaved();
+      if (resumeButton) return void await resume(resumeButton.dataset.symposiumResume);
+      if (renameButton) {
+        const item = renameButton.closest('[data-symposium-saved-id]');
+        const current = item?.querySelector('.symposium-saved-copy strong')?.textContent?.trim() || '';
+        const title = window.prompt('Rename this Symposium:', current);
+        if (title == null || !title.trim()) return;
+        await symposiumCloudApi().update(renameButton.dataset.symposiumRename, { title:title.trim() });
+        if (session.cloudId === renameButton.dataset.symposiumRename) {
+          session.title = title.trim();
+          if (sessionTitleEl) sessionTitleEl.value = session.title;
+        }
+        await refreshSaved();
+        return;
+      }
+      if (deleteButton) {
+        const item = deleteButton.closest('[data-symposium-saved-id]');
+        const title = item?.querySelector('.symposium-saved-copy strong')?.textContent?.trim() || 'this Symposium';
+        if (!window.confirm(`Delete “${title}” and its transcript?`)) return;
+        await symposiumCloudApi().remove(deleteButton.dataset.symposiumDelete);
+        if (session.cloudId === deleteButton.dataset.symposiumDelete) {
+          session.cloudId = '';
+          session.cloudError = '';
+          if (statusEl) statusEl.textContent = 'Saved Symposium deleted. Current view is now temporary.';
+        }
+        await refreshSaved();
+      }
+    } catch (error) {
+      setCloudError(error);
+    }
+  });
+
+  return { refreshSaved, resume, beginNew, persistTurn, queueState, saveNow };
 }
 
 function renderSymposium() {
@@ -23922,6 +24224,11 @@ function renderSymposium() {
         <aside class="symposium-badge"><strong>Reader participates</strong><small>Listen, read, question, challenge, supply evidence, or enter your own argument at any point.</small></aside>
       </header>
 
+      <section class="symposium-saved-panel" aria-label="Saved Symposiums">
+        <div class="symposium-saved-head"><div><strong>Saved Symposiums</strong><small>Cloud-backed sessions you can reopen and continue later.</small></div><button type="button" id="symposium-refresh-sessions">Refresh</button></div>
+        <div class="symposium-saved-list" id="symposium-saved-list"><div class="symposium-saved-empty">Loading saved Symposiums…</div></div>
+      </section>
+
       <div class="symposium-layout">
         <aside class="symposium-panel">
           <div class="symposium-panel-head"><h2>Set the table</h2><p>Choose a format, topic, context, and participants.</p></div>
@@ -23935,6 +24242,10 @@ function renderSymposium() {
                 <label class="symposium-mode"><input type="radio" name="symposium-mode" value="explain"><span>Explain<small>Teach from many lenses</small></span></label>
               </div>
             </div>
+
+            <label>Session name
+              <input id="symposium-session-title" type="text" maxlength="240" placeholder="Optional — generated from the topic">
+            </label>
 
             <label>Topic or question
               <textarea id="symposium-topic" placeholder="Example: Is technological progress making us wiser?">${symposiumEscape(defaultTopic)}</textarea>
@@ -23987,7 +24298,7 @@ function renderSymposium() {
                 <textarea id="symposium-custom-lens" placeholder="Perspective or instructions (optional)"></textarea>
                 <button type="button" id="symposium-add-person">Save personality</button>
               </div>
-              <p class="symposium-hint">Saved personalities remain in your roster on this browser. The AI represents public/published ideas or the perspective you specify; it does not claim to literally be the real person.</p>
+              <p class="symposium-hint">Custom personalities are included with any saved Symposium that uses them. The AI represents public/published ideas or the perspective you specify; it does not claim to literally be the real person.</p>
             </div>
 
             <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
@@ -23997,7 +24308,7 @@ function renderSymposium() {
         <main class="symposium-panel symposium-stage">
           <div class="symposium-stage-toolbar">
             <span class="symposium-stage-status" id="symposium-stage-status">Ready to convene</span>
-            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
+            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save now</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
           </div>
           <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
             <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
@@ -24029,7 +24340,9 @@ function renderSymposium() {
   const personSearchEl = root.querySelector('#symposium-person-search');
   const categoryFilterEl = root.querySelector('#symposium-category-filter');
   const rosterCountEl = root.querySelector('#symposium-roster-count');
-  const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'', startedAt:'' };
+  const session = { active:false, mode:'debate', topic:'', title:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'', startedAt:'', cloudId:'', clientSessionId:'', cloudWriteQueue:Promise.resolve(), cloudError:'', sourceContext:{} };
+  const symposiumCloud = createSymposiumCloudController({ root, session, transcriptEl, statusEl, nextButton, saveButton, chatButton, readerButton, startButton, rosterEl });
+  symposiumCloud.refreshSaved();
 
   let symposiumSelection = null;
 
@@ -24228,6 +24541,7 @@ function renderSymposium() {
     if (transcriptEl.querySelector('.symposium-empty')) transcriptEl.innerHTML = '';
     session.transcript.push(turn);
     transcriptEl.insertAdjacentHTML('beforeend', symposiumTurnHtml(turn));
+    symposiumCloud.persistTurn(turn).catch(()=>{});
     const liveSelection = window.getSelection?.();
     const hasTranscriptSelection = Boolean(
       liveSelection && !liveSelection.isCollapsed && liveSelection.rangeCount
@@ -24346,13 +24660,24 @@ function renderSymposium() {
     if (!topic) { root.querySelector('#symposium-topic').focus(); return window.alert('Enter a topic or question for the Symposium.'); }
     if (!people.length) return window.alert('Choose at least one participant.');
     session.active = true;
+    startButton.disabled = true;
     session.startedAt = new Date().toISOString();
     hideSymposiumSelectionToolbar({ clearSelection:true });
     session.mode = root.querySelector('[name="symposium-mode"]:checked')?.value || 'debate';
     session.topic = topic;
+    session.title = root.querySelector('#symposium-session-title')?.value.trim() || symposiumDefaultSessionTitle(topic);
     session.context = root.querySelector('#symposium-context').value || '';
     session.output = root.querySelector('#symposium-output').value || 'write';
     session.people = people;
+    try {
+      await symposiumCloud.beginNew();
+    } catch (error) {
+      const proceed = window.confirm(`This Symposium cannot be saved to the cloud right now: ${error.message}
+
+Start a temporary session anyway?`);
+      if (!proceed) { session.active = false; startButton.disabled = false; return; }
+      statusEl.textContent = 'Temporary session · cloud save unavailable';
+    }
     session.transcript = [];
     session.nextIndex = 0;
     session.pendingReaderContribution = '';
@@ -24361,6 +24686,7 @@ function renderSymposium() {
     nextButton.disabled = false; saveButton.disabled = false; if (chatButton) chatButton.disabled = false; readerButton.disabled = false;
     await runSpeaker(session.people[0]);
     session.nextIndex = session.people.length > 1 ? 1 : 0;
+    symposiumCloud.queueState().catch(()=>{});
   });
 
   nextButton.addEventListener('click', async ()=>{
@@ -24370,6 +24696,7 @@ function renderSymposium() {
     const pending = session.pendingReaderContribution;
     session.pendingReaderContribution = '';
     await runSpeaker(person, pending);
+    symposiumCloud.queueState().catch(()=>{});
   });
 
   readerButton.addEventListener('click', async ()=>{
@@ -24387,6 +24714,7 @@ function renderSymposium() {
     session.nextIndex = (session.nextIndex + 1) % session.people.length;
     session.pendingReaderContribution = '';
     await runSpeaker(person, readerContribution);
+    symposiumCloud.queueState().catch(()=>{});
   });
 
   root.querySelector('#symposium-reader-input').addEventListener('keydown',(event)=>{
@@ -24423,10 +24751,20 @@ function renderSymposium() {
 
   root.querySelector('#symposium-stop-speech').addEventListener('click',()=>window.speechSynthesis?.cancel?.());
   root.querySelector('#symposium-clear').addEventListener('click',()=>{ window.speechSynthesis?.cancel?.(); renderSymposium(); });
-  saveButton.addEventListener('click',()=>{
+  saveButton.addEventListener('click', async ()=>{
     if (!session.transcript.length) return;
-    saveSymposiumSession({ mode:session.mode, topic:session.topic, participants:session.people.map((p)=>p.name), transcript:session.transcript });
-    const original = saveButton.textContent; saveButton.textContent = 'Saved ✓'; window.setTimeout(()=>saveButton.textContent=original,1300);
+    const original = saveButton.textContent;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving…';
+    try {
+      await symposiumCloud.saveNow();
+      saveButton.textContent = 'Saved ✓';
+    } catch (error) {
+      saveButton.textContent = 'Save failed';
+      statusEl.textContent = `Cloud save problem · ${error.message}`;
+    } finally {
+      window.setTimeout(() => { if (saveButton.isConnected) { saveButton.textContent = original; saveButton.disabled = !session.active; } }, 1300);
+    }
   });
 }
 

@@ -587,6 +587,115 @@ function cleanJsonObject(value, maximumBytes = 50000) {
   return value;
 }
 
+function cleanJsonArray(value, maximumBytes = 100000, maximumItems = 100) {
+  if (!Array.isArray(value)) return [];
+  if (value.length > maximumItems) throw new Error('JSON array has too many items.');
+  const serialized = JSON.stringify(value);
+  if (Buffer.byteLength(serialized, 'utf8') > maximumBytes) throw new Error('JSON payload is too large.');
+  return value;
+}
+
+function symposiumSessionRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    clientSessionId: row.client_session_id || '',
+    title: row.title || 'Untitled Symposium',
+    topic: row.topic || '',
+    mode: row.mode || 'debate',
+    contextText: row.context_text || '',
+    contextLabel: row.context_label || '',
+    outputMode: row.output_mode || 'write',
+    participants: Array.isArray(row.participants) ? row.participants : [],
+    sourceContext: row.source_context && typeof row.source_context === 'object' ? row.source_context : {},
+    status: row.status || 'active',
+    nextSpeakerIndex: Number(row.next_speaker_index) || 0,
+    turnCount: Number(row.turn_count) || 0,
+    startedAt: row.started_at || null,
+    lastOpenedAt: row.last_opened_at || null,
+    lastTurnAt: row.last_turn_at || null,
+    createdAt: row.created_at || null,
+    updatedAt: row.updated_at || null
+  };
+}
+
+function symposiumTurnRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    clientTurnId: row.client_turn_id || '',
+    turnIndex: Number(row.turn_index) || 0,
+    name: row.speaker_name || 'Speaker',
+    monogram: row.speaker_monogram || '',
+    field: row.speaker_field || '',
+    kind: row.turn_kind || 'participant',
+    text: row.body || '',
+    sourceLabel: row.source_label || '',
+    metadata: row.metadata && typeof row.metadata === 'object' ? row.metadata : {},
+    createdAt: row.created_at || null
+  };
+}
+
+
+let symposiumSchemaPromise = null;
+async function ensureSymposiumSchema() {
+  if (!databaseConfigured()) return false;
+  if (!symposiumSchemaPromise) {
+    symposiumSchemaPromise = query(`
+      create table if not exists symposium_sessions (
+        id uuid primary key default gen_random_uuid(),
+        user_id uuid not null references app_users(id) on delete cascade,
+        client_session_id text,
+        title text not null,
+        topic text not null default '',
+        mode text not null default 'debate',
+        context_text text not null default '',
+        context_label text,
+        output_mode text not null default 'write',
+        participants jsonb not null default '[]'::jsonb,
+        source_context jsonb not null default '{}'::jsonb,
+        status text not null default 'active',
+        next_speaker_index integer not null default 0,
+        next_turn_index integer not null default 0,
+        started_at timestamptz,
+        last_opened_at timestamptz,
+        archived_at timestamptz,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now(),
+        unique(user_id, client_session_id),
+        check (status in ('active', 'completed', 'archived'))
+      );
+      create index if not exists symposium_sessions_user_updated_idx
+        on symposium_sessions(user_id, updated_at desc);
+      create table if not exists symposium_turns (
+        id uuid primary key default gen_random_uuid(),
+        user_id uuid not null references app_users(id) on delete cascade,
+        session_id uuid not null references symposium_sessions(id) on delete cascade,
+        client_turn_id text not null,
+        turn_index integer not null,
+        speaker_name text not null,
+        speaker_monogram text,
+        speaker_field text,
+        turn_kind text not null default 'participant',
+        body text not null,
+        source_label text,
+        metadata jsonb not null default '{}'::jsonb,
+        created_at timestamptz not null default now(),
+        unique(session_id, turn_index),
+        unique(session_id, client_turn_id)
+      );
+      create index if not exists symposium_turns_session_order_idx
+        on symposium_turns(session_id, turn_index);
+      create index if not exists symposium_turns_user_created_idx
+        on symposium_turns(user_id, created_at desc);
+    `).then(() => true).catch((error) => {
+      symposiumSchemaPromise = null;
+      throw error;
+    });
+  }
+  return symposiumSchemaPromise;
+}
+
 async function requireAccountUser(req, res) {
   if (!clerkConfigured) {
     res.status(503).json({ error: 'Authentication is not configured.' });
@@ -611,6 +720,248 @@ async function requireAccountUser(req, res) {
   }
   return result.rows[0];
 }
+
+
+/* Durable Symposium sessions -------------------------------------------------
+   PostgreSQL is the source of truth. Browser storage is intentionally not used
+   for saved sessions or transcripts. Every turn is stored independently so a
+   long-running Symposium does not become one ever-growing JSON blob.
+*/
+app.get('/api/account/symposiums', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    await ensureSymposiumSchema();
+    const includeArchived = /^(1|true|yes)$/i.test(String(req.query?.includeArchived || ''));
+    const result = await query(`
+      select s.*,
+             coalesce(turns.turn_count, 0)::int as turn_count,
+             turns.last_turn_at
+      from symposium_sessions s
+      left join lateral (
+        select count(*)::int as turn_count, max(t.created_at) as last_turn_at
+        from symposium_turns t
+        where t.session_id = s.id and t.user_id = s.user_id
+      ) turns on true
+      where s.user_id = $1
+        and ($2::boolean or s.status <> 'archived')
+      order by s.updated_at desc
+      limit 100
+    `, [user.id, includeArchived]);
+    res.json({ sessions: result.rows.map(symposiumSessionRow) });
+  } catch (error) {
+    console.error('Symposium list failed:', error);
+    res.status(500).json({ error: 'Unable to load saved Symposiums.' });
+  }
+});
+
+app.post('/api/account/symposiums', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    await ensureSymposiumSchema();
+    const topic = cleanText(req.body?.topic, 12000);
+    const requestedTitle = cleanText(req.body?.title, 240);
+    const title = requestedTitle || cleanText(topic, 120) || 'Untitled Symposium';
+    const participants = cleanJsonArray(req.body?.participants, 120000, 12);
+    const sourceContext = cleanJsonObject(req.body?.sourceContext, 75000);
+    const clientSessionId = cleanText(req.body?.clientSessionId, 200) || null;
+    const mode = ['debate','interview','court','explain'].includes(req.body?.mode) ? req.body.mode : 'debate';
+    const outputMode = ['write','both','speak'].includes(req.body?.outputMode) ? req.body.outputMode : 'write';
+    const status = ['active','completed','archived'].includes(req.body?.status) ? req.body.status : 'active';
+    const nextSpeakerIndex = clampInteger(req.body?.nextSpeakerIndex, 0, 1000000);
+    const startedAt = req.body?.startedAt ? new Date(req.body.startedAt) : null;
+    if (startedAt && Number.isNaN(startedAt.getTime())) return res.status(400).json({ error: 'startedAt is invalid.' });
+
+    const result = await query(`
+      insert into symposium_sessions
+        (user_id, client_session_id, title, topic, mode, context_text, context_label,
+         output_mode, participants, source_context, status, next_speaker_index,
+         started_at, last_opened_at, created_at, updated_at)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10::jsonb,$11,$12,$13,now(),now(),now())
+      on conflict (user_id, client_session_id) do update set
+        title = excluded.title,
+        topic = excluded.topic,
+        mode = excluded.mode,
+        context_text = excluded.context_text,
+        context_label = excluded.context_label,
+        output_mode = excluded.output_mode,
+        participants = excluded.participants,
+        source_context = excluded.source_context,
+        status = excluded.status,
+        next_speaker_index = excluded.next_speaker_index,
+        started_at = coalesce(symposium_sessions.started_at, excluded.started_at),
+        last_opened_at = now(),
+        updated_at = now()
+      returning *
+    `, [
+      user.id, clientSessionId, title, topic, mode,
+      cleanText(req.body?.contextText, 180000), cleanText(req.body?.contextLabel, 1200) || null,
+      outputMode, JSON.stringify(participants), JSON.stringify(sourceContext), status,
+      nextSpeakerIndex, startedAt
+    ]);
+    res.status(201).json({ session: symposiumSessionRow(result.rows[0]) });
+  } catch (error) {
+    const status = /too large|too many/i.test(error.message) ? 413 : 500;
+    console.error('Symposium create failed:', error);
+    res.status(status).json({ error: status === 413 ? error.message : 'Unable to create the Symposium.' });
+  }
+});
+
+app.get('/api/account/symposiums/:sessionId', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    await ensureSymposiumSchema();
+    const sessionResult = await query(`
+      update symposium_sessions
+      set last_opened_at = now()
+      where id = $1 and user_id = $2
+      returning *
+    `, [req.params.sessionId, user.id]);
+    if (!sessionResult.rows[0]) return res.status(404).json({ error: 'Symposium not found.' });
+    const turnsResult = await query(`
+      select * from symposium_turns
+      where session_id = $1 and user_id = $2
+      order by turn_index asc
+    `, [req.params.sessionId, user.id]);
+    const session = symposiumSessionRow(sessionResult.rows[0]);
+    session.turnCount = turnsResult.rows.length;
+    session.lastTurnAt = turnsResult.rows.length ? turnsResult.rows[turnsResult.rows.length - 1].created_at : null;
+    res.json({
+      session,
+      turns: turnsResult.rows.map(symposiumTurnRow)
+    });
+  } catch (error) {
+    console.error('Symposium load failed:', error);
+    res.status(500).json({ error: 'Unable to load the Symposium.' });
+  }
+});
+
+app.patch('/api/account/symposiums/:sessionId', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    await ensureSymposiumSchema();
+    const body = req.body || {};
+    const title = Object.hasOwn(body, 'title') ? (cleanText(body.title, 240) || 'Untitled Symposium') : null;
+    const topic = Object.hasOwn(body, 'topic') ? cleanText(body.topic, 12000) : null;
+    const contextText = Object.hasOwn(body, 'contextText') ? cleanText(body.contextText, 180000) : null;
+    const contextLabel = Object.hasOwn(body, 'contextLabel') ? cleanText(body.contextLabel, 1200) : null;
+    const mode = Object.hasOwn(body, 'mode') && ['debate','interview','court','explain'].includes(body.mode) ? body.mode : null;
+    const outputMode = Object.hasOwn(body, 'outputMode') && ['write','both','speak'].includes(body.outputMode) ? body.outputMode : null;
+    const statusValue = Object.hasOwn(body, 'status') && ['active','completed','archived'].includes(body.status) ? body.status : null;
+    const participants = Object.hasOwn(body, 'participants') ? cleanJsonArray(body.participants, 120000, 12) : null;
+    const sourceContext = Object.hasOwn(body, 'sourceContext') ? cleanJsonObject(body.sourceContext, 75000) : null;
+    const nextSpeakerIndex = Object.hasOwn(body, 'nextSpeakerIndex') ? clampInteger(body.nextSpeakerIndex, 0, 1000000) : null;
+
+    const result = await query(`
+      update symposium_sessions
+      set title = coalesce($3, title),
+          topic = coalesce($4, topic),
+          mode = coalesce($5, mode),
+          context_text = coalesce($6, context_text),
+          context_label = case when $7::boolean then $8 else context_label end,
+          output_mode = coalesce($9, output_mode),
+          participants = case when $10::boolean then $11::jsonb else participants end,
+          source_context = case when $12::boolean then $13::jsonb else source_context end,
+          status = coalesce($14, status),
+          archived_at = case when $14 = 'archived' then now() when $14 is not null then null else archived_at end,
+          next_speaker_index = coalesce($15, next_speaker_index),
+          last_opened_at = case when $16::boolean then now() else last_opened_at end,
+          updated_at = now()
+      where id = $1 and user_id = $2
+      returning *
+    `, [
+      req.params.sessionId, user.id, title, topic, mode, contextText,
+      Object.hasOwn(body, 'contextLabel'), contextLabel,
+      outputMode,
+      Object.hasOwn(body, 'participants'), participants ? JSON.stringify(participants) : '[]',
+      Object.hasOwn(body, 'sourceContext'), sourceContext ? JSON.stringify(sourceContext) : '{}',
+      statusValue, nextSpeakerIndex, Boolean(body.touchOpen)
+    ]);
+    if (!result.rows[0]) return res.status(404).json({ error: 'Symposium not found.' });
+    res.json({ session: symposiumSessionRow(result.rows[0]) });
+  } catch (error) {
+    const status = /too large|too many/i.test(error.message) ? 413 : 500;
+    console.error('Symposium update failed:', error);
+    res.status(status).json({ error: status === 413 ? error.message : 'Unable to save the Symposium.' });
+  }
+});
+
+app.post('/api/account/symposiums/:sessionId/turns', async (req, res) => {
+  const client = await pool?.connect().catch(() => null);
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    await ensureSymposiumSchema();
+    if (!client) return res.status(503).json({ error: 'The account database is unavailable.' });
+    const text = cleanText(req.body?.text, 50000);
+    if (!text) return res.status(400).json({ error: 'A Symposium turn requires text.' });
+    const clientTurnId = cleanText(req.body?.clientTurnId, 200) || crypto.randomUUID();
+    const metadata = cleanJsonObject(req.body?.metadata, 50000);
+
+    await client.query('begin');
+    const existing = await client.query(`
+      select * from symposium_turns
+      where session_id = $1 and user_id = $2 and client_turn_id = $3
+    `, [req.params.sessionId, user.id, clientTurnId]);
+    if (existing.rows[0]) {
+      await client.query('commit');
+      return res.json({ turn: symposiumTurnRow(existing.rows[0]), duplicate: true });
+    }
+
+    const sequence = await client.query(`
+      update symposium_sessions
+      set next_turn_index = next_turn_index + 1, updated_at = now(), status = 'active'
+      where id = $1 and user_id = $2
+      returning next_turn_index - 1 as turn_index
+    `, [req.params.sessionId, user.id]);
+    if (!sequence.rows[0]) {
+      await client.query('rollback');
+      return res.status(404).json({ error: 'Symposium not found.' });
+    }
+
+    const result = await client.query(`
+      insert into symposium_turns
+        (user_id, session_id, client_turn_id, turn_index, speaker_name,
+         speaker_monogram, speaker_field, turn_kind, body, source_label, metadata, created_at)
+      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,now())
+      returning *
+    `, [
+      user.id, req.params.sessionId, clientTurnId, sequence.rows[0].turn_index,
+      cleanText(req.body?.name, 240) || 'Speaker', cleanText(req.body?.monogram, 20) || null,
+      cleanText(req.body?.field, 300) || null, cleanText(req.body?.kind, 80) || 'participant',
+      text, cleanText(req.body?.sourceLabel, 500) || null, JSON.stringify(metadata)
+    ]);
+    await client.query('commit');
+    res.status(201).json({ turn: symposiumTurnRow(result.rows[0]) });
+  } catch (error) {
+    try { await client?.query('rollback'); } catch {}
+    const status = /too large/i.test(error.message) ? 413 : 500;
+    console.error('Symposium turn save failed:', error);
+    res.status(status).json({ error: status === 413 ? error.message : 'Unable to save the Symposium turn.' });
+  } finally {
+    client?.release();
+  }
+});
+
+app.delete('/api/account/symposiums/:sessionId', async (req, res) => {
+  try {
+    const user = await requireAccountUser(req, res);
+    if (!user) return;
+    await ensureSymposiumSchema();
+    const result = await query(
+      'delete from symposium_sessions where id = $1 and user_id = $2 returning id',
+      [req.params.sessionId, user.id]
+    );
+    if (!result.rows[0]) return res.status(404).json({ error: 'Symposium not found.' });
+    res.json({ deleted: true, sessionId: result.rows[0].id });
+  } catch (error) {
+    console.error('Symposium delete failed:', error);
+    res.status(500).json({ error: 'Unable to delete the Symposium.' });
+  }
+});
 
 app.get('/api/account/bootstrap', async (req, res) => {
   try {

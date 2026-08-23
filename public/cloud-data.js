@@ -70,6 +70,22 @@
         body: String(text || '')
       }),
       removeDocument: (bookId) => request(`/api/account/library/${encodeURIComponent(bookId)}/document`, { method: 'DELETE' })
+    },
+    symposium: {
+      list: (includeArchived = false) => request(`/api/account/symposiums${includeArchived ? '?includeArchived=1' : ''}`),
+      load: (sessionId) => request(`/api/account/symposiums/${encodeURIComponent(sessionId)}`),
+      create: (session) => request('/api/account/symposiums', {
+        method: 'POST', body: JSON.stringify(session || {})
+      }),
+      update: (sessionId, changes) => request(`/api/account/symposiums/${encodeURIComponent(sessionId)}`, {
+        method: 'PATCH', body: JSON.stringify(changes || {})
+      }),
+      addTurn: (sessionId, turn) => request(`/api/account/symposiums/${encodeURIComponent(sessionId)}/turns`, {
+        method: 'POST', body: JSON.stringify(turn || {})
+      }),
+      remove: (sessionId) => request(`/api/account/symposiums/${encodeURIComponent(sessionId)}`, {
+        method: 'DELETE'
+      })
     }
   };
 
