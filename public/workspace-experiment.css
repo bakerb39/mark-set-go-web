@@ -231,8 +231,20 @@ body:has(#app > .msg-workspace-shell:not(.is-closed)) #app.app-shell{
   font-size:.72rem !important;
 }
 .msg-workspace-symposium .symposium-roster{
-  max-height:260px !important;
+  /* One scroll owner for Symposium: the workspace panel body. A nested roster
+     scrollbar trapped mouse-wheel input and hid the custom participant area. */
+  max-height:none !important;
+  height:auto !important;
+  overflow:visible !important;
+  overscroll-behavior:auto !important;
+  scrollbar-gutter:auto !important;
+  padding-right:0 !important;
   gap:5px !important;
+}
+
+.msg-workspace-symposium .symposium-add-participant-block{
+  position:relative;
+  z-index:1;
 }
 .msg-workspace-symposium .symposium-person{
   grid-template-columns:auto 32px 1fr !important;

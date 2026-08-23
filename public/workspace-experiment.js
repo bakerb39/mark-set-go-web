@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.14.1
+ * Mark, Set, Go! Workspace Experiment v0.14.3
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -555,11 +555,8 @@
         body.scrollTop -= (bodyRect.top + topPad) - buttonRect.top;
       }
 
-      // The participant roster has its own scrollbar. Never let a reused
-      // Symposium inherit that nested scroll position as the user's next
-      // destination; the primary action above the roster is the handoff target.
-      const roster = rootHost.querySelector?.('#symposium-roster');
-      if (roster) roster.scrollTop = 0;
+      // The Symposium setup uses one vertical scroll owner. The participant
+      // roster deliberately does not create a nested wheel/scroll region.
     }));
   }
 
@@ -1112,17 +1109,17 @@ function renderSymposiumWorkspace(rootHost, suppliedHandoff = null) {
                  stay in sync with the standalone Symposium renderer. -->
             <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
 
+            <div class="symposium-add-participant-block">
+              <label>Add a participant</label>
+              <div class="symposium-custom-row"><input id="symposium-custom-person" placeholder="e.g., Hannah Arendt"><button type="button" id="symposium-add-person">Add</button></div>
+              <p class="symposium-hint">Custom participants join this session as an AI representation of their published ideas.</p>
+            </div>
+
             <div>
               <label>Participants <span style="font-weight:500;color:#718095">(choose 1–6)</span></label>
               <div class="symposium-roster" id="symposium-roster">
                 ${SYMPOSIUM_PARTICIPANTS.map((person)=>`<label class="symposium-person"><input type="checkbox" data-symposium-person value="${person.id}" ${defaultChecked.has(person.id)?'checked':''}><span class="symposium-avatar">${symposiumEscape(person.monogram)}</span><span><strong>${symposiumEscape(person.name)}</strong><small>${symposiumEscape(person.field)} · ${symposiumEscape(person.era)}</small></span></label>`).join('')}
               </div>
-            </div>
-
-            <div>
-              <label>Add a participant</label>
-              <div class="symposium-custom-row"><input id="symposium-custom-person" placeholder="e.g., Hannah Arendt"><button type="button" id="symposium-add-person">Add</button></div>
-              <p class="symposium-hint">Custom participants join this session as an AI representation of their published ideas.</p>
             </div>
 
           </div>
