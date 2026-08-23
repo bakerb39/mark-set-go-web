@@ -1,21 +1,35 @@
-Mark, Set, Go! — Reader menu-only cleanup v1.1.1
+Mark, Set, Go! — Reader menu v1.2.0 + Read Anything storage fix
+2026-08-23
 
-Purpose
-- Removes the old Reader 1 / Reader 2 tab strip from the Reader page.
-- Reader switching stays in the top navigation/menu.
-- Uses NEW asset names reader-menu.js / reader-menu.css to avoid stale reader-switcher.js caching.
+Replace these files in public/:
+  index.html
+  reader-menu.js
+  reader-menu.css
+  read-anything.js
 
-Deploy
-1. Replace index.html with the included index.html (or make the two equivalent asset-reference changes).
-2. Add reader-menu.js and reader-menu.css.
-3. Remove any old HTML references to reader-switcher.js or reader-switcher.v1.0.x.js/css.
-4. Old reader-switcher files may remain on disk if nothing references them, but deleting them avoids confusion.
+Reader width fix
+----------------
+- Reader 1 is now the canonical visual width.
+- Its actual rendered #app width is measured, not guessed.
+- Reader 2/3/etc use the same measured width.
+- The global 1400px .app-shell rule can no longer make additional Readers wider.
+- Workspace panes remain excluded.
+- No protected Reader engine files are changed.
 
-Defensive cleanup
-- reader-menu.js removes any .reader-session-switcher markup left by v1.0.x.
-- reader-menu.css hides legacy Reader-page switcher classes even if an old script tries to inject them.
+Read Anything quota fix
+-----------------------
+- Full formatting records (original + transformed versions) are no longer written to localStorage.
+- They are stored in IndexedDB: markSetGoReadAnythingFormatsV1 / records.
+- Existing markSetGoReadAnythingFormatV1:* localStorage records are migrated asynchronously to IndexedDB and removed only after a successful IndexedDB write.
+- The small document-to-format-key index remains in localStorage.
+- Existing Reader rendering is not blocked while migration runs.
 
-Untouched
-- app.js
-- protected Reader engine modules
-- workspace pane/runtime files
+Build marker
+------------
+20260823-v7.29.5-reader-menu-storage
+
+Expected asset versions
+-----------------------
+/reader-menu.css?v=20260823-v1.2.0
+/reader-menu.js?v=20260823-v1.2.0
+/read-anything.js?v=20260823-indexeddb-format-storage

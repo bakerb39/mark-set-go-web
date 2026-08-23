@@ -96,3 +96,18 @@
     width: calc(100vw - 20px);
   }
 }
+
+/* v1.2.0: every non-workspace Reader uses Reader 1's measured shell width. */
+#app.app-shell.reader-session-width-match:has(.reader-page-panel) {
+  width: min(var(--msg-canonical-reader-width, 100%), calc(100% - 1.5rem)) !important;
+  max-width: var(--msg-canonical-reader-width, none) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+@media (max-width: 520px) {
+  #app.app-shell.reader-session-width-match:has(.reader-page-panel) {
+    width: calc(100% - .75rem) !important;
+    max-width: none !important;
+  }
+}

@@ -2,7 +2,7 @@
 
 /*
  * Mark, Set, Go! — non-workspace Reader switching
- * v1.1.1 (2026-08-23)
+ * v1.2.0 (2026-08-23)
  *
  * This layer intentionally sits ABOVE the protected Reader engine. It keeps
  * multiple in-memory Reader snapshots while preserving app.js's existing
@@ -29,6 +29,46 @@
   let restoringSlot = false;
   let suppressSlotSync = false;
   let readerMenu = null;
+  let canonicalReaderWidthPx = 0;
+
+  // Reader 1 is the visual baseline. Additional Readers must use the exact
+  // same outer shell width rather than inheriting a later global .app-shell
+  // override. Capture the real rendered width once and reuse it for every slot.
+  function captureCanonicalReaderWidth({ force = false } = {}) {
+    if (!app?.querySelector?.('.reader-page-panel')) return canonicalReaderWidthPx;
+    if (canonicalReaderWidthPx > 0 && !force) return canonicalReaderWidthPx;
+    const width = Math.round(app.getBoundingClientRect?.().width || 0);
+    if (width > 0) {
+      canonicalReaderWidthPx = width;
+      try { sessionStorage.setItem('markSetGoCanonicalReaderWidthV1', String(width)); } catch {}
+    }
+    return canonicalReaderWidthPx;
+  }
+
+  function restoreCanonicalReaderWidthHint() {
+    try {
+      const width = Math.round(Number(sessionStorage.getItem('markSetGoCanonicalReaderWidthV1')) || 0);
+      if (width > 0) canonicalReaderWidthPx = width;
+    } catch {}
+  }
+
+  function applyCanonicalReaderWidth() {
+    if (!app?.querySelector?.('.reader-page-panel')) return;
+    if (!canonicalReaderWidthPx) captureCanonicalReaderWidth();
+    if (!canonicalReaderWidthPx) return;
+    app.classList.add('reader-session-width-match');
+    app.style.setProperty('--msg-canonical-reader-width', `${canonicalReaderWidthPx}px`);
+  }
+
+  function syncCanonicalReaderWidth(slot = activeSlot()) {
+    // Only Reader 1 establishes the baseline. Once captured, every Reader uses
+    // it. This avoids guessing at 1000/1100/1400px and survives theme overrides.
+    if (slot?.ordinal === 1 && !canonicalReaderWidthPx) captureCanonicalReaderWidth();
+    applyCanonicalReaderWidth();
+    requestAnimationFrame(() => applyCanonicalReaderWidth());
+  }
+
+  restoreCanonicalReaderWidthHint();
 
   function removeLegacyReaderStrip() {
     document.querySelectorAll('.reader-session-switcher').forEach((node) => node.remove());
@@ -253,6 +293,7 @@
     }
     originalRenderEmptyReader();
     removeLegacyReaderStrip();
+    syncCanonicalReaderWidth(activeSlot());
     renderReaderMenu();
     dispatchSessionEvent('marksetgo:reader-session-changed');
   }
@@ -279,6 +320,7 @@
         activeReaderSnapshot = snapshot;
         originalApplyReaderSessionSnapshot(snapshot, { resumePlayback });
         removeLegacyReaderStrip();
+        syncCanonicalReaderWidth(target);
         activeReaderSnapshot = decorateSnapshot(cloneSnapshot(activeReaderSnapshot || snapshot), target);
         syncSlotFromSnapshot(activeReaderSnapshot, { slot: target });
         renderReaderMenu();
@@ -377,12 +419,14 @@
     if (ephemeral || restoringSlot) {
       const result = originalRenderReaderWithText(title, text, source);
       removeLegacyReaderStrip();
+      syncCanonicalReaderWidth(activeSlot());
       return result;
     }
 
     const slot = ensureActiveSlot();
     const result = originalRenderReaderWithText(title, text, source);
     removeLegacyReaderStrip();
+    syncCanonicalReaderWidth(slot);
     if (result === false) return result;
 
     const snapshot = activeReaderSnapshot || (() => {
@@ -402,6 +446,7 @@
     ensureActiveSlot();
     const result = originalRenderEmptyReader();
     removeLegacyReaderStrip();
+    syncCanonicalReaderWidth(activeSlot());
     renderReaderMenu();
     dispatchSessionEvent('marksetgo:reader-session-changed');
     return result;
@@ -412,6 +457,7 @@
     const decorated = decorateSnapshot(snapshot, slot);
     const result = originalApplyReaderSessionSnapshot(decorated, options);
     removeLegacyReaderStrip();
+    syncCanonicalReaderWidth(slot);
     if (result) {
       const current = decorateSnapshot(activeReaderSnapshot || decorated, slot);
       activeReaderSnapshot = current;
@@ -522,6 +568,8 @@
   if (activeReaderSnapshot?.title && activeReaderSnapshot?.currentText) {
     const first = ensureActiveSlot(activeReaderSnapshot);
     activeReaderSnapshot = decorateSnapshot(activeReaderSnapshot, first);
+    captureCanonicalReaderWidth();
+    syncCanonicalReaderWidth(first);
     renderReaderMenu();
   } else if (app.querySelector('.empty-reader-page')) {
     ensureActiveSlot();
