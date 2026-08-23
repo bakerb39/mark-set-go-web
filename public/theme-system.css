@@ -861,12 +861,37 @@ html.msg-secondary-reader-document #app.msg-secondary-reader-app > :is(.reader-p
   box-sizing:border-box;
 }
 
-/* v9.4.1 — Book Pages: prevent internal CSS multicolumn rules from drifting
-   into the visible page. The intended center spread divider remains the
-   separate background-image defined by the Reader's Book Pages layout. */
+/* v9.4.2 — Book Pages: keep pagination artifacts out of the visible spread.
+   The multicolumn content scrolls horizontally, so the page-spread divider
+   must NOT be painted on #reader itself; a local background moves with that
+   scrolling content and can periodically appear near a page edge. */
 #reader.reader.book-pages-layout {
   column-rule: none !important;
   column-rule-width: 0 !important;
   column-rule-style: none !important;
+  background-image: none !important;
+  background-attachment: scroll !important;
+}
+
+/* Draw the one intentional divider on the non-scrolling Reader viewport.
+   Reader overlays/controls have higher z-index values, so they remain usable. */
+@media (min-width: 761px) {
+  #reader-frame:has(> #reader.reader.book-pages-layout)::after {
+    content: "" !important;
+    display: block !important;
+    position: absolute !important;
+    z-index: 2 !important;
+    top: 1px !important;
+    bottom: 1px !important;
+    left: 50% !important;
+    width: 1px !important;
+    transform: translateX(-0.5px) !important;
+    background: rgba(255, 255, 255, .18) !important;
+    pointer-events: none !important;
+  }
+
+  #reader-frame:has(> #reader.reader.book-pages-layout.light)::after {
+    background: rgba(17, 17, 17, .14) !important;
+  }
 }
 
