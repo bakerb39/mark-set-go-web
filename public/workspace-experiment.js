@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.2 — Reader stability
+ * Mark, Set, Go! Workspace Experiment v0.15.3 — Reader blank + half split
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -324,6 +324,30 @@
     return Math.max(MIN_SECONDARY_WIDTH, Math.floor((available - 8) / 2));
   }
 
+
+  function forceAuxiliaryReaderHalfSplit(shell = workspaceShell()) {
+    if (!shell || window.matchMedia('(max-width: 900px)').matches) return;
+    const half = preferredSecondaryReaderWidth(shell);
+    secondaryWidth = Math.max(half, Number(secondaryWidth) || 0);
+    // Use inline !important for the initial Reader split. Several later
+    // workspace/theme rules also own grid-template-columns, so setting only the
+    // CSS variable was not enough in the real app. The divider releases this
+    // one-time hard split as soon as the user starts dragging it.
+    shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`, 'important');
+    shell.style.setProperty(
+      'grid-template-columns',
+      `minmax(0,1fr) 8px ${secondaryWidth}px`,
+      'important'
+    );
+  }
+
+  function releaseAuxiliaryReaderForcedSplit(shell = workspaceShell()) {
+    if (!shell) return;
+    shell.style.removeProperty('grid-template-columns');
+    shell.style.removeProperty('--msg-secondary-width');
+    shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
+  }
+
   function workspaceEnabled() {
     return readWorkspacePreference();
   }
@@ -558,6 +582,9 @@
 
     divider.addEventListener('pointerdown', (event) => {
       if (window.matchMedia('(max-width: 900px)').matches) return;
+      // Once the user grabs the divider, hand sizing back to the normal
+      // resizable CSS-variable path.
+      releaseAuxiliaryReaderForcedSplit(shell);
       pointerId = event.pointerId;
       divider.setPointerCapture(pointerId);
       document.body.classList.add('msg-workspace-resizing');
@@ -776,16 +803,30 @@
     activePanelKey = key;
     syncWorkspacePanelMode(shell, body, key);
     const wasClosed = shell.classList.contains('is-closed');
+    const auxiliaryReaderNumber = readerNumberFromPanelKey(key);
     if (wasClosed) {
-      if (readerNumberFromPanelKey(key) >= 2) {
-        secondaryWidth = preferredSecondaryReaderWidth(shell);
-      } else {
-        secondaryWidth = MIN_SECONDARY_WIDTH;
-      }
+      secondaryWidth = auxiliaryReaderNumber >= 2
+        ? preferredSecondaryReaderWidth(shell)
+        : MIN_SECONDARY_WIDTH;
     }
     shell.classList.remove('is-closed');
-    shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
-    window.requestAnimationFrame(dockReaderTopControlsForWorkspace);
+    if (auxiliaryReaderNumber >= 2) {
+      // Selecting Reader 2+ always opens with at least half of the usable
+      // reading area. This is applied after the shell is visible so the
+      // measurement is based on the real expanded workspace width.
+      forceAuxiliaryReaderHalfSplit(shell);
+    } else {
+      releaseAuxiliaryReaderForcedSplit(shell);
+    }
+    window.requestAnimationFrame(() => {
+      // Opening the workspace also widens #app. Re-measure on the next frame so
+      // Reader 2+ gets half of the FINAL expanded reading area, not half of the
+      // narrower pre-workspace shell.
+      if (auxiliaryReaderNumber >= 2 && activePanelKey === key) {
+        forceAuxiliaryReaderHalfSplit(shell);
+      }
+      dockReaderTopControlsForWorkspace();
+    });
     syncMountedWorkspacePanels(body, key);
     syncWorkspacePanelMode(shell, body, key);
     renderWorkspaceTabs(shell);
@@ -934,7 +975,6 @@
 
     // Frame mode: preserve the existing side-by-side workspace behavior.
     if (workspaceEnabled()) {
-      secondaryWidth = preferredSecondaryReaderWidth();
       return activatePanel(record.key);
     }
 

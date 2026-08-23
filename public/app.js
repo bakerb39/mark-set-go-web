@@ -56,7 +56,12 @@ window.MSGSecondaryReaderWorkspace = Object.freeze({
 let secondaryReaderLocalIntent = !isSecondaryReaderWorkspace();
 if (isSecondaryReaderWorkspace()) {
   const markSecondaryReaderIntent = (event) => {
-    if (event?.type === 'keydown' && !['Enter', ' ', 'Spacebar'].includes(event.key)) return;
+    // Reader 2+ must stay blank on boot. Startup scripts can dispatch synthetic
+    // change/click events while they initialize; those are NOT permission to
+    // copy Reader 1's document into this independent Reader. Only a real user
+    // interaction inside this Reader can unlock a document render.
+    if (!event?.isTrusted) return;
+    if (event.type === 'keydown' && !['Enter', ' ', 'Spacebar'].includes(event.key)) return;
     secondaryReaderLocalIntent = true;
   };
   document.addEventListener('pointerdown', markSecondaryReaderIntent, true);
@@ -437,14 +442,23 @@ function navigationViewKey({ action, read, test } = {}) {
 
 
 async function writeReaderSession(snapshot) {
+  // The legacy SessionManager store is the single persistent checkpoint for
+  // Reader 1. Auxiliary Readers are independent live iframe sessions and must
+  // never overwrite that shared checkpoint.
+  if (isSecondaryReaderWorkspace()) return snapshot || null;
   return readerSessionManager.write(snapshot);
 }
 
 async function readReaderSession() {
+  // Most importantly, Reader 2+ must never hydrate itself from Reader 1's
+  // persistent checkpoint. Its own document lives only in its mounted iframe
+  // until dedicated multi-Reader persistence is implemented.
+  if (isSecondaryReaderWorkspace()) return null;
   return readerSessionManager.read();
 }
 
 async function clearReaderSession() {
+  if (isSecondaryReaderWorkspace()) return;
   await readerSessionManager.clear();
   try { localStorage.removeItem(READER_SESSION_META_KEY); } catch {}
 }

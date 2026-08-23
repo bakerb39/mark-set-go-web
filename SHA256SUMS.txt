@@ -1,8 +1,8 @@
-9362a48b7518775dc82227922fc5bdc5a504c31eec425729e32ec3f2d897acca  /mnt/data/msg-v7333/public/app.js
-a668df9831f2d610ef002356724c55c8421c6a10ff8e872d16479e7797e237d6  /mnt/data/msg-v7333/public/index.html
-521f197e7e6b0e86e799ef7462fbb88c5051716820e83163942a8036b8c699bc  /mnt/data/msg-v7333/public/read-anything.js
-c8f79cad7b69f923bd9ea388b94f8c2a003a59d06077cd107c276bcacb4d6374  /mnt/data/msg-v7333/public/reader-tooltip-cleanup.js
-14299c5d56e0dbbd2489e6e60f822b47cac216f2024d5427adfc322178644edd  /mnt/data/msg-v7333/public/topic-feed-reader-cleanup.css
-2a34e6fca01078f57408170e9cb6bf08630eb344101ad18f0ea4157971600430  /mnt/data/msg-v7333/public/topic-feed-reader-cleanup.js
-d8f1a52a26e12235ba1f50424531fbddd9bcd1ca3da8afbbb25f12d8157d5285  /mnt/data/msg-v7333/public/workspace-experiment.css
-5244a212ff94a61e0b28d48a9d9d1926d1986a0ae8716326ac8cf2fe7eb2d352  /mnt/data/msg-v7333/public/workspace-experiment.js
+250e0e2f7a698daf40674fef110e96567b65238cbba2bf386ba3da7a4cf28eac  public/app.js
+b40a6b4cd4a4bcb73ff7f1df222b20fd712e88f553cb98f0679fdaf677d22a28  public/index.html
+521f197e7e6b0e86e799ef7462fbb88c5051716820e83163942a8036b8c699bc  public/read-anything.js
+c8f79cad7b69f923bd9ea388b94f8c2a003a59d06077cd107c276bcacb4d6374  public/reader-tooltip-cleanup.js
+14299c5d56e0dbbd2489e6e60f822b47cac216f2024d5427adfc322178644edd  public/topic-feed-reader-cleanup.css
+2a34e6fca01078f57408170e9cb6bf08630eb344101ad18f0ea4157971600430  public/topic-feed-reader-cleanup.js
+dc62653fc433f7954d381aa1b97644fc474f2110effb8a0897d3c472269c49e2  public/workspace-experiment.css
+e9228ff659bcbdc6e8034a664f5ed79e26201228511c07c18b07970f44db39c0  public/workspace-experiment.js
