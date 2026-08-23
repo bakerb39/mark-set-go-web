@@ -895,3 +895,25 @@ html.msg-secondary-reader-document #app.msg-secondary-reader-app > :is(.reader-p
   }
 }
 
+
+/* v9.4.3 — remove the redundant Topic Feed divider overlay.
+   Book Pages now owns one stationary divider on #reader-frame through v9.4.2. */
+#reader-frame .topic-feed-book-divider-overlay,
+#reader-frame [data-topic-feed-book-divider] {
+  display: none !important;
+}
+
+/* Defensive: Topic Feed Book Pages must never paint their own moving divider. */
+#reader.topic-feed-divider-managed.book-pages-layout {
+  column-rule: none !important;
+  column-rule-width: 0 !important;
+  column-rule-style: none !important;
+  background-image: none !important;
+}
+
+/* v9.4.3 — disable the automatic floating general-selection share pill.
+   Explicit Chat and Symposium actions elsewhere in the app remain available. */
+#msg-content-selection-toolbar,
+.msg-content-selection-toolbar {
+  display: none !important;
+}
