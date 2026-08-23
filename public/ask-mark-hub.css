@@ -207,8 +207,11 @@
   #reader-layout:not(.word-panel-hidden) {
     --word-panel-width:390px;
   }
-  #right-pane-splitter {
+  #reader-layout:not(.word-panel-hidden) #right-pane-splitter {
     display:block !important;
+  }
+  #reader-layout.word-panel-hidden #right-pane-splitter {
+    display:none !important;
   }
   .mark-companion-panel {
     min-width:0;
