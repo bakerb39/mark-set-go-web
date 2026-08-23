@@ -80,19 +80,33 @@
 
     const words = selectedReaderWords();
     let text = '';
+    let canonicalSelection = null;
 
+    // Prefer the Reader's public canonical selection bridge. It resolves the
+    // exact Ask Mark selection from Reader state, so clicking the toolbar cannot
+    // collapse native browser selection and make Reader 2 lose Passage B.
     try {
-      const selection = window.getSelection?.();
-      if (selection && !selection.isCollapsed && selection.rangeCount) {
-        const range = selection.getRangeAt(0);
-        const common = range.commonAncestorContainer?.nodeType === Node.ELEMENT_NODE
-          ? range.commonAncestorContainer
-          : range.commonAncestorContainer?.parentElement;
-        if (common && (common === reader || reader.contains(common))) {
-          text = clean(selection.toString().replace(/\s+/g, ' '), 12000);
-        }
+      canonicalSelection = window.MarkSetGoCurrentReaderDocument?.getSelectionRange?.() || null;
+      if (canonicalSelection?.text) {
+        text = clean(canonicalSelection.text.replace(/\s+/g, ' '), 12000);
       }
     } catch {}
+
+    // Fallbacks support older Reader builds and nonstandard readable surfaces.
+    if (!text) {
+      try {
+        const selection = window.getSelection?.();
+        if (selection && !selection.isCollapsed && selection.rangeCount) {
+          const range = selection.getRangeAt(0);
+          const common = range.commonAncestorContainer?.nodeType === Node.ELEMENT_NODE
+            ? range.commonAncestorContainer
+            : range.commonAncestorContainer?.parentElement;
+          if (common && (common === reader || reader.contains(common))) {
+            text = clean(selection.toString().replace(/\s+/g, ' '), 12000);
+          }
+        }
+      } catch {}
+    }
 
     if (!text && words.length) {
       text = clean(words.map((node) => node.textContent || '').join(' ').replace(/\s+/g, ' '), 12000);
@@ -111,12 +125,16 @@
     );
     const author = clean(doc?.author || source?.author || '', 220);
     const chapter = clean(doc?.chapter || doc?.section || source?.chapter || '', 300);
-    const startIndex = words.length ? Number(words[0].dataset.index) : null;
-    const endIndex = words.length ? Number(words[words.length - 1].dataset.index) + 1 : null;
+    const startIndex = Number.isFinite(Number(canonicalSelection?.startIndex))
+      ? Number(canonicalSelection.startIndex)
+      : (words.length ? Number(words[0].dataset.index) : null);
+    const endIndex = Number.isFinite(Number(canonicalSelection?.endIndex))
+      ? Number(canonicalSelection.endIndex)
+      : (words.length ? Number(words[words.length - 1].dataset.index) + 1 : null);
     const readerLabel = window.__MSG_SECONDARY_READER__ ? 'Reader 2' : 'Reader 1';
 
     return normalizePassage({
-      documentId: doc?.documentId || doc?.id || source?.documentId || '',
+      documentId: canonicalSelection?.documentId || doc?.documentId || doc?.id || source?.documentId || '',
       title,
       author,
       chapter,
@@ -439,6 +457,58 @@
     return isCompare ? button : null;
   }
 
+  // Absolute safety gate for the legacy Reader Compare implementation.
+  // app.js still has a direct button listener that writes a one-passage draft
+  // and opens bare /comparison-workspace.html. If that legacy listener ever
+  // receives the click (for example inside Reader 2), convert the attempted
+  // navigation into a basket add instead. The basket's own explicit workspace
+  // action uses ?passageBasket=1 and is deliberately allowed through.
+  const nativeWindowOpen = window.open.bind(window);
+
+  function isLegacyComparisonWorkspaceUrl(value) {
+    try {
+      const url = new URL(String(value || ''), window.location.href);
+      return url.origin === window.location.origin
+        && url.pathname === '/comparison-workspace.html'
+        && url.searchParams.get('passageBasket') !== '1';
+    } catch {
+      return false;
+    }
+  }
+
+  window.open = function passageComparisonWindowOpen(url, target, features) {
+    if (!isLegacyComparisonWorkspaceUrl(url)) {
+      return nativeWindowOpen(url, target, features);
+    }
+
+    const passage = collectCurrentSelection();
+    if (passage) {
+      forwardSelection(passage);
+    } else if (isChildFrame) {
+      try {
+        window.parent.postMessage({
+          type: 'msg-passage-comparison-status',
+          message: 'Reader 2 could not find the highlighted passage. Highlight it again and choose Compare.'
+        }, window.location.origin);
+      } catch {}
+    } else {
+      expanded = true;
+      notify('Highlight a passage first, then choose Compare.');
+    }
+
+    // The legacy handler writes this immediately before opening the old page.
+    // It is not the source of truth for the passage basket, so discard that
+    // one-passage handoff rather than leaving stale comparison state behind.
+    try { localStorage.removeItem('markSetGoComparisonDraftV1'); } catch {}
+
+    const toolbar = document.querySelector('#mark-selection-toolbar, .mark-selection-toolbar');
+    if (toolbar) toolbar.hidden = true;
+
+    // Return a truthy window-like object so the legacy fallback
+    // `if (!opened) location.href = ...` cannot navigate the Reader either.
+    return Object.freeze({ closed: false, close() {}, focus() {} });
+  };
+
   function handleCompareClick(event) {
     const button = compareToolbarButton(event);
     if (!button) return;
@@ -518,7 +588,7 @@
   }
 
   window.MSGPassageComparison = Object.freeze({
-    version: '1.1-reader2-capture',
+    version: '1.3-canonical-selection-gate',
     addPassage: (passage) => isChildFrame ? forwardSelection(normalizePassage(passage)) : addPassage(passage),
     clear: clearPassages,
     passages: () => passages.map((item) => ({ ...item })),
