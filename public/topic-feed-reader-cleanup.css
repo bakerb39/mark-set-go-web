@@ -1,0 +1,15 @@
+/* Mark, Set, Go! — Topic Feed Reader chrome isolation v1
+   Topic Feed provenance/header UI is valid only while the current Reader page
+   is explicitly a Topic Feed document. This presentation backstop prevents a
+   stale Topic Feed header from ever becoming visible on books/uploads. */
+
+#app .reader-page-panel:not(.topic-feed-reader-page) [data-topic-feed-story-header-external],
+#app .reader-page-panel:not(.topic-feed-reader-page) .topic-feed-story-header-external,
+#app .reader-page-panel:not(.topic-feed-reader-page) [data-topic-feed-story-header-spacer],
+#app .reader-page-panel:not(.topic-feed-reader-page) .topic-feed-story-header-spacer,
+#app .reader-page-panel:not(.topic-feed-reader-page) [data-topic-feed-source-credit],
+#app .reader-page-panel:not(.topic-feed-reader-page) .topic-feed-reader-credit,
+#app .reader-page-panel:not(.topic-feed-reader-page) [data-topic-feed-book-divider],
+#app .reader-page-panel:not(.topic-feed-reader-page) .topic-feed-book-divider-overlay {
+  display: none !important;
+}
