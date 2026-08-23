@@ -508,9 +508,24 @@
     return PANELS.get(activePanelKey) || null;
   }
 
-  function detachActivePanel() {
-    const record = activePanelRecord();
-    if (record?.node?.isConnected) record.node.remove();
+  function setWorkspacePanelActive(record, active) {
+    const node = record?.node;
+    if (!node) return;
+    node.classList.toggle('msg-workspace-panel-active', Boolean(active));
+    node.classList.toggle('msg-workspace-panel-inactive', !active);
+    node.setAttribute('aria-hidden', active ? 'false' : 'true');
+    try { node.inert = !active; } catch {}
+  }
+
+  function syncMountedWorkspacePanels(body, activeKey = activePanelKey) {
+    if (!body) return;
+    PANELS.forEach((record, key) => {
+      // Keep every workspace panel mounted. In particular, removing Reader 2's
+      // iframe destroys its in-memory Reader/document/page position. Inactive
+      // panels are parked visually by CSS instead of being detached.
+      if (!record.node.isConnected) body.appendChild(record.node);
+      setWorkspacePanelActive(record, key === activeKey);
+    });
   }
 
   function renderWorkspaceTabs(shell = workspaceShell()) {
@@ -563,9 +578,10 @@
   function closeWorkspacePanel() {
     const shell = workspaceShell();
     if (!shell) return;
-    detachActivePanel();
+    const body = panelBody(shell);
     activePanelKey = '';
-    syncWorkspacePanelMode(shell, panelBody(shell), '');
+    syncMountedWorkspacePanels(body, '');
+    syncWorkspacePanelMode(shell, body, '');
     restoreReaderTopControlsAfterWorkspace();
     shell.classList.add('is-closed');
     renderWorkspaceTabs(shell);
@@ -580,7 +596,6 @@
     const body = panelBody(shell);
     if (!body) return false;
 
-    if (activePanelKey !== key) detachActivePanel();
     activePanelKey = key;
     syncWorkspacePanelMode(shell, body, key);
     const wasClosed = shell.classList.contains('is-closed');
@@ -594,7 +609,7 @@
     shell.classList.remove('is-closed');
     shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
     window.requestAnimationFrame(dockReaderTopControlsForWorkspace);
-    if (!record.node.isConnected) body.appendChild(record.node);
+    syncMountedWorkspacePanels(body, key);
     syncWorkspacePanelMode(shell, body, key);
     renderWorkspaceTabs(shell);
     return true;

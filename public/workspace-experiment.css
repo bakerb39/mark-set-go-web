@@ -77,8 +77,38 @@ body.msg-workspace-resizing{cursor:col-resize!important;user-select:none!importa
   color:#fff;
 }
 .msg-workspace-close{font-size:22px;line-height:1;width:36px;padding:0}
-.msg-workspace-panel-body{flex:1 1 auto;min-height:0;overflow:auto}
+.msg-workspace-panel-body{flex:1 1 auto;min-height:0;overflow:auto;position:relative}
 .msg-workspace-panel{min-height:100%;background:#fff}
+
+/* v0.5.5 — persistent workspace panels.
+   Inactive panels remain mounted so iframe-backed tools (especially Reader 2)
+   retain their live document, book spread, scroll position, selections and UI
+   state while another workspace tab is active. Only an explicit tab close
+   removes the panel from the DOM. */
+.msg-workspace-panel.msg-workspace-panel-inactive{
+  position:absolute !important;
+  inset:0 !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+  overflow:hidden !important;
+  z-index:0 !important;
+}
+.msg-workspace-panel.msg-workspace-panel-active{
+  position:relative !important;
+  inset:auto !important;
+  width:100% !important;
+  min-height:100% !important;
+  visibility:visible !important;
+  pointer-events:auto !important;
+  z-index:1 !important;
+}
+.msg-workspace-panel.msg-workspace-panel-inactive .msg-workspace-page-frame{
+  width:100% !important;
+  height:100% !important;
+}
 
 /* Make the existing Symposium usable in a side pane without changing its logic. */
 .msg-workspace-symposium .symposium-page{padding:12px!important}
