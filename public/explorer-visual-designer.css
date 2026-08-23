@@ -218,3 +218,24 @@ body.msg-vd-panel-dragging #msg-explorer-visual-designer { transition:none !impo
 #msg-explorer-visual-designer .msg-vd-control > label { color:var(--vd-ink) !important; }
 #msg-explorer-visual-designer .msg-vd-control-output { color:var(--vd-accent-dark) !important; }
 #msg-explorer-visual-designer .msg-vd-control input[type="range"] { accent-color:var(--vd-accent) !important; }
+
+
+/* v2.5 — real page-background controls. */
+#msg-explorer-visual-designer [data-vd-background] {
+  display:grid;
+  gap:2px;
+}
+#msg-explorer-visual-designer [data-vd-background] .msg-vd-control {
+  grid-template-columns:minmax(0,1fr) minmax(118px,auto);
+}
+#msg-explorer-visual-designer [data-vd-background] :is(select,input[type="text"]) {
+  min-height:29px;
+  border:1px solid var(--vd-border) !important;
+  border-radius:7px;
+  background:var(--vd-surface) !important;
+  color:var(--vd-ink) !important;
+  font:600 9px/1.2 var(--msg-font-ui,ui-sans-serif,system-ui,sans-serif);
+}
+#msg-explorer-visual-designer [data-vd-background] select { min-width:118px; padding:4px 22px 4px 7px; }
+#msg-explorer-visual-designer [data-vd-background] .msg-vd-background-url { grid-template-columns:1fr; }
+#msg-explorer-visual-designer [data-vd-background] .msg-vd-background-url input { grid-column:1/-1; }

@@ -548,3 +548,14 @@
   max-height:none !important;
   overflow:visible !important;
 }
+
+
+/* v9.2.89 — theme-safe user messages.
+   Experience themes can replace the old navy bubble material, so keep the
+   message as an explicit light surface with dark ink instead of inheriting
+   white text onto a light themed bubble. */
+.askmark-premium .askmark-conversation .user-message p {
+  color:var(--ask-ink,#183047) !important;
+  background:color-mix(in srgb,var(--ask-gold-soft,#f6e5aa) 38%,var(--ask-paper,#fffdf7)) !important;
+  border:1px solid color-mix(in srgb,var(--ask-gold,#e4c463) 48%,transparent) !important;
+}

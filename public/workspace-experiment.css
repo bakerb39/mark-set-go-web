@@ -768,3 +768,31 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
       minmax(520px,var(--msg-secondary-width)) !important;
   }
 }
+
+
+/* v0.5.6 — Reader 2 must size to the live workspace viewport.
+   Generic workspace pages use a 640px minimum iframe height, but a full Reader
+   is a viewport application of its own. Keeping that generic minimum on Reader 2
+   makes short/full-screen browser viewports overflow and crop the two-reader
+   workspace. */
+.msg-workspace-secondary-reader-page.msg-workspace-panel-active {
+  height:100% !important;
+  min-height:0 !important;
+  max-height:100% !important;
+  overflow:hidden !important;
+}
+.msg-workspace-secondary-reader-page .msg-secondary-reader-frame {
+  display:block !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:100% !important;
+}
+#app > .msg-workspace-shell:not(.is-closed):has(.msg-secondary-reader-frame) {
+  min-width:0 !important;
+  max-width:100% !important;
+  overflow:hidden !important;
+}
+#app > .msg-workspace-shell:not(.is-closed):has(.msg-secondary-reader-frame) > :is(.msg-workspace-primary,.msg-workspace-secondary) {
+  min-width:0 !important;
+}

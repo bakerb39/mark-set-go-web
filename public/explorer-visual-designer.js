@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Mark, Set, Go! Visual Designer v3.2 — Profile launcher + current theme tokens
+ * Mark, Set, Go! Visual Designer v3.3 — Profile launcher + background designer
  *
  * SOURCE RULES:
  * - The application's default Reader layout lives in CSS.
@@ -12,7 +12,8 @@
  * - Leaving Explorer releases Designer-owned inline colors/layout so other
  *   experience themes can style the complete UI normally.
  * - Returning to Explorer reapplies only values the user explicitly saved.
- * - No scenery controls. No MutationObserver.
+ * - Background scenery can be kept, replaced with a solid color, or replaced by an image URL.
+ * - No MutationObserver.
  */
 
 (() => {
@@ -70,13 +71,22 @@
   function r(key,label,min,max,step,unit,prop){return{key,label,min,max,step,unit,prop};}
   function clone(v){return JSON.parse(JSON.stringify(v||{}));}
   function isExplorer(){return document.documentElement.dataset.msgExperienceTheme==='explorer';}
-  function defaultConfig(){return{version:CONFIG_VERSION,preset:'explorer',colors:clone(PRESETS.explorer),layout:{}};}
+  function defaultConfig(){return{version:CONFIG_VERSION,preset:'explorer',colors:clone(PRESETS.explorer),background:{mode:'theme',color:'#dce8dc',imageUrl:'',fit:'cover'},layout:{}};}
   function sanitize(raw){
     const out=defaultConfig();
     if(!raw||Number(raw.version)!==CONFIG_VERSION)return out;
     out.preset=['explorer','antique','custom'].includes(String(raw.preset))?String(raw.preset):'explorer';
     for(const [k,fallback] of Object.entries(PRESETS.explorer)){
       const v=String(raw.colors?.[k]||'');out.colors[k]=/^#[0-9a-f]{6}$/i.test(v)?v:fallback;
+    }
+    if(raw.background&&typeof raw.background==='object'){
+      const mode=String(raw.background.mode||'theme');
+      out.background.mode=['theme','color','image'].includes(mode)?mode:'theme';
+      const color=String(raw.background.color||'');
+      out.background.color=/^#[0-9a-f]{6}$/i.test(color)?color:'#dce8dc';
+      out.background.imageUrl=String(raw.background.imageUrl||'').trim().slice(0,2000);
+      const fit=String(raw.background.fit||'cover');
+      out.background.fit=['cover','contain','auto'].includes(fit)?fit:'cover';
     }
     if(raw.layout&&typeof raw.layout==='object'){
       for(const [id,layer] of Object.entries(LAYERS)){
@@ -117,6 +127,37 @@
     for(const [k,v] of Object.entries(COLOR_VARS))root.style.setProperty(v,config.colors[k]);
   }
 
+  function backgroundOwner(){return document.body;}
+  function releaseBackground(){
+    const body=backgroundOwner();if(!body)return;
+    for(const prop of ['background-color','background-image','background-position','background-repeat','background-size','background-attachment']) body.style.removeProperty(prop);
+  }
+  function normalizedBackgroundUrl(value){
+    const raw=String(value||'').trim();
+    if(!raw)return '';
+    if(/^https?:\/\//i.test(raw)||raw.startsWith('/'))return raw.replace(/[\"'\n\r]/g,(ch)=>encodeURIComponent(ch));
+    return '';
+  }
+  function applyBackground(){
+    if(!isExplorer()){releaseBackground();return;}
+    const body=backgroundOwner();if(!body)return;
+    const bg=config.background||defaultConfig().background;
+    if(bg.mode==='theme'){releaseBackground();return;}
+    body.style.setProperty('background-color',bg.color||'#dce8dc','important');
+    if(bg.mode==='color'){
+      body.style.setProperty('background-image','none','important');
+      body.style.setProperty('background-attachment','scroll','important');
+      return;
+    }
+    const url=normalizedBackgroundUrl(bg.imageUrl);
+    if(!url){body.style.setProperty('background-image','none','important');return;}
+    body.style.setProperty('background-image',`url("${url}")`,'important');
+    body.style.setProperty('background-position','center center','important');
+    body.style.setProperty('background-repeat','no-repeat','important');
+    body.style.setProperty('background-size',bg.fit||'cover','important');
+    body.style.setProperty('background-attachment','fixed','important');
+  }
+
   function applyOneLayout(id){
     if(!isExplorer())return;
     const def=LAYERS[id],values=config.layout[id];if(!def||!values)return;
@@ -148,7 +189,7 @@
     }
   }
   function releaseLayout(){for(const id of Object.keys(LAYERS))releaseLayer(id);}
-  function applyAll(){applyColors();applyLayout();}
+  function applyAll(){applyColors();applyBackground();applyLayout();}
 
   function ensureUI(){
     if(!launcher){launcher=document.getElementById('msg-explorer-design-launcher')||document.body.appendChild(Object.assign(document.createElement('button'),{id:'msg-explorer-design-launcher',type:'button',textContent:'✦ Design',title:'Customize appearance and Reader layout',hidden:true}));launcher.addEventListener('click',openDesigner);}
@@ -157,7 +198,7 @@
       if(!panel){panel=document.createElement('aside');panel.id='msg-explorer-visual-designer';panel.hidden=true;panel.setAttribute('aria-label','Explorer visual designer');panel.innerHTML=`
         <div class="msg-vd-head" data-vd-drag-handle title="Drag to move the Designer"><span class="msg-vd-drag-grip" aria-hidden="true">⋮⋮</span><div class="msg-vd-head-copy"><strong>Visual Designer</strong><small>Saved custom theme · Default Layout returns to the app baseline</small></div><button type="button" data-vd-close aria-label="Close designer">×</button></div>
         <div class="msg-vd-toolbar"><button type="button" data-vd-preset="explorer">Explorer Green</button><button type="button" data-vd-preset="antique">Antique Parchment</button><button type="button" data-vd-export>Export</button><button type="button" data-vd-copy>Copy JSON</button></div>
-        <div class="msg-vd-scroll"><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Layers</span><span>choose a layout area</span></div><div data-vd-layers></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Inspector</span><span data-vd-selected-name></span></div><div data-vd-inspector></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Theme colors</span><span>saved Explorer custom palette</span></div><div data-vd-colors></div></section></div>
+        <div class="msg-vd-scroll"><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Layers</span><span>choose a layout area</span></div><div data-vd-layers></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Inspector</span><span data-vd-selected-name></span></div><div data-vd-inspector></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Background</span><span>page scenery / backdrop</span></div><div data-vd-background></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Theme colors</span><span>saved Explorer custom palette</span></div><div data-vd-colors></div></section></div>
         <div class="msg-vd-status" data-vd-status>Default Layout is the application's CSS baseline.</div>
         <div class="msg-vd-bottom-actions"><button type="button" class="msg-vd-danger" data-vd-default-layout>Default Layout</button><button type="button" data-vd-reset-layer>Reset layer</button><button type="button" class="msg-vd-save" data-vd-save>Save design</button></div>`;document.body.appendChild(panel);}
       panel.querySelector('[data-vd-close]')?.addEventListener('click',closeDesigner);
@@ -182,6 +223,15 @@
     const inspector=panel.querySelector('[data-vd-inspector]'),def=LAYERS[selected];
     inspector.innerHTML=def.controls.map(c=>{const v=Math.round(computedValue(selected,c));return`<div class="msg-vd-control"><label>${c.label}</label><output data-vd-out="${c.key}">${v}${c.unit==='%'?'%':'px'}</output><input type="range" min="${c.min}" max="${c.max}" step="${c.step}" value="${v}" data-vd-layout="${c.key}"></div>`;}).join('');
     inspector.querySelectorAll('[data-vd-layout]').forEach(input=>input.addEventListener('input',()=>{const c=def.controls.find(x=>x.key===input.dataset.vdLayout);if(!c)return;(config.layout[selected]||={})[c.key]=Number(input.value);applyOneLayout(selected);inspector.querySelector(`[data-vd-out="${c.key}"]`).textContent=`${Math.round(Number(input.value))}${c.unit==='%'?'%':'px'}`;setStatus('Layout override is live. Save when ready.',false);}));
+    const background=panel.querySelector('[data-vd-background]');
+    if(background){
+      const bg=config.background||defaultConfig().background;
+      background.innerHTML=`<div class="msg-vd-control"><label>Background type</label><select data-vd-background-mode><option value="theme" ${bg.mode==='theme'?'selected':''}>Theme scenery</option><option value="color" ${bg.mode==='color'?'selected':''}>Solid color</option><option value="image" ${bg.mode==='image'?'selected':''}>Custom image</option></select></div><div class="msg-vd-control"><label>Backdrop color</label><input type="color" value="${bg.color}" data-vd-background-color></div><div class="msg-vd-control msg-vd-background-url"><label>Image URL</label><input type="text" value="${String(bg.imageUrl||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')}" placeholder="/assets/... or https://..." data-vd-background-url></div><div class="msg-vd-control"><label>Image fit</label><select data-vd-background-fit><option value="cover" ${bg.fit==='cover'?'selected':''}>Cover</option><option value="contain" ${bg.fit==='contain'?'selected':''}>Contain</option><option value="auto" ${bg.fit==='auto'?'selected':''}>Natural size</option></select></div>`;
+      background.querySelector('[data-vd-background-mode]')?.addEventListener('change',e=>{config.background.mode=e.target.value;applyBackground();render();setStatus('Background override is live. Save when ready.',false);});
+      background.querySelector('[data-vd-background-color]')?.addEventListener('input',e=>{config.background.color=e.target.value;applyBackground();setStatus('Background color is live. Save when ready.',false);});
+      background.querySelector('[data-vd-background-url]')?.addEventListener('change',e=>{config.background.imageUrl=e.target.value.trim();config.background.mode='image';applyBackground();render();setStatus('Background image is live. Save when ready.',false);});
+      background.querySelector('[data-vd-background-fit]')?.addEventListener('change',e=>{config.background.fit=e.target.value;applyBackground();setStatus('Background fit is live. Save when ready.',false);});
+    }
     const colors=panel.querySelector('[data-vd-colors]');colors.innerHTML=Object.keys(COLOR_VARS).map(k=>`<div class="msg-vd-control"><label>${colorLabels[k]}</label><input type="color" value="${config.colors[k]}" data-vd-color="${k}"></div>`).join('');
     colors.querySelectorAll('[data-vd-color]').forEach(input=>input.addEventListener('input',()=>{config.colors[input.dataset.vdColor]=input.value;config.preset='custom';applyColors();setStatus('Color override is live. Save when ready.',false);}));
   }
@@ -205,7 +255,7 @@
   }
   function closeDesigner(){if(!panel)return;panel.hidden=true;if(launcher){launcher.hidden=true;launcher.textContent='✦ Design';}savePanelPosition();}
   function syncVisibility(){if(launcher)launcher.hidden=true;if(!isExplorer()&&panel)panel.hidden=true;}
-  function onThemeChanged(){if(isExplorer())applyAll();else{for(const v of Object.values(COLOR_VARS))document.documentElement.style.removeProperty(v);releaseLayout();}syncVisibility();}
+  function onThemeChanged(){if(isExplorer())applyAll();else{for(const v of Object.values(COLOR_VARS))document.documentElement.style.removeProperty(v);releaseBackground();releaseLayout();}syncVisibility();}
 
   function panelBounds(left,top){if(!panel)return{left:8,top:8};const r=panel.getBoundingClientRect(),m=8;return{left:Math.round(Math.min(Math.max(left,m),Math.max(m,innerWidth-r.width-m))),top:Math.round(Math.min(Math.max(top,m),Math.max(m,innerHeight-r.height-m)))}};
   function loadPanelPosition(){try{const v=JSON.parse(localStorage.getItem(PANEL_POSITION_KEY)||'null');return v&&Number.isFinite(Number(v.left))&&Number.isFinite(Number(v.top))?{left:Number(v.left),top:Number(v.top)}:null;}catch{return null;}}

@@ -546,12 +546,35 @@ app.get('/api/health', async (_req, res) => {
 // While private beta access is enabled, protect every application API after the
 // public health/config/session endpoints. The browser gate improves UX; this
 // middleware is the actual server-side enforcement boundary.
+//
+// Approved signed-in users are verified against the account row already synced
+// into PostgreSQL. This avoids a fresh Clerk network lookup on every API call
+// (Ask Mark, cloud-library sync, etc.). Clerk remains the fallback only for a
+// newly authenticated user whose account row has not been initialized yet.
 app.use('/api', async (req, res, next) => {
   if (!BETA_ACCESS_ENABLED) return next();
   if (!clerkConfigured) return res.status(503).json({ error: 'Beta access requires Clerk authentication.' });
   const auth = getAuth(req);
   if (!auth?.isAuthenticated || !auth.userId) return res.status(401).json({ error: 'Sign in is required during the private beta.' });
+
+  if (BETA_ALLOWED_USER_IDS.has(String(auth.userId))) return next();
+
   try {
+    if (databaseConfigured()) {
+      try {
+        const stored = await query('select email from app_users where auth_subject = $1 limit 1', [auth.userId]);
+        const storedEmail = String(stored.rows[0]?.email || '').trim();
+        if (storedEmail) {
+          if (!betaAccessFor(auth.userId, storedEmail).granted) {
+            return res.status(403).json({ error: 'This account is not approved for the private beta.' });
+          }
+          return next();
+        }
+      } catch (databaseError) {
+        console.warn('Beta access database lookup failed; falling back to Clerk.', databaseError);
+      }
+    }
+
     const clerkUser = await clerkClient.users.getUser(auth.userId);
     const email = clerkUser.emailAddresses?.find((entry) => entry.id === clerkUser.primaryEmailAddressId)?.emailAddress
       || clerkUser.emailAddresses?.[0]?.emailAddress
