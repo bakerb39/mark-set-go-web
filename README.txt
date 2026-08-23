@@ -1,23 +1,24 @@
-Mark, Set, Go! v7.33.5 — Reader 2 layout polish
+Mark, Set, Go! v7.33.6 — Primary Reader resize + close stability
 
-Updated files only. Copy the contents of public/ over the existing public/ folder.
+Updated files:
+  public/index.html
+  public/workspace-experiment.js
+  public/workspace-experiment.css
 
 Changes:
-- Reader 2+ keeps the desktop Reader grid inside its iframe at half-pane widths,
-  so Ask Beth/Mark opens beside the reading text instead of below it.
-- Reader 2+ uses the same 320px companion-panel width as the primary desktop Reader.
-- The companion panel keeps the normal desktop height behavior instead of the
-  narrow-viewport stacked-panel height.
-- Reader 2+ font-size stepper keeps its preferred themed styling but removes the
-  dark seam between the minus and plus buttons.
+1. Fixes Reader 1 collapsing to a narrow column after the last secondary Reader/workspace pane is closed.
+   The inline !important Reader 2 half-split is now explicitly released before the workspace enters its closed state.
+2. Adds a standalone Reader 1 resize grip on the right edge. Drag horizontally to resize; double-click the grip to restore the app's normal default Reader width. The selected width is remembered in localStorage.
+3. Adds a themed × button to close Reader 1 when Reader 1 is the sole Reader. Closing preserves Reader continuity and returns to Home/background rather than deleting the reading checkpoint.
+4. Keeps all v7.33.5 Reader 2 layout/theme polish intact.
 
 Not changed:
-- Multi-Reader state/session code
-- Reader 2 blank-start behavior
-- Half-screen workspace split logic
-- app.js
+- public/app.js
+- read-anything.js
 - protected Reader engine modules
-- Read Anything/storage
+- workspace-pane.html
+
+No MutationObserver was added.
 
 Expected build marker:
-20260823-v7.33.5-reader2-layout-polish
+  20260823-v7.33.6-primary-reader-resize-close

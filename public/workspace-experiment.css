@@ -1,4 +1,4 @@
-/* Mark, Set, Go! Workspace Experiment v0.5.11 — Reader 2 layout polish */
+/* Mark, Set, Go! Workspace Experiment v0.5.12 — Reader 1 standalone resize + close stability */
 /* Mark, Set, Go! workspace experiment */
 .msg-workspace-shell{
   --msg-secondary-width: 360px;
@@ -1059,4 +1059,103 @@ html.msg-secondary-reader-document #app .reader-topright-font-control::before,
 html.msg-secondary-reader-document #app .reader-topright-font-control::after {
   background:transparent !important;
   border-color:transparent !important;
+}
+
+/* v0.5.12 — Reader 1 standalone sizing + close stability.
+   Reader 2+ can temporarily install an inline !important split; JS now clears
+   that split before returning here. These controls affect only Reader 1 when
+   no workspace pane is visible. */
+.msg-primary-reader-close,
+.msg-primary-reader-resize-grip {
+  display:none;
+}
+.msg-primary-reader-close[hidden] {
+  display:none !important;
+}
+
+body.msg-primary-reader-standalone #app.app-shell {
+  position:relative;
+}
+
+body.msg-primary-reader-standalone.msg-primary-reader-resized #app.app-shell {
+  width:min(var(--msg-primary-reader-width, 1400px), calc(100vw - 24px)) !important;
+  max-width:none !important;
+}
+
+body.msg-primary-reader-standalone #app .reader-page-panel {
+  position:relative;
+}
+
+body.msg-primary-reader-standalone #app .msg-primary-reader-close:not([hidden]) {
+  position:absolute;
+  top:8px;
+  right:8px;
+  z-index:25;
+  display:inline-grid;
+  place-items:center;
+  width:30px;
+  min-width:30px;
+  height:30px;
+  min-height:30px;
+  padding:0;
+  border:1px solid color-mix(in srgb, var(--msg-theme-gold,var(--msg-gold,#d5a928)) 58%, var(--msg-theme-border,var(--msg-blue-border,#9fb4c7)));
+  border-radius:8px;
+  background:linear-gradient(180deg,var(--msg-theme-surface,var(--msg-surface,#fff)),var(--msg-theme-soft-2,var(--msg-blue-soft-2,#f4f7fa)));
+  color:var(--msg-theme-accent-dark,var(--msg-navy-deep,#17365d));
+  box-shadow:0 2px 7px rgba(15,35,60,.12);
+  font:inherit;
+  font-size:20px;
+  font-weight:700;
+  line-height:1;
+  cursor:pointer;
+}
+body.msg-primary-reader-standalone #app .msg-primary-reader-close:hover,
+body.msg-primary-reader-standalone #app .msg-primary-reader-close:focus-visible {
+  border-color:var(--msg-theme-gold,var(--msg-gold,#d5a928));
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--msg-theme-gold,var(--msg-gold,#d5a928)) 26%,transparent),0 2px 7px rgba(15,35,60,.14);
+  outline:none;
+}
+
+body.msg-primary-reader-standalone #app > .msg-primary-reader-resize-grip {
+  position:absolute;
+  top:50%;
+  right:-9px;
+  z-index:40;
+  display:block;
+  width:18px;
+  height:72px;
+  transform:translateY(-50%);
+  cursor:col-resize;
+  touch-action:none;
+  user-select:none;
+}
+body.msg-primary-reader-standalone #app > .msg-primary-reader-resize-grip::before {
+  content:"";
+  position:absolute;
+  top:8px;
+  bottom:8px;
+  left:8px;
+  width:3px;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--msg-theme-gold,var(--msg-gold,#d5a928)) 72%,var(--msg-theme-border,var(--msg-blue-border,#9fb4c7)));
+  box-shadow:0 0 0 1px rgba(255,255,255,.42);
+}
+body.msg-primary-reader-standalone #app > .msg-primary-reader-resize-grip:hover::before,
+body.msg-primary-reader-resizing #app > .msg-primary-reader-resize-grip::before {
+  width:5px;
+  left:7px;
+  background:var(--msg-theme-gold,var(--msg-gold,#d5a928));
+}
+body.msg-primary-reader-resizing {
+  cursor:col-resize !important;
+  user-select:none !important;
+}
+
+@media (max-width:700px) {
+  body.msg-primary-reader-standalone #app > .msg-primary-reader-resize-grip {
+    display:none !important;
+  }
+  body.msg-primary-reader-standalone.msg-primary-reader-resized #app.app-shell {
+    width:calc(100% - .75rem) !important;
+  }
 }

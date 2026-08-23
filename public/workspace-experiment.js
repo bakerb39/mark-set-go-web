@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.3 — Reader blank + half split
+ * Mark, Set, Go! Workspace Experiment v0.15.4 — standalone Reader resize + close stability
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -268,7 +268,10 @@
   const PANEL_ORDER = [];
   let activePanelKey = '';
   const MIN_SECONDARY_WIDTH = 360;
+  const PRIMARY_READER_WIDTH_KEY = 'msg-primary-reader-width-v1';
+  const MIN_PRIMARY_READER_WIDTH = 560;
   let secondaryWidth = MIN_SECONDARY_WIDTH;
+  let primaryReaderResize = null;
   function dockReaderTopControlsForWorkspace() {
     const shell = workspaceShell();
     if (!shell || shell.classList.contains('is-closed')) return;
@@ -314,6 +317,161 @@
 
   function workspaceShell() {
     return APP.querySelector(':scope > .msg-workspace-shell');
+  }
+
+  function readPrimaryReaderWidth() {
+    try {
+      const value = Number(localStorage.getItem(PRIMARY_READER_WIDTH_KEY));
+      return Number.isFinite(value) && value >= MIN_PRIMARY_READER_WIDTH ? value : 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  function maxPrimaryReaderWidth() {
+    return Math.max(MIN_PRIMARY_READER_WIDTH, Math.floor((window.innerWidth || document.documentElement.clientWidth || 0) - 24));
+  }
+
+  function clampPrimaryReaderWidth(value) {
+    const numeric = Number(value) || MIN_PRIMARY_READER_WIDTH;
+    return Math.max(MIN_PRIMARY_READER_WIDTH, Math.min(Math.round(numeric), maxPrimaryReaderWidth()));
+  }
+
+  function applyPrimaryReaderStandaloneWidth() {
+    const shell = workspaceShell();
+    const standalone = hasReader() && (!shell || shell.classList.contains('is-closed'));
+    document.body.classList.toggle('msg-primary-reader-standalone', standalone);
+    if (!standalone) {
+      document.body.classList.remove('msg-primary-reader-resized');
+      APP.style.removeProperty('--msg-primary-reader-width');
+      return;
+    }
+
+    const saved = readPrimaryReaderWidth();
+    if (saved) {
+      const width = clampPrimaryReaderWidth(saved);
+      APP.style.setProperty('--msg-primary-reader-width', `${width}px`);
+      document.body.classList.add('msg-primary-reader-resized');
+    } else {
+      APP.style.removeProperty('--msg-primary-reader-width');
+      document.body.classList.remove('msg-primary-reader-resized');
+    }
+  }
+
+  function resetPrimaryReaderWidth() {
+    try { localStorage.removeItem(PRIMARY_READER_WIDTH_KEY); } catch {}
+    APP.style.removeProperty('--msg-primary-reader-width');
+    document.body.classList.remove('msg-primary-reader-resized');
+  }
+
+  function closePrimaryReaderView() {
+    // Closing Reader 1 is a view action, not a destructive session delete. Keep
+    // the existing continuity checkpoint so the Reader button can resume it.
+    try { window.ReaderContinuity?.saveBeforeNavigation?.(); } catch {}
+    try { window.ReaderContinuity?.commit?.(window.ReaderContinuity?.capture?.()); } catch {}
+
+    const home = document.querySelector('.brand[data-action="home"], [data-action="home"]');
+    if (home) {
+      home.click();
+      return true;
+    }
+    return false;
+  }
+
+  function auxiliaryReaderSessionCount() {
+    let count = 0;
+    PANELS.forEach((_record, key) => { if (readerNumberFromPanelKey(key) >= 2) count += 1; });
+    return count;
+  }
+
+  function ensurePrimaryReaderStandaloneControls() {
+    const panel = APP.querySelector('.reader-page-panel');
+    if (!panel) {
+      document.querySelectorAll('.msg-primary-reader-resize-grip').forEach((node) => node.remove());
+      document.body.classList.remove('msg-primary-reader-standalone', 'msg-primary-reader-resized');
+      APP.style.removeProperty('--msg-primary-reader-width');
+      return false;
+    }
+
+    let close = panel.querySelector('.msg-primary-reader-close');
+    if (!close) {
+      close = document.createElement('button');
+      close.type = 'button';
+      close.className = 'msg-primary-reader-close';
+      close.setAttribute('aria-label', 'Close Reader 1');
+      close.title = 'Close Reader 1';
+      close.textContent = '×';
+      close.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        closePrimaryReaderView();
+      });
+      panel.appendChild(close);
+    }
+
+    // Closing Reader 1 is only offered when it is genuinely the sole Reader.
+    // This avoids destroying mounted auxiliary Reader iframes through a Home render.
+    close.hidden = auxiliaryReaderSessionCount() > 0;
+
+    let grip = APP.querySelector(':scope > .msg-primary-reader-resize-grip');
+    if (!grip) {
+      grip = document.createElement('div');
+      grip.className = 'msg-primary-reader-resize-grip';
+      grip.setAttribute('role', 'separator');
+      grip.setAttribute('aria-orientation', 'vertical');
+      grip.setAttribute('aria-label', 'Resize Reader 1');
+      grip.title = 'Drag to resize Reader 1 · double-click to reset width';
+      grip.tabIndex = 0;
+      APP.appendChild(grip);
+
+      grip.addEventListener('pointerdown', (event) => {
+        const shell = workspaceShell();
+        if ((shell && !shell.classList.contains('is-closed')) || window.matchMedia('(max-width: 700px)').matches) return;
+        const startWidth = APP.getBoundingClientRect().width;
+        primaryReaderResize = { pointerId:event.pointerId, startX:event.clientX, startWidth };
+        try { grip.setPointerCapture(event.pointerId); } catch {}
+        document.body.classList.add('msg-primary-reader-resizing');
+        event.preventDefault();
+      });
+
+      grip.addEventListener('pointermove', (event) => {
+        if (!primaryReaderResize || primaryReaderResize.pointerId !== event.pointerId) return;
+        // #app is centered, so moving one visual edge by N pixels requires a
+        // 2N total-width change to keep that edge under the pointer.
+        const delta = (event.clientX - primaryReaderResize.startX) * 2;
+        const width = clampPrimaryReaderWidth(primaryReaderResize.startWidth + delta);
+        APP.style.setProperty('--msg-primary-reader-width', `${width}px`);
+        document.body.classList.add('msg-primary-reader-resized');
+        event.preventDefault();
+      });
+
+      const finishResize = (event) => {
+        if (!primaryReaderResize || primaryReaderResize.pointerId !== event.pointerId) return;
+        const width = clampPrimaryReaderWidth(APP.getBoundingClientRect().width);
+        try { localStorage.setItem(PRIMARY_READER_WIDTH_KEY, String(width)); } catch {}
+        try { grip.releasePointerCapture(event.pointerId); } catch {}
+        primaryReaderResize = null;
+        document.body.classList.remove('msg-primary-reader-resizing');
+      };
+      grip.addEventListener('pointerup', finishResize);
+      grip.addEventListener('pointercancel', finishResize);
+      grip.addEventListener('dblclick', (event) => {
+        event.preventDefault();
+        resetPrimaryReaderWidth();
+      });
+      grip.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+        const current = APP.getBoundingClientRect().width;
+        const width = clampPrimaryReaderWidth(current + (event.key === 'ArrowRight' ? 40 : -40));
+        APP.style.setProperty('--msg-primary-reader-width', `${width}px`);
+        document.body.classList.add('msg-primary-reader-resized');
+        try { localStorage.setItem(PRIMARY_READER_WIDTH_KEY, String(width)); } catch {}
+        event.preventDefault();
+      });
+    }
+
+    applyPrimaryReaderStandaloneWidth();
+    return true;
   }
 
   function preferredSecondaryReaderWidth(shell = workspaceShell()) {
@@ -549,6 +707,10 @@
       </header>
       <div class="msg-workspace-panel-body"></div>`;
 
+    // The standalone Reader resize grip belongs to #app, not to the Reader DOM.
+    // Remove it before wrapping the existing Reader so it cannot be stranded in
+    // the primary column when workspace mode opens. It is recreated on return.
+    APP.querySelector(':scope > .msg-primary-reader-resize-grip')?.remove();
     const existing = [...APP.childNodes];
     existing.forEach((node) => primary.appendChild(node));
     shell.append(primary, divider, secondary);
@@ -779,8 +941,15 @@
 
   function closeWorkspacePanel() {
     const shell = workspaceShell();
-    if (!shell) return;
+    if (!shell) {
+      ensurePrimaryReaderStandaloneControls();
+      return;
+    }
     const body = panelBody(shell);
+    // Reader 2+ may have installed an inline !important three-column split.
+    // Clear it BEFORE applying is-closed or Reader 1 remains trapped in the old
+    // left-column width after the secondary Reader is closed.
+    releaseAuxiliaryReaderForcedSplit(shell);
     setReaderFocusPresentation(shell, 0);
     activePanelKey = '';
     syncMountedWorkspacePanels(body, '');
@@ -789,6 +958,7 @@
     shell.classList.add('is-closed');
     renderWorkspaceTabs(shell);
     window.speechSynthesis?.cancel?.();
+    window.requestAnimationFrame(() => ensurePrimaryReaderStandaloneControls());
   }
 
   function activatePanel(key) {
@@ -810,6 +980,8 @@
         : MIN_SECONDARY_WIDTH;
     }
     shell.classList.remove('is-closed');
+    document.body.classList.remove('msg-primary-reader-standalone', 'msg-primary-reader-resized');
+    APP.style.removeProperty('--msg-primary-reader-width');
     if (auxiliaryReaderNumber >= 2) {
       // Selecting Reader 2+ always opens with at least half of the usable
       // reading area. This is applied after the shell is visible so the
@@ -838,6 +1010,7 @@
     PANELS.set(key, { key, label, node });
     syncAddReaderControl();
     renderReadersMenu();
+    ensurePrimaryReaderStandaloneControls();
     return activatePanel(key);
   }
 
@@ -850,6 +1023,7 @@
     if (index >= 0) PANEL_ORDER.splice(index, 1);
     syncAddReaderControl();
     renderReadersMenu();
+    ensurePrimaryReaderStandaloneControls();
 
     if (!wasActive) {
       renderWorkspaceTabs();
@@ -1389,19 +1563,29 @@
   // isolated and avoids a MutationObserver. Also retry at a few later points in
   // case another startup script finishes arranging the header after our first pass.
   ensureWorkspaceControls();
+  ensurePrimaryReaderStandaloneControls();
   let navAttempts = 0;
   const navTimer = window.setInterval(() => {
     navAttempts += 1;
     if (ensureWorkspaceControls() || navAttempts > 40) window.clearInterval(navTimer);
   }, 250);
   [1200, 3000, 6000].forEach((delay) => window.setTimeout(ensureWorkspaceControls, delay));
-  window.addEventListener('pageshow', ensureWorkspaceControls);
+  window.addEventListener('pageshow', () => {
+    ensureWorkspaceControls();
+    ensurePrimaryReaderStandaloneControls();
+  });
+  window.addEventListener('resize', () => {
+    if (!document.body.classList.contains('msg-primary-reader-resized')) return;
+    const width = clampPrimaryReaderWidth(APP.getBoundingClientRect().width);
+    APP.style.setProperty('--msg-primary-reader-width', `${width}px`);
+  });
 
   document.addEventListener('marksetgo:document-available', () => {
     window.setTimeout(() => {
       dockReaderTopControlsForWorkspace();
       syncAddReaderControl();
       renderReadersMenu();
+      ensurePrimaryReaderStandaloneControls();
     }, 0);
   });
 
@@ -1417,6 +1601,8 @@
     readers: () => listReaderSessions().map((reader) => ({ ...reader })),
     maxReaders: MAX_READERS,
     activeReader: () => readerNumberFromPanelKey(activePanelKey) || 1,
+    closePrimaryReader: closePrimaryReaderView,
+    resetPrimaryReaderWidth,
     enabled: workspaceEnabled,
     setEnabled: (enabled) => {
       const value = Boolean(enabled);
