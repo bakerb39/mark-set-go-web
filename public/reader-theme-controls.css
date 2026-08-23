@@ -1,0 +1,77 @@
+/* Mark, Set, Go! — theme-aware Reader utility controls v1
+   The live top-right Reader cluster is created dynamically by
+   reader-music-quick.js. Older component CSS hard-codes Mayo/navy colors.
+   Resolve those controls through the active experience theme instead.
+   Presentation only; no Reader behavior or DOM ownership changes. */
+
+html[data-msg-experience-theme] {
+  --msg-reader-utility-bg: var(--msg-theme-accent, #0c2340);
+  --msg-reader-utility-bg-dark: var(--msg-theme-accent-dark, #07182d);
+  --msg-reader-utility-gold: var(--msg-theme-gold, #d5a928);
+  --msg-reader-utility-border: color-mix(
+    in srgb,
+    var(--msg-reader-utility-gold) 48%,
+    var(--msg-reader-utility-bg-dark)
+  );
+  --msg-reader-utility-shadow: color-mix(
+    in srgb,
+    var(--msg-reader-utility-bg-dark) 28%,
+    transparent
+  );
+}
+
+/* These are the exact live controls visible at the upper-right of Reader:
+   [ − | + ]   [ ▶ ]   [ Full screen ]. */
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-font-control,
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-music-toggle,
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button {
+  border-color: var(--msg-reader-utility-border) !important;
+  background: linear-gradient(
+    180deg,
+    var(--msg-reader-utility-bg) 0%,
+    var(--msg-reader-utility-bg-dark) 100%
+  ) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 8px var(--msg-reader-utility-shadow) !important;
+}
+
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-font-control > button {
+  background: transparent !important;
+  color: #fff !important;
+}
+
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-font-control > span {
+  color: color-mix(in srgb, var(--msg-reader-utility-gold) 72%, white) !important;
+  opacity: .78 !important;
+}
+
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-music-toggle:hover,
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-music-toggle:focus-visible,
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-music-toggle[aria-expanded="true"],
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button:hover,
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > #toggle-reader-fullscreen.viewer-fullscreen-button:focus-visible {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--msg-reader-utility-bg) 82%, white) 0%,
+    var(--msg-reader-utility-bg) 100%
+  ) !important;
+  border-color: color-mix(in srgb, var(--msg-reader-utility-gold) 68%, var(--msg-reader-utility-bg)) !important;
+}
+
+html[data-msg-experience-theme] #app .reader-page-panel
+.reader-pane-controls .reader-pane-buttons > .reader-topright-media-stack > .reader-topright-font-control:focus-within {
+  border-color: color-mix(in srgb, var(--msg-reader-utility-gold) 72%, var(--msg-reader-utility-bg)) !important;
+  box-shadow:
+    0 3px 8px var(--msg-reader-utility-shadow),
+    0 0 0 2px color-mix(in srgb, var(--msg-reader-utility-gold) 22%, transparent) !important;
+}
