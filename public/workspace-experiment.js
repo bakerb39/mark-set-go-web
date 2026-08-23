@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.6 — subtle per-pane close + minimize
+ * Mark, Set, Go! Workspace Experiment v0.15.7 — close-only themed pane chrome
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -394,19 +394,6 @@
     return false;
   }
 
-  function minimizePrimaryReaderView() {
-    // Minimize preserves exactly the same Reader checkpoint as Close, but is
-    // intentionally non-destructive: another open pane takes over when present.
-    try { window.ReaderContinuity?.saveBeforeNavigation?.(); } catch {}
-    if (hidePrimaryReaderBehindWorkspace()) return true;
-    const home = document.querySelector('.brand[data-action="home"], [data-action="home"]');
-    if (home) {
-      home.click();
-      return true;
-    }
-    return false;
-  }
-
 
   function ensurePrimaryReaderStandaloneControls() {
     const panel = APP.querySelector('.reader-page-panel, .empty-reader-page');
@@ -423,18 +410,6 @@
       tools.className = 'msg-reader-window-controls msg-reader-window-controls-primary';
       tools.setAttribute('aria-label', 'Reader 1 window controls');
 
-      const minimize = document.createElement('button');
-      minimize.type = 'button';
-      minimize.className = 'msg-reader-window-button msg-primary-reader-minimize';
-      minimize.setAttribute('aria-label', 'Minimize Reader 1');
-      minimize.title = 'Minimize Reader 1';
-      minimize.textContent = '−';
-      minimize.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        minimizePrimaryReaderView();
-      });
-
       const close = document.createElement('button');
       close.type = 'button';
       close.className = 'msg-reader-window-button msg-primary-reader-close';
@@ -447,7 +422,7 @@
         closePrimaryReaderView();
       });
 
-      tools.append(minimize, close);
+      tools.append(close);
       panel.appendChild(tools);
     }
 
@@ -742,7 +717,6 @@
       <header class="msg-workspace-panel-head">
         <nav class="msg-workspace-panel-tabs" aria-label="Open workspace pages"></nav>
         <div class="msg-workspace-window-controls" aria-label="Workspace page controls">
-          <button class="msg-workspace-minimize" type="button" data-msg-workspace-minimize aria-label="Minimize this page" title="Minimize">−</button>
           <button class="msg-workspace-close" type="button" data-msg-workspace-close aria-label="Close this page" title="Close">×</button>
         </div>
       </header>
@@ -1519,22 +1493,13 @@
   }
 
   document.addEventListener('click', (event) => {
-    const minimize = event.target.closest?.('[data-msg-workspace-minimize]');
-    if (minimize) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      // Minimize keeps the active panel mounted and simply returns the primary
-      // Reader to view. Selecting the page/Reader again restores it instantly.
-      closeWorkspacePanel();
-      return;
-    }
 
     const close = event.target.closest?.('[data-msg-workspace-close]');
     if (close) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      // The header × closes the current page/Reader. The adjacent − is the
-      // non-destructive hide/minimize action.
+      // The header × closes the current page/Reader while Reader continuity
+      // remains protected by the existing close/session behavior.
       if (activePanelKey && PANELS.has(activePanelKey)) closeWorkspaceTab(activePanelKey);
       else closeWorkspacePanel();
       return;
@@ -1681,7 +1646,6 @@
     maxReaders: MAX_READERS,
     activeReader: () => readerNumberFromPanelKey(activePanelKey) || 1,
     closePrimaryReader: closePrimaryReaderView,
-    minimizePrimaryReader: minimizePrimaryReaderView,
     resetPrimaryReaderWidth,
     enabled: workspaceEnabled,
     setEnabled: (enabled) => {
