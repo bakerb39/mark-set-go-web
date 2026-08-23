@@ -10,7 +10,12 @@
   const $$=s=>[...document.querySelectorAll(s)];
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const words=s=>String(s||'').toLowerCase().match(/[a-z][a-z'-]{2,}/g)||[];
-  const state=loadDraft();
+  const PARAMS=new URLSearchParams(window.location.search);
+  const PASSAGE_BASKET_MODE=PARAMS.get('passageBasket')==='1';
+  const state=PASSAGE_BASKET_MODE
+    ? {id:`comparison-${Date.now()}`,createdAt:new Date().toISOString(),primary:{title:'Waiting for selected passages',passage:'Return to a Reader, highlight passages, and choose Compare.'},comparisonTexts:[],mode:'agreement',notes:''}
+    : loadDraft();
+  let passageBasketChannel=null;
 
   function loadDraft(){
     try{
@@ -19,13 +24,67 @@
     }catch{}
     return {id:`comparison-${Date.now()}`,createdAt:new Date().toISOString(),primary:{title:'No passage selected',passage:'Return to the reader, highlight a passage, and choose Compare.'},comparisonTexts:[],mode:'syntopicon',notes:''};
   }
-  function persist(){try{localStorage.setItem(DRAFT_KEY,JSON.stringify(state));}catch{}}
-  function init(){
+  function persist(){if(PASSAGE_BASKET_MODE)return;try{localStorage.setItem(DRAFT_KEY,JSON.stringify(state));}catch{}}
+  function renderPrimary(){
     $('#primary-title').textContent=state.primary.title||'Current text';
     $('#primary-passage').textContent=state.primary.passage||'';
     $('#primary-location').textContent=state.primary.chapter||((Number.isFinite(state.primary.startIndex))?`Word ${Number(state.primary.startIndex)+1}`:'');
+  }
+  function applyPassageBasket(items){
+    const list=(Array.isArray(items)?items:[]).filter(item=>item&&String(item.text||item.passage||'').trim()).slice(0,8);
+    if(!list.length)return false;
+    const first=list[0];
+    state.id=`comparison-${Date.now()}`;
+    state.createdAt=new Date().toISOString();
+    state.primary={
+      documentId:first.documentId||'',
+      title:first.title||'Selected passage',
+      author:first.author||'',
+      passage:String(first.text||first.passage||'').trim(),
+      startIndex:Number.isFinite(Number(first.startIndex))?Number(first.startIndex):null,
+      endIndex:Number.isFinite(Number(first.endIndex))?Number(first.endIndex):null,
+      chapter:first.chapter||'',
+      source:null
+    };
+    state.comparisonTexts=list.slice(1).map((item,index)=>({
+      id:item.id||`passage-${index+2}-${Date.now()}`,
+      title:item.title||`Passage ${index+2}`,
+      author:item.author||'',
+      text:String(item.text||item.passage||'').trim(),
+      origin:[item.chapter,item.readerLabel,'Selected passage'].filter(Boolean)[0]||'Selected passage',
+      passageOnly:true,
+      chapter:item.chapter||'',
+      startIndex:Number.isFinite(Number(item.startIndex))?Number(item.startIndex):null
+    }));
+    state.mode='agreement';
+    renderPrimary();
+    renderAll();
+    return true;
+  }
+  function requestPassageBasket(){
+    if(!PASSAGE_BASKET_MODE)return;
+    const save=$('#save-workspace');
+    if(save){save.hidden=true;save.title='Live passage comparisons are kept in memory rather than browser storage.';}
+    try{
+      if(window.opener&&!window.opener.closed){
+        window.opener.postMessage({type:'msg-passage-comparison-workspace-ready'},window.location.origin);
+      }
+    }catch{}
+    if('BroadcastChannel' in window){
+      try{
+        passageBasketChannel=new BroadcastChannel('msg-passage-comparison-v1');
+        passageBasketChannel.addEventListener('message',event=>{
+          const data=event.data||{};
+          if(data.type==='state'&&Array.isArray(data.passages))applyPassageBasket(data.passages);
+        });
+        passageBasketChannel.postMessage({type:'request-state',source:`workspace-${Date.now()}`});
+      }catch{passageBasketChannel=null;}
+    }
+  }
+  function init(){
+    renderPrimary();
     $('#workspace-notes').value=state.notes||'';
-    bind(); renderAll();
+    bind(); renderAll(); requestPassageBasket();
   }
   function bind(){
     $('#add-text').addEventListener('click',openAddDialog); $('#add-text-secondary').addEventListener('click',openAddDialog);
@@ -108,6 +167,14 @@
     const question=`You are helping with a multi-text comparison. ${lens}\n\nPRIMARY PASSAGE (${state.primary.title}):\n${state.primary.passage}\n\nCOMPARISON TEXTS:\n${excerpts}\n\nGive a clear synthesis with headings, specific textual connections, cautions about weak matches, and 3 questions for further study.`;
     try{const response=await fetch('/api/mark-selection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({selection:state.primary.passage,action:'ask',question,title:state.primary.title,chapter:state.primary.chapter||''})});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload.error||payload.detail||`HTTP ${response.status}`);const result=payload.result||{};panel.innerHTML=`<h3>${esc(result.heading||'Ask Mark comparison')}</h3><p>${esc(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div>${result.cautions.map(x=>`<p><strong>Caution:</strong> ${esc(x)}</p>`).join('')}</div>`:''}`;}catch(e){panel.innerHTML=`<p class="status-error">${esc(e.message)}</p>`;}
   }
+  window.addEventListener('message',event=>{
+    if(!PASSAGE_BASKET_MODE||event.origin!==window.location.origin)return;
+    const data=event.data||{};
+    if(data.type==='msg-passage-comparison-workspace-data'&&Array.isArray(data.passages)){
+      applyPassageBasket(data.passages);
+    }
+  });
+
   function saveProject(){
     state.updatedAt=new Date().toISOString();persist();let projects=[];try{projects=JSON.parse(localStorage.getItem(SAVED_KEY)||'[]');if(!Array.isArray(projects))projects=[];}catch{}const i=projects.findIndex(x=>x.id===state.id);if(i>=0)projects[i]=state;else projects.unshift(state);try{localStorage.setItem(SAVED_KEY,JSON.stringify(projects.slice(0,50)));}catch{}const b=$('#save-workspace');const original=b.textContent;b.textContent='Saved';setTimeout(()=>b.textContent=original,1200);
   }
