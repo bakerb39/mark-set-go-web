@@ -1,0 +1,213 @@
+/* v1.0.0 — passage actions hierarchy + companion context plus
+   Keeps the selected-passage toolbar compact and gives the companion + one job:
+   add context to the conversation. No MutationObserver. */
+
+#mark-selection-toolbar.mark-selection-toolbar-v2 {
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  flex-wrap:wrap !important;
+  gap:2px !important;
+  width:max-content !important;
+  max-width:min(860px, calc(100vw - 16px)) !important;
+  padding:5px 7px !important;
+  overflow:visible !important;
+  background:var(--msg-theme-surface, #fffaf0) !important;
+  border-color:var(--msg-theme-border, rgba(130,94,45,.28)) !important;
+  color:var(--msg-theme-ink, #2f211b) !important;
+}
+
+#mark-selection-toolbar.mark-selection-toolbar-v2[hidden] { display:none !important; }
+
+#mark-selection-toolbar.mark-selection-toolbar-v2 > button,
+#mark-selection-toolbar.mark-selection-toolbar-v2 .mark-annotate-split > button,
+#mark-selection-toolbar.mark-selection-toolbar-v2 [data-mark-more-toggle] {
+  min-height:30px !important;
+  height:30px !important;
+  padding:0 9px !important;
+  margin:0 !important;
+  border:0 !important;
+  border-radius:8px !important;
+  background:transparent !important;
+  color:var(--msg-theme-ink, #2f211b) !important;
+  box-shadow:none !important;
+  font:700 .77rem/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  white-space:nowrap !important;
+}
+
+#mark-selection-toolbar.mark-selection-toolbar-v2 > button:hover,
+#mark-selection-toolbar.mark-selection-toolbar-v2 > button:focus-visible,
+#mark-selection-toolbar.mark-selection-toolbar-v2 .mark-annotate-split > button:hover,
+#mark-selection-toolbar.mark-selection-toolbar-v2 .mark-annotate-split > button:focus-visible,
+#mark-selection-toolbar.mark-selection-toolbar-v2 [data-mark-more-toggle]:hover,
+#mark-selection-toolbar.mark-selection-toolbar-v2 [data-mark-more-toggle]:focus-visible {
+  background:var(--msg-theme-soft, rgba(201,137,0,.10)) !important;
+  color:var(--msg-theme-accent-dark, var(--msg-theme-accent, #6b2637)) !important;
+  transform:none !important;
+}
+
+#mark-selection-toolbar.mark-selection-toolbar-v2 [data-mark-toolbar-action="ask"] {
+  color:var(--msg-theme-accent-dark, var(--msg-theme-accent, #6b2637)) !important;
+}
+
+.mark-toolbar-menu-wrap { position:relative !important; display:inline-flex !important; align-items:center !important; }
+.mark-annotate-split {
+  display:inline-flex !important;
+  align-items:center !important;
+  border:1px solid var(--msg-theme-border, rgba(130,94,45,.26)) !important;
+  border-radius:9px !important;
+  overflow:hidden !important;
+  background:var(--msg-theme-soft-2, rgba(255,250,240,.76)) !important;
+}
+#mark-selection-toolbar.mark-selection-toolbar-v2 .mark-annotate-split > button { border-radius:0 !important; }
+#mark-selection-toolbar.mark-selection-toolbar-v2 .mark-annotate-split > .mark-menu-chevron {
+  width:25px !important;
+  min-width:25px !important;
+  padding:0 !important;
+  border-left:1px solid var(--msg-theme-border, rgba(130,94,45,.22)) !important;
+}
+
+#mark-selection-toolbar .mark-toolbar-menu {
+  position:absolute !important;
+  top:calc(100% + 7px) !important;
+  z-index:10050 !important;
+  display:grid !important;
+  gap:2px !important;
+  min-width:190px !important;
+  padding:6px !important;
+  border:1px solid var(--msg-theme-border, rgba(130,94,45,.28)) !important;
+  border-radius:12px !important;
+  background:var(--msg-theme-surface, #fffaf0) !important;
+  color:var(--msg-theme-ink, #2f211b) !important;
+  box-shadow:0 12px 30px var(--msg-theme-shadow, rgba(44,31,22,.18)) !important;
+}
+#mark-selection-toolbar .mark-toolbar-menu[hidden] { display:none !important; }
+#mark-selection-toolbar .mark-annotate-menu { left:0 !important; }
+#mark-selection-toolbar .mark-more-menu { right:0 !important; left:auto !important; width:268px !important; max-height:min(440px,70vh) !important; overflow:auto !important; }
+
+#mark-selection-toolbar .mark-toolbar-menu button {
+  width:100% !important;
+  min-height:34px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  gap:8px !important;
+  padding:7px 9px !important;
+  margin:0 !important;
+  border:0 !important;
+  border-radius:8px !important;
+  background:transparent !important;
+  color:var(--msg-theme-ink, #2f211b) !important;
+  box-shadow:none !important;
+  font:650 .79rem/1.2 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  text-align:left !important;
+}
+#mark-selection-toolbar .mark-toolbar-menu button:hover,
+#mark-selection-toolbar .mark-toolbar-menu button:focus-visible {
+  background:var(--msg-theme-soft, rgba(201,137,0,.10)) !important;
+  color:var(--msg-theme-accent-dark, var(--msg-theme-accent, #6b2637)) !important;
+  transform:none !important;
+}
+.mark-toolbar-menu-section { display:grid !important; gap:2px !important; }
+.mark-toolbar-menu-section + .mark-toolbar-menu-section {
+  margin-top:4px !important;
+  padding-top:6px !important;
+  border-top:1px solid var(--msg-theme-border, rgba(130,94,45,.18)) !important;
+}
+.mark-toolbar-menu-section > span {
+  padding:3px 8px 2px !important;
+  color:var(--msg-theme-muted, #7f7167) !important;
+  font:800 .63rem/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  letter-spacing:.08em !important;
+  text-transform:uppercase !important;
+}
+
+/* Keep the existing annotation editors/pickers above the compact toolbar. */
+#mark-selection-toolbar.mark-selection-toolbar-v2 .passage-highlight-picker,
+#mark-selection-toolbar.mark-selection-toolbar-v2 .reader-writing-editor,
+#mark-selection-toolbar.mark-selection-toolbar-v2 .reader-drawing-editor,
+#mark-selection-toolbar.mark-selection-toolbar-v2 .reader-workspace-editor {
+  z-index:10060 !important;
+}
+
+/* The companion + now means Add context. */
+.askmark-composer { position:relative !important; flex-wrap:wrap !important; }
+.askmark-added-context {
+  grid-column:1 / -1 !important;
+  flex:0 0 100% !important;
+  width:100% !important;
+  display:flex !important;
+  gap:5px !important;
+  flex-wrap:wrap !important;
+  align-items:center !important;
+  padding:0 2px 5px !important;
+}
+.askmark-added-context[hidden] { display:none !important; }
+.askmark-context-chip {
+  display:inline-flex !important;
+  align-items:center !important;
+  gap:4px !important;
+  max-width:100% !important;
+  padding:4px 5px 4px 8px !important;
+  border:1px solid var(--msg-theme-border, rgba(130,94,45,.22)) !important;
+  border-radius:999px !important;
+  background:var(--msg-theme-soft, rgba(201,137,0,.09)) !important;
+  color:var(--msg-theme-ink, #2f211b) !important;
+  font:650 .7rem/1.1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+}
+.askmark-context-chip > span { overflow:hidden !important; text-overflow:ellipsis !important; white-space:nowrap !important; max-width:190px !important; }
+.askmark-context-chip button {
+  width:18px !important;
+  height:18px !important;
+  min-width:18px !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:50% !important;
+  background:transparent !important;
+  color:var(--msg-theme-muted, #7f7167) !important;
+  box-shadow:none !important;
+  line-height:1 !important;
+}
+.askmark-context-chip button:hover { background:var(--msg-theme-soft-2, rgba(0,0,0,.05)) !important; color:var(--msg-theme-accent-dark, #6b2637) !important; transform:none !important; }
+
+.askmark-plus[data-context-count]:not([data-context-count="0"])::after {
+  content:attr(data-context-count);
+  position:absolute;
+  top:-4px;
+  right:-4px;
+  min-width:15px;
+  height:15px;
+  padding:0 3px;
+  display:grid;
+  place-items:center;
+  border-radius:999px;
+  background:var(--msg-theme-accent, #6b2637);
+  color:var(--msg-theme-surface, #fffaf0);
+  font:800 9px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  box-shadow:0 0 0 2px var(--msg-theme-surface, #fffaf0);
+}
+.askmark-plus { position:relative !important; }
+
+.askmark-context-menu { min-width:280px !important; max-width:min(340px,calc(100vw - 28px)) !important; }
+.askmark-context-menu-heading {
+  display:grid !important;
+  gap:2px !important;
+  padding:4px 8px 7px !important;
+  margin-bottom:2px !important;
+  border-bottom:1px solid var(--msg-theme-border, rgba(130,94,45,.16)) !important;
+}
+.askmark-context-menu-heading strong { color:var(--msg-theme-ink, #2f211b) !important; font-size:.82rem !important; }
+.askmark-context-menu-heading small { color:var(--msg-theme-muted, #7f7167) !important; font-size:.69rem !important; line-height:1.3 !important; }
+.askmark-context-menu .askmark-context-clear {
+  margin-top:4px !important;
+  border-top:1px solid var(--msg-theme-border, rgba(130,94,45,.16)) !important;
+  border-radius:0 0 8px 8px !important;
+}
+
+@media (max-width:720px) {
+  #mark-selection-toolbar.mark-selection-toolbar-v2 { max-width:calc(100vw - 10px) !important; }
+  #mark-selection-toolbar.mark-selection-toolbar-v2 > button,
+  #mark-selection-toolbar.mark-selection-toolbar-v2 .mark-annotate-split > button,
+  #mark-selection-toolbar.mark-selection-toolbar-v2 [data-mark-more-toggle] { padding:0 7px !important; font-size:.72rem !important; }
+  #mark-selection-toolbar .mark-more-menu { width:min(268px,calc(100vw - 24px)) !important; }
+}

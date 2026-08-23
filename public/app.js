@@ -11524,6 +11524,9 @@ function showMarkToolbar(selectionData, rect) {
   const bar=app.querySelector('#mark-selection-toolbar'); if(!bar) return;
   state.markSelection=selectionData;
   persistMarkSelectionHighlight(selectionData);
+  bar.querySelectorAll('[data-mark-annotate-menu], [data-mark-more-menu]').forEach((menu)=>{ menu.hidden=true; });
+  bar.querySelector('[data-mark-annotate-toggle]')?.setAttribute('aria-expanded','false');
+  bar.querySelector('[data-mark-more-toggle]')?.setAttribute('aria-expanded','false');
   bar.hidden=false;
   // The passage toolbar can wrap in narrow Reader/workspace panes. Measure the
   // rendered toolbar after it is shown so every action, including Chat and
@@ -11719,6 +11722,17 @@ function openComparisonWorkspace(){
   hideMarkToolbar();
 }
 
+function companionQuestionWithAddedContext(question=''){
+  const base=String(question||'').trim();
+  let extra='';
+  try{ extra=String(window.MarkSetGoAskMarkHub?.contextText?.() || '').trim(); }catch{}
+  if(!extra) return base;
+  const header='\n\nAdditional context supplied by the reader:\n';
+  const budget=Math.max(0,1200-base.length-header.length);
+  if(!budget) return base.slice(0,1200);
+  return `${base}${header}${extra.slice(0,budget)}`.slice(0,1200);
+}
+
 async function runMarkAction(action,question=''){
   const articleContext=window.MSGInvestorArticleContext;
   const currentSelection=state.markSelection;
@@ -11759,6 +11773,7 @@ async function runMarkAction(action,question=''){
   try{
     const targetLanguage=action==='translate'?(window.prompt('Translate into which language?','Spanish')||'').trim():'';
     if(action==='translate'&&!targetLanguage)return;
+    const requestQuestion=action==='ask' ? companionQuestionWithAddedContext(question) : String(question||'').trim();
 
     let response;
 
@@ -11774,14 +11789,14 @@ async function runMarkAction(action,question=''){
           articleText:articleContext.articleText,
           analysis:articleContext.analysis||{},
           history,
-          question:String(question||'').trim()
+          question:requestQuestion
         })
       });
     }else{
       response=await fetch('/api/mark-selection',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({...selected,selection:selected.text,action,question,targetLanguage})
+        body:JSON.stringify({...selected,selection:selected.text,action,question:requestQuestion,targetLanguage})
       });
     }
 
@@ -12426,6 +12441,31 @@ function bindMarkCompanion(reader){
     if (!event.target.closest('input[type="color"], textarea, input[type="text"], select')) event.preventDefault();
   });
 
+  const annotateMenu = toolbar.querySelector('[data-mark-annotate-menu]');
+  const annotateMenuToggle = toolbar.querySelector('[data-mark-annotate-toggle]');
+  const moreMenu = toolbar.querySelector('[data-mark-more-menu]');
+  const moreMenuToggle = toolbar.querySelector('[data-mark-more-toggle]');
+  const closeAnnotateMenu = () => {
+    if (annotateMenu) annotateMenu.hidden = true;
+    annotateMenuToggle?.setAttribute('aria-expanded','false');
+  };
+  const closeMoreMenu = () => {
+    if (moreMenu) moreMenu.hidden = true;
+    moreMenuToggle?.setAttribute('aria-expanded','false');
+  };
+  annotateMenuToggle?.addEventListener('click',()=>{
+    closeMoreMenu();
+    if (!annotateMenu) return;
+    annotateMenu.hidden = !annotateMenu.hidden;
+    annotateMenuToggle.setAttribute('aria-expanded',String(!annotateMenu.hidden));
+  });
+  moreMenuToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu();
+    if (!moreMenu) return;
+    moreMenu.hidden = !moreMenu.hidden;
+    moreMenuToggle.setAttribute('aria-expanded',String(!moreMenu.hidden));
+  });
+
   const highlightPicker = toolbar.querySelector('[data-passage-highlight-picker]');
   const highlightToggle = toolbar.querySelector('[data-passage-highlight-toggle]');
   const closeHighlightPicker = () => {
@@ -12433,9 +12473,15 @@ function bindMarkCompanion(reader){
     highlightToggle?.setAttribute('aria-expanded','false');
   };
   highlightToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu();
+    closeMoreMenu();
     if (!highlightPicker) return;
     highlightPicker.hidden = !highlightPicker.hidden;
     highlightToggle.setAttribute('aria-expanded', String(!highlightPicker.hidden));
+  });
+  toolbar.querySelector('[data-mark-annotation-highlight]')?.addEventListener('click',()=>{
+    closeAnnotateMenu();
+    if (highlightPicker?.hidden) highlightToggle?.click();
   });
   toolbar.querySelectorAll('[data-passage-highlight-color]').forEach((button)=>button.addEventListener('click',()=>{
     const selected = state.markSelection ? {...state.markSelection} : null;
@@ -12463,6 +12509,7 @@ function bindMarkCompanion(reader){
     writingToggle?.setAttribute('aria-expanded','false');
   };
   writingToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
     if (!writingEditor) return;
     closeHighlightPicker();
     writingEditor.hidden = !writingEditor.hidden;
@@ -12498,6 +12545,7 @@ function bindMarkCompanion(reader){
     drawingToggle?.setAttribute('aria-expanded','false');
   };
   drawingToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
     if (!drawingEditor) return;
     closeHighlightPicker();
     closeWritingEditor();
@@ -12523,6 +12571,7 @@ function bindMarkCompanion(reader){
     workspaceToggle?.setAttribute('aria-expanded','false');
   };
   workspaceToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
     if (!workspaceEditor) return;
     closeHighlightPicker(); closeWritingEditor(); closeDrawingEditor();
     workspaceEditor.hidden = !workspaceEditor.hidden;
@@ -12539,6 +12588,7 @@ function bindMarkCompanion(reader){
     updateReaderStatus('Workspace inserted. Add text, draw, or insert a photo.');
   });
   toolbar.querySelector('[data-passage-highlight-erase]')?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
     const selected = state.markSelection ? {...state.markSelection} : null;
     if (!selected) return;
     const result = eraseSavedReaderAnnotations(selected);
@@ -12574,6 +12624,7 @@ function bindMarkCompanion(reader){
   state.readerWritingResizeObserver.observe(reader);
 
   toolbar.querySelectorAll('[data-msg-share-selection]').forEach((button)=>button.addEventListener('click',()=>{
+    closeMoreMenu(); closeAnnotateMenu();
     const selected = state.markSelection ? {...state.markSelection} : (state.markPersistentSelection ? {...state.markPersistentSelection} : null);
     if (!selected?.text) return;
     const payload = {
@@ -12591,6 +12642,7 @@ function bindMarkCompanion(reader){
   }));
 
   toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
+    closeMoreMenu(); closeAnnotateMenu();
     openMarkPanel('selection');
     renderMarkSelectionCard();
     if(b.dataset.markToolbarAction==='ask'){
@@ -12605,7 +12657,26 @@ function bindMarkCompanion(reader){
     }
     runMarkAction(b.dataset.markToolbarAction);
   }));
-  toolbar.querySelector('[data-mark-more]')?.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();});
+  toolbar.querySelectorAll('[data-mark-more-prompt]').forEach((button)=>button.addEventListener('click',()=>{
+    closeMoreMenu();
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    hideMarkToolbar();
+    runMarkAction('ask',button.dataset.markMorePrompt || '');
+  }));
+  toolbar.querySelectorAll('[data-mark-more-tool]').forEach((button)=>button.addEventListener('click',()=>{
+    closeMoreMenu();
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    hideMarkToolbar();
+    const tool=button.dataset.markMoreTool;
+    window.requestAnimationFrame(()=>window.MarkSetGoAskMarkHub?.runStudyTool?.(tool));
+  }));
+  toolbar.querySelector('[data-mark-more-comprehension]')?.addEventListener('click',()=>{
+    closeMoreMenu();
+    hideMarkToolbar();
+    window.MarkSetGoStartComprehension?.();
+  });
   app.querySelector('#toggle-mark-panel')?.addEventListener('click',()=>{
     const layout=app.querySelector('#reader-layout');
     const hidden=layout?.classList.contains('word-panel-hidden');
@@ -13776,8 +13847,70 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         </aside>
       </div>
 
-      <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-reader-drawing-toggle aria-expanded="false">✐ Draw</button><div class="reader-drawing-editor" data-reader-drawing-editor hidden><div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div><label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div></div><button type="button" data-reader-workspace-toggle aria-expanded="false">▣ Space</button><div class="reader-workspace-editor" data-reader-workspace-editor hidden><strong>Insert workspace</strong><label>Height <select data-reader-workspace-height><option value="180">Small</option><option value="280" selected>Medium</option><option value="420">Large</option><option value="600">Extra large</option></select></label><div><button type="button" data-reader-workspace-cancel>Cancel</button><button type="button" data-reader-workspace-insert>Insert</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-msg-share-selection="chat">💬 Chat</button><button type="button" data-msg-share-selection="symposium">🏛 Symposium</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+      <div id="mark-selection-toolbar" class="mark-selection-toolbar mark-selection-toolbar-v2" hidden role="toolbar" aria-label="Selected passage actions">
+        <div class="mark-toolbar-menu-wrap mark-annotate-wrap" data-mark-annotate-wrap>
+          <div class="mark-annotate-split" role="group" aria-label="Annotation tools">
+            <button type="button" data-passage-highlight-toggle aria-expanded="false" title="Highlight selected text">✎ Annotate</button>
+            <button type="button" class="mark-menu-chevron" data-mark-annotate-toggle aria-expanded="false" aria-label="More annotation tools">▾</button>
+          </div>
+          <div class="mark-toolbar-menu mark-annotate-menu" data-mark-annotate-menu hidden>
+            <button type="button" data-mark-annotation-highlight>🖍 <span>Highlight</span></button>
+            <button type="button" data-reader-writing-toggle aria-expanded="false">✎ <span>Write</span></button>
+            <button type="button" data-reader-drawing-toggle aria-expanded="false">✐ <span>Draw</span></button>
+            <button type="button" data-reader-workspace-toggle aria-expanded="false">▣ <span>Space</span></button>
+            <button type="button" data-passage-highlight-erase>⌫ <span>Erase</span></button>
+          </div>
+        </div>
+
+        <div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color">
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button>
+          <label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label>
+        </div>
+
+        <div class="reader-writing-editor" data-reader-writing-editor hidden>
+          <textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea>
+          <div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div>
+          <div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div>
+          <div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div>
+        </div>
+
+        <div class="reader-drawing-editor" data-reader-drawing-editor hidden>
+          <div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div>
+          <label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label>
+          <div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div>
+        </div>
+
+        <div class="reader-workspace-editor" data-reader-workspace-editor hidden><strong>Insert workspace</strong><label>Height <select data-reader-workspace-height><option value="180">Small</option><option value="280" selected>Medium</option><option value="420">Large</option><option value="600">Extra large</option></select></label><div><button type="button" data-reader-workspace-cancel>Cancel</button><button type="button" data-reader-workspace-insert>Insert</button></div></div>
+
+        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button>
+        <button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button>
+        <button type="button" data-mark-toolbar-action="related">∞ Compare</button>
+        <button type="button" data-mark-toolbar-action="save">★ Save</button>
+        <button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+
+        <div class="mark-toolbar-menu-wrap mark-more-wrap" data-mark-more-wrap>
+          <button type="button" data-mark-more-toggle aria-expanded="false">More <span aria-hidden="true">▾</span></button>
+          <div class="mark-toolbar-menu mark-more-menu" data-mark-more-menu hidden>
+            <div class="mark-toolbar-menu-section"><span>Understand</span>
+              <button type="button" data-mark-toolbar-action="simplify">Aa <span>Simplify</span></button>
+              <button type="button" data-mark-toolbar-action="context">⌛ <span>Historical context</span></button>
+            </div>
+            <div class="mark-toolbar-menu-section"><span>Study</span>
+              <button type="button" data-mark-more-prompt="Create a concise study guide for this selected passage.">▤ <span>Study guide</span></button>
+              <button type="button" data-mark-more-tool="flashcards">▱ <span>Flash cards</span></button>
+              <button type="button" data-mark-more-prompt="Identify the key ideas in this selected passage and explain why they matter.">✦ <span>Key ideas</span></button>
+              <button type="button" data-mark-more-comprehension>🧠 <span>Comprehension</span></button>
+            </div>
+            <div class="mark-toolbar-menu-section"><span>Share</span>
+              <button type="button" data-msg-share-selection="chat">💬 <span>Send to Chat</span></button>
+              <button type="button" data-msg-share-selection="symposium">🏛 <span>Discuss in Symposium</span></button>
+            </div>
+          </div>
+        </div>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>

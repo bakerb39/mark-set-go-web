@@ -63,6 +63,60 @@
   let shell = null;
   let legacyHost = null;
   let installAttempts = 0;
+  let addedConversationContext = [];
+
+  function addedContextText() {
+    return addedConversationContext.map((item) => {
+      const label = item.label ? `${item.type}: ${item.label}` : item.type;
+      return `[${label}] ${item.text}`;
+    }).join('\n');
+  }
+
+  function questionWithAddedContext(question='') {
+    const base=String(question||'').trim();
+    const extra=addedContextText().trim();
+    if(!extra) return base;
+    const header='\n\nAdditional context supplied by the reader:\n';
+    const budget=Math.max(0,1200-base.length-header.length);
+    if(!budget) return base.slice(0,1200);
+    return `${base}${header}${extra.slice(0,budget)}`.slice(0,1200);
+  }
+
+  function renderAddedConversationContext() {
+    if (!shell) return;
+    const strip = $('[data-askmark-added-context]', shell);
+    const clear = $('[data-askmark-context-clear]', shell);
+    const plus = $('[data-askmark-more]', shell);
+    if (clear) clear.hidden = !addedConversationContext.length;
+    if (plus) {
+      plus.dataset.contextCount = String(addedConversationContext.length);
+      plus.setAttribute('aria-label', addedConversationContext.length
+        ? `Add context · ${addedConversationContext.length} item${addedConversationContext.length === 1 ? '' : 's'} attached`
+        : 'Add context');
+    }
+    if (!strip) return;
+    strip.hidden = !addedConversationContext.length;
+    strip.innerHTML = addedConversationContext.map((item, index) => `
+      <span class="askmark-context-chip"><span>${escapeHtml(item.label || item.type)}</span><button type="button" data-askmark-context-remove="${index}" aria-label="Remove ${escapeHtml(item.label || item.type)}">×</button></span>`).join('');
+  }
+
+  function addConversationContext(item) {
+    const text = String(item?.text || '').replace(/\s+/g, ' ').trim();
+    if (!text) return false;
+    addedConversationContext.push({
+      type:String(item.type || 'Context'),
+      label:String(item.label || '').trim().slice(0, 80),
+      text:text.slice(0, 2400)
+    });
+    addedConversationContext = addedConversationContext.slice(-6);
+    renderAddedConversationContext();
+    return true;
+  }
+
+  function clearConversationContext() {
+    addedConversationContext = [];
+    renderAddedConversationContext();
+  }
 
   const QUICK_ACTIONS = [
     ['explain', '✦', 'Explain'],
@@ -273,20 +327,22 @@
         </main>
 
         <footer class="askmark-composer" data-askmark-composer>
+          <div class="askmark-added-context" data-askmark-added-context hidden aria-label="Added conversation context"></div>
           <div class="askmark-composer-resize" data-askmark-composer-resize role="separator" aria-label="Resize Ask Mark input" aria-orientation="horizontal" title="Drag upward to enlarge"></div>
-          <button type="button" class="askmark-plus" data-askmark-more aria-label="More actions">＋</button>
+          <button type="button" class="askmark-plus" data-askmark-more aria-label="Add context" title="Add context">＋</button>
           <label>
             <span class="sr-only">Ask Mark anything</span>
             <textarea data-askmark-input rows="1" placeholder=""></textarea>
           </label>
           <button type="button" class="askmark-send" data-askmark-send aria-label="Send to Ask Mark">➜</button>
-          <div class="askmark-more-menu" data-askmark-more-menu hidden>
-            <button type="button" data-askmark-prompt="Create a study guide for this passage."><span>▤</span><span class="askmark-more-copy"><strong>Study guide</strong><small>Use current reading</small></span></button>
-            <button type="button" data-askmark-tool="flashcards"><span>▱</span><span class="askmark-more-copy"><strong>Flash cards</strong><small>Flip through review cards</small></span></button>
-            <button type="button" data-premium-mark-action="context"><span>⌛</span><span class="askmark-more-copy"><strong>Historical context</strong><small>Use current reading</small></span></button>
-            <button type="button" data-askmark-prompt="Identify the key ideas in this passage."><span>✦</span><span class="askmark-more-copy"><strong>Key ideas</strong><small>Use current reading</small></span></button>
-            <button type="button" data-askmark-tool="memory"><span>◇</span><span class="askmark-more-copy"><strong>Memory tools</strong><small>Build clear recall anchors</small></span></button>
-            <button type="button" data-askmark-comprehension><span>🧠</span><span class="askmark-more-copy"><strong>Comprehension</strong><small>Check your understanding</small></span></button>
+          <div class="askmark-more-menu askmark-context-menu" data-askmark-more-menu hidden>
+            <div class="askmark-context-menu-heading"><strong>Add context</strong><small>Give your companion more material for this conversation.</small></div>
+            <button type="button" data-askmark-context-add="passage"><span>▤</span><span class="askmark-more-copy"><strong>Add selected passage</strong><small>Select another passage, then add it here</small></span></button>
+            <button type="button" data-askmark-context-add="note"><span>✎</span><span class="askmark-more-copy"><strong>Add note</strong><small>Add your own thought or instruction</small></span></button>
+            <button type="button" data-askmark-context-add="link"><span>↗</span><span class="askmark-more-copy"><strong>Add link</strong><small>Add a web reference to the conversation</small></span></button>
+            <button type="button" data-askmark-context-add="file"><span>▱</span><span class="askmark-more-copy"><strong>Add text file</strong><small>TXT, Markdown, CSV, HTML, or JSON</small></span></button>
+            <button type="button" class="askmark-context-clear" data-askmark-context-clear hidden><span>×</span><span class="askmark-more-copy"><strong>Clear added context</strong><small>Keep the current reading passage only</small></span></button>
+            <input type="file" data-askmark-context-file hidden accept=".txt,.md,.markdown,.csv,.html,.htm,.json,text/plain,text/markdown,text/csv,text/html,application/json">
           </div>
         </footer>
       </div>`;
@@ -576,6 +632,7 @@
   async function runWholeArticleFollowup(question) {
     const context = activeWholeArticleConversation();
     if (!context || !question) return false;
+    const requestQuestion=questionWithAddedContext(question);
 
     addUserMessage(question);
     const thinking = addThinkingMessage();
@@ -599,7 +656,7 @@
           articleText: context.articleText,
           analysis: context.analysis || {},
           history,
-          question
+          question:requestQuestion
         })
       });
 
@@ -760,9 +817,13 @@
   }
 
   window.MarkSetGoAskMarkHub = Object.freeze({
-    version:'1.0-passage-comparison-bridge',
+    version:'1.1-context-plus-selection-tools',
     open:ensureAskMarkChatVisible,
-    comparePassages:compareExternalPassages
+    comparePassages:compareExternalPassages,
+    runStudyTool:(tool)=>runStudyTool(tool),
+    contextText:()=>addedContextText(),
+    contextItems:()=>addedConversationContext.map((item)=>({...item})),
+    clearContext:()=>clearConversationContext()
   });
 
 
@@ -1008,6 +1069,7 @@
 
   function bindPremiumEvents() {
     installAskMarkScrollIsolation();
+    renderAddedConversationContext();
 
     $('[data-askmark-refresh]', shell)?.addEventListener('click', syncContext);
     $$('[data-askmark-view]', shell).forEach((button) => button.addEventListener('click', () => activatePremiumView(button.dataset.askmarkView)));
@@ -1057,19 +1119,69 @@
       catch (error) { if (status) status.textContent = error?.message || 'Original text could not be restored.'; }
     });
 
-    $('[data-askmark-comprehension]', shell)?.addEventListener('click', () => {
-      $('[data-askmark-more-menu]', shell)?.setAttribute('hidden', '');
-      window.MarkSetGoStartComprehension?.();
+    $$('[data-askmark-context-add]', shell).forEach((button) => button.addEventListener('click', () => {
+      const kind=button.dataset.askmarkContextAdd;
+      const menu=$('[data-askmark-more-menu]',shell);
+      if(menu) menu.hidden=true;
+
+      if(kind==='passage'){
+        const range=window.MarkSetGoCurrentReaderDocument?.getSelectionRange?.();
+        const text=String(range?.text || getSelectionText() || '').trim();
+        if(!text){
+          window.alert('Select another passage in the Reader first, then choose + → Add selected passage.');
+          return;
+        }
+        const context=getBookContext();
+        addConversationContext({type:'Passage',label:context.title || 'Selected passage',text});
+        return;
+      }
+
+      if(kind==='note'){
+        const note=String(window.prompt('Add a note or instruction for this conversation:','') || '').trim();
+        if(note) addConversationContext({type:'Note',label:'Your note',text:note});
+        return;
+      }
+
+      if(kind==='link'){
+        const raw=String(window.prompt('Add a web link:','https://') || '').trim();
+        if(!raw || raw==='https://') return;
+        try{
+          const url=new URL(raw);
+          addConversationContext({type:'Link',label:url.hostname,text:url.href});
+        }catch{ window.alert('Enter a complete web address, such as https://example.com/page.'); }
+        return;
+      }
+
+      if(kind==='file'){
+        $('[data-askmark-context-file]',shell)?.click();
+      }
+    }));
+
+    $('[data-askmark-context-file]',shell)?.addEventListener('change',async(event)=>{
+      const file=event.currentTarget.files?.[0];
+      event.currentTarget.value='';
+      if(!file) return;
+      try{
+        const text=await file.text();
+        if(!String(text||'').trim()) throw new Error('That file does not contain readable text.');
+        addConversationContext({type:'File',label:file.name || 'Text file',text});
+      }catch(error){ window.alert(error?.message || 'That text file could not be added.'); }
     });
 
-    $$('[data-askmark-tool]', shell).forEach((button) => button.addEventListener('click', () => {
-      runStudyTool(button.dataset.askmarkTool);
-    }));
+    $('[data-askmark-context-clear]',shell)?.addEventListener('click',()=>{
+      clearConversationContext();
+      const menu=$('[data-askmark-more-menu]',shell);
+      if(menu) menu.hidden=true;
+    });
 
-    $$('[data-askmark-prompt]', shell).forEach((button) => button.addEventListener('click', () => {
-      $('[data-askmark-more-menu]', shell).hidden = true;
-      runSelectionAction('ask', button.dataset.askmarkPrompt);
-    }));
+    $('[data-askmark-added-context]',shell)?.addEventListener('click',(event)=>{
+      const remove=event.target.closest('[data-askmark-context-remove]');
+      if(!remove) return;
+      const index=Number(remove.dataset.askmarkContextRemove);
+      if(!Number.isInteger(index) || index<0 || index>=addedConversationContext.length) return;
+      addedConversationContext.splice(index,1);
+      renderAddedConversationContext();
+    });
 
     const input = $('[data-askmark-input]', shell);
     const send = () => {
@@ -1200,6 +1312,7 @@
   }
 
   document.addEventListener('marksetgo:document-available', () => {
+    clearConversationContext();
     installAttempts = 0;
     requestAnimationFrame(retryInstall);
     window.setTimeout(()=>refreshMarkProgress(),220);
