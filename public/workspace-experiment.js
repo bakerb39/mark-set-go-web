@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.4 — standalone Reader resize + close stability
+ * Mark, Set, Go! Workspace Experiment v0.15.5 — post-close Reader 1 chrome resync
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -939,6 +939,18 @@
     }
   }
 
+  function schedulePrimaryReaderStandaloneControls() {
+    const sync = () => {
+      const shell = workspaceShell();
+      if (!shell || shell.classList.contains('is-closed')) {
+        ensurePrimaryReaderStandaloneControls();
+      }
+    };
+    window.requestAnimationFrame(sync);
+    window.setTimeout(sync, 45);
+    window.setTimeout(sync, 180);
+  }
+
   function closeWorkspacePanel() {
     const shell = workspaceShell();
     if (!shell) {
@@ -958,7 +970,7 @@
     shell.classList.add('is-closed');
     renderWorkspaceTabs(shell);
     window.speechSynthesis?.cancel?.();
-    window.requestAnimationFrame(() => ensurePrimaryReaderStandaloneControls());
+    schedulePrimaryReaderStandaloneControls();
   }
 
   function activatePanel(key) {
@@ -1027,6 +1039,7 @@
 
     if (!wasActive) {
       renderWorkspaceTabs();
+      schedulePrimaryReaderStandaloneControls();
       return;
     }
 
@@ -1034,6 +1047,7 @@
     const replacement = PANEL_ORDER[Math.min(index, PANEL_ORDER.length - 1)] || PANEL_ORDER[PANEL_ORDER.length - 1] || '';
     if (replacement) activatePanel(replacement);
     else closeWorkspacePanel();
+    schedulePrimaryReaderStandaloneControls();
   }
 
   function panelUrl(mode, value) {

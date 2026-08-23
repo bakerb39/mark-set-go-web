@@ -1,0 +1,102 @@
+/* Mark, Set, Go! multi-Reader final cascade guard v1.0.0
+   Loaded LAST. Presentation only: no Reader engine/state changes. */
+
+/* Reader 2+ is an iframe, so its viewport crosses the base Reader's responsive
+   breakpoints even when the outer desktop has plenty of room. Keep the companion
+   panel beside the reading canvas for normal desktop half-pane widths. */
+@media (min-width:560px) {
+  html.msg-secondary-reader-document #app .reader-layout {
+    --word-panel-width:min(320px,36vw) !important;
+    display:grid !important;
+    grid-template-columns:
+      var(--navigation-width,280px)
+      8px
+      minmax(0,1fr)
+      8px
+      var(--word-panel-width) !important;
+    align-items:stretch !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout.navigation-hidden {
+    grid-template-columns:minmax(0,1fr) 8px var(--word-panel-width) !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout.word-panel-hidden {
+    grid-template-columns:var(--navigation-width,280px) 8px minmax(0,1fr) !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout.navigation-hidden.word-panel-hidden {
+    grid-template-columns:minmax(0,1fr) !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout > .navigation-pane,
+  html.msg-secondary-reader-document #app .reader-layout > .word-panel,
+  html.msg-secondary-reader-document #app .reader-layout > .reader-center-column {
+    grid-column:auto !important;
+    grid-row:auto !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout:not(.navigation-hidden) > #left-pane-splitter,
+  html.msg-secondary-reader-document #app .reader-layout:not(.word-panel-hidden) > #right-pane-splitter {
+    display:block !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout.navigation-hidden > .navigation-pane,
+  html.msg-secondary-reader-document #app .reader-layout.navigation-hidden > #left-pane-splitter,
+  html.msg-secondary-reader-document #app .reader-layout.word-panel-hidden > .word-panel,
+  html.msg-secondary-reader-document #app .reader-layout.word-panel-hidden > #right-pane-splitter {
+    display:none !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout:not(.word-panel-hidden) > .word-panel {
+    width:auto !important;
+    min-width:0 !important;
+    height:min(64vh,660px,calc(100dvh - 220px)) !important;
+    min-height:300px !important;
+    max-height:calc(100dvh - 220px) !important;
+    align-self:start !important;
+  }
+}
+
+/* Make the top-right −/+ text-size control one continuous surface in BOTH
+   primary and auxiliary Readers. The parent owns the outer border; children
+   own no internal borders or shadows, so no burgundy/dark seam can survive. */
+html #app .reader-topright-font-control {
+  display:inline-flex !important;
+  align-items:stretch !important;
+  gap:0 !important;
+  padding:0 !important;
+  overflow:hidden !important;
+  border:1px solid color-mix(in srgb,var(--msg-theme-gold,var(--msg-gold,#d5a928)) 62%,var(--msg-theme-border,var(--msg-blue-border,#9fb4c7))) !important;
+  border-radius:9px !important;
+  background:linear-gradient(180deg,var(--msg-theme-surface,var(--msg-surface,#fff)),var(--msg-theme-soft-2,var(--msg-blue-soft-2,#f4f7fa))) !important;
+  box-shadow:0 2px 7px rgba(15,35,60,.12) !important;
+}
+
+html #app .reader-topright-font-control > button,
+html #app .reader-topright-font-control button {
+  margin:0 !important;
+  border:0 !important;
+  border-left:0 !important;
+  border-right:0 !important;
+  outline-offset:-2px;
+  border-radius:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
+
+html #app .reader-topright-font-control > button + button,
+html #app .reader-topright-font-control button + button {
+  margin-left:0 !important;
+  border-left:0 !important;
+  box-shadow:none !important;
+}
+
+html #app .reader-topright-font-control::before,
+html #app .reader-topright-font-control::after,
+html #app .reader-topright-font-control > button::before,
+html #app .reader-topright-font-control > button::after {
+  border:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+}
