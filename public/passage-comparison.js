@@ -1,4 +1,4 @@
-/* Mark, Set, Go! — Passage Comparison Basket v1
+/* Mark, Set, Go! — Passage Comparison Basket v1.1
    - Intercepts the Reader popup toolbar's existing ∞ Compare action.
    - Collects selected passages without browser storage.
    - Reader 2 hands selections to the parent Reader.
@@ -419,27 +419,63 @@
     } catch { return false; }
   }
 
+  function compareToolbarButton(event) {
+    const target = event.target instanceof Element ? event.target : null;
+    const button = target?.closest?.('button');
+    if (!button) return null;
+
+    // Reader 1 and Reader 2 both use an Ask Mark selection toolbar, but keep
+    // this intentionally tolerant of older/newer toolbar markup. The action
+    // attribute is preferred; the visible Compare label is the compatibility
+    // fallback. Never intercept Compare controls elsewhere in the application.
+    const toolbar = button.closest?.(
+      '#mark-selection-toolbar, .mark-selection-toolbar, [role="toolbar"][aria-label*="Ask Mark"]'
+    );
+    if (!toolbar) return null;
+
+    const action = clean(button.dataset.markToolbarAction || '', 40).toLowerCase();
+    const label = clean(button.textContent || '', 80).replace(/\s+/g, ' ').toLowerCase();
+    const isCompare = action === 'related' || action === 'compare' || /(^|\s)compare(\s|$)/i.test(label);
+    return isCompare ? button : null;
+  }
+
   function handleCompareClick(event) {
-    const button = event.target instanceof Element
-      ? event.target.closest('[data-mark-toolbar-action="related"]')
-      : null;
+    const button = compareToolbarButton(event);
     if (!button) return;
 
-    // Own the popup toolbar's Compare action before app.js can open the legacy
-    // single-passage comparison page. Other Ask Mark actions are untouched.
+    // IMPORTANT: this listener is installed on WINDOW capture, which is earlier
+    // in the event path than app.js's document/toolbar listeners. Reader 2 used
+    // to reach the legacy openComparisonWorkspace() handler before the basket
+    // could forward its second passage. Owning the event here guarantees that
+    // Compare means "add this passage" until the reader explicitly chooses
+    // Open Comparison Workspace from the basket.
     event.preventDefault();
+    event.stopPropagation();
     event.stopImmediatePropagation();
 
     const passage = collectCurrentSelection();
     if (!passage) {
       if (!isChildFrame) notify('Highlight a passage first, then choose Compare.');
+      else {
+        try {
+          window.parent.postMessage({
+            type: 'msg-passage-comparison-status',
+            message: 'Reader 2 could not find the highlighted passage. Highlight it again and choose Compare.'
+          }, window.location.origin);
+        } catch {}
+      }
       return;
     }
+
     forwardSelection(passage);
-    document.querySelector('#mark-selection-toolbar')?.setAttribute('hidden', '');
+    const toolbar = button.closest?.('#mark-selection-toolbar, .mark-selection-toolbar');
+    if (toolbar) toolbar.hidden = true;
   }
 
-  document.addEventListener('click', handleCompareClick, true);
+  // Window capture is deliberate. It runs before document/target listeners even
+  // though this module is loaded after app.js. This is what makes Reader 2 safe
+  // from the legacy one-passage comparison navigation.
+  window.addEventListener('click', handleCompareClick, true);
 
   if (!isChildFrame) {
     window.addEventListener('message', (event) => {
@@ -447,6 +483,11 @@
       const data = event.data || {};
       if (data.type === 'msg-passage-comparison-add' && data.passage) {
         addPassage(data.passage);
+        return;
+      }
+      if (data.type === 'msg-passage-comparison-status' && data.message) {
+        expanded = true;
+        notify(data.message);
         return;
       }
       if (data.type === 'msg-passage-comparison-workspace-ready' && event.source) {
@@ -477,6 +518,7 @@
   }
 
   window.MSGPassageComparison = Object.freeze({
+    version: '1.1-reader2-capture',
     addPassage: (passage) => isChildFrame ? forwardSelection(normalizePassage(passage)) : addPassage(passage),
     clear: clearPassages,
     passages: () => passages.map((item) => ({ ...item })),
