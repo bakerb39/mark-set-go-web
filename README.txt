@@ -1,35 +1,20 @@
-Mark, Set, Go! — Reader menu v1.2.0 + Read Anything storage fix
-2026-08-23
+Mark, Set, Go! v7.33.2 Reader stability restore
 
-Replace these files in public/:
-  index.html
-  reader-menu.js
-  reader-menu.css
-  read-anything.js
+Purpose
+- Restores the actual v7.33.1 multi-Reader architecture after the later reader-menu overlay accidentally downgraded index.html to the v7.29 stack.
+- Reader remains a normal direct navigation button.
+- + remains the add-Reader control.
+- Readers remains the separate Reader switching dropdown.
+- New auxiliary Readers use the established v7.33.1 fresh/empty Reader boot path.
+- Restores the richer Read Anything / article-actions file that was overwritten by the v1.2 reader-menu package.
 
-Reader width fix
-----------------
-- Reader 1 is now the canonical visual width.
-- Its actual rendered #app width is measured, not guessed.
-- Reader 2/3/etc use the same measured width.
-- The global 1400px .app-shell rule can no longer make additional Readers wider.
-- Workspace panes remain excluded.
-- No protected Reader engine files are changed.
+Files intentionally NOT included or modified
+- app.js
+- protected Reader modules under public/reader/
+- workspace-pane.html
+- Reader engine/session internals
 
-Read Anything quota fix
------------------------
-- Full formatting records (original + transformed versions) are no longer written to localStorage.
-- They are stored in IndexedDB: markSetGoReadAnythingFormatsV1 / records.
-- Existing markSetGoReadAnythingFormatV1:* localStorage records are migrated asynchronously to IndexedDB and removed only after a successful IndexedDB write.
-- The small document-to-format-key index remains in localStorage.
-- Existing Reader rendering is not blocked while migration runs.
+Legacy files reader-menu.js and reader-menu.css may remain in public/ but this index.html does not load them. They are inert.
 
-Build marker
-------------
-20260823-v7.29.5-reader-menu-storage
-
-Expected asset versions
------------------------
-/reader-menu.css?v=20260823-v1.2.0
-/reader-menu.js?v=20260823-v1.2.0
-/read-anything.js?v=20260823-indexeddb-format-storage
+Expected build marker after deployment:
+20260823-v7.33.2-reader-stability-restore

@@ -8,90 +8,6 @@
   const FORMAT_RECORD_PREFIX = 'markSetGoReadAnythingFormatV1:';
   const FORMAT_DOCUMENT_INDEX_KEY = 'markSetGoReadAnythingDocumentIndexV1';
   const DOCUMENT_STORAGE_PREFIX = 'markSetGoDocumentV1:';
-  const FORMAT_DB_NAME = 'markSetGoReadAnythingFormatsV1';
-  const FORMAT_DB_STORE = 'records';
-  const FORMAT_DB_VERSION = 1;
-  const formatRecordCache = new Map();
-  let formatDbPromise = null;
-
-  function openFormatDb() {
-    if (formatDbPromise) return formatDbPromise;
-    formatDbPromise = new Promise((resolve, reject) => {
-      if (!window.indexedDB) {
-        reject(new Error('IndexedDB is unavailable.'));
-        return;
-      }
-      const request = indexedDB.open(FORMAT_DB_NAME, FORMAT_DB_VERSION);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(FORMAT_DB_STORE)) {
-          db.createObjectStore(FORMAT_DB_STORE, { keyPath: 'key' });
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error || new Error('Could not open formatting storage.'));
-    });
-    return formatDbPromise;
-  }
-
-  async function putFormatRecord(record) {
-    const db = await openFormatDb();
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(FORMAT_DB_STORE, 'readwrite');
-      tx.objectStore(FORMAT_DB_STORE).put(record);
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error || new Error('Could not store formatting record.'));
-      tx.onabort = () => reject(tx.error || new Error('Formatting storage transaction was aborted.'));
-    });
-    formatRecordCache.set(String(record.key), record);
-    return record;
-  }
-
-  async function getFormatRecord(key) {
-    const safeKey = String(key || '');
-    if (!safeKey) return null;
-    if (formatRecordCache.has(safeKey)) return formatRecordCache.get(safeKey);
-    const db = await openFormatDb();
-    const record = await new Promise((resolve, reject) => {
-      const tx = db.transaction(FORMAT_DB_STORE, 'readonly');
-      const request = tx.objectStore(FORMAT_DB_STORE).get(safeKey);
-      request.onsuccess = () => resolve(request.result || null);
-      request.onerror = () => reject(request.error || new Error('Could not read formatting record.'));
-    });
-    if (record) formatRecordCache.set(safeKey, record);
-    return record;
-  }
-
-  function legacyFormatRecord(key) {
-    try {
-      const value = JSON.parse(localStorage.getItem(formatRecordStorageKey(key)) || 'null');
-      if (value) formatRecordCache.set(String(key), value);
-      return value;
-    } catch {
-      return null;
-    }
-  }
-
-  async function migrateLegacyFormatRecords() {
-    const keys = [];
-    try {
-      for (let index = 0; index < localStorage.length; index += 1) {
-        const storageKey = localStorage.key(index) || '';
-        if (storageKey.startsWith(FORMAT_RECORD_PREFIX)) keys.push(storageKey);
-      }
-    } catch { return; }
-
-    for (const storageKey of keys) {
-      try {
-        const record = JSON.parse(localStorage.getItem(storageKey) || 'null');
-        if (!record?.key) continue;
-        await putFormatRecord(record);
-        localStorage.removeItem(storageKey);
-      } catch (error) {
-        console.warn('A legacy imported-format record could not be migrated.', error);
-      }
-    }
-  }
   let allowLegacyUpload = false;
   let activeImportedDocument = null;
   let activeImportedVersion = 'original';
@@ -119,16 +35,29 @@
 
   function addHistory(documentRecord) {
     const key = `${documentRecord.source?.type || 'text'}|${documentRecord.source?.url || ''}|${documentRecord.title}`.toLowerCase();
-    const items = history().filter((item) => item.key !== key);
-    items.unshift({
-      key,
-      title: documentRecord.title,
-      sourceType: documentRecord.source?.type || 'text',
-      sourceUrl: documentRecord.source?.url || '',
+    const entry = {
+      key: key.slice(0, 2400),
+      title: String(documentRecord.title || 'Imported document').slice(0, 300),
+      sourceType: String(documentRecord.source?.type || 'text').slice(0, 80),
+      sourceUrl: String(documentRecord.source?.url || '').slice(0, 2000),
       importedAt: new Date().toISOString(),
-      characters: documentRecord.text.length
-    });
-    localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(items.slice(0, 30)));
+      characters: String(documentRecord.text || '').length
+    };
+    const items = history().filter((item) => item?.key !== key);
+    items.unshift(entry);
+
+    // Import history is optional metadata. A full localStorage quota must never
+    // prevent a document/article from opening in the Reader.
+    try {
+      localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(items.slice(0, 15)));
+    } catch (error) {
+      try {
+        localStorage.removeItem(IMPORT_HISTORY_KEY);
+        localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify([entry]));
+      } catch {
+        console.warn('Import history was skipped because browser storage is full.', error);
+      }
+    }
   }
 
 
@@ -180,18 +109,9 @@
       selectedVersion: activeImportedVersion || 'original',
       updatedAt: new Date().toISOString()
     };
-
-    // Full document versions are large payloads. localStorage is a small,
-    // synchronous metadata store and was being exhausted by original + adapted
-    // copies of articles/books. Keep the full formatter record in IndexedDB and
-    // leave localStorage for the small document->format-key index only.
-    formatRecordCache.set(String(key), record);
-    void putFormatRecord(record).then(() => {
-      // Remove an older localStorage copy only after IndexedDB has it safely.
-      try { localStorage.removeItem(formatRecordStorageKey(key)); } catch {}
-    }).catch((error) => {
-      console.warn('Imported formatting versions could not be stored in IndexedDB.', error);
-    });
+    try { localStorage.setItem(formatRecordStorageKey(key), JSON.stringify(record)); } catch (error) {
+      console.warn('Imported formatting versions could not be stored.', error);
+    }
   }
 
   function restoreImportedFormatRecord(documentId, documentTitle = '') {
@@ -267,38 +187,8 @@
       document.querySelector('#read-anything-format-control')?.remove();
       return false;
     }
-    let record = formatRecordCache.get(String(key)) || legacyFormatRecord(key);
-    if (record) {
-      // Best-effort one-record migration; the startup sweep handles the rest.
-      void putFormatRecord(record).then(() => {
-        try { localStorage.removeItem(formatRecordStorageKey(key)); } catch {}
-      }).catch(() => {});
-    } else {
-      // IndexedDB is asynchronous. Hydrate the complete version set in the
-      // background while the already-open Reader remains usable immediately.
-      void getFormatRecord(key).then((storedRecord) => {
-        if (!storedRecord) return;
-        const currentDocumentId = String(window.MarkSetGoCurrentReaderDocument?.get?.()?.documentId || '');
-        if (currentDocumentId && currentDocumentId !== String(documentId)) return;
-        const level = storedDocument?.source?.readingLevel || storedRecord.selectedVersion || 'original';
-        activeImportedDocument = {
-          title: cleanImportedTitle(storedRecord.title || storedDocument?.source?.adaptedFrom || storedDocument?.title || documentTitle),
-          baseTitle: cleanImportedTitle(storedRecord.title || storedDocument?.source?.adaptedFrom || storedDocument?.title || documentTitle),
-          author: storedRecord.author || storedDocument?.source?.author || '',
-          source: { ...(storedRecord.source || storedDocument?.source || {}), readAnything: true, readAnythingKey: key, readerDocumentId: String(documentId) },
-          versions: { ...(storedRecord.versions || {}), ...(storedRecord.originalText ? { original: storedRecord.originalText } : {}), ...(storedDocument?.text ? { [level]: storedDocument.text } : {}) },
-          originalText: storedRecord.originalText || storedRecord.versions?.original || ''
-        };
-        if (!activeImportedDocument.versions.original && level === 'original' && storedDocument?.text) {
-          activeImportedDocument.versions.original = storedDocument.text;
-        }
-        activeImportedVersion = storedRecord.selectedVersion && activeImportedDocument.versions[storedRecord.selectedVersion]
-          ? storedRecord.selectedVersion
-          : level;
-        rememberFormatDocument(documentId, key);
-        scheduleFormatControlAttach();
-      }).catch((error) => console.warn('Imported formatting versions could not be restored from IndexedDB.', error));
-    }
+    let record = null;
+    try { record = JSON.parse(localStorage.getItem(formatRecordStorageKey(key)) || 'null'); } catch {}
     if (!record && !storedDocument?.source?.readAnything) return false;
     const readingLevel = storedDocument?.source?.readingLevel || record?.selectedVersion || 'original';
     activeImportedDocument = {
@@ -499,7 +389,7 @@
   }
 
   function versionLabel(level) {
-    return ({ original: 'Original', clean: 'Readable', summaryQuick: 'Summary', summaryStudy: 'Study Summary', summaryDetailed: 'Detailed Summary', custom: 'Custom', graduate: 'Graduate', college: 'College', highschool: 'High School', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
+    return ({ original: 'Original', clean: 'Readable', format_all: 'Formatted', summaryQuick: 'Summary', summaryStudy: 'Study Summary', summaryDetailed: 'Detailed Summary', custom: 'Custom', graduate: 'Graduate', college: 'College', highschool: 'High School', grade8: 'Grade 8', grade6: 'Grade 6', grade4: 'Grade 4' })[level] || level;
   }
 
   function transformSourceText() {
@@ -532,7 +422,7 @@
     if (!text) return;
     activeImportedVersion = level;
     saveActiveFormatRecord();
-    app.classList.toggle('read-anything-paragraph-spacing', level === 'clean' || level.startsWith('summary') || level === 'custom');
+    app.classList.toggle('read-anything-paragraph-spacing', level === 'clean' || level === 'format_all' || level.startsWith('summary') || level === 'custom');
     const suffix = '';
     pendingImportedRender = true;
     window.renderReaderWithText(`${activeImportedDocument.baseTitle || activeImportedDocument.title}${suffix}`, text, {
@@ -598,9 +488,13 @@
     if (!activeImportedDocument) return;
     const versionKey = `summary${style.charAt(0).toUpperCase()}${style.slice(1)}`;
     if (activeImportedDocument.versions[versionKey]) return renderImportedVersion(versionKey);
-    const sourceText = transformSourceText();
+    const sourceText = String(
+      activeImportedDocument.versions?.original ||
+      activeImportedDocument.originalText ||
+      transformSourceText()
+    ).trim();
     if (sourceText.length < 20) throw new Error('The saved document text is unavailable. Reopen the original item from My Library and try again.');
-    showTransformStatus(`Creating ${style} summary…`);
+    showTransformStatus(`Creating ${style} summary of the whole article…`);
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), 90000);
     try {
@@ -1201,10 +1095,824 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     });
   }
 
+  function isWholeArticleDocument() {
+    const type = String(activeImportedDocument?.source?.type || '').toLowerCase();
+    return ['topic-feed', 'bookmarklet', 'website'].includes(type);
+  }
+
+  function activeArticleCompanionIdentity() {
+    const live = window.MSGCompanion?.config;
+    if (live?.id && live?.name) {
+      return {
+        id: live.id,
+        name: live.name,
+        ask: live.ask || `Ask ${live.name}`,
+        avatar: live.avatar || ''
+      };
+    }
+
+    let id = 'mark';
+    try {
+      id = String(
+        localStorage.getItem('msg_companion_persona_v2') ||
+        localStorage.getItem('msg_companion_persona_v1') ||
+        'mark'
+      ).toLowerCase();
+    } catch {}
+
+    if (id === 'chad') {
+      return {
+        id: 'chad',
+        name: 'Chad',
+        ask: 'Ask Chad',
+        avatar: '/assets/companions/chad/chad-avatar.png'
+      };
+    }
+
+    if (id === 'beth') {
+      return {
+        id: 'beth',
+        name: 'Beth',
+        ask: 'Ask Beth',
+        avatar: '/assets/companions/beth/beth-avatar.png'
+      };
+    }
+
+    return {
+      id: 'mark',
+      name: 'Mark',
+      ask: 'Ask Mark',
+      avatar: '/assets/ask-mark/ask-mark-avatar.png'
+    };
+  }
+
+  function buildInvestorFollowupContext(result = {}) {
+    const originalText = String(
+      activeImportedDocument?.versions?.original ||
+      activeImportedDocument?.originalText ||
+      ''
+    ).trim();
+
+    const lines = [
+      `Article: ${activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article'}`,
+      '',
+      'Initial investor analysis:',
+      String(result?.analysis || '').trim(),
+      Array.isArray(result?.keyPoints) && result.keyPoints.length
+        ? `Key investor takeaways:\n${result.keyPoints.map((item) => `- ${item}`).join('\n')}`
+        : '',
+      Array.isArray(result?.catalysts) && result.catalysts.length
+        ? `What to watch:\n${result.catalysts.map((item) => `- ${item}`).join('\n')}`
+        : '',
+      Array.isArray(result?.risks) && result.risks.length
+        ? `Risks:\n${result.risks.map((item) => `- ${item}`).join('\n')}`
+        : '',
+      result?.recommendation
+        ? `General investor posture:\n${result.recommendation}`
+        : '',
+      '',
+      'Article text:',
+      originalText
+    ].filter(Boolean);
+
+    // /api/mark-selection accepts at most 1,800 words and 12,000 characters.
+    // Stay below both ceilings so the normal Ask-companion chat can use this
+    // context without creating a new parallel chat system.
+    const byChars = lines.join('\n\n').slice(0, 11500);
+    return byChars.split(/\s+/).slice(0, 1700).join(' ').trim();
+  }
+
+  function primeInvestorFollowupContext(result = {}) {
+    const contextText = buildInvestorFollowupContext(result);
+    if (!contextText) return false;
+
+    const originalText = String(
+      activeImportedDocument?.versions?.original ||
+      activeImportedDocument?.originalText ||
+      ''
+    ).trim();
+
+    const companion = activeArticleCompanionIdentity();
+    const selection = {
+      text: contextText,
+      selection: contextText,
+      before: '',
+      after: '',
+      title: activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article',
+      chapter: 'Whole article · Investor analysis',
+      documentId: '',
+      startIndex: 0,
+      endIndex: Math.max(1, contextText.split(/\s+/).length),
+      syntheticWholeArticle: true
+    };
+
+    let connected = false;
+
+    // app.js and read-anything.js are classic deferred scripts. The Reader's
+    // existing global lexical state is therefore available here without
+    // changing Reader architecture. Setting only markSelection gives the
+    // existing text-chat runMarkAction() the context it requires.
+    try {
+      if (typeof state !== 'undefined' && state) {
+        selection.documentId = state.documentId || '';
+        selection.startIndex = Math.max(0, Number(state.index) || 0);
+        selection.endIndex = selection.startIndex + Math.max(1, contextText.split(/\s+/).length);
+        state.markSelection = selection;
+        connected = true;
+      }
+    } catch (error) {
+      console.warn('Investor follow-up context could not attach to Reader state.', error);
+    }
+
+    window.MSGInvestorArticleContext = {
+      companion,
+      selection,
+      analysis: result,
+      // Follow-up chat is intentionally grounded in the WHOLE imported article.
+      // Keep the complete original text in memory; do not reduce it to the
+      // 1,700-word legacy selection bridge.
+      articleText: originalText,
+      title: activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article',
+      sourceUrl: activeImportedDocument?.source?.url || '',
+      history: Array.isArray(window.MSGInvestorArticleContext?.history)
+        ? window.MSGInvestorArticleContext.history
+        : [],
+      updatedAt: new Date().toISOString()
+    };
+
+    document.dispatchEvent(new CustomEvent('marksetgo:investor-context-ready', {
+      detail: {
+        companion: companion.id,
+        title: selection.title,
+        connected
+      }
+    }));
+
+    return connected;
+  }
+
+  function notifyAskMarkPanelUpdated(kind = 'response') {
+    document.dispatchEvent(new CustomEvent('marksetgo:askmark-legacy-updated', {
+      detail: { kind }
+    }));
+  }
+
+  function openAskMarkInvestorPanel() {
+    const layout = document.querySelector('#app #reader-layout');
+    const selectionTab = document.querySelector('#app [data-mark-tab="selection"]');
+    const markPanel = document.querySelector('#app #mark-selection-panel');
+
+    // Prefer the Reader's native Ask Mark opener when it is globally available.
+    if (typeof window.openMarkPanel === 'function') {
+      try { window.openMarkPanel('selection'); } catch {}
+    } else {
+      const hidden = layout?.classList.contains('word-panel-hidden');
+      const selectionActive = selectionTab?.classList.contains('active');
+      if ((hidden || !selectionActive) && document.querySelector('#app #toggle-mark-panel')) {
+        document.querySelector('#app #toggle-mark-panel').click();
+      }
+    }
+
+    // Defensive DOM sync for builds where the legacy functions are not exported.
+    layout?.classList.remove('word-panel-hidden');
+    document.querySelectorAll('#app [data-mark-tab]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.markTab === 'selection');
+    });
+    document.querySelectorAll('#app [data-mark-panel]').forEach((panel) => {
+      panel.hidden = panel.dataset.markPanel !== 'selection';
+    });
+
+    return markPanel || document.querySelector('#app #mark-selection-panel');
+  }
+
+  function renderInvestorAnalysisInAskMark(result, { loading = false, error = '' } = {}) {
+    const panel = openAskMarkInvestorPanel();
+    if (!panel) return;
+
+    const companion = activeArticleCompanionIdentity();
+
+    if (loading) {
+      panel.innerHTML = `
+        <div class="mark-selection-card">
+          <span>Whole article · Investor view</span>
+          <blockquote>${escapeHtml(activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article')}</blockquote>
+        </div>
+        <div id="mark-response" class="mark-response">
+          <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Investor analysis</strong></div>
+          <p class="status">${escapeHtml(companion.name)} is analyzing the full article from an investor perspective…</p>
+        </div>`;
+      notifyAskMarkPanelUpdated('response');
+      return;
+    }
+
+    if (error) {
+      panel.innerHTML = `
+        <div class="mark-selection-card">
+          <span>Whole article · Investor view</span>
+          <blockquote>${escapeHtml(activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article')}</blockquote>
+        </div>
+        <div id="mark-response" class="mark-response">
+          <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Investor analysis</strong></div>
+          <p class="status error">${escapeHtml(error)}</p>
+        </div>`;
+      notifyAskMarkPanelUpdated('response');
+      return;
+    }
+
+    const keyPoints = Array.isArray(result?.keyPoints) ? result.keyPoints : [];
+    const catalysts = Array.isArray(result?.catalysts) ? result.catalysts : [];
+    const risks = Array.isArray(result?.risks) ? result.risks : [];
+    const cautions = Array.isArray(result?.cautions) ? result.cautions : [];
+
+    panel.innerHTML = `
+      <div class="mark-selection-card">
+        <span>Whole article · Investor view</span>
+        <blockquote>${escapeHtml(activeImportedDocument?.baseTitle || activeImportedDocument?.title || 'Current article')}</blockquote>
+      </div>
+      <div id="mark-response" class="mark-response" data-investor-analysis="1">
+        <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>${escapeHtml(result?.heading || 'Investor analysis')}</strong></div>
+        <p>${escapeHtml(result?.analysis || '')}</p>
+        ${keyPoints.length ? `<h4>Key investor takeaways</h4><ul>${keyPoints.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+        ${catalysts.length ? `<h4>What to watch</h4><ul>${catalysts.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+        ${risks.length ? `<h4>Risks</h4><ul>${risks.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}</ul>` : ''}
+        <h4>General investor posture</h4>
+        <p>${escapeHtml(result?.recommendation || 'The article alone does not support a clear investment posture.')}</p>
+        ${cautions.length ? `<div class="mark-cautions">${cautions.map((item) => `<p>${escapeHtml(item)}</p>`).join('')}</div>` : ''}
+        <p><small>General market analysis based on this article, not personalized financial advice.</small></p>
+      </div>`;
+
+    // Give the existing Ask-companion text chat a whole-article context so
+    // follow-up questions work immediately after this analysis.
+    primeInvestorFollowupContext(result || {});
+    notifyAskMarkPanelUpdated('response');
+  }
+
+  async function requestInvestorAnalysis() {
+    if (!activeImportedDocument) throw new Error('No article is open.');
+
+    const cached = activeImportedDocument.source?.investorAnalysis;
+    if (cached?.analysis && cached?.recommendation) {
+      renderInvestorAnalysisInAskMark(cached);
+      primeInvestorFollowupContext(cached);
+      return cached;
+    }
+
+    const originalText = String(
+      activeImportedDocument.versions?.original ||
+      activeImportedDocument.originalText ||
+      ''
+    ).trim();
+
+    if (originalText.length < 40) throw new Error('The original article text is unavailable.');
+
+    renderInvestorAnalysisInAskMark(null, { loading: true });
+
+    const companion = activeArticleCompanionIdentity();
+    const controller = new AbortController();
+    const clientTimeout = window.setTimeout(() => controller.abort(), 90000);
+
+    let response;
+    try {
+      response = await fetch('/api/read-anything/investor-analysis', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: activeImportedDocument.baseTitle || activeImportedDocument.title,
+          text: originalText,
+          sourceUrl: activeImportedDocument.source?.url || '',
+          topic: activeImportedDocument.source?.topic || '',
+          companion: companion.id
+        })
+      });
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        const message = `${companion.name}’s analysis took too long. Please try Analyze again.`;
+        renderInvestorAnalysisInAskMark(null, { error: message });
+        throw new Error(message);
+      }
+      throw error;
+    } finally {
+      window.clearTimeout(clientTimeout);
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const companion = activeArticleCompanionIdentity();
+      const message = payload.detail || payload.error || `${companion.name} could not complete the investor analysis.`;
+      renderInvestorAnalysisInAskMark(null, { error: message });
+      throw new Error(message);
+    }
+
+    const result = payload.result || {};
+    activeImportedDocument.source = {
+      ...(activeImportedDocument.source || {}),
+      investorAnalysis: result
+    };
+    saveActiveFormatRecord();
+    renderInvestorAnalysisInAskMark(result);
+    return result;
+  }
+
+
+  function buildSocialPostArticleContext() {
+    if (!activeImportedDocument) return null;
+
+    const articleText = String(
+      activeImportedDocument.versions?.original ||
+      activeImportedDocument.originalText ||
+      ''
+    ).trim();
+
+    if (articleText.length < 40) return null;
+
+    return {
+      title: activeImportedDocument.baseTitle || activeImportedDocument.title || 'Current article',
+      sourceUrl: activeImportedDocument.source?.url || '',
+      articleText,
+      companion: activeArticleCompanionIdentity()
+    };
+  }
+
+  function socialPostPrompt(style = 'default', currentDraft = '') {
+    const styleInstructions = {
+      default: 'Create an engaging social-media post based on this article. Capture the most interesting or useful insight, stay faithful to the article, and write in a natural human voice. Do not invent facts. Keep it concise enough to work on most social platforms. Include the article link only if one is available in the context.',
+      shorter: 'Rewrite the current social-media draft to be substantially shorter and punchier while preserving its main insight and factual accuracy.',
+      professional: 'Rewrite the current social-media draft in a polished, professional tone suitable for LinkedIn while keeping it natural and not overly corporate.',
+      casual: 'Rewrite the current social-media draft in a more conversational, approachable tone while preserving the article’s meaning and factual accuracy.'
+    };
+
+    const instruction = styleInstructions[style] || styleInstructions.default;
+    return currentDraft
+      ? `${instruction}\n\nCurrent draft:\n${currentDraft}`
+      : instruction;
+  }
+
+  function socialShareUrl(platform, text, sourceUrl = '') {
+    const encodedText = encodeURIComponent(String(text || '').trim());
+    const encodedUrl = encodeURIComponent(String(sourceUrl || '').trim());
+    const combined = encodeURIComponent(`${String(text || '').trim()}${sourceUrl ? `\n\n${sourceUrl}` : ''}`.trim());
+
+    switch (platform) {
+      case 'x':
+        return `https://twitter.com/intent/tweet?text=${encodedText}${sourceUrl ? `&url=${encodedUrl}` : ''}`;
+      case 'linkedin':
+        return sourceUrl
+          ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`
+          : 'https://www.linkedin.com/feed/';
+      case 'facebook':
+        return sourceUrl
+          ? `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}&quote=${encodedText}`
+          : 'https://www.facebook.com/';
+      case 'threads':
+        return `https://www.threads.net/intent/post?text=${combined}`;
+      case 'bluesky':
+        return `https://bsky.app/intent/compose?text=${combined}`;
+      default:
+        return '';
+    }
+  }
+
+  async function copySocialPostText(text, button) {
+    const value = String(text || '').trim();
+    if (!value) return false;
+
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      const helper = document.createElement('textarea');
+      helper.value = value;
+      helper.setAttribute('readonly', '');
+      helper.style.position = 'fixed';
+      helper.style.opacity = '0';
+      document.body.appendChild(helper);
+      helper.select();
+      document.execCommand('copy');
+      helper.remove();
+    }
+
+    if (button) {
+      const prior = button.textContent;
+      button.textContent = 'Copied!';
+      window.setTimeout(() => {
+        if (button.isConnected) button.textContent = prior;
+      }, 1400);
+    }
+    return true;
+  }
+
+  function renderSocialPostComposer(draft, { loading = false, error = '' } = {}) {
+    const panel = openAskMarkInvestorPanel();
+    if (!panel) return;
+
+    const context = buildSocialPostArticleContext();
+    const companion = context?.companion || activeArticleCompanionIdentity();
+    const title = context?.title || 'Current article';
+
+    if (loading) {
+      panel.innerHTML = `
+        <div class="mark-selection-card">
+          <span>Whole article · Create post</span>
+          <blockquote>${escapeHtml(title)}</blockquote>
+        </div>
+        <div id="mark-response" class="mark-response" data-social-post-composer="1">
+          <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Create social post</strong></div>
+          <p class="status">${escapeHtml(companion.name)} is drafting a social-media post from this article…</p>
+        </div>`;
+      notifyAskMarkPanelUpdated('response');
+      return;
+    }
+
+    if (error) {
+      panel.innerHTML = `
+        <div class="mark-selection-card">
+          <span>Whole article · Create post</span>
+          <blockquote>${escapeHtml(title)}</blockquote>
+        </div>
+        <div id="mark-response" class="mark-response" data-social-post-composer="1">
+          <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Create social post</strong></div>
+          <p class="status error">${escapeHtml(error)}</p>
+        </div>`;
+      notifyAskMarkPanelUpdated('response');
+      return;
+    }
+
+    panel.innerHTML = `
+      <div class="mark-selection-card">
+        <span>Whole article · Create post</span>
+        <blockquote>${escapeHtml(title)}</blockquote>
+      </div>
+      <div id="mark-response" class="mark-response" data-social-post-composer="1">
+        <div class="mark-response-heading"><span>${escapeHtml(companion.ask)}</span><strong>Social post</strong></div>
+        <label for="msg-social-post-draft" style="display:block;font-weight:700;margin:.2rem 0 .45rem;">Edit your post</label>
+        <textarea id="msg-social-post-draft" rows="9" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit;line-height:1.5;padding:.75rem;border:1px solid rgba(15,35,60,.22);border-radius:10px;">${escapeHtml(String(draft || '').trim())}</textarea>
+        <div class="msg-social-post-rewrite" style="display:flex;flex-wrap:wrap;gap:.45rem;margin:.7rem 0;">
+          <button type="button" class="secondary" data-social-rewrite="default">Regenerate</button>
+          <button type="button" class="secondary" data-social-rewrite="shorter">Shorter</button>
+          <button type="button" class="secondary" data-social-rewrite="professional">More professional</button>
+          <button type="button" class="secondary" data-social-rewrite="casual">More casual</button>
+        </div>
+        <div style="margin-top:.9rem;"><strong>Post to</strong></div>
+        <div class="msg-social-post-platforms" style="display:flex;flex-wrap:wrap;gap:.45rem;margin:.5rem 0;">
+          <button type="button" class="secondary" data-social-platform="x">X</button>
+          <button type="button" class="secondary" data-social-platform="linkedin">LinkedIn</button>
+          <button type="button" class="secondary" data-social-platform="facebook">Facebook</button>
+          <button type="button" class="secondary" data-social-platform="threads">Threads</button>
+          <button type="button" class="secondary" data-social-platform="bluesky">Bluesky</button>
+          <button type="button" class="primary" data-social-copy="1">Copy</button>
+        </div>
+        <p style="margin:.45rem 0 0;opacity:.72;"><small>You can edit the post before sharing. For platforms that do not allow websites to prefill post text, the draft is copied automatically before the platform opens.</small></p>
+      </div>`;
+
+    const textarea = panel.querySelector('#msg-social-post-draft');
+    const copyButton = panel.querySelector('[data-social-copy]');
+
+    copyButton?.addEventListener('click', () => copySocialPostText(textarea?.value || '', copyButton));
+
+    panel.querySelectorAll('[data-social-rewrite]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const style = button.dataset.socialRewrite || 'default';
+        const currentDraft = textarea?.value || '';
+        const oldText = button.textContent;
+        button.disabled = true;
+        button.textContent = 'Writing…';
+        try {
+          const updated = await requestSocialPost(style, currentDraft, { preserveComposer: true });
+          if (textarea && updated) textarea.value = updated;
+        } catch (rewriteError) {
+          window.alert(rewriteError.message || 'The post could not be rewritten.');
+        } finally {
+          if (button.isConnected) {
+            button.disabled = false;
+            button.textContent = oldText;
+          }
+        }
+      });
+    });
+
+    panel.querySelectorAll('[data-social-platform]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const text = String(textarea?.value || '').trim();
+        if (!text) return;
+        const platform = button.dataset.socialPlatform;
+        const sourceUrl = context?.sourceUrl || '';
+
+        // LinkedIn and Facebook commonly ignore prefilled body text from share URLs.
+        // Copy first so the edited draft is still immediately available to paste.
+        if (platform === 'linkedin' || platform === 'facebook') {
+          await copySocialPostText(text);
+        }
+
+        const url = socialShareUrl(platform, text, sourceUrl);
+        if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      });
+    });
+
+    notifyAskMarkPanelUpdated('response');
+  }
+
+  async function requestSocialPost(style = 'default', currentDraft = '', { preserveComposer = false } = {}) {
+    const context = buildSocialPostArticleContext();
+    if (!context) throw new Error('The original article text is unavailable.');
+
+    if (!preserveComposer) renderSocialPostComposer('', { loading: true });
+
+    const controller = new AbortController();
+    const clientTimeout = window.setTimeout(() => controller.abort(), 90000);
+    let response;
+
+    try {
+      response = await fetch('/api/read-anything/article-followup', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companion: context.companion.id,
+          title: context.title,
+          sourceUrl: context.sourceUrl,
+          articleText: context.articleText,
+          analysis: {},
+          history: [],
+          question: socialPostPrompt(style, currentDraft)
+        })
+      });
+    } catch (requestError) {
+      if (requestError?.name === 'AbortError') {
+        const message = `${context.companion.name} took too long to create the post. Please try again.`;
+        if (!preserveComposer) renderSocialPostComposer('', { error: message });
+        throw new Error(message);
+      }
+      if (!preserveComposer) renderSocialPostComposer('', { error: requestError.message || 'The post could not be created.' });
+      throw requestError;
+    } finally {
+      window.clearTimeout(clientTimeout);
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const message = payload.detail || payload.error || `${context.companion.name} could not create the social-media post.`;
+      if (!preserveComposer) renderSocialPostComposer('', { error: message });
+      throw new Error(message);
+    }
+
+    const draft = String(payload.result?.response || payload.result?.text || '').trim();
+    if (!draft) {
+      const message = 'The post response was empty. Please try again.';
+      if (!preserveComposer) renderSocialPostComposer('', { error: message });
+      throw new Error(message);
+    }
+
+    if (!preserveComposer) renderSocialPostComposer(draft);
+    return draft;
+  }
+
+  function installArticleSummaryButton() {
+    const existing = document.querySelector('#read-anything-article-summary-action');
+
+    if (!activeImportedDocument || !isWholeArticleDocument()) {
+      existing?.remove();
+      return;
+    }
+
+    const reader = document.querySelector('#app #reader');
+    if (!reader) return;
+
+    // Keep the action inside the Reader, but visually separate from article prose.
+    // It belongs above the first line rather than participating in the text flow.
+    // These are article-level controls, not article prose. They should remain
+    // available whenever the article is reopened or resumed, even if Continue
+    // Reading starts at word/page index > 0. Keep them above the first VISIBLE
+    // line of the current Reader view instead of restricting them to index 0.
+    let actionRow = existing;
+
+    if (!actionRow) {
+      actionRow = document.createElement('div');
+      actionRow.id = 'read-anything-article-summary-action';
+      actionRow.className = 'read-anything-article-summary-row';
+      actionRow.setAttribute('role', 'group');
+      actionRow.setAttribute('aria-label', 'Article actions');
+      actionRow.style.cssText = [
+        'display:block',
+        'width:100%',
+        'box-sizing:border-box',
+        'margin:0 0 .85em 0',
+        'padding:0',
+        'break-inside:avoid',
+        'page-break-inside:avoid',
+        'position:relative',
+        'z-index:3'
+      ].join(';');
+
+      const makeArticleLink = (action, label, ariaLabel) => {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.className = 'read-anything-inline-article-summary';
+        link.dataset.action = action;
+        link.textContent = label;
+        link.setAttribute('aria-label', ariaLabel);
+        link.style.cssText = [
+          'display:inline',
+          'padding:0',
+          'border:0',
+          'background:none',
+          'color:#1769aa',
+          'font:inherit',
+          'font-size:.8em',
+          'font-weight:600',
+          'line-height:1.2',
+          'text-decoration:none',
+          'cursor:pointer'
+        ].join(';');
+
+        link.onmouseenter = () => {
+          link.style.textDecoration = 'underline';
+          link.style.textUnderlineOffset = '2px';
+        };
+        link.onmouseleave = () => {
+          link.style.textDecoration = 'none';
+        };
+        link.onfocus = () => {
+          link.style.textDecoration = 'underline';
+          link.style.textUnderlineOffset = '2px';
+          link.style.outline = '2px solid rgba(23,105,170,.28)';
+          link.style.outlineOffset = '3px';
+          link.style.borderRadius = '2px';
+        };
+        link.onblur = () => {
+          link.style.textDecoration = 'none';
+          link.style.outline = 'none';
+        };
+        return link;
+      };
+
+      const summaryLink = makeArticleLink(
+        'summarize-whole-article',
+        'Summarize',
+        'Summarize this whole article'
+      );
+      const separator = document.createElement('span');
+      separator.textContent = ' · ';
+      separator.setAttribute('aria-hidden', 'true');
+      separator.style.cssText = 'font-size:.8em;opacity:.42;margin:0 .18em';
+
+      const investorLink = makeArticleLink(
+        'investor-analysis',
+        'Analyze',
+        'Analyze this whole article'
+      );
+      const postSeparator = separator.cloneNode(true);
+      const createPostLink = makeArticleLink(
+        'create-social-post',
+        'Create Post',
+        'Create a social media post from this whole article'
+      );
+
+      actionRow.append(summaryLink, separator, investorLink, postSeparator, createPostLink);
+      reader.prepend(actionRow);
+    } else if (actionRow.parentElement !== reader) {
+      reader.prepend(actionRow);
+    }
+
+    const link = actionRow.querySelector('[data-action="summarize-whole-article"]');
+    if (!link) return;
+
+    const showingSummary = activeImportedVersion.startsWith('summary');
+    link.textContent = showingSummary ? '← Back to article' : 'Summarize';
+    link.title = showingSummary
+      ? 'Return to the complete article'
+      : 'Summarize the entire article into its key points — no highlighting required.';
+    link.disabled = false;
+
+    link.onclick = async (event) => {
+      event?.preventDefault?.();
+      event?.stopPropagation?.();
+
+      if (activeImportedVersion.startsWith('summary')) {
+        renderImportedVersion('original');
+        return;
+      }
+
+      const originalLabel = link.textContent;
+      link.disabled = true;
+      link.textContent = 'Summarizing…';
+
+      try {
+        await requestSummary('quick');
+      } catch (error) {
+        showTransformStatus(error.message, true);
+        link.textContent = 'Summary failed — try again';
+        link.title = error.message || 'The article could not be summarized.';
+        window.setTimeout(() => {
+          if (!link.isConnected) return;
+          link.disabled = false;
+          link.textContent = originalLabel;
+        }, 2500);
+      }
+    };
+
+    const investorLink = actionRow.querySelector('[data-action="investor-analysis"]');
+    if (investorLink) {
+      // This action is deliberately persona-neutral. Mark/Beth/Chad performs it,
+      // but the article itself simply says "Analyze".
+      investorLink.textContent = 'Analyze';
+      investorLink.setAttribute('aria-label', 'Analyze this whole article');
+      {
+        const companion = activeArticleCompanionIdentity();
+        investorLink.title = 'Analyze the whole article and open the result in the active companion panel.';
+      }
+      investorLink.onclick = async (event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+
+        const originalLabel = investorLink.textContent;
+        investorLink.disabled = true;
+        investorLink.textContent = 'Analyzing…';
+
+        try {
+          await requestInvestorAnalysis();
+        } catch (error) {
+          // The Ask Mark panel already contains the detailed error.
+          console.warn('Investor analysis failed:', error);
+        } finally {
+          if (investorLink.isConnected) {
+            investorLink.disabled = false;
+            investorLink.textContent = originalLabel;
+          }
+        }
+      };
+    }
+
+    const createPostLink = actionRow.querySelector('[data-action="create-social-post"]');
+    if (createPostLink) {
+      createPostLink.textContent = 'Create Post';
+      createPostLink.setAttribute('aria-label', 'Create a social media post from this whole article');
+      createPostLink.title = 'Draft an editable social-media post from this article and choose where to share it.';
+      createPostLink.onclick = async (event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+
+        const originalLabel = createPostLink.textContent;
+        createPostLink.disabled = true;
+        createPostLink.textContent = 'Creating…';
+
+        try {
+          await requestSocialPost();
+        } catch (error) {
+          console.warn('Create social post failed:', error);
+        } finally {
+          if (createPostLink.isConnected) {
+            createPostLink.disabled = false;
+            createPostLink.textContent = originalLabel;
+          }
+        }
+      };
+    }
+  }
+
+  function observeInlineArticleSummary() {
+    const reader = document.querySelector('#app #reader');
+    if (!reader || reader.dataset.inlineArticleSummaryObserved === '1') return;
+    reader.dataset.inlineArticleSummaryObserved = '1';
+
+    let queued = false;
+    const observer = new MutationObserver(() => {
+      if (queued) return;
+      queued = true;
+      window.requestAnimationFrame(() => {
+        queued = false;
+        if (!reader.isConnected || !activeImportedDocument || !isWholeArticleDocument()) {
+          observer.disconnect();
+          return;
+        }
+        installArticleSummaryButton();
+      });
+    });
+
+    observer.observe(reader, { childList: true });
+  }
+
+  function installDefaultArticleBookPages() {
+    if (!activeImportedDocument || !isWholeArticleDocument()) return;
+
+    const bookPages = document.querySelector('#app #book-pages');
+    if (!bookPages || bookPages.disabled || bookPages.checked) return;
+
+    // Use the Reader's existing Book Pages change handler rather than changing
+    // Reader internals directly. This keeps layout, pagination, position, and
+    // persisted Reader state synchronized with the normal control.
+    bookPages.checked = true;
+    bookPages.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
   function scheduleFormatControlAttach() {
     document.querySelector('#read-anything-format-control')?.remove();
     document.dispatchEvent(new CustomEvent('marksetgo:transform-state', { detail: { version: activeImportedVersion, label: versionLabel(activeImportedVersion), active: Boolean(activeImportedDocument) } }));
-    [0, 100, 350, 800].forEach((delay) => window.setTimeout(installDisplayFormatControl, delay));
+    [0, 100, 350, 800].forEach((delay) => window.setTimeout(() => {
+      installDisplayFormatControl();
+      installArticleSummaryButton();
+      observeInlineArticleSummary();
+      installDefaultArticleBookPages();
+    }, delay));
     return;
     formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
     formatControlAttachTimers = [];
@@ -1303,24 +2011,43 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   function openDocument(documentRecord) {
+    // A whole-article analysis conversation belongs only to the article that
+    // created it. Never let a later document inherit that context.
+    window.MSGInvestorArticleContext = null;
     const title = cleanImportedTitle(documentRecord?.title || 'Untitled');
     const text = String(documentRecord?.text || '').trim();
     if (!text) throw new Error('No readable text was found.');
     if (typeof window.renderReaderWithText !== 'function') throw new Error('The reader is not ready.');
     addHistory({ ...documentRecord, title, text });
     const readAnythingKey = importedDocumentKey({ ...documentRecord, title });
+    const sourceType = String(documentRecord?.source?.type || '').toLowerCase();
+    const autoFormatArticle = ['topic-feed', 'bookmarklet', 'website'].includes(sourceType);
+    const formattedArticle = autoFormatArticle ? smartFormatText(text, 'all') : '';
+
     activeImportedDocument = {
       ...documentRecord,
       title,
       baseTitle: title,
       author: documentRecord.author || documentRecord.source?.author || '',
-      source: { ...(documentRecord.source || {}), readAnything: true, readAnythingKey },
-      versions: { original: text, clean: cleanFormatText(text) },
+      source: {
+        ...(documentRecord.source || {}),
+        readAnything: true,
+        readAnythingKey,
+        autoFormattedArticle: autoFormatArticle
+      },
+      versions: {
+        original: text,
+        clean: cleanFormatText(text),
+        ...(autoFormatArticle && formattedArticle ? { format_all: formattedArticle } : {})
+      },
       originalText: text
     };
-    activeImportedVersion = 'original';
+
+    // Web/news articles open in the same "Format all" view the user can invoke
+    // manually, while the untouched original remains available at all times.
+    activeImportedVersion = autoFormatArticle && formattedArticle ? 'format_all' : 'original';
     saveActiveFormatRecord();
-    renderImportedVersion('original');
+    renderImportedVersion(activeImportedVersion);
   }
 
   function markdownToText(markdown) {
@@ -1393,7 +2120,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
   function bookmarkletCode() {
     const target = `${location.origin}/capture`;
-    return `javascript:(()=>{const e=s=>String(s||'').replace(/\\s+/g,' ').trim(),s=e(window.getSelection?.().toString()),r=document.querySelector('article,main,[role=main]')||document.body,t=e(document.querySelector('meta[property="og:title"]')?.content||document.querySelector('h1')?.innerText||document.title),a=e(document.querySelector('meta[name="author"]')?.content||document.querySelector('[rel=author]')?.innerText),x=s||[...r.querySelectorAll('h1,h2,h3,p,blockquote,li')].map(n=>e(n.innerText)).filter(v=>v.length>20).filter((v,i,z)=>z.indexOf(v)===i).join('\n\n'),k=s?'selection':'page',c=s?e(window.getSelection()?.anchorNode?.parentElement?.closest('p,blockquote,li')?.innerText||''):'',f=document.createElement('form');f.method='POST';f.action='${target}';f.target='_blank';[['title',t],['author',a],['url',location.href],['text',x],['captureType',k],['context',c]].forEach(([n,v])=>{const i=document.createElement('textarea');i.name=n;i.value=v;f.appendChild(i)});f.hidden=true;document.body.appendChild(f);f.submit();f.remove()})()`;
+    return `javascript:(()=>{const e=s=>String(s||'').replace(/\\s+/g,' ').trim(),s=e(window.getSelection?.().toString()),r=document.querySelector('article,main,[role=main]')||document.body,t=e(document.querySelector('meta[property="og:title"]')?.content||document.querySelector('h1')?.innerText||document.title),a=e(document.querySelector('meta[name="author"]')?.content||document.querySelector('[rel=author]')?.innerText),B=[],H=[],S=new Set(),wc=v=>e(v).split(/\\s+/).filter(Boolean).length;let w=0;if(!s){[...r.querySelectorAll('h1,h2,h3,p,blockquote,li')].forEach(n=>{let v=e(n.innerText);if(v.length<=20||S.has(v))return;S.add(v);const h=/^H[1-3]$/.test(n.tagName),o=n.tagName==='LI'?'• '+v:v;if(h)H.push({title:v,index:w,type:'section'});B.push(o);w+=wc(o)})}const x=s||B.join('\\n\\n'),k=s?'selection':'page',c=s?e(window.getSelection()?.anchorNode?.parentElement?.closest('p,blockquote,li')?.innerText||''):'',f=document.createElement('form');f.method='POST';f.action='${target}';f.target='_blank';[['title',t],['author',a],['url',location.href],['text',x],['captureType',k],['context',c],['structure',JSON.stringify(s?[]:H)]].forEach(([n,v])=>{const i=document.createElement('textarea');i.name=n;i.value=v;f.appendChild(i)});f.hidden=true;document.body.appendChild(f);f.submit();f.remove()})()`;
   }
 
   function renderHub() {
@@ -1505,14 +2232,44 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     });
   }
 
-  function openPendingCapture(attempt = 0) {
-    let payload = null;
-    try { payload = JSON.parse(CAPTURE_STORAGE.getItem(CAPTURE_KEY) || 'null'); } catch {}
-    if (!payload?.text) return;
-    if (typeof window.renderReaderWithText !== 'function' || attempt < 4) {
-      if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
+  async function openPendingCapture(attempt = 0) {
+    // Do not fetch/consume the capture until the Reader bridge is actually ready.
+    // The previous version fetched the token first and then deliberately waited
+    // through several retries, so the capture could disappear before it opened.
+    if (typeof window.renderReaderWithText !== 'function') {
+      if (attempt < 40) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
       return;
     }
+
+    let payload = null;
+    const tokenMatch = location.hash.match(/read-anything-capture=([^&]+)/);
+
+    if (tokenMatch?.[1]) {
+      try {
+        const token = decodeURIComponent(tokenMatch[1]);
+        const response = await fetch(`/api/capture/${encodeURIComponent(token)}`, {
+          cache: 'no-store'
+        });
+        if (response.ok) {
+          payload = await response.json();
+        } else if (response.status === 404) {
+          return;
+        } else {
+          throw new Error(`Capture returned HTTP ${response.status}.`);
+        }
+      } catch {
+        if (attempt < 40) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
+        return;
+      }
+    }
+
+    // Backward compatibility for captures created by the older localStorage flow.
+    if (!payload) {
+      try { payload = JSON.parse(CAPTURE_STORAGE.getItem(CAPTURE_KEY) || 'null'); } catch {}
+    }
+
+    if (!payload?.text) return;
+
     try {
       const isSelection = payload.captureType === 'selection';
       openDocument({
@@ -1524,29 +2281,81 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           url: payload.url || '',
           context: payload.context || '',
           captureType: payload.captureType || 'page',
+          documentToc: Array.isArray(payload.documentToc) ? payload.documentToc : [],
           importedAt: new Date().toISOString()
         }
       });
-      CAPTURE_STORAGE.removeItem(CAPTURE_KEY);
-      if (location.hash.includes('read-anything-capture')) history.replaceState({}, '', location.pathname);
+
+      try { CAPTURE_STORAGE.removeItem(CAPTURE_KEY); } catch {}
+      if (location.hash.includes('read-anything-capture')) {
+        history.replaceState({}, '', `${location.pathname}${location.search}`);
+      }
     } catch {
-      if (attempt < 24) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
+      if (attempt < 40) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
     }
+  }
+
+  function restoreArticleControlsAfterResume(documentId = '', title = '') {
+    const expectedId = String(documentId || '');
+    const delays = [0, 80, 220, 500, 1000, 1800, 3000];
+    let complete = false;
+
+    delays.forEach((delay) => {
+      window.setTimeout(() => {
+        if (complete) return;
+
+        const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+        const currentId = String(current?.documentId || '');
+
+        // If navigation changed documents while this retry sequence was waiting,
+        // do not attach article controls to the wrong Reader document.
+        if (expectedId && currentId && currentId !== expectedId) return;
+
+        // First try the saved Read Anything metadata for the resumed document.
+        // Continue Reading can fire document-available before that record is
+        // fully usable, so this is intentionally retried.
+        if (!activeImportedDocument && expectedId) {
+          restoreImportedFormatRecord(expectedId, title);
+        }
+
+        // The live Reader is the final source of truth. This fallback is what
+        // makes refresh + Continue Reading reliable even when the formatter
+        // record was unavailable during the first event tick.
+        const ready = ensureActiveReaderDocument();
+        if (!ready) return;
+
+        scheduleFormatControlAttach();
+        installArticleSummaryButton();
+        observeInlineArticleSummary();
+
+        if (activeImportedDocument && isWholeArticleDocument()) {
+          complete = true;
+        }
+      }, delay);
+    });
   }
 
   document.addEventListener('marksetgo:document-available', (event) => {
     const documentId = event?.detail?.documentId;
     if (!documentId) return;
+
     if (pendingImportedRender && activeImportedDocument) {
       pendingImportedRender = false;
       const key = activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument);
-      activeImportedDocument.source = { ...(activeImportedDocument.source || {}), readerDocumentId: String(documentId) };
+      activeImportedDocument.source = {
+        ...(activeImportedDocument.source || {}),
+        readerDocumentId: String(documentId)
+      };
       rememberFormatDocument(documentId, key);
       saveActiveFormatRecord();
       scheduleFormatControlAttach();
       return;
     }
-    restoreImportedFormatRecord(documentId, event?.detail?.title || '');
+
+    restoreArticleControlsAfterResume(
+      documentId,
+      event?.detail?.title || ''
+    );
   });
 
   document.addEventListener('click', (event) => {
@@ -1617,8 +2426,5 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     requestCustomTransform,
     requestTranslation
   });
-  // Move any old full-text formatter records out of localStorage after startup.
-  // This is intentionally asynchronous so it never blocks Reader rendering.
-  window.setTimeout(() => { void migrateLegacyFormatRecords(); }, 0);
   window.setTimeout(openPendingCapture, 0);
 })();
