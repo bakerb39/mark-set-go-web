@@ -109,3 +109,112 @@ body.msg-vd-panel-dragging #msg-explorer-visual-designer { transition:none !impo
 
 /* v2.3 — Profile is the only visible launcher. */
 #msg-explorer-design-launcher { display:none !important; }
+
+
+/* v2.4 — Designer chrome follows the same compact block/control language as
+   Action Center. These selectors target the actual data-* containers created
+   by the Designer/enhancement scripts, so buttons never fall back to native UI. */
+#msg-explorer-visual-designer {
+  --vd-surface: var(--msg-surface, var(--msg-theme-surface, #fff));
+  --vd-soft: var(--msg-blue-soft-2, var(--msg-theme-soft-2, #f5f7f9));
+  --vd-soft-strong: var(--msg-blue-soft, var(--msg-theme-soft, #edf3f5));
+  --vd-border: var(--msg-blue-border-soft, var(--msg-theme-border, #bdc9c7));
+  --vd-accent: var(--msg-blue, var(--msg-theme-accent, #2e6f63));
+  --vd-accent-dark: var(--msg-navy-deep, var(--msg-theme-accent-dark, #245c53));
+  --vd-ink: var(--msg-ink, var(--msg-theme-ink, #243a35));
+  --vd-muted: var(--msg-muted, var(--msg-theme-muted, #687872));
+  border-color: var(--vd-border) !important;
+  border-radius: 12px !important;
+  background: var(--vd-surface) !important;
+  color: var(--vd-ink) !important;
+}
+#msg-explorer-visual-designer .msg-vd-head {
+  background: linear-gradient(90deg,var(--vd-soft-strong),var(--vd-surface)) !important;
+  border-bottom-color: var(--vd-border) !important;
+}
+#msg-explorer-visual-designer .msg-vd-head-copy strong { color:var(--vd-accent-dark) !important; }
+#msg-explorer-visual-designer .msg-vd-head-copy small,
+#msg-explorer-visual-designer .msg-vd-section-title span:last-child { color:var(--vd-muted) !important; }
+#msg-explorer-visual-designer .msg-vd-toolbar,
+#msg-explorer-visual-designer .msg-vd-status,
+#msg-explorer-visual-designer .msg-vd-bottom-actions {
+  background:var(--vd-soft) !important;
+  border-color:var(--vd-border) !important;
+}
+#msg-explorer-visual-designer .msg-vd-section { border-bottom-color:var(--vd-border) !important; }
+#msg-explorer-visual-designer .msg-vd-section-title { color:var(--vd-accent-dark) !important; }
+
+#msg-explorer-visual-designer [data-vd-layers] {
+  display:grid !important;
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:5px !important;
+}
+#msg-explorer-visual-designer :is(
+  .msg-vd-toolbar button,
+  [data-vd-layers] > button,
+  .msg-vd-bottom-actions button,
+  .msg-vd-complete-actions button,
+  .msg-vd-file-row button
+) {
+  appearance:none !important;
+  min-height:30px !important;
+  margin:0 !important;
+  padding:6px 8px !important;
+  border:1px solid var(--vd-border) !important;
+  border-radius:8px !important;
+  background:var(--vd-surface) !important;
+  color:var(--vd-ink) !important;
+  box-shadow:0 1px 2px color-mix(in srgb,var(--vd-accent-dark) 8%,transparent) !important;
+  font:700 10px/1.15 var(--msg-font-ui,ui-sans-serif,system-ui,sans-serif) !important;
+  text-align:center !important;
+  cursor:pointer !important;
+  transition:background .14s ease,border-color .14s ease,box-shadow .14s ease,transform .14s ease !important;
+}
+#msg-explorer-visual-designer [data-vd-layers] > button {
+  min-width:0 !important;
+  text-align:left !important;
+}
+#msg-explorer-visual-designer :is(
+  .msg-vd-toolbar button,
+  [data-vd-layers] > button,
+  .msg-vd-bottom-actions button,
+  .msg-vd-complete-actions button,
+  .msg-vd-file-row button
+):hover:not(:disabled),
+#msg-explorer-visual-designer :is(
+  .msg-vd-toolbar button,
+  [data-vd-layers] > button,
+  .msg-vd-bottom-actions button,
+  .msg-vd-complete-actions button,
+  .msg-vd-file-row button
+):focus-visible {
+  border-color:var(--vd-accent) !important;
+  background:var(--vd-soft-strong) !important;
+  box-shadow:0 2px 6px color-mix(in srgb,var(--vd-accent-dark) 13%,transparent) !important;
+  outline:0 !important;
+}
+#msg-explorer-visual-designer [data-vd-layers] > button.is-selected,
+#msg-explorer-visual-designer [data-vd-layers] > button[aria-pressed="true"] {
+  border-color:var(--vd-accent) !important;
+  background:var(--vd-soft-strong) !important;
+  color:var(--vd-accent-dark) !important;
+  box-shadow:inset 3px 0 var(--vd-accent),0 1px 3px color-mix(in srgb,var(--vd-accent-dark) 10%,transparent) !important;
+}
+#msg-explorer-visual-designer .msg-vd-bottom-actions .msg-vd-save {
+  background:var(--vd-accent) !important;
+  border-color:var(--vd-accent) !important;
+  color:#fff !important;
+}
+#msg-explorer-visual-designer .msg-vd-bottom-actions .msg-vd-save:hover,
+#msg-explorer-visual-designer .msg-vd-bottom-actions .msg-vd-save:focus-visible {
+  background:var(--vd-accent-dark) !important;
+  border-color:var(--vd-accent-dark) !important;
+}
+#msg-explorer-visual-designer .msg-vd-complete-actions {
+  display:flex !important;
+  justify-content:flex-start !important;
+  margin-top:4px !important;
+}
+#msg-explorer-visual-designer .msg-vd-control > label { color:var(--vd-ink) !important; }
+#msg-explorer-visual-designer .msg-vd-control-output { color:var(--vd-accent-dark) !important; }
+#msg-explorer-visual-designer .msg-vd-control input[type="range"] { accent-color:var(--vd-accent) !important; }

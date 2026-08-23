@@ -668,6 +668,18 @@
     if (!readerFrame || !header || !spacer || !meta) return;
 
     const styles = getComputedStyle(reader);
+
+    // The fixed story header must visually disappear into the document paper
+    // while remaining opaque enough to mask prose scrolling underneath it.
+    // Copy the ACTUAL rendered Reader background instead of guessing from the
+    // experience theme, because Reader light/dark and theme paper can differ.
+    const frameStyles = getComputedStyle(readerFrame);
+    const transparent = (value) => !value || value === 'transparent' || /rgba\([^)]*,\s*0(?:\.0+)?\s*\)$/i.test(value);
+    const readerPaper = !transparent(styles.backgroundColor)
+      ? styles.backgroundColor
+      : (!transparent(frameStyles.backgroundColor) ? frameStyles.backgroundColor : '#ffffff');
+    header.style.setProperty('--topic-feed-story-paper', readerPaper, 'important');
+
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
     const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
     const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
@@ -735,6 +747,18 @@
 
     positionTopicFeedStoryHeader();
   }
+
+  // Reader light/dark and experience themes can change the paper without
+  // rebuilding the article. Resample the actual Reader color after those UI
+  // changes so the fixed mask never becomes a differently colored band.
+  document.addEventListener('change', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.matches?.('#theme-select,#fs-theme-select')) return;
+    window.requestAnimationFrame(positionTopicFeedStoryHeader);
+  });
+  document.addEventListener('marksetgo:experience-profile-changed', () => {
+    window.requestAnimationFrame(positionTopicFeedStoryHeader);
+  });
 
 
   let activeTopicFeedHeaderContext = null;

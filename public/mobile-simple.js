@@ -1,4 +1,8 @@
 (() => {
+  // Reader 2 runs in a narrow desktop workspace iframe. Do not mistake that
+  // iframe width for a phone and replace the full Reader with the mobile shell.
+  if (window.__MSG_SECONDARY_READER__) return;
+
   const mq = window.matchMedia('(max-width: 700px)');
   const app = document.getElementById('app');
   if (!app) return;

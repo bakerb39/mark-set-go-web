@@ -1,4 +1,4 @@
-/* Mark, Set, Go! shared visual design system — v9.3
+/* Mark, Set, Go! shared visual design system — v9.4
    One palette for application pages. Layout remains owned by page-specific CSS.
    This file intentionally contains presentation rules only. */
 :root {
@@ -752,4 +752,111 @@ html[data-msg-experience-theme] .dialog-tabs button.active {
 @media (max-width:700px) {
   html[data-msg-experience-theme] body { font-size: .9rem; }
   html[data-msg-experience-theme] body h1:not(#reader *) { font-size: clamp(1.55rem,7vw,1.9rem) !important; }
+}
+
+
+/* ---------- v9.4 Action Center block grammar, application-wide ----------
+   Action Center is the reference component language: compact themed paper,
+   fine border, restrained radius/shadow and dense controls. Page CSS still
+   owns layout; this layer owns the shared visual treatment. Reader document
+   internals are deliberately excluded. */
+html[data-msg-experience-theme] {
+  --msg-block-surface: var(--msg-surface);
+  --msg-block-border: color-mix(in srgb,var(--msg-blue) 28%,var(--msg-blue-border-soft));
+  --msg-block-radius: 10px;
+  --msg-block-shadow: 0 2px 8px color-mix(in srgb,var(--msg-navy-deep) 6%,transparent);
+  --msg-block-soft: color-mix(in srgb,var(--msg-blue-soft-2) 70%,var(--msg-surface));
+}
+
+html[data-msg-experience-theme] #app :is(
+  .profile-feature-card,.profile-preset-card,.visual-theme-profile-card,.visual-designer-profile-card,.goals-card,.goal-overview,
+  .app-section-card,.action-composer,.action-list-panel,.action-kpi-grid > article,
+  .platform-card,.source-card,.record-card,.panel-card,.platform-book-card,.unified-book-card,.progress-book-card,
+  .vocabulary-card,.analytics-card,.annual-goal-card,.dashboard-stats > article,.progress-stat,
+  .library-summary-grid > article,.library-summary-grid > section,.library-continue-card,
+  .music-card,.music-primary-section,.music-secondary-section,.music-book-details,.music-browse-details,.music-current-book,
+  .topic-feeds-sidebar,.topic-feed-article,.topic-feed-source-editor,.topic-feed-recommendation-box,.topic-feed-recommendation,
+  .help-card,.ai-tool-card,.reading-skill-card,.study-guide-card,.comprehension-card,.curated-card,.bible-resource-card,.bible-chapter-card,
+  .learning-generator-card,.learning-book-card,.recommendation-card,.trophy-card,.comprehension-setup-card,.reading-profile-summary,.hybrid-profile-panel,
+  .great-book-card,.syntopicon-card,.idea-card,.great-idea-card,.gutenberg-card,.founding-feature-card,.founding-document-card,
+  .browse-search-local-card,.provider-tile,.browse-book-card,.browse-recent-card,.browse-hero-card,.browse-library-card,.library-year-card,
+  .drm-free-result-card,.drm-free-store-card,.drm-free-search-panel,
+  .primary-card,.controls-card,.source-panel,.analysis-panel,.notes-card,.passage-card,
+  .goal-progress-kpis > article,.goal-award-grid > article,.my-links-sidebar,.my-links-viewer
+):not(.reader-page-panel *) {
+  border:1px solid var(--msg-block-border) !important;
+  border-radius:var(--msg-block-radius) !important;
+  background:var(--msg-block-surface) !important;
+  box-shadow:var(--msg-block-shadow) !important;
+}
+
+/* Standalone/composed pages use the same block grammar too. */
+html[data-msg-experience-theme] :is(
+  .workspace-shell .primary-card,.workspace-shell .controls-card,.workspace-shell .source-panel,
+  .workspace-shell .analysis-panel,.workspace-shell .notes-card,.workspace-shell .passage-card,
+  .symposium-page .symposium-hero,.symposium-page .symposium-panel
+) {
+  border:1px solid var(--msg-block-border) !important;
+  border-radius:var(--msg-block-radius) !important;
+  background-color:var(--msg-block-surface) !important;
+  box-shadow:var(--msg-block-shadow) !important;
+}
+
+/* Major titled blocks use the same quiet header wash seen in Action Center. */
+html[data-msg-experience-theme] #app :is(
+  .profile-feature-card,.goals-card,.app-section-card,.analytics-card,.annual-goal-card,
+  .music-primary-section,.music-secondary-section,.topic-feed-source-editor,
+  .topic-feed-recommendation-box,.my-links-sidebar,.my-links-viewer
+):not(.reader-page-panel *) > .section-heading {
+  border-bottom:1px solid var(--msg-blue-border-soft) !important;
+  background:linear-gradient(90deg,var(--msg-blue-soft),var(--msg-surface) 72%) !important;
+}
+
+/* Small dashboard/stat blocks follow the Action Center KPI treatment rather
+   than inventing a separate graphical style on each page. */
+html[data-msg-experience-theme] #app :is(
+  .action-kpi-grid > article,.dashboard-stats > article,.progress-stat,
+  .goal-progress-kpis > article,.library-summary-grid > article
+):not(.reader-page-panel *) {
+  border-top:2px solid var(--msg-blue) !important;
+  padding:.5rem .58rem !important;
+  min-height:58px;
+}
+
+/* Boxed settings inside cards use the same paper/border/radius scale. */
+html[data-msg-experience-theme] #app :is(
+  .toggle-setting,.action-notification-grid > label,.action-email-grid > label,
+  .goal-fields > label,.profile-setting-row,.profile-toggle-row,.topic-morning-settings
+):not(.reader-page-panel *) {
+  border-color:var(--msg-blue-border-soft) !important;
+  border-radius:8px !important;
+  background:var(--msg-block-soft) !important;
+}
+
+/* Secondary Reader: full index.html runtime, with only duplicate site chrome
+   removed. Everything inside #app is the SAME Reader implementation as Reader 1. */
+html.msg-secondary-reader-document .site-header,
+html.msg-secondary-reader-document .site-footer,
+html.msg-secondary-reader-document :is(.crypto-market-ticker,.market-index-ticker) {
+  display:none !important;
+}
+html.msg-secondary-reader-document,
+html.msg-secondary-reader-document body {
+  min-height:100%;
+  background:var(--msg-page) !important;
+}
+html.msg-secondary-reader-document body { margin:0 !important; }
+html.msg-secondary-reader-document #app.msg-secondary-reader-app {
+  width:100% !important;
+  max-width:none !important;
+  min-height:100vh;
+  margin:0 !important;
+  padding:.45rem !important;
+  box-sizing:border-box;
+}
+html.msg-secondary-reader-document #app.msg-secondary-reader-app > :is(.reader-page-panel,.empty-reader-page) {
+  width:100% !important;
+  max-width:none !important;
+  margin:0 !important;
+  box-sizing:border-box;
 }

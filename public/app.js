@@ -36,8 +36,9 @@ app.dataset.viewKey = 'home';
 function isSecondaryReaderWorkspace() {
   if (window.parent === window) return false;
   const params = new URLSearchParams(window.location.search);
-  return params.get('msgWorkspaceMode') === 'reader'
-    && params.get('msgWorkspaceValue') === 'secondary';
+  return params.get('msgSecondaryReader') === '1'
+    || (params.get('msgWorkspaceMode') === 'reader'
+      && params.get('msgWorkspaceValue') === 'secondary');
 }
 
 function shouldDelegateReaderToWorkspaceParent() {
@@ -13384,7 +13385,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   }));
 
   app.innerHTML = `
-    <section class="panel reader-page-panel">
+    <section class="panel reader-page-panel${source?.type === 'topic-feed' ? ' topic-feed-reader-page' : ''}">
       <div class="reader-title-row">
         <div class="reader-title-copy">
           <h1>${escapeHtml(title)}</h1>
@@ -24700,8 +24701,17 @@ window.setInterval(checkActionNotifications, 30000);
 window.setTimeout(checkActionNotifications, 1500);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkActionNotifications(); });
 
-// v5.16: startup stays lightweight. The last book is restored only after an explicit Resume action.
-renderHome();
+// v7.31: Reader 2 boots the exact same Reader runtime as Reader 1. Only the
+// surrounding site chrome is suppressed by the secondary-reader document mode.
+if (isSecondaryReaderWorkspace()) {
+  document.documentElement.classList.add('msg-secondary-reader-document');
+  app.classList.add('msg-secondary-reader-app');
+  app.dataset.viewKey = 'reader-secondary';
+  renderEmptyReader();
+} else {
+  // Normal startup stays lightweight. The last book is restored only after an explicit Resume action.
+  renderHome();
+}
 
 // Keep top navigation popovers over the page rather than in document flow.
 // The top-level menu summaries are controlled explicitly instead of relying on

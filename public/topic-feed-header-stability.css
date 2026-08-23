@@ -1,4 +1,4 @@
-/* Mark, Set, Go! Topic Feed permanent header/band v7.22
+/* Mark, Set, Go! Topic Feed permanent header/band v7.31
    The article scrolls; this header never does. */
 
 #reader-frame {
@@ -14,9 +14,9 @@
 
   /* This is the permanent opaque ceiling. It does not switch on/off and it is
      outside #reader, so scrolling can never translate it with the prose. */
-  background: var(--msg-vd-reader-page-color, var(--msg-theme-surface, #ffffff)) !important;
+  background: var(--topic-feed-story-paper, #ffffff) !important;
   background-image: none !important;
-  box-shadow: 0 7px 0 var(--msg-vd-reader-page-color, var(--msg-theme-surface, #ffffff)) !important;
+  box-shadow: 0 7px 0 var(--topic-feed-story-paper, #ffffff) !important;
   padding: 0 0 6px !important;
   margin: 0 !important;
   opacity: 1 !important;
@@ -69,7 +69,7 @@
   pointer-events: none !important;
   border: 0 !important;
   border-radius: 3px !important;
-  background: var(--msg-vd-reader-page-color, var(--msg-theme-surface, #ffffff)) !important;
+  background: var(--topic-feed-story-paper, #ffffff) !important;
   background-image: none !important;
   box-shadow: none !important;
 }
@@ -102,4 +102,24 @@ button.read-anything-inline-article-summary:hover,
 #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
 button.read-anything-inline-article-summary:focus {
   color: #1769aa !important;
+}
+
+
+/* v7.31 — Topic Feed titles are document labels, not landing-page headlines.
+   Scope this only to article Readers; normal book titles retain their hierarchy. */
+html[data-msg-experience-theme] .reader-page-panel.topic-feed-reader-page .reader-title-copy h1,
+.reader-page-panel.topic-feed-reader-page .reader-title-copy h1 {
+  max-width: 100% !important;
+  font-size: clamp(.92rem, 1.05vw, 1.08rem) !important;
+  line-height: 1.18 !important;
+  font-weight: 720 !important;
+  letter-spacing: -.006em !important;
+  text-wrap: pretty;
+}
+
+/* Keep the mask mechanically opaque but visually indistinguishable from the
+   actual Reader paper copied by topic-feeds.js. */
+#reader-frame > .topic-feed-story-header-external,
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before {
+  background-color: var(--topic-feed-story-paper, #fff) !important;
 }

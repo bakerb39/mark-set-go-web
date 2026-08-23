@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.12.0
+ * Mark, Set, Go! Workspace Experiment v0.13.0
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -10,7 +10,12 @@
 
   const PARAMS = new URLSearchParams(window.location.search);
   const IS_WORKSPACE_PANE = PARAMS.get('msgWorkspacePane') === '1';
+  const IS_SECONDARY_READER_DOCUMENT = PARAMS.get('msgSecondaryReader') === '1';
   const WORKSPACE_PREF_KEY = 'msg-workspace-optin-v1';
+
+  // Reader 2 is a full copy of the main application Reader running in its own
+  // iframe. It must not install another workspace/router inside itself.
+  if (IS_SECONDARY_READER_DOCUMENT) return;
 
   function readWorkspacePreference() {
     try { return localStorage.getItem(WORKSPACE_PREF_KEY) === '1'; }
@@ -586,20 +591,23 @@
   }
 
   function panelUrl(mode, value) {
-    const url = new URL('/workspace-pane.html', window.location.origin);
+    const secondaryReader = mode === 'reader' && value === 'secondary';
+    // Reader 2 intentionally uses index.html: that is the only way to guarantee
+    // it receives the same Reader, Ask Mark/companion stack, themes and feature
+    // scripts as Reader 1. Ordinary workspace pages keep the lightweight shell.
+    const url = new URL(secondaryReader ? '/index.html' : '/workspace-pane.html', window.location.origin);
     url.searchParams.set('msgWorkspaceMode', mode);
     url.searchParams.set('msgWorkspaceValue', value);
-    if (mode === 'reader' && value === 'secondary') url.searchParams.set('msgSecondaryReader', '1');
-    // Keep the pane document/runtime in lockstep with the router and prevent an
-    // older cached pane from reviving the former hand-maintained page list.
-    url.searchParams.set('msgWorkspaceBuild', '0.12.0');
+    if (secondaryReader) url.searchParams.set('msgSecondaryReader', '1');
+    url.searchParams.set('msgWorkspaceBuild', secondaryReader ? '0.13.0-full-reader' : '0.13.0');
     return url.toString();
   }
 
   function createAppPagePanel(mode, value, label) {
     const node = document.createElement('div');
-    node.className = 'msg-workspace-panel msg-workspace-app-page';
-    node.innerHTML = `<iframe class="msg-workspace-page-frame" title="${escapeWorkspaceHtml(label)}" src="${escapeWorkspaceHtml(panelUrl(mode, value))}" loading="eager"></iframe>`;
+    const secondaryReader = mode === 'reader' && value === 'secondary';
+    node.className = `msg-workspace-panel msg-workspace-app-page${secondaryReader ? ' msg-workspace-secondary-reader-page' : ''}`;
+    node.innerHTML = `<iframe class="msg-workspace-page-frame${secondaryReader ? ' msg-secondary-reader-frame' : ''}" title="${escapeWorkspaceHtml(label)}" src="${escapeWorkspaceHtml(panelUrl(mode, value))}" loading="eager"></iframe>`;
     return node;
   }
 
