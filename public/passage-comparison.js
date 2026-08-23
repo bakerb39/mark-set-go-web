@@ -1,4 +1,4 @@
-/* Mark, Set, Go! — Passage Comparison Basket v1.1
+/* Mark, Set, Go! — Passage Comparison Basket v1.3
    - Intercepts the Reader popup toolbar's existing ∞ Compare action.
    - Collects selected passages without browser storage.
    - Reader 2 hands selections to the parent Reader.
