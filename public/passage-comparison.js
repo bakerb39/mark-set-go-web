@@ -1,4 +1,4 @@
-/* Mark, Set, Go! — Passage Comparison Basket v1.3
+/* Mark, Set, Go! — Passage Comparison Basket v1.4
    - Intercepts the Reader popup toolbar's existing ∞ Compare action.
    - Collects selected passages without browser storage.
    - Reader 2 hands selections to the parent Reader.
@@ -270,22 +270,40 @@
       return;
     }
 
-    try {
-      if (typeof window.openMarkPanel === 'function') window.openMarkPanel('selection');
-      if (typeof window.renderMarkSelectionCard === 'function') window.renderMarkSelectionCard();
-    } catch {}
+    const lens = document.querySelector('#msg-passage-comparison-lens')?.selectedOptions?.[0]?.textContent?.trim()
+      || 'Overall comparison';
+    const bridge = window.MarkSetGoAskMarkHub;
 
-    let panel = document.querySelector('#mark-response');
-    const trayResponse = document.querySelector('[data-pc-inline-response]');
-    if (!panel && trayResponse) {
-      trayResponse.hidden = false;
-      panel = trayResponse;
+    if (bridge?.comparePassages) {
+      statusMessage = `Sending ${passages.length} passages to Ask Mark…`;
+      renderTray();
+
+      const result = await bridge.comparePassages({
+        passages: passages.map((item) => ({ ...item })),
+        question: comparisonQuestion(),
+        displayPrompt: `Compare these ${passages.length} selected passages — ${lens}.`
+      });
+
+      if (result?.ok) {
+        statusMessage = 'Mark finished the comparison. Your passages remain in the tray.';
+      } else {
+        statusMessage = result?.error || 'Ask Mark could not complete the comparison.';
+      }
+      renderTray();
+      return;
     }
-    if (!panel) return;
+
+    // Visible fallback only. Never write into #mark-response directly because
+    // that element belongs to the hidden legacy Ask Mark host.
+    const panel = document.querySelector('[data-pc-inline-response]');
+    if (!panel) {
+      notify('Ask Mark is not ready yet.');
+      return;
+    }
 
     panel.hidden = false;
     panel.innerHTML = '<p class="status">Ask Mark is comparing the selected passages…</p>';
-    statusMessage = 'Sent to Ask Mark.';
+    statusMessage = 'Sending comparison…';
     renderTray();
 
     const first = passages[0];
@@ -588,7 +606,7 @@
   }
 
   window.MSGPassageComparison = Object.freeze({
-    version: '1.3-canonical-selection-gate',
+    version: '1.4-askmark-chat-bridge',
     addPassage: (passage) => isChildFrame ? forwardSelection(normalizePassage(passage)) : addPassage(passage),
     clear: clearPassages,
     passages: () => passages.map((item) => ({ ...item })),

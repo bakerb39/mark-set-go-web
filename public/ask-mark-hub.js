@@ -675,6 +675,97 @@
     setTimeout(syncLegacyResponse, 300);
   }
 
+
+  function ensureAskMarkChatVisible() {
+    if (!shell?.isConnected) install();
+
+    const layout = document.getElementById('reader-layout');
+    const markButton = document.getElementById('toggle-mark-panel');
+    const markActive = document.querySelector('[data-mark-tab="selection"]')?.classList.contains('active');
+
+    // Use the Reader's own toggle/open path whenever possible. Clicking it only
+    // when hidden or on another right-pane tab avoids accidentally closing an
+    // already-open Ask Mark panel.
+    if (markButton && (layout?.classList.contains('word-panel-hidden') || !markActive)) {
+      markButton.click();
+    }
+
+    // Defensive fallback: the premium chat lives in the Reader's right pane.
+    if (layout?.classList.contains('word-panel-hidden')) {
+      layout.classList.remove('word-panel-hidden');
+    }
+    markButton?.setAttribute('aria-pressed', 'true');
+    markButton?.classList.remove('pane-closed');
+
+    if (!shell?.isConnected) configureShell();
+    activatePremiumView('chat');
+    return Boolean(shell?.isConnected && $('[data-askmark-conversation]', shell));
+  }
+
+  async function compareExternalPassages({ passages = [], question = '', displayPrompt = '' } = {}) {
+    const normalized = (Array.isArray(passages) ? passages : [])
+      .map((item) => ({
+        text: String(item?.text || '').trim(),
+        title: String(item?.title || 'Selected passage').trim(),
+        author: String(item?.author || '').trim(),
+        chapter: String(item?.chapter || '').trim(),
+        documentId: String(item?.documentId || '').trim(),
+        startIndex: Number.isFinite(Number(item?.startIndex)) ? Number(item.startIndex) : 0,
+        endIndex: Number.isFinite(Number(item?.endIndex)) ? Number(item.endIndex) : null
+      }))
+      .filter((item) => item.text);
+
+    if (normalized.length < 2) {
+      return { ok:false, error:'Add at least two passages before asking Mark to compare them.' };
+    }
+    if (!ensureAskMarkChatVisible()) {
+      return { ok:false, error:'Ask Mark is not ready yet.' };
+    }
+
+    const first = normalized[0];
+    const userText = String(displayPrompt || `Compare these ${normalized.length} selected passages.`).trim();
+    addUserMessage(userText);
+    const thinking = addThinkingMessage();
+
+    try {
+      const response = await fetch('/api/mark-selection', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          selection:first.text,
+          text:first.text,
+          action:'ask',
+          question:String(question || '').trim(),
+          title:first.title,
+          author:first.author,
+          chapter:first.chapter,
+          documentId:first.documentId,
+          startIndex:first.startIndex,
+          endIndex:first.endIndex
+        })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || payload.detail || `HTTP ${response.status}`);
+
+      renderWholeArticleFollowup(thinking, payload.result || {});
+      return { ok:true, result:payload.result || {} };
+    } catch (error) {
+      if (thinking) {
+        thinking.classList.remove('is-thinking');
+        const body = thinking.querySelector('p');
+        if (body) body.textContent = error?.message || 'I could not complete that comparison.';
+      }
+      return { ok:false, error:error?.message || 'Ask Mark could not complete the comparison.' };
+    }
+  }
+
+  window.MarkSetGoAskMarkHub = Object.freeze({
+    version:'1.0-passage-comparison-bridge',
+    open:ensureAskMarkChatVisible,
+    comparePassages:compareExternalPassages
+  });
+
+
   async function runDocumentAction(action) {
     const api = transformApi();
     if (!api?.hasActiveDocument?.()) {
