@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.0 — multi-Reader foundation
+ * Mark, Set, Go! Workspace Experiment v0.15.1 — non-workspace Reader switching
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -453,16 +453,17 @@
       return;
     }
     if (event.data?.type === 'msg-workspace-preference') {
-      writeWorkspacePreference(Boolean(event.data.enabled));
+      const enabled = Boolean(event.data.enabled);
+      writeWorkspacePreference(enabled);
       installProfileWorkspaceToggle(document);
-      if (!event.data.enabled) closeWorkspacePanel();
+      applyWorkspacePreferencePresentation(enabled);
     }
   });
 
   window.addEventListener('storage', (event) => {
     if (event.key !== WORKSPACE_PREF_KEY) return;
     installProfileWorkspaceToggle(document);
-    if (event.newValue !== '1') closeWorkspacePanel();
+    applyWorkspacePreferencePresentation(event.newValue === '1');
   });
 
   function humanize(value) {
@@ -696,14 +697,53 @@
     const readers = listReaderSessions();
     list.innerHTML = readers.map((reader) => {
       const title = reader.documentTitle ? ` · ${reader.documentTitle}` : '';
-      return `<button type="button" role="menuitem" data-msg-reader-select="${reader.number}" title="${escapeWorkspaceHtml(`${reader.label}${title}`)}"><strong>${escapeWorkspaceHtml(reader.label)}</strong><small>${escapeWorkspaceHtml(reader.documentTitle || (reader.number === 1 ? 'Current Reader' : 'No text loaded yet'))}</small></button>`;
+      return `<button type="button" role="menuitem" class="${reader.active ? 'is-active' : ''}" aria-current="${reader.active ? 'true' : 'false'}" data-msg-reader-select="${reader.number}" title="${escapeWorkspaceHtml(`${reader.label}${title}`)}"><strong>${escapeWorkspaceHtml(reader.label)}</strong><small>${escapeWorkspaceHtml(reader.documentTitle || (reader.number === 1 ? 'Current Reader' : 'No text loaded yet'))}</small></button>`;
     }).join('');
+  }
+
+  function setReaderFocusPresentation(shell, readerNumber = 0) {
+    if (!shell) return;
+    const number = normalizeReaderNumber(readerNumber);
+    const focused = number >= 2;
+    shell.classList.toggle('msg-reader-focus-mode', focused);
+    document.body.classList.toggle('msg-reader-focus-active', focused);
+
+    if (focused) {
+      shell.dataset.msgReaderFocus = String(number);
+      shell.querySelector('.msg-workspace-secondary')?.setAttribute('aria-label', `Reader ${number}`);
+    } else {
+      delete shell.dataset.msgReaderFocus;
+      shell.querySelector('.msg-workspace-secondary')?.setAttribute('aria-label', 'Workspace side panel');
+    }
+  }
+
+  function applyWorkspacePreferencePresentation(enabled) {
+    const shell = workspaceShell();
+    const activeReader = readerNumberFromPanelKey(activePanelKey);
+
+    if (!enabled) {
+      // Turning frame/workspace mode off while an auxiliary Reader is selected
+      // should keep that Reader in view, now as the one full-width Reader.
+      if (activeReader >= 2 && PANELS.has(readerPanelKey(activeReader))) {
+        focusReaderSession(activeReader);
+      } else {
+        closeWorkspacePanel();
+      }
+      return;
+    }
+
+    // Turning workspace mode back on while an auxiliary Reader owns the full
+    // Reader area returns that same live session to the right pane.
+    if (shell?.classList.contains('msg-reader-focus-mode') && activeReader >= 2) {
+      activatePanel(readerPanelKey(activeReader));
+    }
   }
 
   function closeWorkspacePanel() {
     const shell = workspaceShell();
     if (!shell) return;
     const body = panelBody(shell);
+    setReaderFocusPresentation(shell, 0);
     activePanelKey = '';
     syncMountedWorkspacePanels(body, '');
     syncWorkspacePanelMode(shell, body, '');
@@ -721,6 +761,7 @@
     const body = panelBody(shell);
     if (!body) return false;
 
+    setReaderFocusPresentation(shell, 0);
     activePanelKey = key;
     syncWorkspacePanelMode(shell, body, key);
     const wasClosed = shell.classList.contains('is-closed');
@@ -800,21 +841,89 @@
     return node;
   }
 
+  function ensureReaderSession(readerNumber) {
+    const number = normalizeReaderNumber(readerNumber);
+    if (number < 2 || number > MAX_READERS || !hasReader()) return null;
+
+    const key = readerPanelKey(number);
+    let record = PANELS.get(key);
+    if (record) return record;
+
+    const label = `Reader ${number}`;
+    const node = createAppPagePanel('reader', number, label);
+    if (!PANEL_ORDER.includes(key)) PANEL_ORDER.push(key);
+    record = { key, label, node, documentTitle:'', documentId:'' };
+    PANELS.set(key, record);
+    syncAddReaderControl();
+    renderReadersMenu();
+    return record;
+  }
+
+  function focusReaderSession(readerNumber) {
+    const number = normalizeReaderNumber(readerNumber);
+    if (number === 1) {
+      closeWorkspacePanel();
+      return true;
+    }
+
+    const record = ensureReaderSession(number);
+    if (!record) return false;
+
+    const shell = ensureWorkspaceShell();
+    const body = panelBody(shell);
+    if (!body) return false;
+
+    activePanelKey = record.key;
+    shell.classList.remove('is-closed');
+    setReaderFocusPresentation(shell, number);
+    syncMountedWorkspacePanels(body, record.key);
+    syncWorkspacePanelMode(shell, body, record.key);
+    renderWorkspaceTabs(shell);
+    renderReadersMenu();
+    syncAddReaderControl();
+
+    // The iframe stays mounted, but its viewport has changed from side-pane
+    // dimensions to the full Reader width. Give its existing Reader runtime a
+    // normal resize signal so Book Pages and overlays can recalculate without
+    // reloading the document.
+    window.requestAnimationFrame(() => {
+      const frame = record.node?.querySelector?.('.msg-aux-reader-frame');
+      try { frame?.contentWindow?.dispatchEvent?.(new Event('resize')); } catch {}
+    });
+    return true;
+  }
+
   function openAppPage(mode, value, label = '') {
     if (!hasReader()) return false;
     const readerNumber = mode === 'reader' ? normalizeReaderNumber(value) : 0;
-    const key = readerNumber >= 2 ? readerPanelKey(readerNumber) : `page:${mode}:${value}`;
+    if (readerNumber >= 2) return openReaderSession(readerNumber);
+
+    const key = `page:${mode}:${value}`;
     if (PANELS.has(key)) return activatePanel(key);
-    const panelLabel = readerNumber >= 2 ? `Reader ${readerNumber}` : (label || humanize(value));
-    return registerPanel(key, panelLabel, createAppPagePanel(mode, readerNumber >= 2 ? readerNumber : value, panelLabel));
+    return registerPanel(key, label || humanize(value), createAppPagePanel(mode, value, label || humanize(value)));
   }
 
   function openReaderSession(readerNumber) {
     const number = normalizeReaderNumber(readerNumber);
-    if (number === 1) { closeWorkspacePanel(); return true; }
+    if (number === 1) {
+      closeWorkspacePanel();
+      renderReadersMenu();
+      return true;
+    }
     if (number < 2 || number > MAX_READERS || !hasReader()) return false;
-    secondaryWidth = preferredSecondaryReaderWidth();
-    return openAppPage('reader', number, `Reader ${number}`);
+
+    const record = ensureReaderSession(number);
+    if (!record) return false;
+
+    // Frame mode: preserve the existing side-by-side workspace behavior.
+    if (workspaceEnabled()) {
+      secondaryWidth = preferredSecondaryReaderWidth();
+      return activatePanel(record.key);
+    }
+
+    // Non-frame mode: make the selected live Reader the one full-width Reader
+    // while Reader 1 and every other session remain mounted and untouched.
+    return focusReaderSession(number);
   }
 
   function addReaderSession() {
@@ -827,10 +936,6 @@
       window.alert(`You can keep up to ${MAX_READERS} Readers open at once.`);
       return false;
     }
-    // Phase 1 displays auxiliary Readers in the persistent workspace. The same
-    // numbered session model will power the non-workspace Readers menu next.
-    writeWorkspacePreference(true);
-    installProfileWorkspaceToggle(document);
     return openReaderSession(next);
   }
 
@@ -1253,8 +1358,14 @@
     openReader: openReaderSession,
     readers: () => listReaderSessions().map((reader) => ({ ...reader })),
     maxReaders: MAX_READERS,
+    activeReader: () => readerNumberFromPanelKey(activePanelKey) || 1,
     enabled: workspaceEnabled,
-    setEnabled: (enabled) => { writeWorkspacePreference(Boolean(enabled)); installProfileWorkspaceToggle(document); if (!enabled) closeWorkspacePanel(); }
+    setEnabled: (enabled) => {
+      const value = Boolean(enabled);
+      writeWorkspacePreference(value);
+      installProfileWorkspaceToggle(document);
+      applyWorkspacePreferencePresentation(value);
+    }
   });
 
 function renderSymposiumWorkspace(rootHost, suppliedHandoff = null) {

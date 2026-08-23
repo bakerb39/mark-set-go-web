@@ -863,3 +863,64 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
   font-size:.69rem;
   opacity:.72;
 }
+
+
+/* v0.5.8 — non-workspace Reader switching.
+   The same live Reader 2–10 iframe sessions used by the workspace can become
+   the single full-width Reader without being detached or recreated. */
+body.msg-reader-focus-active{
+  overflow-x:hidden !important;
+}
+#app > .msg-workspace-shell.msg-reader-focus-mode{
+  grid-template-columns:minmax(0,1fr) !important;
+  width:100% !important;
+  max-width:100% !important;
+  min-width:0 !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:100% !important;
+  column-gap:0 !important;
+  overflow:hidden !important;
+}
+#app > .msg-workspace-shell.msg-reader-focus-mode > .msg-workspace-primary,
+#app > .msg-workspace-shell.msg-reader-focus-mode > .msg-workspace-divider{
+  display:none !important;
+}
+#app > .msg-workspace-shell.msg-reader-focus-mode > .msg-workspace-secondary{
+  display:flex !important;
+  grid-column:1 !important;
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:100% !important;
+  margin:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  overflow:hidden !important;
+}
+#app > .msg-workspace-shell.msg-reader-focus-mode .msg-workspace-panel-head{
+  display:none !important;
+}
+#app > .msg-workspace-shell.msg-reader-focus-mode .msg-workspace-panel-body{
+  flex:1 1 auto !important;
+  width:100% !important;
+  min-width:0 !important;
+  height:100% !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+#app > .msg-workspace-shell.msg-reader-focus-mode .msg-workspace-aux-reader-page.msg-workspace-panel-active,
+#app > .msg-workspace-shell.msg-reader-focus-mode .msg-aux-reader-frame{
+  width:100% !important;
+  max-width:100% !important;
+  height:100% !important;
+  max-height:100% !important;
+  min-height:0 !important;
+}
+.msg-readers-list button.is-active{
+  background:color-mix(in srgb, #d5a928 16%, white) !important;
+  box-shadow:inset 3px 0 #d5a928 !important;
+}
