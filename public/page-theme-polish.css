@@ -1,4 +1,4 @@
-/* Mark, Set, Go! v7.34.7 — continuous theme background + readable Home + Home standalone close.
+/* Mark, Set, Go! v7.34.8 — continuous theme background + reliable standalone close.
    Presentation/navigation chrome only. No Reader core, timing, pagination, or word DOM changes. */
 
 /* ONE CONTINUOUS THEME BACKGROUND
@@ -109,11 +109,11 @@ html[data-msg-experience-theme] #app .home-simple .source-category {
    for framed workspace pages to receive the extra page-level X. Existing workspace/tab chrome
    remains responsible for closing framed panes. */
 #msg-standalone-page-close {
-  display: none;
+  display: inline-flex;
   position: fixed;
   top: 58px;
   right: clamp(12px, 2vw, 28px);
-  z-index: 60;
+  z-index: 5000;
   width: 36px;
   height: 36px;
   padding: 0;
@@ -128,12 +128,12 @@ html[data-msg-experience-theme] #app .home-simple .source-category {
   cursor: pointer;
 }
 
-/* Show on Home and every other standalone app page. Reader itself keeps its
-   own Reader-specific window control, so do not duplicate the X there. */
-body:has(#app[data-view-key]:not([data-view-key="reader"]):not([data-view-key="reader-secondary"])) #msg-standalone-page-close {
-  display: inline-flex;
-}
-
+/* The standalone close is visible by default, including Home. Hide it only
+   when the real Reader owns the page, because Reader views already have their
+   own close control. Using the sibling relationship avoids a fragile :has()
+   visibility dependency. */
+#app[data-view-key="reader"] ~ #msg-standalone-page-close,
+#app[data-view-key="reader-secondary"] ~ #msg-standalone-page-close,
 html.msg-secondary-reader-document #msg-standalone-page-close {
   display: none !important;
 }
