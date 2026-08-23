@@ -1,4 +1,4 @@
-/* Mark, Set, Go! Workspace Experiment v0.5.10 — Reader blank + half split */
+/* Mark, Set, Go! Workspace Experiment v0.5.11 — Reader 2 layout polish */
 /* Mark, Set, Go! workspace experiment */
 .msg-workspace-shell{
   --msg-secondary-width: 360px;
@@ -962,4 +962,101 @@ html.msg-secondary-reader-document #app .reader-page-panel :is(.reader-side-togg
 }
 html.msg-secondary-reader-document #app .read-anything-inline-article-summary {
   color:var(--msg-theme-accent,var(--msg-blue,#0c2340)) !important;
+}
+
+
+/* v0.5.11 — Reader 2+ should behave like the primary Reader at the same
+   physical pane width. The auxiliary Reader lives in an iframe, so viewport
+   media queries see only the iframe width; the base Reader's 1050px breakpoint
+   therefore stacked Ask Beth/Mark below the book even though Reader 1, sitting
+   beside it at the same width, remained in desktop column mode. Restore the
+   normal desktop Reader grid only inside numbered auxiliary Readers. */
+@media (max-width:1050px) and (min-width:701px) {
+  html.msg-secondary-reader-document #app .reader-layout {
+    --word-panel-width:320px !important;
+    grid-template-columns:
+      var(--navigation-width,280px)
+      8px
+      minmax(0,1fr)
+      8px
+      var(--word-panel-width,320px) !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout.navigation-hidden {
+    grid-template-columns:
+      minmax(0,1fr)
+      8px
+      var(--word-panel-width,320px) !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout.word-panel-hidden {
+    grid-template-columns:
+      var(--navigation-width,280px)
+      8px
+      minmax(0,1fr) !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout.navigation-hidden.word-panel-hidden {
+    grid-template-columns:minmax(0,1fr) !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout > :is(.navigation-pane,.word-panel) {
+    grid-column:auto !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout:not(.navigation-hidden) > #left-pane-splitter,
+  html.msg-secondary-reader-document #app .reader-layout:not(.word-panel-hidden) > #right-pane-splitter {
+    display:block !important;
+  }
+
+  html.msg-secondary-reader-document #app .reader-layout.navigation-hidden > :is(.navigation-pane,#left-pane-splitter),
+  html.msg-secondary-reader-document #app .reader-layout.word-panel-hidden > :is(.word-panel,#right-pane-splitter) {
+    display:none !important;
+  }
+  html.msg-secondary-reader-document #app .reader-layout:not(.word-panel-hidden) .word-panel {
+    width:auto !important;
+    height:min(64vh,660px,calc(100dvh - 220px)) !important;
+    min-height:300px !important;
+    max-height:calc(100dvh - 220px) !important;
+    align-self:start !important;
+  }
+}
+
+
+/* Reader 2+ top-right font stepper: keep the warmer themed control style, but
+   remove the dark seam between − and +. The whole segmented control should read
+   as one continuous button surface. */
+html.msg-secondary-reader-document #app .reader-topright-font-control {
+  gap:0 !important;
+  overflow:hidden !important;
+  background:linear-gradient(
+    180deg,
+    var(--msg-theme-surface,var(--msg-surface,#fff)),
+    var(--msg-theme-soft-2,var(--msg-blue-soft-2,#f4f7fa))
+  ) !important;
+  border-color:color-mix(
+    in srgb,
+    var(--msg-theme-gold,var(--msg-gold,#d5a928)) 62%,
+    var(--msg-theme-border,var(--msg-blue-border,#9fb4c7))
+  ) !important;
+}
+
+html.msg-secondary-reader-document #app .reader-topright-font-control button {
+  margin:0 !important;
+  background:transparent !important;
+}
+
+html.msg-secondary-reader-document #app .reader-topright-font-control button:first-child {
+  border-right-color:transparent !important;
+}
+
+html.msg-secondary-reader-document #app .reader-topright-font-control button + button {
+  border-left-color:transparent !important;
+  box-shadow:none !important;
+}
+
+html.msg-secondary-reader-document #app .reader-topright-font-control::before,
+html.msg-secondary-reader-document #app .reader-topright-font-control::after {
+  background:transparent !important;
+  border-color:transparent !important;
 }

@@ -1,12 +1,23 @@
-Mark, Set, Go! v7.33.4 — Reader blank + half split
+Mark, Set, Go! v7.33.5 — Reader 2 layout polish
 
-Updated from v7.33.3 only.
+Updated files only. Copy the contents of public/ over the existing public/ folder.
 
-Fixes:
-- Reader 2+ cannot read or overwrite Reader 1 persistent SessionManager checkpoint.
-- Synthetic startup events cannot unlock Reader 2+ document loading; only trusted user interaction can.
-- Reader 2+ still boots to renderEmptyReader().
-- Selecting Reader 2+ in frame mode forces an initial split of at least half the usable workspace width.
-- Dragging the divider immediately releases the forced initial split and restores normal resizing.
-- Retains v7.33.3 tooltip, theme/button, Reader navigation, and article-action stability fixes.
-- Protected Reader engine modules are untouched.
+Changes:
+- Reader 2+ keeps the desktop Reader grid inside its iframe at half-pane widths,
+  so Ask Beth/Mark opens beside the reading text instead of below it.
+- Reader 2+ uses the same 320px companion-panel width as the primary desktop Reader.
+- The companion panel keeps the normal desktop height behavior instead of the
+  narrow-viewport stacked-panel height.
+- Reader 2+ font-size stepper keeps its preferred themed styling but removes the
+  dark seam between the minus and plus buttons.
+
+Not changed:
+- Multi-Reader state/session code
+- Reader 2 blank-start behavior
+- Half-screen workspace split logic
+- app.js
+- protected Reader engine modules
+- Read Anything/storage
+
+Expected build marker:
+20260823-v7.33.5-reader2-layout-polish
