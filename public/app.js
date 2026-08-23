@@ -12698,13 +12698,23 @@ function openModernGuideContextInAskMark(markerIndex) {
   const wasRunning = isReaderRunning();
   if (wasRunning) pauseReader();
 
-  // Preserve the actual guide action position as the Reader's canonical cursor,
-  // but keep the Ask Mark selection as the full section range.
+  // In Book Pages the Discuss control is a synthetic guide-action token, not
+  // ordinary reading text. Anchoring a reflow to that token can resolve to the
+  // first spread after the companion panel changes width. Keep the cursor on
+  // the last real word immediately before the action instead; that word is on
+  // the spread the reader actually clicked from. Normal mode keeps the legacy
+  // action-token position because it does not repaginate.
   const actionIndex = Math.max(0, Math.min(
     Math.max(0, state.words.length - 1),
     Number.isFinite(Number(markerIndex)) ? Number(markerIndex) : context.startIndex
   ));
-  state.index = actionIndex;
+  const sectionTextAnchor = Math.max(
+    context.startIndex,
+    Math.min(Math.max(context.startIndex, context.endIndex - 1), Math.max(0, state.words.length - 1))
+  );
+  const readerAnchorIndex = state.bookPages ? sectionTextAnchor : actionIndex;
+  state.index = readerAnchorIndex;
+  state.viewportAnchorIndex = readerAnchorIndex;
 
   const selection = {
     text: context.text,
