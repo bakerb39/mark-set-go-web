@@ -51,6 +51,22 @@ window.MSGSecondaryReaderWorkspace = Object.freeze({
   shouldDelegate: shouldDelegateReaderToWorkspaceParent
 });
 
+// Reader 2+ starts blank. Ignore automatic startup/resume renders until the
+// user has deliberately interacted with this numbered Reader iframe.
+let secondaryReaderLocalIntent = !isSecondaryReaderWorkspace();
+if (isSecondaryReaderWorkspace()) {
+  const markSecondaryReaderIntent = (event) => {
+    if (event?.type === 'keydown' && !['Enter', ' ', 'Spacebar'].includes(event.key)) return;
+    secondaryReaderLocalIntent = true;
+  };
+  document.addEventListener('pointerdown', markSecondaryReaderIntent, true);
+  document.addEventListener('keydown', markSecondaryReaderIntent, true);
+  document.addEventListener('change', markSecondaryReaderIntent, true);
+}
+function secondaryReaderAllowsDocumentRender() {
+  return !isSecondaryReaderWorkspace() || secondaryReaderLocalIntent;
+}
+
 
 const { BookModel, SessionManager, ReaderEngine, VirtualRenderer } = window.MarkSetGoReader || {};
 if (!BookModel || !SessionManager || !ReaderEngine || !VirtualRenderer) {
@@ -3969,7 +3985,8 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   if (!snapshot?.title || !snapshot?.currentText) return false;
   const controls = snapshot.controls || {};
 
-  renderReaderWithText(snapshot.title, snapshot.currentText, snapshot.source || { type: 'restored' });
+  const renderResult = renderReaderWithText(snapshot.title, snapshot.currentText, snapshot.source || { type: 'restored' });
+  if (isSecondaryReaderWorkspace() && renderResult === false) return false;
 
   state.originalText = snapshot.originalText || snapshot.currentText;
   state.currentText = snapshot.currentText;
@@ -13244,6 +13261,8 @@ function realignTopicFeedDocumentToc(text, toc) {
 }
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
+  if (isSecondaryReaderWorkspace() && !secondaryReaderAllowsDocumentRender()) return false;
+
   // A Workspace iframe is a secondary control/content surface only. It must
   // never own a second Reader. Send every readable document through the one
   // established outer-Reader handoff. This central guard covers Modern Guides,
@@ -13613,7 +13632,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
               <div id="fullscreen-mark-notebook" data-fs-mark-panel="notebook" hidden></div>
               <div id="fullscreen-mark-format" data-fs-mark-panel="format" hidden></div>
             </aside>
-          <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text" title="Click a word to move the reading position; double-click to pause or resume"></article>
+          <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text"></article>
           </div>
           <div class="reader-viewer-footer" aria-label="Reader pace and page navigation">
             <div id="book-page-controls-home" class="book-page-controls-home">

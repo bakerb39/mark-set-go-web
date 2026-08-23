@@ -7,7 +7,7 @@
 <meta content="width=device-width, initial-scale=1" name="viewport"/>
 <meta content="Mark, Set, Go! reading-speed test and reading accelerator." name="description"/>
 <title>Mark, Set, Go!</title>
-<meta name="msg-build" content="20260823-v7.33.2-reader-stability-restore"/>
+<meta name="msg-build" content="20260823-v7.33.3-reader-stability"/>
 <script>
 (() => {
   const p = new URLSearchParams(location.search);
@@ -20,6 +20,35 @@
   window.__MSG_READER_ID__ = `reader-${readerNumber}`;
   document.documentElement.classList.add('msg-secondary-reader-document');
   document.documentElement.dataset.msgReaderId = window.__MSG_READER_ID__;
+
+  // Keep Reader 2+ on the same live experience palette as Reader 1. This copies
+  // both the named theme and any designer-adjusted semantic color variables.
+  const syncAuxiliaryReaderTheme = () => {
+    try {
+      const parentRoot = window.parent?.document?.documentElement;
+      if (!parentRoot || window.parent === window) return;
+      const root = document.documentElement;
+      const theme = parentRoot.dataset.msgExperienceTheme || parentRoot.dataset.experienceAppearance || '';
+      const appearance = parentRoot.dataset.experienceAppearance || theme;
+      if (theme) root.dataset.msgExperienceTheme = theme;
+      if (appearance) root.dataset.experienceAppearance = appearance;
+      const computed = window.parent.getComputedStyle(parentRoot);
+      [
+        '--msg-theme-page','--msg-theme-surface','--msg-theme-accent','--msg-theme-accent-dark',
+        '--msg-theme-soft','--msg-theme-soft-2','--msg-theme-border','--msg-theme-gold',
+        '--msg-theme-ink','--msg-theme-muted','--msg-theme-shadow'
+      ].forEach((name) => {
+        const value = computed.getPropertyValue(name).trim();
+        if (value) root.style.setProperty(name, value);
+      });
+    } catch {}
+  };
+  window.__MSG_SYNC_AUXILIARY_READER_THEME__ = syncAuxiliaryReaderTheme;
+  syncAuxiliaryReaderTheme();
+  document.addEventListener('DOMContentLoaded', syncAuxiliaryReaderTheme, { once:true });
+  window.addEventListener('pageshow', syncAuxiliaryReaderTheme);
+  window.addEventListener('focus', syncAuxiliaryReaderTheme);
+
   // Auxiliary Readers are user-invoked. Do not let the daily Topic Feed startup
   // replace an intentionally empty Reader before the user chooses text.
   const nativeFetch = window.fetch.bind(window);
@@ -38,7 +67,7 @@
 <script src="/experience-theme-bootstrap.js?v=20260822-v9.3-unified-ui"></script>
 <link href="/styles.css?v=20260822-v7.28.1-share-toolbar" rel="stylesheet"/>
 <link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
-<link href="/workspace-experiment.css?v=0.5.8-non-workspace-reader-switch-r1" rel="stylesheet"/>
+<link href="/workspace-experiment.css?v=0.5.9-reader-stability" rel="stylesheet"/>
 <link href="/symposium-workspace-fix.css?v=4.4-explicit-scroll-owner" rel="stylesheet"/>
 <link href="/ask-mark-hub.css?v=9.2.89-theme-safe-user-message" rel="stylesheet"/>
 <link href="/mobile-simple.css?v=8.5.9" rel="stylesheet"/>
@@ -59,10 +88,10 @@
 <link href="/explorer-visual-designer.css?v=20260823-v2.5-background-controls" rel="stylesheet"/>
 <link href="/theme-system.css?v=20260822-v9.4.3-no-duplicate-divider-no-selection-popup" rel="stylesheet"/>
 <link href="/reader-theme-controls.css?v=20260823-v1-theme-aware-reader-utilities" rel="stylesheet"/>
-<link href="/topic-feed-reader-cleanup.css?v=20260823-v1-non-feed-isolation" rel="stylesheet"/>
+<link href="/topic-feed-reader-cleanup.css?v=20260823-v1.1-reader-stability" rel="stylesheet"/>
 <link href="/passage-comparison.css?v=20260823-v1.3-canonical-selection-gate" rel="stylesheet"/>
   <script defer src="/workspace-pane-cache-refresh.js?v=20260822-v7.21-stability-consolidation"></script>
-<script defer src="/workspace-experiment.js?v=0.15.1-non-workspace-reader-switch-r1"></script>
+<script defer src="/workspace-experiment.js?v=0.15.2-reader-stability"></script>
 <script defer src="/workspace-parent-bridge.js?v=0.8.0-library-delegation"></script>
 <script defer src="/debug-bootstrap.js?v=9.6.2"></script>
 <script defer src="/reader/BookModel.js?v=3.2.1-stable-recovery"></script>
@@ -76,8 +105,8 @@
   <script defer src="/auth.js?v=9.0.4-no-mutation-observer"></script>
   <script defer src="/cloud-data.js?v=8.2.0-cloud-symposiums"></script>
   <script src="/modern-guide-storage-guard.js?v=0.11.4-no-registry-write"></script>
-<script defer src="/app.js?v=20260823-v7.32.2-start-button-up"></script>
-<script defer src="/reader-tooltip-cleanup.js?v=20260822-v7.31.4-no-reader-help-tooltip"></script>
+<script defer src="/app.js?v=20260823-v7.33.3-reader-stability"></script>
+<script defer src="/reader-tooltip-cleanup.js?v=20260823-v7.33.3-reader-stability"></script>
 <script defer src="/workspace-music-handoff.js?v=0.11.2-main-dock"></script>
 <script defer src="/music-save-reliability.js?v=2.0.1-no-mo"></script>
 <script defer src="/cloud-preferences.js?v=8.1.3-no-mo"></script>
@@ -85,7 +114,7 @@
   <script defer src="/cloud-document.js?v=9.2.18-cloud-remove-unified"></script>
   <script defer src="/cloud-productivity.js?v=9.2.19-no-mo"></script>
   <script defer src="/document-manager.js?v=9.2.19-no-mo"></script>
-  <script defer src="/read-anything.js?v=20260817-article-actions-on-document-r1"></script>
+  <script defer src="/read-anything.js?v=20260823-v7.33.3-article-action-stability"></script>
 <script defer src="/workspace-reader-handoff.js?v=0.11.1-freebooks-music"></script>
   <script defer src="/ask-mark-hub.js?v=9.6.8-passage-comparison-bridge"></script>
   <script defer src="/app-walkthrough.js?v=9.4.7-no-mo"></script>
@@ -93,7 +122,7 @@
   <script defer src="/content-share.js?v=20260822-v1.3-repeat-symposium-topic"></script>
   <script defer src="/passage-comparison.js?v=20260823-v1.5-multi-reader-labels"></script>
     <script defer src="/topic-feeds.js?v=20260822-v7.31-header-paper-sync"></script>
-    <script defer src="/topic-feed-reader-cleanup.js?v=20260823-v1-non-feed-isolation"></script>
+    <script defer src="/topic-feed-reader-cleanup.js?v=20260823-v1.1-reader-stability"></script>
     <script defer src="/reader-music-quick.js?v=1.5.6-reader-anchored-player"></script>
     <script defer src="/crypto-ticker.js?v=1.0.1-no-mo"></script>
     <script defer src="/market-indexes.js?v=1.0.1-no-observer"></script>

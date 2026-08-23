@@ -1,4 +1,4 @@
-/* Mark, Set, Go! Workspace Experiment v0.5.7 — multi-Reader foundation */
+/* Mark, Set, Go! Workspace Experiment v0.5.9 — Reader stability */
 /* Mark, Set, Go! workspace experiment */
 .msg-workspace-shell{
   --msg-secondary-width: 360px;
@@ -923,4 +923,43 @@ body.msg-reader-focus-active{
 .msg-readers-list button.is-active{
   background:color-mix(in srgb, #d5a928 16%, white) !important;
   box-shadow:inset 3px 0 #d5a928 !important;
+}
+
+
+/* v0.5.9 — numbered Reader stability. */
+@media (min-width:901px) {
+  #app > .msg-workspace-shell:not(.is-closed):has(.msg-secondary-reader-frame) {
+    grid-template-columns:minmax(0,1fr) 8px minmax(360px,var(--msg-secondary-width)) !important;
+  }
+}
+
+/* Reader 2+ uses the same semantic experience-theme colors as Reader 1. */
+html.msg-secondary-reader-document #app .reader-page-panel :is(
+  button.secondary,
+  .reader-side-toggle,
+  .mark-pane-button,
+  #pause-reader,
+  #reset-reader,
+  #fs-pause,
+  #fs-reset,
+  .reader-topright-font-control button,
+  .reader-topright-music-toggle,
+  [data-reader-wpm-music-toggle],
+  .viewer-fullscreen-button
+) {
+  background:linear-gradient(180deg,var(--msg-theme-surface,var(--msg-surface,#fff)),var(--msg-theme-soft-2,var(--msg-blue-soft-2,#f4f7fa))) !important;
+  border-color:color-mix(in srgb,var(--msg-theme-gold,var(--msg-gold,#d5a928)) 62%,var(--msg-theme-border,var(--msg-blue-border,#9fb4c7))) !important;
+  color:var(--msg-theme-accent-dark,var(--msg-navy-deep,#07182d)) !important;
+}
+html.msg-secondary-reader-document #app .reader-page-panel :is(button.primary,#start-reader,#fs-start) {
+  background:linear-gradient(180deg,var(--msg-theme-accent,var(--msg-blue,#0c2340)),var(--msg-theme-accent-dark,var(--msg-navy-deep,#07182d))) !important;
+  border-color:var(--msg-theme-accent-dark,var(--msg-navy-deep,#07182d)) !important;
+  color:#fff !important;
+}
+html.msg-secondary-reader-document #app .reader-page-panel :is(.reader-side-toggle,.mark-pane-button)[aria-pressed="true"] {
+  background:var(--msg-theme-soft,var(--msg-blue-soft,#e7f0f7)) !important;
+  box-shadow:inset 3px 0 0 var(--msg-theme-gold,var(--msg-gold,#d5a928)) !important;
+}
+html.msg-secondary-reader-document #app .read-anything-inline-article-summary {
+  color:var(--msg-theme-accent,var(--msg-blue,#0c2340)) !important;
 }

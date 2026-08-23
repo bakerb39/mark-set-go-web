@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.1 — non-workspace Reader switching
+ * Mark, Set, Go! Workspace Experiment v0.15.2 — Reader stability
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -319,8 +319,9 @@
   function preferredSecondaryReaderWidth(shell = workspaceShell()) {
     const available = Math.max(0, shell?.getBoundingClientRect?.().width || APP.getBoundingClientRect().width || 0);
     if (!available) return MIN_SECONDARY_WIDTH;
-    const maxSecondary = Math.max(MIN_SECONDARY_WIDTH, available - 520 - 8);
-    return Math.max(MIN_SECONDARY_WIDTH, Math.min(Math.floor(available * 0.48), maxSecondary));
+    // Numbered Readers open at half of the usable reading width. Other workspace
+    // pages retain their existing compact sizing and the divider remains usable.
+    return Math.max(MIN_SECONDARY_WIDTH, Math.floor((available - 8) / 2));
   }
 
   function workspaceEnabled() {
@@ -464,6 +465,16 @@
     if (event.key !== WORKSPACE_PREF_KEY) return;
     installProfileWorkspaceToggle(document);
     applyWorkspacePreferencePresentation(event.newValue === '1');
+  });
+
+  const syncAuxiliaryReaderThemes = () => {
+    for (const record of PANELS.values()) {
+      const frame = record?.node?.querySelector?.('.msg-aux-reader-frame');
+      try { frame?.contentWindow?.__MSG_SYNC_AUXILIARY_READER_THEME__?.(); } catch {}
+    }
+  };
+  document.addEventListener('marksetgo:experience-profile-changed', () => {
+    window.requestAnimationFrame(syncAuxiliaryReaderThemes);
   });
 
   function humanize(value) {
@@ -838,6 +849,12 @@
       node.dataset.msgReaderId = `reader-${readerNumber}`;
     }
     node.innerHTML = `<iframe class="msg-workspace-page-frame${auxiliaryReader ? ' msg-secondary-reader-frame msg-aux-reader-frame' : ''}" ${auxiliaryReader ? `data-msg-reader-number="${readerNumber}" data-msg-reader-id="reader-${readerNumber}"` : ''} title="${escapeWorkspaceHtml(label)}" src="${escapeWorkspaceHtml(panelUrl(mode, value))}" loading="eager"></iframe>`;
+    if (auxiliaryReader) {
+      const frame = node.querySelector('.msg-aux-reader-frame');
+      frame?.addEventListener('load', () => {
+        try { frame.contentWindow?.__MSG_SYNC_AUXILIARY_READER_THEME__?.(); } catch {}
+      });
+    }
     return node;
   }
 
@@ -1163,11 +1180,11 @@
     const symposium = document.querySelector('[data-action="symposium"]');
     const primaryReader = document.querySelector('.top-reader-return[data-action="reader"]');
 
-    // Retire the old one-off “Reader 2” button. Reader 1 now owns a compact
-    // + control that allocates Reader 2 through Reader 10 as needed.
+    // Retire the old one-off “Reader 2” button. The Readers control owns a compact
+    // + button that allocates Reader 2 through Reader 10 as needed.
     document.querySelector('[data-msg-workspace-open="reader"]')?.remove();
 
-    let addReaderButton = document.querySelector('[data-msg-reader-add]');
+    let addReaderButton = document.querySelector('.msg-reader-add-button[data-msg-reader-add]');
     if (!addReaderButton) {
       addReaderButton = document.createElement('button');
       addReaderButton.type = 'button';
@@ -1176,10 +1193,6 @@
       addReaderButton.textContent = '+';
       nav.appendChild(addReaderButton);
     }
-    if (primaryReader && primaryReader.nextSibling !== addReaderButton) {
-      primaryReader.insertAdjacentElement('afterend', addReaderButton);
-    }
-
     let readersMenu = document.querySelector('.msg-readers-menu');
     if (!readersMenu) {
       readersMenu = document.createElement('details');
@@ -1192,8 +1205,13 @@
         </div>`;
       nav.appendChild(readersMenu);
     }
-    if (addReaderButton.nextSibling !== readersMenu) {
-      addReaderButton.insertAdjacentElement('afterend', readersMenu);
+    // Keep Reader 1 as a normal direct button, then group Reader management:
+    // Reader | Readers | +. The + no longer looks attached to Reader 1.
+    if (primaryReader && primaryReader.nextSibling !== readersMenu) {
+      primaryReader.insertAdjacentElement('afterend', readersMenu);
+    }
+    if (readersMenu.nextSibling !== addReaderButton) {
+      readersMenu.insertAdjacentElement('afterend', addReaderButton);
     }
     renderReadersMenu();
     syncAddReaderControl();

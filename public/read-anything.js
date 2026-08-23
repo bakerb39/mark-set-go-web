@@ -1715,7 +1715,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           'padding:0',
           'border:0',
           'background:none',
-          'color:#1769aa',
+          'color:var(--msg-theme-accent,var(--msg-blue,#1769aa))',
           'font:inherit',
           'font-size:.8em',
           'font-weight:600',
@@ -1768,9 +1768,18 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       );
 
       actionRow.append(summaryLink, separator, investorLink, postSeparator, createPostLink);
-      reader.prepend(actionRow);
-    } else if (actionRow.parentElement !== reader) {
-      reader.prepend(actionRow);
+    }
+
+    // Topic Feed owns a fixed external story header. Once it exists, leave the
+    // same action-row DOM node there instead of pulling it back into #reader.
+    const sourceType = String(activeImportedDocument?.source?.type || '').toLowerCase();
+    const topicFeedHeader = sourceType === 'topic-feed'
+      ? reader.closest('#reader-frame')?.querySelector(':scope > [data-topic-feed-story-header-external]')
+      : null;
+    const actionHost = topicFeedHeader || reader;
+    if (actionRow.parentElement !== actionHost) {
+      if (actionHost === reader) reader.prepend(actionRow);
+      else actionHost.appendChild(actionRow);
     }
 
     const link = actionRow.querySelector('[data-action="summarize-whole-article"]');
@@ -1869,28 +1878,6 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     }
   }
 
-  function observeInlineArticleSummary() {
-    const reader = document.querySelector('#app #reader');
-    if (!reader || reader.dataset.inlineArticleSummaryObserved === '1') return;
-    reader.dataset.inlineArticleSummaryObserved = '1';
-
-    let queued = false;
-    const observer = new MutationObserver(() => {
-      if (queued) return;
-      queued = true;
-      window.requestAnimationFrame(() => {
-        queued = false;
-        if (!reader.isConnected || !activeImportedDocument || !isWholeArticleDocument()) {
-          observer.disconnect();
-          return;
-        }
-        installArticleSummaryButton();
-      });
-    });
-
-    observer.observe(reader, { childList: true });
-  }
-
   function installDefaultArticleBookPages() {
     if (!activeImportedDocument || !isWholeArticleDocument()) return;
 
@@ -1910,34 +1897,8 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     [0, 100, 350, 800].forEach((delay) => window.setTimeout(() => {
       installDisplayFormatControl();
       installArticleSummaryButton();
-      observeInlineArticleSummary();
       installDefaultArticleBookPages();
     }, delay));
-    return;
-    formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
-    formatControlAttachTimers = [];
-    let frame = 0;
-    const attachObserver = new MutationObserver(() => {
-      if (!activeImportedDocument) return attachObserver.disconnect();
-      installFormatControl();
-      if (document.querySelector('#read-anything-format-control')) attachObserver.disconnect();
-    });
-    attachObserver.observe(app, { childList: true, subtree: true });
-    window.setTimeout(() => attachObserver.disconnect(), 5000);
-    const attachAfterRender = () => {
-      if (!activeImportedDocument) return;
-      installFormatControl();
-      if (document.querySelector('#read-anything-format-control')) return;
-      frame += 1;
-      if (frame < 180) window.requestAnimationFrame(attachAfterRender);
-    };
-    window.requestAnimationFrame(attachAfterRender);
-    [250, 750, 1500, 3000].forEach((delay) => {
-      const timer = window.setTimeout(() => {
-        if (activeImportedDocument) installFormatControl();
-      }, delay);
-      formatControlAttachTimers.push(timer);
-    });
   }
 
   function installFormatControl() {
@@ -2326,7 +2287,6 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
         scheduleFormatControlAttach();
         installArticleSummaryButton();
-        observeInlineArticleSummary();
 
         if (activeImportedDocument && isWholeArticleDocument()) {
           complete = true;
@@ -2426,5 +2386,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     requestCustomTransform,
     requestTranslation
   });
-  window.setTimeout(openPendingCapture, 0);
+  // A numbered Reader is intentionally empty until the reader chooses content
+  // for that Reader. Pending captures belong to the main Reader startup only.
+  if (!window.__MSG_SECONDARY_READER__) window.setTimeout(openPendingCapture, 0);
 })();
