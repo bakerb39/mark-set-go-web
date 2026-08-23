@@ -11839,6 +11839,67 @@ function notebookRecordFullText(item) {
   return parts.join('\n');
 }
 
+function markRecordSharePayload(item,{sourceLabel='Notebook',type='notebook-entry'}={}) {
+  if(!item)return null;
+  const passage=String(item.selection||'').trim();
+  const note=String(item.note||'').trim();
+  const question=String(item.question||'').trim();
+  const response=String(item.result?.response||'').trim();
+  const keyPoints=Array.isArray(item.result?.keyPoints) ? item.result.keyPoints.filter(Boolean).map(String) : [];
+  const cautions=Array.isArray(item.result?.cautions) ? item.result.cautions.filter(Boolean).map(String) : [];
+
+  let text='';
+  if(response){
+    const responseParts=[response];
+    if(keyPoints.length)responseParts.push(`Key points:
+${keyPoints.map(x=>`- ${x}`).join('\n')}`);
+    if(cautions.length)responseParts.push(`Notes and cautions:
+${cautions.map(x=>`- ${x}`).join('\n')}`);
+    text=responseParts.join('\n\n');
+  }else{
+    text=passage||note||question;
+  }
+  if(!text)return null;
+
+  const contextParts=[];
+  if(response&&passage)contextParts.push(`Relevant passage:
+${passage}`);
+  if(note)contextParts.push(`My note:
+${note}`);
+  if(response&&question)contextParts.push(`Question:
+${question}`);
+
+  return {
+    type,
+    title:item.title||item.result?.heading||'Notebook entry',
+    text,
+    context:contextParts.join('\n\n'),
+    sourceLabel,
+    documentId:item.documentId||state.documentId||'',
+    chapter:item.chapter||item.pageContext||'',
+    startIndex:Number(item.startIndex)||0,
+    metadata:{
+      recordId:item.id||'',
+      recordType:item.recordType||'',
+      action:item.action||'',
+      question
+    }
+  };
+}
+
+function shareMarkRecord(item,destination,{sourceLabel='Notebook',type='notebook-entry'}={}) {
+  const payload=markRecordSharePayload(item,{sourceLabel,type});
+  if(!payload)return false;
+  const shareApi=window.MSGContentShare;
+  const handler=destination==='symposium' ? shareApi?.toSymposium : shareApi?.toChat;
+  if(typeof handler!=='function'){
+    window.alert(destination==='symposium' ? 'Symposium sharing is not available yet.' : 'Chat sharing is not available yet.');
+    return false;
+  }
+  handler.call(shareApi,payload);
+  return true;
+}
+
 function downloadTextFile(filename, text) {
   const blob=new Blob([String(text||'')],{type:'text/plain;charset=utf-8'});
   const url=URL.createObjectURL(blob);
@@ -11897,6 +11958,8 @@ function notebookEntryMarkup(item) {
     <details class="notebook-plain-text"><summary>View as plain text</summary><pre>${escapeHtml(notebookRecordFullText(item))}</pre></details>
     <div class="notebook-record-actions">
       ${item.documentId?`<button type="button" data-mark-jump="${Number(item.startIndex)||0}">Return to passage</button>`:''}
+      <button type="button" data-share-notebook-record="chat" data-share-notebook-id="${escapeHtml(item.id)}">💬 Send to Chat</button>
+      <button type="button" data-share-notebook-record="symposium" data-share-notebook-id="${escapeHtml(item.id)}">🏛 Discuss in Symposium</button>
       <button type="button" data-export-notebook-record="${escapeHtml(item.id)}">Save as text</button>
       <button type="button" data-edit-notebook-note="${escapeHtml(item.id)}">Add/Edit my note</button>
       <button type="button" data-mark-delete="${escapeHtml(item.id)}">Delete</button>
@@ -11906,6 +11969,11 @@ function notebookEntryMarkup(item) {
 
 function bindExpandedNotebookButtons(panel,records,key=MARK_INSIGHTS_KEY) {
   bindMarkRecordButtons(panel,key);
+  panel.querySelectorAll('[data-share-notebook-record]').forEach(button=>button.addEventListener('click',()=>{
+    const item=records.find(x=>x.id===button.dataset.shareNotebookId);
+    if(!item)return;
+    shareMarkRecord(item,button.dataset.shareNotebookRecord,{sourceLabel:'Notebook',type:'notebook-entry'});
+  }));
   panel.querySelectorAll('[data-export-notebook-record]').forEach(button=>button.addEventListener('click',()=>{
     const item=records.find(x=>x.id===button.dataset.exportNotebookRecord);
     if(item)exportNotebookRecords([item],`${item.title||'Book'} - Notebook Entry`);
@@ -11943,7 +12011,13 @@ function renderMarkNotebook(){
 }
 function renderMarkHistory(){
   const panel=app.querySelector('#mark-history-panel'); if(!panel)return; const items=markRecordsForCurrentBook(MARK_HISTORY_KEY);
-  panel.innerHTML=`<div class="mark-list-heading"><strong>Conversation History</strong><small>${items.length} requests</small></div>${items.length?items.map(item=>`<article class="mark-record"><span>${escapeHtml(item.action)}${item.question?` · ${escapeHtml(item.question)}`:''}</span><blockquote>${escapeHtml(item.selection.slice(0,280))}${item.selection.length>280?'…':''}</blockquote><p>${escapeHtml(item.result?.response?.slice(0,500)||'')}</p><div><button type="button" data-mark-jump="${item.startIndex}">Return to passage</button></div></article>`).join(''):'<p class="mark-empty-note">Your requests to Ask Mark for this book will appear here.</p>'}`; bindMarkRecordButtons(panel,MARK_HISTORY_KEY);
+  panel.innerHTML=`<div class="mark-list-heading"><strong>Conversation History</strong><small>${items.length} requests</small></div>${items.length?items.map(item=>`<article class="mark-record"><span>${escapeHtml(item.action)}${item.question?` · ${escapeHtml(item.question)}`:''}</span><blockquote>${escapeHtml(item.selection.slice(0,280))}${item.selection.length>280?'…':''}</blockquote><p>${escapeHtml(item.result?.response?.slice(0,500)||'')}</p><div><button type="button" data-mark-jump="${item.startIndex}">Return to passage</button><button type="button" data-share-mark-history="chat" data-share-history-id="${escapeHtml(item.id)}">💬 Send to Chat</button><button type="button" data-share-mark-history="symposium" data-share-history-id="${escapeHtml(item.id)}">🏛 Discuss in Symposium</button></div></article>`).join(''):'<p class="mark-empty-note">Your requests to Ask Mark for this book will appear here.</p>'}`;
+  bindMarkRecordButtons(panel,MARK_HISTORY_KEY);
+  panel.querySelectorAll('[data-share-mark-history]').forEach(button=>button.addEventListener('click',()=>{
+    const item=items.find(x=>x.id===button.dataset.shareHistoryId);
+    if(!item)return;
+    shareMarkRecord(item,button.dataset.shareMarkHistory,{sourceLabel:'Reading Companion History',type:'companion-history'});
+  }));
 }
 function bindMarkRecordButtons(panel,key){
   panel.querySelectorAll('[data-mark-jump]').forEach(b=>b.addEventListener('click',()=>{const index=Number(b.dataset.markJump)||0;state.index=index;const reader=app.querySelector('#reader');const mode=state.renderedMode||getSelectedMode();const count=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);restoreReadingAnchor(reader,mode,count,index);updateReaderStatus();}));
