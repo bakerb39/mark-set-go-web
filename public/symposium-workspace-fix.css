@@ -1,4 +1,4 @@
-/* Mark, Set, Go! Symposium workspace v4.2
+/* Mark, Set, Go! Symposium workspace v4.3
    Symposium is a first-class wide workspace surface.
    - opens at Chat-like width
    - whole Symposium pane scrolls vertically
@@ -56,6 +56,26 @@
   overflow-y: auto !important;
   overscroll-behavior: contain !important;
   scrollbar-gutter: stable;
+}
+
+/* workspace-experiment.css later sets .msg-workspace-panel-body to
+   overflow:hidden. This direct content-aware selector is intentionally
+   stronger so the complete Symposium setup (including Begin Symposium) is
+   always reachable. */
+.msg-workspace-panel-body:has(> .msg-workspace-symposium) {
+  min-height: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: contain !important;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.msg-workspace-panel-body:has(> .msg-workspace-symposium) > .msg-workspace-symposium {
+  display: block !important;
+  min-height: 100% !important;
+  height: auto !important;
+  overflow: visible !important;
 }
 
 .msg-workspace-symposium {

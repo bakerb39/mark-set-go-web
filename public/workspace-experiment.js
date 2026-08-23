@@ -618,14 +618,78 @@
     return registerPanel(key, label || humanize(value), createAppPagePanel(mode, value, label || humanize(value)));
   }
 
-  function showWorkspacePanel(kind) {
+  function consumeWorkspaceSymposiumHandoff(suppliedHandoff = null) {
+    // toSymposium() stores the handoff for non-workspace routes too. When the
+    // workspace receives that same object directly, consume the stored copy so
+    // it cannot be replayed later as a stale topic.
+    const pending = window.MSGContentShare?.takeSymposiumHandoff?.() || null;
+    return suppliedHandoff || pending;
+  }
+
+  function applySymposiumWorkspaceHandoff(rootHost, suppliedHandoff = null) {
+    const handoff = consumeWorkspaceSymposiumHandoff(suppliedHandoff);
+    const root = rootHost?.querySelector?.('.symposium-page');
+    if (!handoff || !root) return false;
+
+    const topicText = String(handoff.symposiumTopic || handoff.title || '').trim();
+    const contextText = String(handoff.symposiumContext || handoff.context || handoff.text || '').trim();
+    const sourceLabel = String(handoff.sourceLabel || 'Reader').trim() || 'Reader';
+    const sharedLabel = `Shared from ${sourceLabel}`;
+
+    const topic = root.querySelector('#symposium-topic');
+    const context = root.querySelector('#symposium-context');
+    const contextLabel = root.querySelector('#symposium-context-label');
+    if (topicText && topic) topic.value = topicText;
+    if (context) context.value = contextText;
+    if (contextLabel) {
+      contextLabel.textContent = contextText
+        ? `${sharedLabel} · ${splitWords(contextText).length.toLocaleString()} words available`
+        : `${sharedLabel} · topic only`;
+    }
+
+    // Keep the newest shared passage available to the context-choice control.
+    root.__msgSymposiumShared = { text: contextText, label: sharedLabel };
+
+    // A Symposium opened manually may not yet have a Shared Content button.
+    // Add it only when needed; the delegated click handler below owns behavior.
+    const contextChoices = root.querySelector('.symposium-context-choice');
+    if (contextText && contextChoices && !contextChoices.querySelector('[data-symposium-context="shared"]')) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.symposiumContext = 'shared';
+      button.textContent = 'Use shared content';
+      contextChoices.prepend(button);
+    }
+
+    const status = root.querySelector('#symposium-stage-status');
+    if (status) status.textContent = 'New highlighted passage loaded · begin a new Symposium when ready';
+
+    const startButton = root.querySelector('#symposium-start');
+    if (startButton && !root.querySelector('#symposium-transcript .symposium-empty')) {
+      startButton.textContent = 'Begin New Symposium';
+    }
+
+    // Bring the refreshed setup into view without destroying an existing
+    // transcript. Beginning the new session remains an explicit user action.
+    window.requestAnimationFrame(() => {
+      try { topic?.scrollIntoView({ block:'center', behavior:'smooth' }); } catch {}
+    });
+    return true;
+  }
+
+  function showWorkspacePanel(kind, options = {}) {
     if (!hasReader()) return false;
     const key = `tool:${kind}`;
-    if (PANELS.has(key)) return activatePanel(key);
+    if (PANELS.has(key)) {
+      const record = PANELS.get(key);
+      const activated = activatePanel(key);
+      if (kind === 'symposium') applySymposiumWorkspaceHandoff(record?.node, options.handoff || null);
+      return activated;
+    }
 
     const node = document.createElement('div');
     node.className = `msg-workspace-panel msg-workspace-${kind}`;
-    if (kind === 'symposium') renderSymposiumWorkspace(node);
+    if (kind === 'symposium') renderSymposiumWorkspace(node, options.handoff || null);
     else if (kind === 'browser') renderBrowserWorkspace(node);
     else return false;
 
@@ -930,16 +994,16 @@
     openPage: openAppPage,
     close: closeWorkspacePanel,
     browser: () => showWorkspacePanel('browser'),
-    symposium: () => showWorkspacePanel('symposium'),
+    symposium: (handoff = null) => showWorkspacePanel('symposium', { handoff }),
     musicSearch: (query, title) => workspaceYouTubeSearch(query, title),
     enabled: workspaceEnabled,
     setEnabled: (enabled) => { writeWorkspacePreference(Boolean(enabled)); installProfileWorkspaceToggle(document); if (!enabled) closeWorkspacePanel(); }
   });
 
-function renderSymposiumWorkspace(rootHost) {
+function renderSymposiumWorkspace(rootHost, suppliedHandoff = null) {
   ensureSymposiumStyles();
   const readingContext = currentSymposiumReadingContext();
-  const sharedHandoff = window.MSGContentShare?.takeSymposiumHandoff?.() || null;
+  const sharedHandoff = consumeWorkspaceSymposiumHandoff(suppliedHandoff);
   const sharedContextText = String(sharedHandoff?.symposiumContext || '').trim();
   const sharedContextLabel = sharedHandoff ? `Shared from ${sharedHandoff.sourceLabel || 'app content'}` : '';
   const defaultTopic = sharedHandoff?.symposiumTopic || (state?.title ? `Explore the central ideas in ${state.title}` : '');
@@ -1035,6 +1099,7 @@ function renderSymposiumWorkspace(rootHost) {
   const startButton = root.querySelector('#symposium-start');
   const rosterEl = root.querySelector('#symposium-roster');
   const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'' };
+  root.__msgSymposiumShared = { text: sharedContextText, label: sharedContextLabel };
 
   const scrollTranscript = () => { transcriptEl.scrollTop = transcriptEl.scrollHeight; };
   const shouldSpeak = () => session.output === 'both' || session.output === 'speak';
@@ -1052,18 +1117,21 @@ function renderSymposiumWorkspace(rootHost) {
     if (label) statusEl.innerHTML = busy ? `${symposiumEscape(label)} <span class="symposium-loading"><i></i><i></i><i></i></span>` : symposiumEscape(label);
   };
 
-  root.querySelectorAll('[data-symposium-context]').forEach((button)=>button.addEventListener('click',()=>{
-    if (button.dataset.symposiumContext === 'shared' && sharedContextText) {
-      root.querySelector('#symposium-context').value = sharedContextText;
-      root.querySelector('#symposium-context-label').textContent = `${sharedContextLabel} · ${splitWords(sharedContextText).length.toLocaleString()} words available`;
+  root.addEventListener('click', (event) => {
+    const button = event.target.closest?.('[data-symposium-context]');
+    if (!button || !root.contains(button)) return;
+    const liveShared = root.__msgSymposiumShared || { text: sharedContextText, label: sharedContextLabel };
+    if (button.dataset.symposiumContext === 'shared' && liveShared.text) {
+      root.querySelector('#symposium-context').value = liveShared.text;
+      root.querySelector('#symposium-context-label').textContent = `${liveShared.label} · ${splitWords(liveShared.text).length.toLocaleString()} words available`;
     } else if (button.dataset.symposiumContext === 'reading') {
       root.querySelector('#symposium-context').value = readingContext.text;
       root.querySelector('#symposium-context-label').textContent = `${readingContext.label} · ${splitWords(readingContext.text).length.toLocaleString()} words available`;
-    } else {
+    } else if (button.dataset.symposiumContext === 'none') {
       root.querySelector('#symposium-context').value = '';
       root.querySelector('#symposium-context-label').textContent = 'Topic only · no reading passage supplied';
     }
-  }));
+  });
 
   rosterEl.addEventListener('change', (event)=>{
     if (!event.target.matches('[data-symposium-person]')) return;

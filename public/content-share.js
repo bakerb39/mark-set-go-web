@@ -114,12 +114,15 @@
       return true;
     }
 
-    storeSymposiumHandoff(content);
+    const handoff = storeSymposiumHandoff(content);
 
     try {
       const workspace = window.MSGWorkspaceExperiment;
       if (document.querySelector('#reader') && workspace?.enabled?.() && typeof workspace.symposium === 'function') {
-        workspace.symposium();
+        // Pass the new handoff directly. If the Symposium tab is already open,
+        // the workspace can replace its setup topic/context immediately instead
+        // of merely re-activating a stale first-session panel.
+        workspace.symposium(handoff);
         return true;
       }
     } catch {}
