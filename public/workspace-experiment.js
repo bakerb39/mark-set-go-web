@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.7 — close-only themed pane chrome
+ * Mark, Set, Go! Workspace Experiment v0.15.8 — Home Reader 1 route
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -1533,6 +1533,16 @@
         shell?.classList.remove('msg-primary-reader-hidden');
         document.body.classList.remove('msg-primary-reader-view-hidden');
         closeWorkspacePanel();
+
+        // Reader 1 can be selected while the main app is showing Home or any
+        // other non-Reader page. Closing the workspace alone is a no-op there,
+        // so hand off to the app's existing Reader navigation route as well.
+        // Reuse the real top-level Reader button rather than duplicating Reader
+        // state/session logic inside the workspace controller.
+        const appView = String(APP?.dataset?.viewKey || '');
+        if (appView !== 'reader' && appView !== 'reader-secondary') {
+          document.querySelector('.top-reader-return[data-action="reader"]')?.click();
+        }
       } else if (readerNumber >= 2) openReaderSession(readerNumber);
       return;
     }

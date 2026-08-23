@@ -1,4 +1,4 @@
-/* Mark, Set, Go! v7.34.6 — continuous theme background + readable Home + standalone-only page close.
+/* Mark, Set, Go! v7.34.7 — continuous theme background + readable Home + Home standalone close.
    Presentation/navigation chrome only. No Reader core, timing, pagination, or word DOM changes. */
 
 /* ONE CONTINUOUS THEME BACKGROUND
@@ -128,7 +128,9 @@ html[data-msg-experience-theme] #app .home-simple .source-category {
   cursor: pointer;
 }
 
-body:has(#app[data-view-key]:not([data-view-key="home"]):not([data-view-key="action:home"]):not([data-view-key="reader"]):not([data-view-key="reader-secondary"])) #msg-standalone-page-close {
+/* Show on Home and every other standalone app page. Reader itself keeps its
+   own Reader-specific window control, so do not duplicate the X there. */
+body:has(#app[data-view-key]:not([data-view-key="reader"]):not([data-view-key="reader-secondary"])) #msg-standalone-page-close {
   display: inline-flex;
 }
 
