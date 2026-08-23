@@ -1,7 +1,7 @@
-/* Mark, Set, Go! — Passage Comparison Basket v1.4
+/* Mark, Set, Go! — Passage Comparison Basket v1.5
    - Intercepts the Reader popup toolbar's existing ∞ Compare action.
    - Collects selected passages without browser storage.
-   - Reader 2 hands selections to the parent Reader.
+   - Any auxiliary Reader hands selections to Reader 1’s shared basket.
    - Separate top-level tabs synchronize live with BroadcastChannel.
    - Ask Mark can compare immediately; Comparison Workspace remains optional.
    - No MutationObserver. */
@@ -74,6 +74,12 @@
       .sort((a, b) => Number(a.dataset.index) - Number(b.dataset.index));
   }
 
+  function currentReaderLabel() {
+    const number = Number(window.__MSG_READER_NUMBER__ || 0);
+    if (Number.isFinite(number) && number >= 2) return `Reader ${Math.min(10, Math.floor(number))}`;
+    return window.__MSG_SECONDARY_READER__ ? 'Reader 2' : 'Reader 1';
+  }
+
   function collectCurrentSelection() {
     const reader = document.querySelector('#reader');
     if (!reader) return null;
@@ -131,7 +137,7 @@
     const endIndex = Number.isFinite(Number(canonicalSelection?.endIndex))
       ? Number(canonicalSelection.endIndex)
       : (words.length ? Number(words[words.length - 1].dataset.index) + 1 : null);
-    const readerLabel = window.__MSG_SECONDARY_READER__ ? 'Reader 2' : 'Reader 1';
+    const readerLabel = currentReaderLabel();
 
     return normalizePassage({
       documentId: canonicalSelection?.documentId || doc?.documentId || doc?.id || source?.documentId || '',
@@ -460,7 +466,7 @@
     const button = target?.closest?.('button');
     if (!button) return null;
 
-    // Reader 1 and Reader 2 both use an Ask Mark selection toolbar, but keep
+    // Reader 1 and every auxiliary Reader use an Ask Mark selection toolbar, but keep
     // this intentionally tolerant of older/newer toolbar markup. The action
     // attribute is preferred; the visible Compare label is the compatibility
     // fallback. Never intercept Compare controls elsewhere in the application.
@@ -478,7 +484,7 @@
   // Absolute safety gate for the legacy Reader Compare implementation.
   // app.js still has a direct button listener that writes a one-passage draft
   // and opens bare /comparison-workspace.html. If that legacy listener ever
-  // receives the click (for example inside Reader 2), convert the attempted
+  // receives the click (for example inside an auxiliary Reader), convert the attempted
   // navigation into a basket add instead. The basket's own explicit workspace
   // action uses ?passageBasket=1 and is deliberately allowed through.
   const nativeWindowOpen = window.open.bind(window);
@@ -506,7 +512,7 @@
       try {
         window.parent.postMessage({
           type: 'msg-passage-comparison-status',
-          message: 'Reader 2 could not find the highlighted passage. Highlight it again and choose Compare.'
+          message: `${currentReaderLabel()} could not find the highlighted passage. Highlight it again and choose Compare.`
         }, window.location.origin);
       } catch {}
     } else {
@@ -532,7 +538,7 @@
     if (!button) return;
 
     // IMPORTANT: this listener is installed on WINDOW capture, which is earlier
-    // in the event path than app.js's document/toolbar listeners. Reader 2 used
+    // in the event path than app.js's document/toolbar listeners. an auxiliary Reader used
     // to reach the legacy openComparisonWorkspace() handler before the basket
     // could forward its second passage. Owning the event here guarantees that
     // Compare means "add this passage" until the reader explicitly chooses
@@ -548,7 +554,7 @@
         try {
           window.parent.postMessage({
             type: 'msg-passage-comparison-status',
-            message: 'Reader 2 could not find the highlighted passage. Highlight it again and choose Compare.'
+            message: `${currentReaderLabel()} could not find the highlighted passage. Highlight it again and choose Compare.`
           }, window.location.origin);
         } catch {}
       }
@@ -561,7 +567,7 @@
   }
 
   // Window capture is deliberate. It runs before document/target listeners even
-  // though this module is loaded after app.js. This is what makes Reader 2 safe
+  // though this module is loaded after app.js. This is what makes auxiliary Readers safe
   // from the legacy one-passage comparison navigation.
   window.addEventListener('click', handleCompareClick, true);
 
@@ -606,7 +612,7 @@
   }
 
   window.MSGPassageComparison = Object.freeze({
-    version: '1.4-askmark-chat-bridge',
+    version: '1.5-multi-reader-labels',
     addPassage: (passage) => isChildFrame ? forwardSelection(normalizePassage(passage)) : addPassage(passage),
     clear: clearPassages,
     passages: () => passages.map((item) => ({ ...item })),

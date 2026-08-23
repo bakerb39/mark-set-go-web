@@ -1,4 +1,4 @@
-/* Mark, Set, Go! Workspace Experiment v0.4.8 */
+/* Mark, Set, Go! Workspace Experiment v0.5.7 — multi-Reader foundation */
 /* Mark, Set, Go! workspace experiment */
 .msg-workspace-shell{
   --msg-secondary-width: 360px;
@@ -770,9 +770,9 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
 }
 
 
-/* v0.5.6 — Reader 2 must size to the live workspace viewport.
+/* v0.5.6 — Auxiliary Readers must size to the live workspace viewport.
    Generic workspace pages use a 640px minimum iframe height, but a full Reader
-   is a viewport application of its own. Keeping that generic minimum on Reader 2
+   is a viewport application of its own. Keeping that generic minimum on an auxiliary Reader
    makes short/full-screen browser viewports overflow and crop the two-reader
    workspace. */
 .msg-workspace-secondary-reader-page.msg-workspace-panel-active {
@@ -795,4 +795,71 @@ html.msg-workspace-pane-document textarea{font-size:.9rem}
 }
 #app > .msg-workspace-shell:not(.is-closed):has(.msg-secondary-reader-frame) > :is(.msg-workspace-primary,.msg-workspace-secondary) {
   min-width:0 !important;
+}
+
+
+/* v0.5.7 — multi-Reader controls. Reader 1 owns one compact + button;
+   Reader 2–10 rotate through the existing horizontally scrollable workspace tabs. */
+.msg-reader-add-button{
+  display:inline-grid !important;
+  place-items:center !important;
+  flex:0 0 auto !important;
+  width:32px !important;
+  min-width:32px !important;
+  height:32px !important;
+  min-height:32px !important;
+  padding:0 !important;
+  margin-left:3px !important;
+  border-radius:50% !important;
+  font-size:20px !important;
+  font-weight:800 !important;
+  line-height:1 !important;
+}
+.msg-reader-add-button:disabled{
+  opacity:.42 !important;
+  cursor:not-allowed !important;
+}
+.msg-workspace-aux-reader-page.msg-workspace-panel-active{
+  height:100% !important;
+  min-height:0 !important;
+  max-height:100% !important;
+}
+.msg-aux-reader-frame{
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:100% !important;
+}
+
+.msg-readers-menu{
+  flex:0 0 auto;
+}
+.msg-readers-popover{
+  min-width:250px;
+  max-width:min(360px,calc(100vw - 24px));
+}
+.msg-readers-list{
+  display:grid;
+  gap:3px;
+}
+.msg-readers-list button,
+.msg-readers-add-menu{
+  width:100%;
+  display:grid;
+  gap:2px;
+  padding:8px 10px;
+  text-align:left;
+}
+.msg-readers-list button strong,
+.msg-readers-add-menu strong{
+  font-size:.82rem;
+}
+.msg-readers-list button small,
+.msg-readers-add-menu small{
+  max-width:290px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:.69rem;
+  opacity:.72;
 }

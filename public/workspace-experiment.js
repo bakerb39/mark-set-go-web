@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.14.3
+ * Mark, Set, Go! Workspace Experiment v0.15.0 — multi-Reader foundation
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -10,12 +10,50 @@
 
   const PARAMS = new URLSearchParams(window.location.search);
   const IS_WORKSPACE_PANE = PARAMS.get('msgWorkspacePane') === '1';
-  const IS_SECONDARY_READER_DOCUMENT = PARAMS.get('msgSecondaryReader') === '1';
+  const MAX_READERS = 10;
+  const requestedReaderNumber = Number.parseInt(PARAMS.get('msgReaderNumber') || '', 10);
+  const READER_NUMBER = Number.isFinite(requestedReaderNumber)
+    ? Math.min(MAX_READERS, Math.max(1, requestedReaderNumber))
+    : (PARAMS.get('msgSecondaryReader') === '1' ? 2 : 1);
+  const IS_AUXILIARY_READER_DOCUMENT = PARAMS.get('msgSecondaryReader') === '1' || READER_NUMBER > 1;
   const WORKSPACE_PREF_KEY = 'msg-workspace-optin-v1';
 
-  // Reader 2 is a full copy of the main application Reader running in its own
-  // iframe. It must not install another workspace/router inside itself.
-  if (IS_SECONDARY_READER_DOCUMENT) return;
+  // Every auxiliary Reader is a full copy of the main Reader in its own iframe.
+  // Keep the old secondary-reader flag for compatibility with protected Reader
+  // code, while assigning a stable numbered identity for multi-Reader features.
+  if (IS_AUXILIARY_READER_DOCUMENT) {
+    const readerNumber = Math.max(2, READER_NUMBER);
+    window.__MSG_SECONDARY_READER__ = true;
+    window.__MSG_READER_NUMBER__ = readerNumber;
+    window.__MSG_READER_ID__ = `reader-${readerNumber}`;
+    document.documentElement.dataset.msgReaderId = window.__MSG_READER_ID__;
+
+    const announceReaderState = () => {
+      let title = '';
+      let documentId = '';
+      try {
+        const current = window.MarkSetGoCurrentReaderDocument?.get?.() || {};
+        title = String(current.title || '').trim();
+        documentId = String(current.documentId || '').trim();
+      } catch {}
+      try {
+        window.parent?.postMessage?.({
+          type:'msg-reader-session-state',
+          readerNumber,
+          readerId:`reader-${readerNumber}`,
+          title,
+          documentId
+        }, window.location.origin);
+      } catch {}
+    };
+
+    document.addEventListener('marksetgo:document-available', () => window.setTimeout(announceReaderState, 0));
+    window.addEventListener('pageshow', () => window.setTimeout(announceReaderState, 0));
+    window.setTimeout(announceReaderState, 800);
+
+    // Auxiliary Readers never install another workspace/router inside themselves.
+    return;
+  }
 
   function readWorkspacePreference() {
     try { return localStorage.getItem(WORKSPACE_PREF_KEY) === '1'; }
@@ -396,6 +434,24 @@
       }
       return;
     }
+    if (event.data?.type === 'msg-reader-session-state') {
+      const readerNumber = normalizeReaderNumber(event.data.readerNumber);
+      const record = readerNumber >= 2 ? PANELS.get(readerPanelKey(readerNumber)) : null;
+      if (record) {
+        record.documentTitle = String(event.data.title || '').trim();
+        record.documentId = String(event.data.documentId || '').trim();
+        const frame = record.node?.querySelector?.('.msg-secondary-reader-frame');
+        if (frame) {
+          frame.dataset.msgReaderNumber = String(readerNumber);
+          frame.title = record.documentTitle
+            ? `Reader ${readerNumber} — ${record.documentTitle}`
+            : `Reader ${readerNumber}`;
+        }
+        renderWorkspaceTabs();
+        renderReadersMenu();
+      }
+      return;
+    }
     if (event.data?.type === 'msg-workspace-preference') {
       writeWorkspacePreference(Boolean(event.data.enabled));
       installProfileWorkspaceToggle(document);
@@ -520,7 +576,7 @@
   function syncMountedWorkspacePanels(body, activeKey = activePanelKey) {
     if (!body) return;
     PANELS.forEach((record, key) => {
-      // Keep every workspace panel mounted. In particular, removing Reader 2's
+      // Keep every workspace panel mounted. In particular, removing an auxiliary Reader's
       // iframe destroys its in-memory Reader/document/page position. Inactive
       // panels are parked visually by CSS instead of being detached.
       if (!record.node.isConnected) body.appendChild(record.node);
@@ -537,7 +593,7 @@
         const record = PANELS.get(key);
         const active = key === activePanelKey;
         return `<span class="msg-workspace-tab ${active ? 'active' : ''}">
-          <button type="button" class="msg-workspace-tab-main" data-msg-workspace-tab="${escapeWorkspaceHtml(key)}" aria-pressed="${active ? 'true' : 'false'}">${escapeWorkspaceHtml(record.label)}</button>
+          <button type="button" class="msg-workspace-tab-main" data-msg-workspace-tab="${escapeWorkspaceHtml(key)}" aria-pressed="${active ? 'true' : 'false'}" title="${escapeWorkspaceHtml(record.documentTitle ? `${record.label} — ${record.documentTitle}` : record.label)}">${escapeWorkspaceHtml(record.label)}</button>
           <button type="button" class="msg-workspace-tab-x" data-msg-workspace-tab-close="${escapeWorkspaceHtml(key)}" aria-label="Close ${escapeWorkspaceHtml(record.label)}">×</button>
         </span>`;
       }).join('');
@@ -575,6 +631,75 @@
     }));
   }
 
+  function normalizeReaderNumber(value) {
+    if (String(value || '').toLowerCase() === 'secondary') return 2;
+    const parsed = Number.parseInt(String(value || ''), 10);
+    return Number.isFinite(parsed) && parsed >= 1 && parsed <= MAX_READERS ? parsed : 0;
+  }
+
+  function readerPanelKey(readerNumber) {
+    return `reader:${readerNumber}`;
+  }
+
+  function readerNumberFromPanelKey(key) {
+    const match = /^reader:(\d+)$/.exec(String(key || ''));
+    return match ? normalizeReaderNumber(match[1]) : 0;
+  }
+
+  function nextAvailableReaderNumber() {
+    for (let number = 2; number <= MAX_READERS; number += 1) {
+      if (!PANELS.has(readerPanelKey(number))) return number;
+    }
+    return 0;
+  }
+
+  function listReaderSessions() {
+    let primaryTitle = '';
+    try { primaryTitle = String(window.MarkSetGoCurrentReaderDocument?.get?.()?.title || '').trim(); } catch {}
+    const readers = [{
+      number:1, readerId:'reader-1', label:'Reader 1', documentTitle:primaryTitle,
+      active:!activePanelKey
+    }];
+    PANELS.forEach((record, key) => {
+      const number = readerNumberFromPanelKey(key);
+      if (!number) return;
+      readers.push({
+        number, readerId:`reader-${number}`, label:`Reader ${number}`,
+        documentTitle:String(record.documentTitle || ''), active:key === activePanelKey
+      });
+    });
+    return readers.sort((a, b) => a.number - b.number);
+  }
+
+  function syncAddReaderControl() {
+    const buttons = [...document.querySelectorAll('[data-msg-reader-add]')];
+    if (!buttons.length) return;
+    const readerReady = hasReader();
+    const next = nextAvailableReaderNumber();
+    buttons.forEach((button) => {
+      button.disabled = !readerReady || !next;
+      if (!readerReady) {
+        button.title = 'Open a text in Reader 1 before adding another Reader';
+        button.setAttribute('aria-label', 'Add Reader — open Reader 1 first');
+        return;
+      }
+      button.title = next
+        ? `Add Reader ${next} (maximum ${MAX_READERS} Readers)`
+        : `Maximum of ${MAX_READERS} Readers reached`;
+      button.setAttribute('aria-label', next ? `Add Reader ${next}` : `Maximum of ${MAX_READERS} Readers reached`);
+    });
+  }
+
+  function renderReadersMenu() {
+    const list = document.querySelector('[data-msg-readers-list]');
+    if (!list) return;
+    const readers = listReaderSessions();
+    list.innerHTML = readers.map((reader) => {
+      const title = reader.documentTitle ? ` · ${reader.documentTitle}` : '';
+      return `<button type="button" role="menuitem" data-msg-reader-select="${reader.number}" title="${escapeWorkspaceHtml(`${reader.label}${title}`)}"><strong>${escapeWorkspaceHtml(reader.label)}</strong><small>${escapeWorkspaceHtml(reader.documentTitle || (reader.number === 1 ? 'Current Reader' : 'No text loaded yet'))}</small></button>`;
+    }).join('');
+  }
+
   function closeWorkspacePanel() {
     const shell = workspaceShell();
     if (!shell) return;
@@ -600,7 +725,7 @@
     syncWorkspacePanelMode(shell, body, key);
     const wasClosed = shell.classList.contains('is-closed');
     if (wasClosed) {
-      if (key === 'page:reader:secondary') {
+      if (readerNumberFromPanelKey(key) >= 2) {
         secondaryWidth = preferredSecondaryReaderWidth(shell);
       } else {
         secondaryWidth = MIN_SECONDARY_WIDTH;
@@ -618,6 +743,8 @@
   function registerPanel(key, label, node) {
     if (!PANELS.has(key)) PANEL_ORDER.push(key);
     PANELS.set(key, { key, label, node });
+    syncAddReaderControl();
+    renderReadersMenu();
     return activatePanel(key);
   }
 
@@ -628,6 +755,8 @@
     if (record?.node?.isConnected) record.node.remove();
     PANELS.delete(key);
     if (index >= 0) PANEL_ORDER.splice(index, 1);
+    syncAddReaderControl();
+    renderReadersMenu();
 
     if (!wasActive) {
       renderWorkspaceTabs();
@@ -641,31 +770,68 @@
   }
 
   function panelUrl(mode, value) {
-    const secondaryReader = mode === 'reader' && value === 'secondary';
-    // Reader 2 intentionally uses index.html: that is the only way to guarantee
-    // it receives the same Reader, Ask Mark/companion stack, themes and feature
-    // scripts as Reader 1. Ordinary workspace pages keep the lightweight shell.
-    const url = new URL(secondaryReader ? '/index.html' : '/workspace-pane.html', window.location.origin);
+    const readerNumber = mode === 'reader' ? normalizeReaderNumber(value) : 0;
+    const auxiliaryReader = readerNumber >= 2;
+    // Every auxiliary Reader uses index.html so it receives the complete Reader,
+    // Ask Mark, themes, comparison basket and companion stack. Ordinary workspace
+    // pages keep the lightweight workspace-pane shell.
+    const url = new URL(auxiliaryReader ? '/index.html' : '/workspace-pane.html', window.location.origin);
     url.searchParams.set('msgWorkspaceMode', mode);
-    url.searchParams.set('msgWorkspaceValue', value);
-    if (secondaryReader) url.searchParams.set('msgSecondaryReader', '1');
-    url.searchParams.set('msgWorkspaceBuild', secondaryReader ? '0.13.0-full-reader' : '0.13.0');
+    url.searchParams.set('msgWorkspaceValue', auxiliaryReader ? `reader-${readerNumber}` : value);
+    if (auxiliaryReader) {
+      url.searchParams.set('msgSecondaryReader', '1'); // backwards compatibility
+      url.searchParams.set('msgReaderNumber', String(readerNumber));
+      url.searchParams.set('msgReaderId', `reader-${readerNumber}`);
+    }
+    url.searchParams.set('msgWorkspaceBuild', auxiliaryReader ? `0.15.0-reader-${readerNumber}` : '0.13.0');
     return url.toString();
   }
 
   function createAppPagePanel(mode, value, label) {
     const node = document.createElement('div');
-    const secondaryReader = mode === 'reader' && value === 'secondary';
-    node.className = `msg-workspace-panel msg-workspace-app-page${secondaryReader ? ' msg-workspace-secondary-reader-page' : ''}`;
-    node.innerHTML = `<iframe class="msg-workspace-page-frame${secondaryReader ? ' msg-secondary-reader-frame' : ''}" title="${escapeWorkspaceHtml(label)}" src="${escapeWorkspaceHtml(panelUrl(mode, value))}" loading="eager"></iframe>`;
+    const readerNumber = mode === 'reader' ? normalizeReaderNumber(value) : 0;
+    const auxiliaryReader = readerNumber >= 2;
+    node.className = `msg-workspace-panel msg-workspace-app-page${auxiliaryReader ? ' msg-workspace-secondary-reader-page msg-workspace-aux-reader-page' : ''}`;
+    if (auxiliaryReader) {
+      node.dataset.msgReaderNumber = String(readerNumber);
+      node.dataset.msgReaderId = `reader-${readerNumber}`;
+    }
+    node.innerHTML = `<iframe class="msg-workspace-page-frame${auxiliaryReader ? ' msg-secondary-reader-frame msg-aux-reader-frame' : ''}" ${auxiliaryReader ? `data-msg-reader-number="${readerNumber}" data-msg-reader-id="reader-${readerNumber}"` : ''} title="${escapeWorkspaceHtml(label)}" src="${escapeWorkspaceHtml(panelUrl(mode, value))}" loading="eager"></iframe>`;
     return node;
   }
 
   function openAppPage(mode, value, label = '') {
     if (!hasReader()) return false;
-    const key = `page:${mode}:${value}`;
+    const readerNumber = mode === 'reader' ? normalizeReaderNumber(value) : 0;
+    const key = readerNumber >= 2 ? readerPanelKey(readerNumber) : `page:${mode}:${value}`;
     if (PANELS.has(key)) return activatePanel(key);
-    return registerPanel(key, label || humanize(value), createAppPagePanel(mode, value, label || humanize(value)));
+    const panelLabel = readerNumber >= 2 ? `Reader ${readerNumber}` : (label || humanize(value));
+    return registerPanel(key, panelLabel, createAppPagePanel(mode, readerNumber >= 2 ? readerNumber : value, panelLabel));
+  }
+
+  function openReaderSession(readerNumber) {
+    const number = normalizeReaderNumber(readerNumber);
+    if (number === 1) { closeWorkspacePanel(); return true; }
+    if (number < 2 || number > MAX_READERS || !hasReader()) return false;
+    secondaryWidth = preferredSecondaryReaderWidth();
+    return openAppPage('reader', number, `Reader ${number}`);
+  }
+
+  function addReaderSession() {
+    if (!hasReader()) {
+      window.alert('Open a text in Reader 1 first, then add another Reader.');
+      return false;
+    }
+    const next = nextAvailableReaderNumber();
+    if (!next) {
+      window.alert(`You can keep up to ${MAX_READERS} Readers open at once.`);
+      return false;
+    }
+    // Phase 1 displays auxiliary Readers in the persistent workspace. The same
+    // numbered session model will power the non-workspace Readers menu next.
+    writeWorkspacePreference(true);
+    installProfileWorkspaceToggle(document);
+    return openReaderSession(next);
   }
 
   function consumeWorkspaceSymposiumHandoff(suppliedHandoff = null) {
@@ -892,19 +1058,40 @@
     const symposium = document.querySelector('[data-action="symposium"]');
     const primaryReader = document.querySelector('.top-reader-return[data-action="reader"]');
 
-    let readerButton = document.querySelector('[data-msg-workspace-open="reader"]');
-    if (!readerButton) {
-      readerButton = document.createElement('button');
-      readerButton.type = 'button';
-      readerButton.dataset.msgWorkspaceOpen = 'reader';
-      readerButton.className = 'top-level-nav-button msg-secondary-reader-nav-link';
-      readerButton.innerHTML = '<span class="nav-icon" aria-hidden="true">▥</span> Reader 2';
-      readerButton.title = 'Open a second Reader beside the current Reader';
-      nav.appendChild(readerButton);
+    // Retire the old one-off “Reader 2” button. Reader 1 now owns a compact
+    // + control that allocates Reader 2 through Reader 10 as needed.
+    document.querySelector('[data-msg-workspace-open="reader"]')?.remove();
+
+    let addReaderButton = document.querySelector('[data-msg-reader-add]');
+    if (!addReaderButton) {
+      addReaderButton = document.createElement('button');
+      addReaderButton.type = 'button';
+      addReaderButton.dataset.msgReaderAdd = '1';
+      addReaderButton.className = 'top-level-nav-button msg-reader-add-button';
+      addReaderButton.textContent = '+';
+      nav.appendChild(addReaderButton);
     }
-    if (primaryReader && primaryReader.nextSibling !== readerButton) {
-      primaryReader.insertAdjacentElement('afterend', readerButton);
+    if (primaryReader && primaryReader.nextSibling !== addReaderButton) {
+      primaryReader.insertAdjacentElement('afterend', addReaderButton);
     }
+
+    let readersMenu = document.querySelector('.msg-readers-menu');
+    if (!readersMenu) {
+      readersMenu = document.createElement('details');
+      readersMenu.className = 'top-nav-menu msg-readers-menu';
+      readersMenu.innerHTML = `
+        <summary><span class="nav-icon" aria-hidden="true">▤</span> Readers</summary>
+        <div class="menu-popover msg-readers-popover" role="menu">
+          <div class="msg-readers-list" data-msg-readers-list></div>
+          <button type="button" class="msg-readers-add-menu" data-msg-reader-add role="menuitem"><strong>＋ New Reader</strong><small>Open another independent reading session</small></button>
+        </div>`;
+      nav.appendChild(readersMenu);
+    }
+    if (addReaderButton.nextSibling !== readersMenu) {
+      addReaderButton.insertAdjacentElement('afterend', readersMenu);
+    }
+    renderReadersMenu();
+    syncAddReaderControl();
 
     let button = document.querySelector('[data-msg-workspace-open="browser"]');
     if (!button) {
@@ -918,7 +1105,7 @@
     }
 
     if (symposium && symposium.nextSibling !== button) nav.insertBefore(button, symposium.nextSibling);
-    return Boolean(readerButton.isConnected && button.isConnected);
+    return Boolean(addReaderButton.isConnected && readersMenu.isConnected && button.isConnected);
   }
 
   function navigationDescriptor(element) {
@@ -957,19 +1144,26 @@
       return;
     }
 
-    const secondReader = event.target.closest?.('[data-msg-workspace-open="reader"]');
-    if (secondReader) {
+    const readerSelect = event.target.closest?.('[data-msg-reader-select]');
+    if (readerSelect) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const readerNumber = normalizeReaderNumber(readerSelect.dataset.msgReaderSelect);
+      const menu = readerSelect.closest?.('.msg-readers-menu');
+      if (menu) menu.open = false;
+      if (readerNumber === 1) closeWorkspacePanel();
+      else if (readerNumber >= 2) openReaderSession(readerNumber);
+      return;
+    }
+
+    const addReader = event.target.closest?.('[data-msg-reader-add]');
+    if (addReader) {
       event.preventDefault();
       event.stopImmediatePropagation();
       try { closeMenus?.(); } catch {}
-      if (!hasReader()) {
-        window.alert('Open a text in the main Reader first, then use Reader 2 to read another text beside it.');
-        return;
-      }
-      writeWorkspacePreference(true);
-      installProfileWorkspaceToggle(document);
-      secondaryWidth = preferredSecondaryReaderWidth();
-      openAppPage('reader', 'secondary', 'Reader 2');
+      const menu = addReader.closest?.('.msg-readers-menu');
+      if (menu) menu.open = false;
+      addReaderSession();
       return;
     }
 
@@ -1041,7 +1235,11 @@
   window.addEventListener('pageshow', ensureWorkspaceControls);
 
   document.addEventListener('marksetgo:document-available', () => {
-    window.setTimeout(dockReaderTopControlsForWorkspace, 0);
+    window.setTimeout(() => {
+      dockReaderTopControlsForWorkspace();
+      syncAddReaderControl();
+      renderReadersMenu();
+    }, 0);
   });
 
   window.MSGWorkspaceExperiment = Object.freeze({
@@ -1051,6 +1249,10 @@
     browser: () => showWorkspacePanel('browser'),
     symposium: (handoff = null) => showWorkspacePanel('symposium', { handoff }),
     musicSearch: (query, title) => workspaceYouTubeSearch(query, title),
+    addReader: addReaderSession,
+    openReader: openReaderSession,
+    readers: () => listReaderSessions().map((reader) => ({ ...reader })),
+    maxReaders: MAX_READERS,
     enabled: workspaceEnabled,
     setEnabled: (enabled) => { writeWorkspacePreference(Boolean(enabled)); installProfileWorkspaceToggle(document); if (!enabled) closeWorkspacePanel(); }
   });
