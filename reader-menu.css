@@ -1,0 +1,98 @@
+/* Mark, Set, Go! — non-workspace Reader menu v1.1.1 */
+
+/* Legacy v1.0.x Reader-page switcher must never appear in menu-only mode. */
+.reader-session-switcher,
+.reader-session-tabs,
+.reader-session-tab-wrap,
+.reader-session-tab,
+.reader-session-new {
+  display: none !important;
+}
+
+.reader-session-menu {
+  position: fixed;
+  z-index: 10050;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(70vh, 520px);
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid rgba(86, 112, 143, .30);
+  border-radius: 10px;
+  background: var(--panel, #fff);
+  color: var(--text, #172033);
+  box-shadow: 0 12px 34px rgba(16, 35, 62, .20);
+}
+
+.reader-session-menu[hidden] {
+  display: none !important;
+}
+
+.reader-session-menu-list {
+  display: grid;
+  gap: 5px;
+}
+
+.reader-session-menu-item,
+.reader-session-menu-new {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.reader-session-menu-item {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
+}
+
+.reader-session-menu-item:hover,
+.reader-session-menu-item:focus-visible,
+.reader-session-menu-item.is-active {
+  border-color: rgba(47, 125, 225, .24);
+  background: rgba(47, 125, 225, .09);
+  outline: none;
+}
+
+.reader-session-menu-reader {
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.reader-session-menu-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  opacity: .72;
+}
+
+.reader-session-menu-separator {
+  height: 1px;
+  margin: 7px 2px;
+  background: rgba(86, 112, 143, .18);
+}
+
+.reader-session-menu-new {
+  padding: 8px 10px;
+  font-weight: 750;
+}
+
+.reader-session-menu-new:hover,
+.reader-session-menu-new:focus-visible {
+  background: rgba(47, 125, 225, .09);
+  outline: none;
+}
+
+@media (max-width: 600px) {
+  .reader-session-menu {
+    width: calc(100vw - 20px);
+  }
+}
