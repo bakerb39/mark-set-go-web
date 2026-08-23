@@ -218,23 +218,44 @@ html[data-msg-experience-theme] .mark-companion-panel .askmark-hero {
 @media(max-width:600px){.msg-theme-grid{grid-template-columns:1fr}}
 
 
-/* v7.30 — real palette previews in both theme choosers. */
-.msg-theme-swatches,
-.visual-theme-preview {
+/* v7.30.1 — real palette previews in both theme choosers.
+   The Profile selector is intentionally more specific than the legacy
+   explorer-theme.css preview rule used inside workspace panes. */
+.msg-theme-swatches {
   display:grid;
   grid-template-columns:repeat(5,minmax(0,1fr));
   width:100%;
   height:18px;
   overflow:hidden;
+  margin:0 0 8px;
   border:1px solid color-mix(in srgb,var(--msg-theme-border,#9fb4c7) 70%,transparent);
   border-radius:6px;
   background:#fff;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);
 }
-.msg-theme-swatches { margin:0 0 8px; }
+.profile-preferences-page .visual-theme-option .visual-theme-preview {
+  display:grid !important;
+  grid-template-columns:repeat(5,minmax(0,1fr)) !important;
+  position:relative;
+  width:100%;
+  height:72px !important;
+  overflow:hidden;
+  margin:0 0 8px;
+  border:1px solid color-mix(in srgb,var(--msg-theme-border,#9fb4c7) 70%,transparent);
+  border-radius:10px;
+  background:#fff;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);
+}
 .msg-theme-swatches > span,
-.visual-theme-preview > span { display:block; min-width:0; }
-.visual-theme-preview { margin:0 0 8px; }
+.profile-preferences-page .visual-theme-option .visual-theme-preview > span {
+  display:block;
+  min-width:0;
+  width:auto;
+  height:100%;
+}
+.profile-preferences-page .visual-theme-option .visual-theme-preview > span + span {
+  border-left:1px solid rgba(255,255,255,.35);
+}
 .visual-theme-preview-empty {
   grid-column:1/-1;
   display:grid !important;
