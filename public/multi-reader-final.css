@@ -100,3 +100,166 @@ html #app .reader-topright-font-control > button::after {
   background:transparent !important;
   box-shadow:none !important;
 }
+
+/* v1.1.0 — subtle window chrome on every Reader/workspace page.
+   The x/minimize affordances stay present without competing with reading controls. */
+#app > .reader-page-panel,
+#app > .empty-reader-page,
+#app .msg-workspace-primary > .reader-page-panel,
+#app .msg-workspace-primary > .empty-reader-page {
+  position:relative !important;
+}
+
+#app .msg-reader-window-controls.msg-reader-window-controls-primary {
+  position:absolute !important;
+  top:6px !important;
+  right:6px !important;
+  z-index:80 !important;
+  display:flex !important;
+  align-items:center !important;
+  gap:1px !important;
+  padding:1px !important;
+  border:0 !important;
+  border-radius:7px !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  opacity:.42 !important;
+  transition:opacity .12s ease, background .12s ease !important;
+}
+
+#app .msg-reader-window-controls.msg-reader-window-controls-primary:hover,
+#app .msg-reader-window-controls.msg-reader-window-controls-primary:focus-within {
+  opacity:.96 !important;
+  background:color-mix(in srgb,var(--msg-theme-surface,var(--msg-surface,#fff)) 78%,transparent) !important;
+}
+
+#app .msg-reader-window-button,
+#app .msg-primary-reader-close,
+#app .msg-primary-reader-minimize {
+  display:grid !important;
+  place-items:center !important;
+  width:20px !important;
+  min-width:20px !important;
+  height:20px !important;
+  min-height:20px !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:5px !important;
+  background:transparent !important;
+  color:var(--msg-theme-accent-dark,var(--msg-navy-deep,#17365d)) !important;
+  box-shadow:none !important;
+  font:inherit !important;
+  font-size:14px !important;
+  font-weight:600 !important;
+  line-height:1 !important;
+  opacity:.66 !important;
+  cursor:pointer !important;
+}
+
+#app .msg-reader-window-button:hover,
+#app .msg-reader-window-button:focus-visible,
+#app .msg-primary-reader-close:hover,
+#app .msg-primary-reader-close:focus-visible,
+#app .msg-primary-reader-minimize:hover,
+#app .msg-primary-reader-minimize:focus-visible {
+  opacity:1 !important;
+  outline:none !important;
+  background:color-mix(in srgb,var(--msg-theme-accent,var(--msg-blue,#17365d)) 9%,var(--msg-theme-surface,var(--msg-surface,#fff))) !important;
+}
+
+/* Workspace pages get the same quiet − / × pair. */
+.msg-workspace-window-controls {
+  flex:0 0 auto !important;
+  display:flex !important;
+  align-items:center !important;
+  gap:1px !important;
+  opacity:.46 !important;
+  transition:opacity .12s ease !important;
+}
+.msg-workspace-window-controls:hover,
+.msg-workspace-window-controls:focus-within { opacity:1 !important; }
+
+.msg-workspace-minimize,
+.msg-workspace-close {
+  display:grid !important;
+  place-items:center !important;
+  width:22px !important;
+  min-width:22px !important;
+  height:22px !important;
+  min-height:22px !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  border-radius:5px !important;
+  background:transparent !important;
+  color:var(--msg-theme-accent-dark,var(--msg-navy-deep,#17365d)) !important;
+  box-shadow:none !important;
+  font:inherit !important;
+  font-size:15px !important;
+  font-weight:600 !important;
+  line-height:1 !important;
+  opacity:.68 !important;
+  cursor:pointer !important;
+}
+.msg-workspace-minimize:hover,
+.msg-workspace-minimize:focus-visible,
+.msg-workspace-close:hover,
+.msg-workspace-close:focus-visible {
+  opacity:1 !important;
+  outline:none !important;
+  background:color-mix(in srgb,var(--msg-theme-accent,var(--msg-blue,#17365d)) 9%,var(--msg-theme-surface,var(--msg-surface,#fff))) !important;
+}
+
+/* Tab x controls remain available but visually secondary to the page chrome. */
+.msg-workspace-tab .msg-workspace-tab-x {
+  opacity:.42 !important;
+  border-left-color:transparent !important;
+}
+.msg-workspace-tab:hover .msg-workspace-tab-x,
+.msg-workspace-tab .msg-workspace-tab-x:focus-visible {
+  opacity:.9 !important;
+}
+
+/* Closing/minimizing Reader 1 while another workspace page is open lets that
+   page use the whole reading workspace without unmounting it. */
+#app > .msg-workspace-shell.msg-primary-reader-hidden {
+  grid-template-columns:minmax(0,1fr) !important;
+}
+#app > .msg-workspace-shell.msg-primary-reader-hidden > .msg-workspace-primary,
+#app > .msg-workspace-shell.msg-primary-reader-hidden > .msg-workspace-divider {
+  display:none !important;
+}
+#app > .msg-workspace-shell.msg-primary-reader-hidden > .msg-workspace-secondary {
+  display:flex !important;
+  grid-column:1 !important;
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+  height:100% !important;
+  margin:0 !important;
+}
+
+/* In non-frame full-Reader mode the old layout hid the workspace header.
+   Keep only the quiet page controls visible so Reader 2+ also always has −/×. */
+#app > .msg-workspace-shell.msg-reader-focus-mode .msg-workspace-panel-head {
+  display:flex !important;
+  position:absolute !important;
+  top:5px !important;
+  right:6px !important;
+  left:auto !important;
+  z-index:120 !important;
+  width:auto !important;
+  min-height:0 !important;
+  padding:0 !important;
+  border:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  pointer-events:none !important;
+}
+#app > .msg-workspace-shell.msg-reader-focus-mode .msg-workspace-panel-tabs {
+  display:none !important;
+}
+#app > .msg-workspace-shell.msg-reader-focus-mode .msg-workspace-window-controls {
+  pointer-events:auto !important;
+}

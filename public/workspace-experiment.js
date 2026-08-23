@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.5 — post-close Reader 1 chrome resync
+ * Mark, Set, Go! Workspace Experiment v0.15.6 — subtle per-pane close + minimize
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -364,11 +364,27 @@
     document.body.classList.remove('msg-primary-reader-resized');
   }
 
+  function hidePrimaryReaderBehindWorkspace() {
+    const shell = workspaceShell();
+    if (!shell || shell.classList.contains('is-closed') || !activePanelKey) return false;
+    releaseAuxiliaryReaderForcedSplit(shell);
+    shell.classList.add('msg-primary-reader-hidden');
+    document.body.classList.add('msg-primary-reader-view-hidden');
+    return true;
+  }
+
   function closePrimaryReaderView() {
     // Closing Reader 1 is a view action, not a destructive session delete. Keep
-    // the existing continuity checkpoint so the Reader button can resume it.
+    // the continuity checkpoint so Reader 1 can be reopened from the Readers menu.
     try { window.ReaderContinuity?.saveBeforeNavigation?.(); } catch {}
-    try { window.ReaderContinuity?.commit?.(window.ReaderContinuity?.capture?.()); } catch {}
+    try {
+      const snapshot = window.ReaderContinuity?.capture?.();
+      if (snapshot) window.ReaderContinuity?.commit?.(snapshot);
+    } catch {}
+
+    // If another workspace page/Reader is already open, let it take the whole
+    // workspace instead of destroying its mounted iframe by rendering Home.
+    if (hidePrimaryReaderBehindWorkspace()) return true;
 
     const home = document.querySelector('.brand[data-action="home"], [data-action="home"]');
     if (home) {
@@ -378,14 +394,22 @@
     return false;
   }
 
-  function auxiliaryReaderSessionCount() {
-    let count = 0;
-    PANELS.forEach((_record, key) => { if (readerNumberFromPanelKey(key) >= 2) count += 1; });
-    return count;
+  function minimizePrimaryReaderView() {
+    // Minimize preserves exactly the same Reader checkpoint as Close, but is
+    // intentionally non-destructive: another open pane takes over when present.
+    try { window.ReaderContinuity?.saveBeforeNavigation?.(); } catch {}
+    if (hidePrimaryReaderBehindWorkspace()) return true;
+    const home = document.querySelector('.brand[data-action="home"], [data-action="home"]');
+    if (home) {
+      home.click();
+      return true;
+    }
+    return false;
   }
 
+
   function ensurePrimaryReaderStandaloneControls() {
-    const panel = APP.querySelector('.reader-page-panel');
+    const panel = APP.querySelector('.reader-page-panel, .empty-reader-page');
     if (!panel) {
       document.querySelectorAll('.msg-primary-reader-resize-grip').forEach((node) => node.remove());
       document.body.classList.remove('msg-primary-reader-standalone', 'msg-primary-reader-resized');
@@ -393,11 +417,27 @@
       return false;
     }
 
-    let close = panel.querySelector('.msg-primary-reader-close');
-    if (!close) {
-      close = document.createElement('button');
+    let tools = panel.querySelector(':scope > .msg-reader-window-controls.msg-reader-window-controls-primary');
+    if (!tools) {
+      tools = document.createElement('div');
+      tools.className = 'msg-reader-window-controls msg-reader-window-controls-primary';
+      tools.setAttribute('aria-label', 'Reader 1 window controls');
+
+      const minimize = document.createElement('button');
+      minimize.type = 'button';
+      minimize.className = 'msg-reader-window-button msg-primary-reader-minimize';
+      minimize.setAttribute('aria-label', 'Minimize Reader 1');
+      minimize.title = 'Minimize Reader 1';
+      minimize.textContent = '−';
+      minimize.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        minimizePrimaryReaderView();
+      });
+
+      const close = document.createElement('button');
       close.type = 'button';
-      close.className = 'msg-primary-reader-close';
+      close.className = 'msg-reader-window-button msg-primary-reader-close';
       close.setAttribute('aria-label', 'Close Reader 1');
       close.title = 'Close Reader 1';
       close.textContent = '×';
@@ -406,12 +446,10 @@
         event.stopPropagation();
         closePrimaryReaderView();
       });
-      panel.appendChild(close);
-    }
 
-    // Closing Reader 1 is only offered when it is genuinely the sole Reader.
-    // This avoids destroying mounted auxiliary Reader iframes through a Home render.
-    close.hidden = auxiliaryReaderSessionCount() > 0;
+      tools.append(minimize, close);
+      panel.appendChild(tools);
+    }
 
     let grip = APP.querySelector(':scope > .msg-primary-reader-resize-grip');
     if (!grip) {
@@ -703,7 +741,10 @@
     secondary.innerHTML = `
       <header class="msg-workspace-panel-head">
         <nav class="msg-workspace-panel-tabs" aria-label="Open workspace pages"></nav>
-        <button class="msg-workspace-close" type="button" data-msg-workspace-close aria-label="Close workspace">×</button>
+        <div class="msg-workspace-window-controls" aria-label="Workspace page controls">
+          <button class="msg-workspace-minimize" type="button" data-msg-workspace-minimize aria-label="Minimize this page" title="Minimize">−</button>
+          <button class="msg-workspace-close" type="button" data-msg-workspace-close aria-label="Close this page" title="Close">×</button>
+        </div>
       </header>
       <div class="msg-workspace-panel-body"></div>`;
 
@@ -941,10 +982,10 @@
 
   function schedulePrimaryReaderStandaloneControls() {
     const sync = () => {
-      const shell = workspaceShell();
-      if (!shell || shell.classList.contains('is-closed')) {
-        ensurePrimaryReaderStandaloneControls();
-      }
+      // Window controls belong to Reader 1 in every layout. The resize grip
+      // remains standalone-only via CSS, but the − / × chrome must not vanish
+      // merely because a second pane is open or has just closed.
+      ensurePrimaryReaderStandaloneControls();
     };
     window.requestAnimationFrame(sync);
     window.setTimeout(sync, 45);
@@ -967,6 +1008,8 @@
     syncMountedWorkspacePanels(body, '');
     syncWorkspacePanelMode(shell, body, '');
     restoreReaderTopControlsAfterWorkspace();
+    shell.classList.remove('msg-primary-reader-hidden');
+    document.body.classList.remove('msg-primary-reader-view-hidden');
     shell.classList.add('is-closed');
     renderWorkspaceTabs(shell);
     window.speechSynthesis?.cancel?.();
@@ -992,6 +1035,8 @@
         : MIN_SECONDARY_WIDTH;
     }
     shell.classList.remove('is-closed');
+    shell.classList.remove('msg-primary-reader-hidden');
+    document.body.classList.remove('msg-primary-reader-view-hidden');
     document.body.classList.remove('msg-primary-reader-standalone', 'msg-primary-reader-resized');
     APP.style.removeProperty('--msg-primary-reader-width');
     if (auxiliaryReaderNumber >= 2) {
@@ -1121,6 +1166,8 @@
 
     activePanelKey = record.key;
     shell.classList.remove('is-closed');
+    shell.classList.remove('msg-primary-reader-hidden');
+    document.body.classList.remove('msg-primary-reader-view-hidden');
     setReaderFocusPresentation(shell, number);
     syncMountedWorkspacePanels(body, record.key);
     syncWorkspacePanelMode(shell, body, record.key);
@@ -1472,10 +1519,24 @@
   }
 
   document.addEventListener('click', (event) => {
+    const minimize = event.target.closest?.('[data-msg-workspace-minimize]');
+    if (minimize) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      // Minimize keeps the active panel mounted and simply returns the primary
+      // Reader to view. Selecting the page/Reader again restores it instantly.
+      closeWorkspacePanel();
+      return;
+    }
+
     const close = event.target.closest?.('[data-msg-workspace-close]');
     if (close) {
       event.preventDefault();
-      closeWorkspacePanel();
+      event.stopImmediatePropagation();
+      // The header × closes the current page/Reader. The adjacent − is the
+      // non-destructive hide/minimize action.
+      if (activePanelKey && PANELS.has(activePanelKey)) closeWorkspaceTab(activePanelKey);
+      else closeWorkspacePanel();
       return;
     }
 
@@ -1502,8 +1563,12 @@
       const readerNumber = normalizeReaderNumber(readerSelect.dataset.msgReaderSelect);
       const menu = readerSelect.closest?.('.msg-readers-menu');
       if (menu) menu.open = false;
-      if (readerNumber === 1) closeWorkspacePanel();
-      else if (readerNumber >= 2) openReaderSession(readerNumber);
+      if (readerNumber === 1) {
+        const shell = workspaceShell();
+        shell?.classList.remove('msg-primary-reader-hidden');
+        document.body.classList.remove('msg-primary-reader-view-hidden');
+        closeWorkspacePanel();
+      } else if (readerNumber >= 2) openReaderSession(readerNumber);
       return;
     }
 
@@ -1616,6 +1681,7 @@
     maxReaders: MAX_READERS,
     activeReader: () => readerNumberFromPanelKey(activePanelKey) || 1,
     closePrimaryReader: closePrimaryReaderView,
+    minimizePrimaryReader: minimizePrimaryReaderView,
     resetPrimaryReaderWidth,
     enabled: workspaceEnabled,
     setEnabled: (enabled) => {
