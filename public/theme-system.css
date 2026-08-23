@@ -860,3 +860,13 @@ html.msg-secondary-reader-document #app.msg-secondary-reader-app > :is(.reader-p
   margin:0 !important;
   box-sizing:border-box;
 }
+
+/* v9.4.1 — Book Pages: prevent internal CSS multicolumn rules from drifting
+   into the visible page. The intended center spread divider remains the
+   separate background-image defined by the Reader's Book Pages layout. */
+#reader.reader.book-pages-layout {
+  column-rule: none !important;
+  column-rule-width: 0 !important;
+  column-rule-style: none !important;
+}
+
