@@ -1,7 +1,7 @@
 'use strict';
 
 /*
- * Mark, Set, Go! Explorer Visual Designer v3.1
+ * Mark, Set, Go! Visual Designer v3.2 — Profile launcher + current theme tokens
  *
  * SOURCE RULES:
  * - The application's default Reader layout lives in CSS.
@@ -22,8 +22,8 @@
 
   const PRESETS = Object.freeze({
     explorer:Object.freeze({
-      page:'#e8e1cf',surface:'#fffdf6',accent:'#2e6f63',accentDark:'#245c53',
-      soft:'#e7f0e8',soft2:'#f5f1df',border:'#c7d7c7',gold:'#d3ad58',ink:'#173e37',muted:'#61766d'
+      page:'#e9dfc9',surface:'#fffdf7',accent:'#317165',accentDark:'#1f5149',
+      soft:'#e8efe8',soft2:'#f4ecd8',border:'#cbb98e',gold:'#c5a152',ink:'#20322d',muted:'#6d766f'
     }),
     antique:Object.freeze({
       page:'#d6c4a4',surface:'#fff8e7',accent:'#765b35',accentDark:'#5b432b',
@@ -32,9 +32,9 @@
   });
 
   const COLOR_VARS = Object.freeze({
-    page:'--explorer-global-page',surface:'--explorer-global-surface',accent:'--explorer-global-accent',
-    accentDark:'--explorer-global-accent-dark',soft:'--explorer-global-soft',soft2:'--explorer-global-soft-2',
-    gold:'--explorer-global-gold',border:'--explorer-global-border',ink:'--explorer-global-ink',muted:'--explorer-global-muted'
+    page:'--msg-theme-page',surface:'--msg-theme-surface',accent:'--msg-theme-accent',
+    accentDark:'--msg-theme-accent-dark',soft:'--msg-theme-soft',soft2:'--msg-theme-soft-2',
+    gold:'--msg-theme-gold',border:'--msg-theme-border',ink:'--msg-theme-ink',muted:'--msg-theme-muted'
   });
 
   const LAYERS = Object.freeze({
@@ -151,13 +151,13 @@
   function applyAll(){applyColors();applyLayout();}
 
   function ensureUI(){
-    if(!launcher){launcher=document.getElementById('msg-explorer-design-launcher')||document.body.appendChild(Object.assign(document.createElement('button'),{id:'msg-explorer-design-launcher',type:'button',textContent:'✦ Design',title:'Customize Explorer appearance and layout'}));launcher.addEventListener('click',openDesigner);}
+    if(!launcher){launcher=document.getElementById('msg-explorer-design-launcher')||document.body.appendChild(Object.assign(document.createElement('button'),{id:'msg-explorer-design-launcher',type:'button',textContent:'✦ Design',title:'Customize appearance and Reader layout',hidden:true}));launcher.addEventListener('click',openDesigner);}
     if(!panel){
       panel=document.getElementById('msg-explorer-visual-designer');
       if(!panel){panel=document.createElement('aside');panel.id='msg-explorer-visual-designer';panel.hidden=true;panel.setAttribute('aria-label','Explorer visual designer');panel.innerHTML=`
-        <div class="msg-vd-head" data-vd-drag-handle title="Drag to move the Designer"><span class="msg-vd-drag-grip" aria-hidden="true">⋮⋮</span><div class="msg-vd-head-copy"><strong>Explorer Designer</strong><small>Optional overrides · Default Layout always returns to CSS baseline</small></div><button type="button" data-vd-close aria-label="Close designer">×</button></div>
+        <div class="msg-vd-head" data-vd-drag-handle title="Drag to move the Designer"><span class="msg-vd-drag-grip" aria-hidden="true">⋮⋮</span><div class="msg-vd-head-copy"><strong>Visual Designer</strong><small>Saved custom theme · Default Layout returns to the app baseline</small></div><button type="button" data-vd-close aria-label="Close designer">×</button></div>
         <div class="msg-vd-toolbar"><button type="button" data-vd-preset="explorer">Explorer Green</button><button type="button" data-vd-preset="antique">Antique Parchment</button><button type="button" data-vd-export>Export</button><button type="button" data-vd-copy>Copy JSON</button></div>
-        <div class="msg-vd-scroll"><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Layers</span><span>choose a layout area</span></div><div data-vd-layers></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Inspector</span><span data-vd-selected-name></span></div><div data-vd-inspector></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Explorer colors</span><span>theme variables</span></div><div data-vd-colors></div></section></div>
+        <div class="msg-vd-scroll"><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Layers</span><span>choose a layout area</span></div><div data-vd-layers></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Inspector</span><span data-vd-selected-name></span></div><div data-vd-inspector></div></section><section class="msg-vd-section"><div class="msg-vd-section-title"><span>Theme colors</span><span>saved Explorer custom palette</span></div><div data-vd-colors></div></section></div>
         <div class="msg-vd-status" data-vd-status>Default Layout is the application's CSS baseline.</div>
         <div class="msg-vd-bottom-actions"><button type="button" class="msg-vd-danger" data-vd-default-layout>Default Layout</button><button type="button" data-vd-reset-layer>Reset layer</button><button type="button" class="msg-vd-save" data-vd-save>Save design</button></div>`;document.body.appendChild(panel);}
       panel.querySelector('[data-vd-close]')?.addEventListener('click',closeDesigner);
@@ -189,14 +189,22 @@
   function defaultLayout(){releaseLayout();config.layout={};render();setStatus('Default Layout restored from the application CSS.',true);window.dispatchEvent(new Event('resize'));}
   function resetLayer(){releaseLayer(selected);delete config.layout[selected];render();setStatus(`${LAYERS[selected].label} returned to Default Layout.`,true);window.dispatchEvent(new Event('resize'));}
   function applyPreset(name){if(!PRESETS[name])return;config.preset=name;config.colors=clone(PRESETS[name]);applyColors();render();setStatus('Color preset applied. Layout was not changed.',false);}
-  function saveConfig(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(config));setStatus('Explorer design saved.',true);}catch{setStatus('Could not save Explorer design.',false);}}
-  function exportConfig(){const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mark-set-go-explorer-design-v4.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus('Design JSON exported.',true);}
+  function saveConfig(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(config));setStatus('Custom theme design saved.',true);}catch{setStatus('Could not save the custom theme design.',false);}}
+  function exportConfig(){const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mark-set-go-visual-design-v4.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus('Design JSON exported.',true);}
   async function copyConfig(){try{await navigator.clipboard.writeText(JSON.stringify(config,null,2));setStatus('Design JSON copied.',true);}catch{setStatus('Clipboard copy unavailable.',false);}}
   function setStatus(msg,saved){const n=panel?.querySelector('[data-vd-status]');if(n){n.textContent=msg;n.classList.toggle('is-saved',Boolean(saved));}}
 
-  function openDesigner(){if(!isExplorer())return;ensureUI();panel.hidden=false;launcher.textContent='✦ Designing';applyPanelPosition();}
-  function closeDesigner(){if(!panel)return;panel.hidden=true;if(launcher)launcher.textContent='✦ Design';savePanelPosition();}
-  function syncVisibility(){if(!launcher)return;launcher.hidden=!isExplorer();if(!isExplorer()&&panel)panel.hidden=true;}
+  function openDesigner(){
+    if(!isExplorer()) window.MarkSetGoExperienceThemes?.apply?.('explorer');
+    if(!isExplorer()) return false;
+    ensureUI();
+    panel.hidden=false;
+    if(launcher){launcher.hidden=true;launcher.textContent='✦ Designing';}
+    applyPanelPosition();
+    return true;
+  }
+  function closeDesigner(){if(!panel)return;panel.hidden=true;if(launcher){launcher.hidden=true;launcher.textContent='✦ Design';}savePanelPosition();}
+  function syncVisibility(){if(launcher)launcher.hidden=true;if(!isExplorer()&&panel)panel.hidden=true;}
   function onThemeChanged(){if(isExplorer())applyAll();else{for(const v of Object.values(COLOR_VARS))document.documentElement.style.removeProperty(v);releaseLayout();}syncVisibility();}
 
   function panelBounds(left,top){if(!panel)return{left:8,top:8};const r=panel.getBoundingClientRect(),m=8;return{left:Math.round(Math.min(Math.max(left,m),Math.max(m,innerWidth-r.width-m))),top:Math.round(Math.min(Math.max(top,m),Math.max(m,innerHeight-r.height-m)))}};
@@ -204,6 +212,10 @@
   function applyPanelPosition(){if(!panel||panel.hidden)return;const p=loadPanelPosition();if(!p)return;const b=panelBounds(p.left,p.top);panel.style.left=`${b.left}px`;panel.style.top=`${b.top}px`;panel.style.right='auto';panel.style.bottom='auto';}
   function savePanelPosition(){if(!panel||panel.hidden)return;const r=panel.getBoundingClientRect(),b=panelBounds(r.left,r.top);try{localStorage.setItem(PANEL_POSITION_KEY,JSON.stringify(b));}catch{}}
   function bindPanelDragging(){const h=panel?.querySelector('[data-vd-drag-handle]');if(!h||h.dataset.vdDragBound==='1')return;h.dataset.vdDragBound='1';h.addEventListener('pointerdown',e=>{if(e.target instanceof Element&&e.target.closest('button,input,a'))return;if(panel.hidden)return;const r=panel.getBoundingClientRect();panelDrag={id:e.pointerId,x:e.clientX,y:e.clientY,left:r.left,top:r.top};h.setPointerCapture?.(e.pointerId);e.preventDefault();});h.addEventListener('pointermove',e=>{if(!panelDrag||e.pointerId!==panelDrag.id)return;const b=panelBounds(panelDrag.left+e.clientX-panelDrag.x,panelDrag.top+e.clientY-panelDrag.y);panel.style.left=`${b.left}px`;panel.style.top=`${b.top}px`;panel.style.right='auto';panel.style.bottom='auto';});const done=e=>{if(!panelDrag||e.pointerId!==panelDrag.id)return;panelDrag=null;savePanelPosition();};h.addEventListener('pointerup',done);h.addEventListener('pointercancel',done);}
+
+  const designerApi=Object.freeze({open:openDesigner,close:closeDesigner,save:saveConfig,isOpen:()=>Boolean(panel&&!panel.hidden)});
+  window.MarkSetGoVisualDesigner=designerApi;
+  window.MarkSetGoExplorerVisualDesigner=designerApi;
 
   function init(){ensureUI();onThemeChanged();document.addEventListener('marksetgo:experience-profile-changed',onThemeChanged);window.addEventListener('pageshow',onThemeChanged);}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();

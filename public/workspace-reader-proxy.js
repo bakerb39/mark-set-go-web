@@ -1,8 +1,10 @@
-/* Mark, Set, Go! Workspace Topic Feed Reader proxy v0.11.0 */
+/* Mark, Set, Go! Workspace Topic Feed Reader proxy v0.12.0 */
 (() => {
   'use strict';
 
-  if (window.parent === window) return;
+  const params = new URLSearchParams(window.location.search);
+  const isSecondaryReader = params.get('msgWorkspaceMode') === 'reader' && params.get('msgWorkspaceValue') === 'secondary';
+  if (window.parent === window || isSecondaryReader) return;
 
   const localApi = window.MarkSetGoReadAnything;
   if (!localApi || typeof localApi.openDocument !== 'function') return;

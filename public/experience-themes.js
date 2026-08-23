@@ -2,14 +2,14 @@
 
 (() => {
   const THEMES = Object.freeze({
-    default:{label:'Default',description:'The original Mark, Set, Go! navy, blue, and white appearance.'},
-    explorer:{label:'Explorer',description:'Maps, natural history, expedition scenery, green and brass.'},
-    patriotic:{label:'Patriotic',description:'American history, navy, ivory, restrained red and brass.'},
-    scholar:{label:'Scholar',description:'Old library, manuscripts, walnut, burgundy and parchment.'},
-    artistic:{label:'Artistic',description:'Studio and gallery atmosphere with warm creative color.'},
-    modern:{label:'Modern',description:'Clean architecture, restrained geometry and minimal surfaces.'},
-    galactic:{label:'Galactic',description:'Original space-opera atmosphere with stars and luminous instruments.'},
-    expedition:{label:'Expedition',description:'Original archaeology-adventure atmosphere with maps, ruins and field journals.'}
+    default:{label:'Default',description:'The original Mark, Set, Go! navy, blue, and white appearance.',colors:['#07182d','#0c2340','#d5a928','#ffffff','#eef1f4']},
+    explorer:{label:'Explorer',description:'Maps, natural history, expedition scenery, green and brass.',colors:['#1f5149','#317165','#c5a152','#fffdf7','#e9dfc9']},
+    patriotic:{label:'Patriotic',description:'American history, navy, ivory, restrained red and brass.',colors:['#0d2341','#17365f','#c7a44d','#fffdf8','#e7e9ed']},
+    scholar:{label:'Scholar',description:'Old library, manuscripts, walnut, burgundy and parchment.',colors:['#32151c','#5a2330','#b38b42','#fff9ea','#d8cfbb']},
+    artistic:{label:'Artistic',description:'Studio and gallery atmosphere with warm creative color.',colors:['#41233b','#6d3f63','#bd8d52','#fffaf4','#e6ddd6']},
+    modern:{label:'Modern',description:'Clean architecture, restrained geometry and minimal surfaces.',colors:['#111b24','#263746','#9aa6ae','#ffffff','#e9edf0']},
+    galactic:{label:'Galactic',description:'Original space-opera atmosphere with stars and luminous instruments.',colors:['#07101e','#17253f','#d8bd65','#f8fbff','#060a12']},
+    expedition:{label:'Expedition',description:'Original archaeology-adventure atmosphere with maps, ruins and field journals.',colors:['#3d281a','#66452c','#b68232','#fff6df','#c8b58d']}
   });
 
   let dialog = null;
@@ -123,6 +123,7 @@
         <div class="msg-theme-grid">
           ${Object.entries(THEMES).map(([key, theme]) => `
             <button type="button" class="msg-theme-choice" data-msg-theme="${esc(key)}" aria-pressed="false">
+              <span class="msg-theme-swatches" aria-hidden="true">${theme.colors.map(color => `<span style="background:${esc(color)}"></span>`).join('')}</span>
               <strong>${esc(theme.label)}</strong>
               <small>${esc(theme.description)}</small>
             </button>`).join('')}

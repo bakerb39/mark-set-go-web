@@ -30,6 +30,26 @@ if (missingFeatureFunctions.length) {
 const app = document.querySelector('#app');
 app.dataset.viewKey = 'home';
 
+// A secondary Reader is the one workspace page that is allowed to own its own
+// Reader state. Ordinary workspace pages continue handing readable content to
+// the outer Reader so existing navigation behavior is preserved.
+function isSecondaryReaderWorkspace() {
+  if (window.parent === window) return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('msgWorkspaceMode') === 'reader'
+    && params.get('msgWorkspaceValue') === 'secondary';
+}
+
+function shouldDelegateReaderToWorkspaceParent() {
+  if (window.parent === window || isSecondaryReaderWorkspace()) return false;
+  return new URLSearchParams(window.location.search).has('msgWorkspaceMode');
+}
+
+window.MSGSecondaryReaderWorkspace = Object.freeze({
+  active: isSecondaryReaderWorkspace,
+  shouldDelegate: shouldDelegateReaderToWorkspaceParent
+});
+
 
 const { BookModel, SessionManager, ReaderEngine, VirtualRenderer } = window.MarkSetGoReader || {};
 if (!BookModel || !SessionManager || !ReaderEngine || !VirtualRenderer) {
@@ -5118,6 +5138,17 @@ function readingSkillBookOptions(books, placeholder = 'Choose a book…') {
 }
 
 
+
+function renderExperienceThemeSwatches(themeKey) {
+  const colors = window.MarkSetGoExperienceThemes?.themes?.[themeKey]?.colors;
+  if (!Array.isArray(colors) || !colors.length) {
+    return '<span class="visual-theme-preview-empty">Theme palette</span>';
+  }
+  return colors.slice(0,5).map((color) =>
+    `<span style="background:${escapeHtml(String(color))}"></span>`
+  ).join('');
+}
+
 function renderProfilePreferences() {
   finalizeReadingSession();
   stopReader();
@@ -5170,11 +5201,21 @@ function renderProfilePreferences() {
           ${Object.entries(EXPERIENCE_APPEARANCES).map(([key,appearance])=>`
             <button class="profile-preset-option visual-theme-option ${current.appearance===key?'active':''}" type="button" data-profile-appearance="${escapeHtml(key)}" aria-pressed="${current.appearance===key}">
               <span class="profile-preset-check" aria-hidden="true">${current.appearance===key?'✓':''}</span>
-              <span class="visual-theme-preview visual-theme-preview-default" aria-hidden="true"><span></span><span></span><span></span></span>
+              <span class="visual-theme-preview" aria-hidden="true">${renderExperienceThemeSwatches(key)}</span>
               <strong>${escapeHtml(appearance.label)}</strong>
               <small>${escapeHtml(appearance.description)}</small>
             </button>`).join('')}
         </div>
+      </section>
+
+      <section class="profile-feature-card visual-designer-profile-card">
+        <div class="section-heading">
+          <div><span class="source-category">Appearance</span><h2>Visual Designer</h2><p>Create and save your own palette and Reader layout without changing the underlying Reader engine.</p></div>
+        </div>
+        <button class="secondary visual-designer-profile-action" type="button" data-open-visual-designer>
+          <span class="visual-designer-profile-icon" aria-hidden="true">✦</span>
+          <span><strong>Design my own theme</strong><small>Starts from Explorer, then saves your custom colors and optional Reader layout overrides in this browser.</small></span>
+        </button>
       </section>
 
       <section class="profile-feature-card">
@@ -5269,6 +5310,22 @@ function renderProfilePreferences() {
       if(!EXPERIENCE_APPEARANCES[key]) return;
       window.MarkSetGoExperienceThemes?.apply?.(key);
     });
+  });
+
+  app.querySelector('[data-open-visual-designer]')?.addEventListener('click',(event)=>{
+    event.preventDefault();
+    // If Profile is open in the workspace, the Designer must operate on the
+    // outer Reader rather than on the small Profile iframe.
+    const host = window.parent !== window ? window.parent : window;
+    try {
+      window.MarkSetGoExperienceThemes?.apply?.('explorer');
+      const designer = host.MarkSetGoVisualDesigner || host.MarkSetGoExplorerVisualDesigner;
+      if (typeof designer?.open !== 'function') throw new Error('Visual Designer is not loaded.');
+      designer.open();
+    } catch (error) {
+      console.warn('Visual Designer could not open.', error);
+      window.alert('The Visual Designer could not open. Refresh after the updated files finish deploying.');
+    }
   });
 
   // Keep the page synchronized if the profile is changed by another app control.
@@ -10966,7 +11023,7 @@ function bindBrowseSearchLocalActions(container) {
         buyUrl:guide.buyUrl,
         subtitle:`An independent reading guide to ${guide.title}`
       };
-      if (window.parent !== window) {
+      if (shouldDelegateReaderToWorkspaceParent()) {
         const handoff = window.parent.MSGWorkspaceReaderHandoff;
         if (typeof handoff?.openText !== 'function') {
           throw new Error('The main Reader handoff is not ready.');
@@ -10991,7 +11048,7 @@ function bindBrowseSearchLocalActions(container) {
       try {
         const loaded = await loadLocalText(item.action.key);
         const source = { type:'local-library', id:item.action.key, title:loaded.title };
-        if (window.parent !== window) {
+        if (shouldDelegateReaderToWorkspaceParent()) {
           const handoff = window.parent.MSGWorkspaceReaderHandoff;
           if (typeof handoff?.openText !== 'function') {
             throw new Error('The main Reader handoff is not ready.');
@@ -11210,7 +11267,7 @@ function bindUnifiedLibraryActions(container) {
         const file = new File([blob], `${provider}-${id}.${format}`, { type: format === 'epub' ? 'application/epub+zip' : 'application/pdf' });
         const parsed = format === 'epub' ? await parseEpubFile(file) : await parsePdfFile(file);
         parsed.source = { ...(parsed.source || {}), type: provider, provider, id, remoteFormat: format };
-        const isWorkspacePane = window.parent !== window;
+        const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
         if (isWorkspacePane) {
           const handoff = window.parent.MSGWorkspaceReaderHandoff;
           if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
@@ -11224,8 +11281,7 @@ function bindUnifiedLibraryActions(container) {
       const fullTitle = `${book.title}${book.author ? ` — ${book.author}` : ''}`;
       const normalized = normalizeImportedBookText(book.text, { title:book.title, author:book.author });
       const editionSource = { type: provider, id, sourceUrl: book.sourceUrl, remoteFormat: format === 'best' ? 'text' : format, documentToc: normalized.toc, cleanup: normalized.report };
-      const workspaceParams = new URLSearchParams(location.search);
-      const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+      const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
       if (isWorkspacePane) {
         const handoff = window.parent.MSGWorkspaceReaderHandoff;
         if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
@@ -13192,7 +13248,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   // established outer-Reader handoff. This central guard covers Modern Guides,
   // Classic/Bible guides, generated guides, Free Books, and any future feature
   // that reaches the canonical Reader renderer.
-  if (window.parent !== window) {
+  if (shouldDelegateReaderToWorkspaceParent()) {
     try {
       const handoff = window.parent.MSGWorkspaceReaderHandoff;
       if (typeof handoff?.openText === 'function') {
@@ -18310,7 +18366,7 @@ async function loadGreatBookEdition(item, status, button) {
           verifiedPrimaryText: true
         };
 
-        const isWorkspacePane = window.parent !== window;
+        const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
         if (isWorkspacePane) {
           const handoff = window.parent.MSGWorkspaceReaderHandoff;
           if (typeof handoff?.openText !== 'function') {
@@ -19115,8 +19171,7 @@ function renderBibleGuides() {
 
 
 function openBibleDocumentInReader(title, text, source) {
-  const workspaceParams = new URLSearchParams(location.search);
-  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+  const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
 
   if (isWorkspacePane) {
     try {
@@ -21640,8 +21695,7 @@ function renderDrmFreeBookFinder(initial={}) {
             author:data.author||'',
             sourceUrl:data.sourceUrl||''
           };
-          const workspaceParams = new URLSearchParams(location.search);
-          const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+          const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
           if (isWorkspacePane) {
             const handoff = window.parent.MSGWorkspaceReaderHandoff;
             if (typeof handoff?.openText !== 'function') {
@@ -21993,7 +22047,7 @@ function renderBrowseHub() {
         subtitle: `An independent reading guide to ${guide.title}`
       };
 
-      if (window.parent !== window) {
+      if (shouldDelegateReaderToWorkspaceParent()) {
         const handoff = window.parent.MSGWorkspaceReaderHandoff;
         if (typeof handoff?.openText !== 'function') {
           throw new Error('The main Reader handoff is not ready.');
@@ -22294,8 +22348,7 @@ function renderMyLibraryHub() {
     // rendered inside the secondary workspace iframe, hand the selected
     // document to the outer application's real Library/Reader path and stop
     // here before any local Reader state or DOM is touched.
-    const workspaceParams = new URLSearchParams(location.search);
-    const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+    const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
 
     if (isWorkspacePane) {
       const id = String(documentId || '').trim();

@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.5.0
+ * Mark, Set, Go! Workspace Experiment v0.12.0
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -273,6 +273,13 @@
     return APP.querySelector(':scope > .msg-workspace-shell');
   }
 
+  function preferredSecondaryReaderWidth(shell = workspaceShell()) {
+    const available = Math.max(0, shell?.getBoundingClientRect?.().width || APP.getBoundingClientRect().width || 0);
+    if (!available) return MIN_SECONDARY_WIDTH;
+    const maxSecondary = Math.max(MIN_SECONDARY_WIDTH, available - 520 - 8);
+    return Math.max(MIN_SECONDARY_WIDTH, Math.min(Math.floor(available * 0.48), maxSecondary));
+  }
+
   function workspaceEnabled() {
     return readWorkspacePreference();
   }
@@ -538,7 +545,13 @@
     if (activePanelKey !== key) detachActivePanel();
     activePanelKey = key;
     const wasClosed = shell.classList.contains('is-closed');
-    if (wasClosed) secondaryWidth = MIN_SECONDARY_WIDTH;
+    if (wasClosed) {
+      if (key === 'page:reader:secondary') {
+        secondaryWidth = preferredSecondaryReaderWidth(shell);
+      } else {
+        secondaryWidth = MIN_SECONDARY_WIDTH;
+      }
+    }
     shell.classList.remove('is-closed');
     shell.style.setProperty('--msg-secondary-width', `${secondaryWidth}px`);
     window.requestAnimationFrame(dockReaderTopControlsForWorkspace);
@@ -576,9 +589,10 @@
     const url = new URL('/workspace-pane.html', window.location.origin);
     url.searchParams.set('msgWorkspaceMode', mode);
     url.searchParams.set('msgWorkspaceValue', value);
+    if (mode === 'reader' && value === 'secondary') url.searchParams.set('msgSecondaryReader', '1');
     // Keep the pane document/runtime in lockstep with the router and prevent an
     // older cached pane from reviving the former hand-maintained page list.
-    url.searchParams.set('msgWorkspaceBuild', '0.5.0');
+    url.searchParams.set('msgWorkspaceBuild', '0.12.0');
     return url.toString();
   }
 
@@ -749,6 +763,21 @@
     const nav = document.querySelector('.site-header nav');
     if (!nav) return false;
     const symposium = document.querySelector('[data-action="symposium"]');
+    const primaryReader = document.querySelector('.top-reader-return[data-action="reader"]');
+
+    let readerButton = document.querySelector('[data-msg-workspace-open="reader"]');
+    if (!readerButton) {
+      readerButton = document.createElement('button');
+      readerButton.type = 'button';
+      readerButton.dataset.msgWorkspaceOpen = 'reader';
+      readerButton.className = 'top-level-nav-button msg-secondary-reader-nav-link';
+      readerButton.innerHTML = '<span class="nav-icon" aria-hidden="true">▥</span> Reader 2';
+      readerButton.title = 'Open a second Reader beside the current Reader';
+      nav.appendChild(readerButton);
+    }
+    if (primaryReader && primaryReader.nextSibling !== readerButton) {
+      primaryReader.insertAdjacentElement('afterend', readerButton);
+    }
 
     let button = document.querySelector('[data-msg-workspace-open="browser"]');
     if (!button) {
@@ -762,7 +791,7 @@
     }
 
     if (symposium && symposium.nextSibling !== button) nav.insertBefore(button, symposium.nextSibling);
-    return Boolean(symposium && button.isConnected);
+    return Boolean(readerButton.isConnected && button.isConnected);
   }
 
   function navigationDescriptor(element) {
@@ -798,6 +827,22 @@
       event.preventDefault();
       event.stopImmediatePropagation();
       activatePanel(tab.dataset.msgWorkspaceTab);
+      return;
+    }
+
+    const secondReader = event.target.closest?.('[data-msg-workspace-open="reader"]');
+    if (secondReader) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      try { closeMenus?.(); } catch {}
+      if (!hasReader()) {
+        window.alert('Open a text in the main Reader first, then use Reader 2 to read another text beside it.');
+        return;
+      }
+      writeWorkspacePreference(true);
+      installProfileWorkspaceToggle(document);
+      secondaryWidth = preferredSecondaryReaderWidth();
+      openAppPage('reader', 'secondary', 'Reader 2');
       return;
     }
 

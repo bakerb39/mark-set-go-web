@@ -1,10 +1,11 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v7.21 — Chat-aware, explicit routing */
+/* Mark, Set, Go! lightweight workspace pane runtime v7.30 — Chat-aware, explicit routing */
 (() => {
   'use strict';
 
   const params = new URLSearchParams(location.search);
   const mode = params.get('msgWorkspaceMode') || 'action';
   const value = params.get('msgWorkspaceValue') || 'home';
+  const IS_SECONDARY_READER = mode === 'reader' && value === 'secondary';
   const PREF_KEY = 'msg-workspace-optin-v1';
   const app = document.getElementById('app');
 
@@ -150,7 +151,15 @@
     // Chat is module-owned and is deliberately loaded in workspace-pane.html
     // before this runtime. Open it directly instead of relying on a synthetic
     // navigation click.
-    if (mode === 'action' && value === 'msg-chat') {
+    if (IS_SECONDARY_READER) {
+      document.documentElement.classList.add('msg-secondary-reader-pane');
+      if (typeof renderEmptyReader === 'function') {
+        renderEmptyReader();
+        app.dataset.viewKey = 'reader-secondary';
+      } else {
+        app.innerHTML = '<section class="platform-page"><h2>Reader could not load</h2><p>Refresh the page after deployment completes.</p></section>';
+      }
+    } else if (mode === 'action' && value === 'msg-chat') {
       if (window.MarkSetGoChat?.open) {
         window.MarkSetGoChat.open();
       } else {
@@ -216,7 +225,7 @@
       : event.target?.parentElement;
 
     const libraryDocument = targetElement?.closest?.('[data-library-document]');
-    if (libraryDocument?.dataset.libraryDocument) {
+    if (!IS_SECONDARY_READER && libraryDocument?.dataset.libraryDocument) {
       event.preventDefault();
       event.stopImmediatePropagation();
       openParentLibraryDocument(libraryDocument.dataset.libraryDocument);
@@ -247,7 +256,7 @@
     }
 
     const readerAction = targetElement?.closest?.('[data-action="reader"]');
-    if (!readerAction) return;
+    if (!readerAction || IS_SECONDARY_READER) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     sendParent('msg-workspace-return-reader');
@@ -266,6 +275,7 @@
     if (event.key !== ',' && event.key !== '.') return;
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest?.('input,textarea,select,[contenteditable="true"],[role="textbox"]')) return;
+    if (IS_SECONDARY_READER) return;
     sendParent('msg-workspace-topic-feed-key', { key: event.key });
   }, true);
 

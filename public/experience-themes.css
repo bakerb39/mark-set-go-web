@@ -216,3 +216,58 @@ html[data-msg-experience-theme] .mark-companion-panel .askmark-hero {
 .msg-theme-choice strong{display:block;font-size:14px;margin-bottom:3px}
 .msg-theme-choice small{display:block;color:#6f756e;line-height:1.3}
 @media(max-width:600px){.msg-theme-grid{grid-template-columns:1fr}}
+
+
+/* v7.30 — real palette previews in both theme choosers. */
+.msg-theme-swatches,
+.visual-theme-preview {
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  width:100%;
+  height:18px;
+  overflow:hidden;
+  border:1px solid color-mix(in srgb,var(--msg-theme-border,#9fb4c7) 70%,transparent);
+  border-radius:6px;
+  background:#fff;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.3);
+}
+.msg-theme-swatches { margin:0 0 8px; }
+.msg-theme-swatches > span,
+.visual-theme-preview > span { display:block; min-width:0; }
+.visual-theme-preview { margin:0 0 8px; }
+.visual-theme-preview-empty {
+  grid-column:1/-1;
+  display:grid !important;
+  place-items:center;
+  color:var(--msg-theme-muted,#66788a);
+  font-size:10px;
+}
+.visual-theme-option { text-align:left; }
+.visual-theme-option > strong,
+.visual-theme-option > small { display:block; }
+
+/* The restored Designer is launched from Profile, not as an unrelated floating
+   control. The card follows the same theme typography and button language. */
+.visual-designer-profile-action {
+  width:100%;
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 14px;
+  text-align:left;
+}
+.visual-designer-profile-action > span:last-child { min-width:0; }
+.visual-designer-profile-action strong,
+.visual-designer-profile-action small { display:block; }
+.visual-designer-profile-action small { margin-top:3px; color:var(--msg-theme-muted,#66788a); }
+.visual-designer-profile-icon {
+  flex:0 0 36px;
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  border-radius:9px;
+  background:var(--msg-theme-soft,#e7f0f7);
+  color:var(--msg-theme-accent,#0c2340);
+  font-size:18px;
+}
