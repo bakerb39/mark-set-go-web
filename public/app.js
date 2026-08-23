@@ -24266,6 +24266,8 @@ function renderSymposium() {
               <select id="symposium-output"><option value="write">Write</option><option value="both">Speak + write</option><option value="speak">Speak (transcript remains visible)</option></select>
             </label>
 
+            <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
+
             <div>
               <label>Participants <span style="font-weight:500;color:#718095">(choose up to 6 from ${SYMPOSIUM_PARTICIPANTS.length})</span></label>
               <div class="symposium-roster-tools">
@@ -24301,7 +24303,6 @@ function renderSymposium() {
               <p class="symposium-hint">Custom personalities are included with any saved Symposium that uses them. The AI represents public/published ideas or the perspective you specify; it does not claim to literally be the real person.</p>
             </div>
 
-            <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
           </div>
         </aside>
 
