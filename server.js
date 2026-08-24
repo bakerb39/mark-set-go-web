@@ -4039,6 +4039,14 @@ async function resolveArticleFromPublisherFeed(publisherUrl, expectedTitle) {
 }
 
 
+function topicArticleSiteLabel(value) {
+  try {
+    return new URL(String(value || '')).hostname.replace(/^www\./i, '');
+  } catch {
+    return '';
+  }
+}
+
 async function prepareTopicArticle({
   originalUrl,
   title = 'Article',
@@ -4048,7 +4056,13 @@ async function prepareTopicArticle({
   publisherUrl = ''
 }) {
   const cached = getCachedTopicArticle(originalUrl, title);
-  if (cached) return { ...cached, cacheHit: true };
+  if (cached) {
+    return {
+      ...cached,
+      siteName: cached.siteName || cached.site || topicArticleSiteLabel(cached.sourceUrl || originalUrl),
+      cacheHit: true
+    };
+  }
 
   const feedArticleText = usableFeedArticleText(feedText, summary);
   if (feedArticleText) {
@@ -4060,6 +4074,9 @@ async function prepareTopicArticle({
       documentToc: [],
       importMethod: 'feed',
       publisherRestricted: false,
+      siteName: topicArticleSiteLabel(originalUrl) || source,
+      author: '',
+      publishedAt: '',
       text: `${feedArticleText}
 
 Source: ${source}
@@ -4109,7 +4126,10 @@ ${originalUrl}`
       documentToc: [],
       importMethod: 'summary-fallback',
       publisherRestricted: false,
-      text: `${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${source}\n${resolvedPublisherUrl || originalUrl}`,
+      siteName: topicArticleSiteLabel(resolvedPublisherUrl || originalUrl) || source,
+      author: '',
+      publishedAt: '',
+      text: `${summary}\n\nFull article text could not be imported from the publisher.\n\nSource: ${topicArticleSiteLabel(resolvedPublisherUrl || originalUrl) || source}\n${resolvedPublisherUrl || originalUrl}`,
       warning: error?.message || 'A direct publisher article URL could not be resolved.'
     } : null;
     if (payload) {
@@ -4129,7 +4149,10 @@ ${originalUrl}`
       documentToc: Array.isArray(article?.documentToc) ? article.documentToc : [],
       importMethod: article?.importMethod || 'html',
       publisherRestricted: false,
-      text: `${String(article?.text || '').trim()}\n\nSource: ${source}\n${articleUrl}`
+      siteName: article?.site || topicArticleSiteLabel(articleUrl) || source,
+      author: article?.author || '',
+      publishedAt: article?.publishedAt || '',
+      text: `${String(article?.text || '').trim()}\n\nSource: ${article?.site || topicArticleSiteLabel(articleUrl) || source}\n${articleUrl}`
     };
     putCachedTopicArticle([originalUrl, articleUrl], title, payload);
     return payload;
@@ -4143,7 +4166,10 @@ ${originalUrl}`
         documentToc: [],
         importMethod: 'summary-fallback',
         publisherRestricted: Boolean(error?.publisherRestricted),
-        text: `${summary}\n\n${error?.publisherRestricted ? 'The publisher blocks automated full-text import for this article. Open the original article to read it on the publisher site.' : 'Full article text could not be imported from the publisher.'}\n\nSource: ${source}\n${articleUrl}`,
+        siteName: topicArticleSiteLabel(articleUrl) || source,
+        author: '',
+        publishedAt: '',
+        text: `${summary}\n\n${error?.publisherRestricted ? 'The publisher blocks automated full-text import for this article. Open the original article to read it on the publisher site.' : 'Full article text could not be imported from the publisher.'}\n\nSource: ${topicArticleSiteLabel(articleUrl) || source}\n${articleUrl}`,
         warning: error?.message || 'The publisher did not expose readable article text.'
       };
       putCachedTopicArticle([originalUrl, articleUrl], title, payload);
@@ -4571,7 +4597,10 @@ async function prepareAndStoreTopicArticle(userId, topic, article) {
     title:payload.title || article.title, fullArticle:payload.fullArticle !== false,
     sourceUrl:payload.sourceUrl || article.url, repairedUrl:Boolean(payload.repairedUrl),
     warning:payload.warning || '', documentToc:Array.isArray(payload.documentToc) ? payload.documentToc : [],
-    importMethod:payload.importMethod || '', publisherRestricted:Boolean(payload.publisherRestricted)
+    importMethod:payload.importMethod || '', publisherRestricted:Boolean(payload.publisherRestricted),
+    siteName:payload.siteName || payload.site || topicArticleSiteLabel(payload.sourceUrl || article.url),
+    author:payload.author || article.author || '',
+    publishedAt:payload.publishedAt || article.published || ''
   };
   await query(`
     insert into topic_feed_prepared_articles

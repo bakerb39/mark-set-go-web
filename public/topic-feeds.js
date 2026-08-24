@@ -124,6 +124,84 @@
     return normalizeState({ topics: [] });
   }
 
+  function topicStateIdentity(value = state) {
+    // This signature is deliberately metadata-only: it is cheap enough for
+    // cross-pane synchronization but changes whenever the Reader navigation,
+    // source attribution, unread state, or topic configuration should change.
+    return JSON.stringify({
+      preferences: [
+        String(value?.preferences?.timezone || ''),
+        Number(value?.preferences?.morningHour ?? 5),
+        String(value?.preferences?.dailyOpenSourceId || '')
+      ],
+      topics: (value?.topics || []).map((topic) => [
+        String(topic?.id || ''),
+        String(topic?.name || ''),
+        String(topic?.sourceMode || ''),
+        String(topic?.cadence || ''),
+        Number(topic?.maxRecommended || 0),
+        String(topic?.preferences || ''),
+        String(topic?.aiSourcesUpdatedAt || ''),
+        String(topic?.lastRefresh || ''),
+        (topic?.dismissedArticleIds || []).map(String),
+        (topic?.sources || []).map((source) => [
+          String(source?.id || ''),
+          String(source?.name || ''),
+          String(source?.type || ''),
+          String(source?.url || ''),
+          String(source?.origin || '')
+        ]),
+        (topic?.articles || []).map((article) => [
+          String(article?.id || ''),
+          String(article?.sourceClientId || ''),
+          String(article?.sourceName || ''),
+          String(article?.url || ''),
+          String(article?.title || ''),
+          String(article?.published || article?.publishedAt || ''),
+          Boolean(article?.read),
+          Boolean(article?.prepared),
+          Boolean(article?.recommended)
+        ])
+      ])
+    });
+  }
+
+  function announceTopicStateChange() {
+    // localStorage's storage event updates sibling frames, while this message
+    // gives the outer app an immediate signal even when browser storage-event
+    // timing is delayed. Never send the full article payload through postMessage.
+    if (window.parent !== window) {
+      try {
+        window.parent.postMessage({ type:'msg-topic-feeds-state-changed' }, window.location.origin);
+      } catch {}
+    }
+  }
+
+  function adoptSharedTopicState() {
+    if (topicManagerIsOpen()) return false;
+    const incoming = loadState();
+    if (topicStateIdentity(incoming) === topicStateIdentity(state)) return false;
+
+    state = incoming;
+    if (!state.preferences.timezone) state.preferences.timezone = defaultTimezone;
+    if (!state.topics.some((topic) => topic.id === activeTopicId)) {
+      activeTopicId = state.topics[0]?.id || null;
+      activeSourceId = '';
+    }
+
+    // Treat a state received from another same-origin pane as a real local
+    // revision. Until cloud confirms it, a stale hydration response may not
+    // replace the topic list in this window.
+    markLocalTopicRevision();
+    scheduleReaderNavigation();
+
+    if (document.querySelector('.topic-feeds-page') && !topicManagerIsOpen()) {
+      render({ force:true });
+    }
+    if (cloudAuthenticated) void syncCloudNow();
+    return true;
+  }
+
   const LOCAL_CACHE_TARGET_CHARS = 220000;
   const LOCAL_CACHE_EMERGENCY_CHARS = 70000;
 
@@ -217,6 +295,7 @@
   function saveLocalState() {
     const write = (payload) => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      announceTopicStateChange();
       return true;
     };
 
@@ -852,9 +931,27 @@
     topicFeedSourceCredit(context.topic, context.article, context.payload || {});
   }
 
+  function sourceHostLabel(value) {
+    try {
+      return new URL(String(value || '')).hostname.replace(/^www\./i, '');
+    } catch {
+      return '';
+    }
+  }
+
   function topicFeedSourceCredit(topic, article, payload) {
-    const sourceName = String(article?.sourceName || 'Topic Feed').trim();
     const originalUrl = String(payload?.sourceUrl || article?.url || '').trim();
+    const configuredSource = (topic?.sources || []).find(
+      (source) => String(source?.id || '') === String(article?.sourceClientId || '')
+    );
+    const preparedSite = String(payload?.siteName || payload?.site || '').trim();
+    const sourceName = String(
+      preparedSite ||
+      configuredSource?.name ||
+      article?.sourceName ||
+      sourceHostLabel(originalUrl) ||
+      'Topic Feed'
+    ).trim();
     const rawDate = article?.published || article?.publishedAt || '';
     let dateLabel = '';
 
@@ -1005,13 +1102,47 @@
     });
   }
 
-  function openPreparedArticle(topic, article, payload) {
+  function openPreparedArticle(topic, article, payload, options = {}) {
+    const isWorkspacePane = window.parent !== window && (
+      Boolean(window.__MSG_WORKSPACE_PANE__) ||
+      new URLSearchParams(window.location.search).has('msgWorkspaceMode')
+    );
+
+    // A Topic Feed shown in a secondary workspace pane is a source/control
+    // surface. Send the prepared article to the OUTER Topic Feed/Reader module
+    // directly so this feed page is not replaced or closed by Reader rendering.
+    if (isWorkspacePane && !options.fromWorkspacePane) {
+      try {
+        const parentFeeds = window.parent.MarkSetGoTopicFeeds;
+        if (typeof parentFeeds?.openPreparedArticle === 'function') {
+          // Pull the just-saved topic/source state into the outer app before it
+          // builds My Topics or the story header. The workspace iframe remains
+          // untouched and stays open until the reader closes that pane.
+          parentFeeds.syncSharedState?.();
+          parentFeeds.openPreparedArticle(topic, article, payload, { fromWorkspacePane:true });
+          return true;
+        }
+      } catch (error) {
+        console.warn('Workspace could not hand Topic Feed article to the outer Reader.', error);
+      }
+    }
+
     if (!window.MarkSetGoReadAnything?.openDocument) throw new Error('The Reader importer is not ready.');
+
+    const sourceDisplayName = String(
+      payload?.siteName ||
+      payload?.site ||
+      (topic?.sources || []).find((source) => String(source?.id || '') === String(article?.sourceClientId || ''))?.name ||
+      article.sourceName ||
+      sourceHostLabel(payload?.sourceUrl || article?.url) ||
+      'Topic Feed'
+    ).trim();
+
     window.MSGTopicFeedReaderContext = {
       topicId: topic?.id || '',
       topicName: topic?.name || '',
       sourceId: article.sourceClientId || '',
-      sourceName: article.sourceName || '',
+      sourceName: sourceDisplayName,
       articleId: article.id || '',
       updatedAt: new Date().toISOString()
     };
@@ -1019,14 +1150,14 @@
     const readerText = stripTrailingTopicFeedProvenance(payload?.text);
     window.MarkSetGoReadAnything.openDocument({
       title: payload.title || article.title,
-      author: article.author || article.sourceName,
+      author: payload?.author || article.author || sourceDisplayName,
       text: readerText || String(article.feedText || article.summary || '').trim() || 'Open the original article to continue reading.',
       source: {
         type: 'topic-feed',
         url: payload.sourceUrl || article.url,
         topic: topic?.name || '',
         topicId: topic?.id || '',
-        feedSource: article.sourceName || '',
+        feedSource: sourceDisplayName,
         feedSourceId: article.sourceClientId || '',
         articleId: article.id || '',
         fullArticle: payload.fullArticle !== false,
@@ -1037,6 +1168,7 @@
     });
     topicFeedSourceCredit(topic, article, payload);
     scheduleReaderNavigation();
+    return true;
   }
 
   async function openArticle(article, trigger = null, topicOverride = null) {
@@ -1343,7 +1475,7 @@
             <select id="topic-source-mode">
               <option value="ai" ${(topic?.sourceMode || (!topic ? 'ai' : 'manual')) === 'ai' ? 'selected' : ''}>AI-managed — choose and maintain sources automatically</option>
               <option value="hybrid" ${topic?.sourceMode === 'hybrid' ? 'selected' : ''}>AI + my own sources</option>
-              <option value="manual" ${(topic?.sourceMode || (!topic ? 'ai' : 'manual')) === 'manual' ? 'selected' : ''}>My sources only</option>
+              <option value="manual" ${(topic?.sourceMode || (!topic ? 'ai' : 'manual')) === 'manual' ? 'selected' : ''}>Selected sources only</option>
             </select>
           </label>
           <p id="topic-source-mode-note" class="topic-source-help"></p>
@@ -1358,7 +1490,7 @@
           <label>What should be prioritized?<textarea id="topic-preferences" rows="3" placeholder="substantive analysis, policy changes, major product releases…">${escapeHtml(topic?.preferences || '')}</textarea></label>
           <section class="topic-feed-source-editor" id="topic-manual-source-editor">
             <div class="topic-feed-sidebar-head"><strong>Your feeds</strong><button id="topic-add-source" type="button">+ Add your own</button></div>
-            <p class="topic-source-help">Manual and pinned sources live here. In AI-managed mode this section is hidden because the app chooses and refreshes topic-specific sources for you.</p>
+            <p class="topic-source-help">Selected sources live here. Choosing an AI suggestion explicitly uses only the sources you select unless you choose “AI + selected sources.”</p>
             <div id="topic-source-rows">${(topic?.sources || []).map(sourceRow).join('')}</div>
           </section>
           <div class="topic-morning-settings">
@@ -1377,6 +1509,22 @@
   }
 
   function bindManager(existing) {
+    const switchToExplicitSourceSelection = () => {
+      const select = document.getElementById('topic-source-mode');
+      if (!select || select.value !== 'ai') return false;
+
+      // Clicking a specific recommendation is an explicit choice. Never keep
+      // AI-managed mode in that case, because AI-managed intentionally replaces
+      // the source set with a broader AI-maintained collection.
+      select.value = 'manual';
+
+      // When converting an existing AI-managed topic to selected-only mode,
+      // discard only sources that AI added automatically. User-added/pinned
+      // sources remain available alongside the newly selected recommendation.
+      document.querySelectorAll('.topic-feed-source-row[data-source-origin="ai"]').forEach((row) => row.remove());
+      return true;
+    };
+
     const syncSourceModeUi = () => {
       const mode = document.getElementById('topic-source-mode')?.value || 'manual';
       const editor = document.getElementById('topic-manual-source-editor');
@@ -1386,7 +1534,7 @@
         ? 'AI will choose highly topic-specific sources and refresh that source set periodically. You do not need to enter URLs.'
         : mode === 'hybrid'
           ? 'AI will maintain topic-specific sources while also keeping the feeds you add yourself.'
-          : 'Only the feeds you add below will be used.';
+          : 'Only the sources you select or add below will be used.';
     };
     document.getElementById('topic-source-mode')?.addEventListener('change', syncSourceModeUi);
     syncSourceModeUi();
@@ -1401,6 +1549,7 @@
       render({ force: true });
     });
     document.getElementById('topic-add-source')?.addEventListener('click', () => {
+      if (switchToExplicitSourceSelection()) syncSourceModeUi();
       document.getElementById('topic-source-rows')?.insertAdjacentHTML('beforeend', sourceRow());
     });
     document.getElementById('topic-name')?.addEventListener('input', (event) => {
@@ -1410,6 +1559,12 @@
     document.getElementById('topic-feed-recommendations')?.addEventListener('click', (event) => {
       const button = event.target.closest('[data-add-recommended-feed]');
       if (!button) return;
+
+      // An explicit click on Add means the reader chose this source. If the
+      // form was still in AI-managed mode, switch to selected-only so Save does
+      // not throw away the choice and ask the server to add every AI source.
+      if (switchToExplicitSourceSelection()) syncSourceModeUi();
+
       const source = {
         id: uid(), name: button.dataset.feedName || '', type: button.dataset.feedType === 'rss' ? 'rss' : 'website',
         url: button.dataset.feedUrl || '', origin:'recommended', recommendationKey:button.dataset.addRecommendedFeed || ''
@@ -2216,6 +2371,17 @@
     scheduleTopicFeedUiSync();
   }, true);
 
+  window.addEventListener('storage', (event) => {
+    if (event.key !== STORAGE_KEY) return;
+    adoptSharedTopicState();
+  });
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (event.data?.type !== 'msg-topic-feeds-state-changed') return;
+    adoptSharedTopicState();
+  });
+
   document.addEventListener('marksetgo:auth-changed', (event) => {
     if (event.detail?.authenticated) void hydrateCloudState();
     else cloudAuthenticated = false;
@@ -2313,6 +2479,8 @@
     refreshReaderNavigation: () => {
       if (isArticleHubReaderActive()) scheduleReaderNavigation();
     },
-    clearReaderArticleContext
+    clearReaderArticleContext,
+    openPreparedArticle,
+    syncSharedState: adoptSharedTopicState
   });
 })();
