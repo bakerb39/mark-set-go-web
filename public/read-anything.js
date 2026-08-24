@@ -8,12 +8,16 @@
   const FORMAT_RECORD_PREFIX = 'markSetGoReadAnythingFormatV1:';
   const FORMAT_DOCUMENT_INDEX_KEY = 'markSetGoReadAnythingDocumentIndexV1';
   const DOCUMENT_STORAGE_PREFIX = 'markSetGoDocumentV1:';
+  const BOOKMARKLET_QUEUE_KEY = 'markSetGoBookmarkletArticleQueueV1';
+  const BOOKMARKLET_CACHE_PREFIX = 'read-anything-bookmarklet:';
+  const BOOKMARKLET_QUEUE_LIMIT = 30;
   let allowLegacyUpload = false;
   let activeImportedDocument = null;
   let activeImportedVersion = 'original';
   let formatControlAttachTimers = [];
   let defaultArticleBookPagesKey = '';
   let pendingImportedRender = false;
+  let bookmarkletQueueMigrated = false;
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -32,6 +36,191 @@
 
   function history() {
     try { return JSON.parse(localStorage.getItem(IMPORT_HISTORY_KEY) || '[]'); } catch { return []; }
+  }
+
+  function bookmarkletQueue() {
+    try {
+      const items = JSON.parse(localStorage.getItem(BOOKMARKLET_QUEUE_KEY) || '[]');
+      return Array.isArray(items) ? items : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveBookmarkletQueue(items) {
+    try {
+      localStorage.setItem(BOOKMARKLET_QUEUE_KEY, JSON.stringify((Array.isArray(items) ? items : []).slice(0, BOOKMARKLET_QUEUE_LIMIT)));
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function migrateBookmarkletQueueFromFormatRecords() {
+    if (bookmarkletQueueMigrated) return;
+    bookmarkletQueueMigrated = true;
+
+    const existing = bookmarkletQueue();
+    const byKey = new Map(existing.filter((item) => item?.key).map((item) => [String(item.key), item]));
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const storageKey = localStorage.key(index) || '';
+        if (!storageKey.startsWith(FORMAT_RECORD_PREFIX)) continue;
+        let record = null;
+        try { record = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch {}
+        if (String(record?.source?.type || '').toLowerCase() !== 'bookmarklet') continue;
+        const key = String(record?.key || storageKey.slice(FORMAT_RECORD_PREFIX.length));
+        if (!key || byKey.has(key)) continue;
+        byKey.set(key, {
+          key,
+          title: cleanImportedTitle(record?.title || 'Web Article'),
+          author: record?.author || record?.source?.author || '',
+          sourceUrl: String(record?.source?.url || '').slice(0, 4000),
+          sourceName: articleSiteName(record?.source || {}),
+          importedAt: record?.source?.importedAt || record?.updatedAt || new Date().toISOString()
+        });
+      }
+    } catch {}
+
+    const merged = [...byKey.values()].sort((a, b) => {
+      const right = Date.parse(b?.importedAt || '') || 0;
+      const left = Date.parse(a?.importedAt || '') || 0;
+      return right - left;
+    });
+    saveBookmarkletQueue(merged);
+  }
+
+  function articleSiteName(source = {}) {
+    const explicit = String(source.site || source.sourceName || '').trim();
+    if (explicit) return explicit;
+    try {
+      const hostname = new URL(String(source.url || '')).hostname.replace(/^www\./i, '');
+      return hostname || 'Web article';
+    } catch {
+      return 'Web article';
+    }
+  }
+
+  function articleDateLabel(source = {}, { captured = false } = {}) {
+    const raw = source.publishedAt || source.published || source.importedAt || '';
+    if (!raw) return '';
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return '';
+    const label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return captured && !source.publishedAt && !source.published ? `Captured ${label}` : label;
+  }
+
+  function getReadingCacheFunction(name) {
+    try {
+      const candidate = window[name];
+      return typeof candidate === 'function' ? candidate : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function cacheBookmarkletArticle(documentRecord, readAnythingKey) {
+    const cache = getReadingCacheFunction('cacheReadingBook');
+    if (!cache || !readAnythingKey || !documentRecord?.text) return false;
+    return cache({
+      key: `${BOOKMARKLET_CACHE_PREFIX}${readAnythingKey}`,
+      type: 'read-anything-bookmarklet',
+      readAnythingKey,
+      title: documentRecord.title || 'Web Article',
+      author: documentRecord.author || documentRecord.source?.author || '',
+      text: documentRecord.text,
+      source: { ...(documentRecord.source || {}), readAnythingKey },
+      savedAt: new Date().toISOString()
+    });
+  }
+
+  async function loadBookmarkletArticle(readAnythingKey) {
+    if (!readAnythingKey) return null;
+    const read = getReadingCacheFunction('getCachedReadingBook');
+    if (read) {
+      const cached = await read(`${BOOKMARKLET_CACHE_PREFIX}${readAnythingKey}`);
+      if (cached?.text) return cached;
+    }
+
+    // Fallback to the formatter record already maintained by Read Anything.
+    // This does not create a second copy of article text in localStorage.
+    try {
+      const record = JSON.parse(localStorage.getItem(formatRecordStorageKey(readAnythingKey)) || 'null');
+      const text = String(record?.versions?.original || record?.originalText || '').trim();
+      if (!text) return null;
+      return {
+        readAnythingKey,
+        title: record.title || 'Web Article',
+        author: record.author || record.source?.author || '',
+        text,
+        source: { ...(record.source || {}), readAnythingKey }
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  function registerBookmarkletArticle(documentRecord, readAnythingKey) {
+    if (!documentRecord || !readAnythingKey) return;
+    const source = { ...(documentRecord.source || {}), readAnythingKey };
+    const entry = {
+      key: readAnythingKey,
+      title: cleanImportedTitle(documentRecord.title || 'Web Article'),
+      author: documentRecord.author || source.author || '',
+      sourceUrl: String(source.url || '').slice(0, 4000),
+      sourceName: articleSiteName(source),
+      importedAt: source.importedAt || new Date().toISOString()
+    };
+    const items = bookmarkletQueue().filter((item) => item?.key !== readAnythingKey);
+    items.unshift(entry);
+    saveBookmarkletQueue(items);
+    void cacheBookmarkletArticle({ ...documentRecord, title: entry.title, source }, readAnythingKey);
+  }
+
+  function ensureBookmarkletArticleStyles() {
+    if (document.getElementById('read-anything-bookmarklet-article-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'read-anything-bookmarklet-article-styles';
+    style.textContent = `
+      #app .reader-page-panel.read-anything-bookmarklet-reader .reader-title-copy h1 {
+        font-size: clamp(1.55rem, 2.15vw, 2rem) !important;
+        line-height: 1.12 !important;
+        letter-spacing: -.018em !important;
+        max-width: 980px;
+        margin-bottom: .42rem !important;
+      }
+      #app .reader-page-panel.read-anything-bookmarklet-reader .reader-title-links { display: none !important; }
+      #app .read-anything-bookmarklet-source-credit {
+        display: flex; align-items: center; flex-wrap: wrap; gap: .36rem;
+        margin: .05rem 0 .4rem; font-size: .78rem; line-height: 1.35; opacity: .8;
+      }
+      #app .read-anything-bookmarklet-source-credit .source-label { font-weight: 700; opacity: .72; }
+      #app .read-anything-bookmarklet-source-credit strong { font-weight: 700; }
+      #app .read-anything-bookmarklet-source-credit a { color: inherit; text-underline-offset: 2px; }
+      #app .read-anything-bookmarklet-source-credit .sep { opacity: .45; }
+      #app .read-anything-bookmarklet-queue {
+        margin: 0 0 1rem; padding: 0 0 .95rem; border-bottom: 1px solid rgba(127,127,127,.2);
+      }
+      #app .read-anything-bookmarklet-queue-head {
+        display:flex; align-items:baseline; justify-content:space-between; gap:.65rem; margin:0 0 .5rem;
+      }
+      #app .read-anything-bookmarklet-queue-head strong { font-size:.86rem; }
+      #app .read-anything-bookmarklet-queue-head span { font-size:.7rem; opacity:.58; }
+      #app .read-anything-bookmarklet-queue-list { display:grid; gap:.22rem; }
+      #app .read-anything-bookmarklet-queue-item {
+        display:grid; gap:.12rem; width:100%; padding:.46rem .5rem; border:1px solid transparent;
+        border-radius:7px; background:transparent; color:inherit; text-align:left; cursor:pointer;
+      }
+      #app .read-anything-bookmarklet-queue-item:hover { background:rgba(127,127,127,.075); }
+      #app .read-anything-bookmarklet-queue-item[aria-current="true"] {
+        border-color:rgba(201,137,0,.45); background:rgba(201,137,0,.08);
+      }
+      #app .read-anything-bookmarklet-queue-item > span {
+        font-size:.78rem; font-weight:650; line-height:1.28;
+      }
+      #app .read-anything-bookmarklet-queue-item > small { font-size:.66rem; opacity:.58; line-height:1.25; }
+    `;
+    document.head.appendChild(style);
   }
 
   function addHistory(documentRecord) {
@@ -1096,6 +1285,143 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     });
   }
 
+  function isBookmarkletArticleDocument() {
+    return String(activeImportedDocument?.source?.type || '').toLowerCase() === 'bookmarklet';
+  }
+
+  function installBookmarkletArticleChrome() {
+    ensureBookmarkletArticleStyles();
+    const panel = document.querySelector('#app .reader-page-panel');
+    const titleCopy = panel?.querySelector('.reader-title-copy');
+    const existing = document.querySelector('#read-anything-bookmarklet-source-credit');
+
+    if (!panel || !titleCopy || !activeImportedDocument || !isBookmarkletArticleDocument()) {
+      existing?.remove();
+      panel?.classList.remove('read-anything-bookmarklet-reader');
+      return;
+    }
+
+    panel.classList.add('read-anything-bookmarklet-reader');
+    const source = activeImportedDocument.source || {};
+    const sourceName = articleSiteName(source);
+    const dateLabel = articleDateLabel(source, { captured: true });
+    const author = String(activeImportedDocument.author || source.author || '').trim();
+    const url = String(source.url || '').trim();
+
+    let credit = existing;
+    if (!credit || credit.parentElement !== titleCopy) {
+      credit?.remove();
+      credit = document.createElement('div');
+      credit.id = 'read-anything-bookmarklet-source-credit';
+      credit.className = 'read-anything-bookmarklet-source-credit';
+      titleCopy.querySelector('h1')?.insertAdjacentElement('afterend', credit);
+    }
+
+    credit.replaceChildren();
+    const addText = (text, className = '') => {
+      const span = document.createElement('span');
+      if (className) span.className = className;
+      span.textContent = text;
+      credit.appendChild(span);
+    };
+    const addSep = () => addText('·', 'sep');
+
+    addText('Source', 'source-label');
+    const site = document.createElement('strong');
+    site.textContent = sourceName;
+    credit.appendChild(site);
+    if (author) { addSep(); addText(`By ${author}`); }
+    if (dateLabel) { addSep(); addText(dateLabel); }
+    if (url) {
+      addSep();
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'View original ↗';
+      credit.appendChild(link);
+    }
+  }
+
+  async function openBookmarkletQueueEntry(entry, button) {
+    if (!entry?.key) return;
+    const original = button?.innerHTML || '';
+    if (button) button.disabled = true;
+    try {
+      const cached = await loadBookmarkletArticle(entry.key);
+      if (!cached?.text) throw new Error('This captured article is no longer stored in this browser. Capture it again to reopen it.');
+      openDocument({
+        title: cached.title || entry.title || 'Web Article',
+        author: cached.author || entry.author || '',
+        text: cached.text,
+        source: {
+          ...(cached.source || {}),
+          type: 'bookmarklet',
+          url: cached.source?.url || entry.sourceUrl || '',
+          site: cached.source?.site || entry.sourceName || '',
+          importedAt: cached.source?.importedAt || entry.importedAt || new Date().toISOString(),
+          readAnythingKey: entry.key,
+          bookmarkletQueueReplay: true
+        }
+      });
+    } catch (error) {
+      console.warn('Captured article could not be reopened.', error);
+      if (button) {
+        button.title = error.message || 'Captured article could not be reopened.';
+        button.innerHTML = '<span>Article unavailable</span><small>Capture it again to restore the text.</small>';
+      }
+    } finally {
+      if (button?.isConnected) {
+        button.disabled = false;
+        if (button.innerHTML.includes('Article unavailable') === false && original) button.innerHTML = original;
+      }
+    }
+  }
+
+  function installBookmarkletArticleQueue() {
+    migrateBookmarkletQueueFromFormatRecords();
+    if (!activeImportedDocument || !isBookmarkletArticleDocument()) {
+      document.querySelector('#read-anything-bookmarklet-queue')?.remove();
+      return;
+    }
+
+    ensureBookmarkletArticleStyles();
+    const pane = document.querySelector('#app #navigation-pane');
+    const view = pane?.querySelector('[data-reader-view="contents"]');
+    if (!pane || !view) return;
+
+    const items = bookmarkletQueue();
+    const currentKey = String(activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument));
+    let queue = view.querySelector('#read-anything-bookmarklet-queue');
+    if (!queue) {
+      queue = document.createElement('section');
+      queue.id = 'read-anything-bookmarklet-queue';
+      queue.className = 'read-anything-bookmarklet-queue';
+      view.prepend(queue);
+    }
+
+    queue.innerHTML = `
+      <div class="read-anything-bookmarklet-queue-head">
+        <strong>Captured articles</strong><span>${items.length} saved</span>
+      </div>
+      <div class="read-anything-bookmarklet-queue-list">
+        ${items.length ? items.map((item) => `
+          <button type="button" class="read-anything-bookmarklet-queue-item"
+            data-bookmarklet-queue-key="${escapeHtml(item.key || '')}"
+            aria-current="${String(item.key || '') === currentKey ? 'true' : 'false'}">
+            <span>${escapeHtml(item.title || 'Web Article')}</span>
+            <small>${escapeHtml(item.sourceName || 'Web article')}${item.importedAt ? ` · ${escapeHtml(articleDateLabel({ importedAt: item.importedAt }, { captured: true }))}` : ''}</small>
+          </button>`).join('') : '<small>No captured articles yet.</small>'}
+      </div>`;
+
+    queue.querySelectorAll('[data-bookmarklet-queue-key]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const entry = items.find((item) => String(item.key || '') === button.dataset.bookmarkletQueueKey);
+        if (entry) void openBookmarkletQueueEntry(entry, button);
+      });
+    });
+  }
+
   function isWholeArticleDocument() {
     const type = String(activeImportedDocument?.source?.type || '').toLowerCase();
     return ['topic-feed', 'bookmarklet', 'website'].includes(type);
@@ -1631,6 +1957,8 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       if (!activeImportedDocument) return;
       installDisplayFormatControl();
       installArticleSummaryButton();
+      installBookmarkletArticleChrome();
+      installBookmarkletArticleQueue();
       installDefaultArticleBookPages();
     };
 
@@ -1748,6 +2076,15 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     // manually, while the untouched original remains available at all times.
     activeImportedVersion = autoFormatArticle && formattedArticle ? 'format_all' : 'original';
     saveActiveFormatRecord();
+    if (sourceType === 'bookmarklet' && !documentRecord.source?.bookmarkletQueueReplay) {
+      registerBookmarkletArticle({
+        ...documentRecord,
+        title,
+        text,
+        author: activeImportedDocument.author,
+        source: activeImportedDocument.source
+      }, readAnythingKey);
+    }
     renderImportedVersion(activeImportedVersion);
   }
 
@@ -1986,6 +2323,9 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         source: {
           type: isSelection ? 'web-passage' : 'bookmarklet',
           url: payload.url || '',
+          site: (() => {
+            try { return new URL(payload.url || '').hostname.replace(/^www\./i, ''); } catch { return ''; }
+          })(),
           context: payload.context || '',
           captureType: payload.captureType || 'page',
           documentToc: Array.isArray(payload.documentToc) ? payload.documentToc : [],
@@ -2045,6 +2385,11 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       }, delay);
     });
   }
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== BOOKMARKLET_QUEUE_KEY || !isBookmarkletArticleDocument()) return;
+    window.setTimeout(installBookmarkletArticleQueue, 0);
+  });
 
   document.addEventListener('marksetgo:document-available', (event) => {
     const documentId = event?.detail?.documentId;
