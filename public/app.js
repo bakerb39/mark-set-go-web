@@ -30,6 +30,48 @@ if (missingFeatureFunctions.length) {
 const app = document.querySelector('#app');
 app.dataset.viewKey = 'home';
 
+// A secondary Reader is the one workspace page that is allowed to own its own
+// Reader state. Ordinary workspace pages continue handing readable content to
+// the outer Reader so existing navigation behavior is preserved.
+function isSecondaryReaderWorkspace() {
+  if (window.parent === window) return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('msgSecondaryReader') === '1'
+    || (params.get('msgWorkspaceMode') === 'reader'
+      && params.get('msgWorkspaceValue') === 'secondary');
+}
+
+function shouldDelegateReaderToWorkspaceParent() {
+  if (window.parent === window || isSecondaryReaderWorkspace()) return false;
+  return new URLSearchParams(window.location.search).has('msgWorkspaceMode');
+}
+
+window.MSGSecondaryReaderWorkspace = Object.freeze({
+  active: isSecondaryReaderWorkspace,
+  shouldDelegate: shouldDelegateReaderToWorkspaceParent
+});
+
+// Reader 2+ starts blank. Ignore automatic startup/resume renders until the
+// user has deliberately interacted with this numbered Reader iframe.
+let secondaryReaderLocalIntent = !isSecondaryReaderWorkspace();
+if (isSecondaryReaderWorkspace()) {
+  const markSecondaryReaderIntent = (event) => {
+    // Reader 2+ must stay blank on boot. Startup scripts can dispatch synthetic
+    // change/click events while they initialize; those are NOT permission to
+    // copy Reader 1's document into this independent Reader. Only a real user
+    // interaction inside this Reader can unlock a document render.
+    if (!event?.isTrusted) return;
+    if (event.type === 'keydown' && !['Enter', ' ', 'Spacebar'].includes(event.key)) return;
+    secondaryReaderLocalIntent = true;
+  };
+  document.addEventListener('pointerdown', markSecondaryReaderIntent, true);
+  document.addEventListener('keydown', markSecondaryReaderIntent, true);
+  document.addEventListener('change', markSecondaryReaderIntent, true);
+}
+function secondaryReaderAllowsDocumentRender() {
+  return !isSecondaryReaderWorkspace() || secondaryReaderLocalIntent;
+}
+
 
 const { BookModel, SessionManager, ReaderEngine, VirtualRenderer } = window.MarkSetGoReader || {};
 if (!BookModel || !SessionManager || !ReaderEngine || !VirtualRenderer) {
@@ -400,14 +442,23 @@ function navigationViewKey({ action, read, test } = {}) {
 
 
 async function writeReaderSession(snapshot) {
+  // The legacy SessionManager store is the single persistent checkpoint for
+  // Reader 1. Auxiliary Readers are independent live iframe sessions and must
+  // never overwrite that shared checkpoint.
+  if (isSecondaryReaderWorkspace()) return snapshot || null;
   return readerSessionManager.write(snapshot);
 }
 
 async function readReaderSession() {
+  // Most importantly, Reader 2+ must never hydrate itself from Reader 1's
+  // persistent checkpoint. Its own document lives only in its mounted iframe
+  // until dedicated multi-Reader persistence is implemented.
+  if (isSecondaryReaderWorkspace()) return null;
   return readerSessionManager.read();
 }
 
 async function clearReaderSession() {
+  if (isSecondaryReaderWorkspace()) return;
   await readerSessionManager.clear();
   try { localStorage.removeItem(READER_SESSION_META_KEY); } catch {}
 }
@@ -1191,292 +1242,7 @@ const musicPlayerWrap = document.querySelector('#music-player-wrap');
 const musicNowTitle = document.querySelector('#music-now-title');
 const musicNowSource = document.querySelector('#music-now-source');
 const musicNextButton = document.querySelector('#music-next');
-
-function installVideoBesideReaderUi() {
-  if (!musicDock) return;
-
-  let resizer = document.querySelector('#music-side-resizer');
-  if (!resizer) {
-    resizer = document.createElement('div');
-    resizer.id = 'music-side-resizer';
-    resizer.className = 'music-side-resizer';
-    resizer.hidden = true;
-    resizer.tabIndex = 0;
-    resizer.setAttribute('role', 'separator');
-    resizer.setAttribute('aria-orientation', 'vertical');
-    resizer.setAttribute('aria-label', 'Resize video side panel');
-    musicDock.insertBefore(resizer, musicDock.firstChild);
-  }
-
-  const actions = musicDock.querySelector('.music-dock-actions');
-  if (actions && !document.querySelector('#music-beside-reader')) {
-    const button = document.createElement('button');
-    button.id = 'music-beside-reader';
-    button.type = 'button';
-    button.className = 'music-beside-reader-button';
-    button.textContent = 'Play beside reader';
-    button.setAttribute('aria-label', 'Play beside reader');
-    button.setAttribute('aria-pressed', 'false');
-    button.title = 'Keep this media beside the Reader while you turn pages';
-    const next = document.querySelector('#music-next');
-    if (next && next.parentNode === actions) actions.insertBefore(button, next);
-    else actions.insertBefore(button, actions.firstChild);
-  }
-
-  if (!document.querySelector('#msg-video-beside-reader-styles')) {
-    const style = document.createElement('style');
-    style.id = 'msg-video-beside-reader-styles';
-    style.textContent = `
-      :root {
-        --msg-video-side-width: 480px;
-        --msg-video-side-collapsed-width: 330px;
-      }
-
-      .music-dock-actions {
-        align-items: center;
-        flex-shrink: 0;
-      }
-
-      .music-dock-actions .music-beside-reader-button {
-        width: auto;
-        min-width: 0;
-        padding: 0 .62rem;
-        font-size: .68rem;
-        font-weight: 760;
-        white-space: nowrap;
-      }
-
-      .music-dock-actions .music-beside-reader-button[aria-pressed="true"] {
-        background: #315f86;
-      }
-
-      .music-side-resizer {
-        display: none;
-      }
-
-      body.resizing-video-side-panel {
-        cursor: col-resize;
-        user-select: none;
-      }
-
-      @media (min-width: 1051px) {
-        body.video-beside-reader {
-          --msg-video-side-active-width: var(--msg-video-side-width);
-          --msg-video-reader-width: min(1000px, calc(100vw - var(--msg-video-side-active-width) - 3rem));
-          --msg-video-reader-edge: max(1rem, calc((100vw - var(--msg-video-side-active-width) - var(--msg-video-reader-width)) / 2));
-        }
-
-        body.video-beside-reader.video-side-collapsed {
-          --msg-video-side-active-width: var(--msg-video-side-collapsed-width);
-        }
-
-        body.video-beside-reader #app {
-          width: var(--msg-video-reader-width);
-          margin-left: var(--msg-video-reader-edge);
-          margin-right: calc(var(--msg-video-side-active-width) + var(--msg-video-reader-edge));
-          transition: width .18s ease, margin .18s ease;
-        }
-
-        body.resizing-video-side-panel #app {
-          transition: none;
-        }
-
-        .music-dock.beside-reader {
-          top: 4.25rem;
-          right: .75rem;
-          bottom: auto;
-          width: var(--msg-video-side-width);
-          max-width: min(720px, 55vw);
-          border-radius: .75rem;
-          overflow: visible;
-          transition: width .18s ease;
-        }
-
-        body.resizing-video-side-panel .music-dock.beside-reader {
-          transition: none;
-        }
-
-        .music-dock.beside-reader.side-collapsed {
-          width: var(--msg-video-side-collapsed-width);
-        }
-
-        .music-dock.beside-reader .music-dock-bar,
-        .music-dock.beside-reader .music-player-wrap {
-          overflow: hidden;
-        }
-
-        .music-dock.beside-reader .music-dock-bar {
-          border-radius: .7rem .7rem 0 0;
-        }
-
-        .music-dock.beside-reader .music-player-wrap {
-          border-radius: 0 0 .7rem .7rem;
-        }
-
-        .music-dock.beside-reader .music-side-resizer {
-          position: absolute;
-          z-index: 3;
-          top: 0;
-          bottom: 0;
-          left: -8px;
-          display: block;
-          width: 16px;
-          cursor: col-resize;
-          touch-action: none;
-        }
-
-        .music-dock.beside-reader .music-side-resizer::before {
-          content: "";
-          position: absolute;
-          top: .4rem;
-          bottom: .4rem;
-          left: 7px;
-          width: 2px;
-          border-radius: 999px;
-          background: rgba(255,255,255,.22);
-        }
-
-        .music-dock.beside-reader .music-side-resizer:hover::before,
-        .music-dock.beside-reader .music-side-resizer:focus-visible::before,
-        body.resizing-video-side-panel .music-side-resizer::before {
-          background: #78b7ea;
-        }
-
-        .music-dock.beside-reader .music-side-resizer:focus-visible {
-          outline: 2px solid #78b7ea;
-          outline-offset: -2px;
-        }
-
-        .music-dock.beside-reader.minimized {
-          width: var(--msg-video-side-width);
-        }
-      }
-
-      @media (max-width: 1050px) {
-        body.video-beside-reader #app {
-          width: min(1000px, calc(100% - 2rem));
-          margin: 2rem auto;
-        }
-
-        .music-dock.beside-reader,
-        .music-dock.beside-reader.side-collapsed {
-          top: auto;
-          right: .5rem;
-          bottom: .5rem;
-          width: min(480px, calc(100vw - 1rem));
-          max-width: none;
-        }
-
-        .music-dock.beside-reader .music-side-resizer {
-          display: none !important;
-        }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-}
-
-installVideoBesideReaderUi();
-const musicBesideReaderButton = document.querySelector('#music-beside-reader');
-const musicSideResizer = document.querySelector('#music-side-resizer');
-const musicMinimizeButton = document.querySelector('#music-minimize');
-const VIDEO_SIDE_PANEL_WIDTH_KEY = 'markSetGoVideoSidePanelWidthV1';
-const VIDEO_SIDE_PANEL_DEFAULT_WIDTH = 480;
-const VIDEO_SIDE_PANEL_MIN_WIDTH = 360;
-const VIDEO_SIDE_PANEL_COLLAPSED_WIDTH = 330;
 let musicSearchState = null;
-let videoSidePanelWidth = VIDEO_SIDE_PANEL_DEFAULT_WIDTH;
-
-function maxVideoSidePanelWidth() {
-  const viewportLimit = Math.floor(window.innerWidth * 0.55);
-  const readerSpaceLimit = Math.max(VIDEO_SIDE_PANEL_MIN_WIDTH, window.innerWidth - 480);
-  return Math.max(
-    VIDEO_SIDE_PANEL_MIN_WIDTH,
-    Math.min(720, viewportLimit, readerSpaceLimit)
-  );
-}
-
-function applyVideoSidePanelWidth(value, { persist = false } = {}) {
-  const numeric = Number(value);
-  const requested = Number.isFinite(numeric) ? numeric : VIDEO_SIDE_PANEL_DEFAULT_WIDTH;
-  const width = Math.round(Math.max(
-    VIDEO_SIDE_PANEL_MIN_WIDTH,
-    Math.min(requested, maxVideoSidePanelWidth())
-  ));
-  videoSidePanelWidth = width;
-  document.documentElement.style.setProperty('--msg-video-side-width', `${width}px`);
-  if (persist) {
-    try { localStorage.setItem(VIDEO_SIDE_PANEL_WIDTH_KEY, String(width)); } catch {}
-  }
-  return width;
-}
-
-function updateMusicBesideReaderButton(active) {
-  if (!musicBesideReaderButton) return;
-  musicBesideReaderButton.setAttribute('aria-pressed', active ? 'true' : 'false');
-  musicBesideReaderButton.setAttribute('aria-label', active ? 'Return to floating player' : 'Play beside reader');
-  musicBesideReaderButton.textContent = active ? 'Float player' : 'Play beside reader';
-  musicBesideReaderButton.title = active
-    ? 'Return this media to the floating player'
-    : 'Keep this media beside the Reader while you turn pages';
-}
-
-function setMusicBesideReader(enabled) {
-  if (!musicDock) return false;
-  const active = Boolean(enabled);
-  musicDock.classList.toggle('beside-reader', active);
-  document.body.classList.toggle('video-beside-reader', active);
-
-  if (!active) {
-    musicDock.classList.remove('side-collapsed');
-    document.body.classList.remove('video-side-collapsed', 'resizing-video-side-panel');
-  } else {
-    musicDock.classList.remove('minimized');
-    if (musicPlayerWrap) musicPlayerWrap.hidden = false;
-    applyVideoSidePanelWidth(videoSidePanelWidth);
-  }
-
-  if (musicSideResizer) musicSideResizer.hidden = !active;
-  if (musicMinimizeButton) {
-    musicMinimizeButton.textContent = '—';
-    musicMinimizeButton.setAttribute(
-      'aria-label',
-      active ? 'Collapse video side panel' : 'Minimize media player'
-    );
-  }
-  updateMusicBesideReaderButton(active);
-  return active;
-}
-
-function toggleVideoSidePanelCollapsed() {
-  if (!musicDock?.classList.contains('beside-reader')) return false;
-  const collapsed = musicDock.classList.toggle('side-collapsed');
-  document.body.classList.toggle('video-side-collapsed', collapsed);
-  // Keep the iframe mounted and visible. Resizing it does not interrupt playback.
-  if (musicPlayerWrap) musicPlayerWrap.hidden = false;
-  if (musicMinimizeButton) {
-    musicMinimizeButton.textContent = collapsed ? '□' : '—';
-    musicMinimizeButton.setAttribute(
-      'aria-label',
-      collapsed ? 'Expand video side panel' : 'Collapse video side panel'
-    );
-  }
-  return collapsed;
-}
-
-try {
-  const savedVideoSidePanelWidth = Number(localStorage.getItem(VIDEO_SIDE_PANEL_WIDTH_KEY));
-  applyVideoSidePanelWidth(savedVideoSidePanelWidth || VIDEO_SIDE_PANEL_DEFAULT_WIDTH);
-} catch {
-  applyVideoSidePanelWidth(VIDEO_SIDE_PANEL_DEFAULT_WIDTH);
-}
-
-window.MarkSetGoVideoPlayer = {
-  playBesideReader: () => setMusicBesideReader(true),
-  useFloatingPlayer: () => setMusicBesideReader(false),
-  toggleBesideReader: () => setMusicBesideReader(!musicDock?.classList.contains('beside-reader')),
-  get besideReader() { return Boolean(musicDock?.classList.contains('beside-reader')); }
-};
 
 function musicSearchQuery(choice) {
   return choice.searchQuery || `${choice.title || 'reading music'} YouTube`;
@@ -1635,7 +1401,6 @@ function playMusic(choiceOrParsed) {
 function stopMusic() {
   musicSearchState = null;
   if (musicNextButton) musicNextButton.hidden = true;
-  setMusicBesideReader(false);
   musicPlayer.src = '';
   musicDock.hidden = true;
   try { localStorage.removeItem('markSetGoMusic'); } catch {}
@@ -4234,7 +3999,8 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   if (!snapshot?.title || !snapshot?.currentText) return false;
   const controls = snapshot.controls || {};
 
-  renderReaderWithText(snapshot.title, snapshot.currentText, snapshot.source || { type: 'restored' });
+  const renderResult = renderReaderWithText(snapshot.title, snapshot.currentText, snapshot.source || { type: 'restored' });
+  if (isSecondaryReaderWorkspace() && renderResult === false) return false;
 
   state.originalText = snapshot.originalText || snapshot.currentText;
   state.currentText = snapshot.currentText;
@@ -5222,6 +4988,12 @@ function renderHome() {
   stopReader();
   app.dataset.viewKey = 'home';
 
+  // Home owns a local close control only in the top-level app. Workspace/frame
+  // pages rely on their outer pane chrome and must not get a duplicate X.
+  const showStandaloneHomeClose = window.parent === window
+    && !window.__MSG_WORKSPACE_PANE__
+    && !window.MSGWorkspacePane;
+
   let resumeMeta = null;
   try { resumeMeta = JSON.parse(localStorage.getItem(READER_SESSION_META_KEY) || 'null'); } catch {}
   const resumePercent = resumeMeta?.totalWords
@@ -5286,6 +5058,7 @@ function renderHome() {
 
   app.innerHTML = `
     <section class="home-simple">
+      ${showStandaloneHomeClose ? `<button class="msg-home-page-close" data-home-panel-close type="button" aria-label="Close Home" title="Close">×</button>` : ''}
       <header class="home-simple-brand">
         <h1><span class="home-speed-mark" aria-hidden="true">≡</span>Mark, Set, Go!</h1>
         <p class="home-simple-tagline">Read Faster. Understand Deeper. Remember Longer. Apply Daily.</p>
@@ -5350,6 +5123,15 @@ function renderHome() {
 
     </section>`;
 
+  app.querySelector('[data-home-panel-close]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    // Closing Home is intentionally not navigation. Remove the Home surface and
+    // leave the current experience-theme background visible. Clicking the brand
+    // or Home navigation later simply renders Home again.
+    app.replaceChildren();
+  });
+
   bindHomeReaderActions();
 }
 
@@ -5404,6 +5186,17 @@ function readingSkillBookOptions(books, placeholder = 'Choose a book…') {
 }
 
 
+
+function renderExperienceThemeSwatches(themeKey) {
+  const colors = window.MarkSetGoExperienceThemes?.themes?.[themeKey]?.colors;
+  if (!Array.isArray(colors) || !colors.length) {
+    return '<span class="visual-theme-preview-empty">Theme palette</span>';
+  }
+  return colors.slice(0,5).map((color) =>
+    `<span style="background:${escapeHtml(String(color))}"></span>`
+  ).join('');
+}
+
 function renderProfilePreferences() {
   finalizeReadingSession();
   stopReader();
@@ -5456,11 +5249,21 @@ function renderProfilePreferences() {
           ${Object.entries(EXPERIENCE_APPEARANCES).map(([key,appearance])=>`
             <button class="profile-preset-option visual-theme-option ${current.appearance===key?'active':''}" type="button" data-profile-appearance="${escapeHtml(key)}" aria-pressed="${current.appearance===key}">
               <span class="profile-preset-check" aria-hidden="true">${current.appearance===key?'✓':''}</span>
-              <span class="visual-theme-preview visual-theme-preview-default" aria-hidden="true"><span></span><span></span><span></span></span>
+              <span class="visual-theme-preview" aria-hidden="true">${renderExperienceThemeSwatches(key)}</span>
               <strong>${escapeHtml(appearance.label)}</strong>
               <small>${escapeHtml(appearance.description)}</small>
             </button>`).join('')}
         </div>
+      </section>
+
+      <section class="profile-feature-card visual-designer-profile-card">
+        <div class="section-heading">
+          <div><span class="source-category">Appearance</span><h2>Visual Designer</h2><p>Create and save your own palette and Reader layout without changing the underlying Reader engine.</p></div>
+        </div>
+        <button class="secondary visual-designer-profile-action" type="button" data-open-visual-designer>
+          <span class="visual-designer-profile-icon" aria-hidden="true">✦</span>
+          <span><strong>Design my own theme</strong><small>Starts from Explorer, then saves your custom colors and optional Reader layout overrides in this browser.</small></span>
+        </button>
       </section>
 
       <section class="profile-feature-card">
@@ -5555,6 +5358,22 @@ function renderProfilePreferences() {
       if(!EXPERIENCE_APPEARANCES[key]) return;
       window.MarkSetGoExperienceThemes?.apply?.(key);
     });
+  });
+
+  app.querySelector('[data-open-visual-designer]')?.addEventListener('click',(event)=>{
+    event.preventDefault();
+    // If Profile is open in the workspace, the Designer must operate on the
+    // outer Reader rather than on the small Profile iframe.
+    const host = window.parent !== window ? window.parent : window;
+    try {
+      window.MarkSetGoExperienceThemes?.apply?.('explorer');
+      const designer = host.MarkSetGoVisualDesigner || host.MarkSetGoExplorerVisualDesigner;
+      if (typeof designer?.open !== 'function') throw new Error('Visual Designer is not loaded.');
+      designer.open();
+    } catch (error) {
+      console.warn('Visual Designer could not open.', error);
+      window.alert('The Visual Designer could not open. Refresh after the updated files finish deploying.');
+    }
   });
 
   // Keep the page synchronized if the profile is changed by another app control.
@@ -11252,7 +11071,7 @@ function bindBrowseSearchLocalActions(container) {
         buyUrl:guide.buyUrl,
         subtitle:`An independent reading guide to ${guide.title}`
       };
-      if (window.parent !== window) {
+      if (shouldDelegateReaderToWorkspaceParent()) {
         const handoff = window.parent.MSGWorkspaceReaderHandoff;
         if (typeof handoff?.openText !== 'function') {
           throw new Error('The main Reader handoff is not ready.');
@@ -11277,7 +11096,7 @@ function bindBrowseSearchLocalActions(container) {
       try {
         const loaded = await loadLocalText(item.action.key);
         const source = { type:'local-library', id:item.action.key, title:loaded.title };
-        if (window.parent !== window) {
+        if (shouldDelegateReaderToWorkspaceParent()) {
           const handoff = window.parent.MSGWorkspaceReaderHandoff;
           if (typeof handoff?.openText !== 'function') {
             throw new Error('The main Reader handoff is not ready.');
@@ -11496,7 +11315,7 @@ function bindUnifiedLibraryActions(container) {
         const file = new File([blob], `${provider}-${id}.${format}`, { type: format === 'epub' ? 'application/epub+zip' : 'application/pdf' });
         const parsed = format === 'epub' ? await parseEpubFile(file) : await parsePdfFile(file);
         parsed.source = { ...(parsed.source || {}), type: provider, provider, id, remoteFormat: format };
-        const isWorkspacePane = window.parent !== window;
+        const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
         if (isWorkspacePane) {
           const handoff = window.parent.MSGWorkspaceReaderHandoff;
           if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
@@ -11510,8 +11329,7 @@ function bindUnifiedLibraryActions(container) {
       const fullTitle = `${book.title}${book.author ? ` — ${book.author}` : ''}`;
       const normalized = normalizeImportedBookText(book.text, { title:book.title, author:book.author });
       const editionSource = { type: provider, id, sourceUrl: book.sourceUrl, remoteFormat: format === 'best' ? 'text' : format, documentToc: normalized.toc, cleanup: normalized.report };
-      const workspaceParams = new URLSearchParams(location.search);
-      const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+      const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
       if (isWorkspacePane) {
         const handoff = window.parent.MSGWorkspaceReaderHandoff;
         if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
@@ -11722,6 +11540,9 @@ function showMarkToolbar(selectionData, rect) {
   const bar=app.querySelector('#mark-selection-toolbar'); if(!bar) return;
   state.markSelection=selectionData;
   persistMarkSelectionHighlight(selectionData);
+  bar.querySelectorAll('[data-mark-annotate-menu], [data-mark-more-menu]').forEach((menu)=>{ menu.hidden=true; });
+  bar.querySelector('[data-mark-annotate-toggle]')?.setAttribute('aria-expanded','false');
+  bar.querySelector('[data-mark-more-toggle]')?.setAttribute('aria-expanded','false');
   bar.hidden=false;
   // The passage toolbar can wrap in narrow Reader/workspace panes. Measure the
   // rendered toolbar after it is shown so every action, including Chat and
@@ -11917,6 +11738,17 @@ function openComparisonWorkspace(){
   hideMarkToolbar();
 }
 
+function companionQuestionWithAddedContext(question=''){
+  const base=String(question||'').trim();
+  let extra='';
+  try{ extra=String(window.MarkSetGoAskMarkHub?.contextText?.() || '').trim(); }catch{}
+  if(!extra) return base;
+  const header='\n\nAdditional context supplied by the reader:\n';
+  const budget=Math.max(0,1200-base.length-header.length);
+  if(!budget) return base.slice(0,1200);
+  return `${base}${header}${extra.slice(0,budget)}`.slice(0,1200);
+}
+
 async function runMarkAction(action,question=''){
   const articleContext=window.MSGInvestorArticleContext;
   const currentSelection=state.markSelection;
@@ -11957,6 +11789,7 @@ async function runMarkAction(action,question=''){
   try{
     const targetLanguage=action==='translate'?(window.prompt('Translate into which language?','Spanish')||'').trim():'';
     if(action==='translate'&&!targetLanguage)return;
+    const requestQuestion=action==='ask' ? companionQuestionWithAddedContext(question) : String(question||'').trim();
 
     let response;
 
@@ -11972,14 +11805,14 @@ async function runMarkAction(action,question=''){
           articleText:articleContext.articleText,
           analysis:articleContext.analysis||{},
           history,
-          question:String(question||'').trim()
+          question:requestQuestion
         })
       });
     }else{
       response=await fetch('/api/mark-selection',{
         method:'POST',
         headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({...selected,selection:selected.text,action,question,targetLanguage})
+        body:JSON.stringify({...selected,selection:selected.text,action,question:requestQuestion,targetLanguage})
       });
     }
 
@@ -12035,6 +11868,67 @@ function notebookRecordFullText(item) {
   if (item.result?.keyPoints?.length) parts.push(`\nKey points:\n${item.result.keyPoints.map(x=>`- ${x}`).join('\n')}`);
   if (item.result?.cautions?.length) parts.push(`\nNotes and cautions:\n${item.result.cautions.map(x=>`- ${x}`).join('\n')}`);
   return parts.join('\n');
+}
+
+function markRecordSharePayload(item,{sourceLabel='Notebook',type='notebook-entry'}={}) {
+  if(!item)return null;
+  const passage=String(item.selection||'').trim();
+  const note=String(item.note||'').trim();
+  const question=String(item.question||'').trim();
+  const response=String(item.result?.response||'').trim();
+  const keyPoints=Array.isArray(item.result?.keyPoints) ? item.result.keyPoints.filter(Boolean).map(String) : [];
+  const cautions=Array.isArray(item.result?.cautions) ? item.result.cautions.filter(Boolean).map(String) : [];
+
+  let text='';
+  if(response){
+    const responseParts=[response];
+    if(keyPoints.length)responseParts.push(`Key points:
+${keyPoints.map(x=>`- ${x}`).join('\n')}`);
+    if(cautions.length)responseParts.push(`Notes and cautions:
+${cautions.map(x=>`- ${x}`).join('\n')}`);
+    text=responseParts.join('\n\n');
+  }else{
+    text=passage||note||question;
+  }
+  if(!text)return null;
+
+  const contextParts=[];
+  if(response&&passage)contextParts.push(`Relevant passage:
+${passage}`);
+  if(note)contextParts.push(`My note:
+${note}`);
+  if(response&&question)contextParts.push(`Question:
+${question}`);
+
+  return {
+    type,
+    title:item.title||item.result?.heading||'Notebook entry',
+    text,
+    context:contextParts.join('\n\n'),
+    sourceLabel,
+    documentId:item.documentId||state.documentId||'',
+    chapter:item.chapter||item.pageContext||'',
+    startIndex:Number(item.startIndex)||0,
+    metadata:{
+      recordId:item.id||'',
+      recordType:item.recordType||'',
+      action:item.action||'',
+      question
+    }
+  };
+}
+
+function shareMarkRecord(item,destination,{sourceLabel='Notebook',type='notebook-entry'}={}) {
+  const payload=markRecordSharePayload(item,{sourceLabel,type});
+  if(!payload)return false;
+  const shareApi=window.MSGContentShare;
+  const handler=destination==='symposium' ? shareApi?.toSymposium : shareApi?.toChat;
+  if(typeof handler!=='function'){
+    window.alert(destination==='symposium' ? 'Symposium sharing is not available yet.' : 'Chat sharing is not available yet.');
+    return false;
+  }
+  handler.call(shareApi,payload);
+  return true;
 }
 
 function downloadTextFile(filename, text) {
@@ -12095,6 +11989,8 @@ function notebookEntryMarkup(item) {
     <details class="notebook-plain-text"><summary>View as plain text</summary><pre>${escapeHtml(notebookRecordFullText(item))}</pre></details>
     <div class="notebook-record-actions">
       ${item.documentId?`<button type="button" data-mark-jump="${Number(item.startIndex)||0}">Return to passage</button>`:''}
+      <button type="button" data-share-notebook-record="chat" data-share-notebook-id="${escapeHtml(item.id)}">💬 Send to Chat</button>
+      <button type="button" data-share-notebook-record="symposium" data-share-notebook-id="${escapeHtml(item.id)}">🏛 Discuss in Symposium</button>
       <button type="button" data-export-notebook-record="${escapeHtml(item.id)}">Save as text</button>
       <button type="button" data-edit-notebook-note="${escapeHtml(item.id)}">Add/Edit my note</button>
       <button type="button" data-mark-delete="${escapeHtml(item.id)}">Delete</button>
@@ -12104,6 +12000,11 @@ function notebookEntryMarkup(item) {
 
 function bindExpandedNotebookButtons(panel,records,key=MARK_INSIGHTS_KEY) {
   bindMarkRecordButtons(panel,key);
+  panel.querySelectorAll('[data-share-notebook-record]').forEach(button=>button.addEventListener('click',()=>{
+    const item=records.find(x=>x.id===button.dataset.shareNotebookId);
+    if(!item)return;
+    shareMarkRecord(item,button.dataset.shareNotebookRecord,{sourceLabel:'Notebook',type:'notebook-entry'});
+  }));
   panel.querySelectorAll('[data-export-notebook-record]').forEach(button=>button.addEventListener('click',()=>{
     const item=records.find(x=>x.id===button.dataset.exportNotebookRecord);
     if(item)exportNotebookRecords([item],`${item.title||'Book'} - Notebook Entry`);
@@ -12141,7 +12042,13 @@ function renderMarkNotebook(){
 }
 function renderMarkHistory(){
   const panel=app.querySelector('#mark-history-panel'); if(!panel)return; const items=markRecordsForCurrentBook(MARK_HISTORY_KEY);
-  panel.innerHTML=`<div class="mark-list-heading"><strong>Conversation History</strong><small>${items.length} requests</small></div>${items.length?items.map(item=>`<article class="mark-record"><span>${escapeHtml(item.action)}${item.question?` · ${escapeHtml(item.question)}`:''}</span><blockquote>${escapeHtml(item.selection.slice(0,280))}${item.selection.length>280?'…':''}</blockquote><p>${escapeHtml(item.result?.response?.slice(0,500)||'')}</p><div><button type="button" data-mark-jump="${item.startIndex}">Return to passage</button></div></article>`).join(''):'<p class="mark-empty-note">Your requests to Ask Mark for this book will appear here.</p>'}`; bindMarkRecordButtons(panel,MARK_HISTORY_KEY);
+  panel.innerHTML=`<div class="mark-list-heading"><strong>Conversation History</strong><small>${items.length} requests</small></div>${items.length?items.map(item=>`<article class="mark-record"><span>${escapeHtml(item.action)}${item.question?` · ${escapeHtml(item.question)}`:''}</span><blockquote>${escapeHtml(item.selection.slice(0,280))}${item.selection.length>280?'…':''}</blockquote><p>${escapeHtml(item.result?.response?.slice(0,500)||'')}</p><div><button type="button" data-mark-jump="${item.startIndex}">Return to passage</button><button type="button" data-share-mark-history="chat" data-share-history-id="${escapeHtml(item.id)}">💬 Send to Chat</button><button type="button" data-share-mark-history="symposium" data-share-history-id="${escapeHtml(item.id)}">🏛 Discuss in Symposium</button></div></article>`).join(''):'<p class="mark-empty-note">Your requests to Ask Mark for this book will appear here.</p>'}`;
+  bindMarkRecordButtons(panel,MARK_HISTORY_KEY);
+  panel.querySelectorAll('[data-share-mark-history]').forEach(button=>button.addEventListener('click',()=>{
+    const item=items.find(x=>x.id===button.dataset.shareHistoryId);
+    if(!item)return;
+    shareMarkRecord(item,button.dataset.shareMarkHistory,{sourceLabel:'Reading Companion History',type:'companion-history'});
+  }));
 }
 function bindMarkRecordButtons(panel,key){
   panel.querySelectorAll('[data-mark-jump]').forEach(b=>b.addEventListener('click',()=>{const index=Number(b.dataset.markJump)||0;state.index=index;const reader=app.querySelector('#reader');const mode=state.renderedMode||getSelectedMode();const count=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);restoreReadingAnchor(reader,mode,count,index);updateReaderStatus();}));
@@ -12550,6 +12457,31 @@ function bindMarkCompanion(reader){
     if (!event.target.closest('input[type="color"], textarea, input[type="text"], select')) event.preventDefault();
   });
 
+  const annotateMenu = toolbar.querySelector('[data-mark-annotate-menu]');
+  const annotateMenuToggle = toolbar.querySelector('[data-mark-annotate-toggle]');
+  const moreMenu = toolbar.querySelector('[data-mark-more-menu]');
+  const moreMenuToggle = toolbar.querySelector('[data-mark-more-toggle]');
+  const closeAnnotateMenu = () => {
+    if (annotateMenu) annotateMenu.hidden = true;
+    annotateMenuToggle?.setAttribute('aria-expanded','false');
+  };
+  const closeMoreMenu = () => {
+    if (moreMenu) moreMenu.hidden = true;
+    moreMenuToggle?.setAttribute('aria-expanded','false');
+  };
+  annotateMenuToggle?.addEventListener('click',()=>{
+    closeMoreMenu();
+    if (!annotateMenu) return;
+    annotateMenu.hidden = !annotateMenu.hidden;
+    annotateMenuToggle.setAttribute('aria-expanded',String(!annotateMenu.hidden));
+  });
+  moreMenuToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu();
+    if (!moreMenu) return;
+    moreMenu.hidden = !moreMenu.hidden;
+    moreMenuToggle.setAttribute('aria-expanded',String(!moreMenu.hidden));
+  });
+
   const highlightPicker = toolbar.querySelector('[data-passage-highlight-picker]');
   const highlightToggle = toolbar.querySelector('[data-passage-highlight-toggle]');
   const closeHighlightPicker = () => {
@@ -12557,9 +12489,15 @@ function bindMarkCompanion(reader){
     highlightToggle?.setAttribute('aria-expanded','false');
   };
   highlightToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu();
+    closeMoreMenu();
     if (!highlightPicker) return;
     highlightPicker.hidden = !highlightPicker.hidden;
     highlightToggle.setAttribute('aria-expanded', String(!highlightPicker.hidden));
+  });
+  toolbar.querySelector('[data-mark-annotation-highlight]')?.addEventListener('click',()=>{
+    closeAnnotateMenu();
+    if (highlightPicker?.hidden) highlightToggle?.click();
   });
   toolbar.querySelectorAll('[data-passage-highlight-color]').forEach((button)=>button.addEventListener('click',()=>{
     const selected = state.markSelection ? {...state.markSelection} : null;
@@ -12587,6 +12525,7 @@ function bindMarkCompanion(reader){
     writingToggle?.setAttribute('aria-expanded','false');
   };
   writingToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
     if (!writingEditor) return;
     closeHighlightPicker();
     writingEditor.hidden = !writingEditor.hidden;
@@ -12622,6 +12561,7 @@ function bindMarkCompanion(reader){
     drawingToggle?.setAttribute('aria-expanded','false');
   };
   drawingToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
     if (!drawingEditor) return;
     closeHighlightPicker();
     closeWritingEditor();
@@ -12647,6 +12587,7 @@ function bindMarkCompanion(reader){
     workspaceToggle?.setAttribute('aria-expanded','false');
   };
   workspaceToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
     if (!workspaceEditor) return;
     closeHighlightPicker(); closeWritingEditor(); closeDrawingEditor();
     workspaceEditor.hidden = !workspaceEditor.hidden;
@@ -12663,6 +12604,7 @@ function bindMarkCompanion(reader){
     updateReaderStatus('Workspace inserted. Add text, draw, or insert a photo.');
   });
   toolbar.querySelector('[data-passage-highlight-erase]')?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
     const selected = state.markSelection ? {...state.markSelection} : null;
     if (!selected) return;
     const result = eraseSavedReaderAnnotations(selected);
@@ -12698,6 +12640,7 @@ function bindMarkCompanion(reader){
   state.readerWritingResizeObserver.observe(reader);
 
   toolbar.querySelectorAll('[data-msg-share-selection]').forEach((button)=>button.addEventListener('click',()=>{
+    closeMoreMenu(); closeAnnotateMenu();
     const selected = state.markSelection ? {...state.markSelection} : (state.markPersistentSelection ? {...state.markPersistentSelection} : null);
     if (!selected?.text) return;
     const payload = {
@@ -12715,6 +12658,7 @@ function bindMarkCompanion(reader){
   }));
 
   toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
+    closeMoreMenu(); closeAnnotateMenu();
     openMarkPanel('selection');
     renderMarkSelectionCard();
     if(b.dataset.markToolbarAction==='ask'){
@@ -12729,7 +12673,26 @@ function bindMarkCompanion(reader){
     }
     runMarkAction(b.dataset.markToolbarAction);
   }));
-  toolbar.querySelector('[data-mark-more]')?.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();});
+  toolbar.querySelectorAll('[data-mark-more-prompt]').forEach((button)=>button.addEventListener('click',()=>{
+    closeMoreMenu();
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    hideMarkToolbar();
+    runMarkAction('ask',button.dataset.markMorePrompt || '');
+  }));
+  toolbar.querySelectorAll('[data-mark-more-tool]').forEach((button)=>button.addEventListener('click',()=>{
+    closeMoreMenu();
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    hideMarkToolbar();
+    const tool=button.dataset.markMoreTool;
+    window.requestAnimationFrame(()=>window.MarkSetGoAskMarkHub?.runStudyTool?.(tool));
+  }));
+  toolbar.querySelector('[data-mark-more-comprehension]')?.addEventListener('click',()=>{
+    closeMoreMenu();
+    hideMarkToolbar();
+    window.MarkSetGoStartComprehension?.();
+  });
   app.querySelector('#toggle-mark-panel')?.addEventListener('click',()=>{
     const layout=app.querySelector('#reader-layout');
     const hidden=layout?.classList.contains('word-panel-hidden');
@@ -12896,13 +12859,23 @@ function openModernGuideContextInAskMark(markerIndex) {
   const wasRunning = isReaderRunning();
   if (wasRunning) pauseReader();
 
-  // Preserve the actual guide action position as the Reader's canonical cursor,
-  // but keep the Ask Mark selection as the full section range.
+  // In Book Pages the Discuss control is a synthetic guide-action token, not
+  // ordinary reading text. Anchoring a reflow to that token can resolve to the
+  // first spread after the companion panel changes width. Keep the cursor on
+  // the last real word immediately before the action instead; that word is on
+  // the spread the reader actually clicked from. Normal mode keeps the legacy
+  // action-token position because it does not repaginate.
   const actionIndex = Math.max(0, Math.min(
     Math.max(0, state.words.length - 1),
     Number.isFinite(Number(markerIndex)) ? Number(markerIndex) : context.startIndex
   ));
-  state.index = actionIndex;
+  const sectionTextAnchor = Math.max(
+    context.startIndex,
+    Math.min(Math.max(context.startIndex, context.endIndex - 1), Math.max(0, state.words.length - 1))
+  );
+  const readerAnchorIndex = state.bookPages ? sectionTextAnchor : actionIndex;
+  state.index = readerAnchorIndex;
+  state.viewportAnchorIndex = readerAnchorIndex;
 
   const selection = {
     text: context.text,
@@ -12933,7 +12906,7 @@ function openModernGuideContextInAskMark(markerIndex) {
     persistMarkSelectionHighlight(selection);
 
     // Explicitly tell the premium Ask Mark shell that the guide selection is
-    // ready. This avoids depending only on deferred DOM timing.
+    // ready. This avoids depending only on MutationObserver timing.
     document.dispatchEvent(new CustomEvent('marksetgo:guide-section-selected', {
       detail: {
         title: source.originalTitle || state.title || 'this guide',
@@ -13473,12 +13446,14 @@ function realignTopicFeedDocumentToc(text, toc) {
 }
 
 function renderReaderWithText(title, text, source = { type: 'text' }) {
+  if (isSecondaryReaderWorkspace() && !secondaryReaderAllowsDocumentRender()) return false;
+
   // A Workspace iframe is a secondary control/content surface only. It must
   // never own a second Reader. Send every readable document through the one
   // established outer-Reader handoff. This central guard covers Modern Guides,
   // Classic/Bible guides, generated guides, Free Books, and any future feature
   // that reaches the canonical Reader renderer.
-  if (window.parent !== window) {
+  if (shouldDelegateReaderToWorkspaceParent()) {
     try {
       const handoff = window.parent.MSGWorkspaceReaderHandoff;
       if (typeof handoff?.openText === 'function') {
@@ -13614,7 +13589,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   }));
 
   app.innerHTML = `
-    <section class="panel reader-page-panel">
+    <section class="panel reader-page-panel${source?.type === 'topic-feed' ? ' topic-feed-reader-page' : ''}">
       <div class="reader-title-row">
         <div class="reader-title-copy">
           <h1>${escapeHtml(title)}</h1>
@@ -13888,8 +13863,70 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         </aside>
       </div>
 
-      <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-passage-highlight-toggle aria-expanded="false">🖍 Highlight</button><div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color"><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button><button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button><label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label></div><button type="button" data-reader-writing-toggle aria-expanded="false">✎ Write</button><div class="reader-writing-editor" data-reader-writing-editor hidden><textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea><div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div><div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div><div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div></div><button type="button" data-reader-drawing-toggle aria-expanded="false">✐ Draw</button><div class="reader-drawing-editor" data-reader-drawing-editor hidden><div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div><label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div></div><button type="button" data-reader-workspace-toggle aria-expanded="false">▣ Space</button><div class="reader-workspace-editor" data-reader-workspace-editor hidden><strong>Insert workspace</strong><label>Height <select data-reader-workspace-height><option value="180">Small</option><option value="280" selected>Medium</option><option value="420">Large</option><option value="600">Extra large</option></select></label><div><button type="button" data-reader-workspace-cancel>Cancel</button><button type="button" data-reader-workspace-insert>Insert</button></div></div><button type="button" data-passage-highlight-erase>⌫ Erase</button><span class="mark-selection-divider" aria-hidden="true"></span><button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-msg-share-selection="chat">💬 Chat</button><button type="button" data-msg-share-selection="symposium">🏛 Symposium</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+      <div id="mark-selection-toolbar" class="mark-selection-toolbar mark-selection-toolbar-v2" hidden role="toolbar" aria-label="Selected passage actions">
+        <div class="mark-toolbar-menu-wrap mark-annotate-wrap" data-mark-annotate-wrap>
+          <div class="mark-annotate-split" role="group" aria-label="Annotation tools">
+            <button type="button" data-passage-highlight-toggle aria-expanded="false" title="Highlight selected text">✎ Annotate</button>
+            <button type="button" class="mark-menu-chevron" data-mark-annotate-toggle aria-expanded="false" aria-label="More annotation tools">▾</button>
+          </div>
+          <div class="mark-toolbar-menu mark-annotate-menu" data-mark-annotate-menu hidden>
+            <button type="button" data-mark-annotation-highlight>🖍 <span>Highlight</span></button>
+            <button type="button" data-reader-writing-toggle aria-expanded="false">✎ <span>Write</span></button>
+            <button type="button" data-reader-drawing-toggle aria-expanded="false">✐ <span>Draw</span></button>
+            <button type="button" data-reader-workspace-toggle aria-expanded="false">▣ <span>Space</span></button>
+            <button type="button" data-passage-highlight-erase>⌫ <span>Erase</span></button>
+          </div>
+        </div>
+
+        <div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color">
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button>
+          <label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label>
+        </div>
+
+        <div class="reader-writing-editor" data-reader-writing-editor hidden>
+          <textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea>
+          <div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div>
+          <div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div>
+          <div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div>
+        </div>
+
+        <div class="reader-drawing-editor" data-reader-drawing-editor hidden>
+          <div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div>
+          <label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label>
+          <div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div>
+        </div>
+
+        <div class="reader-workspace-editor" data-reader-workspace-editor hidden><strong>Insert workspace</strong><label>Height <select data-reader-workspace-height><option value="180">Small</option><option value="280" selected>Medium</option><option value="420">Large</option><option value="600">Extra large</option></select></label><div><button type="button" data-reader-workspace-cancel>Cancel</button><button type="button" data-reader-workspace-insert>Insert</button></div></div>
+
+        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button>
+        <button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button>
+        <button type="button" data-mark-toolbar-action="related">∞ Compare</button>
+        <button type="button" data-mark-toolbar-action="save">★ Save</button>
+        <button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+
+        <div class="mark-toolbar-menu-wrap mark-more-wrap" data-mark-more-wrap>
+          <button type="button" data-mark-more-toggle aria-expanded="false">More <span aria-hidden="true">▾</span></button>
+          <div class="mark-toolbar-menu mark-more-menu" data-mark-more-menu hidden>
+            <div class="mark-toolbar-menu-section"><span>Understand</span>
+              <button type="button" data-mark-toolbar-action="simplify">Aa <span>Simplify</span></button>
+              <button type="button" data-mark-toolbar-action="context">⌛ <span>Historical context</span></button>
+            </div>
+            <div class="mark-toolbar-menu-section"><span>Study</span>
+              <button type="button" data-mark-more-prompt="Create a concise study guide for this selected passage.">▤ <span>Study guide</span></button>
+              <button type="button" data-mark-more-tool="flashcards">▱ <span>Flash cards</span></button>
+              <button type="button" data-mark-more-prompt="Identify the key ideas in this selected passage and explain why they matter.">✦ <span>Key ideas</span></button>
+              <button type="button" data-mark-more-comprehension>🧠 <span>Comprehension</span></button>
+            </div>
+            <div class="mark-toolbar-menu-section"><span>Share</span>
+              <button type="button" data-msg-share-selection="chat">💬 <span>Send to Chat</span></button>
+              <button type="button" data-msg-share-selection="symposium">🏛 <span>Discuss in Symposium</span></button>
+            </div>
+          </div>
+        </div>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
@@ -15028,6 +15065,17 @@ function scheduleBookPageReflow({ delay = 0, anchorIndex = null } = {}) {
             : Number(state.index) || 0
         );
         restoreBookPageWordAnchor(preservedWord);
+
+        // Book Pages can rebuild/reflow the visible word DOM when a side pane
+        // opens, closes, or changes width. Persistent Ask Mark / Reading
+        // Companion selections are stored by canonical word index, so restore
+        // their visual highlight only after the final page geometry is painted.
+        // Without this, Modern Guide “Discuss with reading companion” appears
+        // selected in normal mode but loses its highlight after Book Pages reflows.
+        if (state.markPersistentSelection) {
+          persistMarkSelectionHighlight(state.markPersistentSelection);
+        }
+
         pendingBookPageAnchorIndex = null;
         persistReaderSession();
       });
@@ -18596,7 +18644,7 @@ async function loadGreatBookEdition(item, status, button) {
           verifiedPrimaryText: true
         };
 
-        const isWorkspacePane = window.parent !== window;
+        const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
         if (isWorkspacePane) {
           const handoff = window.parent.MSGWorkspaceReaderHandoff;
           if (typeof handoff?.openText !== 'function') {
@@ -19401,8 +19449,7 @@ function renderBibleGuides() {
 
 
 function openBibleDocumentInReader(title, text, source) {
-  const workspaceParams = new URLSearchParams(location.search);
-  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+  const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
 
   if (isWorkspacePane) {
     try {
@@ -21926,8 +21973,7 @@ function renderDrmFreeBookFinder(initial={}) {
             author:data.author||'',
             sourceUrl:data.sourceUrl||''
           };
-          const workspaceParams = new URLSearchParams(location.search);
-          const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+          const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
           if (isWorkspacePane) {
             const handoff = window.parent.MSGWorkspaceReaderHandoff;
             if (typeof handoff?.openText !== 'function') {
@@ -22279,7 +22325,7 @@ function renderBrowseHub() {
         subtitle: `An independent reading guide to ${guide.title}`
       };
 
-      if (window.parent !== window) {
+      if (shouldDelegateReaderToWorkspaceParent()) {
         const handoff = window.parent.MSGWorkspaceReaderHandoff;
         if (typeof handoff?.openText !== 'function') {
           throw new Error('The main Reader handoff is not ready.');
@@ -22580,8 +22626,7 @@ function renderMyLibraryHub() {
     // rendered inside the secondary workspace iframe, hand the selected
     // document to the outer application's real Library/Reader path and stop
     // here before any local Reader state or DOM is touched.
-    const workspaceParams = new URLSearchParams(location.search);
-    const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+    const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
 
     if (isWorkspacePane) {
       const id = String(documentId || '').trim();
@@ -23730,7 +23775,6 @@ function renderMyLinks(selectedId = '') {
    pagination, highlighting, or continuity behavior. It only reads bounded
    current-reading context when the user chooses to bring it into a session.
    ========================================================================== */
-const SYMPOSIUM_STORAGE_KEY = 'markSetGoSymposiumSessionsV1';
 const SYMPOSIUM_CUSTOM_PEOPLE_KEY = 'markSetGoSymposiumCustomPeopleV1';
 
 function loadSymposiumCustomPeople() {
@@ -23955,6 +23999,10 @@ function ensureSymposiumStyles() {
     .symposium-hero h1{font-family:Georgia,serif;font-size:clamp(2rem,4vw,3.35rem);line-height:1.02;margin:.45rem 0 .65rem;color:#0c2340}
     .symposium-hero p{max-width:820px;margin:0;color:#53657a;line-height:1.65}
     .symposium-badge{min-width:230px;padding:16px 18px;border-radius:18px;background:#0c2340;color:white}.symposium-badge strong{display:block;color:#f0c85a;font-size:1.05rem}.symposium-badge small{display:block;margin-top:6px;line-height:1.45;color:#d7e1ee}
+    .symposium-saved-panel{margin:0 0 22px;border:1px solid rgba(36,78,124,.16);border-radius:20px;background:rgba(255,255,255,.94);box-shadow:0 10px 28px rgba(30,58,92,.06);overflow:hidden}
+    .symposium-saved-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border-bottom:1px solid rgba(36,78,124,.1);background:#f8fbff}.symposium-saved-head strong{display:block;color:#0c2340}.symposium-saved-head small{display:block;color:#6a7a8e;margin-top:2px}.symposium-saved-head button{border:1px solid #cbd7e5;border-radius:9px;background:white;color:#24486f;padding:7px 10px;font-weight:750;cursor:pointer}
+    .symposium-saved-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;padding:12px}.symposium-saved-empty{grid-column:1/-1;padding:14px;color:#6d7c8f;font-size:.88rem}
+    .symposium-saved-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border:1px solid #dfe7f0;border-radius:13px;padding:11px;background:white;min-width:0}.symposium-saved-copy{display:grid;gap:3px;min-width:0}.symposium-saved-copy strong,.symposium-saved-copy span,.symposium-saved-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.symposium-saved-copy strong{color:#0c2340}.symposium-saved-copy span{color:#50647b;font-size:.84rem}.symposium-saved-copy small{color:#7c8998;font-size:.72rem}.symposium-saved-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.symposium-saved-actions button{border:1px solid #d4deea;border-radius:8px;background:#f8fbff;color:#24486f;padding:5px 7px;font-size:.72rem;font-weight:750;cursor:pointer}.symposium-saved-actions [data-symposium-resume]{background:#0c2340;color:#f2ca60;border-color:#0c2340}.symposium-saved-actions [data-symposium-delete]{color:#7a2630}
     .symposium-layout{display:grid;grid-template-columns:minmax(300px,390px) minmax(0,1fr);gap:22px;align-items:start}
     .symposium-panel{border:1px solid rgba(36,78,124,.16);border-radius:22px;background:white;box-shadow:0 12px 34px rgba(30,58,92,.06);overflow:hidden}
     .symposium-panel-head{padding:20px 22px 14px;border-bottom:1px solid rgba(36,78,124,.1);background:#f8fbff}.symposium-panel-head h2{margin:0 0 4px;font-size:1.15rem;color:#0c2340}.symposium-panel-head p{margin:0;color:#65758a;font-size:.9rem;line-height:1.45}
@@ -24121,13 +24169,312 @@ async function symposiumAskAi({person, mode, topic, context, transcript, userCon
   return text;
 }
 
-function saveSymposiumSession(session) {
-  try {
-    const existing = JSON.parse(localStorage.getItem(SYMPOSIUM_STORAGE_KEY) || '[]');
-    const sessions = Array.isArray(existing) ? existing : [];
-    sessions.unshift({ ...session, savedAt:new Date().toISOString() });
-    localStorage.setItem(SYMPOSIUM_STORAGE_KEY, JSON.stringify(sessions.slice(0,20)));
-  } catch (error) { console.warn('Symposium session could not be saved.', error); }
+function symposiumCloudApi() {
+  const api = window.MarkSetGoCloud?.symposium;
+  if (!api?.list || !api?.load || !api?.create || !api?.update || !api?.addTurn || !api?.remove) {
+    throw new Error('Cloud Symposium storage is not available.');
+  }
+  return api;
+}
+
+function symposiumClientId(prefix = 'symposium') {
+  const uuid = window.crypto?.randomUUID?.();
+  return uuid ? `${prefix}-${uuid}` : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,12)}`;
+}
+
+function symposiumDefaultSessionTitle(topic = '') {
+  const clean = String(topic || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return 'Untitled Symposium';
+  return clean.length > 84 ? `${clean.slice(0,81).trimEnd()}…` : clean;
+}
+
+function symposiumParticipantSnapshot(person = {}) {
+  return {
+    id:String(person.id || ''),
+    name:String(person.name || 'Participant'),
+    field:String(person.field || ''),
+    era:String(person.era || ''),
+    monogram:String(person.monogram || ''),
+    category:String(person.category || ''),
+    lens:String(person.lens || ''),
+    custom:Boolean(person.custom)
+  };
+}
+
+function symposiumSavedDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
+}
+
+function symposiumSavedSessionsHtml(sessions = []) {
+  if (!sessions.length) {
+    return '<div class="symposium-saved-empty">No saved Symposiums yet. Start one below and it will autosave to your account.</div>';
+  }
+  return sessions.map((item) => `
+    <article class="symposium-saved-item" data-symposium-saved-id="${symposiumEscape(item.id)}">
+      <div class="symposium-saved-copy">
+        <strong>${symposiumEscape(item.title || 'Untitled Symposium')}</strong>
+        <span>${symposiumEscape(item.topic || 'No topic')}</span>
+        <small>${Number(item.turnCount || 0).toLocaleString()} turns · Updated ${symposiumEscape(symposiumSavedDate(item.updatedAt || item.lastTurnAt || item.createdAt))}</small>
+      </div>
+      <div class="symposium-saved-actions">
+        <button type="button" data-symposium-resume="${symposiumEscape(item.id)}">Resume</button>
+        <button type="button" data-symposium-rename="${symposiumEscape(item.id)}">Rename</button>
+        <button type="button" data-symposium-delete="${symposiumEscape(item.id)}">Delete</button>
+      </div>
+    </article>`).join('');
+}
+
+function createSymposiumCloudController({
+  root,
+  session,
+  transcriptEl,
+  statusEl,
+  nextButton,
+  saveButton,
+  chatButton,
+  readerButton,
+  startButton,
+  rosterEl
+}) {
+  const savedListEl = root.querySelector('#symposium-saved-list');
+  const sessionTitleEl = root.querySelector('#symposium-session-title');
+  let refreshing = false;
+
+  const sourceContext = () => ({
+    documentId:String(state?.documentId || ''),
+    documentTitle:String(state?.title || ''),
+    contextLabel:String(root.querySelector('#symposium-context-label')?.textContent || '')
+  });
+
+  const payload = () => ({
+    clientSessionId: session.clientSessionId || symposiumClientId('symposium'),
+    title: String(sessionTitleEl?.value || session.title || symposiumDefaultSessionTitle(session.topic)).trim(),
+    topic: String(root.querySelector('#symposium-topic')?.value || session.topic || '').trim(),
+    mode: root.querySelector('[name="symposium-mode"]:checked')?.value || session.mode || 'debate',
+    contextText: String(root.querySelector('#symposium-context')?.value ?? session.context ?? ''),
+    contextLabel: String(root.querySelector('#symposium-context-label')?.textContent || ''),
+    outputMode: root.querySelector('#symposium-output')?.value || session.output || 'write',
+    participants: (session.people || []).map(symposiumParticipantSnapshot),
+    sourceContext: session.sourceContext && Object.keys(session.sourceContext).length ? session.sourceContext : sourceContext(),
+    status:'active',
+    nextSpeakerIndex: Math.max(0, Number(session.nextIndex) || 0),
+    startedAt: session.startedAt || new Date().toISOString()
+  });
+
+  const setCloudError = (error) => {
+    session.cloudError = error?.message || String(error || 'Cloud save failed.');
+    if (statusEl) statusEl.textContent = `Cloud save problem · ${session.cloudError}`;
+  };
+
+  const enqueue = (task) => {
+    session.cloudWriteQueue = (session.cloudWriteQueue || Promise.resolve())
+      .catch(()=>{})
+      .then(task)
+      .catch((error) => {
+        setCloudError(error);
+        throw error;
+      });
+    return session.cloudWriteQueue;
+  };
+
+  const refreshSaved = async () => {
+    if (!savedListEl || refreshing) return;
+    refreshing = true;
+    savedListEl.innerHTML = '<div class="symposium-saved-empty">Loading saved Symposiums…</div>';
+    try {
+      const result = await symposiumCloudApi().list(false);
+      savedListEl.innerHTML = symposiumSavedSessionsHtml(Array.isArray(result?.sessions) ? result.sessions : []);
+    } catch (error) {
+      const signedOut = Number(error?.status) === 401;
+      savedListEl.innerHTML = `<div class="symposium-saved-empty">${symposiumEscape(signedOut ? 'Sign in to save and resume Symposiums across sessions and devices.' : (error?.message || 'Saved Symposiums could not be loaded.'))}</div>`;
+    } finally {
+      refreshing = false;
+    }
+  };
+
+  const ensureRosterPerson = (person) => {
+    if (!person?.id) return;
+    if (!SYMPOSIUM_PARTICIPANTS.some((entry) => String(entry.id) === String(person.id))) {
+      SYMPOSIUM_PARTICIPANTS.push(symposiumParticipantSnapshot(person));
+    }
+    if (rosterEl.querySelector(`[data-symposium-person][value="${CSS.escape(String(person.id))}"]`)) return;
+    rosterEl.insertAdjacentHTML('afterbegin', `<label class="symposium-person"
+      data-symposium-category="${symposiumEscape(person.category || 'Saved session')}"
+      data-symposium-search="${symposiumEscape(symposiumPersonSearchText(person))}">
+      <input type="checkbox" data-symposium-person value="${symposiumEscape(person.id)}">
+      <span class="symposium-avatar">${symposiumEscape(person.monogram || '?')}</span>
+      <span><strong>${symposiumEscape(person.name || 'Participant')}</strong><small>${symposiumEscape(person.field || 'Saved participant')} · ${symposiumEscape(person.era || 'Saved session')}</small></span>
+    </label>`);
+  };
+
+  const applyParticipants = (people) => {
+    const participantList = Array.isArray(people) ? people.map(symposiumParticipantSnapshot) : [];
+    participantList.forEach(ensureRosterPerson);
+    const ids = new Set(participantList.map((person) => String(person.id)));
+    rosterEl.querySelectorAll('[data-symposium-person]').forEach((checkbox) => {
+      checkbox.checked = ids.has(String(checkbox.value));
+    });
+    return participantList;
+  };
+
+  const resume = async (sessionId) => {
+    if (!sessionId) return;
+    if (statusEl) statusEl.textContent = 'Loading saved Symposium…';
+    const result = await symposiumCloudApi().load(sessionId);
+    const record = result?.session;
+    if (!record) throw new Error('The saved Symposium could not be found.');
+    const turns = Array.isArray(result?.turns) ? result.turns : [];
+
+    session.cloudId = record.id;
+    session.sourceContext = record.sourceContext && typeof record.sourceContext === 'object' ? record.sourceContext : {};
+    session.clientSessionId = record.clientSessionId || symposiumClientId('symposium');
+    session.title = record.title || 'Untitled Symposium';
+    session.mode = record.mode || 'debate';
+    session.topic = record.topic || '';
+    session.context = record.contextText || '';
+    session.output = record.outputMode || 'write';
+    session.people = applyParticipants(record.participants);
+    session.transcript = turns.map((turn) => ({
+      name:turn.name || 'Speaker', monogram:turn.monogram || '', field:turn.field || '',
+      text:turn.text || '', kind:turn.kind || 'participant', sourceLabel:turn.sourceLabel || '',
+      metadata:turn.metadata || {}, clientTurnId:turn.clientTurnId || ''
+    }));
+    session.nextIndex = Math.max(0, Number(record.nextSpeakerIndex) || 0);
+    session.pendingReaderContribution = '';
+    session.startedAt = record.startedAt || record.createdAt || new Date().toISOString();
+    session.active = Boolean(session.topic && session.people.length && session.transcript.length);
+    session.cloudError = '';
+    session.cloudWriteQueue = Promise.resolve();
+
+    if (sessionTitleEl) sessionTitleEl.value = session.title;
+    const topicEl = root.querySelector('#symposium-topic'); if (topicEl) topicEl.value = session.topic;
+    const contextEl = root.querySelector('#symposium-context'); if (contextEl) contextEl.value = session.context;
+    const contextLabelEl = root.querySelector('#symposium-context-label');
+    if (contextLabelEl) contextLabelEl.textContent = record.contextLabel || (session.context ? `Saved reading context · ${splitWords(session.context).length.toLocaleString()} words available` : 'Topic only · no reading passage supplied');
+    const modeEl = root.querySelector(`[name="symposium-mode"][value="${CSS.escape(session.mode)}"]`); if (modeEl) modeEl.checked = true;
+    const outputEl = root.querySelector('#symposium-output'); if (outputEl) outputEl.value = session.output;
+
+    transcriptEl.innerHTML = session.transcript.length
+      ? session.transcript.map(symposiumTurnHtml).join('')
+      : '<div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>This saved Symposium has no transcript yet.</p></div>';
+    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    nextButton.disabled = !session.active;
+    readerButton.disabled = !session.active;
+    saveButton.disabled = false;
+    if (chatButton) chatButton.disabled = !session.transcript.length;
+    startButton.textContent = session.transcript.length ? 'Begin New Symposium' : 'Begin Symposium';
+    if (statusEl) statusEl.textContent = session.transcript.length
+      ? `Resumed from cloud · ${session.transcript.length} turns · autosave on`
+      : 'Saved setup loaded · begin when ready';
+  };
+
+  const beginNew = async () => {
+    session.clientSessionId = symposiumClientId('symposium');
+    session.cloudId = '';
+    session.sourceContext = sourceContext();
+    session.cloudError = '';
+    session.cloudWriteQueue = Promise.resolve();
+    if (!session.title) session.title = String(sessionTitleEl?.value || '').trim() || symposiumDefaultSessionTitle(session.topic);
+    if (sessionTitleEl && !sessionTitleEl.value.trim()) sessionTitleEl.value = session.title;
+    const created = await symposiumCloudApi().create(payload());
+    session.cloudId = created?.session?.id || '';
+    if (!session.cloudId) throw new Error('The cloud did not return a Symposium ID.');
+    if (statusEl) statusEl.textContent = 'Cloud autosave on';
+    refreshSaved();
+    return created.session;
+  };
+
+  const persistTurn = (turn) => {
+    if (!session.cloudId || !turn?.text) return Promise.resolve(null);
+    if (!turn.clientTurnId) turn.clientTurnId = symposiumClientId('turn');
+    return enqueue(() => symposiumCloudApi().addTurn(session.cloudId, {
+      clientTurnId: turn.clientTurnId,
+      name: turn.name || 'Speaker',
+      monogram: turn.monogram || '',
+      field: turn.field || '',
+      kind: turn.kind || 'participant',
+      text: turn.text || '',
+      sourceLabel: turn.sourceLabel || '',
+      metadata: turn.metadata || {}
+    }));
+  };
+
+  const queueState = () => {
+    if (!session.cloudId) return Promise.resolve(null);
+    const data = payload();
+    return enqueue(() => symposiumCloudApi().update(session.cloudId, {
+      title:data.title,
+      topic:data.topic,
+      mode:data.mode,
+      contextText:data.contextText,
+      contextLabel:data.contextLabel,
+      outputMode:data.outputMode,
+      participants:data.participants,
+      sourceContext:data.sourceContext,
+      nextSpeakerIndex:data.nextSpeakerIndex,
+      status:'active',
+      touchOpen:true
+    }));
+  };
+
+  const saveNow = async () => {
+    if (!session.transcript.length && !session.topic) return false;
+    if (!session.cloudId) {
+      await beginNew();
+      for (const turn of session.transcript) await persistTurn(turn);
+    }
+    await queueState();
+    await session.cloudWriteQueue;
+    session.cloudError = '';
+    if (statusEl) statusEl.textContent = `Saved to cloud · ${session.transcript.length} turns`;
+    await refreshSaved();
+    return true;
+  };
+
+  root.addEventListener('click', async (event) => {
+    const resumeButton = event.target.closest('[data-symposium-resume]');
+    const renameButton = event.target.closest('[data-symposium-rename]');
+    const deleteButton = event.target.closest('[data-symposium-delete]');
+    const refreshButton = event.target.closest('#symposium-refresh-sessions');
+    if (!resumeButton && !renameButton && !deleteButton && !refreshButton) return;
+
+    try {
+      if (refreshButton) return void refreshSaved();
+      if (resumeButton) return void await resume(resumeButton.dataset.symposiumResume);
+      if (renameButton) {
+        const item = renameButton.closest('[data-symposium-saved-id]');
+        const current = item?.querySelector('.symposium-saved-copy strong')?.textContent?.trim() || '';
+        const title = window.prompt('Rename this Symposium:', current);
+        if (title == null || !title.trim()) return;
+        await symposiumCloudApi().update(renameButton.dataset.symposiumRename, { title:title.trim() });
+        if (session.cloudId === renameButton.dataset.symposiumRename) {
+          session.title = title.trim();
+          if (sessionTitleEl) sessionTitleEl.value = session.title;
+        }
+        await refreshSaved();
+        return;
+      }
+      if (deleteButton) {
+        const item = deleteButton.closest('[data-symposium-saved-id]');
+        const title = item?.querySelector('.symposium-saved-copy strong')?.textContent?.trim() || 'this Symposium';
+        if (!window.confirm(`Delete “${title}” and its transcript?`)) return;
+        await symposiumCloudApi().remove(deleteButton.dataset.symposiumDelete);
+        if (session.cloudId === deleteButton.dataset.symposiumDelete) {
+          session.cloudId = '';
+          session.cloudError = '';
+          if (statusEl) statusEl.textContent = 'Saved Symposium deleted. Current view is now temporary.';
+        }
+        await refreshSaved();
+      }
+    } catch (error) {
+      setCloudError(error);
+    }
+  });
+
+  return { refreshSaved, resume, beginNew, persistTurn, queueState, saveNow };
 }
 
 function renderSymposium() {
@@ -24154,6 +24501,11 @@ function renderSymposium() {
         <aside class="symposium-badge"><strong>Reader participates</strong><small>Listen, read, question, challenge, supply evidence, or enter your own argument at any point.</small></aside>
       </header>
 
+      <section class="symposium-saved-panel" aria-label="Saved Symposiums">
+        <div class="symposium-saved-head"><div><strong>Saved Symposiums</strong><small>Cloud-backed sessions you can reopen and continue later.</small></div><button type="button" id="symposium-refresh-sessions">Refresh</button></div>
+        <div class="symposium-saved-list" id="symposium-saved-list"><div class="symposium-saved-empty">Loading saved Symposiums…</div></div>
+      </section>
+
       <div class="symposium-layout">
         <aside class="symposium-panel">
           <div class="symposium-panel-head"><h2>Set the table</h2><p>Choose a format, topic, context, and participants.</p></div>
@@ -24167,6 +24519,10 @@ function renderSymposium() {
                 <label class="symposium-mode"><input type="radio" name="symposium-mode" value="explain"><span>Explain<small>Teach from many lenses</small></span></label>
               </div>
             </div>
+
+            <label>Session name
+              <input id="symposium-session-title" type="text" maxlength="240" placeholder="Optional — generated from the topic">
+            </label>
 
             <label>Topic or question
               <textarea id="symposium-topic" placeholder="Example: Is technological progress making us wiser?">${symposiumEscape(defaultTopic)}</textarea>
@@ -24186,6 +24542,8 @@ function renderSymposium() {
             <label>Output
               <select id="symposium-output"><option value="write">Write</option><option value="both">Speak + write</option><option value="speak">Speak (transcript remains visible)</option></select>
             </label>
+
+            <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
 
             <div>
               <label>Participants <span style="font-weight:500;color:#718095">(choose up to 6 from ${SYMPOSIUM_PARTICIPANTS.length})</span></label>
@@ -24219,17 +24577,16 @@ function renderSymposium() {
                 <textarea id="symposium-custom-lens" placeholder="Perspective or instructions (optional)"></textarea>
                 <button type="button" id="symposium-add-person">Save personality</button>
               </div>
-              <p class="symposium-hint">Saved personalities remain in your roster on this browser. The AI represents public/published ideas or the perspective you specify; it does not claim to literally be the real person.</p>
+              <p class="symposium-hint">Custom personalities are included with any saved Symposium that uses them. The AI represents public/published ideas or the perspective you specify; it does not claim to literally be the real person.</p>
             </div>
 
-            <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
           </div>
         </aside>
 
         <main class="symposium-panel symposium-stage">
           <div class="symposium-stage-toolbar">
             <span class="symposium-stage-status" id="symposium-stage-status">Ready to convene</span>
-            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save transcript</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
+            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save now</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
           </div>
           <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
             <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
@@ -24261,7 +24618,9 @@ function renderSymposium() {
   const personSearchEl = root.querySelector('#symposium-person-search');
   const categoryFilterEl = root.querySelector('#symposium-category-filter');
   const rosterCountEl = root.querySelector('#symposium-roster-count');
-  const session = { active:false, mode:'debate', topic:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'', startedAt:'' };
+  const session = { active:false, mode:'debate', topic:'', title:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'', startedAt:'', cloudId:'', clientSessionId:'', cloudWriteQueue:Promise.resolve(), cloudError:'', sourceContext:{} };
+  const symposiumCloud = createSymposiumCloudController({ root, session, transcriptEl, statusEl, nextButton, saveButton, chatButton, readerButton, startButton, rosterEl });
+  symposiumCloud.refreshSaved();
 
   let symposiumSelection = null;
 
@@ -24460,6 +24819,7 @@ function renderSymposium() {
     if (transcriptEl.querySelector('.symposium-empty')) transcriptEl.innerHTML = '';
     session.transcript.push(turn);
     transcriptEl.insertAdjacentHTML('beforeend', symposiumTurnHtml(turn));
+    symposiumCloud.persistTurn(turn).catch(()=>{});
     const liveSelection = window.getSelection?.();
     const hasTranscriptSelection = Boolean(
       liveSelection && !liveSelection.isCollapsed && liveSelection.rangeCount
@@ -24578,13 +24938,24 @@ function renderSymposium() {
     if (!topic) { root.querySelector('#symposium-topic').focus(); return window.alert('Enter a topic or question for the Symposium.'); }
     if (!people.length) return window.alert('Choose at least one participant.');
     session.active = true;
+    startButton.disabled = true;
     session.startedAt = new Date().toISOString();
     hideSymposiumSelectionToolbar({ clearSelection:true });
     session.mode = root.querySelector('[name="symposium-mode"]:checked')?.value || 'debate';
     session.topic = topic;
+    session.title = root.querySelector('#symposium-session-title')?.value.trim() || symposiumDefaultSessionTitle(topic);
     session.context = root.querySelector('#symposium-context').value || '';
     session.output = root.querySelector('#symposium-output').value || 'write';
     session.people = people;
+    try {
+      await symposiumCloud.beginNew();
+    } catch (error) {
+      const proceed = window.confirm(`This Symposium cannot be saved to the cloud right now: ${error.message}
+
+Start a temporary session anyway?`);
+      if (!proceed) { session.active = false; startButton.disabled = false; return; }
+      statusEl.textContent = 'Temporary session · cloud save unavailable';
+    }
     session.transcript = [];
     session.nextIndex = 0;
     session.pendingReaderContribution = '';
@@ -24593,6 +24964,7 @@ function renderSymposium() {
     nextButton.disabled = false; saveButton.disabled = false; if (chatButton) chatButton.disabled = false; readerButton.disabled = false;
     await runSpeaker(session.people[0]);
     session.nextIndex = session.people.length > 1 ? 1 : 0;
+    symposiumCloud.queueState().catch(()=>{});
   });
 
   nextButton.addEventListener('click', async ()=>{
@@ -24602,6 +24974,7 @@ function renderSymposium() {
     const pending = session.pendingReaderContribution;
     session.pendingReaderContribution = '';
     await runSpeaker(person, pending);
+    symposiumCloud.queueState().catch(()=>{});
   });
 
   readerButton.addEventListener('click', async ()=>{
@@ -24619,6 +24992,7 @@ function renderSymposium() {
     session.nextIndex = (session.nextIndex + 1) % session.people.length;
     session.pendingReaderContribution = '';
     await runSpeaker(person, readerContribution);
+    symposiumCloud.queueState().catch(()=>{});
   });
 
   root.querySelector('#symposium-reader-input').addEventListener('keydown',(event)=>{
@@ -24655,10 +25029,20 @@ function renderSymposium() {
 
   root.querySelector('#symposium-stop-speech').addEventListener('click',()=>window.speechSynthesis?.cancel?.());
   root.querySelector('#symposium-clear').addEventListener('click',()=>{ window.speechSynthesis?.cancel?.(); renderSymposium(); });
-  saveButton.addEventListener('click',()=>{
+  saveButton.addEventListener('click', async ()=>{
     if (!session.transcript.length) return;
-    saveSymposiumSession({ mode:session.mode, topic:session.topic, participants:session.people.map((p)=>p.name), transcript:session.transcript });
-    const original = saveButton.textContent; saveButton.textContent = 'Saved ✓'; window.setTimeout(()=>saveButton.textContent=original,1300);
+    const original = saveButton.textContent;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving…';
+    try {
+      await symposiumCloud.saveNow();
+      saveButton.textContent = 'Saved ✓';
+    } catch (error) {
+      saveButton.textContent = 'Save failed';
+      statusEl.textContent = `Cloud save problem · ${error.message}`;
+    } finally {
+      window.setTimeout(() => { if (saveButton.isConnected) { saveButton.textContent = original; saveButton.disabled = !session.active; } }, 1300);
+    }
   });
 }
 
@@ -24756,6 +25140,34 @@ document.addEventListener('click', (event) => {
 });
 
 
+
+// v7.35.1 — standalone page close is based on the actual runtime context, not
+// the user's workspace/profile preference. Framed pages use the outer workspace
+// chrome. A true top-level non-Reader page gets one Reader-style ×.
+const standalonePageClose = document.querySelector('#msg-standalone-page-close');
+standalonePageClose?.addEventListener('click', (event) => {
+  if (window.parent !== window) return;
+  const viewKey = String(app.dataset.viewKey || '');
+  if (viewKey === 'home' || viewKey === 'reader' || viewKey === 'reader-secondary') return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  ReaderContinuity.saveBeforeNavigation();
+  closeMenus();
+
+  if (activeReaderSnapshot?.title && activeReaderSnapshot?.currentText) {
+    renderCurrentReader();
+    app.dataset.viewKey = 'reader';
+    return;
+  }
+
+  // No live Reader to return to: closing is dismissal, not navigation into an
+  // empty Reader. Leave the selected experience background visible.
+  stopReader();
+  app.replaceChildren();
+  app.dataset.viewKey = 'closed';
+}, true);
+
 document.addEventListener('change', (event) => {
   const control = event.target.closest?.(ReaderContinuity.protectedControlSelector);
   if (!control || !app.querySelector('#reader')) return;
@@ -24829,63 +25241,12 @@ document.addEventListener('visibilitychange', () => {
 musicNextButton?.addEventListener('click', () => {
   if (musicSearchState) playMusicSearchCandidate(musicSearchState.index + 1);
 });
-musicBesideReaderButton?.addEventListener('click', () => {
-  setMusicBesideReader(!musicDock?.classList.contains('beside-reader'));
-});
 document.querySelector('#music-close')?.addEventListener('click', stopMusic);
-musicMinimizeButton?.addEventListener('click', () => {
-  if (musicDock?.classList.contains('beside-reader')) {
-    toggleVideoSidePanelCollapsed();
-    return;
-  }
+document.querySelector('#music-minimize')?.addEventListener('click', () => {
   const minimized = musicDock.classList.toggle('minimized');
   musicPlayerWrap.hidden = minimized;
-  musicMinimizeButton.textContent = minimized ? '□' : '—';
-  musicMinimizeButton.setAttribute('aria-label', minimized ? 'Restore media player' : 'Minimize media player');
-});
-
-musicSideResizer?.addEventListener('pointerdown', (event) => {
-  if (!musicDock?.classList.contains('beside-reader')) return;
-  if (event.pointerType === 'mouse' && event.button !== 0) return;
-  event.preventDefault();
-  musicDock.classList.remove('side-collapsed');
-  document.body.classList.remove('video-side-collapsed');
-  document.body.classList.add('resizing-video-side-panel');
-  try { musicSideResizer.setPointerCapture(event.pointerId); } catch {}
-
-  const move = (moveEvent) => {
-    applyVideoSidePanelWidth(window.innerWidth - moveEvent.clientX);
-  };
-  const finish = (finishEvent) => {
-    musicSideResizer.removeEventListener('pointermove', move);
-    musicSideResizer.removeEventListener('pointerup', finish);
-    musicSideResizer.removeEventListener('pointercancel', finish);
-    document.body.classList.remove('resizing-video-side-panel');
-    try { musicSideResizer.releasePointerCapture(finishEvent.pointerId); } catch {}
-    applyVideoSidePanelWidth(videoSidePanelWidth, { persist: true });
-  };
-
-  musicSideResizer.addEventListener('pointermove', move);
-  musicSideResizer.addEventListener('pointerup', finish);
-  musicSideResizer.addEventListener('pointercancel', finish);
-});
-
-musicSideResizer?.addEventListener('keydown', (event) => {
-  if (!musicDock?.classList.contains('beside-reader')) return;
-  let delta = 0;
-  if (event.key === 'ArrowLeft') delta = 24;
-  if (event.key === 'ArrowRight') delta = -24;
-  if (!delta) return;
-  event.preventDefault();
-  musicDock.classList.remove('side-collapsed');
-  document.body.classList.remove('video-side-collapsed');
-  applyVideoSidePanelWidth(videoSidePanelWidth + delta, { persist: true });
-});
-
-window.addEventListener('resize', () => {
-  if (musicDock?.classList.contains('beside-reader')) {
-    applyVideoSidePanelWidth(videoSidePanelWidth);
-  }
+  document.querySelector('#music-minimize').textContent = minimized ? '□' : '—';
+  document.querySelector('#music-minimize').setAttribute('aria-label', minimized ? 'Restore music player' : 'Minimize music player');
 });
 try {
   const savedMusic = JSON.parse(localStorage.getItem('markSetGoMusic') || 'null');
@@ -24984,8 +25345,22 @@ window.setInterval(checkActionNotifications, 30000);
 window.setTimeout(checkActionNotifications, 1500);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkActionNotifications(); });
 
-// v5.16: startup stays lightweight. The last book is restored only after an explicit Resume action.
-renderHome();
+// v7.31: Reader 2 boots the exact same Reader runtime as Reader 1. Only the
+// surrounding site chrome is suppressed by the secondary-reader document mode.
+if (isSecondaryReaderWorkspace()) {
+  document.documentElement.classList.add('msg-secondary-reader-document');
+  app.classList.add('msg-secondary-reader-app');
+  app.dataset.viewKey = 'reader-secondary';
+  renderEmptyReader();
+} else if (/read-anything-capture=/.test(String(window.location.hash || ''))) {
+  // A Read with Mark capture is about to be opened by read-anything.js. Do not
+  // paint Home first; that brief Home -> Reader swap was the visible import flash.
+  app.dataset.viewKey = 'capture-loading';
+  app.replaceChildren();
+} else {
+  // Normal startup stays lightweight. The last book is restored only after an explicit Resume action.
+  renderHome();
+}
 
 // Keep top navigation popovers over the page rather than in document flow.
 // The top-level menu summaries are controlled explicitly instead of relying on
