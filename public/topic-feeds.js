@@ -89,6 +89,8 @@
   function normalizeState(value) {
     const topics = repairTopicFeedSourceIds(Array.isArray(value?.topics) ? value.topics : []).map((topic) => ({
       ...topic,
+      sourceMode: topic?.sourceMode === 'ai' || topic?.sourceMode === 'hybrid' ? topic.sourceMode : 'manual',
+      aiSourcesUpdatedAt: topic?.aiSourcesUpdatedAt || null,
       dismissedArticleIds: [...new Set((Array.isArray(topic?.dismissedArticleIds) ? topic.dismissedArticleIds : []).map(String).filter(Boolean))].slice(-500)
     }));
     return {
@@ -151,6 +153,8 @@
       cadence: topic?.cadence === 'weekly' ? 'weekly' : 'daily',
       maxRecommended: Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8)),
       preferences: String(topic?.preferences || '').slice(0, 700),
+      sourceMode: topic?.sourceMode === 'ai' || topic?.sourceMode === 'hybrid' ? topic.sourceMode : 'manual',
+      aiSourcesUpdatedAt: String(topic?.aiSourcesUpdatedAt || '').slice(0, 80),
       lastRefresh: String(topic?.lastRefresh || '').slice(0, 80),
       preparedAt: String(topic?.preparedAt || '').slice(0, 80),
       lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : [])
@@ -394,33 +398,42 @@
     return overlap / Math.min(left.size, right.size);
   }
 
-  function articleScore(article, topic) {
-    const body = `${article.title} ${article.summary}`.toLowerCase();
+  function articleRelevance(article, topic) {
+    const body = `${article.title || ''} ${article.summary || ''}`.toLowerCase();
+    const title = String(article.title || '').toLowerCase();
     const topicTerms = textTokens(topic.name);
     const preferenceTerms = textTokens(topic.preferences);
-    let score = Math.max(0, 8 - (Number(article.sourceRank) || 0));
-    topicTerms.forEach((term) => { if (body.includes(term)) score += 8; });
-    preferenceTerms.forEach((term) => { if (body.includes(term)) score += 3; });
+    const phrase = String(topic.name || '').trim().toLowerCase();
+    const topicHits = topicTerms.reduce((count, term) => count + Number(body.includes(term)), 0);
+    const preferenceHits = preferenceTerms.reduce((count, term) => count + Number(body.includes(term)), 0);
+    const minimumHits = topicTerms.length ? Math.min(2, Math.max(1, Math.ceil(topicTerms.length * .35))) : 0;
+    const exactPhrase = phrase.length >= 4 && body.includes(phrase);
+    let score = Math.max(0, 6 - (Number(article.sourceRank) || 0));
+    score += topicHits * 12;
+    score += preferenceHits * 4;
+    if (exactPhrase) score += 22;
+    if (phrase && title.includes(phrase)) score += 14;
     const published = new Date(article.published || 0).getTime();
     if (Number.isFinite(published) && published > 0) {
       const ageHours = Math.max(0, (Date.now() - published) / 3600000);
-      score += Math.max(0, 14 - ageHours / 8);
+      score += Math.max(0, 10 - ageHours / 12);
     }
-    return score;
+    return { score, relevant: !topicTerms.length || exactPhrase || topicHits >= minimumHits };
   }
 
   function curate(topic) {
     const ranked = [...(topic.articles || [])]
-      .map((article) => ({ ...article, score: articleScore(article, topic) }))
+      .map((article) => ({ ...article, ...articleRelevance(article, topic) }))
       .sort((a, b) => b.score - a.score);
     const recommended = [];
     for (const article of ranked) {
+      if (!article.relevant) continue;
       if (recommended.some((picked) => titleSimilarity(picked.title, article.title) >= 0.66)) continue;
       recommended.push(article);
       if (recommended.length >= (Number(topic.maxRecommended) || 8)) break;
     }
     const ids = new Set(recommended.map((article) => article.id));
-    topic.articles = ranked.map((article) => ({ ...article, recommended: ids.has(article.id) }));
+    topic.articles = ranked.map(({ relevant, ...article }) => ({ ...article, recommended: ids.has(article.id) }));
   }
 
   function refreshIsDue(topic) {
@@ -458,7 +471,8 @@
 
   async function refreshTopic({ forceLocal = false } = {}) {
     const topic = currentTopic();
-    if (!topic || loading || !topic.sources.length) return;
+    if (!topic || loading) return;
+    if (!topic.sources.length && topic.sourceMode !== 'ai' && topic.sourceMode !== 'hybrid') return;
     loading = true;
     render();
     try {
@@ -480,9 +494,13 @@
           // reader's source configuration. A stale server response therefore
           // cannot resurrect a feed that was just removed.
           const dismissed = new Set((live.dismissedArticleIds || []).map(String));
+          const mode = live.sourceMode === 'ai' || live.sourceMode === 'hybrid' ? live.sourceMode : 'manual';
+          const refreshedSources = mode === 'manual'
+            ? live.sources
+            : (Array.isArray(payload.topic.sources) && payload.topic.sources.length ? payload.topic.sources : live.sources);
           const refreshedArticles = filterArticlesForSources(
             payload.topic.articles,
-            live.sources
+            refreshedSources
           ).filter((article) => !dismissed.has(String(article?.id || '')));
 
           state.topics[index] = {
@@ -492,7 +510,9 @@
             cadence: live.cadence,
             maxRecommended: live.maxRecommended,
             preferences: live.preferences,
-            sources: live.sources,
+            sourceMode: mode,
+            aiSourcesUpdatedAt: payload.topic.aiSourcesUpdatedAt || live.aiSourcesUpdatedAt || null,
+            sources: refreshedSources,
             dismissedArticleIds: [...dismissed],
             articles: refreshedArticles,
             lastErrors: Array.isArray(payload.topic.lastErrors)
@@ -503,6 +523,18 @@
         saveState({ cloud: false });
         warmReaderArticlesInBackground(state.topics[index] || currentTopic());
       } else {
+        if (!topic.sources.length && (topic.sourceMode === 'ai' || topic.sourceMode === 'hybrid')) {
+          const recResponse = await fetch(`/api/topic-feeds/recommend?topic=${encodeURIComponent(topic.name)}&preferences=${encodeURIComponent(topic.preferences || '')}`);
+          const recPayload = await recResponse.json().catch(() => ({}));
+          if (recResponse.ok && Array.isArray(recPayload.sources)) {
+            topic.sources = recPayload.sources.map((source) => ({
+              id: uid(), name: source.name || '', type:'website', url:cleanUrl(source.url || ''),
+              origin:'ai', recommendationKey:source.key || ''
+            })).filter((source) => source.name && source.url);
+            topic.aiSourcesUpdatedAt = new Date().toISOString();
+          }
+        }
+        if (!topic.sources.length) throw new Error('No topic-specific sources could be found yet. Try adding more detail to the topic or priorities.');
         const response = await fetch('/api/topic-feeds/fetch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1188,7 +1220,7 @@
         </div>
       </section>`;
     bindMain();
-    if (!loading && topic.sources.length && refreshIsDue(topic) && !all.length) refreshTopic();
+    if (!loading && (topic.sources.length || topic.sourceMode === 'ai' || topic.sourceMode === 'hybrid') && refreshIsDue(topic) && !all.length) refreshTopic();
   }
 
   function sourceRow(source = { id: uid(), name: '', type: 'website', url: '', origin:'manual', recommendationKey:'' }) {
@@ -1215,14 +1247,15 @@
     }
     container.innerHTML = '<p class="topic-recommendation-note">Finding recommended feeds…</p>';
     try {
-      const response = await fetch(`/api/topic-feeds/recommend?topic=${encodeURIComponent(name)}`);
+      const priorities = document.getElementById('topic-preferences')?.value?.trim() || '';
+      const response = await fetch(`/api/topic-feeds/recommend?topic=${encodeURIComponent(name)}&preferences=${encodeURIComponent(priorities)}`);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Recommendations unavailable.');
       const existing = new Set([...document.querySelectorAll('.topic-source-url')].map((input) => cleanUrl(input.value)).filter(Boolean));
       const items = (payload.sources || []).filter((source) => !existing.has(cleanUrl(source.url)));
       container.innerHTML = items.length ? items.map((source) => `
         <article class="topic-feed-recommendation">
-          <div><strong>${escapeHtml(source.name)}</strong><p>${escapeHtml(source.description || '')}</p></div>
+          <div><strong>${escapeHtml(source.name)}</strong><p>${escapeHtml(source.description || '')}</p>${source.reason ? `<small>${escapeHtml(source.reason)}</small>` : ''}</div>
           <button type="button" data-add-recommended-feed="${escapeHtml(source.key)}"
                   data-feed-name="${escapeHtml(source.name)}" data-feed-type="${escapeHtml(source.type || 'website')}"
                   data-feed-url="${escapeHtml(source.url)}">Add</button>
@@ -1245,8 +1278,16 @@
         </header>
         <form id="topic-feed-form" class="topic-feed-form">
           <label>Topic name<input id="topic-name" required value="${escapeHtml(topic?.name || '')}" placeholder="Artificial Intelligence"></label>
+          <label>Source discovery
+            <select id="topic-source-mode">
+              <option value="ai" ${(topic?.sourceMode || (!topic ? 'ai' : 'manual')) === 'ai' ? 'selected' : ''}>AI-managed — choose and maintain sources automatically</option>
+              <option value="hybrid" ${topic?.sourceMode === 'hybrid' ? 'selected' : ''}>AI + my own sources</option>
+              <option value="manual" ${(topic?.sourceMode || (!topic ? 'ai' : 'manual')) === 'manual' ? 'selected' : ''}>My sources only</option>
+            </select>
+          </label>
+          <p id="topic-source-mode-note" class="topic-source-help"></p>
           <section class="topic-feed-recommendation-box">
-            <div class="topic-feed-sidebar-head"><strong>Recommended feeds for this topic</strong><span>Optional</span></div>
+            <div class="topic-feed-sidebar-head"><strong>AI-suggested sources for this topic</strong><span>Topic-specific</span></div>
             <div id="topic-feed-recommendations"></div>
           </section>
           <div class="topic-feed-form-row">
@@ -1254,9 +1295,9 @@
             <label>Recommended articles<input id="topic-max" type="number" min="1" max="25" value="${Number(topic?.maxRecommended) || 8}"></label>
           </div>
           <label>What should be prioritized?<textarea id="topic-preferences" rows="3" placeholder="substantive analysis, policy changes, major product releases…">${escapeHtml(topic?.preferences || '')}</textarea></label>
-          <section class="topic-feed-source-editor">
+          <section class="topic-feed-source-editor" id="topic-manual-source-editor">
             <div class="topic-feed-sidebar-head"><strong>Your feeds</strong><button id="topic-add-source" type="button">+ Add your own</button></div>
-            <p class="topic-source-help">Select “Daily start” on one feed if you want its newest unread downloaded article to open automatically in the Reader once each day.</p>
+            <p class="topic-source-help">Manual and pinned sources live here. In AI-managed mode this section is hidden because the app chooses and refreshes topic-specific sources for you.</p>
             <div id="topic-source-rows">${(topic?.sources || []).map(sourceRow).join('')}</div>
           </section>
           <div class="topic-morning-settings">
@@ -1275,6 +1316,23 @@
   }
 
   function bindManager(existing) {
+    const syncSourceModeUi = () => {
+      const mode = document.getElementById('topic-source-mode')?.value || 'manual';
+      const editor = document.getElementById('topic-manual-source-editor');
+      if (editor) editor.hidden = mode === 'ai';
+      const note = document.getElementById('topic-source-mode-note');
+      if (note) note.textContent = mode === 'ai'
+        ? 'AI will choose highly topic-specific sources and refresh that source set periodically. You do not need to enter URLs.'
+        : mode === 'hybrid'
+          ? 'AI will maintain topic-specific sources while also keeping the feeds you add yourself.'
+          : 'Only the feeds you add below will be used.';
+    };
+    document.getElementById('topic-source-mode')?.addEventListener('change', syncSourceModeUi);
+    syncSourceModeUi();
+    document.getElementById('topic-preferences')?.addEventListener('input', () => {
+      clearTimeout(recommendationTimer);
+      recommendationTimer = window.setTimeout(() => loadRecommendations(document.getElementById('topic-name')?.value || ''), 650);
+    });
     document.getElementById('topic-cancel')?.addEventListener('click', () => {
       // Cancel means discard unsaved edits. If a newer cloud snapshot arrived
       // while the form was open, it is now safe to apply it.
@@ -1286,7 +1344,7 @@
     });
     document.getElementById('topic-name')?.addEventListener('input', (event) => {
       clearTimeout(recommendationTimer);
-      recommendationTimer = window.setTimeout(() => loadRecommendations(event.target.value), 350);
+      recommendationTimer = window.setTimeout(() => loadRecommendations(event.target.value), 650);
     });
     document.getElementById('topic-feed-recommendations')?.addEventListener('click', (event) => {
       const button = event.target.closest('[data-add-recommended-feed]');
@@ -1321,13 +1379,14 @@
     });
     document.getElementById('topic-feed-form')?.addEventListener('submit', async (event) => {
       event.preventDefault();
+      const sourceMode = document.getElementById('topic-source-mode')?.value || 'manual';
       const rows = [...document.querySelectorAll('.topic-feed-source-row')];
-      const sources = rows.map((row) => ({
+      const sources = sourceMode === 'ai' ? [] : rows.map((row) => ({
         id: row.dataset.sourceId || uid(),
         name: row.querySelector('.topic-source-name').value.trim(),
         type: row.querySelector('.topic-source-type').value,
         url: cleanUrl(row.querySelector('.topic-source-url').value),
-        origin: row.dataset.sourceOrigin === 'recommended' ? 'recommended' : 'manual',
+        origin: row.dataset.sourceOrigin === 'ai' ? 'ai' : row.dataset.sourceOrigin === 'recommended' ? 'recommended' : 'manual',
         recommendationKey: row.dataset.recommendationKey || ''
       })).filter((source) => source.name && source.url);
 
@@ -1344,6 +1403,8 @@
         cadence: document.getElementById('topic-cadence').value,
         maxRecommended: Number(document.getElementById('topic-max').value) || 8,
         preferences: document.getElementById('topic-preferences').value.trim(),
+        sourceMode: sourceMode === 'ai' || sourceMode === 'hybrid' ? sourceMode : 'manual',
+        aiSourcesUpdatedAt: sourceMode === 'manual' ? null : (existing?.aiSourcesUpdatedAt || null),
         sources
       };
 

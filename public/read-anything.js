@@ -227,9 +227,13 @@
         width:100% !important; max-width:100% !important; margin:0 !important; padding:0 !important;
         position:relative !important; inset:auto !important; break-inside:auto !important; page-break-inside:auto !important;
       }
-      #app #reader > .read-anything-bookmarklet-header-spacer {
-        display:block !important; flex:0 0 auto !important; pointer-events:none !important;
-        margin:0 !important; padding:0 !important; border:0 !important;
+      #app #reader .reader-group.read-anything-bookmarklet-first-group::before {
+        content:"";
+        display:inline-block;
+        width:100%;
+        height:var(--read-anything-bookmarklet-first-clearance, 0px);
+        vertical-align:top;
+        pointer-events:none;
       }
       #app .read-anything-bookmarklet-source-credit {
         display:flex; align-items:center; flex-wrap:wrap; gap:.34rem;
@@ -1375,6 +1379,10 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     if (!panel || !reader || !readerFrame || !activeImportedDocument || !isBookmarkletArticleDocument()) {
       existingHeader?.remove();
       document.querySelector('#app #reader > [data-read-anything-bookmarklet-header-spacer]')?.remove();
+      document.querySelectorAll('#app #reader .read-anything-bookmarklet-first-group').forEach((group) => {
+        group.classList.remove('read-anything-bookmarklet-first-group');
+        group.style.removeProperty('--read-anything-bookmarklet-first-clearance');
+      });
       panel?.classList.remove('read-anything-bookmarklet-reader');
       return;
     }
@@ -1390,14 +1398,13 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       readerFrame.insertBefore(header, reader);
     }
 
-    let spacer = reader.querySelector(':scope > [data-read-anything-bookmarklet-header-spacer]');
-    if (!spacer) {
-      spacer = document.createElement('div');
-      spacer.className = 'read-anything-bookmarklet-header-spacer';
-      spacer.dataset.readAnythingBookmarkletHeaderSpacer = '1';
-      spacer.setAttribute('aria-hidden', 'true');
-      reader.prepend(spacer);
-    }
+    // Do not insert a standalone spacer into #reader. In Book Pages that spacer
+    // becomes paginated content and can consume the entire first virtual page.
+    reader.querySelector(':scope > [data-read-anything-bookmarklet-header-spacer]')?.remove();
+    reader.querySelectorAll('.read-anything-bookmarklet-first-group').forEach((group) => {
+      group.classList.remove('read-anything-bookmarklet-first-group');
+      group.style.removeProperty('--read-anything-bookmarklet-first-clearance');
+    });
 
     const source = activeImportedDocument.source || {};
     const sourceName = articleSiteName(source);
@@ -1461,17 +1468,15 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     header.style.setProperty('max-width', `${headerWidth}px`, 'important');
 
     window.requestAnimationFrame(() => {
-      if (!reader.isConnected || !header.isConnected || !spacer.isConnected) return;
+      if (!reader.isConnected || !header.isConnected) return;
       const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
       const requiredHeight = Math.max(fontSize * 1.6, headerHeight + Math.max(5, fontSize * .35));
-      spacer.style.width = '100%';
-      spacer.style.maxWidth = `${headerWidth}px`;
-      const previousHeight = Number.parseFloat(spacer.style.height) || 0;
-      if (Math.abs(requiredHeight - previousHeight) > 1) {
-        spacer.style.height = `${Math.ceil(requiredHeight)}px`;
-        if (reader.classList.contains('book-pages-layout')) {
-          window.setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
-        }
+      const firstGroup = reader.querySelector('.reader-group[data-start-index]');
+      if (!firstGroup) return;
+      firstGroup.classList.add('read-anything-bookmarklet-first-group');
+      firstGroup.style.setProperty('--read-anything-bookmarklet-first-clearance', `${Math.ceil(requiredHeight)}px`);
+      if (reader.classList.contains('book-pages-layout')) {
+        window.setTimeout(() => window.dispatchEvent(new Event('resize')), 60);
       }
     });
   }
