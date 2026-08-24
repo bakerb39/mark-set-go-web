@@ -246,13 +246,34 @@
         pointer-events:none;
       }
       #app .read-anything-bookmarklet-source-credit {
-        display:flex; align-items:center; flex-wrap:wrap; gap:.34rem;
+        display:flex; align-items:center; flex-wrap:nowrap; gap:.65rem;
+        position:relative; min-width:0; width:100%;
         margin:0; padding:0; font-size:.76rem; line-height:1.3; opacity:.82;
+      }
+      #app .read-anything-bookmarklet-source-copy {
+        display:flex; align-items:center; flex-wrap:wrap; gap:.34rem;
+        flex:1 1 auto; min-width:0; padding:0 0 .24rem;
+        border-bottom:1px solid rgba(100,116,139,.24);
       }
       #app .read-anything-bookmarklet-source-credit .source-label { font-weight:700; opacity:.72; }
       #app .read-anything-bookmarklet-source-credit strong { font-weight:700; }
       #app .read-anything-bookmarklet-source-credit a { color:inherit; text-underline-offset:2px; }
       #app .read-anything-bookmarklet-source-credit .sep { opacity:.45; }
+      #app .read-anything-bookmarklet-source-credit .topic-feed-reader-share {
+        display:flex; align-items:center; gap:.32rem; flex:0 0 auto; margin-left:auto;
+      }
+      #app .read-anything-bookmarklet-source-credit .topic-feed-share-button {
+        display:inline-grid; place-items:center; width:24px; height:24px; padding:0;
+        border:1px solid rgba(100,116,139,.24); border-radius:7px;
+        background:var(--msg-vd-reader-page-color, #fff); color:inherit;
+        text-decoration:none; box-sizing:border-box; opacity:.82;
+      }
+      #app .read-anything-bookmarklet-source-credit .topic-feed-share-button:hover {
+        opacity:1; border-color:rgba(100,116,139,.42);
+      }
+      #app .read-anything-bookmarklet-source-credit .topic-feed-share-button svg {
+        width:13px; height:13px; display:block; fill:currentColor;
+      }
       #app .read-anything-bookmarklet-nav { display:grid; gap:.45rem; }
       #app .read-anything-bookmarklet-nav-tools { display:flex; justify-content:flex-end; min-height:0; }
       #app .read-anything-bookmarklet-queue-list { display:grid; gap:.28rem; }
@@ -1429,21 +1450,27 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     // Rebuild metadata only when its value actually changed. This keeps bounded
     // startup retries visually inert.
-    const signature = JSON.stringify([sourceName, author, dateLabel, url]);
-    if (credit.dataset.signature !== signature) {
-      credit.dataset.signature = signature;
+    const shareTitle = String(activeImportedDocument.baseTitle || activeImportedDocument.title || document.title || 'Article').trim();
+    const enhancedSignature = JSON.stringify([sourceName, author, dateLabel, url, shareTitle]);
+    if (credit.dataset.signature !== enhancedSignature) {
+      credit.dataset.signature = enhancedSignature;
       credit.replaceChildren();
+
+      const copy = document.createElement('div');
+      copy.className = 'read-anything-bookmarklet-source-copy';
+      credit.appendChild(copy);
+
       const addText = (text, className = '') => {
         const span = document.createElement('span');
         if (className) span.className = className;
         span.textContent = text;
-        credit.appendChild(span);
+        copy.appendChild(span);
       };
       const addSep = () => addText('·', 'sep');
       addText('Source', 'source-label');
       const site = document.createElement('strong');
       site.textContent = sourceName;
-      credit.appendChild(site);
+      copy.appendChild(site);
       if (author) { addSep(); addText(`By ${author}`); }
       if (dateLabel) { addSep(); addText(dateLabel); }
       if (url) {
@@ -1453,7 +1480,53 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.textContent = 'View original ↗';
-        credit.appendChild(link);
+        copy.appendChild(link);
+
+        // Use the exact Topic Feed share destinations/icons so captured articles
+        // and feed articles expose the same header actions.
+        const share = document.createElement('div');
+        share.className = 'topic-feed-reader-share';
+        share.setAttribute('aria-label', 'Share this story');
+        const encodedUrl = encodeURIComponent(url);
+        const encodedTitle = encodeURIComponent(shareTitle);
+        const encodedText = encodeURIComponent(`${shareTitle} — ${url}`);
+        const shareItems = [
+          {
+            id: 'x', label: 'Share on X',
+            href: `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`,
+            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.24 2H21l-6.03 6.9L22.06 22h-5.55l-4.35-5.69L7.19 22H4.42l6.45-7.37L4.07 2h5.69l3.93 5.2L18.24 2Zm-.97 17.7h1.53L8.92 4.18H7.28L17.27 19.7Z"/></svg>`
+          },
+          {
+            id: 'facebook', label: 'Share on Facebook',
+            href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
+            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-9h3l.45-3.5H13.7V7.26c0-1.01.28-1.7 1.74-1.7h1.86V2.43A24.8 24.8 0 0 0 14.59 2c-2.68 0-4.52 1.64-4.52 4.65V9.5H7v3.5h3.07v9h3.63Z"/></svg>`
+          },
+          {
+            id: 'linkedin', label: 'Share on LinkedIn',
+            href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
+            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.34 3.5A2.34 2.34 0 1 1 5.34 8.18a2.34 2.34 0 0 1 0-4.68ZM3.32 9.75h4.04V22H3.32V9.75Zm6.43 0h3.87v1.67h.05c.54-1.02 1.86-2.1 3.82-2.1 4.09 0 4.84 2.69 4.84 6.19V22h-4.03v-5.75c0-1.37-.03-3.13-1.91-3.13-1.91 0-2.2 1.49-2.2 3.03V22H9.75V9.75Z"/></svg>`
+          },
+          {
+            id: 'reddit', label: 'Share on Reddit',
+            href: `https://www.reddit.com/submit?url=${encodedUrl}&title=${encodedTitle}`,
+            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.9 11.25a2.3 2.3 0 0 0-3.9-1.65 11.2 11.2 0 0 0-4.32-1.37l.73-3.42 2.39.51a1.76 1.76 0 1 0 .19-.91l-2.84-.6a.46.46 0 0 0-.55.35l-.86 4.02A11.3 11.3 0 0 0 7 9.62a2.3 2.3 0 1 0-2.53 3.73 4.17 4.17 0 0 0-.08.8c0 3.26 3.39 5.9 7.57 5.9s7.57-2.64 7.57-5.9c0-.28-.03-.55-.08-.82a2.3 2.3 0 0 0 1.45-2.08Zm-13.2 2.14a1.24 1.24 0 1 1 0-2.48 1.24 1.24 0 0 1 0 2.48Zm7.62 3.1c-.95.95-2.75 1.02-3.28 1.02-.54 0-2.35-.07-3.3-1.02a.48.48 0 0 1 .68-.68c.6.6 1.94.73 2.62.73.68 0 2.02-.13 2.61-.73a.48.48 0 1 1 .67.68Zm.98-3.1a1.24 1.24 0 1 1 0-2.48 1.24 1.24 0 0 1 0 2.48Z"/></svg>`
+          },
+          {
+            id: 'email', label: 'Share by email',
+            href: `mailto:?subject=${encodedTitle}&body=${encodedText}`,
+            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm9 7.1L20.2 7H3.8L12 12.1Zm0 2.2L3 8.72V17h18V8.72l-9 5.58Z"/></svg>`
+          }
+        ];
+        share.innerHTML = shareItems.map((item) => `
+          <a class="topic-feed-share-button topic-feed-share-${item.id}"
+             href="${item.href}"
+             ${item.id === 'email' ? '' : 'target="_blank" rel="noopener noreferrer"'}
+             aria-label="${item.label}"
+             title="${item.label}">
+            ${item.icon}
+          </a>
+        `).join('');
+        credit.appendChild(share);
       }
     }
 
