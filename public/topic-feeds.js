@@ -469,12 +469,13 @@
     void prefetchArticles(selected, { wait: false });
   }
 
-  async function refreshTopic({ forceLocal = false } = {}) {
+  async function refreshTopic({ forceLocal = false, preserveReader = false } = {}) {
     const topic = currentTopic();
     if (!topic || loading) return;
     if (!topic.sources.length && topic.sourceMode !== 'ai' && topic.sourceMode !== 'hybrid') return;
     loading = true;
-    render();
+    if (preserveReader) scheduleReaderNavigation();
+    else render();
     try {
       if (cloudAuthenticated && !forceLocal) {
         const response = await fetch('/api/topic-feeds/refresh', {
@@ -560,7 +561,21 @@
     } finally {
       preparing = false;
       loading = false;
-      render();
+      if (preserveReader) {
+        const pane = document.querySelector('#navigation-pane');
+        const view = pane?.querySelector('[data-reader-view="contents"]');
+        if (view) {
+          // Rebuild only the My Topics list after refresh while preserving the
+          // Reader's native Bookmark button and the currently open article.
+          const bookmarkButton = view.querySelector('#add-bookmark');
+          if (bookmarkButton) bookmarkButton.remove();
+          view.querySelector('.topic-reader-nav')?.remove();
+          if (bookmarkButton) view.appendChild(bookmarkButton);
+        }
+        scheduleReaderNavigation();
+      } else {
+        render();
+      }
     }
   }
 
@@ -780,6 +795,17 @@
 
   let activeTopicFeedHeaderContext = null;
 
+  function clearReaderArticleContext() {
+    activeTopicFeedHeaderContext = null;
+    window.MSGTopicFeedReaderContext = null;
+
+    const reader = document.querySelector('#reader');
+    const frame = reader?.closest('#reader-frame');
+    frame?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
+    reader?.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
+    removeTopicBookDivider();
+  }
+
   function stripTrailingTopicFeedProvenance(text) {
     const raw = String(text || '').trim();
     if (!raw) return '';
@@ -787,6 +813,7 @@
   }
 
   function refreshActiveTopicFeedHeader() {
+    if (!isTopicFeedReaderActive()) return;
     const context = activeTopicFeedHeaderContext;
     if (!context?.topic || !context?.article) return;
     topicFeedSourceCredit(context.topic, context.article, context.payload || {});
@@ -810,6 +837,7 @@
     }
 
     const apply = () => {
+      if (!isTopicFeedReaderActive()) return false;
       const reader =
         document.querySelector('#reader') ||
         document.querySelector('.reader, .interactive-reader');
@@ -1540,6 +1568,32 @@
     return Boolean(window.MSGTopicFeedReaderContext);
   }
 
+
+  function currentReaderSourceType() {
+    try {
+      return String(window.MarkSetGoCurrentReaderDocument?.get?.()?.source?.type || '').toLowerCase();
+    } catch {
+      return '';
+    }
+  }
+
+  function isCapturedArticleReaderActive() {
+    return ['bookmarklet', 'website'].includes(currentReaderSourceType());
+  }
+
+  function isArticleHubReaderActive() {
+    return isTopicFeedReaderActive() || isCapturedArticleReaderActive();
+  }
+
+  function capturedArticles() {
+    try {
+      const items = window.MarkSetGoReadAnything?.getCapturedArticles?.();
+      return Array.isArray(items) ? items : [];
+    } catch {
+      return [];
+    }
+  }
+
   let topicBookPageGeometryTimer = 0;
   let topicBookDividerResizeObserver = null;
   let topicBookDividerFrame = null;
@@ -1680,7 +1734,7 @@
   }
 
   function applyTopicReaderPanePreference() {
-    if (!isTopicFeedReaderActive()) return;
+    if (!isArticleHubReaderActive()) return;
 
     // A real user click always wins over automatic restoration. This prevents
     // explicit post-click synchronization from undoing the reader's choice.
@@ -1694,7 +1748,7 @@
     const isOpen = !layout.classList.contains('navigation-hidden');
 
     if (shouldOpen === isOpen) {
-      if (shouldOpen) scheduleTopicBookPageGeometrySync();
+      if (shouldOpen && isTopicFeedReaderActive()) scheduleTopicBookPageGeometrySync();
       return;
     }
 
@@ -1705,7 +1759,7 @@
     } finally {
       window.setTimeout(() => {
         applyingTopicReaderPanePreference = false;
-        if (topicReaderPaneShouldBeOpen()) scheduleTopicBookPageGeometrySync();
+        if (topicReaderPaneShouldBeOpen() && isTopicFeedReaderActive()) scheduleTopicBookPageGeometrySync();
       }, 0);
     }
   }
@@ -1720,7 +1774,7 @@
       // Capture phase is deliberate: persist the desired state before app.js's
       // own click handler changes the Reader layout.
       toggle.addEventListener('click', () => {
-        if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
+        if (applyingTopicReaderPanePreference || !isArticleHubReaderActive()) return;
 
         const layout = document.querySelector('#reader-layout');
         if (!layout) return;
@@ -1732,7 +1786,7 @@
     if (close && close.dataset.topicFeedStickyBound !== '1') {
       close.dataset.topicFeedStickyBound = '1';
       close.addEventListener('click', () => {
-        if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
+        if (applyingTopicReaderPanePreference || !isArticleHubReaderActive()) return;
         markTopicPaneUserIntent(false);
       }, true);
     }
@@ -1796,6 +1850,11 @@
     style.textContent = `
       #app .topic-reader-article-row { position:relative; min-width:0; }
       #app .topic-reader-article-row > .topic-reader-article { width:100%; padding-right:2rem !important; }
+      #app .topic-reader-captured .topic-reader-article { display:grid; gap:.1rem; text-align:left; }
+      #app .topic-reader-captured .topic-reader-article > small { font-size:.66rem; font-weight:500; opacity:.62; line-height:1.2; }
+      #app .topic-reader-captured .topic-reader-article-row[aria-current="true"] > .topic-reader-article {
+        background:rgba(201,137,0,.08); box-shadow:inset 2px 0 0 rgba(201,137,0,.55);
+      }
       #app .topic-reader-article-delete {
         position:absolute; top:.22rem; right:.22rem; z-index:4; width:1.3rem; height:1.3rem; min-width:1.3rem;
         padding:0; border:0; border-radius:999px; display:grid; place-items:center;
@@ -1841,14 +1900,45 @@
   }
 
   function readerTopicListMarkup() {
+    const captured = capturedArticles();
+    const capturedActive = isCapturedArticleReaderActive();
+    const currentCapturedKey = (() => {
+      try {
+        return String(window.MarkSetGoCurrentReaderDocument?.get?.()?.source?.readAnythingKey || '');
+      } catch {
+        return '';
+      }
+    })();
+
+    const capturedMarkup = `<details class="topic-reader-group topic-reader-captured" ${capturedActive ? 'open' : ''}>
+      <summary><strong>Captured Articles</strong><span>${captured.length}</span></summary>
+      <div class="topic-reader-source" data-reader-captured-source>
+        ${captured.length ? captured.map((article) => `<div class="topic-reader-article-row"
+             ${String(article.key || '') === currentCapturedKey ? 'aria-current="true"' : ''}>
+             <button type="button"
+               class="topic-reader-article ${String(article.key || '') === currentCapturedKey ? 'is-read' : ''}"
+               data-reader-captured-article="${escapeHtml(article.key || '')}">
+               ${escapeHtml(article.title || 'Web Article')}
+               <small>${escapeHtml(article.sourceName || 'Web article')}${article.importedAt ? ` · ${escapeHtml(new Date(article.importedAt).toLocaleDateString(undefined, { month:'short', day:'numeric' }))}` : ''}</small>
+             </button>
+             <button type="button" class="topic-reader-article-delete"
+               data-reader-captured-delete="${escapeHtml(article.key || '')}"
+               aria-label="Remove ${escapeHtml(article.title || 'article')} from Captured Articles"
+               title="Remove from queue">×</button>
+           </div>`).join('') : '<small>No captured articles yet.</small>'}
+      </div>
+    </details>`;
+
     return `<div class="topic-reader-nav">
       <div class="topic-reader-nav-head">
         <h2>My Topics</h2>
         <div class="topic-reader-nav-actions">
           <span data-reader-bookmark-slot></span>
+          <button type="button" data-reader-refresh-topics ${loading ? 'disabled' : ''}>${loading ? 'Refreshing…' : 'Refresh'}</button>
           <button type="button" data-reader-manage-topics>Manage</button>
         </div>
       </div>
+      ${capturedMarkup}
       ${state.topics.length ? state.topics.map((topic) => `
         <details class="topic-reader-group" ${topic.id === window.MSGTopicFeedReaderContext?.topicId ? 'open' : ''}>
           <summary><strong>${escapeHtml(topic.name)}</strong><span>${(topic.articles || []).filter((a) => !a.read).length} unread</span></summary>
@@ -1885,7 +1975,7 @@
   }
 
   function decorateReaderNavigation() {
-    if (!isTopicFeedReaderActive()) return;
+    if (!isArticleHubReaderActive()) return;
     ensureTopicReaderDeleteStyles();
     const pane = document.querySelector('#navigation-pane');
     if (!pane) return;
@@ -1928,6 +2018,36 @@
         bookmarkSlot.replaceChildren(nativeBookmarkButton);
       }
     }
+
+    view.querySelector('[data-reader-refresh-topics]')?.addEventListener('click', () => {
+      const readerTopicId = String(window.MSGTopicFeedReaderContext?.topicId || '');
+      if (readerTopicId && state.topics.some((topic) => topic.id === readerTopicId)) {
+        activeTopicId = readerTopicId;
+      }
+      void refreshTopic({ preserveReader: true });
+    }, { once:true });
+
+    view.querySelectorAll('[data-reader-captured-article]').forEach((button) => {
+      if (button.dataset.bound === '1') return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', async () => {
+        try {
+          await window.MarkSetGoReadAnything?.openCapturedArticle?.(button.dataset.readerCapturedArticle);
+        } catch (error) {
+          console.warn('Captured article could not be opened.', error);
+        }
+      });
+    });
+
+    view.querySelectorAll('[data-reader-captured-delete]').forEach((button) => {
+      if (button.dataset.bound === '1') return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void window.MarkSetGoReadAnything?.deleteCapturedArticle?.(button.dataset.readerCapturedDelete);
+      });
+    });
 
     view.querySelector('[data-reader-manage-topics]')?.addEventListener('click', () => {
       render();
@@ -1972,21 +2092,20 @@
       });
     });
 
-    // app.js starts Reader side panes closed when a Reader view is rebuilt.
-    // Topic Feed articles restore the reader's explicit My Topics preference.
+    // My Topics is the shared navigation pane for Topic Feed and Captured
+    // Articles. Only Topic Feed stories receive Topic Feed page geometry/header
+    // treatment; captured articles keep their Read Anything chrome.
     window.setTimeout(applyTopicReaderPanePreference, 0);
-    scheduleTopicBookPageGeometrySync();
-    window.setTimeout(ensureTopicBookDivider, 0);
-    window.setTimeout(ensureTopicBookDivider, 160);
-    window.setTimeout(ensureTopicBookDivider, 420);
-
-    // Opening another story rebuilds the Reader DOM. Put My Topics back at the
-    // exact place the reader was browsing instead of resetting to the top.
-    scheduleTopicReaderScrollRestore();
-
-    // Reader mode/word-count changes rebuild .reader-group elements. Reapply
-    // the small provenance footer treatment without altering currentText.
-    decorateTopicFeedArticleFooter();
+    if (isTopicFeedReaderActive()) {
+      scheduleTopicBookPageGeometrySync();
+      window.setTimeout(ensureTopicBookDivider, 0);
+      window.setTimeout(ensureTopicBookDivider, 160);
+      window.setTimeout(ensureTopicBookDivider, 420);
+      scheduleTopicReaderScrollRestore();
+      decorateTopicFeedArticleFooter();
+    } else {
+      removeTopicBookDivider();
+    }
   }
 
   function scheduleReaderNavigation() {
@@ -2037,11 +2156,23 @@
 
   document.addEventListener('marksetgo:document-available', () => {
     window.setTimeout(scheduleReaderNavigation, 40);
+    if (!isTopicFeedReaderActive()) {
+      activeTopicFeedHeaderContext = null;
+      return;
+    }
     // openDocument() can rebuild the Reader after the first source/header pass.
-    // Re-attach the Topic Feed provenance/actions to the final Reader DOM.
+    // Re-attach Topic Feed provenance only while the current Reader source is
+    // still a Topic Feed article. Each delayed callback rechecks that invariant.
     [40, 140, 360, 820, 1600].forEach((delay) => {
-      window.setTimeout(refreshActiveTopicFeedHeader, delay);
+      window.setTimeout(() => {
+        if (isTopicFeedReaderActive()) refreshActiveTopicFeedHeader();
+      }, delay);
     });
+  });
+
+  document.addEventListener('marksetgo:article-queue-updated', () => {
+    if (!isArticleHubReaderActive()) return;
+    rebuildTopicReaderContents();
   });
 
   document.addEventListener('click', (event) => {
@@ -2099,6 +2230,10 @@
     render,
     refresh: refreshTopic,
     hydrate: hydrateCloudState,
-    state: () => state
+    state: () => state,
+    refreshReaderNavigation: () => {
+      if (isArticleHubReaderActive()) scheduleReaderNavigation();
+    },
+    clearReaderArticleContext
   });
 })();
