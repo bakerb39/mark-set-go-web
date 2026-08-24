@@ -1,9 +1,9 @@
 (() => {
   'use strict';
 
-  // Read with Mark v2: one capture receiver per browser tab, no MutationObserver.
-  // The /capture bridge selects one already-open top-level app tab and sends the
-  // capture there. If no app is open, the bookmarklet falls back to a new app tab.
+  // Read with Mark v3: reuse a stable named top-level app window.
+  // The bookmarklet posts directly to that browsing context; no hidden iframe,
+  // cross-site frame handshake, or response timeout is involved.
   const isTopLevelApp = window.parent === window;
 
   const CHANNEL_NAME = 'mark-set-go-read-with-mark-v2';
@@ -24,8 +24,7 @@
     }
   })();
 
-  // Give bookmarklet-created/fallback windows a stable target name. This is an
-  // optimization only; BroadcastChannel is the actual existing-app handoff.
+  // Give the top-level app a stable target name so the bookmarklet can reuse it.
   if (isTopLevelApp) {
     try { window.name = 'markSetGoApp'; } catch {}
   }
@@ -147,7 +146,7 @@
 
   function upgradedBookmarkletCode() {
     const origin = JSON.stringify(location.origin);
-    return `javascript:(()=>{const O=${origin},N='markSetGoApp',e=s=>String(s||'').replace(/\\s+/g,' ').trim(),q='m'+Date.now().toString(36)+Math.random().toString(36).slice(2),s=e(window.getSelection?.().toString()),r=document.querySelector('article,main,[role=main]')||document.body,t=e(document.querySelector('meta[property="og:title"]')?.content||document.querySelector('h1')?.innerText||document.title),a=e(document.querySelector('meta[name="author"]')?.content||document.querySelector('[rel=author]')?.innerText),B=[],H=[],S=new Set(),wc=v=>e(v).split(/\\s+/).filter(Boolean).length;let w=0;if(!s){[...r.querySelectorAll('h1,h2,h3,p,blockquote,li')].forEach(n=>{let v=e(n.innerText);if(v.length<=20||S.has(v))return;S.add(v);const h=/^H[1-3]$/.test(n.tagName),o=n.tagName==='LI'?'• '+v:v;if(h)H.push({title:v,index:w,type:'section'});B.push(o);w+=wc(o)})}const x=s||B.join('\\n\\n'),k=s?'selection':'page',c=s?e(window.getSelection()?.anchorNode?.parentElement?.closest('p,blockquote,li')?.innerText||''):'',I='msgCaptureBridge_'+q,fr=document.createElement('iframe');fr.name=I;fr.style.cssText='display:none!important;width:0;height:0;border:0';document.body.appendChild(fr);const clean=()=>{window.removeEventListener('message',on);fr.remove()},go=u=>{const z=window.open(u,N);if(!z)alert('Please allow pop-ups for this page, then run Read with Mark again.')},on=ev=>{if(ev.origin!==O)return;const d=ev.data||{};if(d.requestId!==q)return;if(d.type==='marksetgo:capture-delivered'){clean();return}if(d.type==='marksetgo:capture-fallback'){clean();go(O+'/#read-anything-capture='+encodeURIComponent(d.token||''))}};window.addEventListener('message',on);const f=document.createElement('form');f.method='POST';f.action=O+'/capture?bridge=1&requestId='+encodeURIComponent(q);f.target=I;[['title',t],['author',a],['url',location.href],['text',x],['captureType',k],['context',c],['structure',JSON.stringify(s?[]:H)]].forEach(([n,v])=>{const i=document.createElement('textarea');i.name=n;i.value=v;f.appendChild(i)});f.hidden=true;document.body.appendChild(f);f.submit();f.remove();setTimeout(()=>{if(document.body.contains(fr)){clean();alert('Read with Mark did not receive a response. Please try again.')}},6000)})()`;
+    return `javascript:(()=>{const O=${origin},N='markSetGoApp',e=s=>String(s||'').replace(/\\s+/g,' ').trim(),s=e(window.getSelection?.().toString()),r=document.querySelector('article,main,[role=main]')||document.body,t=e(document.querySelector('meta[property="og:title"]')?.content||document.querySelector('h1')?.innerText||document.title),a=e(document.querySelector('meta[name="author"]')?.content||document.querySelector('[rel=author]')?.innerText),B=[],H=[],S=new Set(),wc=v=>e(v).split(/\\s+/).filter(Boolean).length;let w=0;if(!s){[...r.querySelectorAll('h1,h2,h3,p,blockquote,li')].forEach(n=>{let v=e(n.innerText);if(v.length<=20||S.has(v))return;S.add(v);const h=/^H[1-3]$/.test(n.tagName),o=n.tagName==='LI'?'• '+v:v;if(h)H.push({title:v,index:w,type:'section'});B.push(o);w+=wc(o)})}const x=s||B.join('\\n\\n');if(!x){alert('Read with Mark could not find readable text on this page.');return}const k=s?'selection':'page',c=s?e(window.getSelection()?.anchorNode?.parentElement?.closest('p,blockquote,li')?.innerText||''):'',f=document.createElement('form');f.method='POST';f.action=O+'/capture';f.target=N;[['title',t],['author',a],['url',location.href],['text',x],['captureType',k],['context',c],['structure',JSON.stringify(s?[]:H)]].forEach(([n,v])=>{const i=document.createElement('textarea');i.name=n;i.value=v;f.appendChild(i)});f.hidden=true;document.body.appendChild(f);f.submit();f.remove()})()`;
   }
 
   function showUpgradedBookmarklet() {
@@ -160,7 +159,7 @@
     const heading = document.createElement('h2');
     heading.textContent = 'Install “Read with Mark”';
     const intro = document.createElement('p');
-    intro.textContent = 'Replace your existing Read with Mark bookmarklet with this version. It reuses an open Mark, Set, Go! tab when possible and opens a new app tab only when none is available.';
+    intro.textContent = 'Replace your existing Read with Mark bookmarklet with this version. It posts directly to the existing Mark, Set, Go! tab when one is open and creates one only when necessary.';
     const linkWrap = document.createElement('p');
     const link = document.createElement('a');
     link.className = 'primary button-link';
