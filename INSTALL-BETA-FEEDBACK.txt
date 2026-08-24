@@ -1,0 +1,111 @@
+MARK, SET, GO! — BETA FEEDBACK INSTALL
+======================================
+
+This package is deliberately additive. It does not modify the Reader engine,
+pagination, highlighting, themes, or reader state.
+
+FILES TO UPLOAD
+---------------
+1. beta-feedback-server.js
+   -> repository root
+
+2. public/beta-feedback.js
+   -> public/beta-feedback.js
+
+3. db/migrations/005_beta_feedback.sql
+   -> db/migrations/005_beta_feedback.sql
+
+TWO SMALL EXISTING-FILE EDITS
+-----------------------------
+
+A) server.js
+
+Near the top, immediately after:
+
+  const { pool, checkDatabase, databaseConfigured, closeDatabase, query } = require('./db');
+
+add:
+
+  const installBetaFeedback = require('./beta-feedback-server');
+
+Then find the end of the existing function:
+
+  async function requireAccountUser(req, res) {
+    ...
+  }
+
+Immediately AFTER that function and BEFORE the existing /api/account/bootstrap route, add:
+
+  installBetaFeedback({
+    app,
+    query,
+    requireAccountUser,
+    clerkConfigured,
+    getAuth,
+    clerkClient
+  });
+
+B) public/index.html
+
+Add this script tag in <head>, preferably immediately after auth.js:
+
+  <script defer src="/beta-feedback.js?v=1.0.0"></script>
+
+That is the only front-end loader change needed. The script adds its own CSS and
+inserts the "Report issue" button directly to the right of "Mark, Set, Go!".
+
+DATABASE MIGRATION
+------------------
+After the files are deployed, run:
+
+  npm run db:migrate
+
+This applies db/migrations/005_beta_feedback.sql.
+
+ADMIN ACCOUNT
+-------------
+In Render, add ONE of these environment variables:
+
+  BETA_ADMIN_EMAILS=the-email-address-used-by-your-Clerk-admin-account
+
+or:
+
+  BETA_ADMIN_USER_IDS=the-Clerk-user-id-for-your-admin-account
+
+You can list more than one value separated by commas, but for your requirement
+use only your account.
+
+The Admin button is not merely hidden from other users. All admin API endpoints
+also enforce the server-side admin check.
+
+WHAT BETA USERS GET
+-------------------
+A prominent:
+  🐛 Report issue   BETA
+
+button immediately to the right of the Mark, Set, Go! brand.
+
+The report dialog supports:
+- Bug, feature request, or general feedback
+- Short title
+- Detailed text description
+- Upload PNG/JPEG/WEBP screenshot
+- Paste screenshot with Ctrl+V
+- "Capture screen" using the browser's screen/tab/window chooser
+- Automatic URL, current app view, browser, viewport, and app-version context
+
+WHAT THE ADMIN ACCOUNT GETS
+---------------------------
+An Admin button in the top navigation, visible only to the configured admin
+account.
+
+The admin screen provides:
+- All reports
+- Reporter
+- Date/time
+- URL/view context
+- Screenshot
+- Status: New / Reviewing / Planned / In progress / Completed / Closed
+- Priority: Low / Normal / High / Critical
+- Private admin notes
+- Search and filters
