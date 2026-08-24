@@ -212,6 +212,9 @@
         margin-bottom: .32rem !important;
       }
       #app .reader-page-panel.read-anything-bookmarklet-reader .reader-title-links { display: none !important; }
+      #app .reader-page-panel.read-anything-bookmarklet-reader #reader-frame {
+        position:relative !important;
+      }
       #app #reader-frame > .read-anything-bookmarklet-header-external {
         position:absolute !important;
         z-index:14 !important;
@@ -1462,10 +1465,11 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     const headerWidth = reader.classList.contains('book-pages-layout')
       ? Math.max(1, (usableWidth - columnGap) / 2)
       : usableWidth;
-    const frameRect = readerFrame.getBoundingClientRect();
-    const readerRect = reader.getBoundingClientRect();
-    const left = Math.max(0, readerRect.left - frameRect.left + paddingLeft);
-    const top = Math.max(0, readerRect.top - frameRect.top + paddingTop);
+    // #reader-frame is the explicit positioning parent for bookmarklet chrome.
+    // Use Reader offsets inside that frame instead of viewport rectangles so the
+    // compact header can never drift above or across the frame border.
+    const left = Math.max(0, reader.offsetLeft + paddingLeft);
+    const top = Math.max(0, reader.offsetTop + paddingTop);
     header.style.setProperty('left', `${left}px`, 'important');
     header.style.setProperty('top', `${top}px`, 'important');
     header.style.setProperty('width', `${headerWidth}px`, 'important');
@@ -1474,7 +1478,9 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     window.requestAnimationFrame(() => {
       if (!reader.isConnected || !header.isConnected) return;
       const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
-      const requiredHeight = Math.max(fontSize * 1.6, headerHeight + Math.max(5, fontSize * .35));
+      // Reserve only the actual compact header plus a small reading gap. The
+      // previous larger buffer made the first paragraph sit visibly too low.
+      const requiredHeight = Math.max(fontSize * 1.35, headerHeight + Math.max(3, fontSize * .22));
       const firstGroup = reader.querySelector('.reader-group[data-start-index]');
       if (!firstGroup) return;
       firstGroup.classList.add('read-anything-bookmarklet-first-group');
@@ -2099,28 +2105,35 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   function installDefaultArticleBookPages() {
-    if (!activeImportedDocument || !isWholeArticleDocument()) return;
+    if (!activeImportedDocument || !isWholeArticleDocument()) return false;
 
-    // Auto-enable Book Pages only once for a given imported article. Dispatching
-    // the Reader's change handler on every attachment retry can create a
-    // render -> document-available -> attach -> change loop that visibly blinks.
+    const sourceType = String(activeImportedDocument.source?.type || '').toLowerCase();
+
+    // Bookmarklet/URL articles must follow the same stable startup order as
+    // Topic Feed stories: let the Reader restore its saved Book Pages preference
+    // instead of forcing a change while the imported document is still settling.
+    // Forcing the checkbox here rebuilds #reader after the article header has
+    // already been positioned, producing the visible "looks right -> blink ->
+    // old layout" cycle.
+    if (sourceType === 'bookmarklet' || sourceType === 'website') return false;
+
+    // Preserve the established one-shot behavior for other article sources.
     const articleKey = String(
       activeImportedDocument.source?.readAnythingKey ||
       activeImportedDocument.source?.readerDocumentId ||
       importedDocumentKey(activeImportedDocument)
     );
-    if (articleKey && defaultArticleBookPagesKey === articleKey) return;
+    if (articleKey && defaultArticleBookPagesKey === articleKey) return false;
 
     const bookPages = document.querySelector('#app #book-pages');
-    if (!bookPages || bookPages.disabled) return;
+    if (!bookPages || bookPages.disabled) return false;
 
-    // Mark this article before dispatching the change event so a synchronous
-    // Reader rebuild cannot re-enter and dispatch it a second time.
     if (articleKey) defaultArticleBookPagesKey = articleKey;
-    if (bookPages.checked) return;
+    if (bookPages.checked) return false;
 
     bookPages.checked = true;
     bookPages.dispatchEvent(new Event('change', { bubbles: true }));
+    return true;
   }
 
   function scheduleFormatControlAttach() {
@@ -2133,16 +2146,21 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     const attach = () => {
       if (!activeImportedDocument) return;
+
+      // If an established non-bookmarklet article source needs to switch Reader
+      // mode, do that before attaching any article chrome. The change handler can
+      // rebuild #reader, so positioning controls before it is inherently racy.
+      if (installDefaultArticleBookPages()) return;
+
       installDisplayFormatControl();
       installBookmarkletArticleChrome();
       installArticleSummaryButton();
       installBookmarkletArticleChrome();
       installBookmarkletArticleQueue();
-      installDefaultArticleBookPages();
     };
 
     attach();
-    [120, 400, 900].forEach((delay) => {
+    [120, 400, 900, 1600].forEach((delay) => {
       const timer = window.setTimeout(attach, delay);
       formatControlAttachTimers.push(timer);
     });
