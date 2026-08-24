@@ -4364,8 +4364,29 @@ function topicFeedSourceMode(value) {
   return value === 'ai' || value === 'hybrid' ? value : 'manual';
 }
 
+function topicFeedSourceUrlKey(value) {
+  return cleanText(value, 2000).trim().replace(/\/+$/, '').toLowerCase();
+}
+
+function topicFeedSelectedSourceUrls(topic) {
+  return [...new Set((Array.isArray(topic?.selectedSourceUrls) ? topic.selectedSourceUrls : [])
+    .map((value) => cleanText(value, 2000).trim())
+    .filter(Boolean))].slice(0, 30);
+}
+
 async function refreshAiManagedTopicSources(topic, { force = false } = {}) {
   let mode = topicFeedSourceMode(topic?.sourceMode);
+
+  // A persisted explicit subset is the strongest contract. Unless Hybrid was
+  // deliberately selected, the server may never expand beyond these URLs.
+  const selectedSourceUrls = topicFeedSelectedSourceUrls(topic);
+  if (selectedSourceUrls.length && mode !== 'hybrid') {
+    const selected = new Set(selectedSourceUrls.map(topicFeedSourceUrlKey));
+    topic.sourceMode = 'manual';
+    topic.sources = (topic.sources || []).filter((source) => selected.has(topicFeedSourceUrlKey(source.url)));
+    topic.aiSourcesUpdatedAt = null;
+    return false;
+  }
 
   // Server-side backstop for the UI contract: if an AI-managed record contains
   // a source the reader explicitly selected/entered, that explicit choice wins.
@@ -4454,45 +4475,58 @@ function curateTopicFeedArticles(articles, topic) {
 }
 
 function sanitizeTopicFeedState(raw) {
-  const topics = (Array.isArray(raw?.topics) ? raw.topics : []).slice(0, 60).map((topic) => ({
-    id: cleanText(topic?.id, 200),
-    name: cleanText(topic?.name, 200),
-    cadence: topic?.cadence === 'weekly' ? 'weekly' : 'daily',
-    maxRecommended: Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8)),
-    preferences: cleanText(topic?.preferences, 4000),
-    sourceMode: topicFeedSourceMode(topic?.sourceMode),
-    aiSourcesUpdatedAt: topic?.aiSourcesUpdatedAt || null,
-    sources: (Array.isArray(topic?.sources) ? topic.sources : []).slice(0, 30).map((source) => ({
+  const topics = (Array.isArray(raw?.topics) ? raw.topics : []).slice(0, 60).map((topic) => {
+    let sourceMode = topicFeedSourceMode(topic?.sourceMode);
+    let sources = (Array.isArray(topic?.sources) ? topic.sources : []).slice(0, 30).map((source) => ({
       id: cleanText(source?.id, 200),
       name: cleanText(source?.name, 200),
       type: source?.type === 'rss' ? 'rss' : 'website',
       url: cleanText(source?.url, 2000),
       origin: source?.origin === 'ai' ? 'ai' : source?.origin === 'recommended' ? 'recommended' : 'manual',
       recommendationKey: cleanText(source?.recommendationKey, 120)
-    })).filter((source) => source.id && source.name && source.url),
-    articles: (Array.isArray(topic?.articles) ? topic.articles : []).slice(0, 300).map((article) => ({
-      id: cleanText(article?.id, 200),
-      cloudId: cleanText(article?.cloudId, 100),
-      title: cleanText(article?.title, 1200),
-      url: cleanText(article?.url, 4000),
-      summary: cleanText(article?.summary, 8000),
-      published: article?.published || '',
-      author: cleanText(article?.author, 500),
-      sourceName: cleanText(article?.sourceName, 200),
-      sourceUrl: cleanText(article?.sourceUrl, 2000),
-      sourceType: article?.sourceType === 'rss' ? 'rss' : 'website',
-      sourceClientId: cleanText(article?.sourceClientId, 200),
-      feedMode: cleanText(article?.feedMode, 120),
-      sourceRank: clampInteger(article?.sourceRank, 0, 1000),
-      recommended: Boolean(article?.recommended),
-      prepared: Boolean(article?.prepared),
-      read: Boolean(article?.read)
-    })).filter((article) => article.id && article.title && article.url),
-    lastRefresh: topic?.lastRefresh || null,
-    preparedAt: topic?.preparedAt || null,
-    lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : []).slice(0, 30).map((value) => cleanText(value, 1000)),
-    dismissedArticleIds: [...new Set((Array.isArray(topic?.dismissedArticleIds) ? topic.dismissedArticleIds : []).map((value) => cleanText(value, 200)).filter(Boolean))].slice(-500)
-  })).filter((topic) => topic.id && topic.name);
+    })).filter((source) => source.id && source.name && source.url);
+
+    const selectedSourceUrls = topicFeedSelectedSourceUrls(topic);
+    if (selectedSourceUrls.length && sourceMode !== 'hybrid') {
+      const selected = new Set(selectedSourceUrls.map(topicFeedSourceUrlKey));
+      sourceMode = 'manual';
+      sources = sources.filter((source) => selected.has(topicFeedSourceUrlKey(source.url)));
+    }
+
+    return {
+      id: cleanText(topic?.id, 200),
+      name: cleanText(topic?.name, 200),
+      cadence: topic?.cadence === 'weekly' ? 'weekly' : 'daily',
+      maxRecommended: Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8)),
+      preferences: cleanText(topic?.preferences, 4000),
+      sourceMode,
+      aiSourcesUpdatedAt: sourceMode === 'manual' ? null : (topic?.aiSourcesUpdatedAt || null),
+      selectedSourceUrls: sourceMode === 'manual' ? selectedSourceUrls : [],
+      sources,
+      articles: (Array.isArray(topic?.articles) ? topic.articles : []).slice(0, 300).map((article) => ({
+        id: cleanText(article?.id, 200),
+        cloudId: cleanText(article?.cloudId, 100),
+        title: cleanText(article?.title, 1200),
+        url: cleanText(article?.url, 4000),
+        summary: cleanText(article?.summary, 8000),
+        published: article?.published || '',
+        author: cleanText(article?.author, 500),
+        sourceName: cleanText(article?.sourceName, 200),
+        sourceUrl: cleanText(article?.sourceUrl, 2000),
+        sourceType: article?.sourceType === 'rss' ? 'rss' : 'website',
+        sourceClientId: cleanText(article?.sourceClientId, 200),
+        feedMode: cleanText(article?.feedMode, 120),
+        sourceRank: clampInteger(article?.sourceRank, 0, 1000),
+        recommended: Boolean(article?.recommended),
+        prepared: Boolean(article?.prepared),
+        read: Boolean(article?.read)
+      })).filter((article) => article.id && article.title && article.url),
+      lastRefresh: topic?.lastRefresh || null,
+      preparedAt: topic?.preparedAt || null,
+      lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : []).slice(0, 30).map((value) => cleanText(value, 1000)),
+      dismissedArticleIds: [...new Set((Array.isArray(topic?.dismissedArticleIds) ? topic.dismissedArticleIds : []).map((value) => cleanText(value, 200)).filter(Boolean))].slice(-500)
+    };
+  }).filter((topic) => topic.id && topic.name);
   return { topics };
 }
 

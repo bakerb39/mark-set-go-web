@@ -42,6 +42,12 @@
   let topicManagerOpen = false;
   let deferredCloudState = null;
 
+  // The Topic editor keeps explicit AI recommendation choices separately from
+  // the topic's existing source rows. This prevents an older/polluted source
+  // list from being mistaken for the sources selected in the current edit.
+  let managerSelectedRecommendationSources = new Map();
+  let managerNewManualSourceIds = new Set();
+
   function topicManagerIsOpen() {
     return Boolean(
       topicManagerOpen &&
@@ -104,6 +110,8 @@
       ...topic,
       sourceMode: topic?.sourceMode === 'ai' || topic?.sourceMode === 'hybrid' ? topic.sourceMode : 'manual',
       aiSourcesUpdatedAt: topic?.aiSourcesUpdatedAt || null,
+      selectedSourceUrls: [...new Set((Array.isArray(topic?.selectedSourceUrls) ? topic.selectedSourceUrls : [])
+        .map((value) => cleanUrl(value)).filter(Boolean))].slice(0, 30),
       dismissedArticleIds: [...new Set((Array.isArray(topic?.dismissedArticleIds) ? topic.dismissedArticleIds : []).map(String).filter(Boolean))].slice(-500)
     }));
     return {
@@ -142,6 +150,7 @@
         Number(topic?.maxRecommended || 0),
         String(topic?.preferences || ''),
         String(topic?.aiSourcesUpdatedAt || ''),
+        (topic?.selectedSourceUrls || []).map(String),
         String(topic?.lastRefresh || ''),
         (topic?.dismissedArticleIds || []).map(String),
         (topic?.sources || []).map((source) => [
@@ -246,6 +255,8 @@
       preferences: String(topic?.preferences || '').slice(0, 700),
       sourceMode: topic?.sourceMode === 'ai' || topic?.sourceMode === 'hybrid' ? topic.sourceMode : 'manual',
       aiSourcesUpdatedAt: String(topic?.aiSourcesUpdatedAt || '').slice(0, 80),
+      selectedSourceUrls: [...new Set((Array.isArray(topic?.selectedSourceUrls) ? topic.selectedSourceUrls : [])
+        .map((value) => cleanUrl(value)).filter(Boolean))].slice(0, 30),
       lastRefresh: String(topic?.lastRefresh || '').slice(0, 80),
       preparedAt: String(topic?.preparedAt || '').slice(0, 80),
       lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : [])
@@ -625,6 +636,7 @@
             preferences: live.preferences,
             sourceMode: mode,
             aiSourcesUpdatedAt: payload.topic.aiSourcesUpdatedAt || live.aiSourcesUpdatedAt || null,
+            selectedSourceUrls: Array.isArray(live.selectedSourceUrls) ? live.selectedSourceUrls : [],
             sources: refreshedSources,
             dismissedArticleIds: [...dismissed],
             articles: refreshedArticles,
@@ -1102,28 +1114,49 @@
     });
   }
 
+  function receiveWorkspaceArticleContext(topic, article, payload) {
+    // Synchronize state/context only. Do NOT render from this function: rendering
+    // the outer app here can destroy the workspace pane that initiated the read.
+    adoptSharedTopicState();
+    const liveTopic = state.topics.find((item) => String(item?.id || '') === String(topic?.id || '')) || topic;
+    const liveArticle = liveTopic?.articles?.find?.((item) => String(item?.id || '') === String(article?.id || '')) || article;
+    const sourceDisplayName = String(
+      payload?.siteName ||
+      payload?.site ||
+      (liveTopic?.sources || []).find((source) => String(source?.id || '') === String(liveArticle?.sourceClientId || ''))?.name ||
+      liveArticle?.sourceName ||
+      sourceHostLabel(payload?.sourceUrl || liveArticle?.url) ||
+      'Topic Feed'
+    ).trim();
+
+    window.MSGTopicFeedReaderContext = {
+      topicId: liveTopic?.id || '',
+      topicName: liveTopic?.name || '',
+      sourceId: liveArticle?.sourceClientId || '',
+      sourceName: sourceDisplayName,
+      articleId: liveArticle?.id || '',
+      updatedAt: new Date().toISOString()
+    };
+    activeTopicFeedHeaderContext = { topic: liveTopic, article: liveArticle, payload };
+    return true;
+  }
+
   function openPreparedArticle(topic, article, payload, options = {}) {
     const isWorkspacePane = window.parent !== window && (
       Boolean(window.__MSG_WORKSPACE_PANE__) ||
       new URLSearchParams(window.location.search).has('msgWorkspaceMode')
     );
 
-    // A Topic Feed shown in a secondary workspace pane is a source/control
-    // surface. Send the prepared article to the OUTER Topic Feed/Reader module
-    // directly so this feed page is not replaced or closed by Reader rendering.
-    if (isWorkspacePane && !options.fromWorkspacePane) {
+    // Do not invoke the parent's Topic Feed renderer directly from a workspace
+    // pane. That can rebuild the outer app shell that owns the pane itself. The
+    // established Read Anything -> renderReaderWithText workspace handoff is the
+    // canonical path and keeps the source pane alive until the reader closes it.
+    if (isWorkspacePane) {
+      announceTopicStateChange();
       try {
-        const parentFeeds = window.parent.MarkSetGoTopicFeeds;
-        if (typeof parentFeeds?.openPreparedArticle === 'function') {
-          // Pull the just-saved topic/source state into the outer app before it
-          // builds My Topics or the story header. The workspace iframe remains
-          // untouched and stays open until the reader closes that pane.
-          parentFeeds.syncSharedState?.();
-          parentFeeds.openPreparedArticle(topic, article, payload, { fromWorkspacePane:true });
-          return true;
-        }
+        window.parent.MarkSetGoTopicFeeds?.receiveWorkspaceArticleContext?.(topic, article, payload);
       } catch (error) {
-        console.warn('Workspace could not hand Topic Feed article to the outer Reader.', error);
+        console.warn('Workspace could not synchronize Topic Feed Reader context.', error);
       }
     }
 
@@ -1423,6 +1456,7 @@
       <div class="topic-feed-source-row" data-source-id="${escapeHtml(source.id)}"
            data-source-origin="${escapeHtml(source.origin || 'manual')}"
            data-source-explicit="${explicit ? '1' : '0'}"
+           data-source-session-added="${source.sessionAdded ? '1' : '0'}"
            data-recommendation-key="${escapeHtml(source.recommendationKey || '')}">
         <input class="topic-source-name" value="${escapeHtml(source.name)}" placeholder="Feed name" required>
         <select class="topic-source-type"><option value="website" ${source.type === 'website' ? 'selected' : ''}>Website URL</option><option value="rss" ${source.type === 'rss' ? 'selected' : ''}>RSS / Atom</option></select>
@@ -1446,15 +1480,21 @@
       const response = await fetch(`/api/topic-feeds/recommend?topic=${encodeURIComponent(name)}&preferences=${encodeURIComponent(priorities)}`);
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.error || 'Recommendations unavailable.');
-      const existing = new Set([...document.querySelectorAll('.topic-source-url')].map((input) => cleanUrl(input.value)).filter(Boolean));
-      const items = (payload.sources || []).filter((source) => !existing.has(cleanUrl(source.url)));
-      container.innerHTML = items.length ? items.map((source) => `
-        <article class="topic-feed-recommendation">
+      // Always show the current recommendations. Existing source rows may come
+      // from an older AI-managed save; hiding those URLs would make it impossible
+      // for the reader to explicitly choose a clean subset from that old topic.
+      const items = Array.isArray(payload.sources) ? payload.sources : [];
+      container.innerHTML = items.length ? items.map((source) => {
+        const sourceUrl = cleanUrl(source.url);
+        const selected = Boolean(sourceUrl && managerSelectedRecommendationSources.has(sourceUrl));
+        return `
+        <article class="topic-feed-recommendation ${selected ? 'selected' : ''}">
           <div><strong>${escapeHtml(source.name)}</strong><p>${escapeHtml(source.description || '')}</p>${source.reason ? `<small>${escapeHtml(source.reason)}</small>` : ''}</div>
           <button type="button" data-add-recommended-feed="${escapeHtml(source.key)}"
                   data-feed-name="${escapeHtml(source.name)}" data-feed-type="${escapeHtml(source.type || 'website')}"
-                  data-feed-url="${escapeHtml(source.url)}">Add</button>
-        </article>`).join('') : '<p class="topic-recommendation-note">You already added the recommended feeds shown for this topic.</p>';
+                  data-feed-url="${escapeHtml(source.url)}" data-selected="${selected ? '1' : '0'}" aria-pressed="${selected ? 'true' : 'false'}">${selected ? 'Selected' : 'Add'}</button>
+        </article>`;
+      }).join('') : '<p class="topic-recommendation-note">No source suggestions are available yet for this topic.</p>';
     } catch (error) {
       container.innerHTML = `<p class="topic-recommendation-note">${escapeHtml(error.message)}</p>`;
     }
@@ -1463,6 +1503,8 @@
   function showManager() {
     topicManagerOpen = true;
     deferredCloudState = null;
+    managerSelectedRecommendationSources = new Map();
+    managerNewManualSourceIds = new Set();
 
     const topic = currentTopic();
     app.innerHTML = `
@@ -1555,7 +1597,9 @@
       event.preventDefault();
       event.stopPropagation();
       if (switchToExplicitSourceSelection()) syncSourceModeUi();
-      document.getElementById('topic-source-rows')?.insertAdjacentHTML('beforeend', sourceRow());
+      const source = { id: uid(), name:'', type:'website', url:'', origin:'manual', recommendationKey:'', sessionAdded:true };
+      managerNewManualSourceIds.add(source.id);
+      document.getElementById('topic-source-rows')?.insertAdjacentHTML('beforeend', sourceRow(source));
     });
     document.getElementById('topic-name')?.addEventListener('input', (event) => {
       clearTimeout(recommendationTimer);
@@ -1565,37 +1609,54 @@
       const button = event.target.closest('[data-add-recommended-feed]');
       if (!button) return;
 
-      // Selecting a recommendation must be a quiet in-place toggle. In
-      // particular, it must never submit the Topic form, bubble into an outer
-      // workspace/navigation handler, or rebuild/close the recommendation panel.
+      // This click is selection only. It must not submit, navigate, refresh the
+      // Topic page, rebuild the recommendation list, or open/close a workspace.
       event.preventDefault();
       event.stopPropagation();
       if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
-      if (button.dataset.selected === '1') return;
 
-      // An explicit source choice wins over fully automatic source management.
-      // Hybrid remains hybrid because the reader deliberately chose that mode.
-      if (switchToExplicitSourceSelection()) syncSourceModeUi();
+      const url = cleanUrl(button.dataset.feedUrl || '');
+      if (!url) return;
+      const selected = managerSelectedRecommendationSources.has(url);
 
-      const source = {
-        id: uid(), name: button.dataset.feedName || '', type: button.dataset.feedType === 'rss' ? 'rss' : 'website',
-        url: button.dataset.feedUrl || '', origin:'recommended', recommendationKey:button.dataset.addRecommendedFeed || ''
-      };
-      document.getElementById('topic-source-rows')?.insertAdjacentHTML('beforeend', sourceRow(source));
+      if (selected) {
+        managerSelectedRecommendationSources.delete(url);
+        button.dataset.selected = '0';
+        button.classList.remove('selected');
+        button.closest('.topic-feed-recommendation')?.classList.remove('selected');
+        button.textContent = 'Add';
+        button.setAttribute('aria-pressed', 'false');
+      } else {
+        managerSelectedRecommendationSources.set(url, {
+          id: uid(),
+          name: button.dataset.feedName || '',
+          type: button.dataset.feedType === 'rss' ? 'rss' : 'website',
+          url,
+          origin: 'recommended',
+          recommendationKey: button.dataset.addRecommendedFeed || ''
+        });
+        button.dataset.selected = '1';
+        button.classList.add('selected');
+        button.closest('.topic-feed-recommendation')?.classList.add('selected');
+        button.textContent = 'Selected';
+        button.setAttribute('aria-pressed', 'true');
 
-      // Keep the AI suggestion panel exactly where it is so several sources can
-      // be chosen before Save Topic. Do not call loadRecommendations() here.
-      button.dataset.selected = '1';
-      button.classList.add('selected');
-      button.disabled = true;
-      button.textContent = 'Selected';
-      button.setAttribute('aria-pressed', 'true');
+        // Reflect the contract in the selector without rebuilding either panel.
+        // The explicit-selection Map, not this dropdown, remains authoritative.
+        const modeSelect = document.getElementById('topic-source-mode');
+        if (modeSelect?.value === 'ai') modeSelect.value = 'manual';
+        const editor = document.getElementById('topic-manual-source-editor');
+        if (editor) editor.hidden = false;
+        const note = document.getElementById('topic-source-mode-note');
+        if (note) note.textContent = 'Only the sources you select or add below will be used.';
+      }
     });
     document.getElementById('topic-source-rows')?.addEventListener('click', (event) => {
       const remove = event.target.closest('.topic-source-remove');
       if (!remove) return;
       const row = remove.closest('.topic-feed-source-row');
       const removedId = row?.dataset.sourceId || '';
+      if (removedId) managerNewManualSourceIds.delete(removedId);
       row?.remove();
       if (state.preferences.dailyOpenSourceId === removedId) state.preferences.dailyOpenSourceId = '';
     });
@@ -1618,29 +1679,59 @@
 
       const requestedSourceMode = document.getElementById('topic-source-mode')?.value || 'manual';
       const rows = [...document.querySelectorAll('.topic-feed-source-row')];
-      const hasExplicitSelection = rows.some((row) =>
-        row.dataset.sourceExplicit === '1' || row.dataset.sourceOrigin === 'recommended' || row.dataset.sourceOrigin === 'manual'
-      );
-
-      // Safety invariant: explicit source rows can never be discarded simply
-      // because the selector still says AI-managed. A click on a recommendation
-      // is authoritative even if another UI listener interrupted the mode change.
-      const sourceMode = requestedSourceMode === 'ai' && hasExplicitSelection
-        ? 'manual'
-        : requestedSourceMode;
-
-      let sources = sourceMode === 'ai' ? [] : rows.map((row) => ({
+      const rowSources = rows.map((row) => ({
         id: row.dataset.sourceId || uid(),
         name: row.querySelector('.topic-source-name').value.trim(),
         type: row.querySelector('.topic-source-type').value,
         url: cleanUrl(row.querySelector('.topic-source-url').value),
         origin: row.dataset.sourceOrigin === 'ai' ? 'ai' : row.dataset.sourceOrigin === 'recommended' ? 'recommended' : 'manual',
-        recommendationKey: row.dataset.recommendationKey || ''
+        recommendationKey: row.dataset.recommendationKey || '',
+        sessionAdded: row.dataset.sourceSessionAdded === '1' || managerNewManualSourceIds.has(row.dataset.sourceId || '')
       })).filter((source) => source.name && source.url);
+      const selectedRecommendations = [...managerSelectedRecommendationSources.values()]
+        .map((source) => ({ ...source, url: cleanUrl(source.url) }))
+        .filter((source) => source.name && source.url);
+      const hasCurrentRecommendationSelection = selectedRecommendations.length > 0;
 
-      // Selected-sources-only means exactly that. Never carry an old AI-managed
-      // row into a manual topic when the reader has made explicit choices.
-      if (sourceMode === 'manual') sources = sources.filter((source) => source.origin !== 'ai');
+      // Explicit clicks in THIS editor session are authoritative. A stale source
+      // row from an older AI-managed/polluted topic can never silently join them.
+      const sourceMode = requestedSourceMode === 'hybrid'
+        ? 'hybrid'
+        : hasCurrentRecommendationSelection
+          ? 'manual'
+          : requestedSourceMode;
+
+      const dedupeSourceList = (list) => {
+        const seen = new Set();
+        return list.filter((source) => {
+          const key = cleanUrl(source.url).replace(/\/+$/, '').toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      };
+
+      let sources = [];
+      if (sourceMode === 'hybrid') {
+        // Hybrid deliberately combines automatic AI sources with user-selected
+        // sources. Current explicit clicks are pinned alongside manual URL rows.
+        sources = dedupeSourceList([
+          ...rowSources.filter((source) => source.origin !== 'ai'),
+          ...selectedRecommendations
+        ]);
+      } else if (sourceMode === 'manual' && hasCurrentRecommendationSelection) {
+        // Critical invariant: if the reader clicked 1 or 2 recommendations, save
+        // exactly those clicks plus genuinely hand-entered URL rows. Do not carry
+        // old AI/recommended rows forward from a prior broken save.
+        sources = dedupeSourceList([
+          ...rowSources.filter((source) => source.origin === 'manual' && source.sessionAdded),
+          ...selectedRecommendations
+        ]);
+      } else if (sourceMode === 'manual') {
+        sources = dedupeSourceList(rowSources.filter((source) => source.origin !== 'ai'));
+      }
+
+      sources = sources.map(({ sessionAdded, ...source }) => source);
 
       const selectedDaily = document.querySelector('input[name="topic-daily-source"]:checked')?.value || '';
       const existingSourceIds = new Set(sources.map((source) => source.id));
@@ -1657,6 +1748,9 @@
         preferences: document.getElementById('topic-preferences').value.trim(),
         sourceMode: sourceMode === 'ai' || sourceMode === 'hybrid' ? sourceMode : 'manual',
         aiSourcesUpdatedAt: sourceMode === 'manual' ? null : (existing?.aiSourcesUpdatedAt || null),
+        selectedSourceUrls: sourceMode === 'manual'
+          ? sources.map((source) => cleanUrl(source.url)).filter(Boolean)
+          : [],
         sources
       };
 
@@ -2385,6 +2479,9 @@
   // Keep Topic Feed navigation/header geometry synchronized through explicit
   // app events and user interactions. Do not observe DOM mutations.
   const scheduleTopicFeedUiSync = () => {
+    // Topic Setup is a transaction. Reader-side click/change synchronization
+    // must stay completely dormant while the form is open.
+    if (topicManagerIsOpen()) return;
     if (!isTopicFeedReaderActive()) return;
     window.setTimeout(() => {
       scheduleReaderNavigation();
@@ -2516,6 +2613,7 @@
     },
     clearReaderArticleContext,
     openPreparedArticle,
+    receiveWorkspaceArticleContext,
     syncSharedState: adoptSharedTopicState
   });
 })();
