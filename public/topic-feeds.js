@@ -23,6 +23,19 @@
   let dailyAutoOpenAttempted = false;
   let navFrame = 0;
 
+  // Cloud reads/writes can overlap authentication and the Topic editor. Track
+  // intentional local topic changes so an older cloud snapshot can never erase
+  // a topic the reader just saved. Local state remains authoritative until the
+  // same revision has been confirmed by a successful cloud write.
+  let localTopicRevision = 0;
+  let cloudSyncedTopicRevision = 0;
+  let cloudWriteChain = Promise.resolve(true);
+
+  function markLocalTopicRevision() {
+    localTopicRevision += 1;
+    return localTopicRevision;
+  }
+
   // New/Edit Topic is a transactional screen. Background cloud hydration,
   // authentication refreshes, and in-flight feed refreshes must never replace
   // it while the reader is typing.
@@ -240,26 +253,36 @@
     };
   }
 
-  async function syncCloudNow() {
-    if (!cloudAuthenticated) return false;
-    try {
-      const response = await fetch('/api/topic-feeds/state', {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cloudPayload())
-      });
-      if (response.status === 401 || response.status === 503) {
-        cloudAuthenticated = false;
+  function syncCloudNow() {
+    if (!cloudAuthenticated) return Promise.resolve(false);
+
+    // Serialize account writes. Two PUTs completing out of order can otherwise
+    // put an older topic list back in the database after a newer Save Topic.
+    cloudWriteChain = cloudWriteChain.catch(() => false).then(async () => {
+      if (!cloudAuthenticated) return false;
+      const revisionBeingSaved = localTopicRevision;
+      const payloadBeingSaved = cloudPayload();
+      try {
+        const response = await fetch('/api/topic-feeds/state', {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadBeingSaved)
+        });
+        if (response.status === 401 || response.status === 503) {
+          cloudAuthenticated = false;
+          return false;
+        }
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Unable to sync Topic Feeds.');
+        cloudSyncedTopicRevision = Math.max(cloudSyncedTopicRevision, revisionBeingSaved);
+        return true;
+      } catch (error) {
+        console.warn('Topic Feed cloud sync was deferred.', error);
         return false;
       }
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Unable to sync Topic Feeds.');
-      return true;
-    } catch (error) {
-      console.warn('Topic Feed cloud sync was deferred.', error);
-      return false;
-    }
+    });
+    return cloudWriteChain;
   }
 
   function scheduleCloudSave() {
@@ -277,6 +300,7 @@
   async function hydrateCloudState() {
     if (cloudHydrating) return false;
     cloudHydrating = true;
+    const revisionWhenHydrationStarted = localTopicRevision;
     try {
       const response = await fetch('/api/topic-feeds/state', { credentials: 'same-origin' });
       if (response.status === 401 || response.status === 503 || response.status === 409) {
@@ -288,6 +312,15 @@
 
       cloudAuthenticated = true;
       let remote = normalizeState(payload);
+
+      // If the user saved/edited a topic while this GET was in flight, or a
+      // local topic revision has not yet been confirmed by cloud, this response
+      // is older by definition. Never let it replace the local topic list.
+      if (revisionWhenHydrationStarted !== localTopicRevision || localTopicRevision > cloudSyncedTopicRevision) {
+        void syncCloudNow();
+        return true;
+      }
+
       if (!remote.topics.length && state.topics.length) {
         const importResponse = await fetch('/api/topic-feeds/import', {
           method: 'POST',
@@ -1395,6 +1428,7 @@
     document.getElementById('topic-delete')?.addEventListener('click', () => {
       const removedSourceIds = new Set((existing.sources || []).map((source) => source.id));
       state.topics = state.topics.filter((item) => item.id !== existing.id);
+      markLocalTopicRevision();
       if (removedSourceIds.has(state.preferences.dailyOpenSourceId)) state.preferences.dailyOpenSourceId = '';
       activeTopicId = state.topics[0]?.id || null;
       activeSourceId = '';
@@ -1469,6 +1503,11 @@
         };
         state.topics.push(record);
       }
+
+      // From this point forward, no cloud hydration that began before this save
+      // may replace the local topic list. The revision is cleared only by a
+      // successful serialized PUT of this state (or a newer one).
+      markLocalTopicRevision();
 
       activeTopicId = record.id;
       activeSourceId = '';
