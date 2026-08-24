@@ -980,8 +980,32 @@
     }
   }
 
+  function explicitReaderOwnsCurrentView() {
+    // 20260824 bookmarklet race guard: a background Topic Feed hydration must
+    // never replace content the user explicitly opened in the Reader. The
+    // capture hash can disappear immediately after a successful bookmarklet
+    // handoff, so also check the live Reader/view rather than relying on the hash.
+    if (String(location.hash || '').includes('read-anything-capture=')) return true;
+    if (app?.dataset?.viewKey === 'reader') return true;
+    if (document.querySelector('#reader')) return true;
+    try {
+      const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+      if (current?.text || current?.source) return true;
+    } catch {}
+    return false;
+  }
+
   async function maybeAutoOpenDailyArticle() {
     if (!cloudAuthenticated || dailyAutoOpenAttempted || !state.preferences.dailyOpenSourceId) return;
+
+    // Daily auto-open is a startup convenience only. If an explicit Reader is
+    // already active (including Read with Mark), skip it for this app session.
+    // This prevents auth/cloud hydration from replacing a newly captured page.
+    if (explicitReaderOwnsCurrentView()) {
+      dailyAutoOpenAttempted = true;
+      return;
+    }
+
     dailyAutoOpenAttempted = true;
     try {
       const response = await fetch('/api/topic-feeds/daily-open', {
@@ -997,6 +1021,9 @@
       if (localArticle) Object.assign(localArticle, result.article, { read: true, prepared: true });
       saveState({ cloud: false });
       const tryOpen = (attempt = 0) => {
+        // The Reader may have been opened while the daily-open request was in
+        // flight. Re-check immediately before takeover, not only before fetch.
+        if (explicitReaderOwnsCurrentView()) return;
         if (window.MarkSetGoReadAnything?.openDocument) {
           openPreparedArticle(topic, localArticle || result.article, result.payload);
         } else if (attempt < 5) {
@@ -1869,48 +1896,12 @@
     });
   });
 
-  function clearInactiveTopicFeedReaderArtifacts() {
-    // A Topic Feed header is intentionally moved outside #reader while a feed
-    // article is active. When another source replaces that article (for example
-    // Read with Mark), never let the old delayed header work attach itself to the
-    // new Reader.
-    activeTopicFeedHeaderContext = null;
-    window.MSGTopicFeedReaderContext = null;
-    window.clearTimeout(topicFeedStoryHeaderReflowTimer);
-    removeTopicBookDivider();
-
-    const reader = document.querySelector('#reader');
-    const frame = document.querySelector('#reader-frame');
-    const header = frame?.querySelector(':scope > [data-topic-feed-story-header-external]');
-    const actionRow = header?.querySelector(':scope > #read-anything-article-summary-action');
-
-    // If Read Anything has already rebuilt its article actions but Topic Feed
-    // still owns that same node, return it to the current Reader before removing
-    // the obsolete external feed header. This preserves its existing listeners.
-    if (reader && actionRow) reader.prepend(actionRow);
-
-    header?.remove();
-    reader?.querySelectorAll(':scope > [data-topic-feed-story-header-spacer]').forEach((node) => node.remove());
-    reader?.classList.remove('topic-feed-story-header-managed');
-    if (reader?.dataset) delete reader.dataset.topicFeedGeometrySynced;
-  }
-
   document.addEventListener('marksetgo:document-available', () => {
-    if (!isTopicFeedReaderActive()) {
-      clearInactiveTopicFeedReaderArtifacts();
-      return;
-    }
-
     window.setTimeout(scheduleReaderNavigation, 40);
     // openDocument() can rebuild the Reader after the first source/header pass.
-    // Re-attach the Topic Feed provenance/actions only while the current Reader
-    // is still a Topic Feed article. A later Read with Mark import must not
-    // inherit these delayed callbacks.
+    // Re-attach the Topic Feed provenance/actions to the final Reader DOM.
     [40, 140, 360, 820, 1600].forEach((delay) => {
-      window.setTimeout(() => {
-        if (!isTopicFeedReaderActive()) return;
-        refreshActiveTopicFeedHeader();
-      }, delay);
+      window.setTimeout(refreshActiveTopicFeedHeader, delay);
     });
   });
 
