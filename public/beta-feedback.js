@@ -41,12 +41,47 @@
       .beta-feedback-card button{border-radius:8px;border:1px solid #aab5c4;background:#fff;padding:9px 13px;cursor:pointer;font-weight:700}
       .beta-feedback-card button.primary{background:#173a67;color:#fff;border-color:#173a67}
       .beta-feedback-status{min-height:22px;margin-top:10px;font-weight:700}
-      .beta-admin-page{max-width:1180px;margin:0 auto;padding:24px}
-      .beta-admin-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:18px 0}
+      .beta-admin-page{
+        max-width:1180px;
+        margin:24px auto;
+        padding:24px;
+        background:linear-gradient(180deg,#f7f9fc 0%, #eef3f9 100%);
+        color:#172033;
+        border:1px solid #d8e0ea;
+        border-radius:18px;
+        box-shadow:0 20px 55px rgba(14,26,44,.14)
+      }
+      .beta-admin-page .platform-hero{
+        background:#ffffff;
+        color:#172033;
+        border:1px solid #d8e0ea;
+        border-radius:14px;
+        padding:20px 22px;
+        box-shadow:0 10px 28px rgba(14,26,44,.08)
+      }
+      .beta-admin-page .platform-hero h1,
+      .beta-admin-page .platform-hero p,
+      .beta-admin-page .platform-hero .source-category{
+        color:#172033 !important
+      }
+      .beta-admin-page #beta-admin-message{
+        background:#ffffff;
+        color:#172033;
+        border:1px solid #d8e0ea;
+        border-radius:10px;
+        padding:10px 12px
+      }
+      .beta-admin-toolbar{
+        display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin:18px 0;
+        background:#ffffff;
+        border:1px solid #d8e0ea;
+        border-radius:12px;
+        padding:14px
+      }
       .beta-admin-toolbar label{display:grid;gap:5px;font-weight:700}
       .beta-admin-toolbar input,.beta-admin-toolbar select{padding:8px 10px;border:1px solid #b9c4d2;border-radius:8px}
       .beta-admin-list{display:grid;gap:12px}
-      .beta-admin-item{border:1px solid #cfd7e2;border-radius:12px;background:#fff;padding:16px;color:#182436}
+      .beta-admin-item{border:1px solid #cfd7e2;border-radius:12px;background:#fff;padding:16px;color:#182436;box-shadow:0 8px 24px rgba(20,34,56,.06)}
       .beta-admin-item-head{display:flex;gap:10px;justify-content:space-between;align-items:flex-start}
       .beta-admin-item-meta{font-size:12px;color:#667284;margin:7px 0 12px}
       .beta-admin-item-description{white-space:pre-wrap}
