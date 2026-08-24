@@ -25140,6 +25140,34 @@ document.addEventListener('click', (event) => {
 });
 
 
+
+// v7.35.1 — standalone page close is based on the actual runtime context, not
+// the user's workspace/profile preference. Framed pages use the outer workspace
+// chrome. A true top-level non-Reader page gets one Reader-style ×.
+const standalonePageClose = document.querySelector('#msg-standalone-page-close');
+standalonePageClose?.addEventListener('click', (event) => {
+  if (window.parent !== window) return;
+  const viewKey = String(app.dataset.viewKey || '');
+  if (viewKey === 'home' || viewKey === 'reader' || viewKey === 'reader-secondary') return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  ReaderContinuity.saveBeforeNavigation();
+  closeMenus();
+
+  if (activeReaderSnapshot?.title && activeReaderSnapshot?.currentText) {
+    renderCurrentReader();
+    app.dataset.viewKey = 'reader';
+    return;
+  }
+
+  // No live Reader to return to: closing is dismissal, not navigation into an
+  // empty Reader. Leave the selected experience background visible.
+  stopReader();
+  app.replaceChildren();
+  app.dataset.viewKey = 'closed';
+}, true);
+
 document.addEventListener('change', (event) => {
   const control = event.target.closest?.(ReaderContinuity.protectedControlSelector);
   if (!control || !app.querySelector('#reader')) return;
@@ -25324,6 +25352,11 @@ if (isSecondaryReaderWorkspace()) {
   app.classList.add('msg-secondary-reader-app');
   app.dataset.viewKey = 'reader-secondary';
   renderEmptyReader();
+} else if (/read-anything-capture=/.test(String(window.location.hash || ''))) {
+  // A Read with Mark capture is about to be opened by read-anything.js. Do not
+  // paint Home first; that brief Home -> Reader swap was the visible import flash.
+  app.dataset.viewKey = 'capture-loading';
+  app.replaceChildren();
 } else {
   // Normal startup stays lightweight. The last book is restored only after an explicit Resume action.
   renderHome();
