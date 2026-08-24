@@ -5,10 +5,9 @@
   "description": "Mark, Set, Go! unified document manager with cloud/local document resolution and protected reader architecture.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js",
-    "db:migrate": "node scripts/migrate.js",
-    "audit:developer": "node scripts/audit-developer-tools.js"
+    "start": "node apply-beta-feedback.js && node scripts/migrate.js && node server.js",
+    "dev": "node apply-beta-feedback.js && node scripts/migrate.js && node --watch server.js",
+    "db:migrate": "node scripts/migrate.js"
   },
   "engines": {
     "node": ">=20"
