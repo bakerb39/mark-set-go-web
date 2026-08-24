@@ -1971,6 +1971,12 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     if (!payload?.text) return;
 
+    // The capture payload is already present and the Reader bridge is ready at
+    // this point. Open it exactly once. The older code retried the *entire*
+    // openDocument() call whenever any synchronous post-render work threw. Since
+    // renderReaderWithText() rebuilds the Reader DOM before several follow-up
+    // hooks run, that could produce a visible 250 ms render/retry/render loop
+    // (up to 40 times) even though the article had already opened successfully.
     try {
       const isSelection = payload.captureType === 'selection';
       openDocument({
@@ -1986,13 +1992,17 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           importedAt: new Date().toISOString()
         }
       });
+    } catch (error) {
+      // Do NOT automatically invoke openDocument() again. A failure here may be
+      // from post-render UI/continuity code after the Reader has already painted;
+      // repeating the full import is what causes bookmarklet-only blinking.
+      console.error('Read with Mark capture open failed; automatic re-render retry suppressed.', error);
+      return;
+    }
 
-      try { CAPTURE_STORAGE.removeItem(CAPTURE_KEY); } catch {}
-      if (location.hash.includes('read-anything-capture')) {
-        history.replaceState({}, '', `${location.pathname}${location.search}`);
-      }
-    } catch {
-      if (attempt < 40) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
+    try { CAPTURE_STORAGE.removeItem(CAPTURE_KEY); } catch {}
+    if (location.hash.includes('read-anything-capture')) {
+      history.replaceState({}, '', `${location.pathname}${location.search}`);
     }
   }
 
