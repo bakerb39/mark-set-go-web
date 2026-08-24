@@ -1,287 +1,192 @@
-/* Mark, Set, Go! lightweight workspace pane runtime v7.30 — Chat-aware, explicit routing */
-(() => {
-  'use strict';
+'use strict';
 
-  const params = new URLSearchParams(location.search);
+/*
+ * Mark, Set, Go! workspace pane runtime v2.5.2
+ *
+ * A workspace-pane document is deliberately hidden by workspace-experiment.css
+ * until this runtime adds .msg-workspace-pane-ready. If this file is missing or
+ * a requested renderer throws, the page can appear briefly and then vanish.
+ * This runtime makes the secondary pane the sole owner of that visibility gate,
+ * renders the requested lightweight page, and always releases the gate.
+ *
+ * No MutationObserver.
+ */
+(() => {
+  const html = document.documentElement;
+  const params = new URLSearchParams(window.location.search);
   const mode = params.get('msgWorkspaceMode') || 'action';
   const value = params.get('msgWorkspaceValue') || 'home';
-  const IS_SECONDARY_READER = mode === 'reader' && value === 'secondary';
-  const PREF_KEY = 'msg-workspace-optin-v1';
-  const app = document.getElementById('app');
 
-  function sendParent(type, extra = {}) {
-    try { parent.postMessage({ type, ...extra }, location.origin); } catch {}
-  }
+  window.MSGWorkspacePane = true;
+  window.__MSG_WORKSPACE_PANE__ = true;
+  html.classList.add('msg-workspace-pane-document');
 
-  function requestParentMusicSearch(query, title = 'Suggested music') {
-    const cleanQuery = String(query || '').trim();
-    if (!cleanQuery) return false;
+  const reveal = () => {
+    html.classList.add('msg-workspace-pane-ready');
+  };
+
+  // Never leave the secondary pane permanently hidden, even if a feature
+  // renderer fails. The normal route below reveals much earlier than this.
+  const failSafeReveal = window.setTimeout(reveal, 1200);
+
+  function renderActionDirectly(action) {
     try {
-      const direct = parent?.MSGMusicController?.search || parent?.MSGWorkspaceExperiment?.musicSearch;
-      if (typeof direct === 'function') {
-        direct(cleanQuery, String(title || 'Suggested music'));
-        return true;
+      switch (action) {
+        case 'home':
+          if (typeof renderHome === 'function') { renderHome(); return true; }
+          break;
+        case 'browse':
+          if (typeof renderBrowseHub === 'function') { renderBrowseHub(); return true; }
+          break;
+        case 'my-library':
+          if (typeof renderMyLibraryHub === 'function') { renderMyLibraryHub(); return true; }
+          break;
+        case 'profile-preferences':
+          if (typeof renderProfilePreferences === 'function') { renderProfilePreferences(); return true; }
+          break;
+        case 'my-links':
+          if (typeof renderMyLinks === 'function') { renderMyLinks(); return true; }
+          break;
+        case 'mark-notebook':
+          if (typeof renderGlobalNotebook === 'function') { renderGlobalNotebook(); return true; }
+          break;
+        case 'music':
+          if (typeof renderMusicLibrary === 'function') { renderMusicLibrary(); return true; }
+          break;
+        case 'about':
+          if (typeof renderAbout === 'function') { renderAbout(); return true; }
+          break;
+        case 'contact':
+          if (typeof renderContact === 'function') { renderContact(); return true; }
+          break;
+        case 'privacy':
+          if (typeof renderPrivacy === 'function') { renderPrivacy(); return true; }
+          break;
+        case 'terms':
+          if (typeof renderTerms === 'function') { renderTerms(); return true; }
+          break;
+        case 'help':
+          if (typeof renderHelp === 'function') { renderHelp(); return true; }
+          break;
+        case 'my-reading':
+        case 'reading-list':
+          if (typeof renderReadingList === 'function') { renderReadingList(); return true; }
+          break;
+        case 'progress-dashboard':
+        case 'progress-awards':
+          if (typeof renderProgressDashboard === 'function') { renderProgressDashboard(); return true; }
+          break;
+        case 'action-center':
+          if (typeof renderActionCenter === 'function') { renderActionCenter(); return true; }
+          break;
+        case 'vocabulary-builder':
+          if (typeof renderVocabularyBuilder === 'function') { renderVocabularyBuilder(); return true; }
+          break;
+        case 'reading-skills':
+          if (typeof renderReadingSkillsHub === 'function') { renderReadingSkillsHub(); return true; }
+          break;
+        case 'comprehension-library':
+          if (typeof renderComprehensionLibrary === 'function') { renderComprehensionLibrary(); return true; }
+          break;
+        case 'mnemonics':
+          if (typeof renderMnemonicsPage === 'function') { renderMnemonicsPage(); return true; }
+          break;
+        case 'language-learning':
+          if (typeof renderLanguageLearningPage === 'function') { renderLanguageLearningPage(); return true; }
+          break;
+        case 'learning-courses':
+          if (typeof renderLearningCoursesPage === 'function') { renderLearningCoursesPage(); return true; }
+          break;
+        case 'library-bookmarks':
+          if (typeof renderLibraryRecords === 'function') { renderLibraryRecords('bookmarks'); return true; }
+          break;
+        case 'library-notes':
+          if (typeof renderLibraryRecords === 'function') { renderLibraryRecords('notes'); return true; }
+          break;
+        case 'drm-free-books':
+          if (typeof renderDrmFreeBookFinder === 'function') { renderDrmFreeBookFinder(); return true; }
+          break;
+        case 'ai-center':
+          if (typeof renderAiCenter === 'function') { renderAiCenter(); return true; }
+          break;
+        case 'knowledge-graph':
+          if (typeof renderKnowledgeGraph === 'function') { renderKnowledgeGraph(); return true; }
+          break;
       }
-    } catch {}
-    sendParent('msg-workspace-music-search', { query: cleanQuery, title: String(title || 'Suggested music') });
-    return true;
-  }
-
-  function parentReaderDocument() {
-    try {
-      const doc = parent?.MarkSetGoCurrentReaderDocument?.get?.();
-      if (!doc?.title) return null;
-      return {
-        title: String(doc.title || '').trim(),
-        text: String(doc.text || ''),
-        source: doc.source && typeof doc.source === 'object' ? { ...doc.source } : {}
-      };
-    } catch {
-      return null;
+    } catch (error) {
+      console.warn('Workspace direct renderer failed; using the normal route.', error);
     }
+    return false;
   }
 
-  function parentReadingMusicQueries(doc) {
-    if (!doc?.title) return null;
-    try {
-      const recommendation = parent?.recommendedPlayerChoice?.(doc.title, doc.text);
-      if (recommendation?.scoreQuery || recommendation?.moodQuery) {
-        return {
-          suggested: String(recommendation.scoreQuery || `${doc.title} instrumental reading music`).trim(),
-          mood: String(recommendation.moodQuery || `${doc.title} atmospheric instrumental reading music`).trim()
-        };
+  function routeRequestedPage() {
+    let rendered = false;
+
+    if (mode === 'action') rendered = renderActionDirectly(value);
+
+    if (!rendered) {
+      try {
+        const trigger = document.createElement('button');
+        trigger.type = 'button';
+        trigger.hidden = true;
+        if (mode === 'read') trigger.dataset.read = value;
+        else if (mode === 'test') trigger.dataset.test = value;
+        else trigger.dataset.action = value;
+        document.body.appendChild(trigger);
+        trigger.click();
+        trigger.remove();
+        rendered = true;
+      } catch (error) {
+        console.error('Workspace route failed.', error);
       }
-    } catch {}
-    return {
-      suggested: `${doc.title} instrumental reading music`,
-      mood: `${doc.title} atmospheric instrumental reading music`
-    };
-  }
-
-  function installMusicReadingSuggestions() {
-    if (mode !== 'action' || value !== 'music') return;
-    const page = document.querySelector('.music-library');
-    if (!page) return;
-    const doc = parentReaderDocument();
-    if (!doc) return;
-
-    const current = page.querySelector('.music-current-book');
-    if (current) {
-      const label = current.querySelector(':scope > span');
-      const title = current.querySelector(':scope > strong');
-      const detail = current.querySelector(':scope > small');
-      if (label) label.textContent = 'Current reading';
-      if (title) title.textContent = `“${doc.title}”`;
-      if (detail) detail.textContent = 'Suggestions below are based on the Reader open beside this pane.';
-    }
-
-    page.querySelector('.msg-workspace-reading-music-suggestions')?.remove();
-    const queries = parentReadingMusicQueries(doc);
-    if (!queries) return;
-
-    const section = document.createElement('section');
-    section.className = 'music-current-book msg-workspace-reading-music-suggestions';
-    section.setAttribute('aria-label', 'Suggested music for current reading');
-
-    const eyebrow = document.createElement('span');
-    eyebrow.textContent = 'Suggested for this reading';
-    const title = document.createElement('strong');
-    title.textContent = 'Music matched to what you are reading';
-    const actions = document.createElement('div');
-    actions.className = 'msg-workspace-reading-music-actions';
-
-    const suggested = document.createElement('button');
-    suggested.type = 'button';
-    suggested.className = 'secondary';
-    suggested.textContent = '♫ Suggested music';
-    suggested.addEventListener('click', () => {
-      requestParentMusicSearch(queries.suggested, `${doc.title} — suggested music`);
-    });
-
-    const mood = document.createElement('button');
-    mood.type = 'button';
-    mood.className = 'secondary';
-    mood.textContent = '♫ Reading mood';
-    mood.addEventListener('click', () => {
-      requestParentMusicSearch(queries.mood, `${doc.title} — reading mood`);
-    });
-
-    actions.append(suggested, mood);
-    section.append(eyebrow, title, actions);
-    const primary = page.querySelector('.music-primary-section');
-    if (primary) primary.before(section);
-    else page.appendChild(section);
-  }
-
-  function installWorkspaceToggle() {
-    const page = document.querySelector('.profile-preferences-page');
-    if (!page || page.querySelector('.msg-workspace-profile-card')) return;
-
-    const card = document.createElement('section');
-    card.className = 'profile-feature-card msg-workspace-profile-card';
-    card.innerHTML = `
-      <div class="section-heading"><div><span class="source-category">Workspace</span><h2>Workspace</h2><p>Choose how other sections open while you are reading.</p></div></div>
-      <label class="msg-workspace-profile-toggle" for="msg-workspace-profile-toggle">
-        <span class="msg-workspace-profile-copy"><strong>Open pages in workspace</strong><small>Keep the Reader open and open other sections beside it.</small></span>
-        <span class="msg-workspace-switch-wrap"><input id="msg-workspace-profile-toggle" type="checkbox" role="switch" aria-label="Open pages in workspace"><span class="msg-workspace-switch" aria-hidden="true"></span></span>
-      </label>`;
-    page.appendChild(card);
-
-    const toggle = card.querySelector('input');
-    try { toggle.checked = localStorage.getItem(PREF_KEY) === '1'; } catch {}
-    toggle.addEventListener('change', () => {
-      try { localStorage.setItem(PREF_KEY, toggle.checked ? '1' : '0'); } catch {}
-      sendParent('msg-workspace-preference', { enabled: Boolean(toggle.checked) });
-    });
-  }
-
-  function fallbackRoute() {
-    const trigger = document.createElement('button');
-    trigger.type = 'button';
-    trigger.hidden = true;
-    if (mode === 'read') trigger.dataset.read = value;
-    else if (mode === 'test') trigger.dataset.test = value;
-    else trigger.dataset.action = value;
-    document.body.appendChild(trigger);
-    trigger.click();
-    trigger.remove();
-  }
-
-  function renderRequested() {
-    // Chat is module-owned and is deliberately loaded in workspace-pane.html
-    // before this runtime. Open it directly instead of relying on a synthetic
-    // navigation click.
-    if (IS_SECONDARY_READER) {
-      document.documentElement.classList.add('msg-secondary-reader-pane');
-      if (typeof renderEmptyReader === 'function') {
-        renderEmptyReader();
-        app.dataset.viewKey = 'reader-secondary';
-      } else {
-        app.innerHTML = '<section class="platform-page"><h2>Reader could not load</h2><p>Refresh the page after deployment completes.</p></section>';
-      }
-    } else if (mode === 'action' && value === 'msg-chat') {
-      if (window.MarkSetGoChat?.open) {
-        window.MarkSetGoChat.open();
-      } else {
-        app.innerHTML = '<section class="platform-page"><h2>Chat could not load</h2><p>Refresh the page after deployment completes.</p></section>';
-      }
-    } else {
-      fallbackRoute();
     }
 
-    if (mode === 'action' && value === 'profile-preferences') installWorkspaceToggle();
-    if (mode === 'action' && value === 'music') installMusicReadingSuggestions();
+    // The secondary pane is allowed to stay visible even if a feature-specific
+    // route reports an error. This prevents the old visible -> hidden flicker.
+    window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+      window.clearTimeout(failSafeReveal);
+      reveal();
 
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      document.documentElement.classList.add('msg-workspace-pane-ready');
-      sendParent('msg-workspace-pane-ready', { mode, value });
+      // If nothing rendered at all, leave a useful visible diagnostic instead
+      // of an apparently blank/disappeared pane.
+      const app = document.querySelector('#app');
+      if (app && !app.children.length && !String(app.textContent || '').trim()) {
+        const panel = document.createElement('section');
+        panel.className = 'panel';
+        panel.innerHTML = '<h2>Workspace page could not be opened</h2><p>The secondary pane stayed open, but this page renderer was unavailable.</p>';
+        app.appendChild(panel);
+      }
     }));
   }
 
-  function openParentLibraryDocument(documentId) {
-    const id = String(documentId || '').trim();
-    if (!id) return false;
-
-    let parentDocument = null;
-    try {
-      if (parent.location.origin !== location.origin) return false;
-      parentDocument = parent.document;
-    } catch {
-      return false;
-    }
-    if (!parentDocument?.body) return false;
-
-    const route = parentDocument.createElement('button');
-    route.type = 'button';
-    route.hidden = true;
-    route.dataset.action = 'my-library';
-    parentDocument.body.appendChild(route);
-    route.click();
-    route.remove();
-
-    let attempt = 0;
-    const clickBoundOuterDocument = () => {
-      const candidates = [...parentDocument.querySelectorAll('#app [data-library-document]')];
-      const target = candidates.find(
-        (button) => String(button.dataset.libraryDocument || '') === id
-      );
-
-      if (target) {
-        target.click();
-        return;
-      }
-
-      attempt += 1;
-      if (attempt < 30) parent.setTimeout(clickBoundOuterDocument, 25);
-    };
-
-    clickBoundOuterDocument();
-    return true;
-  }
-
+  // Return-to-Reader inside a workspace means close/focus the secondary pane,
+  // never build a competing Reader inside this iframe.
   document.addEventListener('click', (event) => {
-    const targetElement = event.target instanceof Element
-      ? event.target
-      : event.target?.parentElement;
-
-    const libraryDocument = targetElement?.closest?.('[data-library-document]');
-    if (!IS_SECONDARY_READER && libraryDocument?.dataset.libraryDocument) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      openParentLibraryDocument(libraryDocument.dataset.libraryDocument);
-      return;
-    }
-
-    const clickedLink = targetElement?.closest?.('a[href]');
-    const suggestedMusic = targetElement?.closest?.('.book-music-link')
-      || (clickedLink?.closest?.('.book-music-recommendations') ? clickedLink : null);
-
-    if (suggestedMusic?.href) {
-      try {
-        const target = new URL(suggestedMusic.href, location.href);
-        const query = target.searchParams.get('search_query') || target.searchParams.get('q') || '';
-        const label = String(suggestedMusic.textContent || 'Suggested music').replace(/^\s*♫\s*/, '').trim();
-        const isSuggestion = Boolean(query) && (
-          suggestedMusic.classList.contains('book-music-link')
-          || Boolean(suggestedMusic.closest('.book-music-recommendations'))
-          || /reading mood|adaptation score|film or tv score|music score/i.test(label)
-        );
-        if (isSuggestion) {
-          event.preventDefault();
-          event.stopImmediatePropagation();
-          requestParentMusicSearch(query, label || 'Suggested music');
-          return;
-        }
-      } catch {}
-    }
-
-    const readerAction = targetElement?.closest?.('[data-action="reader"]');
-    if (!readerAction || IS_SECONDARY_READER) return;
+    const target = event.target instanceof Element ? event.target : null;
+    const returnReader = target?.closest?.('[data-action="reader"]');
+    if (!returnReader) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    sendParent('msg-workspace-return-reader');
+    try {
+      window.parent?.postMessage?.({ type:'msg-workspace-return-reader' }, window.location.origin);
+    } catch {}
   }, true);
 
-  window.addEventListener('msg:companion-changed', (event) => {
-    const next = String(event.detail?.id || event.detail?.companion || '').toLowerCase();
-    if (!next) return;
-    try {
-      if (parent?.MSGCompanion?.id !== next) parent?.MSGCompanion?.set?.(next);
-    } catch {}
-  });
-
+  // Keep Topic Feed comma/period story navigation working while focus is inside
+  // the workspace iframe without intercepting ordinary text entry.
   document.addEventListener('keydown', (event) => {
     if (event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
     if (event.key !== ',' && event.key !== '.') return;
     const target = event.target instanceof Element ? event.target : null;
-    if (target?.closest?.('input,textarea,select,[contenteditable="true"],[role="textbox"]')) return;
-    if (IS_SECONDARY_READER) return;
-    sendParent('msg-workspace-topic-feed-key', { key: event.key });
+    if (target?.closest?.('input, textarea, select, [contenteditable="true"], [role="textbox"]')) return;
+    try {
+      window.parent?.postMessage?.({ type:'msg-workspace-topic-feed-key', key:event.key }, window.location.origin);
+    } catch {}
   }, true);
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', renderRequested, { once: true });
+    document.addEventListener('DOMContentLoaded', () => window.setTimeout(routeRequestedPage, 0), { once:true });
   } else {
-    renderRequested();
+    window.setTimeout(routeRequestedPage, 0);
   }
 })();
