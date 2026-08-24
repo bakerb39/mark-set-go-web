@@ -1147,21 +1147,6 @@
       new URLSearchParams(window.location.search).has('msgWorkspaceMode')
     );
 
-    // Do not invoke the parent's Topic Feed renderer directly from a workspace
-    // pane. That can rebuild the outer app shell that owns the pane itself. The
-    // established Read Anything -> renderReaderWithText workspace handoff is the
-    // canonical path and keeps the source pane alive until the reader closes it.
-    if (isWorkspacePane) {
-      announceTopicStateChange();
-      try {
-        window.parent.MarkSetGoTopicFeeds?.receiveWorkspaceArticleContext?.(topic, article, payload);
-      } catch (error) {
-        console.warn('Workspace could not synchronize Topic Feed Reader context.', error);
-      }
-    }
-
-    if (!window.MarkSetGoReadAnything?.openDocument) throw new Error('The Reader importer is not ready.');
-
     const sourceDisplayName = String(
       payload?.siteName ||
       payload?.site ||
@@ -1171,17 +1156,8 @@
       'Topic Feed'
     ).trim();
 
-    window.MSGTopicFeedReaderContext = {
-      topicId: topic?.id || '',
-      topicName: topic?.name || '',
-      sourceId: article.sourceClientId || '',
-      sourceName: sourceDisplayName,
-      articleId: article.id || '',
-      updatedAt: new Date().toISOString()
-    };
-    activeTopicFeedHeaderContext = { topic, article, payload };
     const readerText = stripTrailingTopicFeedProvenance(payload?.text);
-    window.MarkSetGoReadAnything.openDocument({
+    const documentRecord = {
       title: payload.title || article.title,
       author: payload?.author || article.author || sourceDisplayName,
       text: readerText || String(article.feedText || article.summary || '').trim() || 'Open the original article to continue reading.',
@@ -1198,7 +1174,52 @@
         documentToc: Array.isArray(payload.documentToc) ? payload.documentToc : [],
         importedAt: new Date().toISOString()
       }
-    });
+    };
+
+    // A Topic Feed page opened in the secondary workspace is a persistent source
+    // pane. Do not route this read through MSGWorkspaceReaderHandoff: that generic
+    // handoff is allowed to transition/replace the secondary pane. Instead invoke
+    // the OUTER app's Read Anything importer directly. The iframe that initiated
+    // the read is never navigated, rendered over, hidden, or closed here.
+    if (isWorkspacePane && !options.fromOuterWorkspacePane) {
+      announceTopicStateChange();
+      try {
+        const parentFeeds = window.parent.MarkSetGoTopicFeeds;
+        parentFeeds?.receiveWorkspaceArticleContext?.(topic, article, payload);
+
+        const parentImporter = window.parent.MarkSetGoReadAnything;
+        if (typeof parentImporter?.openDocument === 'function') {
+          parentImporter.openDocument(documentRecord);
+
+          // The parent Reader and article-action row finish in separate explicit
+          // passes. Re-apply Topic Feed chrome through bounded retries only; no
+          // DOM observer is used and the source workspace pane is left untouched.
+          [0, 80, 220, 520].forEach((delay) => {
+            window.parent.setTimeout(() => {
+              try { parentFeeds?.refreshReaderArticleChrome?.(); } catch {}
+            }, delay);
+          });
+          return true;
+        }
+      } catch (error) {
+        console.warn('Workspace could not open the Topic Feed article in the outer Reader.', error);
+      }
+      // If the outer importer is not ready, fall through to the existing local
+      // path so the action still works rather than silently doing nothing.
+    }
+
+    if (!window.MarkSetGoReadAnything?.openDocument) throw new Error('The Reader importer is not ready.');
+
+    window.MSGTopicFeedReaderContext = {
+      topicId: topic?.id || '',
+      topicName: topic?.name || '',
+      sourceId: article.sourceClientId || '',
+      sourceName: sourceDisplayName,
+      articleId: article.id || '',
+      updatedAt: new Date().toISOString()
+    };
+    activeTopicFeedHeaderContext = { topic, article, payload };
+    window.MarkSetGoReadAnything.openDocument(documentRecord);
     topicFeedSourceCredit(topic, article, payload);
     scheduleReaderNavigation();
     return true;
@@ -1467,36 +1488,57 @@
   }
 
   async function loadRecommendations(topicName) {
-    const container = document.getElementById('topic-feed-recommendations');
-    if (!container) return;
+    const websiteContainer = document.getElementById('topic-feed-recommendations');
+    const rssContainer = document.getElementById('topic-feed-rss-recommendations');
+    if (!websiteContainer && !rssContainer) return;
+
+    const setBoth = (websiteHtml, rssHtml = websiteHtml) => {
+      if (websiteContainer) websiteContainer.innerHTML = websiteHtml;
+      if (rssContainer) rssContainer.innerHTML = rssHtml;
+    };
     const name = String(topicName || '').trim();
     if (name.length < 2) {
-      container.innerHTML = '<p class="topic-recommendation-note">Enter a topic name and recommended feeds will appear here.</p>';
+      setBoth(
+        '<p class="topic-recommendation-note">Enter a topic name and recommended sources will appear here.</p>',
+        '<p class="topic-recommendation-note">Enter a topic name and verified RSS feeds will appear here.</p>'
+      );
       return;
     }
-    container.innerHTML = '<p class="topic-recommendation-note">Finding recommended feeds…</p>';
-    try {
-      const priorities = document.getElementById('topic-preferences')?.value?.trim() || '';
-      const response = await fetch(`/api/topic-feeds/recommend?topic=${encodeURIComponent(name)}&preferences=${encodeURIComponent(priorities)}`);
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Recommendations unavailable.');
-      // Always show the current recommendations. Existing source rows may come
-      // from an older AI-managed save; hiding those URLs would make it impossible
-      // for the reader to explicitly choose a clean subset from that old topic.
-      const items = Array.isArray(payload.sources) ? payload.sources : [];
-      container.innerHTML = items.length ? items.map((source) => {
-        const sourceUrl = cleanUrl(source.url);
-        const selected = Boolean(sourceUrl && managerSelectedRecommendationSources.has(sourceUrl));
-        return `
+    setBoth(
+      '<p class="topic-recommendation-note">Finding topic-specific sources…</p>',
+      '<p class="topic-recommendation-note">Discovering and verifying RSS feeds…</p>'
+    );
+
+    const renderItems = (items, emptyMessage) => items.length ? items.map((source) => {
+      const sourceUrl = cleanUrl(source.url);
+      const selected = Boolean(sourceUrl && managerSelectedRecommendationSources.has(sourceUrl));
+      return `
         <article class="topic-feed-recommendation ${selected ? 'selected' : ''}">
           <div><strong>${escapeHtml(source.name)}</strong><p>${escapeHtml(source.description || '')}</p>${source.reason ? `<small>${escapeHtml(source.reason)}</small>` : ''}</div>
           <button type="button" data-add-recommended-feed="${escapeHtml(source.key)}"
                   data-feed-name="${escapeHtml(source.name)}" data-feed-type="${escapeHtml(source.type || 'website')}"
                   data-feed-url="${escapeHtml(source.url)}" data-selected="${selected ? '1' : '0'}" aria-pressed="${selected ? 'true' : 'false'}">${selected ? 'Selected' : 'Add'}</button>
         </article>`;
-      }).join('') : '<p class="topic-recommendation-note">No source suggestions are available yet for this topic.</p>';
+    }).join('') : `<p class="topic-recommendation-note">${escapeHtml(emptyMessage)}</p>`;
+
+    try {
+      const priorities = document.getElementById('topic-preferences')?.value?.trim() || '';
+      const response = await fetch(`/api/topic-feeds/recommend?topic=${encodeURIComponent(name)}&preferences=${encodeURIComponent(priorities)}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Recommendations unavailable.');
+
+      // Keep website recommendations and direct RSS/Atom feeds visibly separate.
+      // Both use the same explicit-selection Map, so the v2.4.8 invariant still
+      // applies: selecting N recommendations saves exactly those N URLs.
+      const websites = Array.isArray(payload.sources) ? payload.sources : [];
+      const rssFeeds = Array.isArray(payload.rssFeeds) ? payload.rssFeeds : [];
+      if (websiteContainer) websiteContainer.innerHTML = renderItems(websites, 'No website suggestions are available yet for this topic.');
+      if (rssContainer) rssContainer.innerHTML = renderItems(rssFeeds, 'No verified RSS / Atom feeds were found for these publishers yet.');
     } catch (error) {
-      container.innerHTML = `<p class="topic-recommendation-note">${escapeHtml(error.message)}</p>`;
+      setBoth(
+        `<p class="topic-recommendation-note">${escapeHtml(error.message)}</p>`,
+        `<p class="topic-recommendation-note">${escapeHtml(error.message)}</p>`
+      );
     }
   }
 
@@ -1524,8 +1566,13 @@
           </label>
           <p id="topic-source-mode-note" class="topic-source-help"></p>
           <section class="topic-feed-recommendation-box">
-            <div class="topic-feed-sidebar-head"><strong>AI-suggested sources for this topic</strong><span>Topic-specific</span></div>
+            <div class="topic-feed-sidebar-head"><strong>Recommended websites</strong><span>AI · topic-specific</span></div>
             <div id="topic-feed-recommendations"></div>
+          </section>
+          <section class="topic-feed-recommendation-box topic-feed-rss-recommendation-box">
+            <div class="topic-feed-sidebar-head"><strong>Recommended RSS feeds</strong><span>Verified direct feeds</span></div>
+            <p class="topic-source-help">These RSS / Atom URLs are discovered and validated from the recommended publishers, not guessed by AI.</p>
+            <div id="topic-feed-rss-recommendations"></div>
           </section>
           <div class="topic-feed-form-row">
             <label>Edition<select id="topic-cadence"><option value="daily" ${topic?.cadence !== 'weekly' ? 'selected' : ''}>Every day</option><option value="weekly" ${topic?.cadence === 'weekly' ? 'selected' : ''}>Every week</option></select></label>
@@ -1605,52 +1652,57 @@
       clearTimeout(recommendationTimer);
       recommendationTimer = window.setTimeout(() => loadRecommendations(event.target.value), 650);
     });
-    document.getElementById('topic-feed-recommendations')?.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-add-recommended-feed]');
-      if (!button) return;
+    const bindRecommendationPicker = (containerId) => {
+      document.getElementById(containerId)?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-add-recommended-feed]');
+        if (!button) return;
 
-      // This click is selection only. It must not submit, navigate, refresh the
-      // Topic page, rebuild the recommendation list, or open/close a workspace.
-      event.preventDefault();
-      event.stopPropagation();
-      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+        // Recommendation clicks are selection only. They never submit, refresh,
+        // navigate, or close a Topic Setup/workspace pane.
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
 
-      const url = cleanUrl(button.dataset.feedUrl || '');
-      if (!url) return;
-      const selected = managerSelectedRecommendationSources.has(url);
+        const url = cleanUrl(button.dataset.feedUrl || '');
+        if (!url) return;
+        const selected = managerSelectedRecommendationSources.has(url);
 
-      if (selected) {
-        managerSelectedRecommendationSources.delete(url);
-        button.dataset.selected = '0';
-        button.classList.remove('selected');
-        button.closest('.topic-feed-recommendation')?.classList.remove('selected');
-        button.textContent = 'Add';
-        button.setAttribute('aria-pressed', 'false');
-      } else {
-        managerSelectedRecommendationSources.set(url, {
-          id: uid(),
-          name: button.dataset.feedName || '',
-          type: button.dataset.feedType === 'rss' ? 'rss' : 'website',
-          url,
-          origin: 'recommended',
-          recommendationKey: button.dataset.addRecommendedFeed || ''
-        });
-        button.dataset.selected = '1';
-        button.classList.add('selected');
-        button.closest('.topic-feed-recommendation')?.classList.add('selected');
-        button.textContent = 'Selected';
-        button.setAttribute('aria-pressed', 'true');
+        if (selected) {
+          managerSelectedRecommendationSources.delete(url);
+          button.dataset.selected = '0';
+          button.classList.remove('selected');
+          button.closest('.topic-feed-recommendation')?.classList.remove('selected');
+          button.textContent = 'Add';
+          button.setAttribute('aria-pressed', 'false');
+        } else {
+          managerSelectedRecommendationSources.set(url, {
+            id: uid(),
+            name: button.dataset.feedName || '',
+            type: button.dataset.feedType === 'rss' ? 'rss' : 'website',
+            url,
+            origin: 'recommended',
+            recommendationKey: button.dataset.addRecommendedFeed || ''
+          });
+          button.dataset.selected = '1';
+          button.classList.add('selected');
+          button.closest('.topic-feed-recommendation')?.classList.add('selected');
+          button.textContent = 'Selected';
+          button.setAttribute('aria-pressed', 'true');
 
-        // Reflect the contract in the selector without rebuilding either panel.
-        // The explicit-selection Map, not this dropdown, remains authoritative.
-        const modeSelect = document.getElementById('topic-source-mode');
-        if (modeSelect?.value === 'ai') modeSelect.value = 'manual';
-        const editor = document.getElementById('topic-manual-source-editor');
-        if (editor) editor.hidden = false;
-        const note = document.getElementById('topic-source-mode-note');
-        if (note) note.textContent = 'Only the sources you select or add below will be used.';
-      }
-    });
+          // Reflect the contract in the selector without rebuilding either
+          // recommendation section. The explicit Map remains authoritative.
+          const modeSelect = document.getElementById('topic-source-mode');
+          if (modeSelect?.value === 'ai') modeSelect.value = 'manual';
+          const editor = document.getElementById('topic-manual-source-editor');
+          if (editor) editor.hidden = false;
+          const note = document.getElementById('topic-source-mode-note');
+          if (note) note.textContent = 'Only the sources you select or add below will be used.';
+        }
+      });
+    };
+    bindRecommendationPicker('topic-feed-recommendations');
+    bindRecommendationPicker('topic-feed-rss-recommendations');
+
     document.getElementById('topic-source-rows')?.addEventListener('click', (event) => {
       const remove = event.target.closest('.topic-source-remove');
       if (!remove) return;
@@ -2603,6 +2655,13 @@
     }
   });
 
+  function refreshReaderArticleChrome() {
+    if (!isTopicFeedReaderActive() || !activeTopicFeedHeaderContext) return false;
+    refreshActiveTopicFeedHeader();
+    scheduleReaderNavigation();
+    return true;
+  }
+
   window.MarkSetGoTopicFeeds = Object.freeze({
     render,
     refresh: refreshTopic,
@@ -2614,6 +2673,7 @@
     clearReaderArticleContext,
     openPreparedArticle,
     receiveWorkspaceArticleContext,
+    refreshReaderArticleChrome,
     syncSharedState: adoptSharedTopicState
   });
 })();

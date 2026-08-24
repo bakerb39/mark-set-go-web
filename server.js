@@ -4275,6 +4275,70 @@ function recommendTopicFeedSources(topic, limit = 8) {
 const TOPIC_FEED_AI_RECOMMENDATION_CACHE = new Map();
 const TOPIC_FEED_AI_RECOMMENDATION_TTL_MS = 30 * 60 * 1000;
 
+
+// RSS recommendations are derived from the same topic-specific publishers, but
+// the feed URL itself is discovered and validated by the server. The AI never
+// has to invent an /rss path.
+const TOPIC_FEED_RSS_RECOMMENDATION_CACHE = new Map();
+const TOPIC_FEED_RSS_RECOMMENDATION_TTL_MS = 6 * 60 * 60 * 1000;
+
+async function recommendVerifiedRssFeedsForSources(sources, limit = 6) {
+  const candidates = (Array.isArray(sources) ? sources : [])
+    .filter((source) => source?.url && source?.type !== 'rss')
+    .slice(0, Math.max(1, Math.min(8, Number(limit) || 6)));
+
+  const discoveries = await Promise.all(candidates.map(async (source) => {
+    const homepage = String(source.url || '').trim();
+    if (!homepage) return null;
+
+    const cacheKey = homepage.toLowerCase().replace(/\/+$/, '');
+    const cached = TOPIC_FEED_RSS_RECOMMENDATION_CACHE.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+    let result = null;
+    try {
+      // Keep the recommendation endpoint responsive even when a publisher has
+      // unusually slow or broken conventional feed paths. Discovery may finish
+      // later, but this request will not wait indefinitely for it.
+      const discovered = await Promise.race([
+        discoverPublisherFeed(homepage),
+        new Promise((resolve) => setTimeout(() => resolve(null), 12000))
+      ]);
+      if (discovered?.feedUrl) {
+        const feedUrl = String(discovered.feedUrl || '').trim();
+        const name = cleanText(source.name, 200) || (() => {
+          try { return new URL(homepage).hostname.replace(/^www\./i, ''); } catch { return 'Publisher'; }
+        })();
+        result = {
+          key: `rss-${crypto.createHash('sha1').update(feedUrl).digest('hex').slice(0,12)}`,
+          name: `${name} RSS`,
+          type: 'rss',
+          url: feedUrl,
+          description: `Direct RSS / Atom feed from ${name}.`,
+          reason: cleanText(source.reason, 500) || `A direct feed for ${name}, discovered and verified from the publisher.`,
+          origin: 'recommended-rss',
+          publisherUrl: homepage
+        };
+      }
+    } catch (_) {}
+
+    TOPIC_FEED_RSS_RECOMMENDATION_CACHE.set(cacheKey, {
+      expiresAt: Date.now() + TOPIC_FEED_RSS_RECOMMENDATION_TTL_MS,
+      value: result
+    });
+    return result;
+  }));
+
+  const seen = new Set();
+  return discoveries.filter((item) => {
+    if (!item?.url) return false;
+    const key = String(item.url).toLowerCase().replace(/\/+$/, '');
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, Math.max(1, Math.min(8, Number(limit) || 6)));
+}
+
 async function recommendTopicFeedSourcesWithAI(topic, preferences = '', limit = 8) {
   const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
   if (!apiKey) return [];
@@ -4318,7 +4382,7 @@ async function recommendTopicFeedSourcesWithAI(topic, preferences = '', limit = 
         reasoning: { effort: 'low' }, store: false,
         input: [
           { role: 'developer', content: [{ type: 'input_text', text:
-            `Recommend ongoing public web sources for a personalized reading/news feed. Be highly specific to the user's topic rather than returning generic news brands. Prefer specialist publications, official agencies, scholarly/professional organizations, trade publications, or established niche sites that regularly publish on the subject. Do not pad the list with Reuters, AP, BBC, NPR, CNN, Fox, or other broad outlets unless the requested topic itself is broad general news or those outlets are uniquely relevant. Use the organization's/publication's stable homepage URL, not an article URL. Do not invent brands or domains. Diversify source types and perspectives where appropriate. Return at most ${count} sources.` }] },
+            `Recommend ongoing public web sources for a personalized reading/news feed. Be highly specific to the user's topic rather than returning generic news brands. Prefer specialist publications, official agencies, scholarly/professional organizations, trade publications, or established niche sites that regularly publish on the subject. Do not pad the list with Reuters, AP, BBC, NPR, CNN, Fox, or other broad outlets unless the requested topic itself is broad general news or those outlets are uniquely relevant. Use the organization's/publication's stable homepage URL, not an article URL. Do not invent brands or domains. Diversify source types and perspectives where appropriate. When equally relevant, prefer publishers that expose a public RSS or Atom feed; the server will verify the feed separately. Return at most ${count} sources.` }] },
           { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ topic: cleanTopic, priorities: cleanPreferences || undefined }) }] }
         ],
         text: { format: { type: 'json_schema', name: 'topic_feed_sources', strict: true, schema } }
@@ -4741,7 +4805,7 @@ async function refreshDueTopicFeeds({ now = new Date(), userLimit = 200 } = {}) 
 app.get('/api/topic-feeds/recommend', async (req,res) => {
   const topic = cleanText(req.query?.topic,200);
   const preferences = cleanText(req.query?.preferences,2000);
-  if (!topic) return res.json({ topic:'', mode:'catalog', sources:[] });
+  if (!topic) return res.json({ topic:'', mode:'catalog', sources:[], rssFeeds:[] });
   try {
     const [aiSources, catalogSources] = await Promise.all([
       recommendTopicFeedSourcesWithAI(topic, preferences, 8).catch(() => []),
@@ -4756,9 +4820,15 @@ app.get('/api/topic-feeds/recommend', async (req,res) => {
       seen.add(host); merged.push(source);
       if (merged.length >= 8) break;
     }
-    return res.json({ topic, mode:aiSources.length ? 'ai' : 'catalog', sources:merged });
+
+    // Build a separate RSS section from real feeds discovered on the same
+    // topic-specific publishers. These are validated feed URLs, not AI guesses.
+    const rssFeeds = await recommendVerifiedRssFeedsForSources(merged, 6).catch(() => []);
+    return res.json({ topic, mode:aiSources.length ? 'ai' : 'catalog', sources:merged, rssFeeds });
   } catch (error) {
-    return res.json({ topic, mode:'catalog', sources:recommendTopicFeedSources(topic,8), warning:error?.message || '' });
+    const sources = recommendTopicFeedSources(topic,8);
+    const rssFeeds = await recommendVerifiedRssFeedsForSources(sources, 6).catch(() => []);
+    return res.json({ topic, mode:'catalog', sources, rssFeeds, warning:error?.message || '' });
   }
 });
 
