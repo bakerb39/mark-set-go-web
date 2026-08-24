@@ -668,18 +668,6 @@
     if (!readerFrame || !header || !spacer || !meta) return;
 
     const styles = getComputedStyle(reader);
-
-    // The fixed story header must visually disappear into the document paper
-    // while remaining opaque enough to mask prose scrolling underneath it.
-    // Copy the ACTUAL rendered Reader background instead of guessing from the
-    // experience theme, because Reader light/dark and theme paper can differ.
-    const frameStyles = getComputedStyle(readerFrame);
-    const transparent = (value) => !value || value === 'transparent' || /rgba\([^)]*,\s*0(?:\.0+)?\s*\)$/i.test(value);
-    const readerPaper = !transparent(styles.backgroundColor)
-      ? styles.backgroundColor
-      : (!transparent(frameStyles.backgroundColor) ? frameStyles.backgroundColor : '#ffffff');
-    header.style.setProperty('--topic-feed-story-paper', readerPaper, 'important');
-
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
     const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
     const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
@@ -747,18 +735,6 @@
 
     positionTopicFeedStoryHeader();
   }
-
-  // Reader light/dark and experience themes can change the paper without
-  // rebuilding the article. Resample the actual Reader color after those UI
-  // changes so the fixed mask never becomes a differently colored band.
-  document.addEventListener('change', (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target?.matches?.('#theme-select,#fs-theme-select')) return;
-    window.requestAnimationFrame(positionTopicFeedStoryHeader);
-  });
-  document.addEventListener('marksetgo:experience-profile-changed', () => {
-    window.requestAnimationFrame(positionTopicFeedStoryHeader);
-  });
 
 
   let activeTopicFeedHeaderContext = null;
@@ -1893,12 +1869,48 @@
     });
   });
 
+  function clearInactiveTopicFeedReaderArtifacts() {
+    // A Topic Feed header is intentionally moved outside #reader while a feed
+    // article is active. When another source replaces that article (for example
+    // Read with Mark), never let the old delayed header work attach itself to the
+    // new Reader.
+    activeTopicFeedHeaderContext = null;
+    window.MSGTopicFeedReaderContext = null;
+    window.clearTimeout(topicFeedStoryHeaderReflowTimer);
+    removeTopicBookDivider();
+
+    const reader = document.querySelector('#reader');
+    const frame = document.querySelector('#reader-frame');
+    const header = frame?.querySelector(':scope > [data-topic-feed-story-header-external]');
+    const actionRow = header?.querySelector(':scope > #read-anything-article-summary-action');
+
+    // If Read Anything has already rebuilt its article actions but Topic Feed
+    // still owns that same node, return it to the current Reader before removing
+    // the obsolete external feed header. This preserves its existing listeners.
+    if (reader && actionRow) reader.prepend(actionRow);
+
+    header?.remove();
+    reader?.querySelectorAll(':scope > [data-topic-feed-story-header-spacer]').forEach((node) => node.remove());
+    reader?.classList.remove('topic-feed-story-header-managed');
+    if (reader?.dataset) delete reader.dataset.topicFeedGeometrySynced;
+  }
+
   document.addEventListener('marksetgo:document-available', () => {
+    if (!isTopicFeedReaderActive()) {
+      clearInactiveTopicFeedReaderArtifacts();
+      return;
+    }
+
     window.setTimeout(scheduleReaderNavigation, 40);
     // openDocument() can rebuild the Reader after the first source/header pass.
-    // Re-attach the Topic Feed provenance/actions to the final Reader DOM.
+    // Re-attach the Topic Feed provenance/actions only while the current Reader
+    // is still a Topic Feed article. A later Read with Mark import must not
+    // inherit these delayed callbacks.
     [40, 140, 360, 820, 1600].forEach((delay) => {
-      window.setTimeout(refreshActiveTopicFeedHeader, delay);
+      window.setTimeout(() => {
+        if (!isTopicFeedReaderActive()) return;
+        refreshActiveTopicFeedHeader();
+      }, delay);
     });
   });
 
