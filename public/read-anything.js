@@ -1458,8 +1458,14 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     }
 
     const actionRow = document.querySelector('#read-anything-article-summary-action');
-    if (actionRow && actionRow.parentElement !== header) header.insertBefore(actionRow, credit);
-    else if (actionRow && header.firstElementChild !== actionRow) header.insertBefore(actionRow, credit);
+    // Match Topic Feed article-header order exactly: source/provenance first,
+    // then the Summarize / Analyze action row beneath it.
+    if (header.firstElementChild !== credit) header.prepend(credit);
+    if (actionRow) {
+      if (actionRow.parentElement !== header || actionRow.previousElementSibling !== credit) {
+        credit.insertAdjacentElement('afterend', actionRow);
+      }
+    }
 
     const styles = getComputedStyle(reader);
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
