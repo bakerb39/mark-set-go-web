@@ -219,7 +219,11 @@
         gap:.26rem !important;
         box-sizing:border-box !important;
         min-width:0 !important;
-        background:var(--reader-bg, #fff) !important;
+        /* Match the actual Reader page surface. --reader-bg is the outer app
+           background in some themes and can be nearly black. */
+        background:var(--msg-vd-reader-page-color, #fff) !important;
+        background-image:none !important;
+        box-shadow:none !important;
         color:inherit !important;
       }
       #app #reader-frame > .read-anything-bookmarklet-header-external > #read-anything-article-summary-action {
