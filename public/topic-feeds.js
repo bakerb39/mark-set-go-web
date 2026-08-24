@@ -1705,9 +1705,13 @@
 
       const readerWidth = Math.round(reader.getBoundingClientRect().width || 0);
       const paneWidth = Math.round(pane.getBoundingClientRect().width || 0);
-      const signature = `${readerWidth}:${paneWidth}`;
+      const contextKey = `${String(window.MSGTopicFeedReaderContext?.topicId || '')}:${String(window.MSGTopicFeedReaderContext?.articleId || '')}`;
+      const signature = `${contextKey}:${readerWidth}:${paneWidth}`;
 
-      // One sync per final geometry for this Reader DOM.
+      // One sync per article + final geometry. The Reader DOM can be reused when
+      // opening a different story, so width alone is not a safe cache key: a new
+      // article opened from the topic manager could otherwise inherit the prior
+      // article's "already synced" marker and leave its header at startup geometry.
       if (reader.dataset.topicFeedGeometrySynced === signature) return;
       reader.dataset.topicFeedGeometrySynced = signature;
 
@@ -1726,7 +1730,14 @@
           layout.style.removeProperty('--navigation-width');
         }
         window.dispatchEvent(new Event('resize'));
-        window.requestAnimationFrame(ensureTopicBookDivider);
+        window.requestAnimationFrame(() => {
+          // Re-anchor the permanent source/action header after the navigation
+          // pane and Book Pages have reached their final geometry. Do this
+          // explicitly rather than relying on a resize callback firing.
+          keepTopicFeedArticleActionsInHeader();
+          positionTopicFeedStoryHeader();
+          ensureTopicBookDivider();
+        });
       });
     };
 
@@ -1871,6 +1882,7 @@
     const bookmark = view.querySelector('#add-bookmark');
     if (bookmark) bookmark.remove();
     view.querySelector('.topic-reader-nav')?.remove();
+    delete view.dataset.topicReaderNavigationSignature;
     if (bookmark) view.appendChild(bookmark);
     scheduleReaderNavigation();
   }
@@ -1897,6 +1909,29 @@
     } else {
       scheduleCloudSave();
     }
+  }
+
+  function readerTopicNavigationSignature() {
+    // The Reader-side My Topics pane is long-lived. A newly created topic can
+    // therefore change state.topics while the old navigation DOM is still
+    // present. Build a lightweight structural signature so we refresh the pane
+    // only when its actual topic/article contents changed, not on every UI pass.
+    const captured = capturedArticles().map((article) => [
+      String(article?.key || ''),
+      String(article?.title || ''),
+      String(article?.importedAt || '')
+    ]);
+    const topics = state.topics.map((topic) => [
+      String(topic?.id || ''),
+      String(topic?.name || ''),
+      (topic?.sources || []).map((source) => [String(source?.id || ''), String(source?.name || '')]),
+      (topic?.articles || []).map((article) => [
+        String(article?.id || ''),
+        String(article?.title || ''),
+        String(article?.sourceClientId || '')
+      ])
+    ]);
+    return JSON.stringify([captured, topics]);
   }
 
   function readerTopicListMarkup() {
@@ -2001,7 +2036,11 @@
 
     bindTopicReaderPanePreference();
 
-    if (!view.querySelector('.topic-reader-nav')) {
+    const navigationSignature = readerTopicNavigationSignature();
+    const navigationIsStale = !view.querySelector('.topic-reader-nav')
+      || view.dataset.topicReaderNavigationSignature !== navigationSignature;
+
+    if (navigationIsStale) {
       // IMPORTANT: renderNavigationPane() has already bound the Reader's
       // #add-bookmark button to its native addBookmark() function. Keep that
       // exact DOM node before replacing Contents so bookmarks continue to use
@@ -2009,6 +2048,7 @@
       const nativeBookmarkButton = view.querySelector('#add-bookmark');
 
       view.innerHTML = readerTopicListMarkup();
+      view.dataset.topicReaderNavigationSignature = navigationSignature;
 
       const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
       if (nativeBookmarkButton && bookmarkSlot) {

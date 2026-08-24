@@ -2155,13 +2155,14 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     const sourceType = String(activeImportedDocument.source?.type || '').toLowerCase();
 
-    // Bookmarklet/URL articles must follow the same stable startup order as
-    // Topic Feed stories: let the Reader restore its saved Book Pages preference
-    // instead of forcing a change while the imported document is still settling.
-    // Forcing the checkbox here rebuilds #reader after the article header has
-    // already been positioned, producing the visible "looks right -> blink ->
-    // old layout" cycle.
-    if (sourceType === 'bookmarklet' || sourceType === 'website') return false;
+    // Whole web/news articles must let the Reader restore its saved Book Pages
+    // preference instead of forcing a checkbox change while the document/header
+    // is still settling. For Topic Feed articles opened from the manager, forcing
+    // Book Pages here rebuilds #reader in the middle of topicFeedSourceCredit(),
+    // which is why the header can briefly appear and then end up clipped. Existing
+    // stories opened from My Topics often escaped the race because Book Pages was
+    // already active. Keep all three web/news article sources on the stable path.
+    if (sourceType === 'topic-feed' || sourceType === 'bookmarklet' || sourceType === 'website') return false;
 
     // Preserve the established one-shot behavior for other article sources.
     const articleKey = String(
