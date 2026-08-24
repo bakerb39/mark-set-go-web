@@ -7,9 +7,16 @@ function renderAbout() {
     <section class="platform-page business-page">
       <header class="platform-hero business-hero">
         <div>
-          <span class="source-category">About Mark, Set, Go!</span>
+          <div class="b2curious-about-brand" style="margin:0 0 18px;">
+            <img
+              src="/assets/b2curious-logo.png?v=1.0.0"
+              alt="B2 Curious, LLC"
+              style="display:block;width:min(100%,420px);height:auto;max-height:150px;object-fit:contain;object-position:left center;background:#fff;border-radius:12px;padding:10px 14px;box-sizing:border-box;"
+            >
+          </div>
+          <span class="source-category">About Mark, Set, Go! · B2 Curious, LLC</span>
           <h1>Read more. Understand more. Remember more.</h1>
-          <p>Mark, Set, Go! is an independent reading and lifelong-learning platform created by Brian Baker.</p>
+          <p>Mark, Set, Go! is an independent reading and lifelong-learning platform from B2 Curious, LLC, created by Brian Baker.</p>
         </div>
         <div class="business-hero-actions">
           <a class="primary button-link" href="mailto:bakerb39@live.com?subject=Mark%2C%20Set%2C%20Go!%20Inquiry">Contact Brian</a>
@@ -124,5 +131,5 @@ function renderTerms() {
 window.MarkSetGoModules = window.MarkSetGoModules || {};
 window.MarkSetGoModules["business-pages"] = {
   loaded: true,
-  version: '7.2.0'
+  version: '7.2.1-b2curious-about'
 };
