@@ -87,7 +87,10 @@
   }
 
   function normalizeState(value) {
-    const topics = repairTopicFeedSourceIds(Array.isArray(value?.topics) ? value.topics : []);
+    const topics = repairTopicFeedSourceIds(Array.isArray(value?.topics) ? value.topics : []).map((topic) => ({
+      ...topic,
+      dismissedArticleIds: [...new Set((Array.isArray(topic?.dismissedArticleIds) ? topic.dismissedArticleIds : []).map(String).filter(Boolean))].slice(-500)
+    }));
     return {
       topics,
       preferences: {
@@ -153,6 +156,7 @@
       lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : [])
         .slice(0, 8)
         .map((item) => String(item || '').slice(0, 300)),
+      dismissedArticleIds: [...new Set((Array.isArray(topic?.dismissedArticleIds) ? topic.dismissedArticleIds : []).map(String).filter(Boolean))].slice(-500),
       sources: (Array.isArray(topic?.sources) ? topic.sources : [])
         .slice(0, 30)
         .map(compactTopicSourceForStorage),
@@ -475,10 +479,11 @@
           // Refresh owns downloaded article data, but it must NEVER own the
           // reader's source configuration. A stale server response therefore
           // cannot resurrect a feed that was just removed.
+          const dismissed = new Set((live.dismissedArticleIds || []).map(String));
           const refreshedArticles = filterArticlesForSources(
             payload.topic.articles,
             live.sources
-          );
+          ).filter((article) => !dismissed.has(String(article?.id || '')));
 
           state.topics[index] = {
             ...payload.topic,
@@ -488,6 +493,7 @@
             maxRecommended: live.maxRecommended,
             preferences: live.preferences,
             sources: live.sources,
+            dismissedArticleIds: [...dismissed],
             articles: refreshedArticles,
             lastErrors: Array.isArray(payload.topic.lastErrors)
               ? payload.topic.lastErrors
@@ -505,7 +511,10 @@
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || 'Unable to refresh topic feeds.');
         const existingRead = new Set((topic.articles || []).filter((article) => article.read).map((article) => article.url));
-        topic.articles = (payload.articles || []).map((article) => ({ ...article, read: existingRead.has(article.url) }));
+        const dismissed = new Set((topic.dismissedArticleIds || []).map(String));
+        topic.articles = (payload.articles || [])
+          .filter((article) => !dismissed.has(String(article?.id || '')))
+          .map((article) => ({ ...article, read: existingRead.has(article.url) }));
         topic.lastErrors = payload.sources?.filter?.((source) => !source.ok).map((source) => source.error) || [];
         topic.lastRefresh = new Date().toISOString();
         topic.preparedAt = '';
@@ -1719,6 +1728,57 @@
     });
   }
 
+  function ensureTopicReaderDeleteStyles() {
+    if (document.getElementById('topic-reader-delete-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'topic-reader-delete-styles';
+    style.textContent = `
+      #app .topic-reader-article-row { position:relative; min-width:0; }
+      #app .topic-reader-article-row > .topic-reader-article { width:100%; padding-right:2rem !important; }
+      #app .topic-reader-article-delete {
+        position:absolute; top:.22rem; right:.22rem; z-index:4; width:1.3rem; height:1.3rem; min-width:1.3rem;
+        padding:0; border:0; border-radius:999px; display:grid; place-items:center;
+        background:transparent; color:inherit; opacity:.46; font:700 .86rem/1 system-ui,sans-serif; cursor:pointer;
+      }
+      #app .topic-reader-article-delete:hover { opacity:1; background:rgba(160,45,45,.11); color:#9f2222; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function rebuildTopicReaderContents() {
+    const view = document.querySelector('#navigation-pane [data-reader-view="contents"]');
+    if (!view) return;
+    const bookmark = view.querySelector('#add-bookmark');
+    if (bookmark) bookmark.remove();
+    view.querySelector('.topic-reader-nav')?.remove();
+    if (bookmark) view.appendChild(bookmark);
+    scheduleReaderNavigation();
+  }
+
+  async function deleteTopicReaderArticle(topicId, articleId) {
+    const topic = state.topics.find((item) => String(item.id) === String(topicId));
+    if (!topic || !articleId) return;
+    const id = String(articleId);
+    topic.dismissedArticleIds = [...new Set([...(topic.dismissedArticleIds || []).map(String), id])].slice(-500);
+    topic.articles = (topic.articles || []).filter((article) => String(article?.id || '') !== id);
+    saveState({ cloud: false });
+    rebuildTopicReaderContents();
+
+    if (cloudAuthenticated) {
+      try {
+        const response = await fetch(`/api/topic-feeds/article/${encodeURIComponent(id)}?topicId=${encodeURIComponent(String(topic.id || ''))}`, {
+          method:'DELETE', credentials:'same-origin'
+        });
+        if (!response.ok) throw new Error('Cloud delete failed.');
+      } catch (error) {
+        console.warn('Topic Feed article removal will sync on the next state save.', error);
+        scheduleCloudSave();
+      }
+    } else {
+      scheduleCloudSave();
+    }
+  }
+
   function readerTopicListMarkup() {
     return `<div class="topic-reader-nav">
       <div class="topic-reader-nav-head">
@@ -1738,12 +1798,19 @@
             const initialLimit = 10;
             return `<div class="topic-reader-source" data-reader-topic-source-block="${escapeHtml(source.id)}">
               <div class="topic-reader-source-head"><strong>${escapeHtml(source.name)}</strong><span>${sourceArticleCount(topic, source.id, true)} new</span></div>
-              ${articles.length ? articles.map((article, index) => `<button type="button"
-                 class="topic-reader-article ${article.read ? 'is-read' : ''}"
-                 ${index >= initialLimit ? 'hidden data-reader-topic-overflow="1"' : ''}
-                 data-reader-topic-article="${escapeHtml(article.id)}"
-                 data-reader-topic-parent="${escapeHtml(topic.id)}">
-                 ${escapeHtml(article.title)}</button>`).join('') : '<small>No downloaded articles yet.</small>'}
+              ${articles.length ? articles.map((article, index) => `<div class="topic-reader-article-row"
+                 ${index >= initialLimit ? 'hidden data-reader-topic-overflow="1"' : ''}>
+                 <button type="button"
+                   class="topic-reader-article ${article.read ? 'is-read' : ''}"
+                   data-reader-topic-article="${escapeHtml(article.id)}"
+                   data-reader-topic-parent="${escapeHtml(topic.id)}">
+                   ${escapeHtml(article.title)}</button>
+                 <button type="button" class="topic-reader-article-delete"
+                   data-reader-topic-delete="${escapeHtml(article.id)}"
+                   data-reader-topic-parent="${escapeHtml(topic.id)}"
+                   aria-label="Remove ${escapeHtml(article.title)} from My Topics"
+                   title="Remove from queue">×</button>
+               </div>`).join('') : '<small>No downloaded articles yet.</small>'}
               ${articles.length > initialLimit ? `<button type="button"
                  class="topic-reader-show-more"
                  data-reader-topic-more
@@ -1758,6 +1825,7 @@
 
   function decorateReaderNavigation() {
     if (!isTopicFeedReaderActive()) return;
+    ensureTopicReaderDeleteStyles();
     const pane = document.querySelector('#navigation-pane');
     if (!pane) return;
     const tab = pane.querySelector('[data-reader-tab="contents"]');
@@ -1803,6 +1871,16 @@
     view.querySelector('[data-reader-manage-topics]')?.addEventListener('click', () => {
       render();
     }, { once:true });
+
+    view.querySelectorAll('[data-reader-topic-delete]').forEach((button) => {
+      if (button.dataset.bound === '1') return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void deleteTopicReaderArticle(button.dataset.readerTopicParent, button.dataset.readerTopicDelete);
+      });
+    });
 
     view.querySelectorAll('[data-reader-topic-article]').forEach((button) => {
       if (button.dataset.bound === '1') return;
