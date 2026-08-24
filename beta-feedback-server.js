@@ -210,6 +210,23 @@ module.exports = function installBetaFeedback({
     }
   });
 
+  app.delete('/api/admin/beta-feedback/:id', async (req, res) => {
+    const admin = await requireAdmin(req, res);
+    if (!admin) return;
+
+    try {
+      const result = await query(
+        'delete from beta_feedback where id = $1 returning id',
+        [req.params.id]
+      );
+      if (!result.rows[0]) return res.status(404).json({ error: 'Feedback item not found.' });
+      res.json({ deleted: true, id: result.rows[0].id });
+    } catch (error) {
+      console.error('Beta feedback delete failed:', error);
+      res.status(500).json({ error: 'Unable to delete feedback.' });
+    }
+  });
+
   app.patch('/api/admin/beta-feedback/:id', async (req, res) => {
     const admin = await requireAdmin(req, res);
     if (!admin) return;

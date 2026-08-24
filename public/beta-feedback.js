@@ -400,6 +400,7 @@
               </select></label>
               <label>Admin notes<textarea data-admin-notes placeholder="Private notes">${escapeHtml(item.admin_notes || '')}</textarea></label>
               <button type="button" data-admin-save>Save</button>
+              <button type="button" data-admin-delete>Delete</button>
             </div>
             <div class="status" data-admin-item-status></div>
           </article>`).join('') : '<p>No feedback matches these filters.</p>';
@@ -420,6 +421,28 @@
               });
               itemStatus.textContent = 'Saved.';
             } catch (error) { itemStatus.textContent = error.message; }
+          });
+        });
+
+        list.querySelectorAll('[data-admin-delete]').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const item = button.closest('[data-feedback-id]');
+            const title = item.querySelector('h2')?.textContent?.trim() || 'this report';
+            const confirmed = window.confirm(`Delete "${title}" permanently? This cannot be undone.`);
+            if (!confirmed) return;
+
+            const itemStatus = item.querySelector('[data-admin-item-status]');
+            itemStatus.textContent = 'Deleting…';
+            button.disabled = true;
+            try {
+              await api(`/api/admin/beta-feedback/${encodeURIComponent(item.dataset.feedbackId)}`, {
+                method: 'DELETE'
+              });
+              await load();
+            } catch (error) {
+              button.disabled = false;
+              itemStatus.textContent = error.message;
+            }
           });
         });
       } catch (error) {
