@@ -260,7 +260,16 @@
       #app .read-anything-bookmarklet-source-credit a { color:inherit; text-underline-offset:2px; }
       #app .read-anything-bookmarklet-source-credit .sep { opacity:.45; }
       #app .read-anything-bookmarklet-source-credit .topic-feed-reader-share {
-        display:flex; align-items:center; gap:.32rem; flex:0 0 auto; margin-left:auto;
+        /* Topic Feed's global share CSS positions this cluster absolutely.
+           Captured articles use a flex source row, so force the cluster back
+           into normal flow and reserve its width instead of covering the
+           "View original" link. */
+        position:static !important;
+        inset:auto !important;
+        top:auto !important; right:auto !important; bottom:auto !important; left:auto !important;
+        transform:none !important;
+        display:flex !important; align-items:center; gap:.32rem;
+        flex:0 0 auto !important; margin-left:auto !important;
       }
       #app .read-anything-bookmarklet-source-credit .topic-feed-share-button {
         display:inline-grid; place-items:center; width:24px; height:24px; padding:0;
