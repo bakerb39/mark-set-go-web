@@ -1418,9 +1418,11 @@
 
   function sourceRow(source = { id: uid(), name: '', type: 'website', url: '', origin:'manual', recommendationKey:'' }) {
     const daily = state.preferences.dailyOpenSourceId === source.id;
+    const explicit = source.origin !== 'ai';
     return `
       <div class="topic-feed-source-row" data-source-id="${escapeHtml(source.id)}"
            data-source-origin="${escapeHtml(source.origin || 'manual')}"
+           data-source-explicit="${explicit ? '1' : '0'}"
            data-recommendation-key="${escapeHtml(source.recommendationKey || '')}">
         <input class="topic-source-name" value="${escapeHtml(source.name)}" placeholder="Feed name" required>
         <select class="topic-source-type"><option value="website" ${source.type === 'website' ? 'selected' : ''}>Website URL</option><option value="rss" ${source.type === 'rss' ? 'selected' : ''}>RSS / Atom</option></select>
@@ -1548,7 +1550,10 @@
       leaveTopicManager({ applyDeferred: true });
       render({ force: true });
     });
-    document.getElementById('topic-add-source')?.addEventListener('click', () => {
+    document.getElementById('topic-add-source')?.addEventListener('click', (event) => {
+      // This is an editor action, never a form-submit/navigation action.
+      event.preventDefault();
+      event.stopPropagation();
       if (switchToExplicitSourceSelection()) syncSourceModeUi();
       document.getElementById('topic-source-rows')?.insertAdjacentHTML('beforeend', sourceRow());
     });
@@ -1560,9 +1565,16 @@
       const button = event.target.closest('[data-add-recommended-feed]');
       if (!button) return;
 
-      // An explicit click on Add means the reader chose this source. If the
-      // form was still in AI-managed mode, switch to selected-only so Save does
-      // not throw away the choice and ask the server to add every AI source.
+      // Selecting a recommendation must be a quiet in-place toggle. In
+      // particular, it must never submit the Topic form, bubble into an outer
+      // workspace/navigation handler, or rebuild/close the recommendation panel.
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+      if (button.dataset.selected === '1') return;
+
+      // An explicit source choice wins over fully automatic source management.
+      // Hybrid remains hybrid because the reader deliberately chose that mode.
       if (switchToExplicitSourceSelection()) syncSourceModeUi();
 
       const source = {
@@ -1570,7 +1582,14 @@
         url: button.dataset.feedUrl || '', origin:'recommended', recommendationKey:button.dataset.addRecommendedFeed || ''
       };
       document.getElementById('topic-source-rows')?.insertAdjacentHTML('beforeend', sourceRow(source));
-      void loadRecommendations(document.getElementById('topic-name')?.value || '');
+
+      // Keep the AI suggestion panel exactly where it is so several sources can
+      // be chosen before Save Topic. Do not call loadRecommendations() here.
+      button.dataset.selected = '1';
+      button.classList.add('selected');
+      button.disabled = true;
+      button.textContent = 'Selected';
+      button.setAttribute('aria-pressed', 'true');
     });
     document.getElementById('topic-source-rows')?.addEventListener('click', (event) => {
       const remove = event.target.closest('.topic-source-remove');
@@ -1596,9 +1615,21 @@
     });
     document.getElementById('topic-feed-form')?.addEventListener('submit', async (event) => {
       event.preventDefault();
-      const sourceMode = document.getElementById('topic-source-mode')?.value || 'manual';
+
+      const requestedSourceMode = document.getElementById('topic-source-mode')?.value || 'manual';
       const rows = [...document.querySelectorAll('.topic-feed-source-row')];
-      const sources = sourceMode === 'ai' ? [] : rows.map((row) => ({
+      const hasExplicitSelection = rows.some((row) =>
+        row.dataset.sourceExplicit === '1' || row.dataset.sourceOrigin === 'recommended' || row.dataset.sourceOrigin === 'manual'
+      );
+
+      // Safety invariant: explicit source rows can never be discarded simply
+      // because the selector still says AI-managed. A click on a recommendation
+      // is authoritative even if another UI listener interrupted the mode change.
+      const sourceMode = requestedSourceMode === 'ai' && hasExplicitSelection
+        ? 'manual'
+        : requestedSourceMode;
+
+      let sources = sourceMode === 'ai' ? [] : rows.map((row) => ({
         id: row.dataset.sourceId || uid(),
         name: row.querySelector('.topic-source-name').value.trim(),
         type: row.querySelector('.topic-source-type').value,
@@ -1606,6 +1637,10 @@
         origin: row.dataset.sourceOrigin === 'ai' ? 'ai' : row.dataset.sourceOrigin === 'recommended' ? 'recommended' : 'manual',
         recommendationKey: row.dataset.recommendationKey || ''
       })).filter((source) => source.name && source.url);
+
+      // Selected-sources-only means exactly that. Never carry an old AI-managed
+      // row into a manual topic when the reader has made explicit choices.
+      if (sourceMode === 'manual') sources = sources.filter((source) => source.origin !== 'ai');
 
       const selectedDaily = document.querySelector('input[name="topic-daily-source"]:checked')?.value || '';
       const existingSourceIds = new Set(sources.map((source) => source.id));

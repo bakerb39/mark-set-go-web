@@ -4365,7 +4365,20 @@ function topicFeedSourceMode(value) {
 }
 
 async function refreshAiManagedTopicSources(topic, { force = false } = {}) {
-  const mode = topicFeedSourceMode(topic?.sourceMode);
+  let mode = topicFeedSourceMode(topic?.sourceMode);
+
+  // Server-side backstop for the UI contract: if an AI-managed record contains
+  // a source the reader explicitly selected/entered, that explicit choice wins.
+  // This prevents a stale selector value from expanding one chosen source back
+  // into the full AI recommendation set during Refresh.
+  const hasExplicitSources = (topic.sources || []).some((source) => source.origin !== 'ai');
+  if (mode === 'ai' && hasExplicitSources) {
+    topic.sourceMode = 'manual';
+    topic.sources = (topic.sources || []).filter((source) => source.origin !== 'ai');
+    topic.aiSourcesUpdatedAt = null;
+    mode = 'manual';
+  }
+
   if (mode === 'manual') return false;
   const currentAi = (topic.sources || []).filter((source) => source.origin === 'ai');
   const refreshedAt = Date.parse(topic.aiSourcesUpdatedAt || '') || 0;
