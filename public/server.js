@@ -2736,11 +2736,26 @@ async function fetchArticleForFeed(rawUrl, expectedTitle) {
     if (contentType.includes('text/plain')) {
       const text = source.replace(/\s+/g, ' ').trim();
       if (text.length < 300) throw new Error('The publisher did not return enough article text.');
-      return { text, documentToc: [] };
+      return { text, documentToc: [], title: parsed.hostname, author:'', site:parsed.hostname.replace(/^www\./i,''), publishedAt:'' };
     }
 
     const $ = cheerio.load(source);
-    const pageTitle = $('meta[property="og:title"]').attr('content') || $('h1').first().text() || $('title').first().text();
+    const pageTitle = stripMarkup($('meta[property="og:title"]').attr('content') || $('h1').first().text() || $('title').first().text()).trim();
+    const pageAuthor = stripMarkup(
+      $('meta[name="author"]').attr('content') ||
+      $('meta[property="article:author"]').attr('content') ||
+      $('[rel="author"]').first().text() || ''
+    ).trim();
+    const pageSite = stripMarkup($('meta[property="og:site_name"]').attr('content') || '').trim()
+      || parsed.hostname.replace(/^www\./i, '');
+    const pagePublishedAt = cleanText(
+      $('meta[property="article:published_time"]').attr('content') ||
+      $('meta[name="date"]').attr('content') ||
+      $('[itemprop="datePublished"]').first().attr('content') ||
+      $('[itemprop="datePublished"]').first().attr('datetime') ||
+      $('time[datetime]').first().attr('datetime') || '', 200
+    );
+    const pageMeta = { title:pageTitle || parsed.hostname, author:pageAuthor, site:pageSite, publishedAt:pagePublishedAt };
 
     if (publisherRestrictionSignal(response.status, source)) {
       const error = new Error('The publisher blocked automated full-text import.');
@@ -2755,7 +2770,8 @@ async function fetchArticleForFeed(rawUrl, expectedTitle) {
       return {
         text: structured.body.slice(0, 500000),
         documentToc: [],
-        importMethod: 'structured-data'
+        importMethod: 'structured-data',
+        ...pageMeta
       };
     }
 
@@ -2875,7 +2891,8 @@ async function fetchArticleForFeed(rawUrl, expectedTitle) {
     return {
       text: best.text.slice(0, 500000),
       documentToc: best.documentToc.slice(0, 100),
-      importMethod: 'html'
+      importMethod: 'html',
+      ...pageMeta
     };
   } finally {
     clearTimeout(timeout);
@@ -3695,6 +3712,8 @@ app.post('/capture', (req, res) => {
   const payload = {
     title: String(req.body?.title || 'Web Article').trim().slice(0, 500),
     author: String(req.body?.author || '').trim().slice(0, 300),
+    site: String(req.body?.site || '').trim().slice(0, 300),
+    publishedAt: String(req.body?.publishedAt || '').trim().slice(0, 200),
     url: String(req.body?.url || '').trim().slice(0, 4000),
     text: String(req.body?.text || '').trim().slice(0, 5_000_000),
     captureType: req.body?.captureType === 'selection' ? 'selection' : 'page',
@@ -3733,9 +3752,28 @@ app.post('/api/fetch-text', async (req, res) => {
   const url = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
   if (!url) return res.status(400).json({ error: 'A URL is required.' });
   try {
-    const text = await fetchReadableText(url);
-    if (!text) return res.status(422).json({ error: 'No readable text was found on that page.' });
-    return res.json({ title: new URL(url).hostname, author: '', text: text.slice(0, 500000), sourceUrl: url });
+    let article = null;
+    try {
+      article = await fetchArticleForFeed(url, '');
+    } catch (articleError) {
+      const text = await fetchReadableText(url);
+      article = {
+        title: new URL(url).hostname,
+        author: '', site: new URL(url).hostname.replace(/^www\./i, ''), publishedAt:'',
+        text, documentToc: [], importMethod:'generic-page'
+      };
+    }
+    if (!article?.text) return res.status(422).json({ error: 'No readable text was found on that page.' });
+    return res.json({
+      title: article.title || new URL(url).hostname,
+      author: article.author || '',
+      site: article.site || new URL(url).hostname.replace(/^www\./i, ''),
+      publishedAt: article.publishedAt || '',
+      text: String(article.text).slice(0, 500000),
+      documentToc: Array.isArray(article.documentToc) ? article.documentToc.slice(0, 100) : [],
+      importMethod: article.importMethod || 'html',
+      sourceUrl: url
+    });
   } catch (error) {
     const message = error?.name === 'AbortError' ? 'The website took too long to respond.' : error?.message || 'The page could not be imported.';
     return res.status(400).json({ error: message });
@@ -4198,11 +4236,138 @@ function recommendTopicFeedSources(topic, limit = 8) {
   const ranked = TOPIC_FEED_RECOMMENDED_SOURCES
     .map((source) => ({ ...source, score: topicFeedSourceScore(source, topic) }))
     .sort((a,b) => b.score - a.score || a.name.localeCompare(b.name));
-  const relevant = ranked.filter((item) => item.score > 1);
-  const fallback = ranked.filter((item) => ['reuters','ap','bbc','npr'].includes(item.key));
-  const merged = [...relevant];
-  fallback.forEach((item) => { if (!merged.some((x) => x.key === item.key)) merged.push(item); });
-  return merged.slice(0, Math.max(1, Math.min(12, Number(limit) || 8))).map(({tags,score,...item}) => item);
+
+  // Specificity wins over padding. Do not append generic national/international
+  // outlets merely to fill the list; an empty/short list is better than an
+  // irrelevant one and the AI planner can supply topic-specific alternatives.
+  return ranked
+    .filter((item) => item.score >= 8)
+    .slice(0, Math.max(1, Math.min(12, Number(limit) || 8)))
+    .map(({tags,score,...item}) => item);
+}
+
+const TOPIC_FEED_AI_RECOMMENDATION_CACHE = new Map();
+const TOPIC_FEED_AI_RECOMMENDATION_TTL_MS = 30 * 60 * 1000;
+
+async function recommendTopicFeedSourcesWithAI(topic, preferences = '', limit = 8) {
+  const apiKey = String(process.env.OPENAI_API_KEY || '').trim();
+  if (!apiKey) return [];
+
+  const cleanTopic = cleanText(topic, 200);
+  const cleanPreferences = cleanText(preferences, 2000);
+  if (!cleanTopic) return [];
+  const count = Math.max(3, Math.min(10, Number(limit) || 8));
+  const cacheKey = `${cleanTopic.toLowerCase()}|${cleanPreferences.toLowerCase()}|${count}`;
+  const cached = TOPIC_FEED_AI_RECOMMENDATION_CACHE.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.sources;
+
+  const schema = {
+    type: 'object', additionalProperties: false,
+    properties: {
+      sources: {
+        type: 'array', minItems: 1, maxItems: 10,
+        items: {
+          type: 'object', additionalProperties: false,
+          properties: {
+            name: { type: 'string' },
+            url: { type: 'string' },
+            description: { type: 'string' },
+            reason: { type: 'string' }
+          },
+          required: ['name','url','description','reason']
+        }
+      }
+    },
+    required: ['sources']
+  };
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 45000);
+  try {
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST', signal: controller.signal,
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.OPENAI_STUDY_MODEL || process.env.OPENAI_COMPREHENSION_MODEL || 'gpt-5.6-luna',
+        reasoning: { effort: 'low' }, store: false,
+        input: [
+          { role: 'developer', content: [{ type: 'input_text', text:
+            `Recommend ongoing public web sources for a personalized reading/news feed. Be highly specific to the user's topic rather than returning generic news brands. Prefer specialist publications, official agencies, scholarly/professional organizations, trade publications, or established niche sites that regularly publish on the subject. Do not pad the list with Reuters, AP, BBC, NPR, CNN, Fox, or other broad outlets unless the requested topic itself is broad general news or those outlets are uniquely relevant. Use the organization's/publication's stable homepage URL, not an article URL. Do not invent brands or domains. Diversify source types and perspectives where appropriate. Return at most ${count} sources.` }] },
+          { role: 'user', content: [{ type: 'input_text', text: JSON.stringify({ topic: cleanTopic, priorities: cleanPreferences || undefined }) }] }
+        ],
+        text: { format: { type: 'json_schema', name: 'topic_feed_sources', strict: true, schema } }
+      })
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(payload?.error?.message || `OpenAI returned HTTP ${response.status}.`);
+    const parsed = JSON.parse(extractOpenAIOutputText(payload) || '{}');
+    const rawSources = Array.isArray(parsed?.sources) ? parsed.sources : [];
+    const results = [];
+    const seenHosts = new Set();
+
+    for (const candidate of rawSources.slice(0, 12)) {
+      try {
+        const parsedUrl = await validatePublicUrl(candidate?.url);
+        const host = parsedUrl.hostname.toLowerCase().replace(/^www\./, '');
+        if (!host || seenHosts.has(host)) continue;
+        seenHosts.add(host);
+        results.push({
+          key: `ai-${crypto.createHash('sha1').update(host).digest('hex').slice(0,12)}`,
+          name: cleanText(candidate?.name, 200) || host,
+          type: 'website',
+          url: `${parsedUrl.protocol}//${parsedUrl.host}/`,
+          description: cleanText(candidate?.description, 500),
+          reason: cleanText(candidate?.reason, 500),
+          origin: 'ai'
+        });
+        if (results.length >= count) break;
+      } catch {}
+    }
+
+    TOPIC_FEED_AI_RECOMMENDATION_CACHE.set(cacheKey, {
+      expiresAt: Date.now() + TOPIC_FEED_AI_RECOMMENDATION_TTL_MS,
+      sources: results
+    });
+    return results;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function topicFeedSourceMode(value) {
+  return value === 'ai' || value === 'hybrid' ? value : 'manual';
+}
+
+async function refreshAiManagedTopicSources(topic, { force = false } = {}) {
+  const mode = topicFeedSourceMode(topic?.sourceMode);
+  if (mode === 'manual') return false;
+  const currentAi = (topic.sources || []).filter((source) => source.origin === 'ai');
+  const refreshedAt = Date.parse(topic.aiSourcesUpdatedAt || '') || 0;
+  const stale = !refreshedAt || Date.now() - refreshedAt > 7 * 86400000;
+  if (!force && currentAi.length && !stale) return false;
+
+  const suggestions = await recommendTopicFeedSourcesWithAI(topic.name, topic.preferences, 8).catch(() => []);
+  if (!suggestions.length) return false;
+
+  const previousByUrl = new Map((topic.sources || []).map((source) => [String(source.url || '').replace(/\/+$/, '').toLowerCase(), source]));
+  const aiSources = suggestions.map((source) => {
+    const key = String(source.url || '').replace(/\/+$/, '').toLowerCase();
+    const previous = previousByUrl.get(key);
+    return {
+      id: previous?.id || crypto.randomUUID(),
+      name: source.name,
+      type: 'website',
+      url: source.url,
+      origin: 'ai',
+      recommendationKey: source.key || ''
+    };
+  });
+  const pinned = mode === 'hybrid'
+    ? (topic.sources || []).filter((source) => source.origin !== 'ai')
+    : [];
+  topic.sources = [...pinned, ...aiSources].slice(0, 30);
+  topic.aiSourcesUpdatedAt = new Date().toISOString();
+  return true;
 }
 
 function topicFeedTitleSimilarity(a, b) {
@@ -4216,27 +4381,37 @@ function topicFeedTitleSimilarity(a, b) {
 function curateTopicFeedArticles(articles, topic) {
   const topicTerms = topicFeedTokens(topic?.name || '');
   const prefTerms = topicFeedTokens(topic?.preferences || '');
+  const phrase = String(topic?.name || '').trim().toLowerCase();
+  const minimumTopicHits = topicTerms.length ? Math.min(2, Math.max(1, Math.ceil(topicTerms.length * 0.35))) : 0;
   const ranked = [...articles].map((article) => {
+    const title = String(article.title || '').toLowerCase();
     const body = `${article.title || ''} ${article.summary || ''}`.toLowerCase();
-    let score = Math.max(0, 8 - (Number(article.sourceRank) || 0));
-    topicTerms.forEach((term) => { if (body.includes(term)) score += 8; });
-    prefTerms.forEach((term) => { if (body.includes(term)) score += 3; });
+    const topicHits = topicTerms.reduce((count, term) => count + Number(body.includes(term)), 0);
+    const prefHits = prefTerms.reduce((count, term) => count + Number(body.includes(term)), 0);
+    const exactPhrase = phrase.length >= 4 && body.includes(phrase);
+    let score = Math.max(0, 6 - (Number(article.sourceRank) || 0));
+    score += topicHits * 12;
+    score += prefHits * 4;
+    if (exactPhrase) score += 22;
+    if (phrase && title.includes(phrase)) score += 14;
     const published = Date.parse(article.published || '');
     if (Number.isFinite(published) && published > 0) {
       const ageHours = Math.max(0, (Date.now() - published) / 3600000);
-      score += Math.max(0, 14 - ageHours / 8);
+      score += Math.max(0, 10 - ageHours / 12);
     }
-    return { ...article, score };
+    const topicRelevant = !topicTerms.length || exactPhrase || topicHits >= minimumTopicHits;
+    return { ...article, score, topicRelevant };
   }).sort((a,b) => b.score - a.score);
 
   const picks = [];
   for (const article of ranked) {
+    if (!article.topicRelevant) continue;
     if (picks.some((item) => topicFeedTitleSimilarity(item.title, article.title) >= .66)) continue;
     picks.push(article);
     if (picks.length >= Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8))) break;
   }
   const ids = new Set(picks.map((item) => item.id));
-  return ranked.map((item) => ({ ...item, recommended: ids.has(item.id) }));
+  return ranked.map(({ topicRelevant, ...item }) => ({ ...item, recommended: ids.has(item.id) }));
 }
 
 function sanitizeTopicFeedState(raw) {
@@ -4246,12 +4421,14 @@ function sanitizeTopicFeedState(raw) {
     cadence: topic?.cadence === 'weekly' ? 'weekly' : 'daily',
     maxRecommended: Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8)),
     preferences: cleanText(topic?.preferences, 4000),
+    sourceMode: topicFeedSourceMode(topic?.sourceMode),
+    aiSourcesUpdatedAt: topic?.aiSourcesUpdatedAt || null,
     sources: (Array.isArray(topic?.sources) ? topic.sources : []).slice(0, 30).map((source) => ({
       id: cleanText(source?.id, 200),
       name: cleanText(source?.name, 200),
       type: source?.type === 'rss' ? 'rss' : 'website',
       url: cleanText(source?.url, 2000),
-      origin: source?.origin === 'recommended' ? 'recommended' : 'manual',
+      origin: source?.origin === 'ai' ? 'ai' : source?.origin === 'recommended' ? 'recommended' : 'manual',
       recommendationKey: cleanText(source?.recommendationKey, 120)
     })).filter((source) => source.id && source.name && source.url),
     articles: (Array.isArray(topic?.articles) ? topic.articles : []).slice(0, 300).map((article) => ({
@@ -4274,7 +4451,8 @@ function sanitizeTopicFeedState(raw) {
     })).filter((article) => article.id && article.title && article.url),
     lastRefresh: topic?.lastRefresh || null,
     preparedAt: topic?.preparedAt || null,
-    lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : []).slice(0, 30).map((value) => cleanText(value, 1000))
+    lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : []).slice(0, 30).map((value) => cleanText(value, 1000)),
+    dismissedArticleIds: [...new Set((Array.isArray(topic?.dismissedArticleIds) ? topic.dismissedArticleIds : []).map((value) => cleanText(value, 200)).filter(Boolean))].slice(-500)
   })).filter((topic) => topic.id && topic.name);
   return { topics };
 }
@@ -4411,11 +4589,13 @@ async function refreshTopicFeedForAccount(userId, topicId, { prepare = true } = 
   const account = await getTopicFeedAccount(userId);
   const topic = account.state.topics.find((item) => item.id === topicId);
   if (!topic) throw new Error('Topic not found.');
+  await refreshAiManagedTopicSources(topic);
   const edition = await fetchTopicFeedEdition(topic.name, topic.sources);
   const oldRead = new Set((topic.articles || []).filter((article) => article.read).map((article) => article.url));
-  topic.articles = curateTopicFeedArticles(edition.articles, topic).map((article) => ({
-    ...article, read:oldRead.has(article.url), prepared:false
-  }));
+  const dismissed = new Set((topic.dismissedArticleIds || []).map(String));
+  topic.articles = curateTopicFeedArticles(edition.articles, topic)
+    .filter((article) => !dismissed.has(String(article?.id || '')))
+    .map((article) => ({ ...article, read:oldRead.has(article.url), prepared:false }));
   topic.lastErrors = edition.sources.filter((source) => !source.ok).map((source) => source.error || `${source.name} could not be loaded.`);
   topic.lastRefresh = new Date().toISOString();
 
@@ -4482,9 +4662,28 @@ async function refreshDueTopicFeeds({ now = new Date(), userLimit = 200 } = {}) 
   return { usersChecked:rows.rows.length, usersRefreshed, topicsRefreshed };
 }
 
-app.get('/api/topic-feeds/recommend', (req,res) => {
+app.get('/api/topic-feeds/recommend', async (req,res) => {
   const topic = cleanText(req.query?.topic,200);
-  res.json({ topic, sources:topic ? recommendTopicFeedSources(topic,8) : [] });
+  const preferences = cleanText(req.query?.preferences,2000);
+  if (!topic) return res.json({ topic:'', mode:'catalog', sources:[] });
+  try {
+    const [aiSources, catalogSources] = await Promise.all([
+      recommendTopicFeedSourcesWithAI(topic, preferences, 8).catch(() => []),
+      Promise.resolve(recommendTopicFeedSources(topic, 8))
+    ]);
+    const merged = [];
+    const seen = new Set();
+    for (const source of [...aiSources, ...catalogSources]) {
+      let host = '';
+      try { host = new URL(source.url).hostname.toLowerCase().replace(/^www\./,''); } catch { host = String(source.url || '').toLowerCase(); }
+      if (!host || seen.has(host)) continue;
+      seen.add(host); merged.push(source);
+      if (merged.length >= 8) break;
+    }
+    return res.json({ topic, mode:aiSources.length ? 'ai' : 'catalog', sources:merged });
+  } catch (error) {
+    return res.json({ topic, mode:'catalog', sources:recommendTopicFeedSources(topic,8), warning:error?.message || '' });
+  }
 });
 
 app.get('/api/topic-feeds/state', async (req,res) => {
@@ -4521,6 +4720,34 @@ app.post('/api/topic-feeds/import', async (req,res) => {
   } catch (error) {
     console.error('Topic Feed import failed:', error);
     res.status(500).json({error:'Unable to migrate Topic Feeds to your account.'});
+  }
+});
+
+app.delete('/api/topic-feeds/article/:articleId', async (req,res) => {
+  try {
+    const user = await requireAccountUser(req,res); if (!user) return;
+    const articleId = cleanText(req.params?.articleId, 200);
+    if (!articleId) return res.status(400).json({error:'Article id is required.'});
+    const account = await getTopicFeedAccount(user.id);
+    const topicId = cleanText(req.query?.topicId, 200);
+    let removed = false;
+    for (const topic of account.state.topics) {
+      if (topicId && String(topic.id) !== topicId) continue;
+      const before = topic.articles.length;
+      topic.articles = topic.articles.filter((article) => article.id !== articleId);
+      if (topic.articles.length !== before) removed = true;
+      topic.dismissedArticleIds = [...new Set([...(topic.dismissedArticleIds || []), articleId])].slice(-500);
+    }
+    if (topicId) {
+      await query('delete from topic_feed_prepared_articles where user_id=$1 and article_id=$2 and topic_id=$3', [user.id, articleId, topicId]);
+    } else {
+      await query('delete from topic_feed_prepared_articles where user_id=$1 and article_id=$2', [user.id, articleId]);
+    }
+    await saveTopicFeedAccount(user.id, account.state, account.preferences);
+    res.json({deleted:true, articleId, removed});
+  } catch (error) {
+    console.error('Topic Feed article delete failed:', error);
+    res.status(500).json({error:'Unable to remove the Topic Feed article.'});
   }
 });
 
