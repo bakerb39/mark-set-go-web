@@ -12,6 +12,7 @@
   let activeImportedDocument = null;
   let activeImportedVersion = 'original';
   let formatControlAttachTimers = [];
+  let formatControlAttachGeneration = 0;
   let pendingImportedRender = false;
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -1894,11 +1895,76 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   function scheduleFormatControlAttach() {
     document.querySelector('#read-anything-format-control')?.remove();
     document.dispatchEvent(new CustomEvent('marksetgo:transform-state', { detail: { version: activeImportedVersion, label: versionLabel(activeImportedVersion), active: Boolean(activeImportedDocument) } }));
-    [0, 100, 350, 800].forEach((delay) => window.setTimeout(() => {
+
+    // A Reader import used to start several overlapping retry sequences. Each
+    // sequence repeatedly reinserted the article-action row while Book Pages was
+    // still rebuilding the Reader, producing the visible compact/expanded flash.
+    // Collapse every request into one generation and attach the action row only
+    // after Reader geometry has settled. No DOM observer is used here.
+    formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
+    formatControlAttachTimers = [];
+    const generation = ++formatControlAttachGeneration;
+
+    const later = (fn, delay) => {
+      const timer = window.setTimeout(() => {
+        if (generation !== formatControlAttachGeneration || !activeImportedDocument) return;
+        fn();
+      }, delay);
+      formatControlAttachTimers.push(timer);
+      return timer;
+    };
+
+    // Install stable command-bar UI immediately, then let the Reader's existing
+    // Book Pages handler perform its one intentional reflow before article
+    // actions are inserted.
+    later(() => {
       installDisplayFormatControl();
-      installArticleSummaryButton();
       installDefaultArticleBookPages();
-    }, delay));
+    }, 0);
+
+    let lastSignature = '';
+    let stableSamples = 0;
+    let attempts = 0;
+    const attachWhenStable = () => {
+      const reader = document.querySelector('#app #reader');
+      if (!reader) {
+        attempts += 1;
+        if (attempts < 14) later(attachWhenStable, 90);
+        return;
+      }
+
+      const rect = reader.getBoundingClientRect();
+      const signature = [
+        Math.round(rect.width),
+        Math.round(rect.height),
+        reader.classList.contains('book-pages-layout') ? 'book' : 'single'
+      ].join(':');
+
+      if (signature === lastSignature) stableSamples += 1;
+      else {
+        lastSignature = signature;
+        stableSamples = 0;
+      }
+      attempts += 1;
+
+      if (stableSamples >= 2 || attempts >= 14) {
+        installDisplayFormatControl();
+        installArticleSummaryButton();
+        return;
+      }
+      later(attachWhenStable, 90);
+    };
+
+    later(attachWhenStable, 180);
+
+    // One late safety check covers unusually slow font/layout settling without
+    // recreating the old repeated attach/reflow loop.
+    later(() => {
+      installDisplayFormatControl();
+      if (!document.querySelector('#read-anything-article-summary-action')) {
+        installArticleSummaryButton();
+      }
+    }, 1400);
   }
 
   function installFormatControl() {
@@ -2286,7 +2352,6 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         if (!ready) return;
 
         scheduleFormatControlAttach();
-        installArticleSummaryButton();
 
         if (activeImportedDocument && isWholeArticleDocument()) {
           complete = true;
@@ -2308,7 +2373,9 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       };
       rememberFormatDocument(documentId, key);
       saveActiveFormatRecord();
-      scheduleFormatControlAttach();
+      // renderImportedVersion() schedules the one post-render attachment pass
+      // after renderReaderWithText() returns. Do not start a duplicate sequence
+      // from this pre-DOM document-available event.
       return;
     }
 
