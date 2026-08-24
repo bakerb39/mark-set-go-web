@@ -1191,6 +1191,192 @@ const musicPlayerWrap = document.querySelector('#music-player-wrap');
 const musicNowTitle = document.querySelector('#music-now-title');
 const musicNowSource = document.querySelector('#music-now-source');
 const musicNextButton = document.querySelector('#music-next');
+
+function installVideoBesideReaderUi() {
+  if (!musicDock) return;
+
+  let resizer = document.querySelector('#music-side-resizer');
+  if (!resizer) {
+    resizer = document.createElement('div');
+    resizer.id = 'music-side-resizer';
+    resizer.className = 'music-side-resizer';
+    resizer.hidden = true;
+    resizer.tabIndex = 0;
+    resizer.setAttribute('role', 'separator');
+    resizer.setAttribute('aria-orientation', 'vertical');
+    resizer.setAttribute('aria-label', 'Resize video side panel');
+    musicDock.insertBefore(resizer, musicDock.firstChild);
+  }
+
+  const actions = musicDock.querySelector('.music-dock-actions');
+  if (actions && !document.querySelector('#music-beside-reader')) {
+    const button = document.createElement('button');
+    button.id = 'music-beside-reader';
+    button.type = 'button';
+    button.className = 'music-beside-reader-button';
+    button.textContent = 'Play beside reader';
+    button.setAttribute('aria-label', 'Play beside reader');
+    button.setAttribute('aria-pressed', 'false');
+    button.title = 'Keep this media beside the Reader while you turn pages';
+    const next = document.querySelector('#music-next');
+    if (next && next.parentNode === actions) actions.insertBefore(button, next);
+    else actions.insertBefore(button, actions.firstChild);
+  }
+
+  if (!document.querySelector('#msg-video-beside-reader-styles')) {
+    const style = document.createElement('style');
+    style.id = 'msg-video-beside-reader-styles';
+    style.textContent = `
+      :root {
+        --msg-video-side-width: 480px;
+        --msg-video-side-collapsed-width: 330px;
+      }
+
+      .music-dock-actions {
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      .music-dock-actions .music-beside-reader-button {
+        width: auto;
+        min-width: 0;
+        padding: 0 .62rem;
+        font-size: .68rem;
+        font-weight: 760;
+        white-space: nowrap;
+      }
+
+      .music-dock-actions .music-beside-reader-button[aria-pressed="true"] {
+        background: #315f86;
+      }
+
+      .music-side-resizer {
+        display: none;
+      }
+
+      body.resizing-video-side-panel {
+        cursor: col-resize;
+        user-select: none;
+      }
+
+      @media (min-width: 1051px) {
+        body.video-beside-reader {
+          --msg-video-side-active-width: var(--msg-video-side-width);
+          --msg-video-reader-width: min(1000px, calc(100vw - var(--msg-video-side-active-width) - 3rem));
+          --msg-video-reader-edge: max(1rem, calc((100vw - var(--msg-video-side-active-width) - var(--msg-video-reader-width)) / 2));
+        }
+
+        body.video-beside-reader.video-side-collapsed {
+          --msg-video-side-active-width: var(--msg-video-side-collapsed-width);
+        }
+
+        body.video-beside-reader #app {
+          width: var(--msg-video-reader-width);
+          margin-left: var(--msg-video-reader-edge);
+          margin-right: calc(var(--msg-video-side-active-width) + var(--msg-video-reader-edge));
+          transition: width .18s ease, margin .18s ease;
+        }
+
+        body.resizing-video-side-panel #app {
+          transition: none;
+        }
+
+        .music-dock.beside-reader {
+          top: 4.25rem;
+          right: .75rem;
+          bottom: auto;
+          width: var(--msg-video-side-width);
+          max-width: min(720px, 55vw);
+          border-radius: .75rem;
+          overflow: visible;
+          transition: width .18s ease;
+        }
+
+        body.resizing-video-side-panel .music-dock.beside-reader {
+          transition: none;
+        }
+
+        .music-dock.beside-reader.side-collapsed {
+          width: var(--msg-video-side-collapsed-width);
+        }
+
+        .music-dock.beside-reader .music-dock-bar,
+        .music-dock.beside-reader .music-player-wrap {
+          overflow: hidden;
+        }
+
+        .music-dock.beside-reader .music-dock-bar {
+          border-radius: .7rem .7rem 0 0;
+        }
+
+        .music-dock.beside-reader .music-player-wrap {
+          border-radius: 0 0 .7rem .7rem;
+        }
+
+        .music-dock.beside-reader .music-side-resizer {
+          position: absolute;
+          z-index: 3;
+          top: 0;
+          bottom: 0;
+          left: -8px;
+          display: block;
+          width: 16px;
+          cursor: col-resize;
+          touch-action: none;
+        }
+
+        .music-dock.beside-reader .music-side-resizer::before {
+          content: "";
+          position: absolute;
+          top: .4rem;
+          bottom: .4rem;
+          left: 7px;
+          width: 2px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.22);
+        }
+
+        .music-dock.beside-reader .music-side-resizer:hover::before,
+        .music-dock.beside-reader .music-side-resizer:focus-visible::before,
+        body.resizing-video-side-panel .music-side-resizer::before {
+          background: #78b7ea;
+        }
+
+        .music-dock.beside-reader .music-side-resizer:focus-visible {
+          outline: 2px solid #78b7ea;
+          outline-offset: -2px;
+        }
+
+        .music-dock.beside-reader.minimized {
+          width: var(--msg-video-side-width);
+        }
+      }
+
+      @media (max-width: 1050px) {
+        body.video-beside-reader #app {
+          width: min(1000px, calc(100% - 2rem));
+          margin: 2rem auto;
+        }
+
+        .music-dock.beside-reader,
+        .music-dock.beside-reader.side-collapsed {
+          top: auto;
+          right: .5rem;
+          bottom: .5rem;
+          width: min(480px, calc(100vw - 1rem));
+          max-width: none;
+        }
+
+        .music-dock.beside-reader .music-side-resizer {
+          display: none !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
+installVideoBesideReaderUi();
 const musicBesideReaderButton = document.querySelector('#music-beside-reader');
 const musicSideResizer = document.querySelector('#music-side-resizer');
 const musicMinimizeButton = document.querySelector('#music-minimize');
