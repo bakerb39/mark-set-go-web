@@ -11676,7 +11676,7 @@ async function renderReader(kind) {
   if (normalizedKind === 'gutenberg') return renderGutenbergLibrary();
   if (normalizedKind === 'great-books') return renderGreatBooksLibrary();
   if (normalizedKind === 'founding-documents') return renderFoundingDocumentsLibrary();
-  if (normalizedKind === 'syntopicon') return renderSyntopicon();
+  if (normalizedKind === 'syntopicon') { void renderSyntopicon(); return; }
   if (normalizedKind === 'bible') return renderBibleStudy();
   if (normalizedKind === 'bible-guides') return renderBibleGuides();
   if (normalizedKind === 'current-reading') return renderCurrentReading();
@@ -19480,6 +19480,204 @@ const BIBLE_GUIDES = Object.freeze({
 const LAST_BIBLE_PASSAGE_KEY = 'markSetGoLastBiblePassageV1';
 const SYNTOPICON_SAVED_KEY = 'markSetGoSyntopiconSavedV1';
 
+// Phase 7 IndexedDB migration: saved Syntopicon analyses.
+// The collection is capped at 50 studies, so one IndexedDB record keeps this
+// migration small and avoids unnecessary per-analysis index complexity.
+const SYNTOPICON_SAVED_IDB_KEY = 'syntopicon:saved:v1';
+const SYNTOPICON_SAVED_LIMIT = 50;
+
+let syntopiconSavedCache = [];
+let syntopiconStorageHydrated = false;
+let syntopiconStorageHydrationPromise = null;
+let syntopiconStorageWriteChain = Promise.resolve(true);
+let syntopiconStorageDirty = false;
+
+function normalizeSavedSyntopicon(items) {
+  const normalized = [];
+  const seen = new Set();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item || typeof item !== 'object' || !item.analysis) continue;
+
+    const signature = [
+      String(item.savedAt || ''),
+      String(item.idea || item.analysis?.idea || ''),
+      String(item.analysis?.centralQuestion || '')
+    ].join('|').toLowerCase();
+
+    if (signature && seen.has(signature)) continue;
+    if (signature) seen.add(signature);
+
+    normalized.push(item);
+    if (normalized.length >= SYNTOPICON_SAVED_LIMIT) break;
+  }
+
+  return normalized;
+}
+
+function readLegacySavedSyntopicon() {
+  try {
+    const value = JSON.parse(localStorage.getItem(SYNTOPICON_SAVED_KEY) || '[]');
+    return normalizeSavedSyntopicon(value);
+  } catch {
+    return [];
+  }
+}
+
+// Seed the synchronous cache for upgrading users.
+syntopiconSavedCache = readLegacySavedSyntopicon();
+
+function savedSyntopiconAnalyses() {
+  return syntopiconSavedCache;
+}
+
+function removeLegacySyntopiconStorage() {
+  try { localStorage.removeItem(SYNTOPICON_SAVED_KEY); } catch {}
+}
+
+function persistLegacySyntopiconFallback(items) {
+  try {
+    localStorage.setItem(
+      SYNTOPICON_SAVED_KEY,
+      JSON.stringify(normalizeSavedSyntopicon(items))
+    );
+    return true;
+  } catch (error) {
+    console.warn('Saved Syntopicon studies could not be persisted.', error);
+    return false;
+  }
+}
+
+async function persistSavedSyntopicon(items = syntopiconSavedCache) {
+  const normalized = normalizeSavedSyntopicon(items);
+  syntopiconSavedCache = normalized;
+
+  if (typeof cacheReadingBook !== 'function') {
+    return persistLegacySyntopiconFallback(normalized);
+  }
+
+  try {
+    const ok = await cacheReadingBook({
+      key: SYNTOPICON_SAVED_IDB_KEY,
+      type: 'syntopicon-saved-analyses',
+      items: normalized,
+      updatedAt: new Date().toISOString()
+    });
+
+    if (ok) {
+      removeLegacySyntopiconStorage();
+      return true;
+    }
+  } catch (error) {
+    console.warn('Saved Syntopicon IndexedDB persistence failed.', error);
+  }
+
+  // Durability fallback only if IndexedDB is unavailable.
+  return persistLegacySyntopiconFallback(normalized);
+}
+
+async function hydrateSyntopiconStorage() {
+  if (syntopiconStorageHydrationPromise) return syntopiconStorageHydrationPromise;
+
+  syntopiconStorageHydrationPromise = (async () => {
+    const legacy = readLegacySavedSyntopicon();
+
+    try {
+      const wrapper = typeof getCachedReadingBook === 'function'
+        ? await getCachedReadingBook(SYNTOPICON_SAVED_IDB_KEY)
+        : null;
+
+      if (syntopiconStorageDirty) {
+        const ok = await persistSavedSyntopicon(syntopiconSavedCache);
+        syntopiconStorageHydrated = true;
+        if (ok) syntopiconStorageDirty = false;
+        return {
+          hydrated: true,
+          studies: syntopiconSavedCache.length,
+          migrated: ok
+        };
+      }
+
+      if (Array.isArray(wrapper?.items)) {
+        syntopiconSavedCache = normalizeSavedSyntopicon(wrapper.items);
+        removeLegacySyntopiconStorage();
+        syntopiconStorageHydrated = true;
+        return {
+          hydrated: true,
+          studies: syntopiconSavedCache.length,
+          migrated: true
+        };
+      }
+
+      if (legacy.length) {
+        syntopiconSavedCache = legacy;
+        const ok = await persistSavedSyntopicon(legacy);
+        syntopiconStorageHydrated = true;
+        return {
+          hydrated: true,
+          studies: syntopiconSavedCache.length,
+          migrated: ok
+        };
+      }
+
+      syntopiconSavedCache = [];
+      syntopiconStorageHydrated = true;
+      return { hydrated: true, studies: 0, migrated: true };
+    } catch (error) {
+      console.warn('Saved Syntopicon migration was deferred.', error);
+      if (legacy.length) syntopiconSavedCache = legacy;
+      syntopiconStorageHydrated = true;
+      return {
+        hydrated: true,
+        studies: syntopiconSavedCache.length,
+        migrated: false
+      };
+    }
+  })();
+
+  return syntopiconStorageHydrationPromise;
+}
+
+function queueSyntopiconStorageWrite() {
+  syntopiconStorageWriteChain = syntopiconStorageWriteChain
+    .catch(() => false)
+    .then(async () => {
+      await hydrateSyntopiconStorage();
+      const ok = await persistSavedSyntopicon(syntopiconSavedCache);
+      if (ok) syntopiconStorageDirty = false;
+      return ok;
+    });
+
+  return syntopiconStorageWriteChain;
+}
+
+function saveSyntopiconAnalysis(value) {
+  if (!value || typeof value !== 'object' || !value.analysis) return false;
+
+  syntopiconSavedCache = normalizeSavedSyntopicon([
+    value,
+    ...syntopiconSavedCache
+  ]);
+  syntopiconStorageDirty = true;
+  void queueSyntopiconStorageWrite();
+  return true;
+}
+
+window.MarkSetGoSyntopiconStorage = Object.freeze({
+  hydrate: hydrateSyntopiconStorage,
+  getSaved: () => savedSyntopiconAnalyses().map((item) => ({ ...item })),
+  status: () => ({
+    hydrated: syntopiconStorageHydrated,
+    studies: syntopiconSavedCache.length,
+    legacyPresent: (() => {
+      try { return Boolean(localStorage.getItem(SYNTOPICON_SAVED_KEY)); }
+      catch { return false; }
+    })()
+  })
+});
+
+window.setTimeout(() => { void hydrateSyntopiconStorage(); }, 0);
+
 const studyLanguages = {
   en: 'English',
   es: 'Spanish',
@@ -19542,19 +19740,6 @@ function saveLastBiblePassage(value) {
   try { localStorage.setItem(LAST_BIBLE_PASSAGE_KEY, JSON.stringify(value)); } catch {}
 }
 
-function savedSyntopiconAnalyses() {
-  try {
-    const value = JSON.parse(localStorage.getItem(SYNTOPICON_SAVED_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch { return []; }
-}
-
-function saveSyntopiconAnalysis(value) {
-  const saved = savedSyntopiconAnalyses();
-  saved.unshift(value);
-  localStorage.setItem(SYNTOPICON_SAVED_KEY, JSON.stringify(saved.slice(0, 50)));
-}
-
 async function translateStudyBlock(text, targetLanguage, statusElement) {
   if (!text || !targetLanguage || targetLanguage === 'en') return text;
   if (statusElement) statusElement.textContent = `Translating to ${studyLanguages[targetLanguage] || targetLanguage}…`;
@@ -19594,7 +19779,8 @@ function renderSyntopiconResult(analysis, meta) {
   });
 }
 
-function renderSyntopicon() {
+async function renderSyntopicon() {
+  await hydrateSyntopiconStorage();
   recordLearningActivity('great-ideas', { title:state?.title || '' });
   stopReader();
   const lastBible = getLastBiblePassage();
