@@ -927,6 +927,7 @@
     const frame = reader?.closest('#reader-frame');
     frame?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
     reader?.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
+    reader?.querySelectorAll('[data-topic-feed-import-recovery]').forEach((node) => node.remove());
     removeTopicBookDivider();
   }
 
@@ -934,6 +935,103 @@
     const raw = String(text || '').trim();
     if (!raw) return '';
     return raw.replace(/\n{2,}\s*Source:\s*[^\n]+\nhttps?:\/\/\S+\s*$/i, '').trim();
+  }
+
+  const TOPIC_FEED_IMPORT_FALLBACK_TEXT = 'Full article text could not be imported from the publisher.';
+
+  function topicFeedImportFallbackNeeded(payload = {}) {
+    const warning = String(payload?.warning || '');
+    const body = String(payload?.text || '');
+    return Boolean(
+      payload?.fullArticle === false ||
+      warning.includes(TOPIC_FEED_IMPORT_FALLBACK_TEXT) ||
+      body.includes(TOPIC_FEED_IMPORT_FALLBACK_TEXT)
+    );
+  }
+
+  function ensureTopicFeedImportRecoveryStyles() {
+    if (document.getElementById('topic-feed-import-recovery-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'topic-feed-import-recovery-styles';
+    style.textContent = `
+      .topic-feed-import-recovery {
+        display: block;
+        margin: 14px 0 4px;
+        padding: 12px 14px;
+        border: 1px solid var(--msg-theme-border, rgba(148, 163, 184, .42));
+        border-radius: 12px;
+        background: var(--msg-theme-soft, rgba(15, 23, 42, .055));
+        color: var(--msg-theme-ink, inherit);
+        font-size: .95em;
+        line-height: 1.55;
+      }
+      .topic-feed-import-recovery p {
+        margin: 0;
+      }
+      .topic-feed-import-recovery a {
+        color: var(--msg-theme-accent, currentColor);
+        font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        cursor: pointer;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function openReadAnythingFromTopicFeed(event) {
+    event?.preventDefault?.();
+
+    if (typeof window.MarkSetGoReadAnything?.render === 'function') {
+      window.MarkSetGoReadAnything.render();
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        const bookmarkletButton = document.querySelector('#read-anything-bookmarklet');
+        bookmarkletButton?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      }));
+      return;
+    }
+
+    document.querySelector('[data-read="upload"], [data-action="read-anything"]')?.click?.();
+  }
+
+  function decorateTopicFeedImportRecovery(payload = activeTopicFeedHeaderContext?.payload || {}) {
+    const reader = document.querySelector('#reader');
+    if (!reader) return false;
+
+    reader.querySelectorAll('[data-topic-feed-import-recovery]').forEach((node) => node.remove());
+    if (!isTopicFeedReaderActive() || !topicFeedImportFallbackNeeded(payload)) return false;
+
+    ensureTopicFeedImportRecoveryStyles();
+
+    const notice = document.createElement('aside');
+    notice.className = 'topic-feed-import-recovery';
+    notice.dataset.topicFeedImportRecovery = '1';
+    notice.setAttribute('role', 'note');
+    notice.innerHTML = `
+      <p>
+        <strong>Want the full article?</strong>
+        Click <strong>View original</strong> above, then use the
+        <strong>Read with Mark</strong> bookmarklet to import the publisher page.
+        You can find the bookmarklet in the
+        <a href="#read-anything" data-topic-feed-open-read-anything>Read Anything section</a>.
+      </p>
+    `;
+
+    notice.querySelector('[data-topic-feed-open-read-anything]')
+      ?.addEventListener('click', openReadAnythingFromTopicFeed);
+
+    // Keep the recovery instruction in the scrolling article itself so it appears
+    // immediately after the publisher fallback sentence rather than in the fixed header.
+    reader.appendChild(notice);
+    return true;
+  }
+
+  function scheduleTopicFeedImportRecovery(payload = activeTopicFeedHeaderContext?.payload || {}) {
+    [0, 80, 220, 520, 900].forEach((delay) => {
+      window.setTimeout(() => {
+        if (isTopicFeedReaderActive()) decorateTopicFeedImportRecovery(payload);
+      }, delay);
+    });
   }
 
   function refreshActiveTopicFeedHeader() {
@@ -1109,6 +1207,7 @@
           keepTopicFeedArticleActionsInHeader();
           positionTopicFeedStoryHeader();
           decorateTopicFeedArticleFooter();
+          decorateTopicFeedImportRecovery(payload);
         }
       }, delay);
     });
@@ -1221,6 +1320,7 @@
     activeTopicFeedHeaderContext = { topic, article, payload };
     window.MarkSetGoReadAnything.openDocument(documentRecord);
     topicFeedSourceCredit(topic, article, payload);
+    scheduleTopicFeedImportRecovery(payload);
     scheduleReaderNavigation();
     return true;
   }
@@ -2658,6 +2758,7 @@
   function refreshReaderArticleChrome() {
     if (!isTopicFeedReaderActive() || !activeTopicFeedHeaderContext) return false;
     refreshActiveTopicFeedHeader();
+    scheduleTopicFeedImportRecovery(activeTopicFeedHeaderContext.payload || {});
     scheduleReaderNavigation();
     return true;
   }
