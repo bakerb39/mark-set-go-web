@@ -7664,7 +7664,7 @@ function renderComprehensionQuiz(quiz, context) {
   dialog.showModal();
 
   dialog.querySelector('#randomize-whole-guide')?.addEventListener('click', () => {
-    showModernGuideWholeQuizSetup(context.guideSource || state?.source || {});
+    void showModernGuideWholeQuizSetup(context.guideSource || state?.source || {});
   });
 
   dialog.querySelector('#score-comprehension')?.addEventListener('click', () => {
@@ -13622,32 +13622,231 @@ async function startModernGuideSectionComprehensionCheck(markerIndex, source = s
 
 const WHOLE_GUIDE_QUESTION_HISTORY_KEY = 'marksetgo_whole_guide_question_history_v1';
 
-function wholeGuideQuestionHistory(documentId = state?.documentId) {
-  if (!documentId) return [];
+// Phase 6 IndexedDB migration: whole-guide quiz history.
+// Each guide can retain up to 200 complete MCQ objects, so store each guide in
+// its own IndexedDB record rather than rewriting one potentially huge object.
+const WHOLE_GUIDE_HISTORY_INDEX_KEY = 'whole-guide-questions:index:v1';
+const WHOLE_GUIDE_HISTORY_RECORD_PREFIX = 'whole-guide-questions:v1:';
+const WHOLE_GUIDE_HISTORY_LIMIT = 200;
+
+const wholeGuideHistoryCache = new Map();
+const wholeGuideHistoryDirty = new Set();
+let wholeGuideHistoryHydrated = false;
+let wholeGuideHistoryHydrationPromise = null;
+let wholeGuideHistoryWriteChain = Promise.resolve(true);
+
+function normalizeWholeGuideQuestions(items) {
+  const normalized = [];
+  const seen = new Set();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item || typeof item !== 'object') continue;
+    const question = String(item.question || '').trim();
+    const dedupeKey = question.toLowerCase();
+    if (!question || seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    normalized.push(item);
+    if (normalized.length >= WHOLE_GUIDE_HISTORY_LIMIT) break;
+  }
+
+  return normalized;
+}
+
+function readLegacyWholeGuideHistoryStore() {
   try {
-    const store = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
-    return Array.isArray(store[documentId]) ? store[documentId] : [];
+    const parsed = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
-    return [];
+    return {};
   }
 }
 
-function rememberWholeGuideQuestions(documentId, questions = []) {
-  if (!documentId || !Array.isArray(questions) || !questions.length) return;
-  try {
-    const store = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
-    const previous = Array.isArray(store[documentId]) ? store[documentId] : [];
-    const merged = [...questions, ...previous];
-    const seen = new Set();
-    store[documentId] = merged.filter((item) => {
-      const key = String(item?.question || '').trim().toLowerCase();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).slice(0, 200);
-    localStorage.setItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY, JSON.stringify(store));
-  } catch {}
+function seedLegacyWholeGuideHistory() {
+  const legacy = readLegacyWholeGuideHistoryStore();
+  Object.entries(legacy).forEach(([documentId, items]) => {
+    const id = String(documentId || '');
+    if (!id) return;
+    wholeGuideHistoryCache.set(id, normalizeWholeGuideQuestions(items));
+  });
 }
+
+seedLegacyWholeGuideHistory();
+
+function wholeGuideHistoryRecordKey(documentId) {
+  return `${WHOLE_GUIDE_HISTORY_RECORD_PREFIX}${String(documentId || '')}`;
+}
+
+function wholeGuideQuestionHistory(documentId = state?.documentId) {
+  const id = String(documentId || '');
+  if (!id) return [];
+  return wholeGuideHistoryCache.get(id) || [];
+}
+
+function removeLegacyWholeGuideHistory() {
+  try { localStorage.removeItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY); } catch {}
+}
+
+async function persistWholeGuideHistoryIndex() {
+  if (typeof cacheReadingBook !== 'function') return false;
+  return Boolean(await cacheReadingBook({
+    key: WHOLE_GUIDE_HISTORY_INDEX_KEY,
+    type: 'whole-guide-question-index',
+    documentIds: [...wholeGuideHistoryCache.keys()].filter(Boolean),
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+async function persistWholeGuideHistoryDocument(documentId, items = wholeGuideQuestionHistory(documentId)) {
+  const id = String(documentId || '');
+  if (!id || typeof cacheReadingBook !== 'function') return false;
+
+  const normalized = normalizeWholeGuideQuestions(items);
+  wholeGuideHistoryCache.set(id, normalized);
+
+  return Boolean(await cacheReadingBook({
+    key: wholeGuideHistoryRecordKey(id),
+    type: 'whole-guide-question-history',
+    documentId: id,
+    questions: normalized,
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+async function hydrateWholeGuideQuestionHistory() {
+  if (wholeGuideHistoryHydrationPromise) return wholeGuideHistoryHydrationPromise;
+
+  wholeGuideHistoryHydrationPromise = (async () => {
+    const legacy = readLegacyWholeGuideHistoryStore();
+    let migratedDocuments = 0;
+    let failed = 0;
+
+    try {
+      const indexRecord = typeof getCachedReadingBook === 'function'
+        ? await getCachedReadingBook(WHOLE_GUIDE_HISTORY_INDEX_KEY)
+        : null;
+
+      const indexedIds = Array.isArray(indexRecord?.documentIds)
+        ? [...new Set(indexRecord.documentIds.map((value) => String(value || '')).filter(Boolean))]
+        : [];
+
+      for (const documentId of indexedIds) {
+        const wrapper = await getCachedReadingBook(wholeGuideHistoryRecordKey(documentId));
+        if (Array.isArray(wrapper?.questions) && !wholeGuideHistoryDirty.has(documentId)) {
+          wholeGuideHistoryCache.set(
+            documentId,
+            normalizeWholeGuideQuestions(wrapper.questions)
+          );
+        }
+      }
+
+      // Migrate every legacy-only guide. If the user modified a guide while
+      // hydration was running, the live in-memory copy wins.
+      for (const [legacyIdRaw, legacyQuestions] of Object.entries(legacy)) {
+        const documentId = String(legacyIdRaw || '');
+        if (!documentId) continue;
+
+        if (!wholeGuideHistoryCache.has(documentId)) {
+          wholeGuideHistoryCache.set(
+            documentId,
+            normalizeWholeGuideQuestions(legacyQuestions)
+          );
+        }
+
+        if (wholeGuideHistoryDirty.has(documentId)) continue;
+
+        if (!indexedIds.includes(documentId)) {
+          const ok = await persistWholeGuideHistoryDocument(
+            documentId,
+            wholeGuideHistoryCache.get(documentId)
+          );
+          if (ok) migratedDocuments += 1;
+          else failed += 1;
+        }
+      }
+
+      // Persist any user-updated guides that changed before hydration completed.
+      for (const documentId of [...wholeGuideHistoryDirty]) {
+        const ok = await persistWholeGuideHistoryDocument(
+          documentId,
+          wholeGuideHistoryCache.get(documentId)
+        );
+        if (ok) wholeGuideHistoryDirty.delete(documentId);
+        else failed += 1;
+      }
+
+      const indexSaved = await persistWholeGuideHistoryIndex();
+      if (indexSaved && failed === 0) removeLegacyWholeGuideHistory();
+      else if (!indexSaved) failed += 1;
+    } catch (error) {
+      failed += 1;
+      console.warn('Whole-guide quiz history migration was deferred.', error);
+    }
+
+    wholeGuideHistoryHydrated = true;
+    return {
+      hydrated: true,
+      guides: wholeGuideHistoryCache.size,
+      migratedDocuments,
+      failed
+    };
+  })();
+
+  return wholeGuideHistoryHydrationPromise;
+}
+
+function queueWholeGuideHistoryWrite(documentId) {
+  const id = String(documentId || '');
+  if (!id) return Promise.resolve(false);
+
+  wholeGuideHistoryWriteChain = wholeGuideHistoryWriteChain
+    .catch(() => false)
+    .then(async () => {
+      await hydrateWholeGuideQuestionHistory();
+      const saved = await persistWholeGuideHistoryDocument(
+        id,
+        wholeGuideHistoryCache.get(id)
+      );
+      if (!saved) return false;
+
+      const indexSaved = await persistWholeGuideHistoryIndex();
+      if (indexSaved) {
+        wholeGuideHistoryDirty.delete(id);
+        removeLegacyWholeGuideHistory();
+      }
+      return Boolean(indexSaved);
+    });
+
+  return wholeGuideHistoryWriteChain;
+}
+
+function rememberWholeGuideQuestions(documentId, questions = []) {
+  const id = String(documentId || '');
+  if (!id || !Array.isArray(questions) || !questions.length) return;
+
+  const previous = wholeGuideQuestionHistory(id);
+  wholeGuideHistoryCache.set(
+    id,
+    normalizeWholeGuideQuestions([...questions, ...previous])
+  );
+  wholeGuideHistoryDirty.add(id);
+  void queueWholeGuideHistoryWrite(id);
+}
+
+window.MarkSetGoWholeGuideHistory = Object.freeze({
+  hydrate: hydrateWholeGuideQuestionHistory,
+  get: (documentId) => wholeGuideQuestionHistory(documentId).map((item) => ({ ...item })),
+  status: () => ({
+    hydrated: wholeGuideHistoryHydrated,
+    guides: wholeGuideHistoryCache.size,
+    totalQuestions: [...wholeGuideHistoryCache.values()].reduce((sum, items) => sum + items.length, 0),
+    legacyPresent: (() => {
+      try { return Boolean(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY)); }
+      catch { return false; }
+    })()
+  })
+});
+
+window.setTimeout(() => { void hydrateWholeGuideQuestionHistory(); }, 0);
 
 function shuffledWholeGuideQuestions(items = []) {
   const copy = [...items];
@@ -13658,7 +13857,8 @@ function shuffledWholeGuideQuestions(items = []) {
   return copy;
 }
 
-function showModernGuideWholeQuizSetup(source = state?.source || {}) {
+async function showModernGuideWholeQuizSetup(source = state?.source || {}) {
+  await hydrateWholeGuideQuestionHistory();
   const dialog = app.querySelector('#comprehension-dialog');
   if (!dialog) return;
   const historyCount = wholeGuideQuestionHistory().length;
@@ -13705,6 +13905,8 @@ async function generateModernGuideWholeComprehensionCheck(source = state?.source
   if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
     return window.MarkSetGoStartComprehension?.();
   }
+
+  await hydrateWholeGuideQuestionHistory();
 
   const passageWords = state.words.filter((word) => !isModernGuideActionToken(word));
   const passage = passageWords.join(' ').replace(/\s+/g, ' ').trim();
@@ -13786,7 +13988,7 @@ async function startModernGuideWholeComprehensionCheck(source = state?.source ||
   if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
     return window.MarkSetGoStartComprehension?.();
   }
-  showModernGuideWholeQuizSetup(source);
+  await showModernGuideWholeQuizSetup(source);
 }
 
 function activateModernGuideInlineAction(button, source = state?.source || {}) {
