@@ -12949,60 +12949,670 @@ async function emailNotebookRecords(records,label='Mark Notebook') {
   }
 }
 
+
+const notebookInlineSaveTimers = new Map();
+let notebookSelectionState = null;
+let notebookDrawState = null;
+
+function notebookAnnotations(item) {
+  return Array.isArray(item?.notebookAnnotations)
+    ? item.notebookAnnotations.filter((entry) => entry && typeof entry === 'object').slice(-800)
+    : [];
+}
+
+function notebookDrawings(item) {
+  return Array.isArray(item?.notebookDrawings)
+    ? item.notebookDrawings.filter((entry) => entry && typeof entry === 'object').slice(-250)
+    : [];
+}
+
+function notebookSectionText(item, sectionKey) {
+  const key = String(sectionKey || '');
+  if (key === 'selection') return String(item?.selection || '');
+  if (key === 'question') return String(item?.question || '');
+  if (key === 'response') return String(item?.result?.response || '');
+
+  let match = /^keypoint-(\d+)$/.exec(key);
+  if (match) return String(item?.result?.keyPoints?.[Number(match[1])] || '');
+
+  match = /^caution-(\d+)$/.exec(key);
+  if (match) return String(item?.result?.cautions?.[Number(match[1])] || '');
+
+  return '';
+}
+
+function normalizeNotebookAnnotationColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : '#F7D34A';
+}
+
+function notebookAnnotatedHtml(item, sectionKey, textValue) {
+  const text = String(textValue || '');
+  if (!text) return '';
+
+  const relevant = notebookAnnotations(item)
+    .filter((entry) => String(entry.section || '') === String(sectionKey || ''))
+    .map((entry, order) => ({
+      ...entry,
+      order,
+      start:Math.max(0, Math.min(text.length, Number(entry.start) || 0)),
+      end:Math.max(0, Math.min(text.length, Number(entry.end) || 0))
+    }))
+    .filter((entry) => entry.end > entry.start);
+
+  if (!relevant.length) return escapeHtml(text).replace(/\n/g, '<br>');
+
+  const boundaries = new Set([0, text.length]);
+  relevant.forEach((entry) => {
+    boundaries.add(entry.start);
+    boundaries.add(entry.end);
+  });
+  const points = [...boundaries].sort((a,b) => a-b);
+
+  let html = '';
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const start = points[i];
+    const end = points[i + 1];
+    if (end <= start) continue;
+
+    const segment = text.slice(start, end);
+    const active = relevant
+      .filter((entry) => entry.start <= start && entry.end >= end)
+      .sort((a,b) => a.order-b.order)
+      .at(-1);
+
+    const escaped = escapeHtml(segment).replace(/\n/g, '<br>');
+    if (!active) {
+      html += escaped;
+      continue;
+    }
+
+    const note = String(active.note || '').trim();
+    html += `<mark class="notebook-text-highlight${note ? ' has-note' : ''}"
+      data-notebook-annotation-id="${escapeHtml(String(active.id || ''))}"
+      style="--notebook-highlight:${escapeHtml(normalizeNotebookAnnotationColor(active.color))}"
+      ${note ? `title="${escapeHtml(note)}"` : ''}>${escaped}</mark>`;
+  }
+
+  return html;
+}
+
+function updateNotebookRecord(recordId, updater) {
+  const id = String(recordId || '');
+  if (!id || typeof updater !== 'function') return null;
+
+  const current = getMarkRecords(MARK_INSIGHTS_KEY);
+  const index = current.findIndex((item) => String(item.id) === id);
+  if (index < 0) return null;
+
+  const original = current[index];
+  const candidate = updater({ ...original }) || original;
+  const updated = {
+    ...candidate,
+    id:original.id,
+    updatedAt:new Date().toISOString()
+  };
+
+  const next = [...current];
+  next[index] = updated;
+  saveMarkRecords(MARK_INSIGHTS_KEY, next);
+  document.dispatchEvent(new CustomEvent('marksetgo:notebook-changed', {
+    detail:{ id, updated }
+  }));
+  return updated;
+}
+
+function notebookSectionSelector(recordId, sectionKey) {
+  const escape = (value) => window.CSS?.escape
+    ? CSS.escape(String(value))
+    : String(value).replace(/["\\]/g, '\\$&');
+
+  return `[data-notebook-record-id="${escape(recordId)}"] [data-notebook-annotatable="${escape(sectionKey)}"]`;
+}
+
+function refreshNotebookAnnotatedSection(recordId, sectionKey) {
+  const item = getMarkRecords(MARK_INSIGHTS_KEY).find((entry) => String(entry.id) === String(recordId));
+  if (!item) return false;
+  const node = document.querySelector(notebookSectionSelector(recordId, sectionKey));
+  if (!node) return false;
+  const text = notebookSectionText(item, sectionKey);
+  node.innerHTML = notebookAnnotatedHtml(item, sectionKey, text);
+  return true;
+}
+
+function saveNotebookInlineNote(recordId, text, statusNode = null) {
+  const value = String(text || '');
+  const updated = updateNotebookRecord(recordId, (item) => ({
+    ...item,
+    note:value.trimEnd()
+  }));
+  if (!updated) return false;
+
+  if (statusNode) {
+    statusNode.textContent = 'Saved';
+    statusNode.classList.add('saved');
+    window.setTimeout(() => {
+      if (statusNode.isConnected && statusNode.textContent === 'Saved') {
+        statusNode.textContent = '';
+        statusNode.classList.remove('saved');
+      }
+    }, 1200);
+  }
+  return true;
+}
+
+function queueNotebookInlineNoteSave(textarea) {
+  const recordId = String(textarea?.dataset?.notebookNoteEditor || '');
+  if (!recordId) return;
+
+  const article = textarea.closest('[data-notebook-record-id]');
+  const status = article?.querySelector('[data-notebook-note-status]');
+  if (status) {
+    status.textContent = 'Saving…';
+    status.classList.remove('saved');
+  }
+
+  window.clearTimeout(notebookInlineSaveTimers.get(recordId));
+  const timer = window.setTimeout(() => {
+    notebookInlineSaveTimers.delete(recordId);
+    saveNotebookInlineNote(recordId, textarea.value, status);
+  }, 450);
+  notebookInlineSaveTimers.set(recordId, timer);
+}
+
+function captureNotebookSelection(panel) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+
+  const range = selection.getRangeAt(0);
+  const startElement = range.startContainer.nodeType === Node.ELEMENT_NODE
+    ? range.startContainer
+    : range.startContainer.parentElement;
+  const endElement = range.endContainer.nodeType === Node.ELEMENT_NODE
+    ? range.endContainer
+    : range.endContainer.parentElement;
+
+  const startSection = startElement?.closest?.('[data-notebook-annotatable]');
+  const endSection = endElement?.closest?.('[data-notebook-annotatable]');
+  if (!startSection || startSection !== endSection || !panel.contains(startSection)) return null;
+
+  const article = startSection.closest('[data-notebook-record-id]');
+  const recordId = String(article?.dataset?.notebookRecordId || '');
+  const section = String(startSection.dataset.notebookAnnotatable || '');
+  if (!recordId || !section) return null;
+
+  const prefix = range.cloneRange();
+  prefix.selectNodeContents(startSection);
+  try {
+    prefix.setEnd(range.startContainer, range.startOffset);
+  } catch {
+    return null;
+  }
+
+  const start = prefix.toString().length;
+  const selectedText = range.toString();
+  const end = start + selectedText.length;
+  if (!selectedText.trim() || end <= start) return null;
+
+  return {
+    recordId,
+    section,
+    start,
+    end,
+    text:selectedText,
+    rect:range.getBoundingClientRect()
+  };
+}
+
+function ensureNotebookSelectionToolbar() {
+  let toolbar = document.querySelector('#notebook-selection-toolbar');
+  if (toolbar) return toolbar;
+
+  toolbar = document.createElement('div');
+  toolbar.id = 'notebook-selection-toolbar';
+  toolbar.className = 'notebook-selection-toolbar';
+  toolbar.hidden = true;
+  toolbar.setAttribute('role','toolbar');
+  toolbar.setAttribute('aria-label','Notebook annotation tools');
+  toolbar.innerHTML = `
+    <div class="notebook-selection-toolbar-main">
+      <span class="notebook-selection-label">Annotate</span>
+      <button type="button" class="notebook-highlight-swatch" data-notebook-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button>
+      <button type="button" class="notebook-highlight-swatch" data-notebook-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button>
+      <button type="button" class="notebook-highlight-swatch" data-notebook-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button>
+      <button type="button" class="notebook-highlight-swatch" data-notebook-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button>
+      <button type="button" data-notebook-selection-note title="Write a note on this selection">✎ Note</button>
+      <button type="button" data-notebook-selection-erase title="Erase annotations from this selection">⌫</button>
+      <button type="button" data-notebook-selection-close aria-label="Close annotation tools">×</button>
+    </div>
+    <div class="notebook-selection-note-editor" data-notebook-selection-note-editor hidden>
+      <textarea rows="2" maxlength="1000" placeholder="Write on this selection…" aria-label="Annotation note"></textarea>
+      <div>
+        <button type="button" data-notebook-selection-note-cancel>Cancel</button>
+        <button type="button" data-notebook-selection-note-save>Save note</button>
+      </div>
+    </div>`;
+  document.body.appendChild(toolbar);
+
+  toolbar.addEventListener('mousedown', (event) => {
+    if (!event.target.closest('textarea,input,select')) event.preventDefault();
+  });
+
+  const hide = () => {
+    toolbar.hidden = true;
+    toolbar.querySelector('[data-notebook-selection-note-editor]').hidden = true;
+    notebookSelectionState = null;
+  };
+
+  toolbar.querySelector('[data-notebook-selection-close]')?.addEventListener('click', hide);
+
+  toolbar.querySelectorAll('[data-notebook-highlight-color]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const selected = notebookSelectionState;
+      if (!selected) return;
+
+      const annotation = {
+        id:`nb-ann-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+        section:selected.section,
+        start:selected.start,
+        end:selected.end,
+        color:normalizeNotebookAnnotationColor(button.dataset.notebookHighlightColor),
+        note:'',
+        createdAt:new Date().toISOString()
+      };
+
+      updateNotebookRecord(selected.recordId, (item) => ({
+        ...item,
+        notebookAnnotations:[...notebookAnnotations(item), annotation].slice(-800)
+      }));
+      refreshNotebookAnnotatedSection(selected.recordId, selected.section);
+      window.getSelection()?.removeAllRanges?.();
+      hide();
+    });
+  });
+
+  toolbar.querySelector('[data-notebook-selection-note]')?.addEventListener('click', () => {
+    const editor = toolbar.querySelector('[data-notebook-selection-note-editor]');
+    if (!editor) return;
+    editor.hidden = false;
+    requestAnimationFrame(() => editor.querySelector('textarea')?.focus());
+  });
+
+  toolbar.querySelector('[data-notebook-selection-note-cancel]')?.addEventListener('click', () => {
+    const editor = toolbar.querySelector('[data-notebook-selection-note-editor]');
+    if (editor) editor.hidden = true;
+  });
+
+  toolbar.querySelector('[data-notebook-selection-note-save]')?.addEventListener('click', () => {
+    const selected = notebookSelectionState;
+    const textarea = toolbar.querySelector('[data-notebook-selection-note-editor] textarea');
+    const note = String(textarea?.value || '').trim();
+    if (!selected || !note) {
+      textarea?.focus();
+      return;
+    }
+
+    const annotation = {
+      id:`nb-ann-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+      section:selected.section,
+      start:selected.start,
+      end:selected.end,
+      color:'#F7D34A',
+      note,
+      createdAt:new Date().toISOString()
+    };
+
+    updateNotebookRecord(selected.recordId, (item) => ({
+      ...item,
+      notebookAnnotations:[...notebookAnnotations(item), annotation].slice(-800)
+    }));
+    refreshNotebookAnnotatedSection(selected.recordId, selected.section);
+    if (textarea) textarea.value = '';
+    window.getSelection()?.removeAllRanges?.();
+    hide();
+  });
+
+  toolbar.querySelector('[data-notebook-selection-erase]')?.addEventListener('click', () => {
+    const selected = notebookSelectionState;
+    if (!selected) return;
+
+    updateNotebookRecord(selected.recordId, (item) => ({
+      ...item,
+      notebookAnnotations:notebookAnnotations(item).filter((annotation) => {
+        if (String(annotation.section || '') !== selected.section) return true;
+        const start = Number(annotation.start) || 0;
+        const end = Number(annotation.end) || 0;
+        return end <= selected.start || start >= selected.end;
+      })
+    }));
+    refreshNotebookAnnotatedSection(selected.recordId, selected.section);
+    window.getSelection()?.removeAllRanges?.();
+    hide();
+  });
+
+  return toolbar;
+}
+
+function showNotebookSelectionToolbar(panel) {
+  const selected = captureNotebookSelection(panel);
+  const toolbar = ensureNotebookSelectionToolbar();
+  if (!selected) {
+    toolbar.hidden = true;
+    notebookSelectionState = null;
+    return false;
+  }
+
+  notebookSelectionState = selected;
+  toolbar.querySelector('[data-notebook-selection-note-editor]').hidden = true;
+  const noteText = toolbar.querySelector('[data-notebook-selection-note-editor] textarea');
+  if (noteText) noteText.value = '';
+
+  toolbar.hidden = false;
+  const toolbarRect = toolbar.getBoundingClientRect();
+  const left = Math.max(8, Math.min(
+    window.innerWidth - toolbarRect.width - 8,
+    selected.rect.left + (selected.rect.width / 2) - (toolbarRect.width / 2)
+  ));
+  const top = Math.max(8, selected.rect.top - toolbarRect.height - 8);
+  toolbar.style.left = `${Math.round(left)}px`;
+  toolbar.style.top = `${Math.round(top)}px`;
+  return true;
+}
+
+function notebookCanvasContext(canvas) {
+  return canvas?.getContext?.('2d') || null;
+}
+
+function sizeNotebookDrawingCanvas(article, item) {
+  const canvas = article?.querySelector('[data-notebook-drawing-layer]');
+  if (!canvas) return null;
+
+  const width = Math.max(1, Math.round(article.clientWidth));
+  const height = Math.max(1, Math.round(article.scrollHeight));
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+
+  const context = notebookCanvasContext(canvas);
+  if (!context) return canvas;
+  context.setTransform(dpr,0,0,dpr,0,0);
+  context.clearRect(0,0,width,height);
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+
+  for (const stroke of notebookDrawings(item)) {
+    const points = Array.isArray(stroke.points) ? stroke.points : [];
+    if (points.length < 2) continue;
+
+    context.beginPath();
+    context.strokeStyle = normalizeNotebookAnnotationColor(stroke.color || '#C98900');
+    context.lineWidth = Math.max(1, Number(stroke.width) || 4);
+    context.moveTo(
+      Math.max(0, Math.min(width, Number(points[0].x) * width)),
+      Math.max(0, Math.min(height, Number(points[0].y) * height))
+    );
+    points.slice(1).forEach((point) => {
+      context.lineTo(
+        Math.max(0, Math.min(width, Number(point.x) * width)),
+        Math.max(0, Math.min(height, Number(point.y) * height))
+      );
+    });
+    context.stroke();
+  }
+  return canvas;
+}
+
+function renderNotebookDrawings(panel, records) {
+  if (!panel) return;
+  requestAnimationFrame(() => {
+    panel.querySelectorAll('[data-notebook-record-id]').forEach((article) => {
+      const item = records.find((record) => String(record.id) === String(article.dataset.notebookRecordId));
+      if (item) sizeNotebookDrawingCanvas(article, item);
+    });
+  });
+
+  if (!window.__MSG_NOTEBOOK_DRAWING_RESIZE_BOUND__) {
+    window.__MSG_NOTEBOOK_DRAWING_RESIZE_BOUND__ = true;
+    window.addEventListener('resize', () => {
+      const activePanel = document.querySelector('#global-notebook-entries')
+        || document.querySelector('#mark-notebook-panel')
+        || document.querySelector('#fullscreen-mark-notebook');
+      if (!activePanel) return;
+      const all = getMarkRecords(MARK_INSIGHTS_KEY);
+      requestAnimationFrame(() => renderNotebookDrawings(activePanel, all));
+    });
+  }
+}
+
+function bindNotebookDrawingTools(panel, records) {
+  panel.querySelectorAll('[data-notebook-draw]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const article = button.closest('[data-notebook-record-id]');
+      const recordId = String(article?.dataset?.notebookRecordId || '');
+      const item = getMarkRecords(MARK_INSIGHTS_KEY).find((record) => String(record.id) === recordId);
+      if (!article || !item) return;
+
+      const canvas = sizeNotebookDrawingCanvas(article, item);
+      const tools = article.querySelector('[data-notebook-drawing-tools]');
+      if (!canvas || !tools) return;
+
+      const enabled = !article.classList.contains('notebook-drawing-active');
+      panel.querySelectorAll('.notebook-drawing-active').forEach((other) => {
+        if (other === article) return;
+        other.classList.remove('notebook-drawing-active');
+        const otherTools = other.querySelector('[data-notebook-drawing-tools]');
+        if (otherTools) otherTools.hidden = true;
+      });
+      article.classList.toggle('notebook-drawing-active', enabled);
+      tools.hidden = !enabled;
+
+      if (!enabled || canvas.dataset.notebookDrawingBound === '1') return;
+      canvas.dataset.notebookDrawingBound = '1';
+
+      const pointFor = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x:Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(1, rect.width))),
+          y:Math.max(0, Math.min(1, (event.clientY - rect.top) / Math.max(1, rect.height)))
+        };
+      };
+
+      canvas.addEventListener('pointerdown', (event) => {
+        if (!article.classList.contains('notebook-drawing-active')) return;
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+        const color = article.querySelector('[data-notebook-drawing-color]')?.value || '#C98900';
+        const thickness = Number(article.querySelector('[data-notebook-drawing-thickness]')?.value) || 4;
+        notebookDrawState = {
+          article,
+          recordId,
+          pointerId:event.pointerId,
+          stroke:{
+            id:`nb-draw-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+            color:normalizeNotebookAnnotationColor(color),
+            width:thickness,
+            points:[pointFor(event)],
+            createdAt:new Date().toISOString()
+          }
+        };
+        try { canvas.setPointerCapture(event.pointerId); } catch {}
+        event.preventDefault();
+      });
+
+      canvas.addEventListener('pointermove', (event) => {
+        if (!notebookDrawState || notebookDrawState.article !== article || notebookDrawState.pointerId !== event.pointerId) return;
+        notebookDrawState.stroke.points.push(pointFor(event));
+
+        const liveItem = {
+          ...item,
+          notebookDrawings:[...notebookDrawings(item), notebookDrawState.stroke]
+        };
+        sizeNotebookDrawingCanvas(article, liveItem);
+        event.preventDefault();
+      });
+
+      const finish = (event) => {
+        if (!notebookDrawState || notebookDrawState.article !== article || notebookDrawState.pointerId !== event.pointerId) return;
+        try { canvas.releasePointerCapture(event.pointerId); } catch {}
+        const stroke = notebookDrawState.stroke;
+        notebookDrawState = null;
+        if (stroke.points.length < 2) return;
+
+        const updated = updateNotebookRecord(recordId, (record) => ({
+          ...record,
+          notebookDrawings:[...notebookDrawings(record), stroke].slice(-250)
+        }));
+        if (updated) sizeNotebookDrawingCanvas(article, updated);
+      };
+      canvas.addEventListener('pointerup', finish);
+      canvas.addEventListener('pointercancel', finish);
+    });
+  });
+
+  panel.querySelectorAll('[data-notebook-drawing-done]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const article = button.closest('[data-notebook-record-id]');
+      article?.classList.remove('notebook-drawing-active');
+      const tools = article?.querySelector('[data-notebook-drawing-tools]');
+      if (tools) tools.hidden = true;
+    });
+  });
+
+  panel.querySelectorAll('[data-notebook-drawing-clear]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const article = button.closest('[data-notebook-record-id]');
+      const recordId = String(article?.dataset?.notebookRecordId || '');
+      if (!recordId) return;
+      const updated = updateNotebookRecord(recordId, (item) => ({
+        ...item,
+        notebookDrawings:[]
+      }));
+      if (updated) sizeNotebookDrawingCanvas(article, updated);
+    });
+  });
+}
+
+function bindNotebookFlexibleInteractions(panel, records) {
+  if (!panel) return;
+
+  panel.querySelectorAll('[data-notebook-note-editor]').forEach((textarea) => {
+    textarea.addEventListener('input', () => queueNotebookInlineNoteSave(textarea));
+    textarea.addEventListener('blur', () => {
+      const id = String(textarea.dataset.notebookNoteEditor || '');
+      window.clearTimeout(notebookInlineSaveTimers.get(id));
+      notebookInlineSaveTimers.delete(id);
+      const status = textarea.closest('[data-notebook-record-id]')?.querySelector('[data-notebook-note-status]');
+      saveNotebookInlineNote(id, textarea.value, status);
+    });
+  });
+
+  panel.addEventListener('mouseup', (event) => {
+    if (event.target.closest('button,textarea,input,select,a,summary')) return;
+    window.setTimeout(() => showNotebookSelectionToolbar(panel), 0);
+  });
+
+  panel.addEventListener('keyup', (event) => {
+    if (!event.shiftKey || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)) return;
+    window.setTimeout(() => showNotebookSelectionToolbar(panel), 0);
+  });
+
+  bindNotebookDrawingTools(panel, records);
+  renderNotebookDrawings(panel, records);
+}
+
 function notebookEntryMarkup(item) {
   const response=item.result?.response||'';
-  return `<article class="mark-record expanded-notebook-record">
+  const annotations = notebookAnnotations(item);
+  const drawings = notebookDrawings(item);
+
+  return `<article class="mark-record expanded-notebook-record"
+    data-notebook-record-id="${escapeHtml(String(item.id || ''))}">
     <header class="notebook-record-header">
       <div><strong>${escapeHtml(item.title||'Untitled')}</strong><small>${escapeHtml(item.chapter||item.pageContext||'Notebook entry')} · ${escapeHtml(new Date(item.createdAt||Date.now()).toLocaleString())}</small></div>
       <span>${item.result?'Ask Mark insight':item.recordType==='personal-note'?'Personal note':'Passage'}</span>
     </header>
-    ${item.selection?`<section class="notebook-passage"><h4>Relevant passage</h4><blockquote>${escapeHtml(item.selection)}</blockquote></section>`:''}
-    ${item.note?`<section class="notebook-personal-note"><h4>My note</h4><p>${escapeHtml(item.note)}</p></section>`:''}
-    ${item.question?`<section><h4>Question</h4><p>${escapeHtml(item.question)}</p></section>`:''}
-    ${response?`<section class="notebook-mark-response"><h4>${escapeHtml(item.result?.heading||'Ask Mark’s response')}</h4><p>${escapeHtml(response)}</p></section>`:''}
-    ${item.result?.keyPoints?.length?`<section><h4>Key points</h4><ul>${item.result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section>`:''}
-    ${item.result?.cautions?.length?`<section><h4>Notes and cautions</h4><ul>${item.result.cautions.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section>`:''}
+
+    ${item.selection?`<section class="notebook-passage">
+      <h4>Relevant passage</h4>
+      <blockquote data-notebook-annotatable="selection">${notebookAnnotatedHtml(item,'selection',item.selection)}</blockquote>
+    </section>`:''}
+
+    <section class="notebook-personal-note notebook-inline-note-section">
+      <div class="notebook-inline-note-heading">
+        <h4>My note</h4>
+        <small data-notebook-note-status></small>
+      </div>
+      <textarea class="notebook-inline-note-editor"
+        data-notebook-note-editor="${escapeHtml(String(item.id || ''))}"
+        rows="2"
+        maxlength="12000"
+        placeholder="Write a thought, question, connection, or reminder here…">${escapeHtml(item.note||'')}</textarea>
+    </section>
+
+    ${item.question?`<section><h4>Question</h4><p data-notebook-annotatable="question">${notebookAnnotatedHtml(item,'question',item.question)}</p></section>`:''}
+    ${response?`<section class="notebook-mark-response"><h4>${escapeHtml(item.result?.heading||'Ask Mark’s response')}</h4><p data-notebook-annotatable="response">${notebookAnnotatedHtml(item,'response',response)}</p></section>`:''}
+
+    ${item.result?.keyPoints?.length?`<section><h4>Key points</h4><ul>${item.result.keyPoints.map((x,index)=>`<li data-notebook-annotatable="keypoint-${index}">${notebookAnnotatedHtml(item,`keypoint-${index}`,x)}</li>`).join('')}</ul></section>`:''}
+
+    ${item.result?.cautions?.length?`<section><h4>Notes and cautions</h4><ul>${item.result.cautions.map((x,index)=>`<li data-notebook-annotatable="caution-${index}">${notebookAnnotatedHtml(item,`caution-${index}`,x)}</li>`).join('')}</ul></section>`:''}
+
     <details class="notebook-plain-text"><summary>View as plain text</summary><pre>${escapeHtml(notebookRecordFullText(item))}</pre></details>
-    <div class="notebook-record-actions">
-      ${item.documentId?`<button type="button" data-mark-jump="${Number(item.startIndex)||0}">Return to passage</button>`:''}
-      <button type="button" data-share-notebook-record="chat" data-share-notebook-id="${escapeHtml(item.id)}">💬 Send to Chat</button>
-      <button type="button" data-share-notebook-record="symposium" data-share-notebook-id="${escapeHtml(item.id)}">🏛 Discuss in Symposium</button>
-      <button type="button" data-export-notebook-record="${escapeHtml(item.id)}">Save as text</button>
-      <button type="button" data-edit-notebook-note="${escapeHtml(item.id)}">Add/Edit my note</button>
-      <button type="button" data-mark-delete="${escapeHtml(item.id)}">Delete</button>
+
+    <div class="notebook-record-actions compact-action-strip" aria-label="Notebook entry actions">
+      ${item.documentId?`<button type="button" class="notebook-action" data-mark-jump="${Number(item.startIndex)||0}" data-mark-document="${escapeHtml(String(item.documentId || ''))}" title="Return to passage" aria-label="Return to passage">↩ <span>Passage</span></button>`:''}
+      <button type="button" class="notebook-action" data-share-notebook-record="chat" data-share-notebook-id="${escapeHtml(item.id)}" title="Send to Chat">💬 <span>Chat</span></button>
+      <button type="button" class="notebook-action" data-share-notebook-record="symposium" data-share-notebook-id="${escapeHtml(item.id)}" title="Discuss in Symposium">🏛 <span>Symposium</span></button>
+      <button type="button" class="notebook-action" data-notebook-draw title="Draw directly on this entry">✐ <span>Draw</span></button>
+      <button type="button" class="notebook-action" data-export-notebook-record="${escapeHtml(item.id)}" title="Save this entry as text">⇩ <span>Text</span></button>
+      <button type="button" class="notebook-action notebook-delete-action" data-mark-delete="${escapeHtml(item.id)}" title="Delete this entry" aria-label="Delete this notebook entry">×</button>
+    </div>
+
+    <canvas class="notebook-drawing-layer${drawings.length ? ' has-drawing' : ''}" data-notebook-drawing-layer aria-hidden="true"></canvas>
+    <div class="notebook-drawing-tools" data-notebook-drawing-tools hidden>
+      <strong>Draw</strong>
+      <label class="notebook-drawing-color-label">
+        <span>Color</span>
+        <input type="color" data-notebook-drawing-color value="#C98900" aria-label="Drawing color">
+      </label>
+      <label>
+        <span>Size</span>
+        <select data-notebook-drawing-thickness aria-label="Drawing thickness">
+          <option value="2">Thin</option>
+          <option value="4" selected>Medium</option>
+          <option value="7">Thick</option>
+          <option value="12">Marker</option>
+        </select>
+      </label>
+      <button type="button" data-notebook-drawing-clear>Clear</button>
+      <button type="button" data-notebook-drawing-done>Done</button>
     </div>
   </article>`;
 }
-
 function bindExpandedNotebookButtons(panel,records,key=MARK_INSIGHTS_KEY) {
   bindMarkRecordButtons(panel,key);
+
   panel.querySelectorAll('[data-share-notebook-record]').forEach(button=>button.addEventListener('click',()=>{
     const item=records.find(x=>x.id===button.dataset.shareNotebookId);
     if(!item)return;
     shareMarkRecord(item,button.dataset.shareNotebookRecord,{sourceLabel:'Notebook',type:'notebook-entry'});
   }));
+
   panel.querySelectorAll('[data-export-notebook-record]').forEach(button=>button.addEventListener('click',()=>{
     const item=records.find(x=>x.id===button.dataset.exportNotebookRecord);
     if(item)exportNotebookRecords([item],`${item.title||'Book'} - Notebook Entry`);
   }));
-  panel.querySelectorAll('[data-edit-notebook-note]').forEach(button=>button.addEventListener('click',()=>{
-    const current=getMarkRecords(MARK_INSIGHTS_KEY);
-    const item=current.find(x=>x.id===button.dataset.editNotebookNote);
-    if(!item)return;
-    const note=window.prompt('Add or edit your personal note:',item.note||'');
-    if(note===null)return;
-    saveMarkRecords(MARK_INSIGHTS_KEY,current.map(x=>x.id===item.id?{...x,note:note.trim(),updatedAt:new Date().toISOString()}:x));
-    renderMarkNotebook();renderFullscreenMarkNotebook();renderGlobalNotebookEntries();
-  }));
-}
 
+  bindNotebookFlexibleInteractions(panel,records);
+}
 function renderNotebookCollection(panel,records,{title='Ask Mark Notebook',includeExport=true}={}) {
   if(!panel)return;
   panel.innerHTML=`<div class="mark-list-heading notebook-list-heading">
     <div><strong>${escapeHtml(title)}</strong><small>${records.length} saved ${records.length===1?'entry':'entries'}</small></div>
-    <div class="notebook-heading-actions">
-      <button type="button" data-email-notebook-all>Email notes</button>
-      ${includeExport?'<button type="button" data-export-notebook-all>Save as text</button>':''}
+    <div class="notebook-heading-actions compact-action-strip">
+      <button type="button" class="notebook-action" data-email-notebook-all title="Email notebook entries">✉ <span>Email</span></button>
+      ${includeExport?'<button type="button" class="notebook-action" data-export-notebook-all title="Save notebook as text">⇩ <span>Text</span></button>':''}
     </div>
   </div>
   ${records.length?records.map(notebookEntryMarkup).join(''):'<p class="mark-empty-note">Capture a passage, a response from Ask Mark, or one of your own thoughts to begin the notebook.</p>'}`;
@@ -13027,8 +13637,43 @@ function renderMarkHistory(){
   }));
 }
 function bindMarkRecordButtons(panel,key){
-  panel.querySelectorAll('[data-mark-jump]').forEach(b=>b.addEventListener('click',()=>{const index=Number(b.dataset.markJump)||0;state.index=index;const reader=app.querySelector('#reader');const mode=state.renderedMode||getSelectedMode();const count=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);restoreReadingAnchor(reader,mode,count,index);updateReaderStatus();}));
-  panel.querySelectorAll('[data-mark-delete]').forEach(b=>b.addEventListener('click',()=>{saveMarkRecords(key,getMarkRecords(key).filter(x=>x.id!==b.dataset.markDelete));key===MARK_INSIGHTS_KEY?renderMarkNotebook():renderMarkHistory();}));
+  panel.querySelectorAll('[data-mark-jump]').forEach(b=>b.addEventListener('click',async()=>{
+    const index=Number(b.dataset.markJump)||0;
+    const documentId=String(b.dataset.markDocument||'').trim();
+
+    if(!app.querySelector('#reader')){
+      if(documentId && documentId!==state.documentId){
+        const data=await getStoredReaderDocument(documentId);
+        if(!data?.text){
+          window.alert('The source text is not stored in this browser.');
+          return;
+        }
+        renderReaderWithText(data.title,data.text,data.source||{type:'saved'});
+      }else{
+        renderCurrentReader();
+      }
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    }
+
+    state.index=index;
+    const reader=app.querySelector('#reader');
+    if(!reader)return;
+    const mode=state.renderedMode||getSelectedMode();
+    const count=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);
+    restoreReadingAnchor(reader,mode,count,index);
+    updateReaderStatus();
+  }));
+
+  panel.querySelectorAll('[data-mark-delete]').forEach(b=>b.addEventListener('click',()=>{
+    saveMarkRecords(key,getMarkRecords(key).filter(x=>x.id!==b.dataset.markDelete));
+    if(key===MARK_INSIGHTS_KEY){
+      try{renderMarkNotebook();}catch{}
+      try{renderFullscreenMarkNotebook();}catch{}
+      try{renderGlobalNotebookEntries();}catch{}
+    }else{
+      renderMarkHistory();
+    }
+  }));
 }
 function selectReaderParagraphFromEvent(event){
   const reader=app.querySelector('#reader'); if(!reader)return;
@@ -24292,7 +24937,8 @@ function renderGlobalNotebookEntries(){
   if(!panel)return;
   const query=(app.querySelector('#global-notebook-search')?.value||'').trim().toLowerCase();
   const records=getMarkRecords(MARK_INSIGHTS_KEY).filter(item=>!query||[
-    item.title,item.chapter,item.selection,item.note,item.question,item.result?.heading,item.result?.response
+    item.title,item.chapter,item.selection,item.note,item.question,item.result?.heading,item.result?.response,
+    ...notebookAnnotations(item).map(annotation=>annotation.note)
   ].filter(Boolean).join(' ').toLowerCase().includes(query));
   renderNotebookCollection(panel,records,{title:'All Notebook Entries'});
 }
@@ -24303,27 +24949,65 @@ function renderGlobalNotebook(){
   app.innerHTML=`<section class="platform-page global-notebook-page">
     <header class="platform-hero">
       <div><span class="source-category">Ask Mark</span><h1>Notebook</h1><p>Keep passages, Mark’s full responses, and your own thoughts together across every book and page in the app.</p></div>
-      <div class="global-notebook-actions"><button class="primary" type="button" id="add-global-notebook-note">＋ New note</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
+      <div class="global-notebook-actions compact-action-strip">
+        <button class="notebook-action" type="button" data-action="reader" title="Return to Reader">↩ <span>Reader</span></button>
+      </div>
     </header>
+
+    <section class="notebook-quick-composer" aria-label="Quick note">
+      <input id="global-notebook-new-title" type="text" maxlength="180" placeholder="Quick note title (optional)">
+      <textarea id="global-notebook-new-note" rows="3" maxlength="12000" placeholder="Write a new note here…"></textarea>
+      <div class="notebook-quick-composer-actions">
+        <small>Ctrl/⌘ + Enter to save</small>
+        <button type="button" class="notebook-action notebook-quick-save" id="add-global-notebook-note">＋ <span>Save note</span></button>
+      </div>
+    </section>
+
     <div class="global-notebook-toolbar">
       <label>Search notebook<input id="global-notebook-search" type="search" placeholder="Book, passage, thought, theme…"></label>
-      <p>Notebook entries are stored locally in this browser. Export important work as text for backup or use elsewhere.</p>
+      <p>Select text anywhere in an entry to highlight it or attach a note. Use Draw for freehand annotation.</p>
     </div>
     <div id="global-notebook-entries"></div>
   </section>`;
 
   app.querySelector('#global-notebook-search')?.addEventListener('input',renderGlobalNotebookEntries);
-  app.querySelector('#add-global-notebook-note')?.addEventListener('click',()=>{
-    const title=window.prompt('Note title or subject:',app.querySelector('h1')?.textContent||'Personal Note');
-    if(title===null)return;
-    const note=window.prompt('Write your note:','');
-    if(!note?.trim())return;
-    saveMarkInsight({recordType:'personal-note',title:title.trim()||'Personal Note',note:note.trim(),selection:'',documentId:'',pageContext:'Mark Notebook'});
-    renderGlobalNotebookEntries();
-  });
-  renderGlobalNotebookEntries();
-}
 
+  const titleInput=app.querySelector('#global-notebook-new-title');
+  const noteInput=app.querySelector('#global-notebook-new-note');
+  const saveButton=app.querySelector('#add-global-notebook-note');
+
+  const saveQuickNote=()=>{
+    const note=String(noteInput?.value||'').trim();
+    if(!note){
+      noteInput?.focus();
+      return;
+    }
+    const title=String(titleInput?.value||'').trim()||'Personal Note';
+    saveMarkInsight({
+      recordType:'personal-note',
+      title,
+      note,
+      selection:'',
+      documentId:'',
+      pageContext:'Mark Notebook'
+    });
+    if(titleInput)titleInput.value='';
+    if(noteInput)noteInput.value='';
+    renderGlobalNotebookEntries();
+    noteInput?.focus();
+  };
+
+  saveButton?.addEventListener('click',saveQuickNote);
+  noteInput?.addEventListener('keydown',(event)=>{
+    if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){
+      event.preventDefault();
+      saveQuickNote();
+    }
+  });
+
+  renderGlobalNotebookEntries();
+  requestAnimationFrame(()=>noteInput?.focus());
+}
 
 function queueAskMarkBookPreparation({ book, topics = [] } = {}) {
   const title = String(book?.title || state.title || 'this book').trim();

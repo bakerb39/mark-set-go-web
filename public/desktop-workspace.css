@@ -267,3 +267,28 @@ body.msg-desktop-workspace-active .msg-workspace-divider{
   .msg-desktop-mode-button{display:none !important}
   body.msg-desktop-workspace-active #app.app-shell{width:calc(100% - 12px) !important}
 }
+
+
+.msg-readers-desktop-menu{
+  display:grid;
+  width:100%;
+  gap:2px;
+  padding:.48rem .62rem;
+  border:0;
+  border-top:1px solid rgba(11,45,79,.10);
+  background:transparent;
+  color:var(--msg-ink,#18324a);
+  text-align:left;
+}
+.msg-readers-desktop-menu:hover,
+.msg-readers-desktop-menu:focus-visible{
+  background:var(--msg-blue-soft-2,#f4f9fd);
+}
+.msg-readers-desktop-menu strong{
+  font-size:.78rem;
+  color:var(--msg-blue-strong,#236aa8);
+}
+.msg-readers-desktop-menu small{
+  font-size:.68rem;
+  color:var(--msg-muted,#60758a);
+}

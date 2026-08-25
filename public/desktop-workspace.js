@@ -185,6 +185,47 @@
     return button;
   }
 
+  function ensureReadersMenuOption() {
+    const popover = document.querySelector('.msg-readers-popover');
+    if (!popover) return null;
+
+    let button = popover.querySelector('[data-msg-desktop-menu-toggle]');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'msg-readers-desktop-menu';
+      button.dataset.msgDesktopMenuToggle = '1';
+      button.setAttribute('role','menuitem');
+      const addButton = popover.querySelector('[data-msg-reader-add]');
+      popover.insertBefore(button, addButton || null);
+
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (desktopActive) {
+          writeMode('standard');
+          deactivateDesktop();
+        } else {
+          writeMode('desktop');
+          const activated = activateDesktop();
+          if (!activated) {
+            writeMode('standard');
+          }
+        }
+
+        document.querySelector('.msg-readers-menu')?.removeAttribute('open');
+        ensureReadersMenuOption();
+      });
+    }
+
+    button.innerHTML = desktopActive
+      ? '<strong>▦ Standard Workspace</strong><small>Return to the fixed two-frame layout</small>'
+      : '<strong>▦ Desktop Workspace</strong><small>Move and resize open Readers and tools</small>';
+    button.setAttribute('aria-pressed', desktopActive ? 'true' : 'false');
+    return button;
+  }
+
   function canvasBounds(canvas = desktopCanvas()) {
     const rect = canvas?.getBoundingClientRect?.();
     const width = Math.max(640, Math.round(rect?.width || app.clientWidth || window.innerWidth - 24));
@@ -662,6 +703,7 @@
   function syncDesktop() {
     const shell = workspaceShell();
     ensureModeButton(shell);
+    ensureReadersMenuOption();
 
     if (!desktopActive) {
       if (readMode() === 'desktop' && shellIsOpen(shell) && viewportAllowsDesktop()) {
@@ -728,6 +770,7 @@
     wrapPanels(shell, canvas);
     refreshWindowTitles();
     ensureModeButton(shell);
+    ensureReadersMenuOption();
     try { window.dispatchEvent(new Event('resize')); } catch {}
     return true;
   }
@@ -781,6 +824,7 @@
 
     if (!preserveMode) writeMode('standard');
     ensureModeButton(shell);
+    ensureReadersMenuOption();
     try { window.dispatchEvent(new Event('resize')); } catch {}
     window.requestAnimationFrame(() => {
       shell.querySelectorAll('.msg-workspace-page-frame').forEach((frame) => {
@@ -824,7 +868,7 @@
     if (modeButton) return;
 
     if (event.target.closest(
-      '[data-msg-reader-add], [data-msg-reader-select], [data-msg-workspace-open], [data-msg-workspace-tab], [data-msg-workspace-tab-close], [data-msg-workspace-close], [data-action], [data-read], [data-test]'
+      '[data-msg-reader-add], [data-msg-reader-select], .msg-readers-menu summary, [data-msg-workspace-open], [data-msg-workspace-tab], [data-msg-workspace-tab-close], [data-msg-workspace-close], [data-action], [data-read], [data-test]'
     )) {
       scheduleSync();
     }
