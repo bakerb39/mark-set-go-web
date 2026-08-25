@@ -1,0 +1,181 @@
+/* Ask Mark Window Phase 1
+   Space-management only. The Ask Mark conversation/session DOM is never recreated. */
+
+:root{
+  --msg-askmark-docked-width:500px;
+  --msg-askmark-expanded-width:min(900px,64vw);
+  --msg-askmark-expanded-top:56px;
+  --msg-askmark-expanded-bottom:14px;
+}
+
+/* The existing Reader right-pane splitter remains the docked resize owner.
+   This later rule simply gives Ask Mark a roomier initial width. */
+@media (min-width:1000px){
+  #reader-layout.msg-askmark-window-ready:not(.word-panel-hidden){
+    --word-panel-width:var(--msg-askmark-docked-width);
+  }
+}
+
+/* Keep Ask Mark's header controls compact while adding Expand/Restore. */
+.askmark-window-toggle{
+  display:grid !important;
+  place-items:center;
+  width:34px !important;
+  min-width:34px !important;
+  height:34px !important;
+  min-height:34px !important;
+  padding:0 !important;
+  border:1px solid rgba(255,255,255,.16) !important;
+  border-radius:50% !important;
+  color:#fff !important;
+  background:rgba(255,255,255,.07) !important;
+  box-shadow:none !important;
+  font:800 1rem/1 system-ui,sans-serif !important;
+  cursor:pointer;
+}
+.askmark-window-toggle:hover,
+.askmark-window-toggle:focus-visible{
+  background:rgba(255,255,255,.16) !important;
+  border-color:rgba(228,196,99,.72) !important;
+  outline:none;
+}
+
+/* Expanded Ask Mark is an overlay on the right rather than another Reader
+   re-layout. The Reader remains visible on the left. */
+html.msg-askmark-expanded{
+  --msg-askmark-overlay-shadow:0 28px 80px rgba(3,20,34,.34);
+}
+
+html.msg-askmark-expanded .mark-companion-panel{
+  position:fixed !important;
+  z-index:10040 !important;
+  top:var(--msg-askmark-expanded-top) !important;
+  right:14px !important;
+  bottom:var(--msg-askmark-expanded-bottom) !important;
+  left:auto !important;
+  width:var(--msg-askmark-expanded-width) !important;
+  max-width:calc(100vw - 28px) !important;
+  min-width:min(520px,calc(100vw - 28px)) !important;
+  height:auto !important;
+  min-height:0 !important;
+  margin:0 !important;
+  border:1px solid rgba(228,196,99,.4) !important;
+  border-radius:16px !important;
+  overflow:hidden !important;
+  box-shadow:var(--msg-askmark-overlay-shadow) !important;
+}
+
+html.msg-askmark-expanded .mark-companion-panel .reader-control-shell.mark-shell,
+html.msg-askmark-expanded .mark-companion-panel [data-askmark-premium]{
+  height:100% !important;
+  min-height:0 !important;
+}
+
+html.msg-askmark-expanded .askmark-view{
+  padding:1.15rem 1.35rem;
+}
+
+html.msg-askmark-expanded .askmark-conversation{
+  padding:1rem .35rem .6rem;
+}
+
+html.msg-askmark-expanded .askmark-message > div{
+  max-width:min(92%,780px);
+}
+
+html.msg-askmark-expanded .askmark-message p,
+html.msg-askmark-expanded .askmark-rich-response{
+  font-size:.94rem;
+  line-height:1.62;
+}
+
+html.msg-askmark-expanded .askmark-hero{
+  padding:.82rem 1.05rem .76rem;
+}
+
+html.msg-askmark-expanded .askmark-avatar-wrap{
+  width:52px;
+  height:52px;
+}
+
+html.msg-askmark-expanded .askmark-brand-copy h2{
+  font-size:1.34rem;
+}
+
+/* Expanded mode gets its own left-edge resize grip. It does not compete with
+   the Reader's existing docked splitter because it is hidden while docked. */
+.askmark-window-resize{
+  display:none;
+}
+
+html.msg-askmark-expanded .askmark-window-resize{
+  display:block;
+  position:absolute;
+  z-index:10045;
+  top:50%;
+  left:-7px;
+  width:14px;
+  height:96px;
+  transform:translateY(-50%);
+  border:0;
+  border-radius:999px;
+  background:transparent;
+  cursor:ew-resize;
+  touch-action:none;
+}
+
+html.msg-askmark-expanded .askmark-window-resize::after{
+  content:"";
+  position:absolute;
+  top:18px;
+  bottom:18px;
+  left:5px;
+  width:3px;
+  border-radius:999px;
+  background:rgba(228,196,99,.78);
+  box-shadow:0 0 0 1px rgba(11,34,56,.2);
+}
+
+html.msg-askmark-expanded .askmark-window-resize:hover::after,
+html.msg-askmark-expanded .askmark-window-resize:focus-visible::after{
+  background:#f4d776;
+  box-shadow:0 0 0 3px rgba(228,196,99,.2);
+}
+
+/* A subtle visual cue that Ask Mark is in a focus workspace without blocking
+   interaction with the still-visible Reader. */
+html.msg-askmark-expanded body::after{
+  content:"";
+  position:fixed;
+  z-index:10020;
+  inset:0;
+  pointer-events:none;
+  background:linear-gradient(90deg,rgba(4,21,35,.04),rgba(4,21,35,.12));
+}
+
+/* Keep the panel itself above the non-interactive cue. */
+html.msg-askmark-expanded .mark-companion-panel{
+  isolation:isolate;
+}
+
+/* Small screens already use Ask Mark as a full-screen panel. Phase 1 simply
+   preserves that behavior and hides the redundant expanded resize grip. */
+@media (max-width:820px){
+  html.msg-askmark-expanded .mark-companion-panel{
+    inset:0 !important;
+    width:100% !important;
+    max-width:none !important;
+    min-width:0 !important;
+    border-radius:0 !important;
+  }
+  html.msg-askmark-expanded .askmark-window-resize{
+    display:none !important;
+  }
+}
+
+/* Do not animate large geometry for readers who prefer reduced motion. */
+@media (prefers-reduced-motion:no-preference){
+  .mark-companion-panel{
+    transition:box-shadow .16s ease,border-radius .16s ease;
+  }
+}

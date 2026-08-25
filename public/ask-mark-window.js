@@ -1,0 +1,386 @@
+(() => {
+  'use strict';
+
+  const STORAGE_KEY = 'markSetGoAskMarkWindowV1';
+  const DEFAULT_DOCK_WIDTH = 500;
+  const MIN_DOCK_WIDTH = 360;
+  const MAX_DOCK_WIDTH = 760;
+  const MIN_EXPANDED_WIDTH = 520;
+  const MAX_EXPANDED_WIDTH = 980;
+
+  let expanded = false;
+  let resizeState = null;
+  let installScheduled = false;
+
+  function readSettings() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') || {};
+      return {
+        dockWidth:Number(parsed.dockWidth) || DEFAULT_DOCK_WIDTH,
+        expandedWidth:Number(parsed.expandedWidth) || 0
+      };
+    } catch {
+      return { dockWidth:DEFAULT_DOCK_WIDTH, expandedWidth:0 };
+    }
+  }
+
+  function writeSettings(patch = {}) {
+    const next = { ...readSettings(), ...patch };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch {}
+    return next;
+  }
+
+  function layout() {
+    return document.getElementById('reader-layout');
+  }
+
+  function panel() {
+    return document.querySelector('.mark-companion-panel');
+  }
+
+  function premiumShell() {
+    return document.querySelector('.mark-companion-panel [data-askmark-premium]');
+  }
+
+  function askButton() {
+    return document.getElementById('toggle-mark-panel');
+  }
+
+  function askMarkVisible() {
+    const targetLayout = layout();
+    const targetPanel = panel();
+    if (!targetLayout || !targetPanel || targetLayout.classList.contains('word-panel-hidden')) return false;
+
+    const pressed = askButton()?.getAttribute('aria-pressed');
+    if (pressed === 'true') return true;
+
+    const selectionTab = document.querySelector('[data-mark-tab="selection"]');
+    return Boolean(selectionTab?.classList.contains('active') || premiumShell());
+  }
+
+  function clampDockWidth(value) {
+    const viewportMax = Math.max(
+      MIN_DOCK_WIDTH,
+      Math.min(MAX_DOCK_WIDTH, Math.floor(window.innerWidth * .56), window.innerWidth - 390)
+    );
+    return Math.max(MIN_DOCK_WIDTH, Math.min(viewportMax, Math.round(Number(value) || DEFAULT_DOCK_WIDTH)));
+  }
+
+  function clampExpandedWidth(value) {
+    const viewportMax = Math.max(
+      Math.min(MIN_EXPANDED_WIDTH, window.innerWidth - 28),
+      Math.min(MAX_EXPANDED_WIDTH, window.innerWidth - 28)
+    );
+    return Math.max(
+      Math.min(MIN_EXPANDED_WIDTH, viewportMax),
+      Math.min(viewportMax, Math.round(Number(value) || Math.min(900, window.innerWidth * .64)))
+    );
+  }
+
+  function updateViewportBounds() {
+    const root = document.documentElement;
+    const header = document.querySelector('.site-header');
+    const headerRect = header?.getBoundingClientRect();
+    const top = Math.max(8, Math.round((headerRect?.bottom || 0) + 8));
+
+    let bottom = 14;
+    const ribbon = document.getElementById('msg-shared-bottom');
+    if (ribbon) {
+      const rect = ribbon.getBoundingClientRect();
+      if (rect.height > 0 && rect.top > 0 && rect.top < window.innerHeight) {
+        bottom = Math.max(8, Math.round(window.innerHeight - rect.top + 8));
+      }
+    }
+
+    root.style.setProperty('--msg-askmark-expanded-top', `${top}px`);
+    root.style.setProperty('--msg-askmark-expanded-bottom', `${bottom}px`);
+  }
+
+  function applyDockWidth({ force = false } = {}) {
+    const targetLayout = layout();
+    if (!targetLayout) return false;
+
+    targetLayout.classList.add('msg-askmark-window-ready');
+
+    const saved = readSettings();
+    const currentInline = String(targetLayout.style.getPropertyValue('--word-panel-width') || '').trim();
+    const width = clampDockWidth(saved.dockWidth || DEFAULT_DOCK_WIDTH);
+
+    // Preserve an existing live splitter width unless we are restoring our
+    // saved width after a Reader rebuild.
+    if (force || !currentInline) {
+      targetLayout.style.setProperty('--word-panel-width', `${width}px`);
+    }
+
+    document.documentElement.style.setProperty('--msg-askmark-docked-width', `${width}px`);
+    return true;
+  }
+
+  function rememberDockWidth() {
+    if (expanded) return false;
+    const targetPanel = panel();
+    if (!targetPanel || !askMarkVisible()) return false;
+
+    const width = clampDockWidth(targetPanel.getBoundingClientRect().width);
+    writeSettings({ dockWidth:width });
+    document.documentElement.style.setProperty('--msg-askmark-docked-width', `${width}px`);
+    return true;
+  }
+
+  function ensureWindowControls() {
+    const premium = premiumShell();
+    const targetPanel = panel();
+    if (!premium || !targetPanel) return false;
+
+    const actions = premium.querySelector('.askmark-header-actions');
+    if (actions && !actions.querySelector('[data-askmark-window-toggle]')) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'askmark-window-toggle';
+      button.dataset.askmarkWindowToggle = '1';
+      button.setAttribute('aria-pressed', 'false');
+      actions.prepend(button);
+    }
+
+    if (!targetPanel.querySelector('[data-askmark-window-resize]')) {
+      const grip = document.createElement('div');
+      grip.className = 'askmark-window-resize';
+      grip.dataset.askmarkWindowResize = '1';
+      grip.setAttribute('role', 'separator');
+      grip.setAttribute('aria-orientation', 'vertical');
+      grip.setAttribute('aria-label', 'Resize expanded Ask Mark');
+      grip.setAttribute('tabindex', '0');
+      targetPanel.appendChild(grip);
+    }
+
+    syncButton();
+    return true;
+  }
+
+  function syncButton() {
+    const button = document.querySelector('[data-askmark-window-toggle]');
+    if (!button) return;
+
+    button.textContent = expanded ? '❐' : '⤢';
+    button.title = expanded ? 'Restore Ask Mark' : 'Expand Ask Mark';
+    button.setAttribute('aria-label', expanded ? 'Restore Ask Mark' : 'Expand Ask Mark');
+    button.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+  }
+
+  function applyExpandedWidth() {
+    const saved = readSettings();
+    const width = clampExpandedWidth(saved.expandedWidth || Math.min(900, window.innerWidth * .64));
+    document.documentElement.style.setProperty('--msg-askmark-expanded-width', `${width}px`);
+    return width;
+  }
+
+  function setExpanded(next) {
+    const shouldExpand = Boolean(next);
+    if (shouldExpand === expanded) {
+      syncButton();
+      return expanded;
+    }
+
+    if (shouldExpand) {
+      rememberDockWidth();
+      updateViewportBounds();
+      applyExpandedWidth();
+    }
+
+    expanded = shouldExpand;
+    document.documentElement.classList.toggle('msg-askmark-expanded', expanded);
+    syncButton();
+
+    // Ask Mark is the same DOM before/after. Resize only lets its existing
+    // scroll containers recalculate; no session/conversation is recreated.
+    try { window.dispatchEvent(new Event('resize')); } catch {}
+    return expanded;
+  }
+
+  function toggleExpanded() {
+    return setExpanded(!expanded);
+  }
+
+  function restore() {
+    return setExpanded(false);
+  }
+
+  function beginExpandedResize(event) {
+    if (!expanded || event.button > 0) return;
+    const targetPanel = panel();
+    if (!targetPanel) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    resizeState = {
+      pointerId:event.pointerId,
+      startX:event.clientX,
+      startWidth:targetPanel.getBoundingClientRect().width
+    };
+
+    const grip = event.currentTarget;
+    try { grip.setPointerCapture(event.pointerId); } catch {}
+
+    const move = (moveEvent) => {
+      if (!resizeState || moveEvent.pointerId !== resizeState.pointerId) return;
+      // Dragging the left edge left increases width; dragging right decreases it.
+      const width = clampExpandedWidth(
+        resizeState.startWidth + (resizeState.startX - moveEvent.clientX)
+      );
+      document.documentElement.style.setProperty('--msg-askmark-expanded-width', `${width}px`);
+    };
+
+    const stop = (stopEvent) => {
+      if (!resizeState || stopEvent.pointerId !== resizeState.pointerId) return;
+      const targetPanelNow = panel();
+      const width = targetPanelNow
+        ? clampExpandedWidth(targetPanelNow.getBoundingClientRect().width)
+        : clampExpandedWidth(resizeState.startWidth);
+      writeSettings({ expandedWidth:width });
+      resizeState = null;
+      try { grip.releasePointerCapture(stopEvent.pointerId); } catch {}
+      grip.removeEventListener('pointermove', move);
+      grip.removeEventListener('pointerup', stop);
+      grip.removeEventListener('pointercancel', stop);
+    };
+
+    grip.addEventListener('pointermove', move);
+    grip.addEventListener('pointerup', stop);
+    grip.addEventListener('pointercancel', stop);
+  }
+
+  function install() {
+    installScheduled = false;
+    applyDockWidth({ force:false });
+    if (!ensureWindowControls()) return false;
+
+    const button = document.querySelector('[data-askmark-window-toggle]');
+    if (button && button.dataset.askmarkWindowBound !== '1') {
+      button.dataset.askmarkWindowBound = '1';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleExpanded();
+      });
+    }
+
+    const grip = document.querySelector('[data-askmark-window-resize]');
+    if (grip && grip.dataset.askmarkWindowBound !== '1') {
+      grip.dataset.askmarkWindowBound = '1';
+      grip.addEventListener('pointerdown', beginExpandedResize);
+      grip.addEventListener('keydown', (event) => {
+        if (!expanded || !['ArrowLeft','ArrowRight'].includes(event.key)) return;
+        event.preventDefault();
+        const current = panel()?.getBoundingClientRect().width || applyExpandedWidth();
+        const delta = event.key === 'ArrowLeft' ? 30 : -30;
+        const width = clampExpandedWidth(current + delta);
+        document.documentElement.style.setProperty('--msg-askmark-expanded-width', `${width}px`);
+        writeSettings({ expandedWidth:width });
+      });
+    }
+
+    return true;
+  }
+
+  function scheduleInstall() {
+    if (installScheduled) return;
+    installScheduled = true;
+    [0, 80, 240, 650].forEach((delay, index) => {
+      window.setTimeout(() => {
+        install();
+        if (index === 3) installScheduled = false;
+      }, delay);
+    });
+  }
+
+  // One document-level event delegation survives Reader shell rebuilds.
+  document.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target) return;
+
+    if (target.closest('[data-askmark-close]')) {
+      restore();
+      return;
+    }
+
+    if (
+      target.closest('#toggle-mark-panel') ||
+      target.closest('[data-mark-tab="selection"]') ||
+      target.closest('[data-action="reader"]')
+    ) {
+      scheduleInstall();
+    }
+  }, true);
+
+  // The existing splitter remains the docked resize interaction. We only
+  // remember its final width.
+  document.addEventListener('pointerup', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('#right-pane-splitter')) {
+      window.setTimeout(rememberDockWidth, 0);
+    }
+  }, true);
+
+  document.addEventListener('keyup', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest('#right-pane-splitter')) {
+      window.setTimeout(rememberDockWidth, 0);
+    }
+  }, true);
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && expanded) {
+      event.preventDefault();
+      restore();
+    }
+  });
+
+  document.addEventListener('marksetgo:document-available', () => {
+    // A Reader rebuild can replace the Ask Mark shell. Preserve the thread
+    // logic owned by ask-mark-hub.js; just reattach our window controls.
+    window.setTimeout(() => {
+      applyDockWidth({ force:true });
+      scheduleInstall();
+    }, 0);
+  });
+
+  window.addEventListener('resize', () => {
+    updateViewportBounds();
+    if (expanded) applyExpandedWidth();
+    else applyDockWidth({ force:false });
+  });
+
+  window.addEventListener('pageshow', scheduleInstall);
+
+  window.MarkSetGoAskMarkWindow = Object.freeze({
+    expand:() => setExpanded(true),
+    restore,
+    toggle:toggleExpanded,
+    setDockWidth:(width) => {
+      const value = clampDockWidth(width);
+      writeSettings({ dockWidth:value });
+      const targetLayout = layout();
+      targetLayout?.style.setProperty('--word-panel-width', `${value}px`);
+      document.documentElement.style.setProperty('--msg-askmark-docked-width', `${value}px`);
+      return value;
+    },
+    resetWidth:() => {
+      writeSettings({ dockWidth:DEFAULT_DOCK_WIDTH, expandedWidth:0 });
+      const targetLayout = layout();
+      targetLayout?.style.setProperty('--word-panel-width', `${DEFAULT_DOCK_WIDTH}px`);
+      document.documentElement.style.setProperty('--msg-askmark-docked-width', `${DEFAULT_DOCK_WIDTH}px`);
+      document.documentElement.style.removeProperty('--msg-askmark-expanded-width');
+      return DEFAULT_DOCK_WIDTH;
+    },
+    status:() => ({
+      expanded,
+      dockWidth:readSettings().dockWidth,
+      expandedWidth:readSettings().expandedWidth,
+      visible:askMarkVisible()
+    })
+  });
+
+  updateViewportBounds();
+  scheduleInstall();
+})();
