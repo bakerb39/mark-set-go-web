@@ -954,42 +954,12 @@
     const style = document.createElement('style');
     style.id = 'topic-feed-import-recovery-styles';
     style.textContent = `
-      .topic-feed-import-recovery {
-        display: block !important;
-        box-sizing: border-box !important;
-        flex: 0 0 auto !important;
-        align-self: start !important;
-        width: 100% !important;
-        height: auto !important;
-        min-height: 0 !important;
-        margin: 8px 0 4px !important;
-        padding: 0 !important;
-        border: 0 !important;
-        border-radius: 0 !important;
-        background: transparent !important;
-      }
-      .topic-feed-import-recovery-card {
-        display: inline-block !important;
-        box-sizing: border-box !important;
-        width: auto !important;
-        max-width: min(100%, 520px) !important;
-        height: auto !important;
-        min-height: 0 !important;
-        margin: 0 !important;
-        padding: 6px 9px !important;
-        border: 1px solid var(--msg-theme-border, rgba(148, 163, 184, .42));
-        border-radius: 9px;
-        background: var(--msg-theme-soft, rgba(15, 23, 42, .055));
+      .topic-feed-import-recovery-inline {
+        font-size: .94em;
+        line-height: 1.4;
         color: var(--msg-theme-ink, inherit);
-        font-size: .92em;
-        line-height: 1.3;
       }
-      .topic-feed-import-recovery-card p {
-        margin: 0 !important;
-        padding: 0 !important;
-        min-height: 0 !important;
-      }
-      .topic-feed-import-recovery-card a {
+      .topic-feed-import-recovery-inline a {
         color: var(--msg-theme-accent, currentColor);
         font-weight: 700;
         text-decoration: underline;
@@ -1002,6 +972,7 @@
 
   function openReadAnythingFromTopicFeed(event) {
     event?.preventDefault?.();
+    event?.stopPropagation?.();
 
     if (typeof window.MarkSetGoReadAnything?.render === 'function') {
       window.MarkSetGoReadAnything.render();
@@ -1019,32 +990,32 @@
     const reader = document.querySelector('#reader');
     if (!reader) return false;
 
-    reader.querySelectorAll('[data-topic-feed-import-recovery]').forEach((node) => node.remove());
-    if (!isTopicFeedReaderActive() || !topicFeedImportFallbackNeeded(payload)) return false;
+    const existing = reader.querySelector('[data-topic-feed-import-recovery]');
+    if (!isTopicFeedReaderActive() || !topicFeedImportFallbackNeeded(payload)) {
+      existing?.remove();
+      return false;
+    }
+    if (existing) return true;
 
     ensureTopicFeedImportRecoveryStyles();
 
-    const notice = document.createElement('div');
-    notice.className = 'topic-feed-import-recovery';
+    // Important: keep this INLINE. The Reader's multicolumn/layout engine can assign
+    // very large used heights to direct block children even when they have zero
+    // padding. An inline note stays in the normal article text flow and cannot
+    // become a 200+ px callout slot.
+    const notice = document.createElement('span');
+    notice.className = 'topic-feed-import-recovery-inline';
     notice.dataset.topicFeedImportRecovery = '1';
     notice.setAttribute('role', 'note');
-    notice.innerHTML = `
-      <div class="topic-feed-import-recovery-card">
-        <p>
-          <strong>Want the full article?</strong>
-          Click <strong>View original</strong> above, then use the
-          <strong>Read with Mark</strong> bookmarklet to import the publisher page.
-          You can find the bookmarklet in the
-          <a href="#read-anything" data-topic-feed-open-read-anything>Read Anything section</a>.
-        </p>
-      </div>
-    `;
+    notice.innerHTML = `<br><br><strong>Want the full article?</strong>
+      Click <strong>View original</strong> above, then use the
+      <strong>Read with Mark</strong> bookmarklet to import the publisher page.
+      You can find the bookmarklet in the
+      <a href="#read-anything" data-topic-feed-open-read-anything>Read Anything section</a>.`;
 
     notice.querySelector('[data-topic-feed-open-read-anything]')
       ?.addEventListener('click', openReadAnythingFromTopicFeed);
 
-    // Keep the recovery instruction in the scrolling article itself so it appears
-    // immediately after the publisher fallback sentence rather than in the fixed header.
     reader.appendChild(notice);
     return true;
   }
@@ -1230,7 +1201,6 @@
           keepTopicFeedArticleActionsInHeader();
           positionTopicFeedStoryHeader();
           decorateTopicFeedArticleFooter();
-          decorateTopicFeedImportRecovery(payload);
         }
       }, delay);
     });
