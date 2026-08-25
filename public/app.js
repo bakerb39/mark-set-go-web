@@ -1243,6 +1243,35 @@ const musicNowTitle = document.querySelector('#music-now-title');
 const musicNowSource = document.querySelector('#music-now-source');
 const musicNextButton = document.querySelector('#music-next');
 let musicSearchState = null;
+let activeMediaContext = null;
+
+function currentMediaReadingContext(explicit = null) {
+  const value = explicit && typeof explicit === 'object'
+    ? explicit
+    : window.MarkSetGoCurrentReaderDocument?.get?.();
+
+  if (!value || typeof value !== 'object') {
+    return {
+      documentId:String(state?.documentId || ''),
+      title:String(state?.title || ''),
+      source:{ ...(state?.source || {}) }
+    };
+  }
+
+  return {
+    documentId:String(value.documentId || ''),
+    title:String(value.title || state?.title || ''),
+    source:value.source && typeof value.source === 'object'
+      ? { ...value.source }
+      : {}
+  };
+}
+
+function emitMediaEvent(name, detail = {}) {
+  document.dispatchEvent(new CustomEvent(`marksetgo:media-${name}`, {
+    detail
+  }));
+}
 
 function musicSearchQuery(choice) {
   return choice.searchQuery || `${choice.title || 'reading music'} YouTube`;
@@ -1311,7 +1340,7 @@ function parseYouTubeInput(rawValue) {
   return { title: 'YouTube video', src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?playsinline=1&rel=0` };
 }
 
-async function playYouTubeSearch(query, title = 'YouTube search') {
+async function playYouTubeSearch(query, title = 'YouTube search', contextOverride = null) {
   const cleanQuery = String(query || '').trim();
   const workspaceParams = new URLSearchParams(location.search);
   const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
@@ -1320,7 +1349,8 @@ async function playYouTubeSearch(query, title = 'YouTube search') {
       window.parent.postMessage({
         type:'msg-workspace-music-search',
         query:cleanQuery,
-        title:String(title || 'YouTube search')
+        title:String(title || 'YouTube search'),
+        context:currentMediaReadingContext(contextOverride)
       }, window.location.origin);
     } catch (error) {
       console.warn('Workspace could not hand music search to the outer player.', error);
@@ -1328,8 +1358,14 @@ async function playYouTubeSearch(query, title = 'YouTube search') {
     return;
   }
   if (!cleanQuery) return;
+  activeMediaContext = currentMediaReadingContext(contextOverride);
   musicNowTitle.textContent = title;
   musicNowSource.textContent = 'Searching YouTube…';
+  emitMediaEvent('search-start', {
+    query:cleanQuery,
+    title:String(title || 'YouTube search'),
+    context:{ ...activeMediaContext }
+  });
   musicDock.hidden = false;
   musicDock.classList.remove('minimized');
   musicPlayerWrap.hidden = false;
@@ -1339,12 +1375,30 @@ async function playYouTubeSearch(query, title = 'YouTube search') {
     const payload = await loadApiPayload(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`);
     const videoIds = Array.isArray(payload.videoIds) ? payload.videoIds : [];
     if (!videoIds.length) throw new Error('No playable results were found.');
-    musicSearchState = { query: cleanQuery, title, videoIds, index: 0 };
+    musicSearchState = {
+      query:cleanQuery,
+      title,
+      videoIds,
+      index:0,
+      context:{ ...activeMediaContext }
+    };
+    emitMediaEvent('search-results', {
+      query:cleanQuery,
+      title:String(title || 'YouTube search'),
+      videoIds:[...videoIds],
+      context:{ ...activeMediaContext }
+    });
     playMusicSearchCandidate(0);
   } catch (error) {
     musicSearchState = null;
     musicNowSource.textContent = error?.message || 'Music search failed';
     musicPlayer.src = '';
+    emitMediaEvent('search-error', {
+      query:cleanQuery,
+      title:String(title || 'YouTube search'),
+      error:error?.message || 'Media search failed',
+      context:{ ...activeMediaContext }
+    });
   }
 }
 
@@ -1360,6 +1414,22 @@ function playMusicSearchCandidate(index) {
   musicDock.classList.remove('minimized');
   musicPlayerWrap.hidden = false;
   if (musicNextButton) musicNextButton.hidden = musicSearchState.videoIds.length < 2;
+  const playing = {
+    provider:'youtube',
+    videoId,
+    title:String(musicSearchState.title || 'YouTube video'),
+    displayTitle:`YouTube result ${safeIndex + 1}`,
+    source:musicNowSource.textContent,
+    query:String(musicSearchState.query || ''),
+    resultIndex:safeIndex,
+    resultCount:musicSearchState.videoIds.length,
+    src:musicPlayer.src,
+    watchUrl:`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
+    thumbnailUrl:`https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`,
+    context:currentMediaReadingContext(musicSearchState.context)
+  };
+  activeMediaContext = { ...playing.context };
+  emitMediaEvent('playing', playing);
   try {
     localStorage.setItem('markSetGoMusic', JSON.stringify({
       title: musicNowTitle.textContent,
@@ -1370,14 +1440,15 @@ function playMusicSearchCandidate(index) {
   } catch {}
 }
 
-function playMusic(choiceOrParsed) {
+function playMusic(choiceOrParsed, contextOverride = null) {
   const workspaceParams = new URLSearchParams(location.search);
   const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
   if (isWorkspacePane) {
     try {
       window.parent.postMessage({
         type:'msg-workspace-music-play',
-        choice:choiceOrParsed && typeof choiceOrParsed === 'object' ? choiceOrParsed : {}
+        choice:choiceOrParsed && typeof choiceOrParsed === 'object' ? choiceOrParsed : {},
+        context:currentMediaReadingContext(contextOverride)
       }, window.location.origin);
     } catch (error) {
       console.warn('Workspace could not hand music playback to the outer player.', error);
@@ -1385,7 +1456,13 @@ function playMusic(choiceOrParsed) {
     return;
   }
 
+  activeMediaContext = currentMediaReadingContext(
+    contextOverride || choiceOrParsed?.context || choiceOrParsed?.search?.context
+  );
   musicSearchState = choiceOrParsed?.search || null;
+  if (musicSearchState && !musicSearchState.context) {
+    musicSearchState.context = { ...activeMediaContext };
+  }
   if (musicNextButton) musicNextButton.hidden = !musicSearchState?.videoIds?.length;
   const isChoice = Boolean(choiceOrParsed?.youtubeId);
   const src = isChoice ? youtubeEmbedFromChoice(choiceOrParsed) : choiceOrParsed.src;
@@ -1395,16 +1472,74 @@ function playMusic(choiceOrParsed) {
   musicDock.hidden = false;
   musicDock.classList.remove('minimized');
   musicPlayerWrap.hidden = false;
-  try { localStorage.setItem('markSetGoMusic', JSON.stringify({ title: musicNowTitle.textContent, source: musicNowSource.textContent, provider: choiceOrParsed.provider || (isChoice ? 'youtube' : ''), src })); } catch {}
+  const provider = choiceOrParsed.provider || (isChoice ? 'youtube' : '');
+  const videoId = isChoice
+    ? String(choiceOrParsed.youtubeId || '')
+    : (() => {
+        const match = String(src || '').match(/youtube(?:-nocookie)?\.com\/embed\/([\w-]{6,20})/i);
+        return match?.[1] || '';
+      })();
+  emitMediaEvent('playing', {
+    provider,
+    videoId,
+    title:String(choiceOrParsed.title || musicNowTitle.textContent || 'Media'),
+    displayTitle:String(choiceOrParsed.title || musicNowTitle.textContent || 'Media'),
+    source:String(musicNowSource.textContent || ''),
+    src,
+    watchUrl:choiceOrParsed.originalUrl || (videoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}` : ''),
+    thumbnailUrl:videoId ? `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg` : '',
+    context:{ ...activeMediaContext }
+  });
+  try { localStorage.setItem('markSetGoMusic', JSON.stringify({ title: musicNowTitle.textContent, source: musicNowSource.textContent, provider, src })); } catch {}
 }
 
 function stopMusic() {
   musicSearchState = null;
+  activeMediaContext = null;
   if (musicNextButton) musicNextButton.hidden = true;
   musicPlayer.src = '';
   musicDock.hidden = true;
+  emitMediaEvent('stopped', {});
   try { localStorage.removeItem('markSetGoMusic'); } catch {}
 }
+
+window.MarkSetGoMedia = Object.freeze({
+  search:(query,title='YouTube search',context=null)=>playYouTubeSearch(query,title,context),
+  play:(choice,context=null)=>playMusic(choice,context),
+  playCandidate:(index)=>playMusicSearchCandidate(index),
+  stop:()=>stopMusic(),
+  getContext:()=>currentMediaReadingContext(activeMediaContext),
+  getSearchState:()=>musicSearchState
+    ? {
+        ...musicSearchState,
+        videoIds:[...(musicSearchState.videoIds || [])],
+        context:currentMediaReadingContext(musicSearchState.context)
+      }
+    : null
+});
+
+window.addEventListener('message', (event) => {
+  if (window.parent !== window) return;
+  if (event.origin !== window.location.origin) return;
+  const message = event.data;
+  if (!message || typeof message !== 'object') return;
+
+  if (message.type === 'msg-workspace-music-search') {
+    void playYouTubeSearch(
+      String(message.query || ''),
+      String(message.title || 'YouTube search'),
+      message.context && typeof message.context === 'object' ? message.context : null
+    );
+    return;
+  }
+
+  if (message.type === 'msg-workspace-music-play') {
+    playMusic(
+      message.choice && typeof message.choice === 'object' ? message.choice : {},
+      message.context && typeof message.context === 'object' ? message.context : null
+    );
+  }
+});
 
 function renderMusicLibrary() {
   stopReader();

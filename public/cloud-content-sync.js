@@ -19,6 +19,7 @@
 
   const CONTENT_PREFIXES = [
     'reader-annotations:',
+    'reader-media:',
     'whole-guide-questions:'
   ];
 

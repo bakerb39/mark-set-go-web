@@ -37,6 +37,7 @@ const EXACT_KEYS = new Set([
 
 const PREFIXES = [
   'reader-annotations:',
+  'reader-media:',
   'whole-guide-questions:'
 ];
 

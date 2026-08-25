@@ -34,7 +34,9 @@
     'msg-topic-feeds-left-pane-open',
     'msg_companion_persona_v2',
     'msg_companion_persona_v1',
-    'markSetGoMusic'
+    'markSetGoMusic',
+    'markSetGoVideoSidePanelWidthV1',
+    'markSetGoMediaDockModeV1'
   ]);
 
   const SETTINGS_EVENT_SELECTOR = [
