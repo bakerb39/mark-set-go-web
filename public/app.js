@@ -4194,6 +4194,218 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
 
 const BOOK_BUILDER_DRAFT_KEY = 'markSetGoBookBuilderDraftV1';
 
+const BOOK_BUILDER_DRAFT_TEXT_CACHE_KEY = 'book-builder:draft-text:v1';
+const BOOK_BUILDER_ORIGINAL_PREFIX = 'markSetGoBookBuilderOriginalV1:';
+
+let bookBuilderDraftTextCache = '';
+let bookBuilderDraftTextHydrated = false;
+let bookBuilderStorageMigrationPromise = null;
+
+function readLegacyBookBuilderDraft() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BOOK_BUILDER_DRAFT_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeBookBuilderDraftMetadata(value = {}) {
+  const metadata = value && typeof value === 'object' ? { ...value } : {};
+  delete metadata.text;
+  try {
+    localStorage.setItem(BOOK_BUILDER_DRAFT_KEY, JSON.stringify(metadata));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function persistBookBuilderDraftText(text) {
+  const value = String(text || '');
+  bookBuilderDraftTextCache = value;
+  bookBuilderDraftTextHydrated = true;
+
+  if (typeof cacheReadingBook !== 'function') return false;
+  const ok = await cacheReadingBook({
+    key: BOOK_BUILDER_DRAFT_TEXT_CACHE_KEY,
+    type: 'book-builder-draft-text',
+    text: value,
+    updatedAt: new Date().toISOString()
+  });
+
+  if (ok) {
+    // Once the large text is safe in IndexedDB, ensure the legacy draft record
+    // retains only its small synchronous metadata.
+    const legacy = readLegacyBookBuilderDraft();
+    if (Object.prototype.hasOwnProperty.call(legacy, 'text')) {
+      writeBookBuilderDraftMetadata(legacy);
+    }
+  }
+  return Boolean(ok);
+}
+
+async function getBookBuilderDraftText() {
+  if (bookBuilderDraftTextHydrated) return bookBuilderDraftTextCache;
+
+  const legacy = readLegacyBookBuilderDraft();
+  if (typeof legacy.text === 'string' && legacy.text) {
+    bookBuilderDraftTextCache = legacy.text;
+    bookBuilderDraftTextHydrated = true;
+    // Migrate without delaying the caller.
+    void persistBookBuilderDraftText(legacy.text);
+    return bookBuilderDraftTextCache;
+  }
+
+  try {
+    const cached = typeof getCachedReadingBook === 'function'
+      ? await getCachedReadingBook(BOOK_BUILDER_DRAFT_TEXT_CACHE_KEY)
+      : null;
+    bookBuilderDraftTextCache = String(cached?.text || '');
+  } catch {
+    bookBuilderDraftTextCache = '';
+  }
+
+  bookBuilderDraftTextHydrated = true;
+  return bookBuilderDraftTextCache;
+}
+
+async function clearBookBuilderDraftStorage() {
+  bookBuilderDraftTextCache = '';
+  bookBuilderDraftTextHydrated = true;
+  try { localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY); } catch {}
+  if (typeof removeCachedReadingBook === 'function') {
+    await removeCachedReadingBook(BOOK_BUILDER_DRAFT_TEXT_CACHE_KEY);
+  }
+  return true;
+}
+
+async function persistBookBuilderOriginal(originalKey, text) {
+  const key = String(originalKey || '');
+  const value = String(text || '');
+  if (!key || !value) return false;
+
+  if (typeof cacheReadingBook === 'function') {
+    const ok = await cacheReadingBook({
+      key,
+      type: 'book-builder-original',
+      text: value,
+      updatedAt: new Date().toISOString()
+    });
+    if (ok) {
+      try { localStorage.removeItem(key); } catch {}
+      return true;
+    }
+  }
+
+  // Last-resort compatibility fallback. This preserves the original if
+  // IndexedDB is unavailable, while still avoiding localStorage in the normal path.
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.warn('Original book-builder text could not be preserved.', error);
+    return false;
+  }
+}
+
+async function getBookBuilderOriginal(originalKey) {
+  const key = String(originalKey || '');
+  if (!key) return '';
+
+  try {
+    const legacy = localStorage.getItem(key) || '';
+    if (legacy) {
+      void persistBookBuilderOriginal(key, legacy);
+      return legacy;
+    }
+  } catch {}
+
+  try {
+    const cached = typeof getCachedReadingBook === 'function'
+      ? await getCachedReadingBook(key)
+      : null;
+    return String(cached?.text || '');
+  } catch {
+    return '';
+  }
+}
+
+async function removeBookBuilderOriginal(originalKey) {
+  const key = String(originalKey || '');
+  if (!key) return false;
+  try { localStorage.removeItem(key); } catch {}
+  if (typeof removeCachedReadingBook === 'function') {
+    await removeCachedReadingBook(key);
+  }
+  return true;
+}
+
+async function migrateLegacyBookBuilderStorage() {
+  if (bookBuilderStorageMigrationPromise) return bookBuilderStorageMigrationPromise;
+
+  bookBuilderStorageMigrationPromise = (async () => {
+    let draftMigrated = false;
+    let originalsMigrated = 0;
+    let failed = 0;
+
+    const draft = readLegacyBookBuilderDraft();
+    if (typeof draft.text === 'string' && draft.text) {
+      const ok = await persistBookBuilderDraftText(draft.text);
+      if (ok) draftMigrated = true;
+      else failed += 1;
+    }
+
+    const originalKeys = [];
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index) || '';
+        if (key.startsWith(BOOK_BUILDER_ORIGINAL_PREFIX)) originalKeys.push(key);
+      }
+    } catch {}
+
+    for (const key of originalKeys) {
+      let value = '';
+      try { value = localStorage.getItem(key) || ''; } catch {}
+      if (!value) continue;
+      const ok = await persistBookBuilderOriginal(key, value);
+      if (ok) originalsMigrated += 1;
+      else failed += 1;
+    }
+
+    return { draftMigrated, originalsMigrated, failed };
+  })();
+
+  return bookBuilderStorageMigrationPromise;
+}
+
+window.MarkSetGoBookBuilderStorage = Object.freeze({
+  getDraftText: getBookBuilderDraftText,
+  clearDraft: clearBookBuilderDraftStorage,
+  getOriginal: getBookBuilderOriginal,
+  removeOriginal: removeBookBuilderOriginal,
+  migrateLegacy: migrateLegacyBookBuilderStorage,
+  status: () => {
+    const draft = readLegacyBookBuilderDraft();
+    let legacyOriginalCount = 0;
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        if ((localStorage.key(index) || '').startsWith(BOOK_BUILDER_ORIGINAL_PREFIX)) {
+          legacyOriginalCount += 1;
+        }
+      }
+    } catch {}
+    return {
+      draftTextHydrated: bookBuilderDraftTextHydrated,
+      draftTextCharacters: bookBuilderDraftTextCache.length,
+      legacyDraftContainsText: typeof draft.text === 'string' && draft.text.length > 0,
+      legacyOriginalCount
+    };
+  }
+});
+
+window.setTimeout(() => { void migrateLegacyBookBuilderStorage(); }, 0);
+
 function normalizeBuilderText(value) {
   return String(value || '')
     .replace(/\r\n?/g, '\n')
@@ -4356,8 +4568,7 @@ function normalizeImportedBookText(text, options = {}) {
 
 function renderBookBuilder() {
   stopReader();
-  let draft = {};
-  try { draft = JSON.parse(localStorage.getItem(BOOK_BUILDER_DRAFT_KEY) || '{}') || {}; } catch {}
+  const draft = readLegacyBookBuilderDraft();
   app.innerHTML = `
     <section class="platform-page book-builder-page">
       <header class="book-builder-header">
@@ -4531,22 +4742,30 @@ function renderBookBuilder() {
     status.textContent = `${file.name} loaded. Choose a cleanup level, then Clean & Preview.`;
   };
 
+  let draftTextSaveTimer = null;
   const saveDraft = () => {
-    try {
-      localStorage.setItem(BOOK_BUILDER_DRAFT_KEY, JSON.stringify({
-        mode:selectedMode(),
-        title:titleInput.value,
-        author:authorInput.value,
-        text:textInput.value,
-        cleanupLevel:selectedCleanupLevel(),
-        importedSource,
-        cleanToc:cleanTocInput.checked,
-        cleanHeaders:cleanHeadersInput.checked,
-        rights:rightsInput.checked,
-        guideDepth:guideDepthInput?.value || 'extended',
-        guideIdea:guideIdeaInput?.value || ''
-      }));
-    } catch {}
+    writeBookBuilderDraftMetadata({
+      mode:selectedMode(),
+      title:titleInput.value,
+      author:authorInput.value,
+      cleanupLevel:selectedCleanupLevel(),
+      importedSource,
+      cleanToc:cleanTocInput.checked,
+      cleanHeaders:cleanHeadersInput.checked,
+      rights:rightsInput.checked,
+      guideDepth:guideDepthInput?.value || 'extended',
+      guideIdea:guideIdeaInput?.value || ''
+    });
+
+    // The large text payload is kept out of localStorage. Coalesce rapid typing
+    // so IndexedDB receives one current snapshot instead of a full-book write on
+    // every keystroke.
+    bookBuilderDraftTextCache = textInput.value;
+    bookBuilderDraftTextHydrated = true;
+    window.clearTimeout(draftTextSaveTimer);
+    draftTextSaveTimer = window.setTimeout(() => {
+      void persistBookBuilderDraftText(bookBuilderDraftTextCache);
+    }, 450);
   };
   const analyze = () => {
     const analysisSource = cleanedPreview?.text || textInput.value;
@@ -4613,9 +4832,10 @@ function renderBookBuilder() {
     finally { button.disabled = false; }
   });
   app.querySelector('#builder-analyze').addEventListener('click', analyze);
-  app.querySelector('#builder-clear').addEventListener('click', () => {
+  app.querySelector('#builder-clear').addEventListener('click', async () => {
     if (!window.confirm('Clear this book-builder draft?')) return;
-    localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+    window.clearTimeout(draftTextSaveTimer);
+    await clearBookBuilderDraftStorage();
     renderBookBuilder();
   });
   const createInteractiveGuide = async () => {
@@ -4690,7 +4910,8 @@ function renderBookBuilder() {
         actionNote: guide.actionNote || `Choose one useful idea from ${title} and turn it into a concrete next step.`
       };
 
-      localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+      window.clearTimeout(draftTextSaveTimer);
+      await clearBookBuilderDraftStorage();
       renderReaderWithText(`${title} — Mark, Set, Go! Guide`, guideText, {
         type:'modern-guide',
         id:guideId,
@@ -4734,26 +4955,38 @@ function renderBookBuilder() {
     if (!rightsInput.checked) { status.textContent = 'Confirm that you have the right to use this text.'; return rightsInput.focus(); }
     const displayTitle = author ? `${title} — ${author}` : title;
     const rawOriginal = textInput.value.trim();
-    const originalKey = `markSetGoBookBuilderOriginalV1:${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-    try { localStorage.setItem(originalKey, rawOriginal); } catch (error) { console.warn('Original book-builder text could not be preserved separately.', error); }
+    const originalKey = `${BOOK_BUILDER_ORIGINAL_PREFIX}${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+    const originalPreserved = await persistBookBuilderOriginal(originalKey, rawOriginal);
     const source = {
       type: 'book-builder',
       ...(importedSource || {}),
       author,
       cleanupLevel: selectedCleanupLevel(),
-      originalPreserved: true,
-      originalKey,
+      originalPreserved,
+      originalKey: originalPreserved ? originalKey : '',
       createdAt: new Date().toISOString(),
       documentToc: detectTableOfContents(text),
       cleanup: normalized?.report || {},
       private: true
     };
-    localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+    window.clearTimeout(draftTextSaveTimer);
+    await clearBookBuilderDraftStorage();
     renderReaderWithText(displayTitle, text, source);
   });
 
   applyBuilderMode();
+
   if (selectedMode() === 'book' && textInput.value.trim()) analyze();
+
+  // After Phase 4 migration, the large draft text may exist only in IndexedDB.
+  // Populate it once without delaying page construction or overwriting new input.
+  if (!textInput.value) {
+    void getBookBuilderDraftText().then((storedText) => {
+      if (!storedText || !textInput.isConnected || textInput.value) return;
+      textInput.value = storedText;
+      if (selectedMode() === 'book') analyze();
+    });
+  }
 }
 
 function renderEmptyReader() {
@@ -9507,9 +9740,15 @@ async function getStoredReaderDocument(documentId) {
 async function removeStoredReaderDocument(documentId) {
   const id = String(documentId || '');
   if (!id) return false;
+
+  const existing = await getStoredReaderDocument(id);
+  const originalKey = String(existing?.source?.originalKey || '');
+
   readerDocumentMemoryCache.delete(id);
   try { localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${id}`); } catch {}
   await removeCachedReadingBook(readerDocumentCacheKey(id));
+
+  if (originalKey) await removeBookBuilderOriginal(originalKey);
   return true;
 }
 

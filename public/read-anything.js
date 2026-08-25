@@ -537,8 +537,14 @@
     }
 
     if (!key && storedDocument?.source?.originalKey) {
-      const originalText = localStorage.getItem(storedDocument.source.originalKey) || '';
-      if (originalText) {
+      const originalStorageKey = String(storedDocument.source.originalKey || '');
+      let originalText = '';
+      try { originalText = localStorage.getItem(originalStorageKey) || ''; } catch {}
+
+      const activateBookBuilderOriginal = (value) => {
+        const restoredOriginal = String(value || '');
+        if (!restoredOriginal) return false;
+
         key = `builder-${String(documentId)}`;
         const currentKey = 'created';
         activeImportedDocument = {
@@ -546,15 +552,27 @@
           baseTitle: cleanImportedTitle(storedDocument.title),
           author: storedDocument.source?.author || '',
           source: { ...(storedDocument.source || {}), readAnything:true, readAnythingKey:key },
-          versions: { original: originalText, [currentKey]: storedDocument.text || originalText },
-          originalText
+          versions: { original: restoredOriginal, [currentKey]: storedDocument.text || restoredOriginal },
+          originalText: restoredOriginal
         };
         activeImportedVersion = currentKey;
         rememberFormatDocument(documentId, key);
         saveActiveFormatRecord();
         scheduleFormatControlAttach();
         return true;
+      };
+
+      if (originalText) return activateBookBuilderOriginal(originalText);
+
+      if (typeof window.MarkSetGoBookBuilderStorage?.getOriginal === 'function') {
+        void window.MarkSetGoBookBuilderStorage.getOriginal(originalStorageKey).then((loadedOriginal) => {
+          if (!loadedOriginal) return;
+          const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+          if (String(current?.documentId || '') !== String(documentId)) return;
+          activateBookBuilderOriginal(loadedOriginal);
+        }).catch(() => {});
       }
+      return false;
     }
 
     if (!key) {
