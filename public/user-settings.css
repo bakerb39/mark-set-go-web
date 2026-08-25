@@ -18,3 +18,34 @@
 .unified-settings-note{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--msg-gold-soft,#fff7d8) 72%,white);color:var(--msg-muted,#60758a);font-size:.84rem;line-height:1.45}
 .unified-settings-status{min-height:1.3em;margin:10px 0 0}
 @media(max-width:760px){.unified-settings-category-grid{grid-template-columns:1fr}.unified-settings-sync-toggle{align-items:flex-start}.unified-settings-reset{margin-left:0}}
+
+
+/* Unified account-content sync status. */
+.unified-content-sync-summary{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  margin:14px 0 4px;
+  padding:12px 14px;
+  border:1px solid var(--msg-blue-border-soft,#d5e5f2);
+  border-radius:12px;
+  background:var(--msg-surface,#fff);
+}
+.unified-content-sync-summary>div{min-width:0}
+.unified-content-sync-summary strong,
+.unified-content-sync-summary small{display:block}
+.unified-content-sync-summary strong{color:var(--msg-ink,#18324a);font-size:.95rem}
+.unified-content-sync-summary small{margin-top:3px;color:var(--msg-muted,#60758a);font-size:.83rem;line-height:1.4}
+.unified-content-sync-summary>[data-user-content-sync-status]{
+  flex:0 0 min(290px,42%);
+  color:var(--msg-blue-strong,#236aa8);
+  font-size:.82rem;
+  font-weight:750;
+  line-height:1.35;
+  text-align:right;
+}
+@media(max-width:760px){
+  .unified-content-sync-summary{display:block}
+  .unified-content-sync-summary>[data-user-content-sync-status]{display:block;margin-top:8px;text-align:left}
+}

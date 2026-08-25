@@ -5519,8 +5519,17 @@ function renderProfilePreferences() {
           <input type="checkbox" data-user-settings-sync checked>
         </label>
 
+        <div class="unified-content-sync-summary">
+          <div>
+            <strong>Books &amp; learning data</strong>
+            <small>Books, reading position, Mark Notebook, annotations, saved studies and quiz history sync separately from preferences.</small>
+          </div>
+          <span data-user-content-sync-status>Cloud content sync is automatic when signed in.</span>
+        </div>
+
         <div class="unified-settings-actions">
           <button type="button" class="primary" data-user-settings-save>Save current settings</button>
+          <button type="button" class="secondary" data-user-content-sync-now>Sync books &amp; learning data</button>
           <button type="button" class="secondary" data-user-settings-restore>Restore saved settings</button>
           <button type="button" class="secondary" data-user-settings-export>Export settings</button>
           <button type="button" class="secondary" data-user-settings-import>Import settings</button>
@@ -5529,8 +5538,7 @@ function renderProfilePreferences() {
         </div>
 
         <p class="unified-settings-note">
-          Books, reading progress, notebooks, annotations, saved quiz history, and other content are not part of this settings snapshot.
-          A background chosen from your local computer stays on that browser unless you choose it again on another device.
+          Settings and account content are intentionally separate. A background chosen from your local computer remains on that browser unless you choose it again on another device.
         </p>
         <p class="status unified-settings-status" data-user-settings-status role="status" aria-live="polite"></p>
       </section>
@@ -5674,6 +5682,64 @@ function renderProfilePreferences() {
   };
 
   refreshSettingsStatus();
+
+  const contentSyncApi = settingsHost.MarkSetGoCloudContentSync || window.MarkSetGoCloudContentSync;
+  const contentSyncStatus = app.querySelector('[data-user-content-sync-status]');
+
+  const refreshContentSyncStatus = () => {
+    const api = settingsHost.MarkSetGoCloudContentSync || window.MarkSetGoCloudContentSync;
+    if (!contentSyncStatus || !api?.status) return;
+    const info = api.status();
+    if (!info.authenticated) {
+      contentSyncStatus.textContent = 'Sign in to sync books and learning data across devices.';
+      return;
+    }
+    if (info.syncing) {
+      contentSyncStatus.textContent = 'Syncing books and learning data…';
+      return;
+    }
+    if (info.lastError) {
+      contentSyncStatus.textContent = `Sync needs attention: ${info.lastError}`;
+      return;
+    }
+    const details = [];
+    if (Number(info.cloudRecords)) details.push(`${info.cloudRecords} cloud learning record${Number(info.cloudRecords)===1?'':'s'}`);
+    if (Number(info.cloudBooks)) details.push(`${info.cloudBooks} cloud book${Number(info.cloudBooks)===1?'':'s'}`);
+    if (Number(info.oversizeDocuments)) details.push(`${info.oversizeDocuments} book${Number(info.oversizeDocuments)===1?'':'s'} over cloud text limit`);
+    contentSyncStatus.textContent = details.length
+      ? `Account content synced · ${details.join(' · ')}`
+      : 'Account content sync is ready.';
+  };
+
+  app.querySelector('[data-user-content-sync-now]')?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    const api = settingsHost.MarkSetGoCloudContentSync || window.MarkSetGoCloudContentSync;
+    if (!api?.syncNow) return showSettingsMessage('Cloud content sync is not available yet.');
+    const button = event.currentTarget;
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Syncing…';
+    try {
+      const result = await api.syncNow({ manual:true });
+      showSettingsMessage(
+        result?.authenticated === false
+          ? 'Sign in to sync books and learning data across devices.'
+          : 'Books and learning data are synchronized.',
+        Boolean(result?.authenticated !== false)
+      );
+      refreshContentSyncStatus();
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Books and learning data could not be synchronized.');
+    } finally {
+      if (button.isConnected) {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    }
+  });
+
+  document.addEventListener('marksetgo:cloud-content-status', refreshContentSyncStatus);
+  refreshContentSyncStatus();
 
   app.querySelector('[data-user-settings-save]')?.addEventListener('click', async (event) => {
     event.preventDefault();
