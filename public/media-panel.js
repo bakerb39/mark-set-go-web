@@ -7,7 +7,9 @@
   const PANEL_WIDTH_KEY = 'markSetGoVideoSidePanelWidthV1';
   const MODE_KEY = 'markSetGoMediaDockModeV1';
   const FLOAT_POSITION_KEY = 'markSetGoMediaFloatPositionV1';
+  const PLAYER_SIZE_KEY = 'markSetGoMediaPlayerSizeV1';
   const DEFAULT_WIDTH = 480;
+  const MIN_VIDEO_HEIGHT = 150;
   const MIN_WIDTH = 360;
   const MAX_ITEMS_PER_READING = 100;
 
@@ -33,6 +35,9 @@
   let floatPosition = readFloatPosition();
   let floatDragState = null;
   let playbackGuardInstalled = false;
+  let playerSize = readPlayerSize();
+  let playerResizeState = null;
+  let resizeGrip = null;
 
   function readMode() {
     try {
@@ -87,6 +92,122 @@
     return floatPosition;
   }
 
+  function readPlayerSize() {
+    try {
+      const value = JSON.parse(localStorage.getItem(PLAYER_SIZE_KEY) || 'null');
+      const width = Number(value?.width);
+      const videoHeight = Number(value?.videoHeight);
+      return {
+        width:Number.isFinite(width) ? width : null,
+        videoHeight:Number.isFinite(videoHeight) ? videoHeight : null
+      };
+    } catch {
+      return { width:null, videoHeight:null };
+    }
+  }
+
+  function savePlayerSize(value) {
+    const width = Number(value?.width);
+    const videoHeight = Number(value?.videoHeight);
+    playerSize = {
+      width:Number.isFinite(width) ? Math.round(width) : null,
+      videoHeight:Number.isFinite(videoHeight) ? Math.round(videoHeight) : null
+    };
+    try { localStorage.setItem(PLAYER_SIZE_KEY, JSON.stringify(playerSize)); } catch {}
+    return playerSize;
+  }
+
+  function bottomRibbonBoundary() {
+    const margin = 8;
+    const footer = document.querySelector('#msg-shared-bottom');
+    const rect = footer?.getBoundingClientRect?.();
+
+    // If the shared bottom ribbon is currently visible in the viewport, its
+    // top edge is the hard floor for the media player. Otherwise use viewport
+    // bottom. This works whether the ribbon is fixed or simply visible at the
+    // end of a page.
+    if (rect && rect.height > 0 && rect.top > 0 && rect.top < window.innerHeight) {
+      return Math.max(120, Math.floor(rect.top - margin));
+    }
+    return Math.max(120, Math.floor(window.innerHeight - margin));
+  }
+
+  function mediaTopBoundary() {
+    const headerBottom = Math.ceil(
+      document.querySelector('.site-header')?.getBoundingClientRect?.().bottom || 0
+    );
+    return Math.max(8, headerBottom + 4);
+  }
+
+  function availableDockHeight(top = null) {
+    const actualTop = Number.isFinite(Number(top))
+      ? Number(top)
+      : dock.getBoundingClientRect().top;
+    return Math.max(220, Math.floor(bottomRibbonBoundary() - Math.max(mediaTopBoundary(), actualTop)));
+  }
+
+  function clampVideoHeight(value) {
+    const barHeight = Math.max(38, dock.querySelector('.music-dock-bar')?.getBoundingClientRect?.().height || 44);
+    const reserveForPanel = panelOpen ? 118 : 12;
+    const max = Math.max(
+      MIN_VIDEO_HEIGHT,
+      availableDockHeight() - barHeight - reserveForPanel
+    );
+    return Math.round(Math.max(MIN_VIDEO_HEIGHT, Math.min(Number(value) || MIN_VIDEO_HEIGHT, max)));
+  }
+
+  function applyPlayerSize() {
+    const requestedHeight = Number(playerSize?.videoHeight);
+    if (Number.isFinite(requestedHeight)) {
+      const height = clampVideoHeight(requestedHeight);
+      playerSize.videoHeight = height;
+      document.documentElement.style.setProperty('--msg-media-video-height', `${height}px`);
+      dock.classList.add('msg-media-custom-video-size');
+    } else {
+      document.documentElement.style.removeProperty('--msg-media-video-height');
+      dock.classList.remove('msg-media-custom-video-size');
+    }
+
+    if (mode === 'float' && Number.isFinite(Number(playerSize?.width))) {
+      const width = Math.round(Math.max(
+        320,
+        Math.min(Number(playerSize.width), Math.min(900, window.innerWidth - 16))
+      ));
+      playerSize.width = width;
+      dock.style.setProperty('width', `${width}px`, 'important');
+    }
+  }
+
+  function applyBottomRibbonBounds() {
+    if (dock.hidden) return;
+    const rect = dock.getBoundingClientRect();
+    const top = Math.max(mediaTopBoundary(), rect.top || mediaTopBoundary());
+    const maxHeight = Math.max(220, Math.floor(bottomRibbonBoundary() - top));
+
+    // Side / Expanded are fixed from the top, so max-height is authoritative.
+    // Float mode is constrained by its drag/resize calculations and gets this
+    // as a defensive cap as well.
+    dock.style.setProperty('max-height', `${maxHeight}px`, 'important');
+
+    if (Number.isFinite(Number(playerSize?.videoHeight))) {
+      const nextHeight = clampVideoHeight(playerSize.videoHeight);
+      if (nextHeight !== playerSize.videoHeight) {
+        playerSize.videoHeight = nextHeight;
+        document.documentElement.style.setProperty('--msg-media-video-height', `${nextHeight}px`);
+      }
+    }
+  }
+
+  function resetPlayerSize() {
+    playerSize = { width:null, videoHeight:null };
+    try { localStorage.removeItem(PLAYER_SIZE_KEY); } catch {}
+    document.documentElement.style.removeProperty('--msg-media-video-height');
+    dock.classList.remove('msg-media-custom-video-size');
+    if (mode === 'float') dock.style.removeProperty('width');
+    applyBottomRibbonBounds();
+    return true;
+  }
+
   function normalizedMediaUrl(value) {
     const raw = String(value || '').trim();
     if (!raw) return '';
@@ -137,18 +258,17 @@
     const fallbackWidth = Math.min(420, Math.max(280, window.innerWidth - 16));
     const width = Math.max(1, rect.width || dock.offsetWidth || fallbackWidth);
     const height = Math.max(1, rect.height || dock.offsetHeight || 220);
-    const headerBottom = Math.ceil(
-      document.querySelector('.site-header')?.getBoundingClientRect()?.bottom || 0
-    );
     const margin = 8;
-    const minTop = Math.max(margin, headerBottom + 4);
+    const minTop = mediaTopBoundary();
+    const bottom = bottomRibbonBoundary();
+    const usableHeight = Math.max(120, bottom - minTop);
     return {
       width,
       height,
       minLeft:margin,
       minTop,
       maxLeft:Math.max(margin, window.innerWidth - width - margin),
-      maxTop:Math.max(minTop, window.innerHeight - Math.min(height, window.innerHeight - minTop - margin) - margin)
+      maxTop:Math.max(minTop, bottom - Math.min(height, usableHeight))
     };
   }
 
@@ -530,6 +650,19 @@
       resizer = document.querySelector('#msg-media-side-resizer');
     }
 
+    if (!document.querySelector('#msg-media-player-resize-grip')) {
+      resizeGrip = document.createElement('div');
+      resizeGrip.id = 'msg-media-player-resize-grip';
+      resizeGrip.className = 'msg-media-player-resize-grip';
+      resizeGrip.tabIndex = 0;
+      resizeGrip.setAttribute('role','separator');
+      resizeGrip.setAttribute('aria-label','Resize media player');
+      resizeGrip.title = 'Drag to resize the media player';
+      dock.appendChild(resizeGrip);
+    } else {
+      resizeGrip = document.querySelector('#msg-media-player-resize-grip');
+    }
+
     if (!document.querySelector('#msg-media-panel')) {
       const panel = document.createElement('section');
       panel.id = 'msg-media-panel';
@@ -610,6 +743,43 @@
     document.querySelector('#msg-media-results')?.addEventListener('click', onResultsClick);
     document.querySelector('#msg-media-saved')?.addEventListener('click', onSavedClick);
 
+    // Own close at the media layer as well as app.js. The old app listener
+    // still runs, but this guarantees the Media Panel/layout state closes too.
+    document.querySelector('#music-close')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      setPanelOpen(false);
+      dock.classList.remove('msg-media-collapsed');
+      document.body.classList.remove('msg-media-collapsed-active');
+      window.MarkSetGoMedia?.stop?.();
+      if (!dock.hidden) dock.hidden = true;
+
+      // A closed side player must give the Reader its full width back.
+      if (mode !== 'float') {
+        mode = 'float';
+        try { localStorage.setItem(MODE_KEY, 'float'); } catch {}
+        applyMode();
+      }
+    }, true);
+
+    resizeGrip?.addEventListener('pointerdown', beginPlayerResize);
+    resizeGrip?.addEventListener('keydown', (event) => {
+      if (!['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(event.key)) return;
+      event.preventDefault();
+      const currentVideoHeight = Number(playerSize?.videoHeight)
+        || Math.round(playerWrap?.getBoundingClientRect?.().height || 236);
+      let width = Number(playerSize?.width)
+        || Math.round(dock.getBoundingClientRect().width || 420);
+      let videoHeight = currentVideoHeight;
+      if (event.key === 'ArrowUp') videoHeight -= 18;
+      if (event.key === 'ArrowDown') videoHeight += 18;
+      if (mode === 'float' && event.key === 'ArrowLeft') width -= 24;
+      if (mode === 'float' && event.key === 'ArrowRight') width += 24;
+      savePlayerSize({ width:mode === 'float' ? width : playerSize?.width, videoHeight });
+      applyPlayerSize();
+      applyBottomRibbonBounds();
+      if (mode === 'float' && floatPosition) applyFloatDockGeometry();
+    });
+
     const dragBar = dock.querySelector('.music-dock-bar');
     dragBar?.addEventListener('pointerdown', beginFloatDrag);
     if (dragBar) {
@@ -666,7 +836,26 @@
         saveFloatPosition(next);
         reassertFloatDockGeometrySoon();
       }
+      applyPlayerSize();
+      applyBottomRibbonBounds();
     });
+
+    // Footer/ribbon can enter or leave the viewport as the page scrolls.
+    let ribbonScrollFrame = 0;
+    window.addEventListener('scroll', () => {
+      if (ribbonScrollFrame) cancelAnimationFrame(ribbonScrollFrame);
+      ribbonScrollFrame = requestAnimationFrame(() => {
+        ribbonScrollFrame = 0;
+        if (!dock.hidden) {
+          applyBottomRibbonBounds();
+          if (mode === 'float' && floatPosition) {
+            const next = clampFloatPosition(floatPosition.left, floatPosition.top);
+            floatPosition = next;
+            applyFloatDockGeometry(next);
+          }
+        }
+      });
+    }, { passive:true });
 
     // The legacy Reader music chooser may reposition #music-dock after clicks.
     // In side mode our side geometry owns the dock. After the user has dragged
@@ -775,6 +964,71 @@
     if (button.dataset.mediaSavedAction === 'open' && item.watchUrl) {
       window.open(item.watchUrl, '_blank', 'noopener,noreferrer');
     }
+  }
+
+  function beginPlayerResize(event) {
+    if (!resizeGrip || dock.hidden) return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const dockRect = dock.getBoundingClientRect();
+    const videoRect = playerWrap?.getBoundingClientRect?.();
+    const startWidth = Math.round(dockRect.width || 420);
+    const startVideoHeight = Math.round(videoRect?.height || Math.max(MIN_VIDEO_HEIGHT, startWidth * 9 / 16));
+
+    playerResizeState = {
+      pointerId:event.pointerId,
+      startX:event.clientX,
+      startY:event.clientY,
+      startWidth,
+      startVideoHeight
+    };
+
+    dock.classList.add('msg-media-player-resizing');
+    document.body.classList.add('msg-media-player-resizing-active');
+    try { resizeGrip.setPointerCapture(event.pointerId); } catch {}
+
+    const move = (moveEvent) => {
+      if (!playerResizeState || moveEvent.pointerId !== playerResizeState.pointerId) return;
+      const dx = moveEvent.clientX - playerResizeState.startX;
+      const dy = moveEvent.clientY - playerResizeState.startY;
+
+      let nextWidth = playerResizeState.startWidth;
+      // Float grip lives on bottom-right. Side/Expanded grip lives on bottom-left,
+      // where dragging left should make the dock wider.
+      if (mode === 'float') nextWidth += dx;
+
+      const nextVideoHeight = playerResizeState.startVideoHeight + dy;
+      const width = mode === 'float'
+        ? Math.max(320, Math.min(nextWidth, Math.min(900, window.innerWidth - 16)))
+        : playerSize?.width;
+
+      playerSize = {
+        width:Number.isFinite(Number(width)) ? Math.round(width) : null,
+        videoHeight:clampVideoHeight(nextVideoHeight)
+      };
+      applyPlayerSize();
+      applyBottomRibbonBounds();
+      if (mode === 'float' && floatPosition) applyFloatDockGeometry();
+    };
+
+    const finish = (finishEvent) => {
+      if (!playerResizeState) return;
+      resizeGrip.removeEventListener('pointermove', move);
+      resizeGrip.removeEventListener('pointerup', finish);
+      resizeGrip.removeEventListener('pointercancel', finish);
+      try { resizeGrip.releasePointerCapture(finishEvent.pointerId); } catch {}
+      dock.classList.remove('msg-media-player-resizing');
+      document.body.classList.remove('msg-media-player-resizing-active');
+      savePlayerSize(playerSize);
+      playerResizeState = null;
+    };
+
+    resizeGrip.addEventListener('pointermove', move);
+    resizeGrip.addEventListener('pointerup', finish);
+    resizeGrip.addEventListener('pointercancel', finish);
   }
 
   function beginResize(event) {
@@ -900,6 +1154,8 @@
       dragBar.title = mode === 'float' ? 'Drag to move the media player' : '';
     }
 
+    applyPlayerSize();
+    applyBottomRibbonBounds();
     window.dispatchEvent(new Event('resize'));
   }
 
@@ -910,6 +1166,7 @@
     const toggle = document.querySelector('#msg-media-panel-toggle');
     toggle?.setAttribute('aria-expanded', panelOpen ? 'true' : 'false');
     dock.classList.toggle('msg-media-panel-open', panelOpen);
+    applyBottomRibbonBounds();
 
     if (panelOpen) {
       dock.hidden = false;
@@ -1122,8 +1379,13 @@
       renderResults();
       void renderSaved();
     }
+    applyPlayerSize();
+    applyBottomRibbonBounds();
     if (mode === 'float' && floatPosition) {
-      requestAnimationFrame(() => applyFloatDockGeometry());
+      requestAnimationFrame(() => {
+        applyFloatDockGeometry();
+        applyBottomRibbonBounds();
+      });
     }
   });
 
@@ -1144,6 +1406,8 @@
 
   installSameSourceRestartGuard();
   installUi();
+  applyPlayerSize();
+  applyBottomRibbonBounds();
 
   // Restore a dock mode preference only after the player is actually shown.
   // The class itself is harmless while hidden and does not force the player open.
@@ -1155,7 +1419,9 @@
     setMode:(value)=>saveMode(value),
     get mode(){ return mode; },
     get floatPosition(){ return floatPosition ? { ...floatPosition } : null; },
+    get playerSize(){ return { ...playerSize }; },
     resetFloatPosition:()=>resetFloatPosition(),
+    resetPlayerSize:()=>resetPlayerSize(),
     saveCurrent:()=>currentPlaying ? saveItem(currentPlaying,currentPlaying.context) : false,
     getSaved:async()=>Array.isArray((await getMediaRecord(currentContext()))?.items)
       ? (await getMediaRecord(currentContext())).items

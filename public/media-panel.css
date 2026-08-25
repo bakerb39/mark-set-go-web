@@ -453,3 +453,89 @@ body.msg-media-float-dragging{
 body.msg-media-float-dragging{
   user-select:none;
 }
+
+
+/* v1.2 — closing, bottom-ribbon boundary and player resize */
+
+/* This MUST win over later side/expanded display:flex rules. */
+.music-dock[hidden]{
+  display:none !important;
+}
+
+.music-dock.msg-media-custom-video-size .music-player-wrap{
+  aspect-ratio:auto !important;
+  height:var(--msg-media-video-height) !important;
+  min-height:var(--msg-media-video-height) !important;
+  max-height:var(--msg-media-video-height) !important;
+  flex:0 0 var(--msg-media-video-height) !important;
+}
+
+.music-dock.msg-media-custom-video-size .music-player-wrap iframe{
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+}
+
+.msg-media-player-resize-grip{
+  position:absolute;
+  z-index:20;
+  right:-3px;
+  bottom:-3px;
+  width:20px;
+  height:20px;
+  cursor:nwse-resize;
+  touch-action:none;
+}
+.msg-media-player-resize-grip::before{
+  content:"";
+  position:absolute;
+  right:4px;
+  bottom:4px;
+  width:9px;
+  height:9px;
+  border-right:2px solid rgba(255,255,255,.72);
+  border-bottom:2px solid rgba(255,255,255,.72);
+  border-radius:0 0 2px 0;
+}
+.msg-media-player-resize-grip:focus-visible{
+  outline:2px solid #78b7ea;
+  outline-offset:1px;
+  border-radius:4px;
+}
+
+/* Side/Expanded already resize width from the left edge; the corner grip there
+   adjusts video height, so put it at the lower-left instead. */
+.music-dock.msg-media-beside .msg-media-player-resize-grip,
+.music-dock.msg-media-expanded .msg-media-player-resize-grip{
+  left:-3px;
+  right:auto;
+  cursor:ns-resize;
+}
+.music-dock.msg-media-beside .msg-media-player-resize-grip::before,
+.music-dock.msg-media-expanded .msg-media-player-resize-grip::before{
+  left:4px;
+  right:auto;
+  border-right:0;
+  border-left:2px solid rgba(255,255,255,.72);
+  border-bottom:2px solid rgba(255,255,255,.72);
+  border-radius:0 0 0 2px;
+}
+
+body.msg-media-player-resizing-active{
+  user-select:none !important;
+}
+.music-dock.msg-media-player-resizing{
+  transition:none !important;
+}
+
+/* Side/Expanded contents must scroll INSIDE the capped dock rather than extend
+   beneath the shared bottom ribbon. */
+.music-dock.msg-media-beside,
+.music-dock.msg-media-expanded{
+  overflow:hidden !important;
+}
+.music-dock.msg-media-beside .msg-media-panel,
+.music-dock.msg-media-expanded .msg-media-panel{
+  min-height:0 !important;
+  overflow-y:auto !important;
+}
