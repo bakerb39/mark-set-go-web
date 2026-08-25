@@ -280,13 +280,19 @@ body.msg-media-resizing{
 
   .music-dock.msg-media-beside,
   .music-dock.msg-media-expanded{
-    top:4.25rem;
+    position:fixed !important;
+    left:auto !important;
+    right:.75rem !important;
+    top:4.25rem !important;
+    bottom:auto !important;
+    transform:none !important;
+    margin:0 !important;
     right:.75rem;
     bottom:auto;
     display:flex;
     flex-direction:column;
-    width:var(--msg-media-side-width);
-    max-width:min(780px,58vw);
+    width:var(--msg-media-side-width) !important;
+    max-width:min(780px,58vw) !important;
     max-height:calc(100vh - 5rem);
     overflow:visible;
     border-radius:.75rem;
@@ -294,7 +300,7 @@ body.msg-media-resizing{
   }
 
   .music-dock.msg-media-expanded{
-    width:max(var(--msg-media-side-width),min(720px,58vw));
+    width:max(var(--msg-media-side-width),min(720px,58vw)) !important;
   }
 
   .music-dock.msg-media-beside.msg-media-collapsed,

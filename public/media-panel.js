@@ -70,6 +70,12 @@
     if (persist) {
       try { localStorage.setItem(PANEL_WIDTH_KEY, String(sideWidth)); } catch {}
     }
+    if (dock && ['beside','expanded'].includes(mode)) {
+      const desiredWidth = mode === 'expanded'
+        ? Math.max(sideWidth, Math.min(720, maxSideWidth()))
+        : sideWidth;
+      dock.style.setProperty('width', `${Math.round(desiredWidth)}px`, 'important');
+    }
     return sideWidth;
   }
 
@@ -394,7 +400,16 @@
     });
 
     window.addEventListener('resize', () => {
-      if (mode !== 'float') setWidth(sideWidth);
+      if (mode !== 'float') {
+        setWidth(sideWidth);
+        reassertSideDockGeometrySoon();
+      }
+    });
+
+    // The legacy Reader music chooser may reposition #music-dock after a click.
+    // Reassert side placement on the next task only while side mode is active.
+    document.addEventListener('click', () => {
+      reassertSideDockGeometrySoon();
     });
   }
 
@@ -527,6 +542,55 @@
     resizer.addEventListener('pointercancel', finish);
   }
 
+  function clearSideDockGeometry() {
+    [
+      'position',
+      'left',
+      'right',
+      'top',
+      'bottom',
+      'width',
+      'max-width',
+      'transform',
+      'margin',
+      'inset',
+      'inset-inline-start',
+      'inset-inline-end'
+    ].forEach((name) => dock.style.removeProperty(name));
+    delete dock.dataset.msgMediaSideGeometry;
+  }
+
+  function applySideDockGeometry() {
+    if (!['beside','expanded'].includes(mode)) return;
+
+    // reader-music-quick.js positions the same dock near the Reader's music
+    // control with inline !important top/right/left/bottom values. Side mode
+    // owns viewport placement, so replace those values authoritatively.
+    delete dock.dataset.readerChooserPositioned;
+    dock.dataset.msgMediaSideGeometry = '1';
+
+    const desiredWidth = mode === 'expanded'
+      ? Math.max(sideWidth, Math.min(720, maxSideWidth()))
+      : sideWidth;
+
+    dock.style.setProperty('position', 'fixed', 'important');
+    dock.style.setProperty('left', 'auto', 'important');
+    dock.style.setProperty('right', '12px', 'important');
+    dock.style.setProperty('top', '68px', 'important');
+    dock.style.setProperty('bottom', 'auto', 'important');
+    dock.style.setProperty('width', `${Math.round(desiredWidth)}px`, 'important');
+    dock.style.setProperty('max-width', 'min(780px, 58vw)', 'important');
+    dock.style.setProperty('transform', 'none', 'important');
+    dock.style.setProperty('margin', '0', 'important');
+  }
+
+  function reassertSideDockGeometrySoon() {
+    if (!['beside','expanded'].includes(mode)) return;
+    window.setTimeout(() => {
+      if (['beside','expanded'].includes(mode)) applySideDockGeometry();
+    }, 0);
+  }
+
   function applyMode() {
     dock.classList.toggle('msg-media-beside', mode === 'beside');
     dock.classList.toggle('msg-media-expanded', mode === 'expanded');
@@ -539,6 +603,7 @@
     if (!side) {
       dock.classList.remove('msg-media-collapsed');
       document.body.classList.remove('msg-media-collapsed-active');
+      clearSideDockGeometry();
       if (minimizeButton) {
         minimizeButton.textContent = '—';
         minimizeButton.setAttribute('aria-label','Minimize media player');
@@ -547,6 +612,7 @@
       dock.classList.remove('minimized');
       if (playerWrap) playerWrap.hidden = false;
       setWidth(mode === 'expanded' ? Math.max(sideWidth, Math.min(720, maxSideWidth())) : sideWidth);
+      applySideDockGeometry();
     }
 
     if (resizer) resizer.hidden = !side;
