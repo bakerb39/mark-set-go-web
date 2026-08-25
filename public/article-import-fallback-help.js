@@ -4,7 +4,7 @@
   const FALLBACK_TEXT = 'Full article text could not be imported from the publisher.';
   const NOTICE_ID = 'article-import-fallback-help';
 
-  function addStyles() {
+  function ensureStyles() {
     if (document.getElementById('article-import-fallback-help-styles')) return;
 
     const style = document.createElement('style');
@@ -48,19 +48,23 @@
     }
 
     const trigger = document.querySelector(
-      'button[data-read="upload"], [data-read="upload"], [data-action="read-anything"]'
+      '[data-read="upload"], [data-action="read-anything"]'
     );
-
     trigger?.click?.();
   }
 
-  function showFallbackHelp() {
+  function addFallbackNotice() {
     document.getElementById(NOTICE_ID)?.remove();
 
-    const reader = document.querySelector('#app #reader');
+    const app = document.getElementById('app');
+    if (!app) return;
+
+    // Topic Feed / regular reader builds use #reader. Some reader wrappers place
+    // it inside a center column, so attach immediately after the actual text area.
+    const reader = app.querySelector('#reader');
     if (!reader) return;
 
-    addStyles();
+    ensureStyles();
 
     const notice = document.createElement('aside');
     notice.id = NOTICE_ID;
@@ -78,7 +82,6 @@
     notice.querySelector('[data-open-read-anything]')
       ?.addEventListener('click', openReadAnything);
 
-    // Put the guidance immediately after the reader text rather than above it.
     reader.insertAdjacentElement('afterend', notice);
   }
 
@@ -87,28 +90,24 @@
 
     if (
       typeof original !== 'function' ||
-      original.__articleImportFallbackHelpInstalled
+      original.__msgArticleFallbackHelpInstalled
     ) return;
 
     function wrappedRenderReaderWithText(title, text, source) {
       const result = original.apply(this, arguments);
 
       if (String(text || '').includes(FALLBACK_TEXT)) {
-        requestAnimationFrame(() => requestAnimationFrame(showFallbackHelp));
+        requestAnimationFrame(() => requestAnimationFrame(addFallbackNotice));
       }
 
       return result;
     }
 
-    wrappedRenderReaderWithText.__articleImportFallbackHelpInstalled = true;
-    wrappedRenderReaderWithText.__articleImportFallbackHelpOriginal = original;
-
+    wrappedRenderReaderWithText.__msgArticleFallbackHelpInstalled = true;
+    wrappedRenderReaderWithText.__msgArticleFallbackHelpOriginal = original;
     window.renderReaderWithText = wrappedRenderReaderWithText;
   }
 
-  // All scripts here are deferred. Waiting for DOMContentLoaded ensures that
-  // app.js, read-anything.js, and the other reader integrations have finished
-  // assigning their final renderReaderWithText implementation before wrapping it.
   if (document.readyState === 'loading') {
     window.addEventListener('DOMContentLoaded', install, { once: true });
   } else {
