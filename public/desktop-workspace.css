@@ -1,0 +1,269 @@
+/* Mark, Set, Go! Desktop Workspace v1.0 */
+
+.msg-desktop-mode-button{
+  width:auto !important;
+  min-width:76px !important;
+  padding:4px 9px !important;
+  font-size:.76rem !important;
+  font-weight:800 !important;
+}
+
+body.msg-desktop-workspace-active{
+  overflow-x:hidden !important;
+}
+
+body.msg-desktop-workspace-active #app.app-shell{
+  width:calc(100vw - 24px) !important;
+  max-width:none !important;
+  margin:10px auto !important;
+}
+
+#app > .msg-workspace-shell.msg-desktop-workspace{
+  position:relative !important;
+  display:block !important;
+  grid-template-columns:none !important;
+  column-gap:0 !important;
+  overflow:hidden !important;
+  background:
+    radial-gradient(circle at 20% 12%,rgba(47,117,181,.08),transparent 24%),
+    linear-gradient(180deg,#edf4f9 0%,#e6eff6 100%);
+  border:1px solid var(--msg-blue-border-soft,#d5e5f2);
+  border-radius:12px;
+  box-shadow:inset 0 1px rgba(255,255,255,.9);
+}
+
+#app > .msg-workspace-shell.msg-desktop-workspace > .msg-workspace-divider,
+#app > .msg-workspace-shell.msg-desktop-workspace > .msg-workspace-secondary{
+  display:none !important;
+}
+
+.msg-desktop-canvas{
+  position:relative;
+  width:100%;
+  min-width:0;
+  overflow:hidden;
+  isolation:isolate;
+}
+
+.msg-desktop-toolbar{
+  position:absolute;
+  z-index:20000;
+  top:7px;
+  left:50%;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  min-height:34px;
+  max-width:calc(100% - 24px);
+  padding:5px 7px 5px 10px;
+  transform:translateX(-50%);
+  border:1px solid rgba(11,45,79,.18);
+  border-radius:9px;
+  background:rgba(255,255,255,.94);
+  color:var(--msg-ink,#18324a);
+  box-shadow:0 5px 20px rgba(11,45,79,.12);
+  backdrop-filter:blur(9px);
+  white-space:nowrap;
+}
+.msg-desktop-toolbar strong{font-size:.76rem;color:var(--msg-navy,#0b2d4f)}
+.msg-desktop-toolbar span{font-size:.68rem;color:var(--msg-muted,#60758a)}
+.msg-desktop-toolbar button{
+  min-height:26px;
+  padding:3px 8px;
+  border:1px solid var(--msg-blue-border,#b8d3e8);
+  border-radius:6px;
+  background:var(--msg-blue-soft-2,#f4f9fd);
+  color:var(--msg-blue-strong,#236aa8);
+  font:inherit;
+  font-size:.7rem;
+  font-weight:800;
+  cursor:pointer;
+}
+.msg-desktop-toolbar [data-msg-desktop-standard]{
+  background:var(--msg-navy,#0b2d4f);
+  border-color:var(--msg-navy,#0b2d4f);
+  color:#fff;
+}
+
+.msg-desktop-window{
+  position:absolute !important;
+  display:flex !important;
+  flex-direction:column !important;
+  min-width:360px;
+  min-height:300px;
+  overflow:hidden !important;
+  border:1px solid rgba(11,45,79,.34);
+  border-radius:11px;
+  background:#fff;
+  box-shadow:0 14px 38px rgba(11,45,79,.20),0 2px 8px rgba(11,45,79,.10);
+  transition:box-shadow .12s ease,border-color .12s ease;
+}
+.msg-desktop-window.is-front{
+  border-color:var(--msg-blue,#2f75b5);
+  box-shadow:0 20px 52px rgba(11,45,79,.26),0 3px 10px rgba(11,45,79,.14);
+}
+.msg-desktop-window[hidden]{display:none !important}
+
+.msg-desktop-titlebar{
+  flex:0 0 34px;
+  min-height:34px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding:4px 5px 4px 9px;
+  border-bottom:1px solid rgba(255,255,255,.16);
+  background:linear-gradient(180deg,var(--msg-navy,#0b2d4f),var(--msg-navy-deep,#08243f));
+  color:#fff;
+  cursor:grab;
+  user-select:none;
+  touch-action:none;
+}
+.msg-desktop-window-moving .msg-desktop-titlebar,
+body.msg-desktop-dragging{cursor:grabbing !important}
+
+.msg-desktop-window-title{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-width:0;
+}
+.msg-desktop-window-title strong{
+  overflow:hidden;
+  max-width:min(48vw,520px);
+  color:#fff !important;
+  font-size:.76rem;
+  font-weight:760;
+  line-height:1;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.msg-desktop-window-dot{
+  flex:0 0 auto;
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:var(--msg-gold,#f1d77a);
+  box-shadow:0 0 0 2px rgba(241,215,122,.18);
+}
+
+.msg-desktop-window-actions{
+  display:flex;
+  align-items:center;
+  gap:3px;
+  flex:0 0 auto;
+}
+.msg-desktop-window-actions button{
+  display:grid;
+  width:26px;
+  height:25px;
+  min-width:26px;
+  min-height:25px;
+  place-items:center;
+  padding:0;
+  border:0;
+  border-radius:5px;
+  background:rgba(255,255,255,.12);
+  color:#fff;
+  font:inherit;
+  font-size:.95rem;
+  line-height:1;
+  cursor:pointer;
+}
+.msg-desktop-window-actions button:hover,
+.msg-desktop-window-actions button:focus-visible{background:rgba(255,255,255,.24)}
+.msg-desktop-window-actions [data-msg-desktop-close]:hover{background:#a33a3a}
+
+.msg-desktop-window-content{
+  position:relative;
+  flex:1 1 auto;
+  min-width:0;
+  min-height:0;
+  overflow:hidden;
+  background:#fff;
+}
+
+/* Reader 1 is moved intact into its desktop window. */
+.msg-desktop-window-content > .msg-workspace-primary{
+  position:relative !important;
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  height:100% !important;
+  max-height:100% !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  overflow:auto !important;
+}
+
+/* The same live workspace panel nodes are used in Desktop mode. Standard mode's
+   inactive class stays on them internally, but Desktop deliberately exposes all
+   windows at once. */
+.msg-desktop-window-content > .msg-workspace-panel,
+.msg-desktop-window-content > .msg-workspace-panel.msg-workspace-panel-active,
+.msg-desktop-window-content > .msg-workspace-panel.msg-workspace-panel-inactive{
+  position:relative !important;
+  inset:auto !important;
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  height:100% !important;
+  max-height:100% !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  visibility:visible !important;
+  pointer-events:auto !important;
+  overflow:auto !important;
+  z-index:auto !important;
+  background:#fff;
+}
+
+.msg-desktop-window-content > .msg-workspace-app-page{
+  overflow:hidden !important;
+}
+.msg-desktop-window-content .msg-workspace-page-frame,
+.msg-desktop-window-content .msg-secondary-reader-frame,
+.msg-desktop-window-content .msg-aux-reader-frame{
+  display:block !important;
+  width:100% !important;
+  max-width:100% !important;
+  height:100% !important;
+  max-height:100% !important;
+  min-height:0 !important;
+  border:0 !important;
+}
+
+.msg-desktop-window-content .msg-browser,
+.msg-desktop-window-content .symposium-page{
+  min-height:100% !important;
+}
+
+/* Eight desktop resize zones. */
+.msg-desktop-resize-handle{position:absolute;z-index:30;touch-action:none}
+.msg-desktop-resize-n{top:-4px;left:8px;right:8px;height:9px;cursor:n-resize}
+.msg-desktop-resize-s{bottom:-4px;left:8px;right:8px;height:9px;cursor:s-resize}
+.msg-desktop-resize-e{top:8px;right:-4px;bottom:8px;width:9px;cursor:e-resize}
+.msg-desktop-resize-w{top:8px;left:-4px;bottom:8px;width:9px;cursor:w-resize}
+.msg-desktop-resize-ne{top:-5px;right:-5px;width:14px;height:14px;cursor:ne-resize}
+.msg-desktop-resize-nw{top:-5px;left:-5px;width:14px;height:14px;cursor:nw-resize}
+.msg-desktop-resize-se{right:-5px;bottom:-5px;width:16px;height:16px;cursor:se-resize}
+.msg-desktop-resize-sw{left:-5px;bottom:-5px;width:16px;height:16px;cursor:sw-resize}
+
+.msg-desktop-window-resizing{transition:none !important}
+body.msg-desktop-resizing{user-select:none !important}
+
+.msg-desktop-window-maximized{
+  border-radius:8px !important;
+  transition:left .14s ease,top .14s ease,width .14s ease,height .14s ease !important;
+}
+
+/* Existing Reader 1 resize grip/divider are Standard-mode controls. */
+body.msg-desktop-workspace-active .msg-primary-reader-resize-grip,
+body.msg-desktop-workspace-active .msg-workspace-divider{
+  display:none !important;
+}
+
+@media(max-width:999px){
+  .msg-desktop-mode-button{display:none !important}
+  body.msg-desktop-workspace-active #app.app-shell{width:calc(100% - 12px) !important}
+}

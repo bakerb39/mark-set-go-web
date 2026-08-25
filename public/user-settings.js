@@ -36,7 +36,8 @@
     'msg_companion_persona_v1',
     'markSetGoMusic',
     'markSetGoVideoSidePanelWidthV1',
-    'markSetGoMediaDockModeV1'
+    'markSetGoMediaDockModeV1',
+    'msg-workspace-layout-mode-v1'
   ]);
 
   const SETTINGS_EVENT_SELECTOR = [
