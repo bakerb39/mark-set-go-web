@@ -955,20 +955,23 @@
     style.id = 'topic-feed-import-recovery-styles';
     style.textContent = `
       .topic-feed-import-recovery {
-        display: block;
-        box-sizing: border-box;
-        align-self: start;
-        height: auto !important;
+        display: inline-block !important;
+        box-sizing: border-box !important;
+        flex: 0 0 auto !important;
+        place-self: start !important;
+        width: auto !important;
+        max-width: min(100%, 520px) !important;
+        height: fit-content !important;
         min-height: 0 !important;
         max-height: none !important;
-        margin: 10px 0 4px;
-        padding: 7px 10px;
+        margin: 8px 0 4px !important;
+        padding: 6px 9px !important;
         border: 1px solid var(--msg-theme-border, rgba(148, 163, 184, .42));
-        border-radius: 10px;
+        border-radius: 9px;
         background: var(--msg-theme-soft, rgba(15, 23, 42, .055));
         color: var(--msg-theme-ink, inherit);
-        font-size: .95em;
-        line-height: 1.35;
+        font-size: .92em;
+        line-height: 1.3;
       }
       .topic-feed-import-recovery p {
         margin: 0 !important;
@@ -1010,7 +1013,7 @@
 
     ensureTopicFeedImportRecoveryStyles();
 
-    const notice = document.createElement('aside');
+    const notice = document.createElement('div');
     notice.className = 'topic-feed-import-recovery';
     notice.dataset.topicFeedImportRecovery = '1';
     notice.setAttribute('role', 'note');
