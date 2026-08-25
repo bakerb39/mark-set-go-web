@@ -47,7 +47,9 @@
     '[data-vd-background-url]',
     '[data-vd-background-fit]',
     '[data-vd-background-color]',
-    '[data-vd-ui-scale]'
+    '[data-vd-ui-scale]',
+    '[data-crypto-ticker-toggle]',
+    '[data-market-indexes-toggle]'
   ].join(',');
 
   const state = {
@@ -175,6 +177,33 @@
     }
   }
 
+  function captureDisplayOptions() {
+    const host = (() => {
+      try {
+        if (window.parent && window.parent !== window && window.parent.document) return window.parent;
+      } catch {}
+      return window;
+    })();
+
+    const enabled = (apiName, storageKey) => {
+      try {
+        const api = host?.[apiName] || window?.[apiName];
+        if (typeof api?.enabled === 'function') return Boolean(api.enabled());
+      } catch {}
+      try {
+        const stored = host.localStorage?.getItem(storageKey) ?? localStorage.getItem(storageKey);
+        return stored === '1';
+      } catch {
+        return false;
+      }
+    };
+
+    return {
+      cryptoTicker: enabled('MarkSetGoCryptoTicker', 'markSetGoCryptoTickerEnabledV1'),
+      marketIndexes: enabled('MarkSetGoMarketIndexes', 'markSetGoMarketIndexesEnabledV1')
+    };
+  }
+
   function captureSnapshot() {
     return {
       version: VERSION,
@@ -182,6 +211,7 @@
       profile: captureProfile(),
       designer: captureDesigner(),
       readerDefaults: captureReaderDefaults(),
+      displayOptions: captureDisplayOptions(),
       localSettings: capturePortableLocalSettings()
     };
   }
@@ -213,6 +243,10 @@
       profile: raw.profile && typeof raw.profile === 'object' ? clone(raw.profile) : null,
       designer: raw.designer && typeof raw.designer === 'object' ? clone(raw.designer) : null,
       readerDefaults,
+      displayOptions:{
+        cryptoTicker:Boolean(raw.displayOptions?.cryptoTicker),
+        marketIndexes:Boolean(raw.displayOptions?.marketIndexes)
+      },
       localSettings
     };
   }
@@ -267,6 +301,41 @@
     state.applying = true;
     try {
       applyPortableLocalSettings(snapshot.localSettings);
+
+      const applyDisplayOption = (apiName, storageKey, enabled) => {
+        const host = (() => {
+          try {
+            if (window.parent && window.parent !== window && window.parent.document) return window.parent;
+          } catch {}
+          return window;
+        })();
+
+        try {
+          const api = host?.[apiName] || window?.[apiName];
+          if (typeof api?.setEnabled === 'function') {
+            api.setEnabled(Boolean(enabled));
+            return;
+          }
+        } catch {}
+
+        try {
+          host.localStorage?.setItem(storageKey, enabled ? '1' : '0');
+          if (host !== window) localStorage.setItem(storageKey, enabled ? '1' : '0');
+        } catch {}
+      };
+
+      if (snapshot.displayOptions) {
+        applyDisplayOption(
+          'MarkSetGoCryptoTicker',
+          'markSetGoCryptoTickerEnabledV1',
+          snapshot.displayOptions.cryptoTicker
+        );
+        applyDisplayOption(
+          'MarkSetGoMarketIndexes',
+          'markSetGoMarketIndexesEnabledV1',
+          snapshot.displayOptions.marketIndexes
+        );
+      }
 
       if (snapshot.profile) {
         try {
@@ -493,6 +562,7 @@
         profile:captureProfile(),
         designer:captureDesigner(),
         readerDefaults:{},
+        displayOptions:{cryptoTicker:false,marketIndexes:false},
         localSettings:{}
       };
       writeEnvelope(empty);

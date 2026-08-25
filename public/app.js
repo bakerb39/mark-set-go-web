@@ -5428,6 +5428,58 @@ function renderExperienceThemeSwatches(themeKey) {
   ).join('');
 }
 
+
+const PROFILE_CRYPTO_TICKER_STORAGE_KEY = 'markSetGoCryptoTickerEnabledV1';
+const PROFILE_MARKET_INDEXES_STORAGE_KEY = 'markSetGoMarketIndexesEnabledV1';
+
+function profilePreferenceHostWindow() {
+  try {
+    if (window.parent && window.parent !== window && window.parent.document) return window.parent;
+  } catch {}
+  return window;
+}
+
+function profileTickerEnabled(apiName, storageKey) {
+  const host = profilePreferenceHostWindow();
+  try {
+    const api = host?.[apiName] || window?.[apiName];
+    if (typeof api?.enabled === 'function') return Boolean(api.enabled());
+  } catch {}
+  try {
+    const stored = host.localStorage?.getItem(storageKey) ?? localStorage.getItem(storageKey);
+    if (stored === '1') return true;
+    if (stored === '0') return false;
+  } catch {}
+  return false;
+}
+
+function setProfileTickerEnabled(apiName, storageKey, enabled) {
+  const host = profilePreferenceHostWindow();
+  let applied = false;
+
+  try {
+    const api = host?.[apiName] || window?.[apiName];
+    if (typeof api?.setEnabled === 'function') {
+      api.setEnabled(Boolean(enabled));
+      applied = true;
+    }
+  } catch (error) {
+    console.warn(`${apiName} could not be updated through its public API.`, error);
+  }
+
+  try {
+    host.localStorage?.setItem(storageKey, enabled ? '1' : '0');
+    if (host !== window) localStorage.setItem(storageKey, enabled ? '1' : '0');
+    applied = true;
+  } catch {}
+
+  document.dispatchEvent(new CustomEvent('marksetgo:profile-display-option-changed', {
+    detail:{ apiName, storageKey, enabled:Boolean(enabled) }
+  }));
+
+  return applied;
+}
+
 function renderProfilePreferences() {
   finalizeReadingSession();
   stopReader();
@@ -5553,6 +5605,30 @@ function renderProfilePreferences() {
               <span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small></span>
               <input type="checkbox" data-profile-feature="${escapeHtml(key)}" ${current.features[key]!==false?'checked':''}>
             </label>`).join('')}
+
+          <label class="profile-feature-row" data-crypto-ticker-setting="1">
+            <span>
+              <strong>Cryptocurrency Ticker</strong>
+              <small>Show live Bitcoin, Ethereum, Solana, XRP, and Dogecoin prices below the top navigation.</small>
+            </span>
+            <input
+              type="checkbox"
+              data-crypto-ticker-toggle
+              aria-label="Show cryptocurrency ticker"
+              ${profileTickerEnabled('MarkSetGoCryptoTicker',PROFILE_CRYPTO_TICKER_STORAGE_KEY)?'checked':''}>
+          </label>
+
+          <label class="profile-feature-row" data-market-indexes-setting="1">
+            <span>
+              <strong>Major Stock Indexes</strong>
+              <small>Show the S&amp;P 500, Dow, Nasdaq Composite, and Russell 2000 below the top navigation.</small>
+            </span>
+            <input
+              type="checkbox"
+              data-market-indexes-toggle
+              aria-label="Show major stock indexes"
+              ${profileTickerEnabled('MarkSetGoMarketIndexes',PROFILE_MARKET_INDEXES_STORAGE_KEY)?'checked':''}>
+          </label>
         </div>
       </section>
 
@@ -5605,6 +5681,36 @@ function renderProfilePreferences() {
   app.querySelectorAll('[data-profile-feature]').forEach((input)=>{
     input.addEventListener('change',saveFromControls);
   });
+
+  app.querySelector('[data-crypto-ticker-toggle]')?.addEventListener('change',(event)=>{
+    const enabled=Boolean(event.currentTarget.checked);
+    const saved=setProfileTickerEnabled(
+      'MarkSetGoCryptoTicker',
+      PROFILE_CRYPTO_TICKER_STORAGE_KEY,
+      enabled
+    );
+    if(status){
+      status.className=`status profile-save-status ${saved?'success':''}`;
+      status.textContent=`Cryptocurrency Ticker is ${enabled?'on':'off'}.`;
+    }
+  });
+
+  app.querySelector('[data-market-indexes-toggle]')?.addEventListener('change',(event)=>{
+    const enabled=Boolean(event.currentTarget.checked);
+    const saved=setProfileTickerEnabled(
+      'MarkSetGoMarketIndexes',
+      PROFILE_MARKET_INDEXES_STORAGE_KEY,
+      enabled
+    );
+    if(status){
+      status.className=`status profile-save-status ${saved?'success':''}`;
+      status.textContent=`Major Stock Indexes is ${enabled?'on':'off'}.`;
+    }
+  });
+
+  document.dispatchEvent(new CustomEvent('marksetgo:profile-rendered',{
+    detail:{view:'profile-preferences'}
+  }));
 
   app.querySelectorAll('[data-profile-preset]').forEach((button)=>{
     button.addEventListener('click',(event)=>{

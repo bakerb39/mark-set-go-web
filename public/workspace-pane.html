@@ -12,7 +12,7 @@
 <link rel="stylesheet" href="/topic-feeds.css?v=2.1.17-clean-header">
 <link rel="stylesheet" href="/reader-music-quick.css?v=1.5.1-reading-suggestions">
 <link rel="stylesheet" href="/crypto-ticker.css?v=1.0.1-workspace-restore">
-<link href="/experience-themes.css?v=20260822-v7.30.1-palette-visible" rel="stylesheet">
+<link href="/experience-themes.css?v=20260822-v7.14-parent-background-owner" rel="stylesheet">
 <link href="/experience-theme-layout.css?v=20260822-v7.14-parent-background-owner" rel="stylesheet">
 <link href="/topic-feed-header-stability.css?v=20260822-v7.22-fixed-permanent-topic-header" rel="stylesheet">
 <link href="/msg-chat.css?v=20260822-v7.28-content-sharing" rel="stylesheet">
@@ -20,6 +20,7 @@
 <link href="/explorer-theme.css?v=1.1.1-workspace-profile" rel="stylesheet">
 <link href="/companion-persona-safe.css?v=9.7.1-workspace-profile" rel="stylesheet">
 <link href="/theme-system.css?v=20260822-v9.3-unified-ui" rel="stylesheet">
+<link href="/user-settings.css?v=20260825-v1.2.0-profile-sync" rel="stylesheet">
 <script>
   // This is a secondary view only. Do not boot a second authenticated app.
   window.__MSG_WORKSPACE_PANE__ = true;
@@ -45,17 +46,16 @@
 <script defer src="/modules/pages/help-page.js?v=9.3.1-kindle-import"></script>
 <script defer src="/modules/pages/business-pages.js?v=7.2.1"></script>
 <script src="/modern-guide-storage-guard.js?v=0.11.4-no-registry-write"></script>
-<script defer src="/app.js?v=20260824-v2.5.1-shell-rescue"></script>
-<script defer src="/experience-themes.js?v=20260822-v7.30-theme-swatches"></script>
-<script defer src="/read-anything.js?v=20260824-v2.5.1-current-read-anything"></script>
-<script defer src="/read-with-mark-bridge.js?v=20260824-v2.5.1-shell-rescue"></script>
+<script defer src="/app.js?v=20260825-v2.5.9-profile-settings-tickers"></script>
+<script defer src="/experience-themes.js?v=20260822-v7.14-parent-background-owner"></script>
+<script defer src="/read-anything.js?v=20260817-article-actions-on-document"></script>
 <script defer src="/workspace-reader-proxy.js?v=0.11.0-bible-topic"></script>
 <script>window.addEventListener("DOMContentLoaded",()=>window.MarkSetGoExperienceProfile?.apply?.());</script>
-<script defer src="/topic-feeds.js?v=20260824-v2.5.1-current-topic-feeds"></script>
+<script defer src="/topic-feeds.js?v=20260822-v7.27-storage-quota-fix"></script>
 <script defer src="/msg-chat.js?v=20260822-v7.28.2-message-body"></script>
-  <script defer src="/content-share.js?v=20260822-v1.3-repeat-symposium-topic"></script>
+  <script defer src="/content-share.js?v=20260822-v1.1-message-body"></script>
 <!-- Render the requested lightweight page before Profile extensions initialize. -->
-<script defer src="/workspace-pane-runtime.js?v=20260824-v2.5.2-visibility-runtime"></script>
+<script defer src="/workspace-pane-runtime.js?v=20260822-v7.21-stability-consolidation"></script>
 <script defer src="/companion-persona-safe.js?v=9.7.5-workspace-profile"></script>
 <script defer src="/crypto-ticker.js?v=1.0.2-workspace-profile"></script>
 <script defer src="/market-indexes.js?v=1.0.2-workspace-profile"></script>
@@ -66,6 +66,5 @@
   <div class="music-dock-bar"><div><strong id="music-now-title">Music</strong><span id="music-now-source">YouTube</span></div><div class="music-dock-actions"><button aria-label="Try another result" id="music-next" type="button" hidden>↻</button><button aria-label="Minimize music player" id="music-minimize" type="button">—</button><button aria-label="Close music player" id="music-close" type="button">×</button></div></div>
   <div class="music-player-wrap" id="music-player-wrap"><iframe allow="autoplay; encrypted-media; picture-in-picture; clipboard-write" allowfullscreen loading="lazy" id="music-player" referrerpolicy="strict-origin-when-cross-origin" title="Spotify or YouTube music player"></iframe></div>
 </aside>
-<script defer src="/standalone-document-close.js?v=1.0.0-runtime-context"></script>
 </body>
 </html>
