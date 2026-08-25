@@ -6,6 +6,7 @@
   const MEDIA_KEY_PREFIX = 'reader-media:v1:';
   const PANEL_WIDTH_KEY = 'markSetGoVideoSidePanelWidthV1';
   const MODE_KEY = 'markSetGoMediaDockModeV1';
+  const FLOAT_POSITION_KEY = 'markSetGoMediaFloatPositionV1';
   const DEFAULT_WIDTH = 480;
   const MIN_WIDTH = 360;
   const MAX_ITEMS_PER_READING = 100;
@@ -29,6 +30,9 @@
   let activeSearch = null;
   let activeContext = currentContext();
   let resizer = null;
+  let floatPosition = readFloatPosition();
+  let floatDragState = null;
+  let playbackGuardInstalled = false;
 
   function readMode() {
     try {
@@ -58,6 +62,242 @@
     } catch {
       return DEFAULT_WIDTH;
     }
+  }
+
+  function readFloatPosition() {
+    try {
+      const value = JSON.parse(localStorage.getItem(FLOAT_POSITION_KEY) || 'null');
+      const left = Number(value?.left);
+      const top = Number(value?.top);
+      if (!Number.isFinite(left) || !Number.isFinite(top)) return null;
+      return { left, top };
+    } catch {
+      return null;
+    }
+  }
+
+  function saveFloatPosition(value) {
+    floatPosition = value && Number.isFinite(Number(value.left)) && Number.isFinite(Number(value.top))
+      ? { left:Number(value.left), top:Number(value.top) }
+      : null;
+    try {
+      if (floatPosition) localStorage.setItem(FLOAT_POSITION_KEY, JSON.stringify(floatPosition));
+      else localStorage.removeItem(FLOAT_POSITION_KEY);
+    } catch {}
+    return floatPosition;
+  }
+
+  function normalizedMediaUrl(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    try {
+      const url = new URL(raw, window.location.href);
+      url.hash = '';
+      return url.href;
+    } catch {
+      return raw;
+    }
+  }
+
+  function installSameSourceRestartGuard() {
+    if (playbackGuardInstalled) return true;
+
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'src');
+    if (!descriptor?.get || !descriptor?.set) return false;
+
+    try {
+      Object.defineProperty(player, 'src', {
+        configurable:true,
+        enumerable:descriptor.enumerable,
+        get() {
+          return descriptor.get.call(player);
+        },
+        set(value) {
+          const current = normalizedMediaUrl(descriptor.get.call(player));
+          const next = normalizedMediaUrl(value);
+          if (current && next && current === next) {
+            // Setting an iframe to the exact same URL reloads it in browsers.
+            // Ignore duplicate assignments so navigation/UI resync code cannot
+            // restart an already playing video.
+            return;
+          }
+          descriptor.set.call(player, value);
+        }
+      });
+      playbackGuardInstalled = true;
+      dock.dataset.msgPersistentMediaPlayer = '1';
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function floatViewportBounds() {
+    const rect = dock.getBoundingClientRect();
+    const fallbackWidth = Math.min(420, Math.max(280, window.innerWidth - 16));
+    const width = Math.max(1, rect.width || dock.offsetWidth || fallbackWidth);
+    const height = Math.max(1, rect.height || dock.offsetHeight || 220);
+    const headerBottom = Math.ceil(
+      document.querySelector('.site-header')?.getBoundingClientRect()?.bottom || 0
+    );
+    const margin = 8;
+    const minTop = Math.max(margin, headerBottom + 4);
+    return {
+      width,
+      height,
+      minLeft:margin,
+      minTop,
+      maxLeft:Math.max(margin, window.innerWidth - width - margin),
+      maxTop:Math.max(minTop, window.innerHeight - Math.min(height, window.innerHeight - minTop - margin) - margin)
+    };
+  }
+
+  function clampFloatPosition(left, top) {
+    const bounds = floatViewportBounds();
+    return {
+      left:Math.round(Math.min(bounds.maxLeft, Math.max(bounds.minLeft, Number(left) || 0))),
+      top:Math.round(Math.min(bounds.maxTop, Math.max(bounds.minTop, Number(top) || bounds.minTop)))
+    };
+  }
+
+  function clearFloatDockGeometry() {
+    if (dock.dataset.msgMediaFloatGeometry !== '1') return;
+    [
+      'position',
+      'left',
+      'right',
+      'top',
+      'bottom',
+      'transform',
+      'margin'
+    ].forEach((name) => dock.style.removeProperty(name));
+    delete dock.dataset.msgMediaFloatGeometry;
+  }
+
+  function applyFloatDockGeometry(position = floatPosition) {
+    if (mode !== 'float' || !position) return false;
+
+    const next = clampFloatPosition(position.left, position.top);
+    floatPosition = next;
+
+    // The old Reader music chooser can also position #music-dock with inline
+    // !important rules. Once the user has deliberately moved the floating
+    // player, their position owns the floating geometry.
+    delete dock.dataset.readerChooserPositioned;
+    dock.dataset.msgMediaFloatGeometry = '1';
+    dock.style.setProperty('position', 'fixed', 'important');
+    dock.style.setProperty('left', `${next.left}px`, 'important');
+    dock.style.setProperty('top', `${next.top}px`, 'important');
+    dock.style.setProperty('right', 'auto', 'important');
+    dock.style.setProperty('bottom', 'auto', 'important');
+    dock.style.setProperty('transform', 'none', 'important');
+    dock.style.setProperty('margin', '0', 'important');
+    return true;
+  }
+
+  function reassertFloatDockGeometrySoon() {
+    if (mode !== 'float' || !floatPosition) return;
+    window.setTimeout(() => {
+      if (mode === 'float' && floatPosition) applyFloatDockGeometry();
+    }, 0);
+  }
+
+  function resetFloatPosition() {
+    saveFloatPosition(null);
+    clearFloatDockGeometry();
+    delete dock.dataset.readerChooserPositioned;
+    dock.style.removeProperty('left');
+    dock.style.removeProperty('top');
+    dock.style.removeProperty('right');
+    dock.style.removeProperty('bottom');
+    return true;
+  }
+
+  function beginFloatDrag(event) {
+    if (mode !== 'float') return;
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest(
+      'button,a,input,select,textarea,[role="button"],[contenteditable="true"]'
+    )) return;
+
+    const bar = event.currentTarget;
+    const rect = dock.getBoundingClientRect();
+    const start = clampFloatPosition(rect.left, rect.top);
+
+    event.preventDefault();
+    document.body.classList.add('msg-media-float-dragging');
+    dock.classList.add('msg-media-dragging');
+    dock.dataset.msgMediaFloatGeometry = '1';
+    delete dock.dataset.readerChooserPositioned;
+
+    floatDragState = {
+      pointerId:event.pointerId,
+      startX:event.clientX,
+      startY:event.clientY,
+      startLeft:start.left,
+      startTop:start.top
+    };
+
+    applyFloatDockGeometry(start);
+    try { bar.setPointerCapture(event.pointerId); } catch {}
+
+    const move = (moveEvent) => {
+      if (!floatDragState || moveEvent.pointerId !== floatDragState.pointerId) return;
+      const next = clampFloatPosition(
+        floatDragState.startLeft + (moveEvent.clientX - floatDragState.startX),
+        floatDragState.startTop + (moveEvent.clientY - floatDragState.startY)
+      );
+      floatPosition = next;
+      applyFloatDockGeometry(next);
+    };
+
+    const finish = (finishEvent) => {
+      if (!floatDragState) return;
+      bar.removeEventListener('pointermove', move);
+      bar.removeEventListener('pointerup', finish);
+      bar.removeEventListener('pointercancel', finish);
+      try { bar.releasePointerCapture(finishEvent.pointerId); } catch {}
+      document.body.classList.remove('msg-media-float-dragging');
+      dock.classList.remove('msg-media-dragging');
+      saveFloatPosition(floatPosition || clampFloatPosition(rect.left, rect.top));
+      floatDragState = null;
+    };
+
+    bar.addEventListener('pointermove', move);
+    bar.addEventListener('pointerup', finish);
+    bar.addEventListener('pointercancel', finish);
+  }
+
+  function preservePlaybackAcrossNavigation() {
+    const currentSrc = normalizedMediaUrl(player.getAttribute('src') || player.src);
+    if (!currentSrc || dock.hidden) return;
+
+    const currentNode = player;
+    const currentDock = dock;
+
+    window.setTimeout(() => {
+      requestAnimationFrame(() => {
+        // Normal Mark, Set, Go! navigation replaces #app only. These should
+        // remain the same app-level nodes for uninterrupted playback.
+        const livePlayer = document.querySelector('#music-player');
+        const liveDock = document.querySelector('#music-dock');
+
+        if (livePlayer !== currentNode || liveDock !== currentDock) {
+          console.warn('Persistent media player was unexpectedly replaced during navigation.');
+          return;
+        }
+
+        const afterSrc = normalizedMediaUrl(currentNode.getAttribute('src') || currentNode.src);
+        if (!afterSrc && currentSrc) {
+          // Recovery for an unexpected clear. Normal navigation should never
+          // reach this path, so playback remains uninterrupted in the normal case.
+          currentNode.src = currentSrc;
+        }
+
+        if (mode === 'float' && floatPosition) applyFloatDockGeometry();
+        if (mode === 'beside' || mode === 'expanded') applySideDockGeometry();
+      });
+    }, 0);
   }
 
   function setWidth(value, persist = false) {
@@ -370,6 +610,24 @@
     document.querySelector('#msg-media-results')?.addEventListener('click', onResultsClick);
     document.querySelector('#msg-media-saved')?.addEventListener('click', onSavedClick);
 
+    const dragBar = dock.querySelector('.music-dock-bar');
+    dragBar?.addEventListener('pointerdown', beginFloatDrag);
+    if (dragBar) {
+      dragBar.title = mode === 'float'
+        ? 'Drag to move the media player'
+        : dragBar.title || '';
+    }
+
+    // Preserve the same app-level iframe across normal in-app navigation.
+    document.addEventListener('click', (event) => {
+      if (!(event.target instanceof Element)) return;
+      const navigation = event.target.closest(
+        '[data-action],[data-read],[data-test],[data-topic-feed-open-read-anything]'
+      );
+      if (!navigation) return;
+      preservePlaybackAcrossNavigation();
+    }, true);
+
     // In side modes, repurpose minimize as a visual collapse while leaving the
     // iframe mounted so playback is not interrupted. In floating mode the
     // existing app.js minimize behavior remains untouched.
@@ -403,13 +661,19 @@
       if (mode !== 'float') {
         setWidth(sideWidth);
         reassertSideDockGeometrySoon();
+      } else if (floatPosition) {
+        const next = clampFloatPosition(floatPosition.left, floatPosition.top);
+        saveFloatPosition(next);
+        reassertFloatDockGeometrySoon();
       }
     });
 
-    // The legacy Reader music chooser may reposition #music-dock after a click.
-    // Reassert side placement on the next task only while side mode is active.
+    // The legacy Reader music chooser may reposition #music-dock after clicks.
+    // In side mode our side geometry owns the dock. After the user has dragged
+    // Float mode, their saved floating position owns it there too.
     document.addEventListener('click', () => {
       reassertSideDockGeometrySoon();
+      reassertFloatDockGeometrySoon();
     });
   }
 
@@ -604,11 +868,13 @@
       dock.classList.remove('msg-media-collapsed');
       document.body.classList.remove('msg-media-collapsed-active');
       clearSideDockGeometry();
+      if (floatPosition) applyFloatDockGeometry();
       if (minimizeButton) {
         minimizeButton.textContent = '—';
         minimizeButton.setAttribute('aria-label','Minimize media player');
       }
     } else {
+      clearFloatDockGeometry();
       dock.classList.remove('minimized');
       if (playerWrap) playerWrap.hidden = false;
       setWidth(mode === 'expanded' ? Math.max(sideWidth, Math.min(720, maxSideWidth())) : sideWidth);
@@ -629,6 +895,11 @@
       expand.setAttribute('aria-pressed', mode === 'expanded' ? 'true' : 'false');
     }
 
+    const dragBar = dock.querySelector('.music-dock-bar');
+    if (dragBar) {
+      dragBar.title = mode === 'float' ? 'Drag to move the media player' : '';
+    }
+
     window.dispatchEvent(new Event('resize'));
   }
 
@@ -647,6 +918,9 @@
       refreshContext();
       renderResults();
       void renderSaved();
+      if (mode === 'float' && floatPosition) {
+        requestAnimationFrame(() => applyFloatDockGeometry());
+      }
     }
   }
 
@@ -848,6 +1122,9 @@
       renderResults();
       void renderSaved();
     }
+    if (mode === 'float' && floatPosition) {
+      requestAnimationFrame(() => applyFloatDockGeometry());
+    }
   });
 
   document.addEventListener('marksetgo:media-stopped', () => {
@@ -865,6 +1142,7 @@
     }
   });
 
+  installSameSourceRestartGuard();
   installUi();
 
   // Restore a dock mode preference only after the player is actually shown.
@@ -876,6 +1154,8 @@
     close:()=>setPanelOpen(false),
     setMode:(value)=>saveMode(value),
     get mode(){ return mode; },
+    get floatPosition(){ return floatPosition ? { ...floatPosition } : null; },
+    resetFloatPosition:()=>resetFloatPosition(),
     saveCurrent:()=>currentPlaying ? saveItem(currentPlaying,currentPlaying.context) : false,
     getSaved:async()=>Array.isArray((await getMediaRecord(currentContext()))?.items)
       ? (await getMediaRecord(currentContext())).items

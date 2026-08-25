@@ -430,3 +430,26 @@ body.msg-media-resizing{
     text-align:left;
   }
 }
+
+
+/* Float mode behaves like a movable desktop window. */
+.music-dock.msg-media-floating .music-dock-bar{
+  cursor:move;
+  cursor:grab;
+  user-select:none;
+  touch-action:none;
+}
+
+.music-dock.msg-media-floating.msg-media-dragging .music-dock-bar,
+body.msg-media-float-dragging{
+  cursor:grabbing !important;
+}
+
+.music-dock.msg-media-floating .music-dock-actions,
+.music-dock.msg-media-floating .music-dock-actions *{
+  cursor:pointer;
+}
+
+body.msg-media-float-dragging{
+  user-select:none;
+}
