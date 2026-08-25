@@ -228,32 +228,164 @@
     return `ra-${(hash >>> 0).toString(36)}`;
   }
 
+  // Phase 2 IndexedDB migration: Read Anything formatting/version records.
+  // Large transformed/original text versions no longer live in localStorage.
+  // The existing app IndexedDB database remains the only browser database.
+  const FORMAT_INDEX_CACHE_KEY = 'read-anything:format-index:v1';
+  const FORMAT_RECORD_CACHE_PREFIX = 'read-anything:format-record:v1:';
+
+  let formatDocumentIndexCache = {};
+  let formatRecordCache = new Map();
+  let formatStorageHydrated = false;
+  let formatStorageHydrationPromise = null;
+  let formatWriteChain = Promise.resolve(true);
+
   function formatRecordStorageKey(key) {
     return `${FORMAT_RECORD_PREFIX}${key}`;
   }
 
+  function indexedFormatRecordKey(key) {
+    return `${FORMAT_RECORD_CACHE_PREFIX}${String(key || '')}`;
+  }
 
-  function formatDocumentIndex() {
+  function normalizeFormatDocumentIndex(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    const result = {};
+    Object.entries(value).forEach(([documentId, key]) => {
+      const id = String(documentId || '').slice(0, 240);
+      const formatKey = String(key || '').slice(0, 500);
+      if (id && formatKey) result[id] = formatKey;
+    });
+    return result;
+  }
+
+  function normalizeFormatRecord(record, fallbackKey = '') {
+    if (!record || typeof record !== 'object') return null;
+    const key = String(record.key || fallbackKey || '').slice(0, 500);
+    if (!key) return null;
+    return {
+      ...record,
+      key,
+      title: String(record.title || 'Imported document').slice(0, 300),
+      author: String(record.author || '').slice(0, 300),
+      source: record.source && typeof record.source === 'object' ? record.source : {},
+      versions: record.versions && typeof record.versions === 'object' ? record.versions : {},
+      originalText: String(record.originalText || record.versions?.original || ''),
+      selectedVersion: String(record.selectedVersion || 'original').slice(0, 120),
+      updatedAt: String(record.updatedAt || new Date().toISOString()).slice(0, 80)
+    };
+  }
+
+  function readLegacyFormatDocumentIndex() {
     try {
-      const value = JSON.parse(localStorage.getItem(FORMAT_DOCUMENT_INDEX_KEY) || '{}');
-      return value && typeof value === 'object' ? value : {};
+      return normalizeFormatDocumentIndex(
+        JSON.parse(localStorage.getItem(FORMAT_DOCUMENT_INDEX_KEY) || '{}')
+      );
     } catch {
       return {};
     }
   }
 
+  function readLegacyFormatRecords() {
+    const result = new Map();
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const storageKey = localStorage.key(index) || '';
+        if (!storageKey.startsWith(FORMAT_RECORD_PREFIX)) continue;
+        const key = storageKey.slice(FORMAT_RECORD_PREFIX.length);
+        try {
+          const record = normalizeFormatRecord(
+            JSON.parse(localStorage.getItem(storageKey) || 'null'),
+            key
+          );
+          if (record) result.set(record.key, record);
+        } catch {}
+      }
+    } catch {}
+    return result;
+  }
+
+  // Seed synchronously from the legacy store so an upgrade cannot temporarily
+  // break Continue Reading while the first IndexedDB migration is still running.
+  formatDocumentIndexCache = readLegacyFormatDocumentIndex();
+  formatRecordCache = readLegacyFormatRecords();
+
+  function formatDocumentIndex() {
+    return formatDocumentIndexCache;
+  }
+
+  function removeLegacyFormatStorage() {
+    try { localStorage.removeItem(FORMAT_DOCUMENT_INDEX_KEY); } catch {}
+    try {
+      const keys = [];
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index) || '';
+        if (key.startsWith(FORMAT_RECORD_PREFIX)) keys.push(key);
+      }
+      keys.forEach((key) => {
+        try { localStorage.removeItem(key); } catch {}
+      });
+    } catch {}
+  }
+
+  async function persistFormatIndex() {
+    if (typeof cacheReadingBook !== 'function') return false;
+    const recordKeys = [...formatRecordCache.keys()].slice(0, 5000);
+    return Boolean(await cacheReadingBook({
+      key: FORMAT_INDEX_CACHE_KEY,
+      type: 'read-anything-format-index',
+      documentMap: normalizeFormatDocumentIndex(formatDocumentIndexCache),
+      recordKeys,
+      updatedAt: new Date().toISOString()
+    }));
+  }
+
+  async function persistFormatRecord(record) {
+    if (typeof cacheReadingBook !== 'function') return false;
+    const normalized = normalizeFormatRecord(record);
+    if (!normalized) return false;
+    return Boolean(await cacheReadingBook({
+      key: indexedFormatRecordKey(normalized.key),
+      type: 'read-anything-format-record',
+      formatKey: normalized.key,
+      record: normalized,
+      updatedAt: new Date().toISOString()
+    }));
+  }
+
+  function queueFormatStorageWrite(task) {
+    formatWriteChain = formatWriteChain
+      .catch(() => false)
+      .then(task)
+      .catch((error) => {
+        console.warn('Read Anything formatting data could not be persisted to IndexedDB.', error);
+        return false;
+      });
+    return formatWriteChain;
+  }
+
   function rememberFormatDocument(documentId, key) {
     if (!documentId || !key) return;
-    const index = formatDocumentIndex();
-    index[String(documentId)] = String(key);
-    try { localStorage.setItem(FORMAT_DOCUMENT_INDEX_KEY, JSON.stringify(index)); } catch {}
+    formatDocumentIndexCache[String(documentId)] = String(key);
+
+    // Index writes are small and serialized behind any in-flight format record
+    // write. No localStorage write occurs here.
+    void queueFormatStorageWrite(async () => {
+      const ok = await persistFormatIndex();
+      return ok;
+    });
   }
 
   function saveActiveFormatRecord() {
     if (!activeImportedDocument) return;
     const key = activeImportedDocument.source?.readAnythingKey || importedDocumentKey(activeImportedDocument);
-    activeImportedDocument.source = { ...(activeImportedDocument.source || {}), readAnything: true, readAnythingKey: key };
-    const record = {
+    activeImportedDocument.source = {
+      ...(activeImportedDocument.source || {}),
+      readAnything: true,
+      readAnythingKey: key
+    };
+
+    const record = normalizeFormatRecord({
       key,
       title: activeImportedDocument.baseTitle || activeImportedDocument.title,
       author: activeImportedDocument.author || '',
@@ -262,34 +394,142 @@
       originalText: activeImportedDocument.versions?.original || activeImportedDocument.originalText || '',
       selectedVersion: activeImportedVersion || 'original',
       updatedAt: new Date().toISOString()
-    };
-    try { localStorage.setItem(formatRecordStorageKey(key), JSON.stringify(record)); } catch (error) {
-      console.warn('Imported formatting versions could not be stored.', error);
-    }
+    });
+
+    if (!record) return;
+
+    // Update synchronously so all existing formatter callers continue to behave
+    // exactly as before. IndexedDB persistence happens behind the UI.
+    formatRecordCache.set(key, record);
+
+    void queueFormatStorageWrite(async () => {
+      const recordSaved = await persistFormatRecord(record);
+      if (!recordSaved) return false;
+      const indexSaved = await persistFormatIndex();
+      if (recordSaved && indexSaved && formatStorageHydrated) removeLegacyFormatStorage();
+      return Boolean(recordSaved && indexSaved);
+    });
+  }
+
+  async function hydrateFormatStorage() {
+    if (formatStorageHydrationPromise) return formatStorageHydrationPromise;
+
+    formatStorageHydrationPromise = (async () => {
+      const legacyIndex = readLegacyFormatDocumentIndex();
+      const legacyRecords = readLegacyFormatRecords();
+      let allLegacyPersisted = true;
+
+      try {
+        const indexedIndexRecord = typeof getCachedReadingBook === 'function'
+          ? await getCachedReadingBook(FORMAT_INDEX_CACHE_KEY)
+          : null;
+
+        const indexedDocumentMap = normalizeFormatDocumentIndex(indexedIndexRecord?.documentMap);
+        const indexedKeys = Array.isArray(indexedIndexRecord?.recordKeys)
+          ? [...new Set(indexedIndexRecord.recordKeys.map((key) => String(key || '')).filter(Boolean))]
+          : [];
+
+        const indexedRecords = new Map();
+
+        if (typeof getCachedReadingBook === 'function' && indexedKeys.length) {
+          const loaded = await Promise.all(indexedKeys.map(async (key) => {
+            const wrapper = await getCachedReadingBook(indexedFormatRecordKey(key));
+            const record = normalizeFormatRecord(wrapper?.record, key);
+            return record ? [key, record] : null;
+          }));
+          loaded.filter(Boolean).forEach(([key, record]) => indexedRecords.set(key, record));
+        }
+
+        // IndexedDB wins for records it already contains. Legacy records are only
+        // used to fill gaps during the one-time migration.
+        const mergedRecords = new Map(indexedRecords);
+        legacyRecords.forEach((record, key) => {
+          if (!mergedRecords.has(key)) mergedRecords.set(key, record);
+        });
+
+        const mergedIndex = {
+          ...legacyIndex,
+          ...indexedDocumentMap
+        };
+
+        formatRecordCache = mergedRecords;
+        formatDocumentIndexCache = mergedIndex;
+
+        // Persist any legacy-only records before deleting the old localStorage
+        // copies. A single failed record keeps all legacy format data intact.
+        for (const [key, record] of legacyRecords.entries()) {
+          if (indexedRecords.has(key)) continue;
+          const ok = await persistFormatRecord(record);
+          if (!ok) {
+            allLegacyPersisted = false;
+            break;
+          }
+        }
+
+        if (allLegacyPersisted) {
+          const indexSaved = await persistFormatIndex();
+          if (indexSaved) removeLegacyFormatStorage();
+          else allLegacyPersisted = false;
+        }
+      } catch (error) {
+        allLegacyPersisted = false;
+        console.warn('Read Anything formatting migration was deferred.', error);
+      } finally {
+        formatStorageHydrated = true;
+      }
+
+      // If the Reader was restored before IndexedDB finished hydrating, attach
+      // its format controls now that the authoritative cache is available.
+      try {
+        const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+        if (current?.documentId) {
+          restoreArticleControlsAfterResume(current.documentId, current.title || '');
+        }
+      } catch {}
+
+      return {
+        hydrated: formatStorageHydrated,
+        migrated: allLegacyPersisted,
+        records: formatRecordCache.size,
+        documents: Object.keys(formatDocumentIndexCache).length
+      };
+    })();
+
+    return formatStorageHydrationPromise;
   }
 
   function restoreImportedFormatRecord(documentId, documentTitle = '') {
+    // On a post-migration reload there may be no legacy cache to seed from.
+    // Wait for the async IndexedDB hydration instead of adopting/overwriting the
+    // live Reader before its saved formatter versions have had a chance to load.
+    if (
+      !formatStorageHydrated &&
+      !formatRecordCache.size &&
+      !Object.keys(formatDocumentIndexCache).length
+    ) {
+      void hydrateFormatStorage();
+      return false;
+    }
+
     let storedDocument = null;
     try { storedDocument = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
-    const indexedKey = formatDocumentIndex()[String(documentId)] || '';
+
+    const indexedKey = formatDocumentIndexCache[String(documentId)] || '';
     const sourceKey = storedDocument?.source?.readAnythingKey || '';
     let key = sourceKey || indexedKey || (storedDocument?.source?.readAnything ? importedDocumentKey(storedDocument) : '');
+
     if (!key && documentTitle) {
       const normalizedTitle = cleanImportedTitle(documentTitle).toLowerCase();
-      for (let index = 0; index < localStorage.length; index += 1) {
-        const storageKey = localStorage.key(index) || '';
-        if (!storageKey.startsWith(FORMAT_RECORD_PREFIX)) continue;
-        try {
-          const candidate = JSON.parse(localStorage.getItem(storageKey) || 'null');
-          const candidateTitle = String(candidate?.title || '').trim().toLowerCase();
-          if (candidateTitle && candidateTitle === normalizedTitle) {
-            key = storageKey.slice(FORMAT_RECORD_PREFIX.length);
-            rememberFormatDocument(documentId, key);
-            break;
-          }
-        } catch {}
+      for (const [candidateKey, candidate] of formatRecordCache.entries()) {
+        const candidateTitle = String(candidate?.title || '').trim().toLowerCase();
+        if (candidateTitle && candidateTitle === normalizedTitle) {
+          key = candidateKey;
+          rememberFormatDocument(documentId, key);
+          break;
+        }
       }
     }
+
     if (!key && storedDocument?.source?.originalKey) {
       const originalText = localStorage.getItem(storedDocument.source.originalKey) || '';
       if (originalText) {
@@ -310,6 +550,7 @@
         return true;
       }
     }
+
     if (!key) {
       // A document can be fully loaded in the Reader without having originated in
       // Read Anything/Create a Book. Adopt the Reader's persisted document so
@@ -337,27 +578,54 @@
         scheduleFormatControlAttach();
         return true;
       }
+
       activeImportedDocument = null;
       document.querySelector('#read-anything-format-control')?.remove();
       return false;
     }
-    let record = null;
-    try { record = JSON.parse(localStorage.getItem(formatRecordStorageKey(key)) || 'null'); } catch {}
-    if (!record && !storedDocument?.source?.readAnything) return false;
+
+    const record = formatRecordCache.get(key) || null;
+
+    if (!record && !storedDocument?.source?.readAnything) {
+      // If IndexedDB is still hydrating, do not treat a not-yet-loaded record as
+      // permanently missing.
+      if (!formatStorageHydrated) {
+        void hydrateFormatStorage();
+        return false;
+      }
+      return false;
+    }
+
     const readingLevel = storedDocument?.source?.readingLevel || record?.selectedVersion || 'original';
     activeImportedDocument = {
       title: cleanImportedTitle(record?.title || storedDocument?.source?.adaptedFrom || storedDocument?.title),
       baseTitle: cleanImportedTitle(record?.title || storedDocument?.source?.adaptedFrom || storedDocument?.title),
       author: record?.author || storedDocument?.source?.author || '',
-      source: { ...(record?.source || storedDocument?.source || {}), readAnything: true, readAnythingKey: key, readerDocumentId: String(documentId) },
-      versions: { ...(record?.versions || {}), ...(record?.originalText ? { original: record.originalText } : {}), ...(storedDocument?.text ? { [readingLevel]: storedDocument.text } : {}) },
+      source: {
+        ...(record?.source || storedDocument?.source || {}),
+        readAnything: true,
+        readAnythingKey: key,
+        readerDocumentId: String(documentId)
+      },
+      versions: {
+        ...(record?.versions || {}),
+        ...(record?.originalText ? { original: record.originalText } : {}),
+        ...(storedDocument?.text ? { [readingLevel]: storedDocument.text } : {})
+      },
       originalText: record?.originalText || record?.versions?.original || ''
     };
-    if (!activeImportedDocument.versions.original && activeImportedDocument.originalText) activeImportedDocument.versions.original = activeImportedDocument.originalText;
-    if (!activeImportedDocument.versions.original && readingLevel === 'original' && storedDocument?.text) activeImportedDocument.versions.original = storedDocument.text;
+
+    if (!activeImportedDocument.versions.original && activeImportedDocument.originalText) {
+      activeImportedDocument.versions.original = activeImportedDocument.originalText;
+    }
+    if (!activeImportedDocument.versions.original && readingLevel === 'original' && storedDocument?.text) {
+      activeImportedDocument.versions.original = storedDocument.text;
+    }
+
     activeImportedVersion = record?.selectedVersion && activeImportedDocument.versions[record.selectedVersion]
       ? record.selectedVersion
       : readingLevel;
+
     scheduleFormatControlAttach();
     return true;
   }
@@ -2280,11 +2548,28 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     requestCustomTransform,
     requestTranslation,
     hydrateImportHistory,
-    getImportHistory: () => history().map((item) => ({ ...item }))
+    getImportHistory: () => history().map((item) => ({ ...item })),
+    hydrateFormatStorage,
+    getFormatStorageStatus: () => ({
+      hydrated: formatStorageHydrated,
+      records: formatRecordCache.size,
+      documents: Object.keys(formatDocumentIndexCache).length,
+      legacyIndexPresent: Boolean(localStorage.getItem(FORMAT_DOCUMENT_INDEX_KEY)),
+      legacyRecordCount: (() => {
+        let count = 0;
+        try {
+          for (let index = 0; index < localStorage.length; index += 1) {
+            if ((localStorage.key(index) || '').startsWith(FORMAT_RECORD_PREFIX)) count += 1;
+          }
+        } catch {}
+        return count;
+      })()
+    })
   });
 
-  // Start the one-time Phase 1 migration after app.js has established the shared
-  // IndexedDB helpers. This is nonblocking and touches no other storage keys.
+  // Start both completed migration phases after app.js has established the
+  // shared IndexedDB helpers. Neither path blocks Reader startup.
   void hydrateImportHistory();
+  void hydrateFormatStorage();
   window.setTimeout(openPendingCapture, 0);
 })();
