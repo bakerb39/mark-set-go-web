@@ -1,0 +1,20 @@
+/* Mark, Set, Go! — Unified My Settings v1.0.0 */
+.unified-settings-card .section-heading{align-items:flex-start}
+.unified-settings-sync-badge{flex:0 0 auto;display:inline-flex;align-items:center;min-height:30px;padding:5px 10px;border:1px solid var(--msg-blue-border-soft,#d5e5f2);border-radius:999px;background:var(--msg-blue-soft-2,#f4f9fd);color:var(--msg-muted,#60758a);font-size:.82rem;font-weight:800;white-space:nowrap}
+.unified-settings-sync-badge.is-synced{border-color:color-mix(in srgb,var(--msg-blue,#2f75b5) 38%,white);background:var(--msg-blue-soft,#e8f2fb);color:var(--msg-blue-strong,#236aa8)}
+.unified-settings-category-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.unified-settings-category-grid article{min-width:0;padding:12px 14px;border:1px solid var(--msg-blue-border-soft,#d5e5f2);border-radius:12px;background:var(--msg-surface,#fff)}
+.unified-settings-category-grid strong,.unified-settings-category-grid small{display:block}
+.unified-settings-category-grid strong{margin-bottom:3px;color:var(--msg-ink,#18324a);font-size:.95rem}
+.unified-settings-category-grid small{color:var(--msg-muted,#60758a);font-size:.85rem;line-height:1.4}
+.unified-settings-sync-toggle{display:flex;align-items:center;justify-content:space-between;gap:18px;margin:12px 0 14px;padding:12px 14px;border:1px solid var(--msg-blue-border-soft,#d5e5f2);border-radius:12px;background:var(--msg-blue-soft-2,#f4f9fd)}
+.unified-settings-sync-toggle span,.unified-settings-sync-toggle strong,.unified-settings-sync-toggle small{display:block}
+.unified-settings-sync-toggle strong{color:var(--msg-ink,#18324a);font-size:.95rem}
+.unified-settings-sync-toggle small{margin-top:2px;color:var(--msg-muted,#60758a);font-size:.84rem}
+.unified-settings-sync-toggle input{flex:0 0 auto;width:20px;height:20px}
+.unified-settings-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.unified-settings-actions>button{min-height:38px}
+.unified-settings-reset{margin-left:auto}
+.unified-settings-note{margin:12px 0 0;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--msg-gold-soft,#fff7d8) 72%,white);color:var(--msg-muted,#60758a);font-size:.84rem;line-height:1.45}
+.unified-settings-status{min-height:1.3em;margin:10px 0 0}
+@media(max-width:760px){.unified-settings-category-grid{grid-template-columns:1fr}.unified-settings-sync-toggle{align-items:flex-start}.unified-settings-reset{margin-left:0}}

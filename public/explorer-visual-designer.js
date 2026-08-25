@@ -519,17 +519,50 @@
   function defaultLayout(){releaseLayout();config.layout={};render();setStatus('Default Layout restored from the application CSS.',true);window.dispatchEvent(new Event('resize'));}
   function resetLayer(){releaseLayer(selected);delete config.layout[selected];render();setStatus(`${LAYERS[selected].label} returned to Default Layout.`,true);window.dispatchEvent(new Event('resize'));}
   function applyPreset(name){if(!PRESETS[name])return;config.preset=name;config.colors=clone(PRESETS[name]);applyColors();render();setStatus('Color preset applied. Layout was not changed.',false);}
+  function emitDesignerSettingsSaved(){
+    document.dispatchEvent(new CustomEvent('marksetgo:visual-designer-saved',{
+      detail:{config:clone(config)}
+    }));
+  }
+
   function saveConfig(){
     if(config.background?.mode==='image'&&config.background?.imageSource==='local'&&!localBackgroundStored){
       setStatus('The local background is not stored yet. Re-select the image, then Save design.',false);
-      return;
+      return false;
     }
     try{
       localStorage.setItem(STORAGE_KEY,JSON.stringify(config));
       setStatus('Custom theme design saved.',true);
+      emitDesignerSettingsSaved();
+      return true;
     }catch{
       setStatus('Could not save the custom theme design.',false);
+      return false;
     }
+  }
+
+  function applyExternalConfig(value,{persist=false}={}){
+    config=sanitize(value);
+    applyAll();
+    if(panel&&!panel.hidden)render();
+    if(persist){
+      try{localStorage.setItem(STORAGE_KEY,JSON.stringify(config));}
+      catch(error){console.warn('Visual Designer settings could not be persisted.',error);}
+    }
+    document.dispatchEvent(new CustomEvent('marksetgo:visual-designer-changed',{
+      detail:{config:clone(config)}
+    }));
+    return clone(config);
+  }
+
+  async function resetExternalConfig(){
+    config=defaultConfig();
+    try{localStorage.removeItem(STORAGE_KEY);}catch{}
+    await removeLocalBackgroundAsset();
+    applyAll();
+    if(panel&&!panel.hidden)render();
+    emitDesignerSettingsSaved();
+    return clone(config);
   }
   function exportConfig(){const blob=new Blob([JSON.stringify(config,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='mark-set-go-visual-design-v4.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);setStatus('Design JSON exported.',true);}
   async function copyConfig(){try{await navigator.clipboard.writeText(JSON.stringify(config,null,2));setStatus('Design JSON copied.',true);}catch{setStatus('Clipboard copy unavailable.',false);}}
@@ -567,6 +600,9 @@
     open:openDesigner,
     close:closeDesigner,
     save:saveConfig,
+    getConfig:()=>clone(config),
+    applyConfig:applyExternalConfig,
+    reset:resetExternalConfig,
     isOpen:()=>Boolean(panel&&!panel.hidden),
     status:()=>({
       uiScale:Math.round(Number(config.typography?.uiScale)||DEFAULT_UI_SCALE),

@@ -5497,6 +5497,44 @@ function renderProfilePreferences() {
         </button>
       </section>
 
+      <section class="profile-feature-card unified-settings-card" data-user-settings-card>
+        <div class="section-heading">
+          <div>
+            <span class="source-category">Account &amp; preferences</span>
+            <h2>My Settings</h2>
+            <p>Save how you like the app to behave. Signed-in users can automatically carry these preferences to another device.</p>
+          </div>
+          <span class="unified-settings-sync-badge" data-user-settings-sync-badge>Checking sync…</span>
+        </div>
+
+        <div class="unified-settings-category-grid" aria-label="Settings included">
+          <article><strong>Appearance</strong><small>Theme, Visual Designer, interface text size</small></article>
+          <article><strong>Reader defaults</strong><small>Mode, WPM, font, Book Pages, pointer and focus</small></article>
+          <article><strong>Learning</strong><small>Study language and push-training preferences</small></article>
+          <article><strong>App behavior</strong><small>Companion, list layouts, notifications and feed pane</small></article>
+        </div>
+
+        <label class="unified-settings-sync-toggle">
+          <span><strong>Sync settings across devices</strong><small>When signed in, changes are saved to your account automatically.</small></span>
+          <input type="checkbox" data-user-settings-sync checked>
+        </label>
+
+        <div class="unified-settings-actions">
+          <button type="button" class="primary" data-user-settings-save>Save current settings</button>
+          <button type="button" class="secondary" data-user-settings-restore>Restore saved settings</button>
+          <button type="button" class="secondary" data-user-settings-export>Export settings</button>
+          <button type="button" class="secondary" data-user-settings-import>Import settings</button>
+          <button type="button" class="secondary unified-settings-reset" data-user-settings-reset>Reset settings</button>
+          <input type="file" accept="application/json,.json" data-user-settings-file hidden>
+        </div>
+
+        <p class="unified-settings-note">
+          Books, reading progress, notebooks, annotations, saved quiz history, and other content are not part of this settings snapshot.
+          A background chosen from your local computer stays on that browser unless you choose it again on another device.
+        </p>
+        <p class="status unified-settings-status" data-user-settings-status role="status" aria-live="polite"></p>
+      </section>
+
       <section class="profile-feature-card">
         <div class="section-heading">
           <div><span class="source-category">Interface</span><h2>Choose what appears</h2><p>These choices control navigation and feature visibility across the app.</p></div>
@@ -5606,6 +5644,144 @@ function renderProfilePreferences() {
       window.alert('The Visual Designer could not open. Refresh after the updated files finish deploying.');
     }
   });
+
+  const settingsHost = window.parent !== window ? window.parent : window;
+  const settingsApi = settingsHost.MarkSetGoUserSettings || window.MarkSetGoUserSettings;
+  const settingsStatus = app.querySelector('[data-user-settings-status]');
+  const settingsSync = app.querySelector('[data-user-settings-sync]');
+  const settingsBadge = app.querySelector('[data-user-settings-sync-badge]');
+  const settingsFile = app.querySelector('[data-user-settings-file]');
+
+  const showSettingsMessage = (message, success = false) => {
+    if (!settingsStatus) return;
+    settingsStatus.className = `status unified-settings-status ${success ? 'success' : ''}`;
+    settingsStatus.textContent = String(message || '');
+  };
+
+  const refreshSettingsStatus = () => {
+    if (!settingsApi?.status) {
+      if (settingsBadge) settingsBadge.textContent = 'Settings service unavailable';
+      return;
+    }
+    const info = settingsApi.status();
+    if (settingsSync) settingsSync.checked = info.syncEnabled !== false;
+    if (settingsBadge) {
+      settingsBadge.textContent = info.authenticated
+        ? (info.syncEnabled !== false ? 'Account sync on' : 'Account sync off')
+        : 'Saved on this browser';
+      settingsBadge.classList.toggle('is-synced', Boolean(info.authenticated && info.syncEnabled !== false));
+    }
+  };
+
+  refreshSettingsStatus();
+
+  app.querySelector('[data-user-settings-save]')?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    if (!settingsApi?.saveCurrent) return showSettingsMessage('Settings service is not available.');
+    const button = event.currentTarget;
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = 'Saving…';
+    try {
+      const result = await settingsApi.saveCurrent({ reason:'profile-button' });
+      showSettingsMessage(
+        result?.cloudSaved
+          ? 'Current settings saved to this browser and your account.'
+          : 'Current settings saved to this browser.',
+        true
+      );
+      refreshSettingsStatus();
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Settings could not be saved.');
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  });
+
+  app.querySelector('[data-user-settings-restore]')?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    if (!settingsApi?.restore) return showSettingsMessage('Settings service is not available.');
+    const button = event.currentTarget;
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = 'Restoring…';
+    try {
+      const result = await settingsApi.restore({ preferCloud:true });
+      showSettingsMessage(
+        result?.source === 'cloud'
+          ? 'Account settings restored.'
+          : 'Browser settings restored.',
+        true
+      );
+      window.setTimeout(() => renderProfilePreferences(), 120);
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Saved settings could not be restored.');
+    } finally {
+      if (button.isConnected) {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    }
+  });
+
+  app.querySelector('[data-user-settings-export]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    try {
+      settingsApi?.export?.();
+      showSettingsMessage('Settings JSON exported.', true);
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Settings could not be exported.');
+    }
+  });
+
+  app.querySelector('[data-user-settings-import]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    settingsFile?.click();
+  });
+
+  settingsFile?.addEventListener('change', async () => {
+    const file = settingsFile.files?.[0];
+    settingsFile.value = '';
+    if (!file || !settingsApi?.importFile) return;
+    try {
+      await settingsApi.importFile(file, { apply:true, save:true });
+      showSettingsMessage('Imported settings applied and saved.', true);
+      window.setTimeout(() => renderProfilePreferences(), 120);
+    } catch (error) {
+      showSettingsMessage(error?.message || 'That settings file could not be imported.');
+    }
+  });
+
+  app.querySelector('[data-user-settings-reset]')?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    if (!settingsApi?.reset) return showSettingsMessage('Settings service is not available.');
+    if (!window.confirm('Reset app preferences to their defaults? Your books, progress, notebooks, annotations, and other saved content will not be deleted.')) return;
+    try {
+      await settingsApi.reset({ sync:true });
+      showSettingsMessage('Settings reset to defaults.', true);
+      window.setTimeout(() => location.reload(), 180);
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Settings could not be reset.');
+    }
+  });
+
+  settingsSync?.addEventListener('change', async () => {
+    try {
+      await settingsApi?.setSyncEnabled?.(Boolean(settingsSync.checked));
+      refreshSettingsStatus();
+      showSettingsMessage(
+        settingsSync.checked
+          ? 'Automatic settings sync is on.'
+          : 'Automatic settings sync is off. Settings still save on this browser.',
+        true
+      );
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Sync preference could not be changed.');
+    }
+  });
+
+  document.addEventListener('marksetgo:user-settings-status', refreshSettingsStatus);
 
   // Keep the page synchronized if the profile is changed by another app control.
   const onProfileChange=(event)=>{
