@@ -435,8 +435,7 @@
     if (entry.key === 'reader:1') {
       try {
         if (window.MSGWorkspaceExperiment?.closePrimaryReader?.()) {
-          window.setTimeout(syncDesktop, 0);
-          window.setTimeout(syncDesktop, 100);
+          scheduleSync();
           return;
         }
       } catch {}
@@ -447,8 +446,7 @@
     const close = document.querySelector(`[data-msg-workspace-tab-close="${escaped}"]`);
     if (close) {
       close.click();
-      window.setTimeout(syncDesktop, 0);
-      window.setTimeout(syncDesktop, 120);
+      scheduleSync();
     }
   }
 
@@ -685,7 +683,23 @@
     if (!primary) return null;
 
     let entry = windows.get('reader:1');
-    if (entry?.wrapper?.isConnected) return entry;
+
+    // The Standard workspace can briefly reparent the live Reader while a
+    // Desktop window is closing. A connected wrapper is not enough: it must
+    // still own the current live Reader node. If it does not, discard only the
+    // stale wrapper record and immediately wrap the same live Reader again.
+    if (
+      entry?.wrapper?.isConnected &&
+      entry.contentNode === primary &&
+      entry.wrapper.contains(primary)
+    ) {
+      return entry;
+    }
+
+    if (entry) {
+      try { entry.wrapper?.remove(); } catch {}
+      windows.delete('reader:1');
+    }
 
     entry = createWindow('reader:1', panelLabel(primary, 'reader:1'), primary, { primary:true });
     if (entry) {
@@ -699,10 +713,22 @@
     nodes.forEach((node) => {
       const key = panelKey(node);
       if (!key) return;
+
       let entry = windows.get(key);
-      if (!entry?.wrapper?.isConnected) {
+      const entryOwnsLiveNode = Boolean(
+        entry?.wrapper?.isConnected &&
+        entry.contentNode === node &&
+        entry.wrapper.contains(node)
+      );
+
+      if (!entryOwnsLiveNode) {
+        if (entry) {
+          try { entry.wrapper?.remove(); } catch {}
+          windows.delete(key);
+        }
         entry = createWindow(key, panelLabel(node, key), node, { primary:false });
       }
+
       try { node.inert = false; } catch {}
       node.setAttribute('aria-hidden','false');
       entry?.wrapper?.removeAttribute('hidden');
@@ -756,6 +782,11 @@
 
     const canvas = ensureCanvas(shell);
     updateCanvasSize(shell);
+
+    // A close action can cause the underlying Standard workspace to reparent a
+    // live pane. Remove stale window ownership first, then rebuild around the
+    // same live nodes in this very sync pass.
+    cleanupDeadWindows();
     wrapPrimary(shell, canvas);
     wrapPanels(shell, canvas);
     cleanupDeadWindows();
@@ -888,9 +919,12 @@
   }
 
   function scheduleSync() {
-    window.setTimeout(syncDesktop, 0);
-    window.setTimeout(syncDesktop, 90);
-    window.setTimeout(syncDesktop, 260);
+    // Workspace close/reparent work can finish on a later task/frame. Keep this
+    // deliberately finite (no observer / no polling) but cover the late close
+    // path so Desktop repairs an orphaned pane automatically.
+    [0, 90, 260, 650, 1200].forEach((delay) => {
+      window.setTimeout(syncDesktop, delay);
+    });
   }
 
   document.addEventListener('click', (event) => {
