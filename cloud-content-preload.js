@@ -1,26 +1,28 @@
 'use strict';
 
 /*
-  Mark, Set, Go! cloud-content preload v4
+  Cloud-content preload v5.
 
-  The real server.js remains the entry script.
-  This preload only watches for the existing app.use('/api', ...) middleware.
-  Immediately AFTER that middleware is registered, it installs the cloud-content
-  routes and restores Express's original .use implementation.
+  The normal server.js remains the actual program.
 
-  Resulting order:
-    express.json / urlencoded
-    Clerk middleware
-    existing beta /api middleware
-    NEW cloud-content routes
-    existing account/application routes
-    static files
-    existing SPA fallback
-    app.listen(...)
+  Registration order:
+    1. existing express.json/urlencoded
+    2. existing Clerk middleware
+    3. NEW account content routes
+    4. existing private-beta /api middleware
+    5. all existing application routes
+
+  The three cloud-content endpoints perform their own beta allowlist check using:
+    - the authenticated Clerk user ID already available on the request
+    - the account email already stored in app_users
+    - BETA_ALLOWED_USER_IDS / BETA_ALLOWED_EMAILS
+
+  This avoids the existing beta middleware's extra Clerk users.getUser() network
+  request, which was returning "Unable to verify beta access."
 */
 
 try {
-  console.log('[cloud-sync preload] Waiting for existing /api middleware.');
+  console.log('[cloud-sync preload] Waiting for existing private-beta /api middleware.');
 
   const express = require('express');
   const installCloudContentRoutes = require('./cloud-content-routes');
@@ -29,25 +31,34 @@ try {
   let installed = false;
 
   express.application.use = function markSetGoCloudContentUseHook(...args) {
-    const result = originalUse.apply(this, args);
+    const isExistingApiGate =
+      !installed &&
+      args[0] === '/api' &&
+      args.length >= 2;
 
-    if (!installed && args[0] === '/api') {
+    if (isExistingApiGate) {
       installed = true;
 
-      // Restore Express before adding our routes.
+      // Restore Express before registering anything.
       express.application.use = originalUse;
 
-      console.log('[cloud-sync preload] Existing /api middleware reached; registering account content routes.');
+      console.log(
+        '[cloud-sync preload] Private-beta /api gate reached; registering sync routes immediately before it.'
+      );
+
       installCloudContentRoutes(this);
+
+      // Now register the application's original beta middleware exactly as server.js intended.
+      return originalUse.apply(this, args);
     }
 
-    return result;
+    return originalUse.apply(this, args);
   };
 
   process.once('beforeExit', () => {
     if (!installed) {
       console.warn(
-        '[cloud-sync preload] Process is exiting before the expected /api middleware was observed.'
+        '[cloud-sync preload] Process is exiting before the expected private-beta /api middleware was observed.'
       );
     }
   });

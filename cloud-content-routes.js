@@ -6,6 +6,22 @@ const CLERK_PUBLISHABLE_KEY = String(process.env.CLERK_PUBLISHABLE_KEY || '').tr
 const CLERK_SECRET_KEY = String(process.env.CLERK_SECRET_KEY || '').trim();
 const clerkConfigured = Boolean(CLERK_PUBLISHABLE_KEY && CLERK_SECRET_KEY);
 
+const BETA_ACCESS_ENABLED = /^(1|true|yes|on)$/i.test(
+  String(process.env.BETA_ACCESS_ENABLED || '').trim()
+);
+const BETA_ALLOWED_EMAILS = new Set(
+  String(process.env.BETA_ALLOWED_EMAILS || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean)
+);
+const BETA_ALLOWED_USER_IDS = new Set(
+  String(process.env.BETA_ALLOWED_USER_IDS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+
 let getAuth = null;
 if (clerkConfigured) {
   ({ getAuth } = require('@clerk/express'));
@@ -43,43 +59,75 @@ function validatePayload(value) {
     error.status = 400;
     throw error;
   }
+
   const serialized = JSON.stringify(value);
   const bytes = Buffer.byteLength(serialized, 'utf8');
+
   if (bytes > MAX_CONTENT_BYTES) {
-    const error = new Error(`This learning-data record is too large for account sync (${bytes.toLocaleString()} bytes).`);
+    const error = new Error(
+      `This learning-data record is too large for account sync (${bytes.toLocaleString()} bytes).`
+    );
     error.status = 413;
     throw error;
   }
+
   return { serialized, bytes };
 }
 
-async function requireAccountUser(req, res) {
+function betaAccessAllowed(authSubject, email) {
+  if (!BETA_ACCESS_ENABLED) return true;
+
+  const userId = String(authSubject || '').trim();
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+
+  return (
+    (userId && BETA_ALLOWED_USER_IDS.has(userId)) ||
+    (normalizedEmail && BETA_ALLOWED_EMAILS.has(normalizedEmail))
+  );
+}
+
+async function requireSyncAccountUser(req, res) {
   if (!clerkConfigured || typeof getAuth !== 'function') {
     res.status(503).json({ error: 'Authentication is not configured.' });
     return null;
   }
+
   if (!databaseConfigured()) {
     res.status(503).json({ error: 'The account database is not configured.' });
     return null;
   }
 
   const auth = getAuth(req);
+
   if (!auth?.isAuthenticated || !auth.userId) {
     res.status(401).json({ error: 'Sign in is required.' });
     return null;
   }
 
   const result = await query(
-    'select id, email, display_name, plan_code, status from app_users where auth_subject = $1',
+    `select id, email, display_name, plan_code, status, auth_subject
+     from app_users
+     where auth_subject = $1`,
     [auth.userId]
   );
 
-  if (!result.rows[0]) {
-    res.status(409).json({ error: 'Account session must be initialized before account data can be used.' });
+  const user = result.rows[0];
+
+  if (!user) {
+    res.status(409).json({
+      error: 'Account session must be initialized before account data can be used.'
+    });
     return null;
   }
 
-  return result.rows[0];
+  if (!betaAccessAllowed(auth.userId, user.email)) {
+    res.status(403).json({
+      error: 'This account is not approved for the private beta.'
+    });
+    return null;
+  }
+
+  return user;
 }
 
 module.exports = function installCloudContentRoutes(app) {
@@ -89,6 +137,7 @@ module.exports = function installCloudContentRoutes(app) {
 
   app.locals ||= {};
   if (app.locals.__markSetGoCloudContentRoutesInstalled) return;
+
   app.locals.__markSetGoCloudContentRoutesInstalled = true;
 
   let schemaPromise = null;
@@ -130,8 +179,9 @@ module.exports = function installCloudContentRoutes(app) {
 
   app.get('/api/account/content-sync', async (req, res) => {
     try {
-      const user = await requireAccountUser(req, res);
+      const user = await requireSyncAccountUser(req, res);
       if (!user) return;
+
       await ensureSchema();
 
       const result = await query(`
@@ -150,12 +200,15 @@ module.exports = function installCloudContentRoutes(app) {
 
   app.put('/api/account/content-sync/:contentKey', async (req, res) => {
     try {
-      const user = await requireAccountUser(req, res);
+      const user = await requireSyncAccountUser(req, res);
       if (!user) return;
+
       await ensureSchema();
 
       const key = allowedContentKey(req.params.contentKey);
-      if (!key) return res.status(400).json({ error: 'Unsupported account content key.' });
+      if (!key) {
+        return res.status(400).json({ error: 'Unsupported account content key.' });
+      }
 
       const payload = validatePayload(req.body?.payload);
       const clientUpdatedAt = normalizeClientUpdatedAt(req.body?.clientUpdatedAt);
@@ -170,10 +223,18 @@ module.exports = function installCloudContentRoutes(app) {
           updated_at = now()
         where user_content_snapshots.client_updated_at <= excluded.client_updated_at
         returning content_key, payload, client_updated_at, updated_at
-      `, [String(user.id), key, payload.serialized, clientUpdatedAt]);
+      `, [
+        String(user.id),
+        key,
+        payload.serialized,
+        clientUpdatedAt
+      ]);
 
       if (result.rows[0]) {
-        return res.json({ record: formatRow(result.rows[0]), bytes: payload.bytes });
+        return res.json({
+          record: formatRow(result.rows[0]),
+          bytes: payload.bytes
+        });
       }
 
       const current = await query(`
@@ -187,22 +248,32 @@ module.exports = function installCloudContentRoutes(app) {
         staleWriteIgnored: true
       });
     } catch (error) {
-      const status = Number(error.status) || (/too large/i.test(error.message) ? 413 : 500);
+      const status =
+        Number(error.status) ||
+        (/too large/i.test(error.message) ? 413 : 500);
+
       console.error('Account content save failed:', error);
+
       res.status(status).json({
-        error: status >= 500 ? 'Unable to save account learning data.' : error.message
+        error:
+          status >= 500
+            ? 'Unable to save account learning data.'
+            : error.message
       });
     }
   });
 
   app.delete('/api/account/content-sync/:contentKey', async (req, res) => {
     try {
-      const user = await requireAccountUser(req, res);
+      const user = await requireSyncAccountUser(req, res);
       if (!user) return;
+
       await ensureSchema();
 
       const key = allowedContentKey(req.params.contentKey);
-      if (!key) return res.status(400).json({ error: 'Unsupported account content key.' });
+      if (!key) {
+        return res.status(400).json({ error: 'Unsupported account content key.' });
+      }
 
       const result = await query(`
         delete from user_content_snapshots
@@ -210,12 +281,19 @@ module.exports = function installCloudContentRoutes(app) {
         returning content_key
       `, [String(user.id), key]);
 
-      res.json({ deleted: Boolean(result.rows[0]), key });
+      res.json({
+        deleted: Boolean(result.rows[0]),
+        key
+      });
     } catch (error) {
       console.error('Account content delete failed:', error);
-      res.status(500).json({ error: 'Unable to delete account learning data.' });
+      res.status(500).json({
+        error: 'Unable to delete account learning data.'
+      });
     }
   });
 
-  console.log('[cloud-sync bootstrap] Account content routes registered.');
+  console.log(
+    '[cloud-sync preload] Account content routes registered with direct beta allowlist verification.'
+  );
 };
