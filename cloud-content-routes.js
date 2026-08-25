@@ -1,5 +1,16 @@
 'use strict';
 
+const { query, databaseConfigured } = require('./db');
+
+const CLERK_PUBLISHABLE_KEY = String(process.env.CLERK_PUBLISHABLE_KEY || '').trim();
+const CLERK_SECRET_KEY = String(process.env.CLERK_SECRET_KEY || '').trim();
+const clerkConfigured = Boolean(CLERK_PUBLISHABLE_KEY && CLERK_SECRET_KEY);
+
+let getAuth = null;
+if (clerkConfigured) {
+  ({ getAuth } = require('@clerk/express'));
+}
+
 const MAX_CONTENT_BYTES = 6 * 1024 * 1024;
 
 const EXACT_KEYS = new Set([
@@ -39,13 +50,44 @@ function validatePayload(value) {
     error.status = 413;
     throw error;
   }
-  return { value, serialized, bytes };
+  return { serialized, bytes };
 }
 
-module.exports = function installCloudContentRoutes({ app, query, requireAccountUser }) {
-  if (!app || typeof app.get !== 'function' || typeof query !== 'function' || typeof requireAccountUser !== 'function') {
-    throw new Error('Cloud content routes require app, query, and requireAccountUser.');
+async function requireAccountUser(req, res) {
+  if (!clerkConfigured || typeof getAuth !== 'function') {
+    res.status(503).json({ error: 'Authentication is not configured.' });
+    return null;
   }
+  if (!databaseConfigured()) {
+    res.status(503).json({ error: 'The account database is not configured.' });
+    return null;
+  }
+
+  const auth = getAuth(req);
+  if (!auth?.isAuthenticated || !auth.userId) {
+    res.status(401).json({ error: 'Sign in is required.' });
+    return null;
+  }
+
+  const result = await query(
+    'select id, email, display_name, plan_code, status from app_users where auth_subject = $1',
+    [auth.userId]
+  );
+
+  if (!result.rows[0]) {
+    res.status(409).json({ error: 'Account session must be initialized before account data can be used.' });
+    return null;
+  }
+
+  return result.rows[0];
+}
+
+module.exports = function installCloudContentRoutes(app) {
+  if (!app || typeof app.get !== 'function' || typeof app.put !== 'function') {
+    throw new Error('Cloud content routes require an Express application.');
+  }
+
+  app.locals ||= {};
   if (app.locals.__markSetGoCloudContentRoutesInstalled) return;
   app.locals.__markSetGoCloudContentRoutesInstalled = true;
 
@@ -53,6 +95,7 @@ module.exports = function installCloudContentRoutes({ app, query, requireAccount
 
   async function ensureSchema() {
     if (schemaPromise) return schemaPromise;
+
     schemaPromise = (async () => {
       await query(`
         create table if not exists user_content_snapshots (
@@ -65,6 +108,7 @@ module.exports = function installCloudContentRoutes({ app, query, requireAccount
           primary key (user_id, content_key)
         )
       `);
+
       await query(`
         create index if not exists idx_user_content_snapshots_user_updated
         on user_content_snapshots (user_id, updated_at desc)
@@ -73,6 +117,7 @@ module.exports = function installCloudContentRoutes({ app, query, requireAccount
       schemaPromise = null;
       throw error;
     });
+
     return schemaPromise;
   }
 
@@ -88,12 +133,14 @@ module.exports = function installCloudContentRoutes({ app, query, requireAccount
       const user = await requireAccountUser(req, res);
       if (!user) return;
       await ensureSchema();
+
       const result = await query(`
         select content_key, payload, client_updated_at, updated_at
         from user_content_snapshots
         where user_id = $1
         order by updated_at desc
       `, [String(user.id)]);
+
       res.json({ records: result.rows.map(formatRow) });
     } catch (error) {
       console.error('Account content load failed:', error);
@@ -126,19 +173,18 @@ module.exports = function installCloudContentRoutes({ app, query, requireAccount
       `, [String(user.id), key, payload.serialized, clientUpdatedAt]);
 
       if (result.rows[0]) {
-        return res.json({ record: formatRow(result.rows[0]), bytes:payload.bytes });
+        return res.json({ record: formatRow(result.rows[0]), bytes: payload.bytes });
       }
 
-      // A newer cloud write already exists. Return it instead of overwriting it.
       const current = await query(`
         select content_key, payload, client_updated_at, updated_at
         from user_content_snapshots
         where user_id = $1 and content_key = $2
       `, [String(user.id), key]);
 
-      res.status(200).json({
+      res.json({
         record: current.rows[0] ? formatRow(current.rows[0]) : null,
-        staleWriteIgnored:true
+        staleWriteIgnored: true
       });
     } catch (error) {
       const status = Number(error.status) || (/too large/i.test(error.message) ? 413 : 500);
@@ -164,10 +210,12 @@ module.exports = function installCloudContentRoutes({ app, query, requireAccount
         returning content_key
       `, [String(user.id), key]);
 
-      res.json({ deleted:Boolean(result.rows[0]), key });
+      res.json({ deleted: Boolean(result.rows[0]), key });
     } catch (error) {
       console.error('Account content delete failed:', error);
       res.status(500).json({ error: 'Unable to delete account learning data.' });
     }
   });
+
+  console.log('[cloud-sync bootstrap] Account content routes registered.');
 };

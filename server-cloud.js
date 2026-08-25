@@ -1,70 +1,55 @@
 'use strict';
 
-const fs = require('node:fs');
-const path = require('node:path');
+/*
+  Starts the real server.js unchanged.
 
-const root = __dirname;
-const serverPath = path.join(root, 'server.js');
-const routesPath = path.join(root, 'cloud-content-routes.js');
-const runtimePath = path.join(root, '.server-cloud-runtime.js');
-
-function fatal(message, error) {
-  console.error(`[cloud-sync bootstrap] ${message}`);
-  if (error?.stack) console.error(error.stack);
-  else if (error) console.error(error);
-  process.exitCode = 1;
-}
+  The only hook is temporary: when server.js is about to register its final
+  wildcard app.get('*', ...) SPA fallback, the hook first registers the cloud
+  content API routes on that same Express app. Then the original Express .get
+  implementation is restored before the fallback itself is registered.
+*/
 
 try {
-  console.log('[cloud-sync bootstrap] Starting additive cloud-content bootstrap.');
+  console.log('[cloud-sync bootstrap] Starting real server.js with route hook.');
 
-  if (!fs.existsSync(serverPath)) {
-    throw new Error(`server.js was not found at ${serverPath}`);
-  }
-  if (!fs.existsSync(routesPath)) {
-    throw new Error(`cloud-content-routes.js was not found at ${routesPath}`);
-  }
+  const express = require('express');
+  const installCloudContentRoutes = require('./cloud-content-routes');
 
-  let source = fs.readFileSync(serverPath, 'utf8');
+  const originalGet = express.application.get;
+  let installed = false;
 
-  const installer = "require('./cloud-content-routes')({ app, query, requireAccountUser });";
+  express.application.get = function markSetGoCloudRouteHook(routePath, ...handlers) {
+    const isWildcardFallback =
+      !installed &&
+      handlers.length > 0 &&
+      (routePath === '*' || routePath === '/*');
 
-  if (!source.includes(installer)) {
-    // Find the wildcard SPA fallback without depending on its exact whitespace
-    // or callback formatting. New account routes must be registered BEFORE it.
-    const fallbackPattern = /app\.get\(\s*(['"`])\*\1\s*,/g;
-    const matches = [...source.matchAll(fallbackPattern)];
-    const fallback = matches.at(-1);
+    if (isWildcardFallback) {
+      installed = true;
 
-    if (!fallback || !Number.isInteger(fallback.index)) {
-      throw new Error(
-        'Could not locate the wildcard SPA fallback in server.js. ' +
-        'The original server.js has been left untouched.'
-      );
+      // Restore Express immediately. The installer and all subsequent routes
+      // use the untouched native Express implementation.
+      express.application.get = originalGet;
+
+      console.log('[cloud-sync bootstrap] SPA fallback reached; registering account content routes first.');
+      installCloudContentRoutes(this);
+
+      return originalGet.call(this, routePath, ...handlers);
     }
 
-    console.log(
-      `[cloud-sync bootstrap] SPA fallback found at character ${fallback.index.toLocaleString()}.`
+    return originalGet.call(this, routePath, ...handlers);
+  };
+
+  require('./server.js');
+
+  if (!installed) {
+    console.warn(
+      '[cloud-sync bootstrap] server.js started, but its wildcard SPA fallback ' +
+      'was not observed. Account content routes were not installed.'
     );
-
-    source =
-      source.slice(0, fallback.index) +
-      "\n\n/* Cloud learning-data routes — additive bootstrap */\n" +
-      installer +
-      "\n\n" +
-      source.slice(fallback.index);
-  } else {
-    console.log('[cloud-sync bootstrap] Cloud-content installer already exists in server source.');
   }
-
-  // Generate a sibling runtime so all relative require() calls and __dirname
-  // continue to resolve exactly as they do from the repository root.
-  fs.writeFileSync(runtimePath, source, 'utf8');
-
-  console.log('[cloud-sync bootstrap] Generated patched runtime.');
-  console.log('[cloud-sync bootstrap] Starting existing server with cloud-content routes.');
-
-  require(runtimePath);
 } catch (error) {
-  fatal('Startup failed before the application could listen on its port.', error);
+  console.error('[cloud-sync bootstrap] Startup failed.');
+  console.error(error?.stack || error);
+  process.exitCode = 1;
 }
