@@ -956,17 +956,24 @@
     style.textContent = `
       .topic-feed-import-recovery {
         display: block;
-        margin: 14px 0 4px;
-        padding: 12px 14px;
+        box-sizing: border-box;
+        align-self: start;
+        height: auto !important;
+        min-height: 0 !important;
+        max-height: none !important;
+        margin: 10px 0 4px;
+        padding: 7px 10px;
         border: 1px solid var(--msg-theme-border, rgba(148, 163, 184, .42));
-        border-radius: 12px;
+        border-radius: 10px;
         background: var(--msg-theme-soft, rgba(15, 23, 42, .055));
         color: var(--msg-theme-ink, inherit);
         font-size: .95em;
-        line-height: 1.55;
+        line-height: 1.35;
       }
       .topic-feed-import-recovery p {
-        margin: 0;
+        margin: 0 !important;
+        padding: 0 !important;
+        min-height: 0 !important;
       }
       .topic-feed-import-recovery a {
         color: var(--msg-theme-accent, currentColor);
