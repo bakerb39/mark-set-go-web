@@ -189,42 +189,74 @@
     const popover = document.querySelector('.msg-readers-popover');
     if (!popover) return null;
 
-    let button = popover.querySelector('[data-msg-desktop-menu-toggle]');
-    if (!button) {
-      button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'msg-readers-desktop-menu';
-      button.dataset.msgDesktopMenuToggle = '1';
-      button.setAttribute('role','menuitem');
-      const addButton = popover.querySelector('[data-msg-reader-add]');
-      popover.insertBefore(button, addButton || null);
+    // Layout is a property of the Reader workspace, not another Reader.
+    popover.querySelector('[data-msg-desktop-menu-toggle]')?.remove();
 
-      button.addEventListener('click', (event) => {
+    let control = popover.querySelector('[data-msg-readers-layout-control]');
+    if (!control) {
+      control = document.createElement('div');
+      control.className = 'msg-readers-layout-control';
+      control.dataset.msgReadersLayoutControl = '1';
+      control.setAttribute('role','group');
+      control.setAttribute('aria-label','Reader workspace layout');
+
+      control.innerHTML = `
+        <span class="msg-readers-layout-label">Layout</span>
+        <div class="msg-readers-layout-options">
+          <button type="button"
+            class="msg-readers-layout-option"
+            data-msg-layout-choice="standard">Standard</button>
+          <button type="button"
+            class="msg-readers-layout-option"
+            data-msg-layout-choice="desktop">Desktop</button>
+        </div>`;
+
+      const addButton = popover.querySelector('[data-msg-reader-add]');
+      if (addButton) addButton.insertAdjacentElement('afterend', control);
+      else popover.appendChild(control);
+
+      control.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-msg-layout-choice]');
+        if (!button) return;
+
         event.preventDefault();
         event.stopPropagation();
 
-        if (desktopActive) {
-          writeMode('standard');
-          deactivateDesktop();
-        } else {
-          writeMode('desktop');
-          const activated = activateDesktop();
-          if (!activated) {
-            writeMode('standard');
+        const requested = String(button.dataset.msgLayoutChoice || 'standard');
+        if (requested === 'desktop') {
+          if (!desktopActive) {
+            writeMode('desktop');
+            const activated = activateDesktop();
+            if (!activated) writeMode('standard');
           }
+        } else {
+          writeMode('standard');
+          if (desktopActive) deactivateDesktop();
         }
 
-        document.querySelector('.msg-readers-menu')?.removeAttribute('open');
         ensureReadersMenuOption();
       });
     }
 
-    button.innerHTML = desktopActive
-      ? '<strong>▦ Standard Workspace</strong><small>Return to the fixed two-frame layout</small>'
-      : '<strong>▦ Desktop Workspace</strong><small>Move and resize open Readers and tools</small>';
-    button.setAttribute('aria-pressed', desktopActive ? 'true' : 'false');
-    return button;
+    const standard = control.querySelector('[data-msg-layout-choice="standard"]');
+    const desktop = control.querySelector('[data-msg-layout-choice="desktop"]');
+
+    standard?.setAttribute('aria-pressed', desktopActive ? 'false' : 'true');
+    desktop?.setAttribute('aria-pressed', desktopActive ? 'true' : 'false');
+    standard?.classList.toggle('is-active', !desktopActive);
+    desktop?.classList.toggle('is-active', desktopActive);
+
+    if (!viewportAllowsDesktop()) {
+      desktop?.setAttribute('disabled','');
+      desktop?.setAttribute('title','Desktop layout is available on wider screens.');
+    } else {
+      desktop?.removeAttribute('disabled');
+      desktop?.removeAttribute('title');
+    }
+
+    return control;
   }
+
 
   function canvasBounds(canvas = desktopCanvas()) {
     const rect = canvas?.getBoundingClientRect?.();
