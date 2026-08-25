@@ -11,36 +11,24 @@
     style.id = 'article-import-fallback-help-styles';
     style.textContent = `
       #${NOTICE_ID} {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 14px;
-        margin: 0 0 12px;
-        padding: 12px 14px;
-        border: 1px solid rgba(148, 163, 184, .45);
+        margin: 14px 0 8px;
+        padding: 13px 15px;
+        border: 1px solid rgba(148, 163, 184, .42);
         border-radius: 12px;
-        background: rgba(15, 23, 42, .06);
+        background: rgba(15, 23, 42, .055);
         font-size: 14px;
-        line-height: 1.45;
+        line-height: 1.55;
       }
 
-      #${NOTICE_ID} .article-import-fallback-copy {
-        min-width: 0;
-      }
-
-      #${NOTICE_ID} strong {
-        font-weight: 700;
+      #${NOTICE_ID} p {
+        margin: 0;
       }
 
       #${NOTICE_ID} a {
-        white-space: nowrap;
-      }
-
-      @media (max-width: 700px) {
-        #${NOTICE_ID} {
-          align-items: flex-start;
-          flex-direction: column;
-        }
+        font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        cursor: pointer;
       }
     `;
     document.head.appendChild(style);
@@ -49,23 +37,28 @@
   function openReadAnything(event) {
     event?.preventDefault?.();
 
+    if (window.MarkSetGoReadAnything?.render) {
+      window.MarkSetGoReadAnything.render();
+
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const bookmarkletButton = document.querySelector('#read-anything-bookmarklet');
+        bookmarkletButton?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      }));
+      return;
+    }
+
     const trigger = document.querySelector(
-      'button[data-read="upload"], [data-read="upload"]'
+      'button[data-read="upload"], [data-read="upload"], [data-action="read-anything"]'
     );
 
-    if (trigger) {
-      trigger.click();
-    }
+    trigger?.click?.();
   }
 
   function showFallbackHelp() {
-    const appRoot = document.getElementById('app');
+    document.getElementById(NOTICE_ID)?.remove();
 
-    if (!appRoot || document.getElementById(NOTICE_ID)) return;
-
-    const reader = appRoot.querySelector('#reader');
-
-    if (!reader?.parentElement) return;
+    const reader = document.querySelector('#app #reader');
+    if (!reader) return;
 
     addStyles();
 
@@ -73,39 +66,32 @@
     notice.id = NOTICE_ID;
     notice.setAttribute('role', 'note');
     notice.innerHTML = `
-      <div class="article-import-fallback-copy">
+      <p>
         <strong>Want the full article?</strong>
         Click <strong>View Original</strong>, then use the
         <strong>Read with Mark</strong> bookmarklet to import the publisher page.
-        The bookmarklet can be found in the
+        You can find the bookmarklet in the
         <a href="#read-anything" data-open-read-anything>Read Anything section</a>.
-      </div>
-      <a class="secondary button-link"
-         href="#read-anything"
-         data-open-read-anything>
-        Open Read Anything →
-      </a>
+      </p>
     `;
 
-    notice.querySelectorAll('[data-open-read-anything]').forEach((link) => {
-      link.addEventListener('click', openReadAnything);
-    });
+    notice.querySelector('[data-open-read-anything]')
+      ?.addEventListener('click', openReadAnything);
 
-    reader.parentElement.insertBefore(notice, reader);
+    // Put the guidance immediately after the reader text rather than above it.
+    reader.insertAdjacentElement('afterend', notice);
   }
 
-  function installFallbackHelp() {
-    const originalRenderReaderWithText = window.renderReaderWithText;
+  function install() {
+    const original = window.renderReaderWithText;
 
     if (
-      typeof originalRenderReaderWithText !== 'function' ||
-      originalRenderReaderWithText.__articleFallbackHelpInstalled
-    ) {
-      return;
-    }
+      typeof original !== 'function' ||
+      original.__articleImportFallbackHelpInstalled
+    ) return;
 
-    function renderReaderWithArticleFallbackHelp(title, text, source) {
-      const result = originalRenderReaderWithText.apply(this, arguments);
+    function wrappedRenderReaderWithText(title, text, source) {
+      const result = original.apply(this, arguments);
 
       if (String(text || '').includes(FALLBACK_TEXT)) {
         requestAnimationFrame(() => requestAnimationFrame(showFallbackHelp));
@@ -114,12 +100,18 @@
       return result;
     }
 
-    renderReaderWithArticleFallbackHelp.__articleFallbackHelpInstalled = true;
-    renderReaderWithArticleFallbackHelp.__articleFallbackHelpOriginal =
-      originalRenderReaderWithText;
+    wrappedRenderReaderWithText.__articleImportFallbackHelpInstalled = true;
+    wrappedRenderReaderWithText.__articleImportFallbackHelpOriginal = original;
 
-    window.renderReaderWithText = renderReaderWithArticleFallbackHelp;
+    window.renderReaderWithText = wrappedRenderReaderWithText;
   }
 
-  window.addEventListener('DOMContentLoaded', installFallbackHelp, { once: true });
+  // All scripts here are deferred. Waiting for DOMContentLoaded ensures that
+  // app.js, read-anything.js, and the other reader integrations have finished
+  // assigning their final renderReaderWithText implementation before wrapping it.
+  if (document.readyState === 'loading') {
+    window.addEventListener('DOMContentLoaded', install, { once: true });
+  } else {
+    install();
+  }
 })();
