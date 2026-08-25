@@ -512,7 +512,13 @@
     }
 
     let storedDocument = null;
-    try { storedDocument = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+    try { storedDocument = window.MarkSetGoDocumentStore?.peek?.(documentId) || null; } catch {}
+
+    if (!storedDocument && typeof window.MarkSetGoDocumentStore?.get === 'function') {
+      void window.MarkSetGoDocumentStore.get(documentId).then((loaded) => {
+        if (loaded?.text) restoreArticleControlsAfterResume(documentId, documentTitle);
+      }).catch(() => {});
+    }
 
     const indexedKey = formatDocumentIndexCache[String(documentId)] || '';
     const sourceKey = storedDocument?.source?.readAnythingKey || '';

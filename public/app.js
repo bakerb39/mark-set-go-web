@@ -5040,11 +5040,10 @@ function renderHome() {
     });
 
     app.querySelectorAll('[data-home-resume-document]').forEach((button) => {
-      button.addEventListener('click', () => {
+      button.addEventListener('click', async () => {
         const documentId = button.dataset.homeResumeDocument;
         if (!documentId) return;
-        let data = null;
-        try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+        const data = await getStoredReaderDocument(documentId);
         if (!data?.text) {
           renderReadingList();
           return;
@@ -5156,8 +5155,7 @@ function readingSkillBooks() {
 
 async function readingSkillBookText(book) {
   if (!book?.documentId) return null;
-  let data = null;
-  try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${book.documentId}`) || 'null'); } catch {}
+  const data = await getStoredReaderDocument(book.documentId);
   if (data?.text) return { title:data.title || book.title, text:data.text, source:data.source || book.source || {} };
 
   if (book.source?.type === 'modern-guide') {
@@ -7191,10 +7189,9 @@ function renderProgressDashboard() {
     renderProgressDashboard();
   });
 
-  app.querySelectorAll('[data-progress-open]').forEach((button)=>button.addEventListener('click',()=>{
+  app.querySelectorAll('[data-progress-open]').forEach((button)=>button.addEventListener('click',async ()=>{
     const documentId=button.dataset.progressOpen;
-    let data=null;
-    try{data=JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`)||'null');}catch{}
+    const data=await getStoredReaderDocument(documentId);
     if(!data?.text) return window.alert('That text is not stored in this browser. Open it again from My Reading or its original library.');
     renderReaderWithText(data.title,data.text,data.source||{type:'saved'});
     const record=readStoredObject(READING_PROGRESS_KEY)[documentId];
@@ -9128,16 +9125,21 @@ async function clearRemovedBookReferences(removed) {
   const progress = readStoredObject(READING_PROGRESS_KEY);
   let progressChanged = false;
 
+  const removedDocumentIds = [];
   Object.entries(progress).forEach(([documentId, record]) => {
     if (
       (removedDocumentId && documentId === removedDocumentId)
       || sameBookIdentity(record?.title, removedTitle)
     ) {
       delete progress[documentId];
-      localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`);
+      removedDocumentIds.push(documentId);
       progressChanged = true;
     }
   });
+
+  if (removedDocumentIds.length) {
+    await Promise.all(removedDocumentIds.map((documentId) => removeStoredReaderDocument(documentId)));
+  }
 
   if (progressChanged) {
     localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progress));
@@ -9418,105 +9420,175 @@ function saveBookmarks(bookmarks) {
   setBookmarkCookie(trimmed);
 }
 
-async function migrateLegacyTopicFeedDocumentsToIndexedDb() {
-  const keys = [];
+function readerDocumentCacheKey(documentId) {
+  return `reader-document:${String(documentId || '')}`;
+}
+
+const readerDocumentMemoryCache = new Map();
+let readerDocumentMigrationPromise = null;
+
+function normalizeStoredReaderDocument(value, documentId = '') {
+  if (!value || typeof value !== 'object') return null;
+  const text = String(value.text || value.currentText || '');
+  if (!text) return null;
+  return {
+    documentId: String(value.documentId || documentId || ''),
+    title: String(value.title || 'Untitled'),
+    text,
+    source: value.source && typeof value.source === 'object' ? value.source : {}
+  };
+}
+
+function readLegacyStoredReaderDocument(documentId) {
+  if (!documentId) return null;
   try {
-    for (let index = 0; index < localStorage.length; index += 1) {
-      const key = localStorage.key(index);
-      if (key?.startsWith(DOCUMENT_STORAGE_PREFIX)) keys.push(key);
-    }
+    return normalizeStoredReaderDocument(
+      JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'),
+      documentId
+    );
   } catch {
-    return;
-  }
-
-  for (const key of keys) {
-    let saved = null;
-    try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch {}
-    if (saved?.source?.type !== 'topic-feed' || !saved?.text) continue;
-
-    const documentId = key.slice(DOCUMENT_STORAGE_PREFIX.length);
-    if (!documentId) continue;
-
-    const stored = await cacheReadingBook({
-      key: `reader-document:${documentId}`,
-      type: 'reader-document',
-      documentId,
-      title: saved.title || '',
-      text: saved.text,
-      source: saved.source || {},
-      savedAt: new Date().toISOString()
-    });
-    if (stored) {
-      try { localStorage.removeItem(key); } catch {}
-    }
+    return null;
   }
 }
 
-// Reclaim quota consumed by Topic Feed article bodies saved by older builds.
-// Removal occurs only after the existing IndexedDB reading-library store has
-// accepted the article, so this is a migration rather than a destructive purge.
-window.setTimeout(() => { void migrateLegacyTopicFeedDocumentsToIndexedDb(); }, 0);
+function peekStoredReaderDocument(documentId) {
+  if (!documentId) return null;
+  return readerDocumentMemoryCache.get(String(documentId))
+    || readLegacyStoredReaderDocument(documentId)
+    || null;
+}
+
+async function persistStoredReaderDocument(documentId, value) {
+  const normalized = normalizeStoredReaderDocument(value, documentId);
+  if (!normalized?.documentId || !normalized.text) return false;
+
+  readerDocumentMemoryCache.set(normalized.documentId, normalized);
+
+  const stored = await cacheReadingBook({
+    key: readerDocumentCacheKey(normalized.documentId),
+    type: 'reader-document',
+    documentId: normalized.documentId,
+    title: normalized.title,
+    text: normalized.text,
+    source: normalized.source,
+    savedAt: new Date().toISOString()
+  });
+
+  if (stored) {
+    try { localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${normalized.documentId}`); } catch {}
+  }
+  return Boolean(stored);
+}
+
+async function getStoredReaderDocument(documentId) {
+  const id = String(documentId || '');
+  if (!id) return null;
+
+  const memory = readerDocumentMemoryCache.get(id);
+  if (memory?.text) return memory;
+
+  // Legacy localStorage is migration fallback only.
+  const legacy = readLegacyStoredReaderDocument(id);
+  if (legacy?.text) {
+    readerDocumentMemoryCache.set(id, legacy);
+    void persistStoredReaderDocument(id, legacy);
+    return legacy;
+  }
+
+  const cached = await getCachedReadingBook(readerDocumentCacheKey(id));
+  const normalized = normalizeStoredReaderDocument(cached, id);
+  if (normalized?.text) {
+    readerDocumentMemoryCache.set(id, normalized);
+    return normalized;
+  }
+  return null;
+}
+
+async function removeStoredReaderDocument(documentId) {
+  const id = String(documentId || '');
+  if (!id) return false;
+  readerDocumentMemoryCache.delete(id);
+  try { localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${id}`); } catch {}
+  await removeCachedReadingBook(readerDocumentCacheKey(id));
+  return true;
+}
+
+async function migrateLegacyReaderDocumentsToIndexedDb() {
+  if (readerDocumentMigrationPromise) return readerDocumentMigrationPromise;
+
+  readerDocumentMigrationPromise = (async () => {
+    const keys = [];
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(DOCUMENT_STORAGE_PREFIX)) keys.push(key);
+      }
+    } catch {
+      return { migrated:0, failed:0 };
+    }
+
+    let migrated = 0;
+    let failed = 0;
+
+    for (const key of keys) {
+      const documentId = key.slice(DOCUMENT_STORAGE_PREFIX.length);
+      if (!documentId) continue;
+
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch {}
+      const normalized = normalizeStoredReaderDocument(saved, documentId);
+      if (!normalized?.text) continue;
+
+      readerDocumentMemoryCache.set(documentId, normalized);
+      const stored = await persistStoredReaderDocument(documentId, normalized);
+      if (stored) migrated += 1;
+      else failed += 1;
+    }
+
+    return { migrated, failed };
+  })();
+
+  return readerDocumentMigrationPromise;
+}
+
+window.MarkSetGoDocumentStore = Object.freeze({
+  get: getStoredReaderDocument,
+  peek: peekStoredReaderDocument,
+  put: persistStoredReaderDocument,
+  remove: removeStoredReaderDocument,
+  migrateLegacy: migrateLegacyReaderDocumentsToIndexedDb,
+  status: () => {
+    let legacyCount = 0;
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        if ((localStorage.key(index) || '').startsWith(DOCUMENT_STORAGE_PREFIX)) legacyCount += 1;
+      }
+    } catch {}
+    return {
+      memoryDocuments: readerDocumentMemoryCache.size,
+      legacyDocumentCount: legacyCount
+    };
+  }
+});
+
+window.setTimeout(() => { void migrateLegacyReaderDocumentsToIndexedDb(); }, 0);
 
 function persistCurrentDocument() {
   if (!state.documentId || !state.currentText) return false;
-  const key = `${DOCUMENT_STORAGE_PREFIX}${state.documentId}`;
+
   const next = {
+    documentId: state.documentId,
     title: state.title,
     text: state.currentText,
     source: state.source
   };
 
-  // Topic Feed article bodies are already durable in the Topic Feed/server
-  // pipeline. Do not duplicate those potentially large bodies in localStorage.
-  // Keep a durable browser copy in the existing IndexedDB library instead,
-  // and remove any legacy localStorage copy so it cannot consume the shared
-  // per-origin quota used by the rest of the app.
-  if (state.source?.type === 'topic-feed') {
-    void cacheReadingBook({
-      key: `reader-document:${state.documentId}`,
-      type: 'reader-document',
-      documentId: state.documentId,
-      title: state.title,
-      text: state.currentText,
-      source: state.source,
-      savedAt: new Date().toISOString()
-    }).then((stored) => {
-      if (!stored) return;
-      try { localStorage.removeItem(key); } catch {}
-    });
-    return true;
-  }
-
-  try {
-    const existingRaw = localStorage.getItem(key);
-    let shouldWrite = !existingRaw;
-    if (existingRaw) {
-      try {
-        const existing = JSON.parse(existingRaw);
-        shouldWrite = existing?.title !== next.title
-          || existing?.text !== next.text
-          || JSON.stringify(existing?.source || {}) !== JSON.stringify(next.source || {});
-      } catch {
-        shouldWrite = true;
-      }
-    }
-    if (shouldWrite) {
-      try {
-        localStorage.setItem(key, JSON.stringify(next));
-      } catch (error) {
-        if (error?.name === 'QuotaExceededError') {
-          try { localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY); } catch {}
-          localStorage.setItem(key, JSON.stringify(next));
-        } else {
-          throw error;
-        }
-      }
-    }
-    return true;
-  } catch (error) {
-    console.warn('Document could not be stored in this browser.', error);
-    return false;
-  }
+  // Keep Reader actions nonblocking. The in-memory cache updates immediately;
+  // IndexedDB persistence finishes in the background.
+  void persistStoredReaderDocument(state.documentId, next).then((stored) => {
+    if (!stored) console.warn('Document could not be stored in IndexedDB.');
+  });
+  return true;
 }
 
 
@@ -9798,12 +9870,7 @@ function jumpToWordIndex(wordIndex) {
 async function openBookmark(id) {
   const bookmark = getBookmarks().find((item) => item.id === id);
   if (!bookmark) return;
-  let documentData = null;
-  try {
-    documentData = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${bookmark.documentId}`) || 'null');
-  } catch {
-    documentData = null;
-  }
+  let documentData = await getStoredReaderDocument(bookmark.documentId);
 
   try {
     if (!documentData?.text && bookmark.source?.type === 'gutenberg' && bookmark.source.id) {
@@ -10497,7 +10564,7 @@ function profileDimensionCard(icon, title, score, description) {
 }
 
 
-function currentBookTextForProfile(book = {}) {
+async function currentBookTextForProfile(book = {}) {
   if (state?.title && state?.currentText && sameBookIdentity(state.title, book.title)) {
     return state.currentText;
   }
@@ -10509,13 +10576,8 @@ function currentBookTextForProfile(book = {}) {
   );
 
   if (match?.documentId) {
-    try {
-      const stored = localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${match.documentId}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed?.text || parsed?.currentText || '';
-      }
-    } catch {}
+    const stored = await getStoredReaderDocument(match.documentId);
+    if (stored?.text) return stored.text;
   }
   return '';
 }
@@ -10634,7 +10696,7 @@ async function enhanceReadingProfileWithAi({ dialog, book, localProfile, button 
   button.textContent = 'Analyzing with AI…';
 
   try {
-    const text = currentBookTextForProfile(book);
+    const text = await currentBookTextForProfile(book);
     const response = await fetch('/api/reading-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -10714,7 +10776,7 @@ async function requestBookPreparation({ dialog, book, topics, button }) {
   status.textContent = 'Ask Mark is preparing a spoiler-free orientation…';
 
   try {
-    const text = currentBookTextForProfile(book);
+    const text = await currentBookTextForProfile(book);
     const response = await fetch('/api/book-guide', {
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
@@ -10763,7 +10825,7 @@ async function requestQuickBookGuide({ dialog, book, spoilerMode, button }) {
   setBookGuideStatus(dialog, 'Creating your Quick Book Guide…');
 
   try {
-    const text = currentBookTextForProfile(book);
+    const text = await currentBookTextForProfile(book);
     const response = await fetch('/api/book-guide', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -22356,10 +22418,9 @@ function renderBrowseHub() {
     }
   }));
 
-  app.querySelectorAll('[data-progress-open]').forEach((button) => button.addEventListener('click', () => {
+  app.querySelectorAll('[data-progress-open]').forEach((button) => button.addEventListener('click', async () => {
     const documentId = button.dataset.progressOpen;
-    let data = null;
-    try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+    const data = await getStoredReaderDocument(documentId);
     if (!data?.text) return renderReadingList();
     renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
@@ -22599,7 +22660,7 @@ function renderMyLibraryHub() {
 
     delete progressRecords[documentId];
     localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progressRecords));
-    localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`);
+    await removeStoredReaderDocument(documentId);
     writeModernGuideLibrary(readModernGuideLibrary().filter((item) => String(item.documentId || '') !== String(documentId)));
 
     const readingList = getReadingList().filter((item) => String(item.documentId || '') !== String(documentId));
@@ -22679,8 +22740,7 @@ function renderMyLibraryHub() {
       return;
     }
 
-    let data = null;
-    try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+    let data = await getStoredReaderDocument(documentId);
 
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
 
@@ -22915,10 +22975,9 @@ function renderLibraryRecords(kind) {
   </section>`;
 
   bindListPresentationControls({key:`library-${kind}`, root:'#library-record-list', itemSelector:'.record-card', defaultView:'list'});
-  app.querySelectorAll('[data-record-document]').forEach((button) => button.addEventListener('click', () => {
+  app.querySelectorAll('[data-record-document]').forEach((button) => button.addEventListener('click', async () => {
     const id = button.dataset.recordDocument;
-    let data = null;
-    try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${id}`) || 'null'); } catch {}
+    const data = await getStoredReaderDocument(id);
     if (!data?.text) return window.alert('The source text is not stored in this browser.');
     renderReaderWithText(data.title, data.text, data.source || {type:'saved'});
     requestAnimationFrame(() => jumpToWordIndex(Number(button.dataset.recordIndex)||0));
@@ -22995,7 +23054,7 @@ async function runPendingAskMarkPreparation(output) {
     </div>`;
 
   try {
-    const text = currentBookTextForProfile(pending.book);
+    const text = await currentBookTextForProfile(pending.book);
     const response = await fetch('/api/book-guide', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
