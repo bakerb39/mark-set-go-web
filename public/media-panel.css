@@ -1,0 +1,541 @@
+/* Mark, Set, Go! Media Panel v1.0 */
+
+:root{
+  --msg-media-side-width:480px;
+  --msg-media-collapsed-width:330px;
+}
+
+.music-dock-actions{
+  align-items:center;
+  flex-wrap:nowrap;
+}
+
+.music-dock-actions #msg-media-panel-toggle,
+.music-dock-actions #music-beside-reader,
+.music-dock-actions #msg-media-expand,
+.music-dock-actions #msg-media-save-current{
+  width:auto;
+  min-width:0;
+  padding:0 .52rem;
+  white-space:nowrap;
+  font-size:.7rem;
+  font-weight:760;
+}
+
+.music-dock-actions button[aria-pressed="true"],
+.music-dock-actions #msg-media-panel-toggle[aria-expanded="true"]{
+  background:var(--msg-blue-strong,#315f86);
+  color:#fff;
+}
+
+.msg-media-side-resizer{display:none}
+
+.msg-media-panel{
+  border-top:1px solid color-mix(in srgb,var(--msg-blue-border-soft,#d5e5f2) 72%,transparent);
+  background:var(--msg-surface,#fff);
+  color:var(--msg-ink,#18324a);
+  padding:.72rem;
+  overflow:auto;
+  max-height:min(48vh,560px);
+}
+
+.msg-media-search-row{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:.45rem;
+  margin-bottom:.65rem;
+}
+
+.msg-media-search-row input{
+  min-width:0;
+  height:38px;
+  padding:0 .7rem;
+  border:1px solid var(--msg-blue-border-soft,#d5e5f2);
+  border-radius:.55rem;
+  background:var(--msg-surface,#fff);
+  color:var(--msg-ink,#18324a);
+  font:inherit;
+}
+
+.msg-media-search-row button,
+.msg-media-quick-actions button,
+.msg-media-card-actions button{
+  min-height:32px;
+  padding:.28rem .58rem;
+  border:1px solid var(--msg-blue-border-soft,#d5e5f2);
+  border-radius:.5rem;
+  background:var(--msg-blue-soft-2,#f4f9fd);
+  color:var(--msg-blue-strong,#236aa8);
+  font:inherit;
+  font-size:.78rem;
+  font-weight:760;
+  cursor:pointer;
+}
+
+.msg-media-card-actions button:disabled{
+  opacity:.55;
+  cursor:default;
+}
+
+.msg-media-reading-context{
+  margin-bottom:.75rem;
+  padding:.62rem .68rem;
+  border:1px solid var(--msg-blue-border-soft,#d5e5f2);
+  border-radius:.7rem;
+  background:var(--msg-blue-soft-2,#f4f9fd);
+}
+
+.msg-media-reading-context>span,
+.msg-media-reading-context>strong{
+  display:block;
+}
+
+.msg-media-reading-context>span{
+  color:var(--msg-muted,#60758a);
+  font-size:.72rem;
+  font-weight:800;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+
+.msg-media-reading-context>strong{
+  margin:.16rem 0 .48rem;
+  font-size:.92rem;
+  line-height:1.3;
+}
+
+.msg-media-quick-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.38rem;
+}
+
+.msg-media-section{
+  margin-top:.7rem;
+}
+
+.msg-media-section-heading{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:.6rem;
+  margin-bottom:.4rem;
+}
+
+.msg-media-section-heading strong{font-size:.9rem}
+.msg-media-section-heading span{
+  max-width:62%;
+  overflow:hidden;
+  color:var(--msg-muted,#60758a);
+  font-size:.73rem;
+  text-align:right;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.msg-media-results,
+.msg-media-saved{
+  display:grid;
+  gap:.46rem;
+}
+
+.msg-media-result-card,
+.msg-media-saved-card{
+  display:grid;
+  grid-template-columns:112px minmax(0,1fr);
+  gap:.58rem;
+  min-width:0;
+  padding:.42rem;
+  border:1px solid var(--msg-blue-border-soft,#d5e5f2);
+  border-radius:.65rem;
+  background:var(--msg-surface,#fff);
+}
+
+.msg-media-thumb-button{
+  position:relative;
+  display:block;
+  width:112px;
+  height:63px;
+  padding:0;
+  overflow:hidden;
+  border:0;
+  border-radius:.5rem;
+  background:#111;
+  cursor:pointer;
+}
+
+.msg-media-thumb-button img,
+.msg-media-saved-card>img{
+  width:112px;
+  height:63px;
+  object-fit:cover;
+  border-radius:.5rem;
+}
+
+.msg-media-thumb-button span{
+  position:absolute;
+  inset:50% auto auto 50%;
+  display:grid;
+  width:30px;
+  height:30px;
+  place-items:center;
+  border-radius:50%;
+  background:rgba(0,0,0,.72);
+  color:#fff;
+  transform:translate(-50%,-50%);
+}
+
+.msg-media-result-copy,
+.msg-media-saved-card>div{
+  min-width:0;
+}
+
+.msg-media-result-copy strong,
+.msg-media-saved-card strong{
+  display:block;
+  overflow:hidden;
+  color:var(--msg-ink,#18324a);
+  font-size:.84rem;
+  line-height:1.25;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.msg-media-result-copy small,
+.msg-media-saved-card small{
+  display:block;
+  margin:.12rem 0 .34rem;
+  overflow:hidden;
+  color:var(--msg-muted,#60758a);
+  font-size:.72rem;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.msg-media-card-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.3rem;
+}
+
+.msg-media-card-actions button{
+  min-height:27px;
+  padding:.18rem .46rem;
+  font-size:.7rem;
+}
+
+.msg-media-saved-icon{
+  display:grid;
+  width:112px;
+  height:63px;
+  place-items:center;
+  border-radius:.5rem;
+  background:var(--msg-blue-soft-2,#f4f9fd);
+  color:var(--msg-blue-strong,#236aa8);
+  font-size:1.35rem;
+}
+
+.msg-media-empty{
+  padding:.62rem;
+  border:1px dashed var(--msg-blue-border-soft,#d5e5f2);
+  border-radius:.58rem;
+  color:var(--msg-muted,#60758a);
+  font-size:.78rem;
+  line-height:1.4;
+  text-align:center;
+}
+
+.msg-media-status{
+  min-height:1.1em;
+  margin:.55rem 0 0;
+  color:var(--msg-muted,#60758a);
+  font-size:.74rem;
+}
+.msg-media-status.success{color:var(--msg-blue-strong,#236aa8)}
+
+body.msg-media-resizing{
+  cursor:col-resize;
+  user-select:none;
+}
+
+@media (min-width:1051px){
+  body.msg-media-side-active{
+    --msg-media-active-width:var(--msg-media-side-width);
+    --msg-media-reader-width:min(1000px,calc(100vw - var(--msg-media-active-width) - 3rem));
+    --msg-media-reader-edge:max(1rem,calc((100vw - var(--msg-media-active-width) - var(--msg-media-reader-width))/2));
+  }
+
+  body.msg-media-side-active.msg-media-collapsed-active{
+    --msg-media-active-width:var(--msg-media-collapsed-width);
+  }
+
+  body.msg-media-side-active #app{
+    width:var(--msg-media-reader-width);
+    margin-left:var(--msg-media-reader-edge);
+    margin-right:calc(var(--msg-media-active-width) + var(--msg-media-reader-edge));
+    transition:width .18s ease,margin .18s ease;
+  }
+
+  body.msg-media-resizing #app{transition:none}
+
+  .music-dock.msg-media-beside,
+  .music-dock.msg-media-expanded{
+    position:fixed !important;
+    left:auto !important;
+    right:.75rem !important;
+    top:4.25rem !important;
+    bottom:auto !important;
+    transform:none !important;
+    margin:0 !important;
+    right:.75rem;
+    bottom:auto;
+    display:flex;
+    flex-direction:column;
+    width:var(--msg-media-side-width) !important;
+    max-width:min(780px,58vw) !important;
+    max-height:calc(100vh - 5rem);
+    overflow:visible;
+    border-radius:.75rem;
+    transition:width .18s ease;
+  }
+
+  .music-dock.msg-media-expanded{
+    width:max(var(--msg-media-side-width),min(720px,58vw)) !important;
+  }
+
+  .music-dock.msg-media-beside.msg-media-collapsed,
+  .music-dock.msg-media-expanded.msg-media-collapsed{
+    width:var(--msg-media-collapsed-width);
+  }
+
+  .music-dock.msg-media-beside .music-dock-bar,
+  .music-dock.msg-media-expanded .music-dock-bar,
+  .music-dock.msg-media-beside .music-player-wrap,
+  .music-dock.msg-media-expanded .music-player-wrap,
+  .music-dock.msg-media-beside .msg-media-panel,
+  .music-dock.msg-media-expanded .msg-media-panel{
+    overflow:hidden;
+  }
+
+  .music-dock.msg-media-beside .music-player-wrap,
+  .music-dock.msg-media-expanded .music-player-wrap{
+    flex:0 0 auto;
+  }
+
+  .music-dock.msg-media-beside .msg-media-panel,
+  .music-dock.msg-media-expanded .msg-media-panel{
+    flex:1 1 auto;
+    max-height:none;
+    overflow:auto;
+  }
+
+  .music-dock.msg-media-expanded .music-player-wrap iframe{
+    min-height:380px;
+  }
+
+  .music-dock.msg-media-collapsed .msg-media-panel{
+    display:none !important;
+  }
+
+  .music-dock.msg-media-collapsed .music-player-wrap{
+    max-height:185px;
+  }
+
+  .music-dock.msg-media-beside .msg-media-side-resizer,
+  .music-dock.msg-media-expanded .msg-media-side-resizer{
+    position:absolute;
+    z-index:5;
+    top:0;
+    bottom:0;
+    left:-8px;
+    display:block;
+    width:16px;
+    cursor:col-resize;
+    touch-action:none;
+  }
+
+  .music-dock.msg-media-beside .msg-media-side-resizer::before,
+  .music-dock.msg-media-expanded .msg-media-side-resizer::before{
+    content:"";
+    position:absolute;
+    top:.45rem;
+    bottom:.45rem;
+    left:7px;
+    width:2px;
+    border-radius:999px;
+    background:rgba(255,255,255,.25);
+  }
+
+  .music-dock.msg-media-beside .msg-media-side-resizer:focus-visible,
+  .music-dock.msg-media-expanded .msg-media-side-resizer:focus-visible{
+    outline:2px solid #78b7ea;
+    outline-offset:-2px;
+  }
+}
+
+@media (max-width:1050px){
+  body.msg-media-side-active #app{
+    width:min(1000px,calc(100% - 2rem));
+    margin:2rem auto;
+  }
+
+  .music-dock.msg-media-beside,
+  .music-dock.msg-media-expanded,
+  .music-dock.msg-media-beside.msg-media-collapsed,
+  .music-dock.msg-media-expanded.msg-media-collapsed{
+    top:auto;
+    right:.5rem;
+    bottom:.5rem;
+    width:min(520px,calc(100vw - 1rem));
+    max-width:none;
+    max-height:80vh;
+  }
+
+  .music-dock .msg-media-side-resizer{
+    display:none !important;
+  }
+
+  .msg-media-panel{
+    max-height:42vh;
+  }
+}
+
+@media (max-width:560px){
+  .music-dock-actions #music-beside-reader,
+  .music-dock-actions #msg-media-expand{
+    display:none;
+  }
+
+  .msg-media-result-card,
+  .msg-media-saved-card{
+    grid-template-columns:88px minmax(0,1fr);
+  }
+
+  .msg-media-thumb-button,
+  .msg-media-thumb-button img,
+  .msg-media-saved-card>img,
+  .msg-media-saved-icon{
+    width:88px;
+    height:50px;
+  }
+
+  .msg-media-section-heading{
+    display:block;
+  }
+
+  .msg-media-section-heading span{
+    display:block;
+    max-width:none;
+    margin-top:.1rem;
+    text-align:left;
+  }
+}
+
+
+/* Float mode behaves like a movable desktop window. */
+.music-dock.msg-media-floating .music-dock-bar{
+  cursor:move;
+  cursor:grab;
+  user-select:none;
+  touch-action:none;
+}
+
+.music-dock.msg-media-floating.msg-media-dragging .music-dock-bar,
+body.msg-media-float-dragging{
+  cursor:grabbing !important;
+}
+
+.music-dock.msg-media-floating .music-dock-actions,
+.music-dock.msg-media-floating .music-dock-actions *{
+  cursor:pointer;
+}
+
+body.msg-media-float-dragging{
+  user-select:none;
+}
+
+
+/* v1.2 — closing, bottom-ribbon boundary and player resize */
+
+/* This MUST win over later side/expanded display:flex rules. */
+.music-dock[hidden]{
+  display:none !important;
+}
+
+.music-dock.msg-media-custom-video-size .music-player-wrap{
+  aspect-ratio:auto !important;
+  height:var(--msg-media-video-height) !important;
+  min-height:var(--msg-media-video-height) !important;
+  max-height:var(--msg-media-video-height) !important;
+  flex:0 0 var(--msg-media-video-height) !important;
+}
+
+.music-dock.msg-media-custom-video-size .music-player-wrap iframe{
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+}
+
+.msg-media-player-resize-grip{
+  position:absolute;
+  z-index:20;
+  right:-3px;
+  bottom:-3px;
+  width:20px;
+  height:20px;
+  cursor:nwse-resize;
+  touch-action:none;
+}
+.msg-media-player-resize-grip::before{
+  content:"";
+  position:absolute;
+  right:4px;
+  bottom:4px;
+  width:9px;
+  height:9px;
+  border-right:2px solid rgba(255,255,255,.72);
+  border-bottom:2px solid rgba(255,255,255,.72);
+  border-radius:0 0 2px 0;
+}
+.msg-media-player-resize-grip:focus-visible{
+  outline:2px solid #78b7ea;
+  outline-offset:1px;
+  border-radius:4px;
+}
+
+/* Side/Expanded already resize width from the left edge; the corner grip there
+   adjusts video height, so put it at the lower-left instead. */
+.music-dock.msg-media-beside .msg-media-player-resize-grip,
+.music-dock.msg-media-expanded .msg-media-player-resize-grip{
+  left:-3px;
+  right:auto;
+  cursor:ns-resize;
+}
+.music-dock.msg-media-beside .msg-media-player-resize-grip::before,
+.music-dock.msg-media-expanded .msg-media-player-resize-grip::before{
+  left:4px;
+  right:auto;
+  border-right:0;
+  border-left:2px solid rgba(255,255,255,.72);
+  border-bottom:2px solid rgba(255,255,255,.72);
+  border-radius:0 0 0 2px;
+}
+
+body.msg-media-player-resizing-active{
+  user-select:none !important;
+}
+.music-dock.msg-media-player-resizing{
+  transition:none !important;
+}
+
+/* Side/Expanded contents must scroll INSIDE the capped dock rather than extend
+   beneath the shared bottom ribbon. */
+.music-dock.msg-media-beside,
+.music-dock.msg-media-expanded{
+  overflow:hidden !important;
+}
+.music-dock.msg-media-beside .msg-media-panel,
+.music-dock.msg-media-expanded .msg-media-panel{
+  min-height:0 !important;
+  overflow-y:auto !important;
+}

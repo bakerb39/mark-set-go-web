@@ -1,0 +1,140 @@
+MARK, SET, GO! — RECONCILED /PUBLIC UPLOAD
+Generated: 2026-08-25
+
+IMPORTANT
+=========
+THIS ZIP IS INTENTIONALLY FLAT.
+
+There is NO "public" directory inside the ZIP.
+
+In GitHub:
+1. Open repository.
+2. Open the EXISTING "public" folder.
+3. Choose Add file / Upload files.
+4. Drag the FILES from this ZIP into that existing public folder.
+5. Confirm the GitHub path shown for each file is:
+
+     public/index.html
+     public/app.js
+     public/media-panel.js
+     ...
+
+   NOT:
+
+     public/public/index.html
+
+FILES IN THIS RECONCILED SET
+============================
+index.html
+app.js
+workspace-pane.html
+desktop-workspace.js
+desktop-workspace.css
+notebook-flex.css
+workspace-auth-guard.js
+media-panel.js
+media-panel.css
+user-settings.js
+cloud-content-sync.js
+
+WHAT THIS PUTS ON ONE BASELINE
+==============================
+NOTEBOOK
+- inline My note textarea; no Add/Edit browser prompt
+- Quick Note composer
+- selection highlights
+- selection notes
+- freehand drawing
+- compact Notebook action strip
+- improved Return to passage
+
+WORKSPACE
+- Standard two-frame layout retained
+- Desktop Workspace mode
+- Desktop Workspace also appears under Readers
+- Reader 2+ auth/cloud guard prevents its own beta recheck/cloud reload cycle
+
+MEDIA
+- Float / Beside / Expanded
+- draggable Float
+- playback persistence for normal in-app navigation
+- close X fix
+- bottom-ribbon boundary
+- resize controls
+- saved media / media search panel
+
+SETTINGS / SYNC
+- Desktop/Standard workspace preference
+- media mode/width settings
+- reader-media cloud content prefix remains in public cloud sync
+
+DO NOT REPLACE IN THIS UPLOAD
+=============================
+workspace-experiment.js
+workspace-experiment.css
+auth.js
+server.js
+package.json
+cloud-content-preload.js
+cloud-content-routes.js
+
+The ROOT beta-access fix is a separate deployment and should remain in place.
+
+FIRST VISUAL CHECK AFTER DEPLOY
+===============================
+Hard refresh.
+
+Open My Notebook.
+At the TOP, you should visibly see a Quick Note composer with:
+- title field
+- "Write a new note here…" textarea
+- Save note
+
+Every existing notebook entry should visibly show:
+- My note
+- an inline textarea
+- a much smaller action strip
+
+If you still see:
+  "+ New note"
+and
+  "Add/Edit my note"
+with browser prompts,
+then the browser is NOT loading this reconciled public/app.js/index.html.
+
+Quick browser check:
+View page source or DevTools Network and confirm index requests:
+
+  /app.js?v=20260825-v2.7.0-notebook-flex
+  /notebook-flex.css?v=20260825-v1.0.0
+
+DESKTOP CHECK
+=============
+Open Readers.
+You should see:
+  Desktop Workspace
+  Move and resize open Readers and tools
+
+MEDIA CHECK
+===========
+Existing Media player behavior should remain:
+- draggable in Float
+- Beside/Expanded
+- X closes
+- resizable
+- capped above bottom ribbon
+
+READER 2 CHECK
+==============
+Open Reader 2 and leave it open.
+It should no longer independently show a beta-access check or refresh itself
+because of a secondary cloud restore.
+
+VALIDATION
+==========
+JavaScript syntax checks: PASS
+Notebook markers: PASS
+Desktop markers: PASS
+Media markers: PASS
+Reader 2 auth guard marker: PASS
+No new MutationObserver in the new Desktop/Media/Auth-guard layers: PASS
