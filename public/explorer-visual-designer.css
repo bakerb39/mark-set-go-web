@@ -1,4 +1,4 @@
-/* Visual Designer v2.3 — Profile-launched custom theme editor — draggable panel + expanded layout controls.
+/* Visual Designer v2.6 — local background picker + interface text sizing.
    Editor chrome only. No Reader engine/timing/pagination styles. */
 
 #msg-explorer-design-launcher,
@@ -239,3 +239,37 @@ body.msg-vd-panel-dragging #msg-explorer-visual-designer { transition:none !impo
 #msg-explorer-visual-designer [data-vd-background] select { min-width:118px; padding:4px 22px 4px 7px; }
 #msg-explorer-visual-designer [data-vd-background] .msg-vd-background-url { grid-template-columns:1fr; }
 #msg-explorer-visual-designer [data-vd-background] .msg-vd-background-url input { grid-column:1/-1; }
+
+
+/* v2.6 — local background picker + global interface text-size control. */
+#msg-explorer-visual-designer [data-vd-background] .msg-vd-background-local {
+  grid-template-columns:1fr;
+}
+#msg-explorer-visual-designer [data-vd-background] .msg-vd-background-local > label,
+#msg-explorer-visual-designer [data-vd-background] .msg-vd-background-local > .msg-vd-file-row,
+#msg-explorer-visual-designer [data-vd-background] .msg-vd-background-local > .msg-vd-background-file-name {
+  grid-column:1 / -1;
+}
+#msg-explorer-visual-designer .msg-vd-background-file-name {
+  display:block;
+  overflow:hidden;
+  color:var(--vd-muted);
+  font:600 8px/1.3 var(--msg-font-ui,ui-sans-serif,system-ui,sans-serif);
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+#msg-explorer-visual-designer .msg-vd-file-row button:disabled {
+  opacity:.45 !important;
+  cursor:default !important;
+}
+#msg-explorer-visual-designer [data-vd-typography] .msg-vd-control {
+  margin-bottom:5px;
+}
+#msg-explorer-visual-designer .msg-vd-typography-note {
+  padding:5px 6px;
+  border:1px solid var(--vd-border);
+  border-radius:7px;
+  background:var(--vd-soft);
+  color:var(--vd-muted);
+  font:600 8px/1.35 var(--msg-font-ui,ui-sans-serif,system-ui,sans-serif);
+}
