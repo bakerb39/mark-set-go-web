@@ -8,17 +8,12 @@
   const FORMAT_RECORD_PREFIX = 'markSetGoReadAnythingFormatV1:';
   const FORMAT_DOCUMENT_INDEX_KEY = 'markSetGoReadAnythingDocumentIndexV1';
   const DOCUMENT_STORAGE_PREFIX = 'markSetGoDocumentV1:';
-  const BOOKMARKLET_QUEUE_KEY = 'markSetGoBookmarkletArticleQueueV1';
-  const BOOKMARKLET_QUEUE_DELETED_KEY = 'markSetGoBookmarkletArticleDeletedV1';
-  const BOOKMARKLET_CACHE_PREFIX = 'read-anything-bookmarklet:';
-  const BOOKMARKLET_QUEUE_LIMIT = 30;
   let allowLegacyUpload = false;
   let activeImportedDocument = null;
   let activeImportedVersion = 'original';
   let formatControlAttachTimers = [];
   let defaultArticleBookPagesKey = '';
   let pendingImportedRender = false;
-  let bookmarkletQueueMigrated = false;
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -35,311 +30,188 @@
     document.querySelectorAll('.site-header details[open]').forEach((menu) => menu.removeAttribute('open'));
   }
 
-  function history() {
-    try { return JSON.parse(localStorage.getItem(IMPORT_HISTORY_KEY) || '[]'); } catch { return []; }
-  }
+  // Phase 1 IndexedDB migration: Read Anything import history only.
+  // The existing app IndexedDB store (markSetGoLocalLibraryV1 / books) remains
+  // the single browser database. The in-memory cache preserves the synchronous
+  // history() API used by the current Read Anything UI.
+  const IMPORT_HISTORY_CACHE_KEY = 'read-anything:import-history:v1';
+  const IMPORT_HISTORY_LIMIT = 15;
+  let importHistoryCache = [];
+  let importHistoryHydrationPromise = null;
+  let importHistoryWriteChain = Promise.resolve(true);
 
-  function bookmarkletQueue() {
-    try {
-      const items = JSON.parse(localStorage.getItem(BOOKMARKLET_QUEUE_KEY) || '[]');
-      return Array.isArray(items) ? items : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveBookmarkletQueue(items) {
-    try {
-      localStorage.setItem(BOOKMARKLET_QUEUE_KEY, JSON.stringify((Array.isArray(items) ? items : []).slice(0, BOOKMARKLET_QUEUE_LIMIT)));
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  function bookmarkletDeletedKeys() {
-    try {
-      const keys = JSON.parse(localStorage.getItem(BOOKMARKLET_QUEUE_DELETED_KEY) || '[]');
-      return Array.isArray(keys) ? keys.map(String).filter(Boolean) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  function saveBookmarkletDeletedKeys(keys) {
-    try {
-      const unique = [...new Set((Array.isArray(keys) ? keys : []).map(String).filter(Boolean))].slice(-200);
-      localStorage.setItem(BOOKMARKLET_QUEUE_DELETED_KEY, JSON.stringify(unique));
-    } catch {}
-  }
-
-  function migrateBookmarkletQueueFromFormatRecords() {
-    if (bookmarkletQueueMigrated) return;
-    bookmarkletQueueMigrated = true;
-
-    const existing = bookmarkletQueue();
-    const deleted = new Set(bookmarkletDeletedKeys());
-    const byKey = new Map(existing.filter((item) => item?.key && !deleted.has(String(item.key))).map((item) => [String(item.key), item]));
-    try {
-      for (let index = 0; index < localStorage.length; index += 1) {
-        const storageKey = localStorage.key(index) || '';
-        if (!storageKey.startsWith(FORMAT_RECORD_PREFIX)) continue;
-        let record = null;
-        try { record = JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch {}
-        if (!['bookmarklet', 'website'].includes(String(record?.source?.type || '').toLowerCase())) continue;
-        const key = String(record?.key || storageKey.slice(FORMAT_RECORD_PREFIX.length));
-        if (!key || deleted.has(key) || byKey.has(key)) continue;
-        byKey.set(key, {
-          key,
-          title: cleanImportedTitle(record?.title || 'Web Article'),
-          author: record?.author || record?.source?.author || '',
-          sourceUrl: String(record?.source?.url || '').slice(0, 4000),
-          sourceName: articleSiteName(record?.source || {}),
-          publishedAt: record?.source?.publishedAt || record?.source?.published || '',
-          importedAt: record?.source?.importedAt || record?.updatedAt || new Date().toISOString()
-        });
-      }
-    } catch {}
-
-    const merged = [...byKey.values()].sort((a, b) => {
-      const right = Date.parse(b?.importedAt || '') || 0;
-      const left = Date.parse(a?.importedAt || '') || 0;
-      return right - left;
-    });
-    saveBookmarkletQueue(merged);
-  }
-
-  function articleSiteName(source = {}) {
-    const explicit = String(source.site || source.sourceName || '').trim();
-    if (explicit) return explicit;
-    try {
-      const hostname = new URL(String(source.url || '')).hostname.replace(/^www\./i, '');
-      return hostname || 'Web article';
-    } catch {
-      return 'Web article';
-    }
-  }
-
-  function articleDateLabel(source = {}, { captured = false } = {}) {
-    const raw = source.publishedAt || source.published || source.importedAt || '';
-    if (!raw) return '';
-    const date = new Date(raw);
-    if (Number.isNaN(date.getTime())) return '';
-    const label = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-    return captured && !source.publishedAt && !source.published ? `Captured ${label}` : label;
-  }
-
-  function getReadingCacheFunction(name) {
-    try {
-      const candidate = window[name];
-      return typeof candidate === 'function' ? candidate : null;
-    } catch {
-      return null;
-    }
-  }
-
-  async function cacheBookmarkletArticle(documentRecord, readAnythingKey) {
-    const cache = getReadingCacheFunction('cacheReadingBook');
-    if (!cache || !readAnythingKey || !documentRecord?.text) return false;
-    return cache({
-      key: `${BOOKMARKLET_CACHE_PREFIX}${readAnythingKey}`,
-      type: 'read-anything-bookmarklet',
-      readAnythingKey,
-      title: documentRecord.title || 'Web Article',
-      author: documentRecord.author || documentRecord.source?.author || '',
-      text: documentRecord.text,
-      source: { ...(documentRecord.source || {}), readAnythingKey },
-      savedAt: new Date().toISOString()
-    });
-  }
-
-  async function loadBookmarkletArticle(readAnythingKey) {
-    if (!readAnythingKey) return null;
-    const read = getReadingCacheFunction('getCachedReadingBook');
-    if (read) {
-      const cached = await read(`${BOOKMARKLET_CACHE_PREFIX}${readAnythingKey}`);
-      if (cached?.text) return cached;
-    }
-
-    // Fallback to the formatter record already maintained by Read Anything.
-    // This does not create a second copy of article text in localStorage.
-    try {
-      const record = JSON.parse(localStorage.getItem(formatRecordStorageKey(readAnythingKey)) || 'null');
-      const text = String(record?.versions?.original || record?.originalText || '').trim();
-      if (!text) return null;
-      return {
-        readAnythingKey,
-        title: record.title || 'Web Article',
-        author: record.author || record.source?.author || '',
-        text,
-        source: { ...(record.source || {}), readAnythingKey }
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  function registerBookmarkletArticle(documentRecord, readAnythingKey) {
-    if (!documentRecord || !readAnythingKey) return;
-    const deleted = bookmarkletDeletedKeys().filter((key) => key !== String(readAnythingKey));
-    saveBookmarkletDeletedKeys(deleted);
-    const source = { ...(documentRecord.source || {}), readAnythingKey };
-    const entry = {
-      key: readAnythingKey,
-      title: cleanImportedTitle(documentRecord.title || 'Web Article'),
-      author: documentRecord.author || source.author || '',
-      sourceUrl: String(source.url || '').slice(0, 4000),
-      sourceName: articleSiteName(source),
-      publishedAt: source.publishedAt || source.published || '',
-      importedAt: source.importedAt || new Date().toISOString()
+  function normalizeImportHistoryItem(item = {}) {
+    const key = String(item?.key || '').slice(0, 2400);
+    if (!key) return null;
+    return {
+      key,
+      title: String(item?.title || 'Imported document').slice(0, 300),
+      sourceType: String(item?.sourceType || 'text').slice(0, 80),
+      sourceUrl: String(item?.sourceUrl || '').slice(0, 2000),
+      importedAt: String(item?.importedAt || new Date().toISOString()).slice(0, 80),
+      characters: Math.max(0, Number(item?.characters) || 0)
     };
-    const items = bookmarkletQueue().filter((item) => item?.key !== readAnythingKey);
-    items.unshift(entry);
-    saveBookmarkletQueue(items);
-    void cacheBookmarkletArticle({ ...documentRecord, title: entry.title, source }, readAnythingKey);
-    document.dispatchEvent(new CustomEvent('marksetgo:article-queue-updated', {
-      detail: { source:'captured', action:'added', key:readAnythingKey }
-    }));
   }
 
-  function ensureBookmarkletArticleStyles() {
-    if (document.getElementById('read-anything-bookmarklet-article-styles')) return;
-    const style = document.createElement('style');
-    style.id = 'read-anything-bookmarklet-article-styles';
-    style.textContent = `
-      #app .reader-page-panel.read-anything-bookmarklet-reader .reader-title-copy h1 {
-        font-size: clamp(1.35rem, 1.8vw, 1.72rem) !important;
-        line-height: 1.13 !important;
-        letter-spacing: -.016em !important;
-        max-width: 980px;
-        margin-bottom: .32rem !important;
+  function normalizeImportHistoryItems(items) {
+    const seen = new Set();
+    const normalized = [];
+    for (const raw of Array.isArray(items) ? items : []) {
+      const item = normalizeImportHistoryItem(raw);
+      if (!item || seen.has(item.key)) continue;
+      seen.add(item.key);
+      normalized.push(item);
+      if (normalized.length >= IMPORT_HISTORY_LIMIT) break;
+    }
+    return normalized;
+  }
+
+  function readLegacyImportHistory() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(IMPORT_HISTORY_KEY) || '[]');
+      return normalizeImportHistoryItems(parsed);
+    } catch {
+      return [];
+    }
+  }
+
+  importHistoryCache = readLegacyImportHistory();
+
+  function history() {
+    return importHistoryCache;
+  }
+
+  function recentImportsSectionMarkup(items = history().slice(0, 5)) {
+    const recent = Array.isArray(items) ? items : [];
+    if (!recent.length) return '';
+    return `<section class="read-anything-recent" data-read-anything-recent>
+      <h2>Recent imports</h2>
+      ${recent.map((item) => `<article><span>${escapeHtml(item.sourceType)}</span><strong>${escapeHtml(item.title)}</strong><small>${new Date(item.importedAt).toLocaleString()}</small></article>`).join('')}
+    </section>`;
+  }
+
+  function refreshRecentImportsUi() {
+    const page = app.querySelector('.read-anything-page');
+    if (!page) return;
+
+    const existing = page.querySelector('[data-read-anything-recent], .read-anything-recent');
+    const markup = recentImportsSectionMarkup();
+
+    if (!markup) {
+      existing?.remove();
+      return;
+    }
+
+    if (existing) {
+      existing.outerHTML = markup;
+      return;
+    }
+
+    const workspace = page.querySelector('#read-anything-workspace');
+    if (workspace) workspace.insertAdjacentHTML('afterend', markup);
+    else page.insertAdjacentHTML('beforeend', markup);
+  }
+
+  function removeLegacyImportHistory() {
+    try { localStorage.removeItem(IMPORT_HISTORY_KEY); } catch {}
+  }
+
+  async function readIndexedImportHistoryRecord() {
+    if (typeof getCachedReadingBook !== 'function') return null;
+    return getCachedReadingBook(IMPORT_HISTORY_CACHE_KEY);
+  }
+
+  async function persistImportHistory(items = importHistoryCache) {
+    if (typeof cacheReadingBook !== 'function') return false;
+    const normalized = normalizeImportHistoryItems(items);
+    const ok = await cacheReadingBook({
+      key: IMPORT_HISTORY_CACHE_KEY,
+      type: 'read-anything-import-history',
+      items: normalized,
+      updatedAt: new Date().toISOString()
+    });
+    if (ok) importHistoryCache = normalized;
+    return Boolean(ok);
+  }
+
+  function hydrateImportHistory() {
+    if (importHistoryHydrationPromise) return importHistoryHydrationPromise;
+
+    importHistoryHydrationPromise = (async () => {
+      const legacy = readLegacyImportHistory();
+
+      try {
+        const indexed = await readIndexedImportHistoryRecord();
+
+        // IndexedDB is authoritative once a valid record exists, including an
+        // intentionally empty history.
+        if (indexed && Array.isArray(indexed.items)) {
+          importHistoryCache = normalizeImportHistoryItems(indexed.items);
+          removeLegacyImportHistory();
+          refreshRecentImportsUi();
+          return importHistoryCache;
+        }
+
+        // One-time migration: retain localStorage until the IndexedDB write has
+        // completed successfully. A failed IndexedDB write leaves the legacy key
+        // untouched so no history is lost.
+        if (legacy.length) {
+          importHistoryCache = legacy;
+          const migrated = await persistImportHistory(legacy);
+          if (migrated) removeLegacyImportHistory();
+        } else {
+          importHistoryCache = [];
+        }
+      } catch (error) {
+        console.warn('Read Anything import history migration was deferred.', error);
       }
-      #app .reader-page-panel.read-anything-bookmarklet-reader .reader-title-links { display: none !important; }
-      #app .reader-page-panel.read-anything-bookmarklet-reader #reader-frame {
-        position:relative !important;
-      }
-      #app #reader-frame > .read-anything-bookmarklet-header-external {
-        position:absolute !important;
-        z-index:14 !important;
-        display:grid !important;
-        gap:.26rem !important;
-        box-sizing:border-box !important;
-        min-width:0 !important;
-        /* Match the actual Reader page surface. --reader-bg is the outer app
-           background in some themes and can be nearly black. */
-        background:var(--msg-vd-reader-page-color, #fff) !important;
-        background-image:none !important;
-        box-shadow:none !important;
-        color:inherit !important;
-      }
-      #app #reader-frame > .read-anything-bookmarklet-header-external > #read-anything-article-summary-action {
-        display:flex !important; align-items:center !important; flex-wrap:wrap !important;
-        width:100% !important; max-width:100% !important; margin:0 !important; padding:0 !important;
-        position:relative !important; inset:auto !important; break-inside:auto !important; page-break-inside:auto !important;
-      }
-      #app #reader .reader-group.read-anything-bookmarklet-first-group::before {
-        content:"";
-        display:inline-block;
-        width:100%;
-        height:var(--read-anything-bookmarklet-first-clearance, 0px);
-        vertical-align:top;
-        pointer-events:none;
-      }
-      #app .read-anything-bookmarklet-source-credit {
-        display:flex; align-items:center; flex-wrap:nowrap; gap:.65rem;
-        position:relative; min-width:0; width:100%;
-        margin:0; padding:0; font-size:.76rem; line-height:1.3; opacity:.82;
-      }
-      #app .read-anything-bookmarklet-source-copy {
-        display:flex; align-items:center; flex-wrap:wrap; gap:.34rem;
-        flex:1 1 auto; min-width:0; padding:0 0 .24rem;
-        border-bottom:1px solid rgba(100,116,139,.24);
-      }
-      #app .read-anything-bookmarklet-source-credit .source-label { font-weight:700; opacity:.72; }
-      #app .read-anything-bookmarklet-source-credit strong { font-weight:700; }
-      #app .read-anything-bookmarklet-source-credit a { color:inherit; text-underline-offset:2px; }
-      #app .read-anything-bookmarklet-source-credit .sep { opacity:.45; }
-      #app .read-anything-bookmarklet-source-credit .topic-feed-reader-share {
-        /* Topic Feed's global share CSS positions this cluster absolutely.
-           Captured articles use a flex source row, so force the cluster back
-           into normal flow and reserve its width instead of covering the
-           "View original" link. */
-        position:static !important;
-        inset:auto !important;
-        top:auto !important; right:auto !important; bottom:auto !important; left:auto !important;
-        transform:none !important;
-        display:flex !important; align-items:center; gap:.32rem;
-        flex:0 0 auto !important; margin-left:auto !important;
-      }
-      #app .read-anything-bookmarklet-source-credit .topic-feed-share-button {
-        display:inline-grid; place-items:center; width:24px; height:24px; padding:0;
-        border:1px solid rgba(100,116,139,.24); border-radius:7px;
-        background:var(--msg-vd-reader-page-color, #fff); color:inherit;
-        text-decoration:none; box-sizing:border-box; opacity:.82;
-      }
-      #app .read-anything-bookmarklet-source-credit .topic-feed-share-button:hover {
-        opacity:1; border-color:rgba(100,116,139,.42);
-      }
-      #app .read-anything-bookmarklet-source-credit .topic-feed-share-button svg {
-        width:13px; height:13px; display:block; fill:currentColor;
-      }
-      #app .read-anything-bookmarklet-nav { display:grid; gap:.45rem; }
-      #app .read-anything-bookmarklet-nav-tools { display:flex; justify-content:flex-end; min-height:0; }
-      #app .read-anything-bookmarklet-queue-list { display:grid; gap:.28rem; }
-      #app .read-anything-bookmarklet-queue-row,
-      #app .topic-reader-article-row {
-        position:relative; min-width:0;
-      }
-      #app .read-anything-bookmarklet-queue-item {
-        display:grid; gap:.12rem; width:100%; min-width:0; padding:.5rem 2rem .5rem .55rem;
-        border:1px solid transparent; border-radius:7px; background:transparent;
-        color:inherit; text-align:left; cursor:pointer;
-      }
-      #app .read-anything-bookmarklet-queue-item:hover { background:rgba(127,127,127,.075); }
-      #app .read-anything-bookmarklet-queue-row[aria-current="true"] .read-anything-bookmarklet-queue-item {
-        border-color:rgba(201,137,0,.45); background:rgba(201,137,0,.08);
-      }
-      #app .read-anything-bookmarklet-queue-item > span { font-size:.78rem; font-weight:650; line-height:1.28; }
-      #app .read-anything-bookmarklet-queue-item > small { font-size:.66rem; opacity:.58; line-height:1.25; }
-      #app .read-anything-bookmarklet-queue-delete,
-      #app .topic-reader-article-delete {
-        position:absolute; top:.25rem; right:.25rem; z-index:3;
-        width:1.35rem; height:1.35rem; min-width:1.35rem; padding:0; border:0; border-radius:999px;
-        display:grid; place-items:center; background:transparent; color:inherit; opacity:.48;
-        font:700 .88rem/1 system-ui,sans-serif; cursor:pointer;
-      }
-      #app .read-anything-bookmarklet-queue-delete:hover,
-      #app .topic-reader-article-delete:hover { opacity:1; background:rgba(160,45,45,.11); color:#9f2222; }
-      #app .topic-reader-article-row > .topic-reader-article { width:100%; padding-right:2rem !important; }
-    `;
-    document.head.appendChild(style);
+
+      refreshRecentImportsUi();
+      return importHistoryCache;
+    })();
+
+    return importHistoryHydrationPromise;
   }
 
   function addHistory(documentRecord) {
     const key = `${documentRecord.source?.type || 'text'}|${documentRecord.source?.url || ''}|${documentRecord.title}`.toLowerCase();
-    const entry = {
-      key: key.slice(0, 2400),
-      title: String(documentRecord.title || 'Imported document').slice(0, 300),
-      sourceType: String(documentRecord.source?.type || 'text').slice(0, 80),
-      sourceUrl: String(documentRecord.source?.url || '').slice(0, 2000),
+    const entry = normalizeImportHistoryItem({
+      key,
+      title: documentRecord.title,
+      sourceType: documentRecord.source?.type || 'text',
+      sourceUrl: documentRecord.source?.url || '',
       importedAt: new Date().toISOString(),
       characters: String(documentRecord.text || '').length
-    };
-    const items = history().filter((item) => item?.key !== key);
-    items.unshift(entry);
+    });
+    if (!entry) return;
 
-    // Import history is optional metadata. A full localStorage quota must never
-    // prevent a document/article from opening in the Reader.
-    try {
-      localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify(items.slice(0, 15)));
-    } catch (error) {
-      try {
-        localStorage.removeItem(IMPORT_HISTORY_KEY);
-        localStorage.setItem(IMPORT_HISTORY_KEY, JSON.stringify([entry]));
-      } catch {
-        console.warn('Import history was skipped because browser storage is full.', error);
-      }
-    }
+    // Update the synchronous cache immediately so opening a document never waits
+    // on browser storage.
+    importHistoryCache = normalizeImportHistoryItems([
+      entry,
+      ...importHistoryCache.filter((item) => item?.key !== entry.key)
+    ]);
+    refreshRecentImportsUi();
+
+    // Serialize writes. If hydration is still in flight, first load/migrate the
+    // authoritative IndexedDB state, then merge this new entry back in.
+    importHistoryWriteChain = importHistoryWriteChain
+      .catch(() => false)
+      .then(async () => {
+        await hydrateImportHistory();
+
+        importHistoryCache = normalizeImportHistoryItems([
+          entry,
+          ...importHistoryCache.filter((item) => item?.key !== entry.key)
+        ]);
+
+        const saved = await persistImportHistory(importHistoryCache);
+        if (saved) removeLegacyImportHistory();
+        else console.warn('Import history was not persisted to IndexedDB.');
+
+        refreshRecentImportsUi();
+        return saved;
+      });
   }
 
 
@@ -1377,273 +1249,6 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     });
   }
 
-  function isBookmarkletArticleDocument() {
-    return ['bookmarklet', 'website'].includes(String(activeImportedDocument?.source?.type || '').toLowerCase());
-  }
-
-
-  async function deleteBookmarkletQueueEntry(readAnythingKey) {
-    const key = String(readAnythingKey || '');
-    if (!key) return;
-
-    saveBookmarkletQueue(bookmarkletQueue().filter((item) => String(item?.key || '') !== key));
-    saveBookmarkletDeletedKeys([...bookmarkletDeletedKeys(), key]);
-
-    try { localStorage.removeItem(formatRecordStorageKey(key)); } catch {}
-    try {
-      const index = formatDocumentIndex();
-      let changed = false;
-      Object.keys(index).forEach((documentId) => {
-        if (String(index[documentId] || '') === key) { delete index[documentId]; changed = true; }
-      });
-      if (changed) localStorage.setItem(FORMAT_DOCUMENT_INDEX_KEY, JSON.stringify(index));
-    } catch {}
-
-    const removeCache = getReadingCacheFunction('removeCachedReadingBook');
-    if (removeCache) {
-      try { await removeCache(`${BOOKMARKLET_CACHE_PREFIX}${key}`); } catch {}
-    }
-
-    installBookmarkletArticleQueue();
-    document.dispatchEvent(new CustomEvent('marksetgo:article-queue-updated', { detail: { source:'bookmarklet', deletedKey:key } }));
-  }
-
-  function installBookmarkletArticleChrome() {
-    ensureBookmarkletArticleStyles();
-    const panel = document.querySelector('#app .reader-page-panel');
-    const reader = panel?.querySelector('#reader');
-    const readerFrame = reader?.closest('#reader-frame');
-    const existingHeader = readerFrame?.querySelector(':scope > [data-read-anything-bookmarklet-header-external]')
-      || document.querySelector('[data-read-anything-bookmarklet-header-external]');
-
-    if (!panel || !reader || !readerFrame || !activeImportedDocument || !isBookmarkletArticleDocument()) {
-      existingHeader?.remove();
-      document.querySelector('#app #reader > [data-read-anything-bookmarklet-header-spacer]')?.remove();
-      document.querySelectorAll('#app #reader .read-anything-bookmarklet-first-group').forEach((group) => {
-        group.classList.remove('read-anything-bookmarklet-first-group');
-        group.style.removeProperty('--read-anything-bookmarklet-first-clearance');
-      });
-      panel?.classList.remove('read-anything-bookmarklet-reader');
-      return;
-    }
-
-    panel.classList.add('read-anything-bookmarklet-reader');
-    let header = existingHeader;
-    if (!header || header.parentElement !== readerFrame) {
-      header?.remove();
-      header = document.createElement('div');
-      header.className = 'read-anything-bookmarklet-header-external';
-      header.dataset.readAnythingBookmarkletHeaderExternal = '1';
-      header.setAttribute('aria-label', 'Captured article controls and source');
-      readerFrame.insertBefore(header, reader);
-    }
-
-    // Never use a standalone spacer in #reader. More importantly, retries must
-    // not remove/re-add the current first-group clearance: doing that on every
-    // 120/400/900/1600ms attachment pass visibly flashes the article layout.
-    reader.querySelector(':scope > [data-read-anything-bookmarklet-header-spacer]')?.remove();
-
-    const source = activeImportedDocument.source || {};
-    const sourceName = articleSiteName(source);
-    const dateLabel = articleDateLabel(source, { captured: true });
-    const author = String(activeImportedDocument.author || source.author || '').trim();
-    const url = String(source.url || '').trim();
-
-    let credit = header.querySelector(':scope > #read-anything-bookmarklet-source-credit');
-    if (!credit) {
-      credit = document.createElement('div');
-      credit.id = 'read-anything-bookmarklet-source-credit';
-      credit.className = 'read-anything-bookmarklet-source-credit';
-      header.appendChild(credit);
-    }
-
-    // Rebuild metadata only when its value actually changed. This keeps bounded
-    // startup retries visually inert.
-    const shareTitle = String(activeImportedDocument.baseTitle || activeImportedDocument.title || document.title || 'Article').trim();
-    const enhancedSignature = JSON.stringify([sourceName, author, dateLabel, url, shareTitle]);
-    if (credit.dataset.signature !== enhancedSignature) {
-      credit.dataset.signature = enhancedSignature;
-      credit.replaceChildren();
-
-      const copy = document.createElement('div');
-      copy.className = 'read-anything-bookmarklet-source-copy';
-      credit.appendChild(copy);
-
-      const addText = (text, className = '') => {
-        const span = document.createElement('span');
-        if (className) span.className = className;
-        span.textContent = text;
-        copy.appendChild(span);
-      };
-      const addSep = () => addText('·', 'sep');
-      addText('Source', 'source-label');
-      const site = document.createElement('strong');
-      site.textContent = sourceName;
-      copy.appendChild(site);
-      if (author) { addSep(); addText(`By ${author}`); }
-      if (dateLabel) { addSep(); addText(dateLabel); }
-      if (url) {
-        addSep();
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.textContent = 'View original ↗';
-        copy.appendChild(link);
-
-        // Use the exact Topic Feed share destinations/icons so captured articles
-        // and feed articles expose the same header actions.
-        const share = document.createElement('div');
-        share.className = 'topic-feed-reader-share';
-        share.setAttribute('aria-label', 'Share this story');
-        const encodedUrl = encodeURIComponent(url);
-        const encodedTitle = encodeURIComponent(shareTitle);
-        const encodedText = encodeURIComponent(`${shareTitle} — ${url}`);
-        const shareItems = [
-          {
-            id: 'x', label: 'Share on X',
-            href: `https://twitter.com/intent/tweet?text=${encodedTitle}&url=${encodedUrl}`,
-            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.24 2H21l-6.03 6.9L22.06 22h-5.55l-4.35-5.69L7.19 22H4.42l6.45-7.37L4.07 2h5.69l3.93 5.2L18.24 2Zm-.97 17.7h1.53L8.92 4.18H7.28L17.27 19.7Z"/></svg>`
-          },
-          {
-            id: 'facebook', label: 'Share on Facebook',
-            href: `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`,
-            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-9h3l.45-3.5H13.7V7.26c0-1.01.28-1.7 1.74-1.7h1.86V2.43A24.8 24.8 0 0 0 14.59 2c-2.68 0-4.52 1.64-4.52 4.65V9.5H7v3.5h3.07v9h3.63Z"/></svg>`
-          },
-          {
-            id: 'linkedin', label: 'Share on LinkedIn',
-            href: `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`,
-            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.34 3.5A2.34 2.34 0 1 1 5.34 8.18a2.34 2.34 0 0 1 0-4.68ZM3.32 9.75h4.04V22H3.32V9.75Zm6.43 0h3.87v1.67h.05c.54-1.02 1.86-2.1 3.82-2.1 4.09 0 4.84 2.69 4.84 6.19V22h-4.03v-5.75c0-1.37-.03-3.13-1.91-3.13-1.91 0-2.2 1.49-2.2 3.03V22H9.75V9.75Z"/></svg>`
-          },
-          {
-            id: 'reddit', label: 'Share on Reddit',
-            href: `https://www.reddit.com/submit?url=${encodedUrl}&title=${encodedTitle}`,
-            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.9 11.25a2.3 2.3 0 0 0-3.9-1.65 11.2 11.2 0 0 0-4.32-1.37l.73-3.42 2.39.51a1.76 1.76 0 1 0 .19-.91l-2.84-.6a.46.46 0 0 0-.55.35l-.86 4.02A11.3 11.3 0 0 0 7 9.62a2.3 2.3 0 1 0-2.53 3.73 4.17 4.17 0 0 0-.08.8c0 3.26 3.39 5.9 7.57 5.9s7.57-2.64 7.57-5.9c0-.28-.03-.55-.08-.82a2.3 2.3 0 0 0 1.45-2.08Zm-13.2 2.14a1.24 1.24 0 1 1 0-2.48 1.24 1.24 0 0 1 0 2.48Zm7.62 3.1c-.95.95-2.75 1.02-3.28 1.02-.54 0-2.35-.07-3.3-1.02a.48.48 0 0 1 .68-.68c.6.6 1.94.73 2.62.73.68 0 2.02-.13 2.61-.73a.48.48 0 1 1 .67.68Zm.98-3.1a1.24 1.24 0 1 1 0-2.48 1.24 1.24 0 0 1 0 2.48Z"/></svg>`
-          },
-          {
-            id: 'email', label: 'Share by email',
-            href: `mailto:?subject=${encodedTitle}&body=${encodedText}`,
-            icon: `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Zm9 7.1L20.2 7H3.8L12 12.1Zm0 2.2L3 8.72V17h18V8.72l-9 5.58Z"/></svg>`
-          }
-        ];
-        share.innerHTML = shareItems.map((item) => `
-          <a class="topic-feed-share-button topic-feed-share-${item.id}"
-             href="${item.href}"
-             ${item.id === 'email' ? '' : 'target="_blank" rel="noopener noreferrer"'}
-             aria-label="${item.label}"
-             title="${item.label}">
-            ${item.icon}
-          </a>
-        `).join('');
-        credit.appendChild(share);
-      }
-    }
-
-    const actionRow = document.querySelector('#read-anything-article-summary-action');
-    // Match Topic Feed article-header order exactly: source/provenance first,
-    // then the Summarize / Analyze action row beneath it.
-    if (header.firstElementChild !== credit) header.prepend(credit);
-    if (actionRow) {
-      if (actionRow.parentElement !== header || actionRow.previousElementSibling !== credit) {
-        credit.insertAdjacentElement('afterend', actionRow);
-      }
-    }
-
-    const styles = getComputedStyle(reader);
-    const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
-    const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
-    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
-    const columnGap = Number.parseFloat(styles.columnGap) || 0;
-    const fontSize = Number.parseFloat(styles.fontSize) || 14;
-    const usableWidth = Math.max(1, reader.clientWidth - paddingLeft - paddingRight);
-    const headerWidth = reader.classList.contains('book-pages-layout')
-      ? Math.max(1, (usableWidth - columnGap) / 2)
-      : usableWidth;
-    const left = Math.max(0, reader.offsetLeft + paddingLeft);
-    const top = Math.max(0, reader.offsetTop + paddingTop);
-
-    const setPixelIfChanged = (name, value) => {
-      const next = `${Math.round(value)}px`;
-      if (header.style.getPropertyValue(name) !== next) {
-        header.style.setProperty(name, next, 'important');
-      }
-    };
-    setPixelIfChanged('left', left);
-    setPixelIfChanged('top', top);
-    setPixelIfChanged('width', headerWidth);
-    setPixelIfChanged('max-width', headerWidth);
-
-    window.requestAnimationFrame(() => {
-      if (!reader.isConnected || !header.isConnected) return;
-      const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
-      const requiredHeight = Math.ceil(Math.max(fontSize * 1.35, headerHeight + Math.max(3, fontSize * .22)));
-      const firstGroup = reader.querySelector('.reader-group[data-start-index]');
-      if (!firstGroup) return;
-
-      // Remove the marker only from obsolete groups left by a Reader rebuild.
-      reader.querySelectorAll('.reader-group.read-anything-bookmarklet-first-group').forEach((group) => {
-        if (group === firstGroup) return;
-        group.classList.remove('read-anything-bookmarklet-first-group');
-        group.style.removeProperty('--read-anything-bookmarklet-first-clearance');
-      });
-
-      firstGroup.classList.add('read-anything-bookmarklet-first-group');
-      const previous = Number.parseFloat(firstGroup.style.getPropertyValue('--read-anything-bookmarklet-first-clearance')) || 0;
-      if (Math.abs(previous - requiredHeight) > 1) {
-        firstGroup.style.setProperty('--read-anything-bookmarklet-first-clearance', `${requiredHeight}px`);
-        if (reader.classList.contains('book-pages-layout')) {
-          window.setTimeout(() => {
-            if (firstGroup.isConnected && isBookmarkletArticleDocument()) {
-              window.dispatchEvent(new Event('resize'));
-            }
-          }, 60);
-        }
-      }
-    });
-  }
-
-  async function openBookmarkletQueueEntry(entry, button) {
-    if (!entry?.key) return;
-    const original = button?.innerHTML || '';
-    if (button) button.disabled = true;
-    try {
-      const cached = await loadBookmarkletArticle(entry.key);
-      if (!cached?.text) throw new Error('This captured article is no longer stored in this browser. Capture it again to reopen it.');
-      openDocument({
-        title: cached.title || entry.title || 'Web Article',
-        author: cached.author || entry.author || '',
-        text: cached.text,
-        source: {
-          ...(cached.source || {}),
-          type: 'bookmarklet',
-          url: cached.source?.url || entry.sourceUrl || '',
-          site: cached.source?.site || entry.sourceName || '',
-          publishedAt: cached.source?.publishedAt || entry.publishedAt || '',
-          importedAt: cached.source?.importedAt || entry.importedAt || new Date().toISOString(),
-          readAnythingKey: entry.key,
-          bookmarkletQueueReplay: true
-        }
-      });
-    } catch (error) {
-      console.warn('Captured article could not be reopened.', error);
-      if (button) {
-        button.title = error.message || 'Captured article could not be reopened.';
-        button.innerHTML = '<span>Article unavailable</span><small>Capture it again to restore the text.</small>';
-      }
-    } finally {
-      if (button?.isConnected) {
-        button.disabled = false;
-        if (button.innerHTML.includes('Article unavailable') === false && original) button.innerHTML = original;
-      }
-    }
-  }
-
-  function installBookmarkletArticleQueue() {
-    migrateBookmarkletQueueFromFormatRecords();
-    if (!activeImportedDocument || !isBookmarkletArticleDocument()) return;
-    window.MarkSetGoTopicFeeds?.refreshReaderNavigation?.();
-  }
-
   function isWholeArticleDocument() {
     const type = String(activeImportedDocument?.source?.type || '').toLowerCase();
     return ['topic-feed', 'bookmarklet', 'website'].includes(type);
@@ -1973,14 +1578,8 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     const reader = document.querySelector('#app #reader');
     if (!reader) return;
-    const bookmarkletHeader = isBookmarkletArticleDocument()
-      ? reader.closest('#reader-frame')?.querySelector(':scope > [data-read-anything-bookmarklet-header-external]')
-      : null;
-    const actionHost = bookmarkletHeader || reader;
 
-    // Article controls must not participate in Book Pages column flow. Bookmarklet
-    // articles place them in the external first-page header; Topic Feeds re-home
-    // the same node into their established external header immediately afterward.
+    // Keep the action inside the Reader, but visually separate from article prose.
     // It belongs above the first line rather than participating in the text flow.
     // These are article-level controls, not article prose. They should remain
     // available whenever the article is reopened or resumed, even if Continue
@@ -2065,11 +1664,9 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       );
 
       actionRow.append(summaryLink, separator, investorLink);
-      if (bookmarkletHeader) bookmarkletHeader.prepend(actionRow);
-      else actionHost.prepend(actionRow);
-    } else if (actionRow.parentElement !== actionHost) {
-      if (bookmarkletHeader) bookmarkletHeader.prepend(actionRow);
-      else actionHost.prepend(actionRow);
+      reader.prepend(actionRow);
+    } else if (actionRow.parentElement !== reader) {
+      reader.prepend(actionRow);
     }
 
     const link = actionRow.querySelector('[data-action="summarize-whole-article"]');
@@ -2143,7 +1740,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   function observeInlineArticleSummary() {
-    // Intentionally observer-free. Repeated DOM-observer callbacks on the
+    // Intentionally observer-free. Repeated MutationObserver callbacks on the
     // Reader can feed DOM changes back into the control installer and cause
     // visible flicker while an imported article is settling. Deterministic,
     // bounded retries in scheduleFormatControlAttach() handle late Reader DOM.
@@ -2151,36 +1748,28 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
   }
 
   function installDefaultArticleBookPages() {
-    if (!activeImportedDocument || !isWholeArticleDocument()) return false;
+    if (!activeImportedDocument || !isWholeArticleDocument()) return;
 
-    const sourceType = String(activeImportedDocument.source?.type || '').toLowerCase();
-
-    // Whole web/news articles must let the Reader restore its saved Book Pages
-    // preference instead of forcing a checkbox change while the document/header
-    // is still settling. For Topic Feed articles opened from the manager, forcing
-    // Book Pages here rebuilds #reader in the middle of topicFeedSourceCredit(),
-    // which is why the header can briefly appear and then end up clipped. Existing
-    // stories opened from My Topics often escaped the race because Book Pages was
-    // already active. Keep all three web/news article sources on the stable path.
-    if (sourceType === 'topic-feed' || sourceType === 'bookmarklet' || sourceType === 'website') return false;
-
-    // Preserve the established one-shot behavior for other article sources.
+    // Auto-enable Book Pages only once for a given imported article. Dispatching
+    // the Reader's change handler on every attachment retry can create a
+    // render -> document-available -> attach -> change loop that visibly blinks.
     const articleKey = String(
       activeImportedDocument.source?.readAnythingKey ||
       activeImportedDocument.source?.readerDocumentId ||
       importedDocumentKey(activeImportedDocument)
     );
-    if (articleKey && defaultArticleBookPagesKey === articleKey) return false;
+    if (articleKey && defaultArticleBookPagesKey === articleKey) return;
 
     const bookPages = document.querySelector('#app #book-pages');
-    if (!bookPages || bookPages.disabled) return false;
+    if (!bookPages || bookPages.disabled) return;
 
+    // Mark this article before dispatching the change event so a synchronous
+    // Reader rebuild cannot re-enter and dispatch it a second time.
     if (articleKey) defaultArticleBookPagesKey = articleKey;
-    if (bookPages.checked) return false;
+    if (bookPages.checked) return;
 
     bookPages.checked = true;
     bookPages.dispatchEvent(new Event('change', { bubbles: true }));
-    return true;
   }
 
   function scheduleFormatControlAttach() {
@@ -2193,20 +1782,13 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     const attach = () => {
       if (!activeImportedDocument) return;
-
-      // If an established non-bookmarklet article source needs to switch Reader
-      // mode, do that before attaching any article chrome. The change handler can
-      // rebuild #reader, so positioning controls before it is inherently racy.
-      if (installDefaultArticleBookPages()) return;
-
       installDisplayFormatControl();
       installArticleSummaryButton();
-      installBookmarkletArticleChrome();
-      installBookmarkletArticleQueue();
+      installDefaultArticleBookPages();
     };
 
     attach();
-    [120, 400, 900, 1600].forEach((delay) => {
+    [120, 400, 900].forEach((delay) => {
       const timer = window.setTimeout(attach, delay);
       formatControlAttachTimers.push(timer);
     });
@@ -2293,10 +1875,6 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     addHistory({ ...documentRecord, title, text });
     const readAnythingKey = importedDocumentKey({ ...documentRecord, title });
     const sourceType = String(documentRecord?.source?.type || '').toLowerCase();
-    if (sourceType !== 'topic-feed') {
-      window.MSGTopicFeedReaderContext = null;
-      window.MarkSetGoTopicFeeds?.clearReaderArticleContext?.();
-    }
     const autoFormatArticle = ['topic-feed', 'bookmarklet', 'website'].includes(sourceType);
     const formattedArticle = autoFormatArticle ? smartFormatText(text, 'all') : '';
 
@@ -2323,15 +1901,6 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     // manually, while the untouched original remains available at all times.
     activeImportedVersion = autoFormatArticle && formattedArticle ? 'format_all' : 'original';
     saveActiveFormatRecord();
-    if (['bookmarklet', 'website'].includes(sourceType) && !documentRecord.source?.bookmarkletQueueReplay) {
-      registerBookmarkletArticle({
-        ...documentRecord,
-        title,
-        text,
-        author: activeImportedDocument.author,
-        source: activeImportedDocument.source
-      }, readAnythingKey);
-    }
     renderImportedVersion(activeImportedVersion);
   }
 
@@ -2360,13 +1929,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       title: payload.title || parsed.hostname,
       author: payload.author || '',
       text: payload.text,
-      source: {
-        type: 'website', url,
-        site: payload.site || parsed.hostname.replace(/^www\./i, ''),
-        publishedAt: payload.publishedAt || '',
-        documentToc: Array.isArray(payload.documentToc) ? payload.documentToc : [],
-        importedAt: new Date().toISOString()
-      }
+      source: { type: 'website', url, site: parsed.hostname, importedAt: new Date().toISOString() }
     });
     status.textContent = 'Opening webpage…';
   }
@@ -2411,7 +1974,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
   function bookmarkletCode() {
     const target = `${location.origin}/capture`;
-    return `javascript:(()=>{const e=s=>String(s||'').replace(/\\s+/g,' ').trim(),m=(q,a='content')=>e(document.querySelector(q)?.getAttribute(a)||''),s=e(window.getSelection?.().toString()),r=document.querySelector('article,main,[role=main]')||document.body,t=e(m('meta[property="og:title"]')||document.querySelector('h1')?.innerText||document.title),a=e(m('meta[name="author"]')||m('meta[property="article:author"]')||document.querySelector('[rel=author]')?.innerText),n=e(m('meta[property="og:site_name"]')||location.hostname.replace(/^www\\./i,'')),p=e(m('meta[property="article:published_time"]')||m('meta[name="date"]')||m('meta[itemprop="datePublished"]')||document.querySelector('time[datetime]')?.getAttribute('datetime')),B=[],H=[],S=new Set(),wc=v=>e(v).split(/\\s+/).filter(Boolean).length;let w=0;if(!s){[...r.querySelectorAll('h1,h2,h3,p,blockquote,li')].forEach(n=>{let v=e(n.innerText);if(v.length<=20||S.has(v))return;S.add(v);const h=/^H[1-3]$/.test(n.tagName),o=n.tagName==='LI'?'• '+v:v;if(h)H.push({title:v,index:w,type:'section'});B.push(o);w+=wc(o)})}const x=s||B.join('\\n\\n'),k=s?'selection':'page',c=s?e(window.getSelection()?.anchorNode?.parentElement?.closest('p,blockquote,li')?.innerText||''):'',f=document.createElement('form');f.method='POST';f.action='${target}';f.target='_blank';[['title',t],['author',a],['site',n],['publishedAt',p],['url',location.href],['text',x],['captureType',k],['context',c],['structure',JSON.stringify(s?[]:H)]].forEach(([n,v])=>{const i=document.createElement('textarea');i.name=n;i.value=v;f.appendChild(i)});f.hidden=true;document.body.appendChild(f);f.submit();f.remove()})()`;
+    return `javascript:(()=>{const e=s=>String(s||'').replace(/\\s+/g,' ').trim(),s=e(window.getSelection?.().toString()),r=document.querySelector('article,main,[role=main]')||document.body,t=e(document.querySelector('meta[property="og:title"]')?.content||document.querySelector('h1')?.innerText||document.title),a=e(document.querySelector('meta[name="author"]')?.content||document.querySelector('[rel=author]')?.innerText),B=[],H=[],S=new Set(),wc=v=>e(v).split(/\\s+/).filter(Boolean).length;let w=0;if(!s){[...r.querySelectorAll('h1,h2,h3,p,blockquote,li')].forEach(n=>{let v=e(n.innerText);if(v.length<=20||S.has(v))return;S.add(v);const h=/^H[1-3]$/.test(n.tagName),o=n.tagName==='LI'?'• '+v:v;if(h)H.push({title:v,index:w,type:'section'});B.push(o);w+=wc(o)})}const x=s||B.join('\\n\\n'),k=s?'selection':'page',c=s?e(window.getSelection()?.anchorNode?.parentElement?.closest('p,blockquote,li')?.innerText||''):'',f=document.createElement('form');f.method='POST';f.action='${target}';f.target='_blank';[['title',t],['author',a],['url',location.href],['text',x],['captureType',k],['context',c],['structure',JSON.stringify(s?[]:H)]].forEach(([n,v])=>{const i=document.createElement('textarea');i.name=n;i.value=v;f.appendChild(i)});f.hidden=true;document.body.appendChild(f);f.submit();f.remove()})()`;
   }
 
   function renderHub() {
@@ -2456,7 +2019,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         </div>
         <div id="read-anything-status" class="status" role="status" aria-live="polite"></div>
         <section id="read-anything-workspace" class="read-anything-workspace" hidden></section>
-        ${recent.length ? `<section class="read-anything-recent"><h2>Recent imports</h2>${recent.map((item) => `<article><span>${escapeHtml(item.sourceType)}</span><strong>${escapeHtml(item.title)}</strong><small>${new Date(item.importedAt).toLocaleString()}</small></article>`).join('')}</section>` : ''}
+        ${recentImportsSectionMarkup(recent)}
       </section>`;
 
     const status = app.querySelector('#read-anything-status');
@@ -2561,12 +2124,6 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
     if (!payload?.text) return;
 
-    // The capture payload is already present and the Reader bridge is ready at
-    // this point. Open it exactly once. The older code retried the *entire*
-    // openDocument() call whenever any synchronous post-render work threw. Since
-    // renderReaderWithText() rebuilds the Reader DOM before several follow-up
-    // hooks run, that could produce a visible 250 ms render/retry/render loop
-    // (up to 40 times) even though the article had already opened successfully.
     try {
       const isSelection = payload.captureType === 'selection';
       openDocument({
@@ -2576,27 +2133,19 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         source: {
           type: isSelection ? 'web-passage' : 'bookmarklet',
           url: payload.url || '',
-          site: payload.site || (() => {
-            try { return new URL(payload.url || '').hostname.replace(/^www\./i, ''); } catch { return ''; }
-          })(),
-          publishedAt: payload.publishedAt || '',
           context: payload.context || '',
           captureType: payload.captureType || 'page',
           documentToc: Array.isArray(payload.documentToc) ? payload.documentToc : [],
           importedAt: new Date().toISOString()
         }
       });
-    } catch (error) {
-      // Do NOT automatically invoke openDocument() again. A failure here may be
-      // from post-render UI/continuity code after the Reader has already painted;
-      // repeating the full import is what causes bookmarklet-only blinking.
-      console.error('Read with Mark capture open failed; automatic re-render retry suppressed.', error);
-      return;
-    }
 
-    try { CAPTURE_STORAGE.removeItem(CAPTURE_KEY); } catch {}
-    if (location.hash.includes('read-anything-capture')) {
-      history.replaceState({}, '', `${location.pathname}${location.search}`);
+      try { CAPTURE_STORAGE.removeItem(CAPTURE_KEY); } catch {}
+      if (location.hash.includes('read-anything-capture')) {
+        history.replaceState({}, '', `${location.pathname}${location.search}`);
+      }
+    } catch {
+      if (attempt < 40) window.setTimeout(() => openPendingCapture(attempt + 1), 250);
     }
   }
 
@@ -2639,11 +2188,6 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       }, delay);
     });
   }
-
-  window.addEventListener('storage', (event) => {
-    if (event.key !== BOOKMARKLET_QUEUE_KEY || !isBookmarkletArticleDocument()) return;
-    window.setTimeout(installBookmarkletArticleQueue, 0);
-  });
 
   document.addEventListener('marksetgo:document-available', (event) => {
     const documentId = event?.detail?.documentId;
@@ -2735,17 +2279,12 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     requestSummary,
     requestCustomTransform,
     requestTranslation,
-    getCapturedArticles: () => {
-      migrateBookmarkletQueueFromFormatRecords();
-      return bookmarkletQueue().map((item) => ({ ...item }));
-    },
-    openCapturedArticle: async (key) => {
-      migrateBookmarkletQueueFromFormatRecords();
-      const entry = bookmarkletQueue().find((item) => String(item?.key || '') === String(key || ''));
-      if (!entry) throw new Error('Captured article not found.');
-      return openBookmarkletQueueEntry(entry);
-    },
-    deleteCapturedArticle: (key) => deleteBookmarkletQueueEntry(key)
+    hydrateImportHistory,
+    getImportHistory: () => history().map((item) => ({ ...item }))
   });
+
+  // Start the one-time Phase 1 migration after app.js has established the shared
+  // IndexedDB helpers. This is nonblocking and touches no other storage keys.
+  void hydrateImportHistory();
   window.setTimeout(openPendingCapture, 0);
 })();
