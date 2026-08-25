@@ -1955,7 +1955,24 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         'Analyze this whole article'
       );
 
-      actionRow.append(summaryLink, separator, investorLink);
+      const comprehensionSeparator = document.createElement('span');
+      comprehensionSeparator.textContent = ' · ';
+      comprehensionSeparator.setAttribute('aria-hidden', 'true');
+      comprehensionSeparator.style.cssText = 'font-size:.8em;opacity:.42;margin:0 .18em';
+
+      const comprehensionLink = makeArticleLink(
+        'article-comprehension',
+        'Comprehension',
+        'Check comprehension of this article'
+      );
+
+      actionRow.append(
+        summaryLink,
+        separator,
+        investorLink,
+        comprehensionSeparator,
+        comprehensionLink
+      );
       reader.prepend(actionRow);
     } else if (actionRow.parentElement !== reader) {
       reader.prepend(actionRow);
@@ -2027,6 +2044,39 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
             investorLink.textContent = originalLabel;
           }
         }
+      };
+    }
+
+    const comprehensionLink = actionRow.querySelector('[data-action="article-comprehension"]');
+    if (comprehensionLink) {
+      comprehensionLink.textContent = 'Comprehension';
+      comprehensionLink.setAttribute('aria-label', 'Check comprehension of this article');
+      comprehensionLink.title = 'Create a comprehension quiz from this article.';
+
+      comprehensionLink.onclick = (event) => {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+
+        const openComprehension = () => {
+          if (typeof window.MarkSetGoStartComprehension !== 'function') {
+            showTransformStatus('Comprehension is not available yet. Please try again.', true);
+            return;
+          }
+          window.MarkSetGoStartComprehension();
+        };
+
+        // A summary is a derivative view. If the user clicks Comprehension while
+        // viewing the summary, return to the full article first so the quiz tests
+        // the actual article rather than the generated summary.
+        if (activeImportedVersion.startsWith('summary')) {
+          renderImportedVersion('original');
+          window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(openComprehension);
+          });
+          return;
+        }
+
+        openComprehension();
       };
     }
   }
