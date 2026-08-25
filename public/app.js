@@ -11704,37 +11704,215 @@ async function renderReader(kind) {
 const MARK_INSIGHTS_KEY = 'markSetGoMarkInsightsV1';
 const MARK_HISTORY_KEY = 'markSetGoMarkHistoryV1';
 
-function getMarkRecords(key) {
-  try { const value=JSON.parse(localStorage.getItem(key)||'[]'); return Array.isArray(value)?value:[]; }
-  catch { return []; }
+// Phase 5 IndexedDB migration: Mark Notebook + Ask Mark history.
+// These collections can contain passages and AI responses and were previously
+// large enough to require QuotaExceededError trimming in localStorage.
+const MARK_STORAGE_KEYS = [MARK_INSIGHTS_KEY, MARK_HISTORY_KEY];
+const MARK_STORAGE_IDB_KEYS = Object.freeze({
+  [MARK_INSIGHTS_KEY]: 'mark-notebook:insights:v1',
+  [MARK_HISTORY_KEY]: 'mark-notebook:history:v1'
+});
+const MARK_STORAGE_LIMIT = 300;
+
+const markStorageCache = new Map();
+const markStorageDirtyKeys = new Set();
+let markStorageHydrated = false;
+let markStorageHydrationPromise = null;
+let markStorageWriteChain = Promise.resolve(true);
+
+function normalizeMarkRecords(records) {
+  const result = [];
+  const seen = new Set();
+  for (const item of Array.isArray(records) ? records : []) {
+    if (!item || typeof item !== 'object') continue;
+    const id = String(item.id || '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push(item);
+    if (result.length >= MARK_STORAGE_LIMIT) break;
+  }
+  return result;
 }
-function saveMarkRecords(key, records) {
-  const requested=Array.isArray(records) ? records.slice(0,300) : [];
-  let candidate=requested;
 
-  while(candidate.length){
+function readLegacyMarkRecords(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '[]');
+    return normalizeMarkRecords(value);
+  } catch {
+    return [];
+  }
+}
+
+// Seed synchronously so upgrading users see their Notebook immediately while
+// IndexedDB hydration runs in the background.
+MARK_STORAGE_KEYS.forEach((key) => {
+  markStorageCache.set(key, readLegacyMarkRecords(key));
+});
+
+function getMarkRecords(key) {
+  return markStorageCache.get(key) || [];
+}
+
+function markStorageIdbKey(key) {
+  return MARK_STORAGE_IDB_KEYS[key] || `mark-notebook:${String(key || '')}`;
+}
+
+function removeLegacyMarkRecords(key) {
+  try { localStorage.removeItem(key); } catch {}
+}
+
+function persistLegacyMarkFallback(key, records) {
+  let candidate = normalizeMarkRecords(records);
+  while (candidate.length) {
     try {
-      localStorage.setItem(key,JSON.stringify(candidate));
-      const verified=getMarkRecords(key);
-      return verified.length>0 && verified[0]?.id===candidate[0]?.id;
-    } catch(error) {
-      if(error?.name!=='QuotaExceededError' && error?.name!=='NS_ERROR_DOM_QUOTA_REACHED'){
-        console.warn('Notebook records could not be saved.',error);
+      localStorage.setItem(key, JSON.stringify(candidate));
+      return true;
+    } catch (error) {
+      if (error?.name !== 'QuotaExceededError' && error?.name !== 'NS_ERROR_DOM_QUOTA_REACHED') {
+        console.warn('Notebook fallback storage could not be saved.', error);
         return false;
       }
-
-      // Preserve the newest entry while progressively dropping old notebook
-      // history if browser storage is tight. Never silently claim success.
-      if(candidate.length===1){
-        console.warn('Notebook storage is full; the newest entry could not be saved.',error);
-        return false;
-      }
-      candidate=candidate.slice(0,Math.max(1,Math.floor(candidate.length*.8)));
+      if (candidate.length === 1) return false;
+      candidate = candidate.slice(0, Math.max(1, Math.floor(candidate.length * .8)));
     }
   }
-  return false;
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
 }
-function markRecordsForCurrentBook(key) { return getMarkRecords(key).filter(item=>item.documentId===state.documentId); }
+
+async function persistMarkCollection(key, records = getMarkRecords(key)) {
+  const normalized = normalizeMarkRecords(records);
+  markStorageCache.set(key, normalized);
+
+  if (typeof cacheReadingBook !== 'function') {
+    return persistLegacyMarkFallback(key, normalized);
+  }
+
+  try {
+    const ok = await cacheReadingBook({
+      key: markStorageIdbKey(key),
+      type: key === MARK_INSIGHTS_KEY ? 'mark-notebook-insights' : 'mark-notebook-history',
+      legacyKey: key,
+      items: normalized,
+      updatedAt: new Date().toISOString()
+    });
+
+    if (ok) {
+      removeLegacyMarkRecords(key);
+      return true;
+    }
+  } catch (error) {
+    console.warn('Notebook IndexedDB persistence failed.', error);
+  }
+
+  // Preserve durability if IndexedDB is temporarily unavailable.
+  return persistLegacyMarkFallback(key, normalized);
+}
+
+function refreshMarkStorageUi() {
+  try { renderMarkNotebook?.(); } catch {}
+  try { renderMarkHistory?.(); } catch {}
+  try { renderFullscreenMarkNotebook?.(); } catch {}
+  try { renderGlobalNotebookEntries?.(); } catch {}
+}
+
+async function hydrateMarkStorage() {
+  if (markStorageHydrationPromise) return markStorageHydrationPromise;
+
+  markStorageHydrationPromise = (async () => {
+    let migrated = 0;
+    let failed = 0;
+
+    for (const key of MARK_STORAGE_KEYS) {
+      const legacy = readLegacyMarkRecords(key);
+      const wasDirty = markStorageDirtyKeys.has(key);
+
+      try {
+        const wrapper = typeof getCachedReadingBook === 'function'
+          ? await getCachedReadingBook(markStorageIdbKey(key))
+          : null;
+        const indexed = Array.isArray(wrapper?.items)
+          ? normalizeMarkRecords(wrapper.items)
+          : null;
+
+        if (wasDirty) {
+          // A user save/delete occurred before hydration completed. The live
+          // in-memory state wins and is persisted after the read finishes.
+          const ok = await persistMarkCollection(key, getMarkRecords(key));
+          if (ok) migrated += 1;
+          else failed += 1;
+          continue;
+        }
+
+        if (indexed) {
+          markStorageCache.set(key, indexed);
+          removeLegacyMarkRecords(key);
+          migrated += 1;
+          continue;
+        }
+
+        if (legacy.length) {
+          markStorageCache.set(key, legacy);
+          const ok = await persistMarkCollection(key, legacy);
+          if (ok) migrated += 1;
+          else failed += 1;
+        } else {
+          markStorageCache.set(key, []);
+        }
+      } catch (error) {
+        failed += 1;
+        console.warn(`Notebook migration was deferred for ${key}.`, error);
+        if (legacy.length) markStorageCache.set(key, legacy);
+      }
+    }
+
+    markStorageHydrated = true;
+    refreshMarkStorageUi();
+    return {
+      hydrated: true,
+      migrated,
+      failed,
+      insights: getMarkRecords(MARK_INSIGHTS_KEY).length,
+      history: getMarkRecords(MARK_HISTORY_KEY).length
+    };
+  })();
+
+  return markStorageHydrationPromise;
+}
+
+function queueMarkStorageWrite(key) {
+  markStorageWriteChain = markStorageWriteChain
+    .catch(() => false)
+    .then(async () => {
+      await hydrateMarkStorage();
+      const ok = await persistMarkCollection(key, getMarkRecords(key));
+      if (ok) markStorageDirtyKeys.delete(key);
+      return ok;
+    });
+  return markStorageWriteChain;
+}
+
+function saveMarkRecords(key, records) {
+  if (!MARK_STORAGE_KEYS.includes(key)) return false;
+  const requested = normalizeMarkRecords(records);
+  markStorageCache.set(key, requested);
+  markStorageDirtyKeys.add(key);
+
+  // Keep all existing Notebook callers synchronous. Verification reads the
+  // in-memory collection immediately; durable IndexedDB persistence is queued.
+  void queueMarkStorageWrite(key);
+  return true;
+}
+
+function markRecordsForCurrentBook(key) {
+  return getMarkRecords(key).filter(item => item.documentId === state.documentId);
+}
+
+window.setTimeout(() => { void hydrateMarkStorage(); }, 0);
 
 const MARK_NOTEBOOK_SAVE_PAYLOADS=new Map();
 
@@ -11759,7 +11937,21 @@ function saveRegisteredMarkNotebookInsight(id) {
 
 window.MarkSetGoNotebook = Object.freeze({
   saveInsight:saveRegisteredMarkNotebookInsight,
-  count:()=>getMarkRecords(MARK_INSIGHTS_KEY).length
+  count:()=>getMarkRecords(MARK_INSIGHTS_KEY).length,
+  hydrateStorage:hydrateMarkStorage,
+  storageStatus:()=>{
+    let legacyInsights=false;
+    let legacyHistory=false;
+    try { legacyInsights=Boolean(localStorage.getItem(MARK_INSIGHTS_KEY)); } catch {}
+    try { legacyHistory=Boolean(localStorage.getItem(MARK_HISTORY_KEY)); } catch {}
+    return {
+      hydrated:markStorageHydrated,
+      insights:getMarkRecords(MARK_INSIGHTS_KEY).length,
+      history:getMarkRecords(MARK_HISTORY_KEY).length,
+      legacyInsightsPresent:legacyInsights,
+      legacyHistoryPresent:legacyHistory
+    };
+  }
 });
 
 
