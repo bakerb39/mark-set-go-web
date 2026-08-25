@@ -1,7 +1,45 @@
 (() => {
   'use strict';
 
-  // Mark, Set, Go! Cloud Content Sync v1.0.0
+  const IS_AUXILIARY_WORKSPACE =
+    Boolean(window.__MSG_WORKSPACE_PANE__ || window.__MSG_SECONDARY_READER__) ||
+    (
+      window.parent !== window &&
+      (() => {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          return (
+            params.get('msgSecondaryReader') === '1' ||
+            Number(params.get('msgReaderNumber') || 0) >= 2 ||
+            params.get('msgWorkspaceMode') === 'reader'
+          );
+        } catch {
+          return false;
+        }
+      })()
+    );
+
+  if (IS_AUXILIARY_WORKSPACE) {
+    const skippedStatus = () => ({
+      authenticated:false,
+      syncing:false,
+      cloudRecords:0,
+      cloudBooks:0,
+      oversizeDocuments:0,
+      lastSyncAt:'',
+      lastError:'',
+      restoredThisSession:0,
+      skipped:'workspace-pane'
+    });
+
+    window.MarkSetGoCloudContentSync = Object.freeze({
+      syncNow:async () => ({ ...skippedStatus() }),
+      status:skippedStatus
+    });
+    return;
+  }
+
+  // Mark, Set, Go! Cloud Content Sync v1.0.2 — live restore, never reload
   // PostgreSQL/account = durable master; IndexedDB = local/offline working copy.
   // No MutationObserver is used.
 
@@ -9,7 +47,6 @@
   const STORE_NAME = 'books';
   const POLL_MS = 30000;
   const MAX_ACCOUNT_DOCUMENT_BYTES = 5 * 1024 * 1024;
-  const RELOAD_MARKER = 'markSetGoCloudContentRestoreReloadV1';
 
   const EXACT_CONTENT_KEYS = new Set([
     'mark-notebook:insights:v1',
@@ -564,22 +601,6 @@
     };
   }
 
-  function recentRestoreReloaded() {
-    try {
-      const value = Number(sessionStorage.getItem(RELOAD_MARKER) || 0);
-      return value > 0 && Date.now() - value < 120000;
-    } catch {
-      return false;
-    }
-  }
-
-  function scheduleReloadAfterRestore(restored) {
-    if (!restored || recentRestoreReloaded()) return false;
-    try { sessionStorage.setItem(RELOAD_MARKER, String(Date.now())); } catch {}
-    window.setTimeout(() => location.reload(), 180);
-    return true;
-  }
-
   async function syncNow({ manual = false } = {}) {
     if (!state.authenticated) return { authenticated:false };
     if (state.syncing) return { authenticated:true, syncing:true };
@@ -609,10 +630,19 @@
       state.syncing = false;
       emit('synced', { generic, books, manual });
 
-      if (restored && !manual) {
-        scheduleReloadAfterRestore(restored);
-      } else if (!restored) {
-        try { sessionStorage.removeItem(RELOAD_MARKER); } catch {}
+      if (restored) {
+        const detail = {
+          restored,
+          generic,
+          books,
+          manual,
+          restoredAt:state.lastSyncAt
+        };
+        // Cloud restore is now live and non-destructive. Consumers that need to
+        // refresh a view can listen for this event; background sync must never
+        // reload the application or reset active Reader/workspace state.
+        document.dispatchEvent(new CustomEvent('marksetgo:cloud-content-restored', { detail }));
+        window.dispatchEvent(new CustomEvent('marksetgo:cloud-content-restored', { detail }));
       }
 
       return {
