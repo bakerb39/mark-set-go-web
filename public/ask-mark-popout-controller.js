@@ -195,6 +195,25 @@
     return document.querySelector('.mark-companion-panel [data-askmark-send]');
   }
 
+  function hideDockedCompanion() {
+    const layout = document.getElementById('reader-layout');
+    if (!layout) return false;
+
+    // Keep the live Companion DOM/session mounted, but remove the duplicate
+    // visible surface while the dedicated second-screen window is in use.
+    layout.classList.add('word-panel-hidden');
+
+    const markButton = document.getElementById('toggle-mark-panel');
+    const toolsButton = document.getElementById('toggle-word-panel');
+
+    markButton?.setAttribute('aria-pressed', 'false');
+    toolsButton?.setAttribute('aria-pressed', 'false');
+    markButton?.classList.add('pane-closed');
+    toolsButton?.classList.add('pane-closed');
+
+    return true;
+  }
+
   function trySubmitQuestion(question, requestId, attempt = 0) {
     const input = askInput();
     const send = askSendButton();
@@ -220,15 +239,20 @@
     if (attempt === 0) {
       const toggle = document.getElementById('toggle-mark-panel');
       if (toggle) {
-        try { toggle.click(); } catch {}
+        try {
+          // Let the Reader rebuild the live Companion shell if necessary, then
+          // immediately re-hide the docked surface before the next paint.
+          toggle.click();
+          hideDockedCompanion();
+        } catch {}
       }
     }
 
     if (attempt < 5) {
-      window.setTimeout(
-        () => trySubmitQuestion(question, requestId, attempt + 1),
-        [50,120,240,420,700][attempt] || 700
-      );
+      window.setTimeout(() => {
+        hideDockedCompanion();
+        trySubmitQuestion(question, requestId, attempt + 1);
+      }, [50,120,240,420,700][attempt] || 700);
       return false;
     }
 
@@ -244,6 +268,8 @@
   function submitFromPopout(question, requestId = '') {
     const clean = String(question || '').trim();
     if (!clean) return false;
+
+    hideDockedCompanion();
     return trySubmitQuestion(clean, requestId || makeId('question'), 0);
   }
 
@@ -252,6 +278,7 @@
 
     try {
       if (popupWindow && !popupWindow.closed) {
+        hideDockedCompanion();
         popupWindow.focus();
         sendState('focus-existing', true);
         return popupWindow;
@@ -268,6 +295,10 @@
       window.alert('The browser blocked the Companion pop-out. Allow pop-ups for this site, then try again.');
       return null;
     }
+
+    // Pop-out is now the visible chat surface. Keep the same Companion session
+    // mounted in Reader, but close its docked UI so answers are not duplicated.
+    hideDockedCompanion();
 
     try { popupWindow.focus(); } catch {}
 
@@ -377,6 +408,7 @@
   window.MarkSetGoAskMarkPopout = Object.freeze({
     open:openPopout,
     submit:submitFromPopout,
+    hideDocked:hideDockedCompanion,
     snapshot,
     sync:() => sendState('manual', true),
     get connected(){

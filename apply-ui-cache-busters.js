@@ -129,7 +129,7 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-window.css',
-  '<link href="/ask-mark-popout-controller.css?v=20260826-v1.0.0-second-screen" rel="stylesheet"/>'
+  '<link href="/ask-mark-popout-controller.css?v=20260826-v1.1.0-popout-exclusive" rel="stylesheet"/>'
 );
 
 index = ensureAfterAsset(
@@ -141,7 +141,7 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-window.js',
-  '  <script defer src="/ask-mark-popout-controller.js?v=20260826-v1.0.0-second-screen"></script>'
+  '  <script defer src="/ask-mark-popout-controller.js?v=20260826-v1.1.0-popout-exclusive"></script>'
 );
 
 index = ensureAfterAsset(
