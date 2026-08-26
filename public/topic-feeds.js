@@ -868,10 +868,15 @@
     const readerRect = reader.getBoundingClientRect();
     const left = Math.max(0, readerRect.left - frameRect.left + paddingLeft);
     const contentTop = Math.max(0, readerRect.top - frameRect.top + paddingTop);
+    // Leave a tiny gap so the Reader's own top boundary line remains visible.
+    // Reduce internal padding by the same amount so Source/actions do not move.
+    const boundaryGap = 3;
+    const headerTop = Math.min(boundaryGap, contentTop);
+    const headerContentPadding = Math.max(0, contentTop - headerTop);
 
     header.style.setProperty('left', `${left}px`, 'important');
-    header.style.setProperty('top', '0px', 'important');
-    header.style.setProperty('padding-top', `${contentTop}px`, 'important');
+    header.style.setProperty('top', `${headerTop}px`, 'important');
+    header.style.setProperty('padding-top', `${headerContentPadding}px`, 'important');
     header.style.setProperty('width', `${headerWidth}px`, 'important');
     header.style.setProperty('max-width', `${headerWidth}px`, 'important');
 
@@ -891,7 +896,7 @@
       // headerHeight now includes the opaque ceiling ABOVE the Reader text.
       // Exclude that ceiling padding from the in-document spacer so the article
       // stays at the same starting position.
-      const contentHeaderHeight = Math.max(0, headerHeight - contentTop);
+      const contentHeaderHeight = Math.max(0, headerHeight - headerContentPadding);
       const requiredHeight = Math.max(fontSize * 2, contentHeaderHeight + fontSize);
       const previousHeight = Number.parseFloat(spacer.style.height) || 0;
       spacer.style.width = '100%';

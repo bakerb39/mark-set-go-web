@@ -29,7 +29,7 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'topic-feeds.js',
-  '20260825-v2.5.5-top-ceiling-owner'
+  '20260825-v2.5.6-boundary-gap'
 );
 
 if (index !== before) {
