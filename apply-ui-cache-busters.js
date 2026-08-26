@@ -61,6 +61,24 @@ index = replaceAssetVersion(
   '20260826-v1.2.2-beside-reader-layout'
 );
 
+index = replaceAssetVersion(
+  index,
+  'media-player-launch-polish.js',
+  '20260826-v1.1.0-label-only'
+);
+
+index = replaceAssetVersion(
+  index,
+  'ask-mark-desktop.css',
+  '20260826-v2.1.0-single-owner'
+);
+
+index = replaceAssetVersion(
+  index,
+  'ask-mark-desktop.js',
+  '20260826-v2.1.0-single-owner'
+);
+
 /* Phase 2 Reading Companion Desktop bridge.
    Loaded after Phase 1 Ask Mark window assets and after Desktop Workspace. */
 index = ensureAfterAsset(
@@ -84,13 +102,13 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-window.css',
-  '<link href="/ask-mark-desktop.css?v=20260826-v2.0.2-live-companion" rel="stylesheet"/>'
+  '<link href="/ask-mark-desktop.css?v=20260826-v2.1.0-single-owner" rel="stylesheet"/>'
 );
 
 index = ensureAfterAsset(
   index,
   'ask-mark-window.js',
-  '  <script defer src="/ask-mark-desktop.js?v=20260826-v2.0.2-live-companion"></script>'
+  '  <script defer src="/ask-mark-desktop.js?v=20260826-v2.1.0-single-owner"></script>'
 );
 
 if (index !== before) {

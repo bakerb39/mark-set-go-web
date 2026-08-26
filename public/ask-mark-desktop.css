@@ -22,7 +22,7 @@ body.msg-desktop-workspace-active #reader-layout.msg-askmark-desktop-detached > 
   background:var(--msg-theme-surface,#fff);
 }
 
-.msg-askmark-desktop-window .mark-companion-panel {
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .mark-companion-panel {
   position:relative !important;
   inset:auto !important;
   display:flex !important;
@@ -42,8 +42,7 @@ body.msg-desktop-workspace-active #reader-layout.msg-askmark-desktop-detached > 
   z-index:auto !important;
 }
 
-.msg-askmark-desktop-window .mark-companion-panel .reader-control-shell.mark-shell,
-.msg-askmark-desktop-window .mark-companion-panel [data-askmark-premium] {
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .mark-companion-panel .reader-control-shell.mark-shell {
   display:flex !important;
   flex:1 1 auto !important;
   flex-direction:column !important;
@@ -54,14 +53,28 @@ body.msg-desktop-workspace-active #reader-layout.msg-askmark-desktop-detached > 
   max-height:none !important;
 }
 
-.msg-askmark-desktop-window .askmark-view {
+/* Preserve Ask Mark's native header / stage / composer grid. Phase 2 previously
+   converted this to flex, which distorted the chat inside Desktop. */
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .mark-companion-panel [data-askmark-premium],
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .askmark-premium {
+  display:grid !important;
+  grid-template-rows:auto minmax(0,1fr) auto !important;
+  flex:1 1 auto !important;
+  width:100% !important;
+  height:100% !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  max-height:none !important;
+}
+
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .askmark-view {
   flex:1 1 auto !important;
   min-height:0 !important;
   overflow:auto !important;
   padding:1rem 1.15rem !important;
 }
 
-.msg-askmark-desktop-window .askmark-conversation {
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .askmark-conversation {
   min-height:0 !important;
 }
 
@@ -128,4 +141,64 @@ body.msg-desktop-workspace-active #reader-layout.msg-askmark-desktop-detached > 
   .askmark-desktop-open-button {
     display:none !important;
   }
+}
+
+
+/* v2.1 — Desktop is the sole Ask Mark geometry owner while detached.
+   These selectors intentionally outrank Phase 1 html.msg-askmark-expanded
+   rules even if that class exists for a transient frame. */
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .mark-companion-panel,
+html.msg-askmark-desktop-owner.msg-askmark-expanded .msg-askmark-desktop-window .mark-companion-panel {
+  position:relative !important;
+  inset:auto !important;
+  top:auto !important;
+  right:auto !important;
+  bottom:auto !important;
+  left:auto !important;
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+  height:100% !important;
+  max-height:none !important;
+  min-height:0 !important;
+  margin:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  transform:none !important;
+  transition:none !important;
+  z-index:auto !important;
+}
+
+html.msg-askmark-desktop-owner.msg-askmark-expanded body::after {
+  content:none !important;
+  display:none !important;
+}
+
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .askmark-stage {
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .askmark-view.is-active {
+  display:flex !important;
+  flex-direction:column !important;
+  height:100% !important;
+  min-height:0 !important;
+  overflow:auto !important;
+  animation:none !important;
+}
+
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .askmark-message,
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .askmark-avatar-glow {
+  animation:none !important;
+}
+
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .askmark-composer {
+  flex:0 0 auto !important;
+  min-width:0 !important;
+}
+
+html.msg-askmark-desktop-owner .msg-askmark-desktop-window .askmark-composer textarea {
+  min-width:0 !important;
 }

@@ -169,10 +169,25 @@
     applyGeometry(currentGeometry(), { persist:true });
   }
 
+  function setDesktopOwnership(active) {
+    const root = document.documentElement;
+    const owns = Boolean(active);
+
+    root.classList.toggle('msg-askmark-desktop-owner', owns);
+
+    if (owns) {
+      // Phase 1 Expanded is a Standard-layout presentation. It must never
+      // survive into Desktop, where the Desktop wrapper owns all geometry.
+      try { window.MarkSetGoAskMarkWindow?.restore?.(); } catch {}
+      root.classList.remove('msg-askmark-expanded');
+    }
+  }
+
   function markReaderDetached(active) {
     document.querySelectorAll('#reader-layout').forEach((layout) => {
       layout.classList.toggle('msg-askmark-desktop-detached', Boolean(active));
     });
+    setDesktopOwnership(active);
   }
 
   function bringFront() {
@@ -454,6 +469,8 @@
     // Expanded mode is a Standard-workspace presentation. Desktop gets its own
     // maximize/restore controls around the exact same live companion node.
     try { window.MarkSetGoAskMarkWindow?.restore?.(); } catch {}
+    document.documentElement.classList.remove('msg-askmark-expanded');
+    setDesktopOwnership(true);
 
     panelNode = panel;
     if (!homeParent || !homeParent.isConnected) {
@@ -521,6 +538,7 @@
     }
 
     panelNode = panel;
+    setDesktopOwnership(false);
     notifyResize();
     return true;
   }
@@ -571,27 +589,46 @@
       if (windowNode?.isConnected || panelNode?.dataset?.msgAskmarkDesktopDetached === '1') {
         dockSuppressed = false;
         restoreToReader({ keepOpen:true });
+      } else {
+        setDesktopOwnership(false);
       }
-      return;
+      return true;
     }
 
-    if (!companionIsOpen()) {
-      if (windowNode?.isConnected) restoreToReader({ keepOpen:true });
-      return;
+    // Once the live panel is already in a Desktop window, Desktop owns it.
+    // Do not keep polling Reader classes and moving the same node back/forth
+    // during transient workspace rerenders.
+    if (windowNode?.isConnected && panelNode?.isConnected) {
+      setDesktopOwnership(true);
+      updateDesktopTitle();
+      return true;
     }
 
-    if (!dockSuppressed) detachToDesktop();
-    updateDesktopTitle();
+    if (dockSuppressed || !companionIsOpen()) return false;
+
+    const detached = detachToDesktop();
+    if (detached) updateDesktopTitle();
+    return detached;
   }
 
-  function scheduleSync() {
+  function scheduleSync({ retry = true } = {}) {
     if (syncScheduled) return;
     syncScheduled = true;
-    [0, 60, 160, 360, 800].forEach((delay, index) => {
-      window.setTimeout(() => {
-        sync();
-        if (index === 4) syncScheduled = false;
-      }, delay);
+
+    window.requestAnimationFrame(() => {
+      const complete = sync();
+
+      // Desktop core may dispatch its mode event just before the canvas has
+      // finished moving the live workspace nodes. One bounded retry is enough.
+      if (
+        retry &&
+        !complete &&
+        desktopActive() &&
+        !dockSuppressed &&
+        companionIsOpen()
+      ) {
+        window.setTimeout(() => scheduleSync({ retry:false }), 90);
+      }
     });
   }
 
@@ -654,7 +691,7 @@
 
   document.addEventListener('marksetgo:document-available', () => {
     updateDesktopTitle();
-    scheduleSync();
+    if (!windowNode?.isConnected && desktopActive()) scheduleSync();
   });
 
   window.addEventListener('resize', () => {
@@ -676,7 +713,6 @@
         } else {
           applyGeometry(currentGeometry());
         }
-        notifyResize();
       } else {
         scheduleSync();
       }
@@ -685,12 +721,10 @@
 
   window.addEventListener('pageshow', scheduleSync);
 
-  // Phase 1 may install/rebuild its header controls a moment after Ask Mark
-  // opens. Finite checks are enough to add the Desktop control.
-  [0, 100, 320, 900, 1800].forEach((delay) => window.setTimeout(() => {
-    ensureDesktopOpenButton();
-    sync();
-  }, delay));
+  // Phase 1 may install its header controls after this bridge. Add the Desktop
+  // button with two finite checks, but do not repeatedly move the live panel.
+  [0, 240].forEach((delay) => window.setTimeout(ensureDesktopOpenButton, delay));
+  window.setTimeout(scheduleSync, 0);
 
   window.MarkSetGoAskMarkDesktop = Object.freeze({
     open:() => {
@@ -710,6 +744,7 @@
       desktopActive:desktopActive(),
       detached:Boolean(windowNode?.isConnected),
       dockSuppressed,
+      owner:document.documentElement.classList.contains('msg-askmark-desktop-owner'),
       geometry:windowNode?.isConnected ? currentGeometry() : savedGeometry()
     })
   });
