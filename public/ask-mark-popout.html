@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Reading Companion</title>
-  <link rel="stylesheet" href="/ask-mark-popout.css?v=20260826-v1.0.0">
+  <link rel="stylesheet" href="/ask-mark-popout.css?v=20260826-v1.2.0-article-first">
 </head>
 <body>
   <main class="companion-popout" data-popout-shell>
@@ -28,6 +28,18 @@
       <small data-connection-status>Connecting…</small>
     </section>
 
+    <section class="popout-article-actions" data-popout-article-actions hidden aria-label="Whole article actions">
+      <span>Whole article</span>
+      <div>
+        <button type="button" data-popout-article-action="explain">Explain</button>
+        <button type="button" data-popout-article-action="summarize">Summarize</button>
+        <button type="button" data-popout-article-action="analyze">Analyze</button>
+        <button type="button" data-popout-article-action="simplify">Simplify</button>
+        <button type="button" data-popout-article-action="context">Context</button>
+        <button type="button" data-popout-article-action="related">Compare</button>
+      </div>
+    </section>
+
     <section class="popout-conversation" data-popout-conversation aria-live="polite">
       <div class="popout-empty">
         Open Ask Beth in the Reader, then use this window on your second screen.
@@ -39,6 +51,6 @@
       <button type="button" data-popout-send aria-label="Send">➜</button>
     </footer>
   </main>
-  <script src="/ask-mark-popout-page.js?v=20260826-v1.0.0"></script>
+  <script src="/ask-mark-popout-page.js?v=20260826-v1.2.0-article-first"></script>
 </body>
 </html>

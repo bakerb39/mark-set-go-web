@@ -90,6 +90,7 @@
         conversation?.querySelector('.is-thinking') ||
         conversation?.querySelector('[data-askmark-legacy-pending="1"]')
       ),
+      articleMode:Boolean(window.MarkSetGoArticleCompanion?.available?.()),
       panelVisible:!document.getElementById('reader-layout')?.classList.contains('word-panel-hidden')
     };
   }
@@ -109,6 +110,14 @@
 
       if (message.type === 'ASK') {
         submitFromPopout(String(message.question || ''), String(message.requestId || ''));
+        return;
+      }
+
+      if (message.type === 'ARTICLE_ACTION') {
+        runArticleActionFromPopout(
+          String(message.action || ''),
+          String(message.requestId || '')
+        );
         return;
       }
 
@@ -270,7 +279,56 @@
     if (!clean) return false;
 
     hideDockedCompanion();
-    return trySubmitQuestion(clean, requestId || makeId('question'), 0);
+    const id = requestId || makeId('question');
+
+    if (window.MarkSetGoArticleCompanion?.available?.()) {
+      pendingQuestionId = id;
+      post({ type:'ASK_ACCEPTED', requestId:id, at:Date.now() });
+      startActiveSync('popout-article-question');
+
+      Promise.resolve(window.MarkSetGoArticleCompanion.ask(clean))
+        .catch((error) => {
+          post({
+            type:'ASK_ERROR',
+            requestId:id,
+            error:error?.message || 'The article question could not be sent.',
+            at:Date.now()
+          });
+        });
+      return true;
+    }
+
+    return trySubmitQuestion(clean, id, 0);
+  }
+
+  function runArticleActionFromPopout(action, requestId = '') {
+    const id = requestId || makeId('article-action');
+
+    if (!window.MarkSetGoArticleCompanion?.available?.()) {
+      post({
+        type:'ASK_ERROR',
+        requestId:id,
+        error:'Whole-article actions are available only when the Reader contains a full article.',
+        at:Date.now()
+      });
+      return false;
+    }
+
+    hideDockedCompanion();
+    pendingQuestionId = id;
+    post({ type:'ASK_ACCEPTED', requestId:id, at:Date.now() });
+    startActiveSync('popout-article-action');
+
+    Promise.resolve(window.MarkSetGoArticleCompanion.action(action))
+      .catch((error) => {
+        post({
+          type:'ASK_ERROR',
+          requestId:id,
+          error:error?.message || 'The article action could not be completed.',
+          at:Date.now()
+        });
+      });
+    return true;
   }
 
   function openPopout() {
@@ -380,6 +438,7 @@
 
   [
     'marksetgo:askmark-legacy-updated',
+    'marksetgo:askmark-article-updated',
     'marksetgo:document-available',
     'marksetgo:notebook-saved',
     'marksetgo:workspace-layout-mode'

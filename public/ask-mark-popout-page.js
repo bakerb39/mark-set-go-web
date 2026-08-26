@@ -69,6 +69,13 @@
 
     readingTitle.textContent = reading.title || 'Current reading';
 
+    const articleActions = document.querySelector('[data-popout-article-actions]');
+    if (articleActions) articleActions.hidden = !state.articleMode;
+
+    input.placeholder = state.articleMode
+      ? 'Ask anything about the whole article…'
+      : 'Ask about the current reading…';
+
     const html = cleanConversationMarkup(state.conversationHtml);
     const nearBottom =
       conversation.scrollHeight - conversation.scrollTop - conversation.clientHeight < 90;
@@ -134,6 +141,25 @@
   }
 
   sendButton.addEventListener('click', submit);
+
+  document.querySelectorAll('[data-popout-article-action]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!connected || sending) return;
+
+      sending = true;
+      sendButton.disabled = true;
+      const requestId = makeId();
+
+      post({
+        type:'ARTICLE_ACTION',
+        requestId,
+        action:String(button.dataset.popoutArticleAction || ''),
+        at:Date.now()
+      });
+
+      setConnection(true, 'Working with the whole article…');
+    });
+  });
 
   input.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && !event.shiftKey) {

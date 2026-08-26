@@ -71,13 +71,13 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'ask-mark-window.css',
-  '20260826-v1.1.1-desktop-bounds-buttons-kept'
+  '20260826-v1.2.0-shorter-expanded-chat'
 );
 
 index = replaceAssetVersion(
   index,
   'ask-mark-window.js',
-  '20260826-v1.1.1-desktop-bounds-buttons-kept'
+  '20260826-v1.2.0-shorter-expanded-chat'
 );
 
 index = replaceAssetVersion(
@@ -129,7 +129,13 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-window.css',
-  '<link href="/ask-mark-popout-controller.css?v=20260826-v1.1.0-popout-exclusive" rel="stylesheet"/>'
+  '<link href="/ask-mark-article-mode.css?v=20260826-v1.0.0-whole-article-first" rel="stylesheet"/>'
+);
+
+index = ensureAfterAsset(
+  index,
+  'ask-mark-window.css',
+  '<link href="/ask-mark-popout-controller.css?v=20260826-v1.2.0-article-first" rel="stylesheet"/>'
 );
 
 index = ensureAfterAsset(
@@ -141,7 +147,13 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-window.js',
-  '  <script defer src="/ask-mark-popout-controller.js?v=20260826-v1.1.0-popout-exclusive"></script>'
+  '  <script defer src="/ask-mark-article-mode.js?v=20260826-v1.0.0-whole-article-first"></script>'
+);
+
+index = ensureAfterAsset(
+  index,
+  'ask-mark-article-mode.js',
+  '  <script defer src="/ask-mark-popout-controller.js?v=20260826-v1.2.0-article-first"></script>'
 );
 
 index = ensureAfterAsset(
