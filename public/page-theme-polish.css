@@ -107,24 +107,45 @@ html[data-msg-experience-theme] #app .home-simple .source-category {
 /* STANDALONE PAGE CLOSE ONLY
    This button exists only in index.html, never workspace-pane.html. It is therefore impossible
    for framed workspace pages to receive the extra page-level X. Existing workspace/tab chrome
-   remains responsible for closing framed panes. */
+   remains responsible for closing framed panes.
+
+   v1.0.6 — standardized to the same compact Reader/Home close visual language.
+   The old 36px circular floating style is intentionally retired. */
 #msg-standalone-page-close {
-  display: inline-flex;
+  display: inline-grid;
   position: fixed;
   top: 58px;
   right: clamp(12px, 2vw, 28px);
   z-index: 5000;
-  width: 36px;
-  height: 36px;
+
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
   padding: 0;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid color-mix(in srgb, var(--msg-theme-border, #cbb98e) 78%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--msg-theme-surface, #fffdf7) 94%, transparent);
-  color: var(--msg-theme-accent-dark, #173f39);
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--msg-theme-shadow, rgba(29,46,40,.18)) 80%, transparent);
-  font: 700 24px/1 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  place-items: center;
+
+  border: 1px solid color-mix(
+    in srgb,
+    var(--msg-theme-gold,var(--msg-gold,#d5a928)) 58%,
+    var(--msg-theme-border,var(--msg-blue-border,#9fb4c7))
+  );
+  border-radius: 8px;
+
+  background: linear-gradient(
+    180deg,
+    var(--msg-theme-surface,var(--msg-surface,#fff)),
+    var(--msg-theme-soft-2,var(--msg-blue-soft-2,#f4f7fa))
+  );
+
+  color: var(--msg-theme-accent-dark,var(--msg-navy-deep,#17365d));
+  box-shadow: 0 2px 7px rgba(15,35,60,.12);
+
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
   cursor: pointer;
 }
 
@@ -140,10 +161,17 @@ html.msg-secondary-reader-document #msg-standalone-page-close {
 
 #msg-standalone-page-close:hover,
 #msg-standalone-page-close:focus-visible {
-  border-color: var(--msg-theme-accent, #245c53);
-  color: var(--msg-theme-accent, #245c53);
+  border-color: var(--msg-theme-gold,var(--msg-gold,#d5a928));
+  color: var(--msg-theme-accent-dark,var(--msg-navy-deep,#17365d));
+  box-shadow:
+    0 0 0 2px color-mix(
+      in srgb,
+      var(--msg-theme-gold,var(--msg-gold,#d5a928)) 26%,
+      transparent
+    ),
+    0 2px 7px rgba(15,35,60,.14);
   outline: none;
-  transform: translateY(-1px);
+  transform: none;
 }
 
 @media (max-width: 700px) {
@@ -151,11 +179,16 @@ html.msg-secondary-reader-document #msg-standalone-page-close {
     padding: 16px !important;
     border-radius: 16px !important;
   }
+
+  /* Keep the same control dimensions on mobile so page-level close buttons
+     don't randomly change visual language by viewport. */
   #msg-standalone-page-close {
     top: 52px;
     right: 10px;
-    width: 34px;
-    height: 34px;
+    width: 22px;
+    min-width: 22px;
+    height: 22px;
+    min-height: 22px;
   }
 }
 
