@@ -5,40 +5,44 @@
 
   const ACTIONS = Object.freeze({
     explain:{
-      label:'Explain the whole article.',
-      prompt:'Explain the entire article clearly. Walk through the main idea, important facts, and why they matter.'
+      label:'Explain',
+      whole:'Explain the whole article.',
+      selected:'Explain this selected passage.'
     },
     summarize:{
-      label:'Summarize the whole article.',
-      prompt:'Summarize the entire article. Cover the main point, the most important facts, and the key takeaway.'
+      label:'Summarize',
+      whole:'Summarize the whole article.',
+      selected:'Summarize this selected passage.'
     },
     analyze:{
-      label:'Analyze the whole article.',
-      prompt:'Analyze the entire article. Identify its main claims, evidence, assumptions, implications, and important uncertainties or limitations.'
+      label:'Analyze',
+      whole:'Analyze the whole article.',
+      selected:'Analyze this selected passage.'
     },
     simplify:{
-      label:'Simplify the whole article.',
-      prompt:'Simplify the entire article without losing important meaning. Explain it in plain language and define any important technical ideas.'
+      label:'Simplify',
+      whole:'Simplify the whole article.',
+      selected:'Simplify this selected passage.'
     },
     context:{
-      label:'Give me context for the whole article.',
-      prompt:'Give me the broader context for the entire article. Explain what led to this, why it matters, and the important background a reader should understand.'
+      label:'Context',
+      whole:'Give me the broader context for the whole article.',
+      selected:'Give me the broader context for this selected passage.'
     },
     related:{
-      label:'Compare the ideas in the whole article.',
-      prompt:'Compare and connect the major ideas or viewpoints in the entire article. Point out tensions, alternatives, or competing interpretations that help me understand it better.'
+      label:'Compare',
+      whole:'Compare and connect the major ideas or viewpoints in the whole article.',
+      selected:'Compare this selected passage with relevant ideas or competing viewpoints.'
     }
   });
 
   const $ = (selector, root = document) => root.querySelector(selector);
 
-  function hub() {
-    return window.MarkSetGoAskMarkHub;
-  }
-
-  function fallbackArticle() {
+  function currentArticle() {
     const current = window.MarkSetGoCurrentReaderDocument?.get?.() || {};
-    const source = current.source && typeof current.source === 'object' ? current.source : {};
+    const source = current.source && typeof current.source === 'object'
+      ? current.source
+      : {};
     const type = String(source.type || '').toLowerCase();
 
     if (!ARTICLE_TYPES.has(type)) return null;
@@ -48,17 +52,39 @@
     if (text.length < 40) return null;
 
     return {
-      title:String(current.title || 'Current article'),
+      current,
+      source,
       type,
+      title:String(current.title || 'Current article'),
       text
     };
   }
 
   function articleAvailable() {
-    try {
-      if (typeof hub()?.isWholeArticle === 'function') return Boolean(hub().isWholeArticle());
-    } catch {}
-    return Boolean(fallbackArticle());
+    return Boolean(currentArticle());
+  }
+
+  function selectionPanel() {
+    return (
+      $('.mark-companion-panel #mark-selection-panel') ||
+      $('#mark-selection-panel')
+    );
+  }
+
+  function selectionText() {
+    return selectionPanel()
+      ?.querySelector('.mark-selection-card blockquote')
+      ?.textContent
+      ?.trim() || '';
+  }
+
+  function scopeInfo() {
+    const selected = Boolean(selectionText());
+    return {
+      selected,
+      key:selected ? 'selection' : 'article',
+      label:selected ? 'Selected passage' : 'Whole article'
+    };
   }
 
   function composer() {
@@ -69,42 +95,63 @@
     return $('.mark-companion-panel [data-askmark-input]');
   }
 
+  function sendButton() {
+    return $('.mark-companion-panel [data-askmark-send]');
+  }
+
+  function premium() {
+    return $('.mark-companion-panel [data-askmark-premium]');
+  }
+
   function panelVisible() {
     const layout = document.getElementById('reader-layout');
     return Boolean(layout && !layout.classList.contains('word-panel-hidden'));
   }
 
+  function markConversationStarted() {
+    premium()?.classList.add('askmark-conversation-started');
+  }
+
+  function syncConversationStartedFromDom() {
+    const conversation = $('.mark-companion-panel [data-askmark-conversation]');
+    if ((conversation?.children?.length || 0) > 1) {
+      markConversationStarted();
+    }
+  }
+
   function actionMarkup() {
     return `
       <div class="askmark-article-mode" data-askmark-article-mode>
-        <span class="askmark-article-scope">Whole article</span>
-        <div class="askmark-article-actions" role="group" aria-label="Whole article actions">
-          <button type="button" data-askmark-article-action="explain">Explain</button>
-          <button type="button" data-askmark-article-action="summarize">Summarize</button>
-          <button type="button" data-askmark-article-action="analyze">Analyze</button>
-          <button type="button" data-askmark-article-action="simplify">Simplify</button>
-          <button type="button" data-askmark-article-action="context">Context</button>
-          <button type="button" data-askmark-article-action="related">Compare</button>
+        <span class="askmark-article-scope" data-askmark-article-scope>Whole article</span>
+        <div class="askmark-article-actions-wrap">
+          <button
+            type="button"
+            class="askmark-article-actions-toggle"
+            data-askmark-article-actions-toggle
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >Actions <span aria-hidden="true">▾</span></button>
+          <div
+            class="askmark-article-actions-menu"
+            data-askmark-article-actions-menu
+            role="menu"
+            hidden
+          >
+            ${Object.entries(ACTIONS).map(([key,item]) => `
+              <button
+                type="button"
+                role="menuitem"
+                data-askmark-article-action="${key}"
+              >${item.label}</button>
+            `).join('')}
+          </div>
         </div>
       </div>`;
-  }
-
-  function bindActionButtons(root) {
-    root?.querySelectorAll('[data-askmark-article-action]').forEach((button) => {
-      if (button.dataset.askmarkArticleBound === '1') return;
-      button.dataset.askmarkArticleBound = '1';
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        const action = String(button.dataset.askmarkArticleAction || '');
-        void runAction(action);
-      });
-    });
   }
 
   function makeInputReady(field, { focus = false } = {}) {
     if (!field) return false;
 
-    // A full article should never need a selection before the composer can be used.
     field.disabled = false;
     field.readOnly = false;
     field.removeAttribute('disabled');
@@ -121,9 +168,122 @@
     return true;
   }
 
+  function closeActionsMenu() {
+    const menu = $('[data-askmark-article-actions-menu]');
+    const toggle = $('[data-askmark-article-actions-toggle]');
+    if (menu) menu.hidden = true;
+    if (toggle) toggle.setAttribute('aria-expanded','false');
+  }
+
+  function toggleActionsMenu() {
+    const menu = $('[data-askmark-article-actions-menu]');
+    const toggle = $('[data-askmark-article-actions-toggle]');
+    if (!menu || !toggle) return false;
+
+    const nextOpen = menu.hidden;
+    menu.hidden = !nextOpen;
+    toggle.setAttribute('aria-expanded', nextOpen ? 'true' : 'false');
+    return nextOpen;
+  }
+
+  function submitThroughComposer(question) {
+    const field = input();
+    const send = sendButton();
+    const clean = String(question || '').trim();
+
+    if (!field || !send || !clean) return false;
+
+    makeInputReady(field);
+    markConversationStarted();
+
+    field.value = clean;
+    field.dispatchEvent(new Event('input', { bubbles:true }));
+    send.click();
+    return true;
+  }
+
+  function runAction(action) {
+    const item = ACTIONS[String(action || '').toLowerCase()];
+    if (!item || !articleAvailable()) return false;
+
+    const scope = scopeInfo();
+    closeActionsMenu();
+
+    // IMPORTANT: use the same composer as a normal reader question.
+    // ask-mark-hub.js already owns the routing rule:
+    // selection present -> selected passage
+    // no selection     -> whole article
+    return submitThroughComposer(scope.selected ? item.selected : item.whole);
+  }
+
+  function bindArticleControls(root) {
+    if (!root) return;
+
+    const toggle = root.querySelector('[data-askmark-article-actions-toggle]');
+    if (toggle && toggle.dataset.askmarkCompactBound !== '1') {
+      toggle.dataset.askmarkCompactBound = '1';
+      toggle.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleActionsMenu();
+      });
+    }
+
+    root.querySelectorAll('[data-askmark-article-action]').forEach((button) => {
+      if (button.dataset.askmarkCompactBound === '1') return;
+      button.dataset.askmarkCompactBound = '1';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        runAction(button.dataset.askmarkArticleAction);
+      });
+    });
+  }
+
+  function syncScope() {
+    if (!articleAvailable()) return false;
+
+    const scope = scopeInfo();
+    const chip = $('[data-askmark-article-scope]');
+    const field = input();
+    const toggle = $('[data-askmark-article-actions-toggle]');
+
+    if (chip) {
+      chip.textContent = scope.label;
+      chip.dataset.scope = scope.key;
+      chip.title = scope.selected
+        ? 'Ask Beth will use only the highlighted passage.'
+        : 'Ask Beth will use the whole article because nothing is highlighted.';
+    }
+
+    if (field) {
+      field.placeholder = scope.selected
+        ? 'Ask about the selected passage…'
+        : 'Ask anything about this article…';
+      field.setAttribute(
+        'aria-label',
+        scope.selected
+          ? 'Ask about the selected passage'
+          : 'Ask about the whole article'
+      );
+    }
+
+    if (toggle) {
+      toggle.setAttribute(
+        'aria-label',
+        scope.selected
+          ? 'Actions for selected passage'
+          : 'Actions for whole article'
+      );
+    }
+
+    return true;
+  }
+
   function syncArticleUi({ focus = false } = {}) {
     const targetComposer = composer();
     const field = input();
+
     if (!targetComposer || !field) return false;
 
     let tools = targetComposer.querySelector('[data-askmark-article-mode]');
@@ -144,9 +304,9 @@
       tools = targetComposer.querySelector('[data-askmark-article-mode]');
     }
 
-    bindActionButtons(tools);
-    field.placeholder = 'Ask anything about the whole article…';
-    field.setAttribute('aria-label','Ask about the whole article');
+    bindArticleControls(tools);
+    syncScope();
+    syncConversationStartedFromDom();
     makeInputReady(field, { focus });
     return true;
   }
@@ -157,20 +317,18 @@
     });
   }
 
-  async function askWholeArticle(question, displayQuestion = '') {
-    const api = hub();
-    if (!articleAvailable() || typeof api?.askWholeArticle !== 'function') return false;
-    return api.askWholeArticle(
-      String(question || '').trim(),
-      String(displayQuestion || '').trim()
-    );
-  }
-
-  async function runAction(action) {
-    const item = ACTIONS[String(action || '').toLowerCase()];
-    if (!item || !articleAvailable()) return false;
-    return askWholeArticle(item.prompt, item.label);
-  }
+  // Hide the introductory greeting as soon as the reader actually begins
+  // composing. Capture phase means this does not interfere with the Hub owner.
+  document.addEventListener('input', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (
+      articleAvailable() &&
+      target?.matches?.('[data-askmark-input]') &&
+      String(target.value || '').trim()
+    ) {
+      markConversationStarted();
+    }
+  }, true);
 
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
@@ -183,27 +341,66 @@
     ) {
       scheduleSync({ focus:true });
     }
+
+    if (target.closest('[data-askmark-send]') && articleAvailable()) {
+      const value = String(input()?.value || '').trim();
+      if (value) markConversationStarted();
+    }
+
+    const menu = $('[data-askmark-article-actions-menu]');
+    if (
+      menu &&
+      !menu.hidden &&
+      !target.closest('[data-askmark-article-actions-wrap]') &&
+      !target.closest('.askmark-article-actions-wrap')
+    ) {
+      closeActionsMenu();
+    }
   }, true);
 
-  document.addEventListener('marksetgo:document-available', () => {
-    scheduleSync({ focus:panelVisible() });
+  document.addEventListener('keydown', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+
+    if (
+      articleAvailable() &&
+      target?.matches?.('[data-askmark-input]') &&
+      event.key === 'Enter' &&
+      !event.shiftKey &&
+      String(target.value || '').trim()
+    ) {
+      markConversationStarted();
+    }
+
+    if (event.key === 'Escape') closeActionsMenu();
+  }, true);
+
+  document.addEventListener('selectionchange', () => {
+    window.setTimeout(syncScope, 60);
   });
 
-  document.addEventListener('marksetgo:workspace-layout-mode', () => {
-    scheduleSync({ focus:false });
+  [
+    'marksetgo:askmark-legacy-updated',
+    'marksetgo:document-available',
+    'marksetgo:workspace-layout-mode'
+  ].forEach((name) => {
+    document.addEventListener(name, () => {
+      scheduleSync({ focus:name === 'marksetgo:document-available' && panelVisible() });
+    });
   });
 
   window.addEventListener('pageshow', () => scheduleSync());
 
-  // Compatibility API for the pop-out controller. The actual conversation/API
-  // owner is ask-mark-hub.js.
+  // Pop-out compatibility. These calls deliberately go through the normal
+  // composer, preserving the exact same selection-first routing rule.
   window.MarkSetGoArticleCompanion = Object.freeze({
     available:articleAvailable,
-    ask:(question) => askWholeArticle(question, question),
+    scope:() => scopeInfo().key,
+    scopeLabel:() => scopeInfo().label,
+    ask:(question) => submitThroughComposer(question),
     action:runAction,
     sync:syncArticleUi,
     actions:Object.fromEntries(
-      Object.entries(ACTIONS).map(([key,value]) => [key,value.prompt])
+      Object.entries(ACTIONS).map(([key,value]) => [key,value.label])
     )
   });
 

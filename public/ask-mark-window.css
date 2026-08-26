@@ -1,20 +1,18 @@
-/* Ask Beth window management — popup-only edition.
-   Expanded/overlay Ask Beth has been retired. */
+/* Ask Beth — conversation-first docked sidebar, popup-only.
+   Expanded/overlay mode is retired. */
 
 :root{
   --msg-askmark-docked-width:500px;
 }
 
-/* Preserve the roomier normal docked width. The Reader splitter can still
-   write --word-panel-width after the user resizes it. */
+/* Preserve the normal Reader splitter as the width owner. */
 @media (min-width:1000px){
   #reader-layout.msg-askmark-window-ready:not(.word-panel-hidden){
     --word-panel-width:var(--msg-askmark-docked-width);
   }
 }
 
-/* Hard-disable any stale Expand/Restore UI that an older cached script may
-   briefly try to create. The popup control is NOT affected. */
+/* Expanded Ask Beth is retired. Hide stale controls/state from older caches. */
 .askmark-window-toggle,
 [data-askmark-window-toggle],
 .askmark-window-resize,
@@ -22,15 +20,10 @@
   display:none !important;
 }
 
-/* If an older cached script leaves the expanded state class behind, neutralize
-   the overlay geometry and return Ask Beth to the ordinary Reader right pane. */
 html.msg-askmark-expanded .mark-companion-panel{
   position:relative !important;
   z-index:auto !important;
-  top:auto !important;
-  right:auto !important;
-  bottom:auto !important;
-  left:auto !important;
+  inset:auto !important;
   width:auto !important;
   max-width:none !important;
   min-width:0 !important;
@@ -45,127 +38,249 @@ html.msg-askmark-expanded body::after{
   display:none !important;
 }
 
-/* Keep header controls understandable:
-   Notebook / Format / Settings together, popup as the window action. */
+/* -------------------------------------------------------------------------
+   Compact header: keep the familiar tools, but make the header a small bar.
+   ------------------------------------------------------------------------- */
 .mark-companion-panel{
   container-type:inline-size;
 }
 
-.askmark-brand-copy{
+.mark-companion-panel .askmark-hero{
+  min-height:58px !important;
+  grid-template-columns:40px minmax(0,1fr) auto !important;
+  gap:.52rem !important;
+  padding:.5rem .62rem !important;
+}
+
+.mark-companion-panel .askmark-avatar-wrap{
+  width:38px !important;
+  height:38px !important;
+}
+
+.mark-companion-panel .askmark-avatar-glow{
+  inset:-4px !important;
+}
+
+.mark-companion-panel .askmark-presence{
+  width:10px !important;
+  height:10px !important;
+  border-width:2px !important;
+}
+
+.mark-companion-panel .askmark-eyebrow{
+  display:none !important;
+}
+
+.mark-companion-panel .askmark-brand-copy{
   min-width:0;
 }
 
-.askmark-brand-copy h2{
+.mark-companion-panel .askmark-brand-copy h2{
   max-width:100%;
+  margin:0 !important;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-  word-break:normal;
-  overflow-wrap:normal;
+  font-size:1.12rem !important;
+  line-height:1.05 !important;
 }
 
-.askmark-header-actions{
+.mark-companion-panel .askmark-header-actions{
   display:flex !important;
   align-items:center !important;
-  gap:.42rem !important;
+  gap:.28rem !important;
   min-width:0;
-  padding-right:1.45rem !important;
+  padding-right:1.15rem !important;
 }
 
-.askmark-header-tool-actions,
-.askmark-header-window-actions{
+.mark-companion-panel .askmark-header-tool-actions,
+.mark-companion-panel .askmark-header-window-actions{
   display:flex;
   align-items:center;
-  gap:.28rem;
+  gap:.22rem;
   min-width:0;
 }
 
-.askmark-header-window-actions{
-  padding-left:.42rem;
+.mark-companion-panel .askmark-header-window-actions{
+  padding-left:.34rem;
   border-left:1px solid rgba(255,255,255,.18);
 }
 
-/* The only window action now is Pop out. */
-.askmark-header-window-actions:empty{
+.mark-companion-panel .askmark-header-window-actions:empty{
   display:none;
 }
 
-@container (max-width:470px){
-  .askmark-hero{
-    grid-template-columns:52px minmax(0,1fr) !important;
-    grid-template-areas:
-      "avatar brand"
-      "actions actions";
-    gap:.5rem .65rem !important;
-    padding:.72rem .72rem .68rem !important;
+.mark-companion-panel .askmark-header-actions button,
+.mark-companion-panel .askmark-popout-button{
+  width:29px !important;
+  min-width:29px !important;
+  height:29px !important;
+  min-height:29px !important;
+  padding:0 !important;
+}
+
+.mark-companion-panel .askmark-close{
+  top:.22rem !important;
+  right:.24rem !important;
+  width:22px !important;
+  height:22px !important;
+  font-size:1.05rem !important;
+}
+
+/* -------------------------------------------------------------------------
+   Conversation gets almost all available height.
+   ------------------------------------------------------------------------- */
+.mark-companion-panel [data-askmark-premium],
+.mark-companion-panel .askmark-premium{
+  display:grid !important;
+  grid-template-rows:auto minmax(0,1fr) auto !important;
+  height:100% !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+
+.mark-companion-panel .askmark-stage{
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+
+.mark-companion-panel .askmark-view[data-askmark-view-panel="chat"].is-active{
+  box-sizing:border-box !important;
+  display:flex !important;
+  flex-direction:column !important;
+  height:auto !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+  padding:.42rem .58rem .3rem !important;
+}
+
+.mark-companion-panel .askmark-conversation{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  height:auto !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  padding:.2rem .08rem .25rem !important;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+}
+
+.mark-companion-panel .askmark-message{
+  margin-bottom:.58rem !important;
+}
+
+.mark-companion-panel .askmark-message > img{
+  width:27px !important;
+  height:27px !important;
+}
+
+.mark-companion-panel .askmark-message > div{
+  max-width:91% !important;
+}
+
+.mark-companion-panel .askmark-message p,
+.mark-companion-panel .askmark-rich-response{
+  padding:.58rem .68rem !important;
+  font-size:.84rem !important;
+  line-height:1.48 !important;
+}
+
+/* Initial greeting is deliberately tiny. Once the reader starts typing,
+   article-mode.js adds askmark-conversation-started and the greeting vanishes. */
+.mark-companion-panel .askmark-conversation > .askmark-message:first-child{
+  margin:.05rem 0 .35rem !important;
+}
+
+.mark-companion-panel .askmark-conversation > .askmark-message:first-child > img,
+.mark-companion-panel .askmark-conversation > .askmark-message:first-child > div > span{
+  display:none !important;
+}
+
+.mark-companion-panel .askmark-conversation > .askmark-message:first-child > div{
+  max-width:100% !important;
+  width:100% !important;
+}
+
+.mark-companion-panel .askmark-conversation > .askmark-message:first-child p{
+  padding:.46rem .58rem !important;
+  border-radius:10px !important;
+  font-size:.78rem !important;
+  line-height:1.4 !important;
+  box-shadow:none !important;
+}
+
+.mark-companion-panel .askmark-premium.askmark-conversation-started
+.askmark-conversation > .askmark-message:first-child{
+  display:none !important;
+}
+
+/* The input grows automatically with text, so the old drag handle only burns
+   vertical space and creates another interaction the reader does not need. */
+.mark-companion-panel .askmark-composer-resize{
+  display:none !important;
+}
+
+/* Composer is a reserved bottom row and never scrolls with the answer. */
+.mark-companion-panel .askmark-composer{
+  position:relative !important;
+  z-index:20 !important;
+  box-sizing:border-box !important;
+  flex:0 0 auto !important;
+  margin:0 !important;
+  border-top:1px solid rgba(17,52,81,.12) !important;
+  background:rgba(255,253,247,.985) !important;
+  backdrop-filter:blur(12px);
+}
+
+.mark-companion-panel .askmark-composer textarea{
+  min-height:40px !important;
+  padding:.58rem .68rem !important;
+  font-size:.82rem !important;
+}
+
+.mark-companion-panel .askmark-plus,
+.mark-companion-panel .askmark-send{
+  width:38px !important;
+  min-width:38px !important;
+  height:38px !important;
+  min-height:38px !important;
+}
+
+/* Narrow panes keep the same architecture instead of stacking a giant header. */
+@container (max-width:410px){
+  .mark-companion-panel .askmark-hero{
+    grid-template-columns:36px minmax(0,1fr) auto !important;
+    grid-template-areas:none !important;
+    gap:.4rem !important;
+    padding:.46rem .5rem !important;
   }
 
-  .askmark-avatar-wrap{
-    grid-area:avatar;
-    width:48px !important;
-    height:48px !important;
+  .mark-companion-panel .askmark-avatar-wrap{
+    width:34px !important;
+    height:34px !important;
   }
 
-  .askmark-brand-copy{
-    grid-area:brand;
-    align-self:center;
+  .mark-companion-panel .askmark-brand-copy h2{
+    font-size:1.02rem !important;
   }
 
-  .askmark-header-actions{
-    grid-area:actions;
-    justify-self:start;
-    width:100%;
-    padding-right:1.55rem !important;
+  .mark-companion-panel .askmark-header-actions{
+    width:auto !important;
+    padding-right:1.1rem !important;
+    gap:.2rem !important;
   }
 
-  .askmark-brand-copy h2{
-    font-size:1.12rem !important;
-  }
-
-  .askmark-eyebrow{
-    font-size:.57rem !important;
-    letter-spacing:.09em !important;
-    white-space:nowrap;
-  }
-
-  .askmark-header-actions button,
-  .askmark-popout-button{
-    width:31px !important;
-    min-width:31px !important;
-    height:31px !important;
-    min-height:31px !important;
+  .mark-companion-panel .askmark-header-actions button,
+  .mark-companion-panel .askmark-popout-button{
+    width:27px !important;
+    min-width:27px !important;
+    height:27px !important;
+    min-height:27px !important;
   }
 }
 
-@container (max-width:360px){
-  .askmark-hero{
-    grid-template-columns:44px minmax(0,1fr) !important;
-    gap:.42rem .5rem !important;
-  }
-
-  .askmark-avatar-wrap{
-    width:42px !important;
-    height:42px !important;
-  }
-
-  .askmark-eyebrow{
+@container (max-width:350px){
+  .mark-companion-panel .askmark-header-actions [data-askmark-view="format"]{
     display:none !important;
-  }
-
-  .askmark-brand-copy h2{
-    font-size:1.06rem !important;
-  }
-
-  .askmark-header-actions{
-    gap:.25rem !important;
-  }
-
-  .askmark-header-tool-actions,
-  .askmark-header-window-actions{
-    gap:.2rem;
-  }
-
-  .askmark-header-window-actions{
-    padding-left:.3rem;
   }
 }

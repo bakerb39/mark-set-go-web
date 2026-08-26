@@ -33,129 +33,17 @@ function ensureAfterAsset(content, anchorAsset, html) {
   throw new Error(`ui cache: could not locate anchor asset ${anchorAsset}`);
 }
 
-function replaceRequired(content, before, after, label) {
-  if (content.includes(after)) return content;
-  if (!content.includes(before)) {
-    throw new Error(`ui cache: expected ${label} marker was not found`);
-  }
-  return content.replace(before, after);
-}
+/*
+  IMPORTANT:
+  There is intentionally NO patchAskMarkHubArticleOwner() here.
 
-function patchAskMarkHubArticleOwner() {
-  const hubPath = path.join(__dirname, 'public', 'ask-mark-hub.js');
-  let hub = fs.readFileSync(hubPath, 'utf8');
+  ask-mark-hub.js already owns the correct routing rule:
+    highlighted passage -> selection
+    no highlight        -> whole article
 
-  if (hub.includes("version:'1.2-article-composer-owner'")) {
-    return false;
-  }
-
-  hub = replaceRequired(
-    hub,
-`  async function runWholeArticleFollowup(question) {
-    const context = activeWholeArticleConversation();
-    if (!context || !question) return false;
-    const requestQuestion=questionWithAddedContext(question);
-
-    addUserMessage(question);`,
-`  async function runWholeArticleFollowup(question,{ forceWholeArticle=false, displayQuestion='' }={}) {
-    const context = forceWholeArticle
-      ? ensureWholeArticleConversationContext()
-      : activeWholeArticleConversation();
-    if (!context || !question) return false;
-
-    const shownQuestion=String(displayQuestion || question).trim();
-    const requestQuestion=questionWithAddedContext(question);
-
-    addUserMessage(shownQuestion);`,
-    'whole-article follow-up owner'
-  );
-
-  hub = replaceRequired(
-    hub,
-`      if (activeWholeArticleConversation()) {
-        void runWholeArticleFollowup(value);
-        return;
-      }
-
-      runSelectionAction('ask', value);`,
-`      // For a full article, the Companion composer always means WHOLE ARTICLE.
-      // A highlighted sentence is used only by explicit passage actions.
-      if (currentWholeArticleReader()) {
-        void runWholeArticleFollowup(value,{ forceWholeArticle:true });
-        return;
-      }
-
-      runSelectionAction('ask', value);`,
-    'article composer send routing'
-  );
-
-  hub = replaceRequired(
-    hub,
-`    if (!shell?.isConnected) configureShell();
-    activatePremiumView('chat');
-    return Boolean(shell?.isConnected && $('[data-askmark-conversation]', shell));
-  }`,
-`    if (!shell?.isConnected) configureShell();
-    activatePremiumView('chat');
-
-    // Full articles do not require a selection before the reader can type.
-    const composerInput = $('[data-askmark-input]', shell);
-    if (currentWholeArticleReader() && composerInput) {
-      composerInput.disabled = false;
-      composerInput.readOnly = false;
-      composerInput.removeAttribute('disabled');
-      composerInput.removeAttribute('readonly');
-      composerInput.tabIndex = 0;
-      composerInput.style.pointerEvents = 'auto';
-      window.setTimeout(() => {
-        try { composerInput.focus({ preventScroll:true }); }
-        catch { try { composerInput.focus(); } catch {} }
-      }, 40);
-    }
-
-    return Boolean(shell?.isConnected && $('[data-askmark-conversation]', shell));
-  }`,
-    'article composer ready/focus'
-  );
-
-  hub = replaceRequired(
-    hub,
-`  window.MarkSetGoAskMarkHub = Object.freeze({
-    version:'1.1-context-plus-selection-tools',
-    open:ensureAskMarkChatVisible,
-    comparePassages:compareExternalPassages,
-    runStudyTool:(tool)=>runStudyTool(tool),
-    contextText:()=>addedContextText(),
-    contextItems:()=>addedConversationContext.map((item)=>({...item})),
-    clearContext:()=>clearConversationContext()
-  });`,
-`  window.MarkSetGoAskMarkHub = Object.freeze({
-    version:'1.2-article-composer-owner',
-    open:ensureAskMarkChatVisible,
-    isWholeArticle:()=>Boolean(currentWholeArticleReader()),
-    askWholeArticle:(question,displayQuestion='')=>{
-      const clean=String(question||'').trim();
-      if(!clean) return Promise.resolve(false);
-      return runWholeArticleFollowup(clean,{
-        forceWholeArticle:true,
-        displayQuestion:String(displayQuestion||'').trim()
-      });
-    },
-    comparePassages:compareExternalPassages,
-    runStudyTool:(tool)=>runStudyTool(tool),
-    contextText:()=>addedContextText(),
-    contextItems:()=>addedConversationContext.map((item)=>({...item})),
-    clearContext:()=>clearConversationContext()
-  });`,
-    'Ask Mark Hub public article API'
-  );
-
-  fs.writeFileSync(hubPath, hub, 'utf8');
-  console.log('ui cache: Ask Mark whole-article composer owner patched');
-  return true;
-}
-
-patchAskMarkHubArticleOwner();
+  The prior startup patch forced article questions to whole-article context and
+  created a second behavior owner. This version leaves the Hub source intact.
+*/
 
 let index = fs.readFileSync(indexPath, 'utf8');
 const before = index;
@@ -176,7 +64,7 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'ask-mark-hub.js',
-  '20260826-v9.6.10-article-composer-owner'
+  '20260826-v9.6.11-selection-first-owner'
 );
 
 index = replaceAssetVersion(
@@ -203,17 +91,16 @@ index = replaceAssetVersion(
   '20260826-v1.1.0-label-only'
 );
 
-
 index = replaceAssetVersion(
   index,
   'ask-mark-window.css',
-  '20260826-v1.3.0-responsive-window-actions'
+  '20260826-v1.5.0-conversation-first-popup-only'
 );
 
 index = replaceAssetVersion(
   index,
   'ask-mark-window.js',
-  '20260826-v1.3.0-responsive-window-actions'
+  '20260826-v1.5.0-conversation-first-popup-only'
 );
 
 index = replaceAssetVersion(
@@ -231,13 +118,13 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'ask-mark-article-mode.css',
-  '20260826-v1.1.0-owner-ui'
+  '20260826-v1.2.0-conversation-first'
 );
 
 index = replaceAssetVersion(
   index,
   'ask-mark-article-mode.js',
-  '20260826-v1.1.0-owner-ui'
+  '20260826-v1.2.0-conversation-first'
 );
 
 index = replaceAssetVersion(
@@ -301,7 +188,7 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-window.css',
-  '<link href="/ask-mark-article-mode.css?v=20260826-v1.1.0-owner-ui" rel="stylesheet"/>'
+  '<link href="/ask-mark-article-mode.css?v=20260826-v1.2.0-conversation-first" rel="stylesheet"/>'
 );
 
 index = ensureAfterAsset(
@@ -325,7 +212,7 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-window.js',
-  '  <script defer src="/ask-mark-article-mode.js?v=20260826-v1.1.0-owner-ui"></script>'
+  '  <script defer src="/ask-mark-article-mode.js?v=20260826-v1.2.0-conversation-first"></script>'
 );
 
 index = ensureAfterAsset(
@@ -342,7 +229,7 @@ index = ensureAfterAsset(
 
 if (index !== before) {
   fs.writeFileSync(indexPath, index, 'utf8');
-  console.log('ui cache: Ask Mark Desktop bridge disabled for stability');
+  console.log('ui cache: Ask Beth conversation-first popup-only sidebar current');
 } else {
-  console.log('ui cache: Ask Mark Desktop stability rollback already current');
+  console.log('ui cache: Ask Beth conversation-first assets already current');
 }

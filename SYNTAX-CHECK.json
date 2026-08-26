@@ -1,0 +1,14 @@
+{
+  "apply-ui-cache-busters.js": {
+    "ok": true,
+    "stderr": ""
+  },
+  "ask-mark-window.js": {
+    "ok": true,
+    "stderr": ""
+  },
+  "ask-mark-article-mode.js": {
+    "ok": true,
+    "stderr": ""
+  }
+}
