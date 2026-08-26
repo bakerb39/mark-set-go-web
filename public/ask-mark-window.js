@@ -66,33 +66,64 @@
     return Math.max(MIN_DOCK_WIDTH, Math.min(viewportMax, Math.round(Number(value) || DEFAULT_DOCK_WIDTH)));
   }
 
+  function desktopReaderContentRect() {
+    if (!document.body.classList.contains('msg-desktop-workspace-active')) return null;
+    const host = document.querySelector(
+      '.msg-desktop-reader-one-window .msg-desktop-window-content'
+    );
+    const rect = host?.getBoundingClientRect?.();
+    if (!rect || rect.width < 120 || rect.height < 160) return null;
+    return rect;
+  }
+
   function clampExpandedWidth(value) {
+    const hostRect = desktopReaderContentRect();
+    const availableWidth = hostRect
+      ? Math.max(280, Math.floor(hostRect.width - 12))
+      : Math.max(280, window.innerWidth - 28);
+
     const viewportMax = Math.max(
-      Math.min(MIN_EXPANDED_WIDTH, window.innerWidth - 28),
-      Math.min(MAX_EXPANDED_WIDTH, window.innerWidth - 28)
+      Math.min(MIN_EXPANDED_WIDTH, availableWidth),
+      Math.min(MAX_EXPANDED_WIDTH, availableWidth)
     );
     return Math.max(
       Math.min(MIN_EXPANDED_WIDTH, viewportMax),
-      Math.min(viewportMax, Math.round(Number(value) || Math.min(900, window.innerWidth * .64)))
+      Math.min(
+        viewportMax,
+        Math.round(Number(value) || Math.min(900, availableWidth * .82))
+      )
     );
   }
 
   function updateViewportBounds() {
     const root = document.documentElement;
-    const header = document.querySelector('.site-header');
-    const headerRect = header?.getBoundingClientRect();
-    const top = Math.max(8, Math.round((headerRect?.bottom || 0) + 8));
+    const desktopRect = desktopReaderContentRect();
 
+    let top = 8;
+    let right = 14;
     let bottom = 14;
-    const ribbon = document.getElementById('msg-shared-bottom');
-    if (ribbon) {
-      const rect = ribbon.getBoundingClientRect();
-      if (rect.height > 0 && rect.top > 0 && rect.top < window.innerHeight) {
-        bottom = Math.max(8, Math.round(window.innerHeight - rect.top + 8));
+
+    if (desktopRect) {
+      const inset = 4;
+      top = Math.max(inset, Math.round(desktopRect.top + inset));
+      right = Math.max(inset, Math.round(window.innerWidth - desktopRect.right + inset));
+      bottom = Math.max(inset, Math.round(window.innerHeight - desktopRect.bottom + inset));
+    } else {
+      const header = document.querySelector('.site-header');
+      const headerRect = header?.getBoundingClientRect();
+      top = Math.max(8, Math.round((headerRect?.bottom || 0) + 8));
+
+      const ribbon = document.getElementById('msg-shared-bottom');
+      if (ribbon) {
+        const rect = ribbon.getBoundingClientRect();
+        if (rect.height > 0 && rect.top > 0 && rect.top < window.innerHeight) {
+          bottom = Math.max(8, Math.round(window.innerHeight - rect.top + 8));
+        }
       }
     }
 
     root.style.setProperty('--msg-askmark-expanded-top', `${top}px`);
+    root.style.setProperty('--msg-askmark-expanded-right', `${right}px`);
     root.style.setProperty('--msg-askmark-expanded-bottom', `${bottom}px`);
   }
 

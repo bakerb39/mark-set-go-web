@@ -6,6 +6,7 @@
   --msg-askmark-expanded-width:min(900px,64vw);
   --msg-askmark-expanded-top:56px;
   --msg-askmark-expanded-bottom:14px;
+  --msg-askmark-expanded-right:14px;
 }
 
 /* The existing Reader right-pane splitter remains the docked resize owner.
@@ -50,14 +51,16 @@ html.msg-askmark-expanded .mark-companion-panel{
   position:fixed !important;
   z-index:10040 !important;
   top:var(--msg-askmark-expanded-top) !important;
-  right:14px !important;
+  right:var(--msg-askmark-expanded-right) !important;
   bottom:var(--msg-askmark-expanded-bottom) !important;
   left:auto !important;
   width:var(--msg-askmark-expanded-width) !important;
   max-width:calc(100vw - 28px) !important;
   min-width:min(520px,calc(100vw - 28px)) !important;
   height:auto !important;
+  max-height:calc(100vh - var(--msg-askmark-expanded-top) - var(--msg-askmark-expanded-bottom)) !important;
   min-height:0 !important;
+  box-sizing:border-box !important;
   margin:0 !important;
   border:1px solid rgba(228,196,99,.4) !important;
   border-radius:16px !important;
@@ -178,4 +181,25 @@ html.msg-askmark-expanded .mark-companion-panel{
   .mark-companion-panel{
     transition:box-shadow .16s ease,border-radius .16s ease;
   }
+}
+
+
+/* Desktop-bound expanded Companion.
+   All original Ask Beth header buttons remain visible and functional. */
+html.msg-askmark-expanded body.msg-desktop-workspace-active .mark-companion-panel .reader-control-shell.mark-shell,
+html.msg-askmark-expanded body.msg-desktop-workspace-active .mark-companion-panel [data-askmark-premium] {
+  height:100% !important;
+  max-height:100% !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+
+html.msg-askmark-expanded body.msg-desktop-workspace-active .askmark-stage,
+html.msg-askmark-expanded body.msg-desktop-workspace-active .askmark-view,
+html.msg-askmark-expanded body.msg-desktop-workspace-active .askmark-conversation {
+  min-height:0 !important;
+}
+
+html.msg-askmark-expanded body.msg-desktop-workspace-active .askmark-composer {
+  flex:0 0 auto !important;
 }

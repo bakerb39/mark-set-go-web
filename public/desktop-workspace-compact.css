@@ -1,41 +1,33 @@
-/* Desktop Workspace compact toolbar v1.0
-   Preserve canvas space: instructions move to title/tooltips instead of a
-   permanently visible explanatory strip. */
-
-.msg-desktop-toolbar{
-  top:5px !important;
-  min-height:28px !important;
-  max-width:max-content !important;
-  padding:3px 5px !important;
-  gap:4px !important;
-  border-radius:7px !important;
-}
-
-/* The permanent "Drag a title bar · resize from any edge" sentence costs
-   valuable vertical and horizontal real estate. Desktop behavior is now
-   discoverable through window affordances/tooltips instead. */
-.msg-desktop-toolbar > span{
+/* Desktop Workspace: controls live in Readers -> Layout. */
+.msg-desktop-toolbar {
   display:none !important;
 }
 
-.msg-desktop-toolbar > strong{
-  margin:0 3px 0 2px !important;
-  font-size:.69rem !important;
-  line-height:1 !important;
+/* Redundant per-window Desktop/Standard toggle is removed from JS; hide any
+   stale cached copy during the transition. */
+.msg-desktop-mode-button,
+[data-msg-desktop-toggle] {
+  display:none !important;
 }
 
-.msg-desktop-toolbar button{
-  min-height:22px !important;
-  padding:2px 6px !important;
-  border-radius:5px !important;
-  font-size:.65rem !important;
-  line-height:1 !important;
+.msg-readers-layout-control {
+  flex-wrap:wrap;
 }
 
-/* Use the toolbar label as the concise orientation cue. */
-.msg-desktop-toolbar > strong::after{
-  content:"";
+.msg-readers-layout-reset {
+  flex:1 0 100%;
+  min-height:24px !important;
+  margin-top:3px !important;
+  padding:3px 6px !important;
+  border:0 !important;
+  border-top:1px solid rgba(11,45,79,.10) !important;
+  border-radius:0 !important;
+  background:transparent !important;
+  color:var(--msg-muted,#60758a) !important;
+  box-shadow:none !important;
+  font:inherit !important;
+  font-size:.66rem !important;
+  font-weight:760 !important;
+  text-align:right;
+  cursor:pointer;
 }
-
-/* Slightly reclaim canvas height. Existing window geometry already honors
-   TOOLBAR_CLEARANCE, so this is visual-only and does not move saved windows. */

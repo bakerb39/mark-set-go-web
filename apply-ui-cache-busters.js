@@ -58,13 +58,38 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'media-panel.js',
-  '20260826-v1.2.2-beside-reader-layout'
+  '20260826-v1.2.3-reader-launch-owner'
 );
 
 index = replaceAssetVersion(
   index,
   'media-player-launch-polish.js',
   '20260826-v1.1.0-label-only'
+);
+
+
+index = replaceAssetVersion(
+  index,
+  'ask-mark-window.css',
+  '20260826-v1.1.1-desktop-bounds-buttons-kept'
+);
+
+index = replaceAssetVersion(
+  index,
+  'ask-mark-window.js',
+  '20260826-v1.1.1-desktop-bounds-buttons-kept'
+);
+
+index = replaceAssetVersion(
+  index,
+  'desktop-workspace.js',
+  '20260826-v1.0.5-menu-layout-only'
+);
+
+index = replaceAssetVersion(
+  index,
+  'desktop-workspace-compact.css',
+  '20260826-v1.1.1-menu-layout-only'
 );
 
 /* Stability rollback:
@@ -98,7 +123,7 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'desktop-workspace.css',
-  '<link href="/desktop-workspace-compact.css?v=20260826-v1.0.0-compact-toolbar" rel="stylesheet"/>'
+  '<link href="/desktop-workspace-compact.css?v=20260826-v1.1.1-menu-layout-only" rel="stylesheet"/>'
 );
 
 index = ensureAfterAsset(

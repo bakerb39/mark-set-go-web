@@ -6,7 +6,7 @@
   const MIN_DESKTOP_WIDTH = 1000;
   const MIN_WINDOW_WIDTH = 360;
   const MIN_WINDOW_HEIGHT = 300;
-  const TOOLBAR_CLEARANCE = 46;
+  const TOOLBAR_CLEARANCE = 8;
 
   const app = document.querySelector('#app');
   if (!app) return;
@@ -154,35 +154,12 @@
   }
 
   function ensureModeButton(shell = workspaceShell()) {
-    if (!shell || shell.classList.contains('is-closed')) return null;
-    const controls = shell.querySelector('.msg-workspace-panel-head .msg-workspace-window-controls');
-    if (!controls) return null;
-
-    let button = controls.querySelector('[data-msg-desktop-toggle]');
-    if (!button) {
-      button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'msg-desktop-mode-button';
-      button.dataset.msgDesktopToggle = '1';
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (desktopActive) {
-          writeMode('standard');
-          deactivateDesktop();
-        } else {
-          writeMode('desktop');
-          activateDesktop();
-        }
-      });
-      controls.insertBefore(button, controls.firstChild);
-    }
-    button.textContent = desktopActive ? 'Standard' : 'Desktop';
-    button.title = desktopActive
-      ? 'Return to the normal two-frame workspace'
-      : 'Move workspace panes like desktop windows';
-    button.setAttribute('aria-pressed', desktopActive ? 'true' : 'false');
-    return button;
+    // Layout mode is controlled only from Readers -> Layout.
+    // Remove the older redundant Desktop/Standard button from window chrome.
+    shell?.querySelectorAll('[data-msg-desktop-toggle]').forEach((button) => {
+      try { button.remove(); } catch {}
+    });
+    return null;
   }
 
   function ensureReadersMenuOption() {
@@ -209,13 +186,26 @@
           <button type="button"
             class="msg-readers-layout-option"
             data-msg-layout-choice="desktop">Desktop</button>
-        </div>`;
+        </div>
+        <button type="button"
+          class="msg-readers-layout-reset"
+          data-msg-layout-reset
+          hidden>Reset layout</button>`;
 
       const addButton = popover.querySelector('[data-msg-reader-add]');
       if (addButton) addButton.insertAdjacentElement('afterend', control);
       else popover.appendChild(control);
 
       control.addEventListener('click', (event) => {
+        const reset = event.target.closest('[data-msg-layout-reset]');
+        if (reset) {
+          event.preventDefault();
+          event.stopPropagation();
+          resetDesktopLayout();
+          ensureReadersMenuOption();
+          return;
+        }
+
         const button = event.target.closest('[data-msg-layout-choice]');
         if (!button) return;
 
@@ -240,6 +230,7 @@
 
     const standard = control.querySelector('[data-msg-layout-choice="standard"]');
     const desktop = control.querySelector('[data-msg-layout-choice="desktop"]');
+    const reset = control.querySelector('[data-msg-layout-reset]');
 
     standard?.setAttribute('aria-pressed', desktopActive ? 'false' : 'true');
     desktop?.setAttribute('aria-pressed', desktopActive ? 'true' : 'false');
@@ -253,6 +244,8 @@
       desktop?.removeAttribute('disabled');
       desktop?.removeAttribute('title');
     }
+
+    if (reset) reset.hidden = !desktopActive;
 
     return control;
   }
@@ -639,22 +632,8 @@
 
     canvas = document.createElement('div');
     canvas.className = 'msg-desktop-canvas';
-    canvas.innerHTML = `
-      <div class="msg-desktop-toolbar" role="toolbar" aria-label="Desktop workspace controls">
-        <strong>Desktop Workspace</strong>
-        <span>Drag a title bar · resize from any edge</span>
-        <button type="button" data-msg-desktop-reset>Reset layout</button>
-        <button type="button" data-msg-desktop-standard>Standard</button>
-      </div>`;
+    // Layout controls live in Readers -> Layout. No persistent canvas toolbar.
     shell.appendChild(canvas);
-
-    canvas.querySelector('[data-msg-desktop-standard]')?.addEventListener('click', () => {
-      writeMode('standard');
-      deactivateDesktop();
-    });
-    canvas.querySelector('[data-msg-desktop-reset]')?.addEventListener('click', () => {
-      resetDesktopLayout();
-    });
     return canvas;
   }
 
