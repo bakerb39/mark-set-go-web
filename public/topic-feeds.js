@@ -870,7 +870,7 @@
     const contentTop = Math.max(0, readerRect.top - frameRect.top + paddingTop);
     // Leave a tiny gap so the Reader's own top boundary line remains visible.
     // Reduce internal padding by the same amount so Source/actions do not move.
-    const boundaryGap = 3;
+    const boundaryGap = 1;
     const headerTop = Math.min(boundaryGap, contentTop);
     const headerContentPadding = Math.max(0, contentTop - headerTop);
 

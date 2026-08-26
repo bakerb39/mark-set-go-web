@@ -29,7 +29,7 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'topic-feeds.js',
-  '20260825-v2.5.6-boundary-gap'
+  '20260825-v2.5.7-boundary-gap-1px'
 );
 
 if (index !== before) {
