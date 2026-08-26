@@ -124,7 +124,7 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'ask-mark-article-mode.js',
-  '20260826-v1.2.0-conversation-first'
+  '20260826-v1.2.1-canonical-selection-clear'
 );
 
 index = replaceAssetVersion(
@@ -212,7 +212,7 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-window.js',
-  '  <script defer src="/ask-mark-article-mode.js?v=20260826-v1.2.0-conversation-first"></script>'
+  '  <script defer src="/ask-mark-article-mode.js?v=20260826-v1.2.1-canonical-selection-clear"></script>'
 );
 
 index = ensureAfterAsset(

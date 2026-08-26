@@ -71,11 +71,60 @@
     );
   }
 
-  function selectionText() {
+  function canonicalSelection() {
+    const api = window.MarkSetGoCurrentReaderDocument;
+    if (typeof api?.getSelectionRange !== 'function') {
+      return { available:false, range:null, text:'' };
+    }
+
+    try {
+      const range = api.getSelectionRange();
+      return {
+        available:true,
+        range:range || null,
+        text:String(range?.text || '').trim()
+      };
+    } catch {
+      return { available:false, range:null, text:'' };
+    }
+  }
+
+  function legacySelectionText() {
     return selectionPanel()
       ?.querySelector('.mark-selection-card blockquote')
       ?.textContent
       ?.trim() || '';
+  }
+
+  function clearStaleLegacySelection() {
+    const canonical = canonicalSelection();
+
+    // If the Reader exposes its canonical selection API, it is authoritative.
+    // An empty canonical range means the passage has been deselected, even if
+    // the older Ask Beth selection card still contains the previous quote.
+    if (!canonical.available || canonical.text) return false;
+
+    const panel = selectionPanel();
+    const quote = panel?.querySelector('.mark-selection-card blockquote');
+    const card = quote?.closest('.mark-selection-card');
+
+    if (quote && String(quote.textContent || '').trim()) {
+      quote.textContent = '';
+    }
+    if (card) card.hidden = true;
+
+    return true;
+  }
+
+  function selectionText() {
+    const canonical = canonicalSelection();
+
+    // Never fall back to stale legacy text when the canonical API exists.
+    if (canonical.available) return canonical.text;
+
+    // Compatibility only for older Reader builds that do not expose
+    // getSelectionRange().
+    return legacySelectionText();
   }
 
   function scopeInfo() {
@@ -187,6 +236,8 @@
   }
 
   function submitThroughComposer(question) {
+    clearStaleLegacySelection();
+
     const field = input();
     const send = sendButton();
     const clean = String(question || '').trim();
@@ -243,6 +294,7 @@
   function syncScope() {
     if (!articleAvailable()) return false;
 
+    clearStaleLegacySelection();
     const scope = scopeInfo();
     const chip = $('[data-askmark-article-scope]');
     const field = input();
@@ -374,9 +426,18 @@
     if (event.key === 'Escape') closeActionsMenu();
   }, true);
 
-  document.addEventListener('selectionchange', () => {
-    window.setTimeout(syncScope, 60);
-  });
+  function scheduleSelectionScopeSync() {
+    [0,60,180].forEach((delay) => {
+      window.setTimeout(() => {
+        clearStaleLegacySelection();
+        syncScope();
+      }, delay);
+    });
+  }
+
+  document.addEventListener('selectionchange', scheduleSelectionScopeSync);
+  document.addEventListener('pointerup', scheduleSelectionScopeSync, true);
+  window.addEventListener('focus', scheduleSelectionScopeSync);
 
   [
     'marksetgo:askmark-legacy-updated',
