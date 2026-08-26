@@ -36,7 +36,7 @@ function ensureAfterAsset(content, anchorAsset, html) {
 let index = fs.readFileSync(indexPath, 'utf8');
 const before = index;
 
-/* Preserve the current direct-owner cache versions. */
+/* Preserve current direct-owner versions. */
 index = replaceAssetVersion(
   index,
   'page-theme-polish.css',
@@ -58,7 +58,7 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'media-panel.js',
-  '20260826-v1.2.3-reader-launch-owner'
+  '20260826-v1.2.2-beside-reader-layout'
 );
 
 index = replaceAssetVersion(
@@ -67,20 +67,22 @@ index = replaceAssetVersion(
   '20260826-v1.1.0-label-only'
 );
 
+/* Stability rollback:
+   Keep the asset slots so old runtime-injected tags get a NEW cache URL,
+   but load a disabled/no-reparent implementation instead of Phase 2. */
 index = replaceAssetVersion(
   index,
   'ask-mark-desktop.css',
-  '20260826-v2.1.0-single-owner'
+  '20260826-v2.2.0-disabled-stability'
 );
 
 index = replaceAssetVersion(
   index,
   'ask-mark-desktop.js',
-  '20260826-v2.1.0-single-owner'
+  '20260826-v2.2.0-disabled-stability'
 );
 
-/* Phase 2 Reading Companion Desktop bridge.
-   Loaded after Phase 1 Ask Mark window assets and after Desktop Workspace. */
+/* Other additive UI assets remain unchanged. */
 index = ensureAfterAsset(
   index,
   'topic-feeds.css',
@@ -102,18 +104,18 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-window.css',
-  '<link href="/ask-mark-desktop.css?v=20260826-v2.1.0-single-owner" rel="stylesheet"/>'
+  '<link href="/ask-mark-desktop.css?v=20260826-v2.2.0-disabled-stability" rel="stylesheet"/>'
 );
 
 index = ensureAfterAsset(
   index,
   'ask-mark-window.js',
-  '  <script defer src="/ask-mark-desktop.js?v=20260826-v2.1.0-single-owner"></script>'
+  '  <script defer src="/ask-mark-desktop.js?v=20260826-v2.2.0-disabled-stability"></script>'
 );
 
 if (index !== before) {
   fs.writeFileSync(indexPath, index, 'utf8');
-  console.log('ui cache: Reading Companion Desktop Phase 2 assets installed');
+  console.log('ui cache: Ask Mark Desktop bridge disabled for stability');
 } else {
-  console.log('ui cache: Reading Companion Desktop Phase 2 assets already current');
+  console.log('ui cache: Ask Mark Desktop stability rollback already current');
 }
