@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Reading Companion</title>
+  <link rel="stylesheet" href="/ask-mark-popout.css?v=20260826-v1.0.0">
+</head>
+<body>
+  <main class="companion-popout" data-popout-shell>
+    <header class="popout-header">
+      <div class="popout-identity">
+        <img data-popout-avatar alt="" hidden>
+        <div>
+          <span>YOUR READING COMPANION</span>
+          <h1 data-popout-name>Reading Companion</h1>
+        </div>
+      </div>
+      <div class="popout-header-actions">
+        <button type="button" data-focus-reader title="Focus Reader">Reader</button>
+        <button type="button" data-close-popout aria-label="Close pop-out" title="Close">×</button>
+      </div>
+    </header>
+
+    <section class="popout-reading">
+      <span>Following Reader</span>
+      <strong data-reading-title>Waiting for Reader…</strong>
+      <small data-connection-status>Connecting…</small>
+    </section>
+
+    <section class="popout-conversation" data-popout-conversation aria-live="polite">
+      <div class="popout-empty">
+        Open Ask Beth in the Reader, then use this window on your second screen.
+      </div>
+    </section>
+
+    <footer class="popout-composer">
+      <textarea data-popout-input rows="1" placeholder="Ask about the current reading…"></textarea>
+      <button type="button" data-popout-send aria-label="Send">➜</button>
+    </footer>
+  </main>
+  <script src="/ask-mark-popout-page.js?v=20260826-v1.0.0"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+/* Reading Companion second-screen pop-out button */
+.askmark-popout-button {
+  position:relative;
+}
+
+.askmark-popout-button::after {
+  content:"";
+}
+
+/* Keep the existing Ask Beth header controls intact. Pop out is one more
+   compact member of the same cluster, not a new toolbar. */
+.askmark-header-actions .askmark-popout-button {
+  font-size:1rem !important;
+  font-weight:850 !important;
+}
