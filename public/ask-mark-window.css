@@ -1,243 +1,52 @@
-/* Ask Mark Window Phase 1
-   Space-management only. The Ask Mark conversation/session DOM is never recreated. */
+/* Ask Beth window management — popup-only edition.
+   Expanded/overlay Ask Beth has been retired. */
 
 :root{
   --msg-askmark-docked-width:500px;
-  --msg-askmark-expanded-width:min(900px,64vw);
-  --msg-askmark-expanded-top:56px;
-  --msg-askmark-expanded-bottom:auto;
-  --msg-askmark-expanded-right:14px;
-  --msg-askmark-expanded-height:min(680px,76vh);
 }
 
-/* The existing Reader right-pane splitter remains the docked resize owner.
-   This later rule simply gives Ask Mark a roomier initial width. */
+/* Preserve the roomier normal docked width. The Reader splitter can still
+   write --word-panel-width after the user resizes it. */
 @media (min-width:1000px){
   #reader-layout.msg-askmark-window-ready:not(.word-panel-hidden){
     --word-panel-width:var(--msg-askmark-docked-width);
   }
 }
 
-/* Keep Ask Mark's header controls compact while adding Expand/Restore. */
-.askmark-window-toggle{
-  display:grid !important;
-  place-items:center;
-  width:34px !important;
-  min-width:34px !important;
-  height:34px !important;
-  min-height:34px !important;
-  padding:0 !important;
-  border:1px solid rgba(255,255,255,.16) !important;
-  border-radius:50% !important;
-  color:#fff !important;
-  background:rgba(255,255,255,.07) !important;
-  box-shadow:none !important;
-  font:800 1rem/1 system-ui,sans-serif !important;
-  cursor:pointer;
-}
-.askmark-window-toggle:hover,
-.askmark-window-toggle:focus-visible{
-  background:rgba(255,255,255,.16) !important;
-  border-color:rgba(228,196,99,.72) !important;
-  outline:none;
+/* Hard-disable any stale Expand/Restore UI that an older cached script may
+   briefly try to create. The popup control is NOT affected. */
+.askmark-window-toggle,
+[data-askmark-window-toggle],
+.askmark-window-resize,
+[data-askmark-window-resize]{
+  display:none !important;
 }
 
-/* Expanded Ask Mark is an overlay on the right rather than another Reader
-   re-layout. The Reader remains visible on the left. */
-html.msg-askmark-expanded{
-  --msg-askmark-overlay-shadow:0 28px 80px rgba(3,20,34,.34);
-}
-
+/* If an older cached script leaves the expanded state class behind, neutralize
+   the overlay geometry and return Ask Beth to the ordinary Reader right pane. */
 html.msg-askmark-expanded .mark-companion-panel{
-  position:fixed !important;
-  z-index:10040 !important;
-  top:var(--msg-askmark-expanded-top) !important;
-  right:var(--msg-askmark-expanded-right) !important;
+  position:relative !important;
+  z-index:auto !important;
+  top:auto !important;
+  right:auto !important;
   bottom:auto !important;
   left:auto !important;
-  width:var(--msg-askmark-expanded-width) !important;
-  max-width:calc(100vw - 28px) !important;
-  min-width:min(520px,calc(100vw - 28px)) !important;
-  height:var(--msg-askmark-expanded-height) !important;
-  max-height:calc(100vh - var(--msg-askmark-expanded-top) - 18px) !important;
-  min-height:min(360px,calc(100vh - 36px)) !important;
-  box-sizing:border-box !important;
+  width:auto !important;
+  max-width:none !important;
+  min-width:0 !important;
+  height:100% !important;
+  max-height:none !important;
+  min-height:0 !important;
   margin:0 !important;
-  border:1px solid rgba(228,196,99,.4) !important;
-  border-radius:16px !important;
-  overflow:hidden !important;
-  box-shadow:var(--msg-askmark-overlay-shadow) !important;
+  border-radius:0 !important;
 }
 
-html.msg-askmark-expanded .mark-companion-panel .reader-control-shell.mark-shell,
-html.msg-askmark-expanded .mark-companion-panel [data-askmark-premium]{
-  height:100% !important;
-  min-height:0 !important;
-}
-
-html.msg-askmark-expanded .askmark-view{
-  padding:1.15rem 1.35rem;
-}
-
-html.msg-askmark-expanded .askmark-conversation{
-  padding:1rem .35rem .6rem;
-}
-
-html.msg-askmark-expanded .askmark-message > div{
-  max-width:min(92%,780px);
-}
-
-html.msg-askmark-expanded .askmark-message p,
-html.msg-askmark-expanded .askmark-rich-response{
-  font-size:.94rem;
-  line-height:1.62;
-}
-
-html.msg-askmark-expanded .askmark-hero{
-  padding:.82rem 1.05rem .76rem;
-}
-
-html.msg-askmark-expanded .askmark-avatar-wrap{
-  width:52px;
-  height:52px;
-}
-
-html.msg-askmark-expanded .askmark-brand-copy h2{
-  font-size:1.34rem;
-}
-
-/* Expanded mode gets its own left-edge resize grip. It does not compete with
-   the Reader's existing docked splitter because it is hidden while docked. */
-.askmark-window-resize{
-  display:none;
-}
-
-html.msg-askmark-expanded .askmark-window-resize{
-  display:block;
-  position:absolute;
-  z-index:10045;
-  top:50%;
-  left:-7px;
-  width:14px;
-  height:96px;
-  transform:translateY(-50%);
-  border:0;
-  border-radius:999px;
-  background:transparent;
-  cursor:ew-resize;
-  touch-action:none;
-}
-
-html.msg-askmark-expanded .askmark-window-resize::after{
-  content:"";
-  position:absolute;
-  top:18px;
-  bottom:18px;
-  left:5px;
-  width:3px;
-  border-radius:999px;
-  background:rgba(228,196,99,.78);
-  box-shadow:0 0 0 1px rgba(11,34,56,.2);
-}
-
-html.msg-askmark-expanded .askmark-window-resize:hover::after,
-html.msg-askmark-expanded .askmark-window-resize:focus-visible::after{
-  background:#f4d776;
-  box-shadow:0 0 0 3px rgba(228,196,99,.2);
-}
-
-/* A subtle visual cue that Ask Mark is in a focus workspace without blocking
-   interaction with the still-visible Reader. */
 html.msg-askmark-expanded body::after{
-  content:"";
-  position:fixed;
-  z-index:10020;
-  inset:0;
-  pointer-events:none;
-  background:linear-gradient(90deg,rgba(4,21,35,.04),rgba(4,21,35,.12));
+  display:none !important;
 }
 
-/* Keep the panel itself above the non-interactive cue. */
-html.msg-askmark-expanded .mark-companion-panel{
-  isolation:isolate;
-}
-
-/* Small screens already use Ask Mark as a full-screen panel. Phase 1 simply
-   preserves that behavior and hides the redundant expanded resize grip. */
-@media (max-width:820px){
-  html.msg-askmark-expanded .mark-companion-panel{
-    inset:0 !important;
-    width:100% !important;
-    max-width:none !important;
-    min-width:0 !important;
-    border-radius:0 !important;
-  }
-  html.msg-askmark-expanded .askmark-window-resize{
-    display:none !important;
-  }
-}
-
-/* Do not animate large geometry for readers who prefer reduced motion. */
-@media (prefers-reduced-motion:no-preference){
-  .mark-companion-panel{
-    transition:box-shadow .16s ease,border-radius .16s ease;
-  }
-}
-
-
-/* Desktop-bound expanded Companion.
-   All original Ask Beth header buttons remain visible and functional. */
-html.msg-askmark-expanded body.msg-desktop-workspace-active .mark-companion-panel .reader-control-shell.mark-shell,
-html.msg-askmark-expanded body.msg-desktop-workspace-active .mark-companion-panel [data-askmark-premium] {
-  height:100% !important;
-  max-height:100% !important;
-  min-height:0 !important;
-  overflow:hidden !important;
-}
-
-html.msg-askmark-expanded body.msg-desktop-workspace-active .askmark-stage,
-html.msg-askmark-expanded body.msg-desktop-workspace-active .askmark-view,
-html.msg-askmark-expanded body.msg-desktop-workspace-active .askmark-conversation {
-  min-height:0 !important;
-}
-
-html.msg-askmark-expanded body.msg-desktop-workspace-active .askmark-composer {
-  flex:0 0 auto !important;
-}
-
-
-/* v1.2 — expanded chat is intentionally shorter and typing-first.
-   The stage absorbs the flexible height; the composer always owns its row. */
-html.msg-askmark-expanded .mark-companion-panel [data-askmark-premium],
-html.msg-askmark-expanded .mark-companion-panel .askmark-premium {
-  display:grid !important;
-  grid-template-rows:auto minmax(0,1fr) auto !important;
-  height:100% !important;
-  min-height:0 !important;
-}
-
-html.msg-askmark-expanded .askmark-stage {
-  min-height:0 !important;
-  overflow:hidden !important;
-}
-
-html.msg-askmark-expanded .askmark-view.is-active {
-  min-height:0 !important;
-  overflow:auto !important;
-}
-
-html.msg-askmark-expanded .askmark-composer {
-  position:relative !important;
-  z-index:4 !important;
-  flex:0 0 auto !important;
-  min-height:66px !important;
-  padding-bottom:max(.82rem,env(safe-area-inset-bottom)) !important;
-  background:rgba(255,253,247,.985) !important;
-}
-
-
-/* v1.3 — header controls have two clear groups:
-   tools (Notebook / Format / Settings) and window actions (Expand / Pop out). */
+/* Keep header controls understandable:
+   Notebook / Format / Settings together, popup as the window action. */
 .mark-companion-panel{
   container-type:inline-size;
 }
@@ -274,6 +83,11 @@ html.msg-askmark-expanded .askmark-composer {
 .askmark-header-window-actions{
   padding-left:.42rem;
   border-left:1px solid rgba(255,255,255,.18);
+}
+
+/* The only window action now is Pop out. */
+.askmark-header-window-actions:empty{
+  display:none;
 }
 
 @container (max-width:470px){
@@ -315,7 +129,6 @@ html.msg-askmark-expanded .askmark-composer {
   }
 
   .askmark-header-actions button,
-  .askmark-window-toggle,
   .askmark-popout-button{
     width:31px !important;
     min-width:31px !important;
