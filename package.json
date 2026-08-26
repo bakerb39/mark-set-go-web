@@ -1,13 +1,13 @@
 {
   "name": "mark-set-go-web",
-  "version": "8.0.9",
+  "version": "8.0.10",
   "private": true,
   "description": "Mark, Set, Go! unified document manager with cloud/local document resolution and protected reader architecture.",
   "main": "server.js",
   "scripts": {
-    "prestart": "node apply-beta-feedback.js && node apply-ui-cache-busters.js",
+    "prestart": "node apply-beta-feedback.js && node apply-ui-cache-busters.js && node apply-topic-feed-performance.js",
     "start": "node -r ./cloud-content-preload.js server.js",
-    "predev": "node apply-beta-feedback.js && node apply-ui-cache-busters.js",
+    "predev": "node apply-beta-feedback.js && node apply-ui-cache-busters.js && node apply-topic-feed-performance.js",
     "dev": "node --watch -r ./cloud-content-preload.js server.js",
     "db:migrate": "node scripts/migrate.js"
   },
