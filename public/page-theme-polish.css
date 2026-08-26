@@ -251,3 +251,73 @@ html.msg-single-theme-background .explorer-world-art.msg-vd-designer-surface-act
   display: none !important;
   visibility: hidden !important;
 }
+
+
+/* v1.0.7 — PAGE-OWNED CLOSE
+   The original global standalone close remains the navigation source only.
+   app.js now renders the visible X inside the active page card. */
+#msg-standalone-page-close {
+  display: none !important;
+}
+
+#app > .msg-page-close-owner {
+  position: relative !important;
+}
+
+#app .msg-page-local-close {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 60;
+
+  display: inline-grid;
+  place-items: center;
+
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+
+  border: 1px solid color-mix(
+    in srgb,
+    var(--msg-theme-gold,var(--msg-gold,#d5a928)) 58%,
+    var(--msg-theme-border,var(--msg-blue-border,#9fb4c7))
+  );
+  border-radius: 8px;
+
+  background: linear-gradient(
+    180deg,
+    var(--msg-theme-surface,var(--msg-surface,#fff)),
+    var(--msg-theme-soft-2,var(--msg-blue-soft-2,#f4f7fa))
+  );
+
+  color: var(--msg-theme-accent-dark,var(--msg-navy-deep,#17365d));
+  box-shadow: 0 2px 7px rgba(15,35,60,.12);
+
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+#app .msg-page-local-close:hover,
+#app .msg-page-local-close:focus-visible {
+  border-color: var(--msg-theme-gold,var(--msg-gold,#d5a928));
+  box-shadow:
+    0 0 0 2px color-mix(
+      in srgb,
+      var(--msg-theme-gold,var(--msg-gold,#d5a928)) 26%,
+      transparent
+    ),
+    0 2px 7px rgba(15,35,60,.14);
+  outline: none;
+}
+
+/* Home and Reader retain their own component-level close controls. */
+#app[data-view-key="home"] .msg-page-local-close,
+#app[data-view-key="reader"] .msg-page-local-close,
+#app[data-view-key="reader-secondary"] .msg-page-local-close {
+  display: none !important;
+}

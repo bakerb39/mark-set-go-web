@@ -27213,6 +27213,93 @@ standalonePageClose?.addEventListener('click', (event) => {
   app.dataset.viewKey = 'closed';
 }, true);
 
+// v7.35.2 — PAGE-LOCAL CLOSE OWNER
+// The original #msg-standalone-page-close remains the canonical close action,
+// but it is no longer the visible control. A compact Reader-style proxy is
+// mounted inside the active page itself so the X always belongs to the page
+// rather than floating against the browser viewport.
+function standalonePageOwnsClose() {
+  if (window.parent !== window) return false;
+  const viewKey = String(app.dataset.viewKey || '').trim();
+  if (!viewKey || ['home','reader','reader-secondary','closed'].includes(viewKey)) return false;
+  return Boolean(app.firstElementChild);
+}
+
+function pageCloseOwner() {
+  if (!standalonePageOwnsClose()) return null;
+
+  // Prefer the actual outer page card/wrapper. These are all direct children of
+  // #app in the main document. The generic fallback keeps newer pages covered
+  // automatically without adding page-specific close code.
+  return (
+    app.querySelector(':scope > .beta-admin-page') ||
+    app.querySelector(':scope > .platform-page') ||
+    app.querySelector(':scope > .panel') ||
+    app.querySelector(':scope > section') ||
+    app.querySelector(':scope > article') ||
+    app.firstElementChild
+  );
+}
+
+function installPageLocalClose() {
+  // Remove only our proxy. Any component-level X (Reader, modal, Ask Mark,
+  // Media, Desktop windows) remains completely independent.
+  app.querySelectorAll('[data-msg-page-local-close]').forEach((node) => node.remove());
+  app.querySelectorAll('.msg-page-close-owner').forEach((node) => node.classList.remove('msg-page-close-owner'));
+
+  if (!standalonePageClose || !standalonePageOwnsClose()) return false;
+
+  const owner = pageCloseOwner();
+  if (!owner) return false;
+
+  owner.classList.add('msg-page-close-owner');
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'msg-page-local-close';
+  button.dataset.msgPageLocalClose = '1';
+  button.setAttribute('aria-label', 'Close page');
+  button.title = 'Close';
+  button.textContent = '×';
+
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Proxy to the existing close action instead of duplicating navigation,
+    // Reader-continuity, or dismissal logic.
+    standalonePageClose.click();
+  });
+
+  owner.appendChild(button);
+  return true;
+}
+
+function schedulePageLocalClose() {
+  // SPA page rendering is synchronous in most paths, but several feature pages
+  // finish on a later task. Bounded retries cover those cases without observers
+  // or background polling.
+  [0, 50, 140, 320].forEach((delay) => {
+    window.setTimeout(installPageLocalClose, delay);
+  });
+}
+
+// Any app navigation can swap #app.innerHTML. Re-check after interaction rather
+// than observing the DOM continuously.
+document.addEventListener('click', (event) => {
+  if (event.target instanceof Element && event.target.closest('[data-msg-page-local-close]')) return;
+  schedulePageLocalClose();
+}, true);
+
+document.addEventListener('marksetgo:document-available', schedulePageLocalClose);
+document.addEventListener('marksetgo:auth-changed', schedulePageLocalClose);
+document.addEventListener('marksetgo:cloud-content-restored', schedulePageLocalClose);
+window.addEventListener('pageshow', schedulePageLocalClose);
+window.addEventListener('popstate', schedulePageLocalClose);
+window.addEventListener('hashchange', schedulePageLocalClose);
+
+schedulePageLocalClose();
+
 document.addEventListener('change', (event) => {
   const control = event.target.closest?.(ReaderContinuity.protectedControlSelector);
   if (!control || !app.querySelector('#reader')) return;
