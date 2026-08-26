@@ -858,15 +858,20 @@
       ? Math.max(1, (usableWidth - columnGap) / 2)
       : usableWidth;
 
-    // Anchor the header to the viewport/frame, never to #reader's scrollable
-    // content. Scrolling #reader therefore cannot move this band by one pixel.
+    // The opaque Topic Feed header owns the ENTIRE top ceiling of #reader-frame.
+    // Previously the header box itself began at contentTop, leaving the strip
+    // above it uncovered and allowing scrolling prose to show through.
+    //
+    // Start the opaque header at frame top, then retain the old visual position
+    // of Source / View original / article actions with equivalent top padding.
     const frameRect = readerFrame.getBoundingClientRect();
     const readerRect = reader.getBoundingClientRect();
     const left = Math.max(0, readerRect.left - frameRect.left + paddingLeft);
-    const top = Math.max(0, readerRect.top - frameRect.top + paddingTop);
+    const contentTop = Math.max(0, readerRect.top - frameRect.top + paddingTop);
 
     header.style.setProperty('left', `${left}px`, 'important');
-    header.style.setProperty('top', `${top}px`, 'important');
+    header.style.setProperty('top', '0px', 'important');
+    header.style.setProperty('padding-top', `${contentTop}px`, 'important');
     header.style.setProperty('width', `${headerWidth}px`, 'important');
     header.style.setProperty('max-width', `${headerWidth}px`, 'important');
 
@@ -883,9 +888,11 @@
       if (!reader.isConnected || !header.isConnected || !spacer.isConnected) return;
 
       const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
-      // Reserve the initial header footprint plus one text-line buffer. That
-      // spacer scrolls away with the article; the external header never does.
-      const requiredHeight = Math.max(fontSize * 2, headerHeight + fontSize);
+      // headerHeight now includes the opaque ceiling ABOVE the Reader text.
+      // Exclude that ceiling padding from the in-document spacer so the article
+      // stays at the same starting position.
+      const contentHeaderHeight = Math.max(0, headerHeight - contentTop);
+      const requiredHeight = Math.max(fontSize * 2, contentHeaderHeight + fontSize);
       const previousHeight = Number.parseFloat(spacer.style.height) || 0;
       spacer.style.width = '100%';
       spacer.style.maxWidth = `${headerWidth}px`;

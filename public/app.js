@@ -5492,11 +5492,11 @@ function renderHome() {
 
   app.querySelector('[data-home-panel-close]')?.addEventListener('click', (event) => {
     event.preventDefault();
-    event.stopPropagation();
-    // Closing Home is intentionally not navigation. Remove the Home surface and
-    // leave the current experience-theme background visible. Clicking the brand
-    // or Home navigation later simply renders Home again.
+    event.stopImmediatePropagation();
+    // Closing Home is dismissal only. Never hand this click to the generic
+    // page-close / Reader-return path, even when a live Reader snapshot exists.
     app.replaceChildren();
+    app.dataset.viewKey = 'closed';
   });
 
   bindHomeReaderActions();
@@ -27192,6 +27192,17 @@ document.addEventListener('click', (event) => {
 const standalonePageClose = document.querySelector('#msg-standalone-page-close');
 standalonePageClose?.addEventListener('click', (event) => {
   if (window.parent !== window) return;
+
+  // The actual Home DOM is authoritative. A stale viewKey must never turn the
+  // front-page close into "return to Reader".
+  if (app.querySelector('.home-simple')) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    app.replaceChildren();
+    app.dataset.viewKey = 'closed';
+    return;
+  }
+
   const viewKey = String(app.dataset.viewKey || '');
   if (viewKey === 'home' || viewKey === 'reader' || viewKey === 'reader-secondary') return;
 
@@ -27220,6 +27231,7 @@ standalonePageClose?.addEventListener('click', (event) => {
 // rather than floating against the browser viewport.
 function standalonePageOwnsClose() {
   if (window.parent !== window) return false;
+  if (app.querySelector('.home-simple')) return false;
   const viewKey = String(app.dataset.viewKey || '').trim();
   if (!viewKey || ['home','reader','reader-secondary','closed'].includes(viewKey)) return false;
   return Boolean(app.firstElementChild);
@@ -27266,8 +27278,14 @@ function installPageLocalClose() {
     event.preventDefault();
     event.stopPropagation();
 
-    // Proxy to the existing close action instead of duplicating navigation,
-    // Reader-continuity, or dismissal logic.
+    if (app.querySelector('.home-simple')) {
+      event.stopImmediatePropagation();
+      app.replaceChildren();
+      app.dataset.viewKey = 'closed';
+      return;
+    }
+
+    // Proxy to the existing close action for ordinary standalone pages.
     standalonePageClose.click();
   });
 
