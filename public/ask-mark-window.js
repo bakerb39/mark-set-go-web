@@ -101,30 +101,62 @@
 
     let top = 8;
     let right = 14;
-    let bottom = 14;
+    let availableHeight = Math.max(360, window.innerHeight - 28);
 
     if (desktopRect) {
-      const inset = 4;
-      top = Math.max(inset, Math.round(desktopRect.top + inset));
-      right = Math.max(inset, Math.round(window.innerWidth - desktopRect.right + inset));
-      bottom = Math.max(inset, Math.round(window.innerHeight - desktopRect.bottom + inset));
+      const inset = 10;
+      const usableTop = desktopRect.top + inset;
+      const usableBottom = desktopRect.bottom - inset;
+      availableHeight = Math.max(300, usableBottom - usableTop);
+
+      // Expanded means "more reading room", not "fill the entire Desktop
+      // window". Keep the composer comfortably above the bottom edge.
+      const desiredHeight = Math.min(
+        680,
+        Math.max(420, Math.round(availableHeight * 0.74))
+      );
+      const height = Math.min(desiredHeight, Math.max(300, availableHeight));
+      const verticalSlack = Math.max(0, availableHeight - height);
+
+      top = Math.round(usableTop + verticalSlack * 0.42);
+      right = Math.max(
+        inset,
+        Math.round(window.innerWidth - desktopRect.right + inset)
+      );
+
+      root.style.setProperty('--msg-askmark-expanded-height', `${height}px`);
     } else {
       const header = document.querySelector('.site-header');
       const headerRect = header?.getBoundingClientRect();
-      top = Math.max(8, Math.round((headerRect?.bottom || 0) + 8));
+      const usableTop = Math.max(8, Math.round((headerRect?.bottom || 0) + 12));
 
+      let usableBottom = window.innerHeight - 18;
       const ribbon = document.getElementById('msg-shared-bottom');
       if (ribbon) {
         const rect = ribbon.getBoundingClientRect();
         if (rect.height > 0 && rect.top > 0 && rect.top < window.innerHeight) {
-          bottom = Math.max(8, Math.round(window.innerHeight - rect.top + 8));
+          usableBottom = Math.min(usableBottom, Math.round(rect.top - 18));
         }
       }
+
+      availableHeight = Math.max(300, usableBottom - usableTop);
+      const desiredHeight = Math.min(
+        680,
+        Math.max(440, Math.round(availableHeight * 0.78))
+      );
+      const height = Math.min(desiredHeight, Math.max(300, availableHeight));
+      const verticalSlack = Math.max(0, availableHeight - height);
+
+      top = Math.round(usableTop + verticalSlack * 0.34);
+      root.style.setProperty('--msg-askmark-expanded-height', `${height}px`);
     }
 
     root.style.setProperty('--msg-askmark-expanded-top', `${top}px`);
     root.style.setProperty('--msg-askmark-expanded-right', `${right}px`);
-    root.style.setProperty('--msg-askmark-expanded-bottom', `${bottom}px`);
+
+    // Kept only as a compatibility variable for older cached CSS. The new
+    // layout uses explicit height + top and does not stretch with bottom.
+    root.style.setProperty('--msg-askmark-expanded-bottom', 'auto');
   }
 
   function applyDockWidth({ force = false } = {}) {
@@ -158,20 +190,54 @@
     return true;
   }
 
+  function ensureHeaderActionGroups(actions) {
+    if (!actions) return { tools:null, windows:null };
+
+    let tools = actions.querySelector(':scope > .askmark-header-tool-actions');
+    if (!tools) {
+      tools = document.createElement('div');
+      tools.className = 'askmark-header-tool-actions';
+      tools.setAttribute('aria-label', 'Companion tools');
+      actions.prepend(tools);
+    }
+
+    let windows = actions.querySelector(':scope > .askmark-header-window-actions');
+    if (!windows) {
+      windows = document.createElement('div');
+      windows.className = 'askmark-header-window-actions';
+      windows.setAttribute('aria-label', 'Companion window actions');
+      actions.appendChild(windows);
+    }
+
+    actions.querySelectorAll('[data-askmark-view]').forEach((button) => {
+      if (button.parentElement !== tools) tools.appendChild(button);
+    });
+
+    const expand = actions.querySelector('[data-askmark-window-toggle]');
+    if (expand && expand.parentElement !== windows) windows.appendChild(expand);
+
+    const popout = actions.querySelector('[data-askmark-popout]');
+    if (popout && popout.parentElement !== windows) windows.appendChild(popout);
+
+    return { tools, windows };
+  }
+
   function ensureWindowControls() {
     const premium = premiumShell();
     const targetPanel = panel();
     if (!premium || !targetPanel) return false;
 
     const actions = premium.querySelector('.askmark-header-actions');
+    const groups = ensureHeaderActionGroups(actions);
     if (actions && !actions.querySelector('[data-askmark-window-toggle]')) {
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'askmark-window-toggle';
       button.dataset.askmarkWindowToggle = '1';
       button.setAttribute('aria-pressed', 'false');
-      actions.prepend(button);
+      (groups.windows || actions).appendChild(button);
     }
+    ensureHeaderActionGroups(actions);
 
     if (!targetPanel.querySelector('[data-askmark-window-resize]')) {
       const grip = document.createElement('div');
@@ -408,6 +474,7 @@
       expanded,
       dockWidth:readSettings().dockWidth,
       expandedWidth:readSettings().expandedWidth,
+      expandedHeight:document.documentElement.style.getPropertyValue('--msg-askmark-expanded-height') || '',
       visible:askMarkVisible()
     })
   });

@@ -1,21 +1,46 @@
-/* Whole-article-first Reading Companion mode */
+/* Whole-article-first Reading Companion mode.
+   This file owns only article-specific presentation. ask-mark-hub.js owns send/API behavior. */
 
-.askmark-composer.askmark-article-composer {
-  grid-template-rows:auto auto;
+.askmark-composer.askmark-article-composer{
+  display:grid !important;
+  grid-template-columns:auto minmax(0,1fr) auto !important;
+  grid-template-rows:auto auto !important;
+  align-items:end !important;
+  gap:.48rem !important;
 }
 
-.askmark-article-mode {
+.askmark-composer.askmark-article-composer > .askmark-article-mode{
   grid-column:1 / -1;
+  grid-row:1;
+}
+
+.askmark-composer.askmark-article-composer > .askmark-plus,
+.askmark-composer.askmark-article-composer > label,
+.askmark-composer.askmark-article-composer > .askmark-send{
+  grid-row:2;
+}
+
+.askmark-composer.askmark-article-composer > label{
+  min-width:0;
+}
+
+.askmark-composer.askmark-article-composer textarea{
+  pointer-events:auto !important;
+  min-width:0 !important;
+}
+
+.askmark-article-mode{
   display:grid;
   grid-template-columns:auto minmax(0,1fr);
   gap:.5rem;
   align-items:center;
+  min-width:0;
   margin:0 0 .12rem;
   padding:0 0 .5rem;
   border-bottom:1px solid rgba(17,52,81,.09);
 }
 
-.askmark-article-scope {
+.askmark-article-scope{
   display:inline-flex;
   align-items:center;
   min-height:25px;
@@ -29,15 +54,16 @@
   white-space:nowrap;
 }
 
-.askmark-article-actions {
+.askmark-article-actions{
   display:flex;
   gap:4px;
   min-width:0;
   overflow-x:auto;
+  padding-bottom:2px;
   scrollbar-width:thin;
 }
 
-.askmark-article-actions button {
+.askmark-article-actions button{
   flex:0 0 auto;
   min-height:26px;
   padding:3px 8px;
@@ -52,22 +78,33 @@
 }
 
 .askmark-article-actions button:hover,
-.askmark-article-actions button:focus-visible {
+.askmark-article-actions button:focus-visible{
   border-color:rgba(211,164,71,.7);
   background:#fffaf0;
   outline:none;
 }
 
-html.msg-askmark-expanded .askmark-article-mode {
+html.msg-askmark-expanded .askmark-article-mode{
   padding-bottom:.55rem;
 }
 
-@media(max-width:620px) {
-  .askmark-article-mode {
+@container (max-width:420px){
+  .askmark-article-mode{
     grid-template-columns:1fr;
     gap:.3rem;
   }
-  .askmark-article-scope {
+
+  .askmark-article-scope{
     justify-self:start;
+  }
+
+  .askmark-article-actions{
+    width:100%;
+  }
+
+  .askmark-article-actions button{
+    min-height:25px;
+    padding:3px 7px;
+    font-size:.63rem;
   }
 }

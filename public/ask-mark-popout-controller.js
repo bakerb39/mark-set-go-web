@@ -90,7 +90,10 @@
         conversation?.querySelector('.is-thinking') ||
         conversation?.querySelector('[data-askmark-legacy-pending="1"]')
       ),
-      articleMode:Boolean(window.MarkSetGoArticleCompanion?.available?.()),
+      articleMode:Boolean(
+        window.MarkSetGoAskMarkHub?.isWholeArticle?.() ||
+        window.MarkSetGoArticleCompanion?.available?.()
+      ),
       panelVisible:!document.getElementById('reader-layout')?.classList.contains('word-panel-hidden')
     };
   }
@@ -281,12 +284,15 @@
     hideDockedCompanion();
     const id = requestId || makeId('question');
 
-    if (window.MarkSetGoArticleCompanion?.available?.()) {
+    if (
+      window.MarkSetGoAskMarkHub?.isWholeArticle?.() &&
+      typeof window.MarkSetGoAskMarkHub?.askWholeArticle === 'function'
+    ) {
       pendingQuestionId = id;
       post({ type:'ASK_ACCEPTED', requestId:id, at:Date.now() });
       startActiveSync('popout-article-question');
 
-      Promise.resolve(window.MarkSetGoArticleCompanion.ask(clean))
+      Promise.resolve(window.MarkSetGoAskMarkHub.askWholeArticle(clean, clean))
         .catch((error) => {
           post({
             type:'ASK_ERROR',
@@ -304,7 +310,10 @@
   function runArticleActionFromPopout(action, requestId = '') {
     const id = requestId || makeId('article-action');
 
-    if (!window.MarkSetGoArticleCompanion?.available?.()) {
+    if (
+      !window.MarkSetGoAskMarkHub?.isWholeArticle?.() &&
+      !window.MarkSetGoArticleCompanion?.available?.()
+    ) {
       post({
         type:'ASK_ERROR',
         requestId:id,
@@ -373,7 +382,14 @@
     if (!actions) return null;
 
     let button = actions.querySelector(BUTTON_SELECTOR);
-    if (button) return button;
+    const windowActions =
+      actions.querySelector('.askmark-header-window-actions') ||
+      actions;
+
+    if (button) {
+      if (button.parentElement !== windowActions) windowActions.appendChild(button);
+      return button;
+    }
 
     button = document.createElement('button');
     button.type = 'button';
@@ -383,9 +399,9 @@
     button.title = 'Pop out Reading Companion to another screen';
     button.setAttribute('aria-label','Pop out Reading Companion to another screen');
 
-    // Put Pop out before the close control but after the existing Notebook /
-    // Format / Settings buttons.
-    actions.appendChild(button);
+    // Expand/Restore and Pop out are both window actions, so keep the two
+    // arrows together instead of splitting them around Notebook/Format/Settings.
+    windowActions.appendChild(button);
 
     button.addEventListener('click', (event) => {
       event.preventDefault();

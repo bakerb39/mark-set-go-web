@@ -1,0 +1,133 @@
+/* Reader Workspace — Profile / My Settings */
+
+.msg-reader-workspace-profile-card{
+  display:grid;
+  gap:12px;
+}
+
+.msg-workspace-profile-toggle,
+.msg-workspace-profile-layout{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  padding:12px 14px;
+  border:1px solid var(--msg-blue-border-soft,#d5e5f2);
+  border-radius:12px;
+  background:var(--msg-surface,#fff);
+}
+
+.msg-workspace-profile-copy{
+  display:block;
+  min-width:0;
+}
+
+.msg-workspace-profile-copy strong,
+.msg-workspace-profile-copy small{
+  display:block;
+}
+
+.msg-workspace-profile-copy strong{
+  color:var(--msg-ink,#18324a);
+  font-size:.95rem;
+}
+
+.msg-workspace-profile-copy small{
+  margin-top:3px;
+  color:var(--msg-muted,#60758a);
+  font-size:.84rem;
+  line-height:1.4;
+}
+
+.msg-workspace-switch-wrap{
+  position:relative;
+  flex:0 0 auto;
+  width:44px;
+  height:24px;
+}
+
+.msg-workspace-switch-wrap input{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  margin:0;
+  opacity:0;
+  cursor:pointer;
+  z-index:2;
+}
+
+.msg-workspace-switch{
+  position:absolute;
+  inset:0;
+  border:1px solid var(--msg-blue-border-soft,#d5e5f2);
+  border-radius:999px;
+  background:#dce5ec;
+  transition:.16s ease;
+}
+
+.msg-workspace-switch::after{
+  content:"";
+  position:absolute;
+  top:3px;
+  left:3px;
+  width:16px;
+  height:16px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 1px 4px rgba(10,31,48,.2);
+  transition:.16s ease;
+}
+
+.msg-workspace-switch-wrap input:checked + .msg-workspace-switch{
+  border-color:var(--msg-blue,#2f75b5);
+  background:var(--msg-blue,#2f75b5);
+}
+
+.msg-workspace-switch-wrap input:checked + .msg-workspace-switch::after{
+  transform:translateX(20px);
+}
+
+.msg-workspace-switch-wrap input:focus-visible + .msg-workspace-switch{
+  outline:2px solid color-mix(in srgb,var(--msg-blue,#2f75b5) 34%,transparent);
+  outline-offset:2px;
+}
+
+.msg-workspace-profile-layout-options{
+  display:inline-flex;
+  flex:0 0 auto;
+  padding:3px;
+  border:1px solid var(--msg-blue-border-soft,#d5e5f2);
+  border-radius:10px;
+  background:var(--msg-blue-soft-2,#f4f9fd);
+}
+
+.msg-workspace-profile-layout-options button{
+  min-height:30px;
+  padding:4px 9px;
+  border:0;
+  border-radius:7px;
+  color:var(--msg-muted,#60758a);
+  background:transparent;
+  box-shadow:none;
+  font-size:.78rem;
+  font-weight:800;
+  cursor:pointer;
+}
+
+.msg-workspace-profile-layout-options button.is-selected,
+.msg-workspace-profile-layout-options button[aria-pressed="true"]{
+  color:#fff;
+  background:var(--msg-blue-strong,#236aa8);
+}
+
+@media(max-width:700px){
+  .msg-workspace-profile-toggle,
+  .msg-workspace-profile-layout{
+    align-items:flex-start;
+  }
+
+  .msg-workspace-profile-layout{
+    flex-direction:column;
+  }
+}

@@ -37,6 +37,7 @@
     'markSetGoMusic',
     'markSetGoVideoSidePanelWidthV1',
     'markSetGoMediaDockModeV1',
+    'msg-workspace-optin-v1',
     'msg-workspace-layout-mode-v1'
   ]);
 
@@ -52,7 +53,8 @@
     '[data-vd-background-color]',
     '[data-vd-ui-scale]',
     '[data-crypto-ticker-toggle]',
-    '[data-market-indexes-toggle]'
+    '[data-market-indexes-toggle]',
+    '[data-workspace-profile-toggle]'
   ].join(',');
 
   const state = {

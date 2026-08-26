@@ -5,8 +5,9 @@
   --msg-askmark-docked-width:500px;
   --msg-askmark-expanded-width:min(900px,64vw);
   --msg-askmark-expanded-top:56px;
-  --msg-askmark-expanded-bottom:14px;
+  --msg-askmark-expanded-bottom:auto;
   --msg-askmark-expanded-right:14px;
+  --msg-askmark-expanded-height:min(680px,76vh);
 }
 
 /* The existing Reader right-pane splitter remains the docked resize owner.
@@ -52,14 +53,14 @@ html.msg-askmark-expanded .mark-companion-panel{
   z-index:10040 !important;
   top:var(--msg-askmark-expanded-top) !important;
   right:var(--msg-askmark-expanded-right) !important;
-  bottom:var(--msg-askmark-expanded-bottom) !important;
+  bottom:auto !important;
   left:auto !important;
   width:var(--msg-askmark-expanded-width) !important;
   max-width:calc(100vw - 28px) !important;
   min-width:min(520px,calc(100vw - 28px)) !important;
-  height:auto !important;
-  max-height:calc(100vh - var(--msg-askmark-expanded-top) - var(--msg-askmark-expanded-bottom)) !important;
-  min-height:0 !important;
+  height:var(--msg-askmark-expanded-height) !important;
+  max-height:calc(100vh - var(--msg-askmark-expanded-top) - 18px) !important;
+  min-height:min(360px,calc(100vh - 36px)) !important;
   box-sizing:border-box !important;
   margin:0 !important;
   border:1px solid rgba(228,196,99,.4) !important;
@@ -202,4 +203,156 @@ html.msg-askmark-expanded body.msg-desktop-workspace-active .askmark-conversatio
 
 html.msg-askmark-expanded body.msg-desktop-workspace-active .askmark-composer {
   flex:0 0 auto !important;
+}
+
+
+/* v1.2 — expanded chat is intentionally shorter and typing-first.
+   The stage absorbs the flexible height; the composer always owns its row. */
+html.msg-askmark-expanded .mark-companion-panel [data-askmark-premium],
+html.msg-askmark-expanded .mark-companion-panel .askmark-premium {
+  display:grid !important;
+  grid-template-rows:auto minmax(0,1fr) auto !important;
+  height:100% !important;
+  min-height:0 !important;
+}
+
+html.msg-askmark-expanded .askmark-stage {
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+
+html.msg-askmark-expanded .askmark-view.is-active {
+  min-height:0 !important;
+  overflow:auto !important;
+}
+
+html.msg-askmark-expanded .askmark-composer {
+  position:relative !important;
+  z-index:4 !important;
+  flex:0 0 auto !important;
+  min-height:66px !important;
+  padding-bottom:max(.82rem,env(safe-area-inset-bottom)) !important;
+  background:rgba(255,253,247,.985) !important;
+}
+
+
+/* v1.3 — header controls have two clear groups:
+   tools (Notebook / Format / Settings) and window actions (Expand / Pop out). */
+.mark-companion-panel{
+  container-type:inline-size;
+}
+
+.askmark-brand-copy{
+  min-width:0;
+}
+
+.askmark-brand-copy h2{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  word-break:normal;
+  overflow-wrap:normal;
+}
+
+.askmark-header-actions{
+  display:flex !important;
+  align-items:center !important;
+  gap:.42rem !important;
+  min-width:0;
+  padding-right:1.45rem !important;
+}
+
+.askmark-header-tool-actions,
+.askmark-header-window-actions{
+  display:flex;
+  align-items:center;
+  gap:.28rem;
+  min-width:0;
+}
+
+.askmark-header-window-actions{
+  padding-left:.42rem;
+  border-left:1px solid rgba(255,255,255,.18);
+}
+
+@container (max-width:470px){
+  .askmark-hero{
+    grid-template-columns:52px minmax(0,1fr) !important;
+    grid-template-areas:
+      "avatar brand"
+      "actions actions";
+    gap:.5rem .65rem !important;
+    padding:.72rem .72rem .68rem !important;
+  }
+
+  .askmark-avatar-wrap{
+    grid-area:avatar;
+    width:48px !important;
+    height:48px !important;
+  }
+
+  .askmark-brand-copy{
+    grid-area:brand;
+    align-self:center;
+  }
+
+  .askmark-header-actions{
+    grid-area:actions;
+    justify-self:start;
+    width:100%;
+    padding-right:1.55rem !important;
+  }
+
+  .askmark-brand-copy h2{
+    font-size:1.12rem !important;
+  }
+
+  .askmark-eyebrow{
+    font-size:.57rem !important;
+    letter-spacing:.09em !important;
+    white-space:nowrap;
+  }
+
+  .askmark-header-actions button,
+  .askmark-window-toggle,
+  .askmark-popout-button{
+    width:31px !important;
+    min-width:31px !important;
+    height:31px !important;
+    min-height:31px !important;
+  }
+}
+
+@container (max-width:360px){
+  .askmark-hero{
+    grid-template-columns:44px minmax(0,1fr) !important;
+    gap:.42rem .5rem !important;
+  }
+
+  .askmark-avatar-wrap{
+    width:42px !important;
+    height:42px !important;
+  }
+
+  .askmark-eyebrow{
+    display:none !important;
+  }
+
+  .askmark-brand-copy h2{
+    font-size:1.06rem !important;
+  }
+
+  .askmark-header-actions{
+    gap:.25rem !important;
+  }
+
+  .askmark-header-tool-actions,
+  .askmark-header-window-actions{
+    gap:.2rem;
+  }
+
+  .askmark-header-window-actions{
+    padding-left:.3rem;
+  }
 }
