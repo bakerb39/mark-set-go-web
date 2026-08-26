@@ -58,7 +58,7 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'media-panel.js',
-  '20260826-v1.2.2-beside-reader-layout'
+  '20260826-v1.2.3-reader-launch-owner'
 );
 
 index = replaceAssetVersion(

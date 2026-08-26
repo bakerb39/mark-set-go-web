@@ -300,8 +300,17 @@
     delete dock.dataset.msgMediaFloatGeometry;
   }
 
+  function readerOwnsInitialFloatPosition() {
+    return mode === 'float' && dock.dataset.readerChooserPositioned === '1';
+  }
+
   function applyFloatDockGeometry(position = floatPosition) {
     if (mode !== 'float' || !position) return false;
+
+    // Reader launch owns the initial Float placement directly under ▶.
+    // Do not restore an older saved Float position over that marker.
+    // beginFloatDrag() already removes the marker before Media Panel takes over.
+    if (readerOwnsInitialFloatPosition()) return false;
 
     const next = clampFloatPosition(position.left, position.top);
     floatPosition = next;
@@ -322,9 +331,15 @@
   }
 
   function reassertFloatDockGeometrySoon() {
-    if (mode !== 'float' || !floatPosition) return;
+    if (mode !== 'float' || !floatPosition || readerOwnsInitialFloatPosition()) return;
     window.setTimeout(() => {
-      if (mode === 'float' && floatPosition) applyFloatDockGeometry();
+      if (
+        mode === 'float' &&
+        floatPosition &&
+        !readerOwnsInitialFloatPosition()
+      ) {
+        applyFloatDockGeometry();
+      }
     }, 0);
   }
 
@@ -927,7 +942,7 @@
       } else if (floatPosition) {
         const next = clampFloatPosition(floatPosition.left, floatPosition.top);
         saveFloatPosition(next);
-        reassertFloatDockGeometrySoon();
+        if (!readerOwnsInitialFloatPosition()) reassertFloatDockGeometrySoon();
       }
       applyPlayerSize();
       applyBottomRibbonBounds();
@@ -941,7 +956,11 @@
         ribbonScrollFrame = 0;
         if (!dock.hidden) {
           applyBottomRibbonBounds();
-          if (mode === 'float' && floatPosition) {
+          if (
+            mode === 'float' &&
+            floatPosition &&
+            !readerOwnsInitialFloatPosition()
+          ) {
             const next = clampFloatPosition(floatPosition.left, floatPosition.top);
             floatPosition = next;
             applyFloatDockGeometry(next);
@@ -1216,7 +1235,7 @@
       document.body.classList.remove('msg-media-collapsed-active');
       restoreReaderSideLayout();
       clearSideDockGeometry();
-      if (floatPosition) applyFloatDockGeometry();
+      if (floatPosition && !readerOwnsInitialFloatPosition()) applyFloatDockGeometry();
       if (minimizeButton) {
         minimizeButton.textContent = '—';
         minimizeButton.setAttribute('aria-label','Minimize media player');
@@ -1519,6 +1538,13 @@
     resetFloatPosition:()=>resetFloatPosition(),
     resetPlayerSize:()=>resetPlayerSize(),
     syncBesideLayout:()=>applyReaderSideLayout(),
+    get floatOwnership(){
+      return {
+        readerOwnsInitialPosition:readerOwnsInitialFloatPosition(),
+        savedPosition:floatPosition ? { ...floatPosition } : null,
+        readerMarker:dock.dataset.readerChooserPositioned || ''
+      };
+    },
     get besideLayout(){
       const appNode = readerAppNode();
       return {
