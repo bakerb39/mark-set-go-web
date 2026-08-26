@@ -140,6 +140,10 @@ html.msg-askmark-expanded body::after{
 }
 
 .mark-companion-panel .askmark-stage{
+  display:grid !important;
+  grid-template-rows:minmax(0,1fr) !important;
+  height:100% !important;
+  max-height:100% !important;
   min-height:0 !important;
   overflow:hidden !important;
 }
@@ -148,21 +152,26 @@ html.msg-askmark-expanded body::after{
   box-sizing:border-box !important;
   display:flex !important;
   flex-direction:column !important;
-  height:auto !important;
+  width:100% !important;
+  height:100% !important;
+  max-height:100% !important;
   min-height:0 !important;
   overflow:hidden !important;
   padding:.42rem .58rem .3rem !important;
 }
 
 .mark-companion-panel .askmark-conversation{
-  flex:1 1 auto !important;
+  box-sizing:border-box !important;
+  flex:1 1 0 !important;
+  width:100% !important;
+  height:0 !important;
   min-height:0 !important;
-  height:auto !important;
+  max-height:100% !important;
   overflow-x:hidden !important;
-  overflow-y:auto !important;
+  overflow-y:scroll !important;
   padding:.2rem .08rem .25rem !important;
   overscroll-behavior:contain;
-  scrollbar-gutter:stable;
+  scrollbar-gutter:stable !important;
 }
 
 .mark-companion-panel .askmark-message{
@@ -296,7 +305,8 @@ html.msg-askmark-expanded body::after{
 }
 
 .mark-companion-panel .askmark-conversation::-webkit-scrollbar{
-  width:10px;
+  display:block !important;
+  width:11px !important;
 }
 
 .mark-companion-panel .askmark-conversation::-webkit-scrollbar-track{
@@ -306,7 +316,7 @@ html.msg-askmark-expanded body::after{
 
 .mark-companion-panel .askmark-conversation::-webkit-scrollbar-thumb{
   min-height:34px;
-  background:rgba(17,52,81,.42);
+  background:rgba(17,52,81,.55);
   border:2px solid transparent;
   border-radius:999px;
   background-clip:padding-box;
@@ -316,4 +326,32 @@ html.msg-askmark-expanded body::after{
   background:rgba(17,52,81,.62);
   border:2px solid transparent;
   background-clip:padding-box;
+}
+
+
+/* v1.5.2 — hard scroll-geometry guard.
+   The middle Reader row is bounded; the conversation is the sole vertical
+   scrolling surface. This prevents long answers from being clipped behind
+   the sticky composer. */
+.mark-companion-panel [data-askmark-premium] > .askmark-stage,
+.mark-companion-panel .askmark-premium > .askmark-stage{
+  min-height:0 !important;
+  height:100% !important;
+  max-height:100% !important;
+}
+
+.mark-companion-panel .askmark-stage >
+.askmark-view[data-askmark-view-panel="chat"].is-active{
+  min-height:0 !important;
+  height:100% !important;
+  max-height:100% !important;
+}
+
+.mark-companion-panel .askmark-stage >
+.askmark-view[data-askmark-view-panel="chat"].is-active >
+.askmark-conversation{
+  flex:1 1 0 !important;
+  min-height:0 !important;
+  height:0 !important;
+  overflow-y:scroll !important;
 }
