@@ -1,0 +1,22 @@
+/* Topic Feed import title first-paint stability.
+   The normal Reader title already settles at this compact size. This rule
+   guarantees a Topic Feed import uses it from its FIRST visible paint. */
+
+#app.msg-topic-feed-reader-document .reader-title-copy h1 {
+  font-family: var(--msg-font-ui, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif) !important;
+  font-size: clamp(1.22rem, 1.55vw, 1.52rem) !important;
+  line-height: 1.18 !important;
+  font-weight: 700 !important;
+  letter-spacing: -.012em !important;
+}
+
+/* Long news headlines should wrap normally rather than force Reader chrome
+   taller through inherited display-heading behavior. */
+#app.msg-topic-feed-reader-document .reader-title-copy {
+  min-width: 0 !important;
+}
+
+#app.msg-topic-feed-reader-document .reader-title-copy h1 {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
