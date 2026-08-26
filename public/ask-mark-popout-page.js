@@ -15,6 +15,9 @@
   let lastStateAt = 0;
   let connected = false;
   let sending = false;
+  let queuedQuestion = '';
+  let queuedArticleAction = '';
+  let lastReconnectRequestAt = 0;
 
   function makeId() {
     return `popout-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -34,8 +37,10 @@
   function setConnection(value, label = '') {
     connected = Boolean(value);
     status.textContent = label || (connected ? 'Connected to Reader' : 'Waiting for Reader…');
-    input.disabled = !connected;
-    sendButton.disabled = !connected || sending;
+
+    // Connection status must never prevent composing a question.
+    input.disabled = false;
+    sendButton.disabled = Boolean(sending);
   }
 
   function cleanConversationMarkup(html) {
@@ -91,8 +96,10 @@
 
     if (!state.busy) {
       sending = false;
-      sendButton.disabled = !connected;
+      sendButton.disabled = false;
     }
+
+    window.setTimeout(flushQueuedWork, 0);
   }
 
   function handleMessage(message) {
@@ -120,44 +127,90 @@
     }
   }
 
+  function flushQueuedWork() {
+    if (!connected || sending) return false;
+
+    if (queuedArticleAction) {
+      const action = queuedArticleAction;
+      queuedArticleAction = '';
+      sending = true;
+      const requestId = makeId();
+
+      post({
+        type:'ARTICLE_ACTION',
+        requestId,
+        action,
+        at:Date.now()
+      });
+
+      setConnection(true, 'Working with the whole article…');
+      return true;
+    }
+
+    if (queuedQuestion) {
+      const question = queuedQuestion;
+      queuedQuestion = '';
+      sending = true;
+      const requestId = makeId();
+
+      post({
+        type:'ASK',
+        requestId,
+        question,
+        at:Date.now()
+      });
+
+      setConnection(true, 'Sending to Reader…');
+      return true;
+    }
+
+    return false;
+  }
+
+  function requestReconnect(reason = 'compose') {
+    const now = Date.now();
+    if (now - lastReconnectRequestAt < 500) return;
+    lastReconnectRequestAt = now;
+    post({ type:'REQUEST_STATE', reason, at:now });
+  }
+
   function submit() {
     const question = String(input.value || '').trim();
-    if (!question || !connected || sending) return;
+    if (!question || sending) return;
 
-    sending = true;
-    sendButton.disabled = true;
-    const requestId = makeId();
+    if (!connected) {
+      queuedQuestion = question;
+      input.value = '';
+      input.style.height = '';
+      setConnection(false, 'Question ready · reconnecting to Reader…');
+      requestReconnect('queued-question');
+      return;
+    }
 
-    post({
-      type:'ASK',
-      requestId,
-      question,
-      at:Date.now()
-    });
-
+    queuedQuestion = question;
+    flushQueuedWork();
     input.value = '';
     input.style.height = '';
-    setConnection(true, 'Sending to Reader…');
   }
 
   sendButton.addEventListener('click', submit);
 
   document.querySelectorAll('[data-popout-article-action]').forEach((button) => {
     button.addEventListener('click', () => {
-      if (!connected || sending) return;
+      if (sending) return;
 
-      sending = true;
-      sendButton.disabled = true;
-      const requestId = makeId();
+      const action = String(button.dataset.popoutArticleAction || '');
+      if (!action) return;
 
-      post({
-        type:'ARTICLE_ACTION',
-        requestId,
-        action:String(button.dataset.popoutArticleAction || ''),
-        at:Date.now()
-      });
+      if (!connected) {
+        queuedArticleAction = action;
+        setConnection(false, 'Action ready · reconnecting to Reader…');
+        requestReconnect('queued-article-action');
+        return;
+      }
 
-      setConnection(true, 'Working with the whole article…');
+      queuedArticleAction = action;
+      flushQueuedWork();
     });
   });
 
@@ -193,14 +246,23 @@
   ensureChannel();
   setConnection(false, 'Connecting to Reader…');
 
+  window.setTimeout(() => {
+    try { input.focus({ preventScroll:true }); } catch { input.focus(); }
+  }, 0);
+
   post({ type:'READY', at:Date.now() });
 
   // Low-frequency heartbeat only for reconnecting after a Reader refresh.
   // Conversation updates themselves are event-driven/bounded from the Reader.
   window.setInterval(() => {
-    if (Date.now() - lastStateAt > 6000) {
+    const staleFor = Date.now() - lastStateAt;
+
+    if (staleFor > 6000) {
+      requestReconnect('heartbeat');
+    }
+
+    if (staleFor > 18000 && connected) {
       setConnection(false, 'Reconnecting to Reader…');
-      post({ type:'REQUEST_STATE', reason:'heartbeat', at:Date.now() });
     }
   }, 3000);
 })();

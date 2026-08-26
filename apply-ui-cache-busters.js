@@ -135,7 +135,7 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-window.css',
-  '<link href="/ask-mark-popout-controller.css?v=20260826-v1.2.0-article-first" rel="stylesheet"/>'
+  '<link href="/ask-mark-popout-controller.css?v=20260826-v1.2.1-always-typeable" rel="stylesheet"/>'
 );
 
 index = ensureAfterAsset(
@@ -153,7 +153,7 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-article-mode.js',
-  '  <script defer src="/ask-mark-popout-controller.js?v=20260826-v1.2.0-article-first"></script>'
+  '  <script defer src="/ask-mark-popout-controller.js?v=20260826-v1.2.1-always-typeable"></script>'
 );
 
 index = ensureAfterAsset(
