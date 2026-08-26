@@ -1,5 +1,6 @@
-/* Whole-article-first Reading Companion mode.
-   This file owns only article-specific presentation. ask-mark-hub.js owns send/API behavior. */
+/* Ask Beth / Reading Companion article-mode presentation.
+   v1.2.0 — expanded composer visibility fix.
+   Article context routing is intentionally untouched. */
 
 .askmark-composer.askmark-article-composer{
   display:grid !important;
@@ -86,6 +87,90 @@
 
 html.msg-askmark-expanded .askmark-article-mode{
   padding-bottom:.55rem;
+}
+
+/* Expanded article chat:
+   header = natural height
+   stage  = the only flexible/scrolling area
+   composer = always-reserved bottom row */
+html.msg-askmark-expanded .mark-companion-panel [data-askmark-premium],
+html.msg-askmark-expanded .mark-companion-panel .askmark-premium{
+  display:grid !important;
+  grid-template-rows:auto minmax(0,1fr) auto !important;
+  height:100% !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+
+html.msg-askmark-expanded .askmark-stage{
+  min-height:0 !important;
+  height:auto !important;
+  overflow:hidden !important;
+}
+
+html.msg-askmark-expanded .askmark-view[data-askmark-view-panel="chat"].is-active{
+  box-sizing:border-box !important;
+  display:flex !important;
+  flex-direction:column !important;
+  height:auto !important;
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+
+html.msg-askmark-expanded .askmark-view[data-askmark-view-panel="chat"] .askmark-conversation{
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  height:auto !important;
+  overflow-x:hidden !important;
+  overflow-y:auto !important;
+  overscroll-behavior:contain;
+}
+
+/* This is the important part: never allow the composer to disappear
+   below the fixed-height expanded panel. */
+html.msg-askmark-expanded .askmark-composer.askmark-article-composer{
+  position:relative !important;
+  z-index:50 !important;
+  grid-row:3 !important;
+  align-self:stretch !important;
+  width:100% !important;
+  min-height:102px !important;
+  max-height:min(210px,36vh) !important;
+  box-sizing:border-box !important;
+  margin:0 !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  pointer-events:auto !important;
+  transform:none !important;
+  overflow:visible !important;
+  background:rgba(255,253,247,.99) !important;
+}
+
+html.msg-askmark-expanded .askmark-composer.askmark-article-composer > label,
+html.msg-askmark-expanded .askmark-composer.askmark-article-composer textarea{
+  visibility:visible !important;
+  opacity:1 !important;
+  pointer-events:auto !important;
+}
+
+html.msg-askmark-expanded .askmark-composer.askmark-article-composer textarea{
+  display:block !important;
+  width:100% !important;
+  min-height:43px !important;
+}
+
+/* Keep the article action strip from stealing vertical space when the
+   expanded window is relatively short. */
+@media (max-height:760px){
+  html.msg-askmark-expanded .askmark-composer.askmark-article-composer{
+    min-height:94px !important;
+    padding-top:.55rem !important;
+    padding-bottom:.58rem !important;
+  }
+
+  html.msg-askmark-expanded .askmark-article-mode{
+    padding-bottom:.35rem;
+  }
 }
 
 @container (max-width:420px){
