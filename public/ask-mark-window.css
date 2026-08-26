@@ -284,3 +284,36 @@ html.msg-askmark-expanded body::after{
     display:none !important;
   }
 }
+
+
+/* v1.5.1 — keep the conversation's vertical scrollbar visibly discoverable.
+   The conversation remains the only scrolling owner in the docked chat. */
+.mark-companion-panel .askmark-conversation{
+  overflow-y:scroll !important;
+  scrollbar-width:auto !important;
+  scrollbar-color:rgba(17,52,81,.48) rgba(17,52,81,.08);
+  scrollbar-gutter:stable !important;
+}
+
+.mark-companion-panel .askmark-conversation::-webkit-scrollbar{
+  width:10px;
+}
+
+.mark-companion-panel .askmark-conversation::-webkit-scrollbar-track{
+  background:rgba(17,52,81,.06);
+  border-radius:999px;
+}
+
+.mark-companion-panel .askmark-conversation::-webkit-scrollbar-thumb{
+  min-height:34px;
+  background:rgba(17,52,81,.42);
+  border:2px solid transparent;
+  border-radius:999px;
+  background-clip:padding-box;
+}
+
+.mark-companion-panel .askmark-conversation::-webkit-scrollbar-thumb:hover{
+  background:rgba(17,52,81,.62);
+  border:2px solid transparent;
+  background-clip:padding-box;
+}

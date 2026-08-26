@@ -94,13 +94,13 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'ask-mark-window.css',
-  '20260826-v1.5.0-conversation-first-popup-only'
+  '20260826-v1.5.1-conversation-first-visible-scrollbar'
 );
 
 index = replaceAssetVersion(
   index,
   'ask-mark-window.js',
-  '20260826-v1.5.0-conversation-first-popup-only'
+  '20260826-v1.5.1-conversation-first-visible-scrollbar'
 );
 
 index = replaceAssetVersion(
