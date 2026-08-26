@@ -55,6 +55,12 @@ index = replaceAssetVersion(
   '20260825-v2.5.7-boundary-gap-1px'
 );
 
+index = replaceAssetVersion(
+  index,
+  'media-panel.js',
+  '20260826-v1.2.2-beside-reader-layout'
+);
+
 /* Phase 2 Reading Companion Desktop bridge.
    Loaded after Phase 1 Ask Mark window assets and after Desktop Workspace. */
 index = ensureAfterAsset(

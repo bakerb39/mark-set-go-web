@@ -39,6 +39,12 @@
   let playerResizeState = null;
   let resizeGrip = null;
 
+  // Beside/Expanded must resize the Reader and the media dock as one layout.
+  // CSS alone can lose to later workspace/theme rules, while the dock itself
+  // already uses inline !important geometry. Keep the Reader handoff equally
+  // authoritative and restore its prior inline styles when leaving side mode.
+  let sideReaderLayoutSnapshot = null;
+
   function readMode() {
     try {
       const value = localStorage.getItem(MODE_KEY);
@@ -420,6 +426,89 @@
     }, 0);
   }
 
+  function readerAppNode() {
+    return document.getElementById('app');
+  }
+
+  function captureInlineProperty(node, name) {
+    return {
+      value:node?.style?.getPropertyValue(name) || '',
+      priority:node?.style?.getPropertyPriority(name) || ''
+    };
+  }
+
+  function restoreInlineProperty(node, name, snapshot) {
+    if (!node) return;
+    if (snapshot?.value) {
+      node.style.setProperty(name, snapshot.value, snapshot.priority || '');
+    } else {
+      node.style.removeProperty(name);
+    }
+  }
+
+  function effectiveSideLayoutWidth() {
+    if (dock.classList.contains('msg-media-collapsed')) {
+      return 330;
+    }
+    return mode === 'expanded'
+      ? Math.max(sideWidth, Math.min(720, maxSideWidth()))
+      : sideWidth;
+  }
+
+  function restoreReaderSideLayout() {
+    const appNode = readerAppNode();
+    if (!appNode || !sideReaderLayoutSnapshot) return false;
+
+    ['width','max-width','margin-left','margin-right'].forEach((name) => {
+      restoreInlineProperty(appNode, name, sideReaderLayoutSnapshot[name]);
+    });
+
+    delete appNode.dataset.msgMediaBesideLayout;
+    sideReaderLayoutSnapshot = null;
+    return true;
+  }
+
+  function applyReaderSideLayout() {
+    const appNode = readerAppNode();
+    const side = ['beside','expanded'].includes(mode);
+
+    // At <=1050px the existing design intentionally falls back to an overlay
+    // media player rather than attempting two narrow side-by-side panes.
+    if (!appNode || !side || window.innerWidth <= 1050 || dock.hidden) {
+      restoreReaderSideLayout();
+      return false;
+    }
+
+    if (!sideReaderLayoutSnapshot) {
+      sideReaderLayoutSnapshot = {
+        width:captureInlineProperty(appNode,'width'),
+        'max-width':captureInlineProperty(appNode,'max-width'),
+        'margin-left':captureInlineProperty(appNode,'margin-left'),
+        'margin-right':captureInlineProperty(appNode,'margin-right')
+      };
+    }
+
+    const mediaWidth = Math.max(MIN_WIDTH, effectiveSideLayoutWidth());
+    const available = Math.max(360, window.innerWidth - mediaWidth - 48);
+    const readerWidth = Math.max(360, Math.min(1000, available));
+    const edge = Math.max(
+      16,
+      Math.floor((window.innerWidth - mediaWidth - readerWidth) / 2)
+    );
+
+    appNode.dataset.msgMediaBesideLayout = '1';
+    appNode.style.setProperty('width', `${Math.round(readerWidth)}px`, 'important');
+    appNode.style.setProperty('max-width', `${Math.round(readerWidth)}px`, 'important');
+    appNode.style.setProperty('margin-left', `${Math.round(edge)}px`, 'important');
+    appNode.style.setProperty(
+      'margin-right',
+      `${Math.round(mediaWidth + edge)}px`,
+      'important'
+    );
+
+    return true;
+  }
+
   function setWidth(value, persist = false) {
     const requested = Number(value);
     sideWidth = Math.round(Math.max(
@@ -435,6 +524,7 @@
         ? Math.max(sideWidth, Math.min(720, maxSideWidth()))
         : sideWidth;
       dock.style.setProperty('width', `${Math.round(desiredWidth)}px`, 'important');
+      applyReaderSideLayout();
     }
     return sideWidth;
   }
@@ -812,6 +902,8 @@
         'aria-label',
         collapsed ? 'Expand media side panel' : 'Collapse media side panel'
       );
+      applyReaderSideLayout();
+      window.dispatchEvent(new Event('resize'));
     }, true);
 
     resizer?.addEventListener('pointerdown', beginResize);
@@ -831,6 +923,7 @@
       if (mode !== 'float') {
         setWidth(sideWidth);
         reassertSideDockGeometrySoon();
+        applyReaderSideLayout();
       } else if (floatPosition) {
         const next = clampFloatPosition(floatPosition.left, floatPosition.top);
         saveFloatPosition(next);
@@ -1121,6 +1214,7 @@
     if (!side) {
       dock.classList.remove('msg-media-collapsed');
       document.body.classList.remove('msg-media-collapsed-active');
+      restoreReaderSideLayout();
       clearSideDockGeometry();
       if (floatPosition) applyFloatDockGeometry();
       if (minimizeButton) {
@@ -1133,6 +1227,7 @@
       if (playerWrap) playerWrap.hidden = false;
       setWidth(mode === 'expanded' ? Math.max(sideWidth, Math.min(720, maxSideWidth())) : sideWidth);
       applySideDockGeometry();
+      applyReaderSideLayout();
     }
 
     if (resizer) resizer.hidden = !side;
@@ -1172,6 +1267,7 @@
       dock.hidden = false;
       dock.classList.remove('minimized');
       if (playerWrap) playerWrap.hidden = false;
+      if (['beside','expanded'].includes(mode)) applyReaderSideLayout();
       refreshContext();
       renderResults();
       void renderSaved();
@@ -1422,6 +1518,15 @@
     get playerSize(){ return { ...playerSize }; },
     resetFloatPosition:()=>resetFloatPosition(),
     resetPlayerSize:()=>resetPlayerSize(),
+    syncBesideLayout:()=>applyReaderSideLayout(),
+    get besideLayout(){
+      const appNode = readerAppNode();
+      return {
+        active:Boolean(appNode?.dataset?.msgMediaBesideLayout === '1'),
+        appWidth:appNode?.getBoundingClientRect?.().width || 0,
+        mediaWidth:dock?.getBoundingClientRect?.().width || 0
+      };
+    },
     saveCurrent:()=>currentPlaying ? saveItem(currentPlaying,currentPlaying.context) : false,
     getSaved:async()=>Array.isArray((await getMediaRecord(currentContext()))?.items)
       ? (await getMediaRecord(currentContext())).items
