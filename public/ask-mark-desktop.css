@@ -1,0 +1,131 @@
+/* Reading Companion / Ask Mark — Desktop Workspace Phase 2 */
+
+/* The Reader owns the full Reader window while its companion is detached. */
+body.msg-desktop-workspace-active #reader-layout.msg-askmark-desktop-detached {
+  grid-template-columns:minmax(0,1fr) !important;
+  column-gap:0 !important;
+}
+
+body.msg-desktop-workspace-active #reader-layout.msg-askmark-desktop-detached #right-pane-splitter {
+  display:none !important;
+}
+
+body.msg-desktop-workspace-active #reader-layout.msg-askmark-desktop-detached > :not(.mark-companion-panel) {
+  max-width:100% !important;
+}
+
+/* Same live companion node, now hosted in a Desktop window. */
+.msg-askmark-desktop-window .msg-askmark-desktop-content {
+  display:flex;
+  flex-direction:column;
+  overflow:hidden !important;
+  background:var(--msg-theme-surface,#fff);
+}
+
+.msg-askmark-desktop-window .mark-companion-panel {
+  position:relative !important;
+  inset:auto !important;
+  display:flex !important;
+  flex:1 1 auto !important;
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+  height:100% !important;
+  max-height:none !important;
+  min-height:0 !important;
+  margin:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  overflow:hidden !important;
+  transform:none !important;
+  z-index:auto !important;
+}
+
+.msg-askmark-desktop-window .mark-companion-panel .reader-control-shell.mark-shell,
+.msg-askmark-desktop-window .mark-companion-panel [data-askmark-premium] {
+  display:flex !important;
+  flex:1 1 auto !important;
+  flex-direction:column !important;
+  width:100% !important;
+  height:100% !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  max-height:none !important;
+}
+
+.msg-askmark-desktop-window .askmark-view {
+  flex:1 1 auto !important;
+  min-height:0 !important;
+  overflow:auto !important;
+  padding:1rem 1.15rem !important;
+}
+
+.msg-askmark-desktop-window .askmark-conversation {
+  min-height:0 !important;
+}
+
+/* Desktop title bar now owns maximize/resize. Avoid duplicate Phase 1 chrome. */
+.msg-askmark-desktop-window .askmark-window-toggle,
+.msg-askmark-desktop-window .askmark-window-resize {
+  display:none !important;
+}
+
+/* The companion's own close is redundant inside a real Desktop window.
+   The Desktop title bar provides Dock, Maximize and Close. */
+.msg-askmark-desktop-window [data-askmark-close] {
+  display:none !important;
+}
+
+/* Compact "open in Desktop" control in Standard Ask Mark header. */
+.askmark-desktop-open-button {
+  display:grid !important;
+  place-items:center !important;
+  width:34px !important;
+  min-width:34px !important;
+  height:34px !important;
+  min-height:34px !important;
+  padding:0 !important;
+  border:1px solid rgba(255,255,255,.16) !important;
+  border-radius:50% !important;
+  background:rgba(255,255,255,.07) !important;
+  color:#fff !important;
+  box-shadow:none !important;
+  font:800 .9rem/1 system-ui,sans-serif !important;
+}
+
+.askmark-desktop-open-button:hover,
+.askmark-desktop-open-button:focus-visible {
+  background:rgba(255,255,255,.16) !important;
+  border-color:rgba(228,196,99,.72) !important;
+  outline:none !important;
+}
+
+/* It has no meaning once the companion already owns a Desktop window. */
+.msg-askmark-desktop-window .askmark-desktop-open-button {
+  display:none !important;
+}
+
+/* Give the research response comfortable measure in a larger window. */
+.msg-askmark-desktop-window .askmark-message > div {
+  max-width:min(94%,860px) !important;
+}
+
+.msg-askmark-desktop-window .askmark-message p,
+.msg-askmark-desktop-window .askmark-rich-response {
+  font-size:.95rem;
+  line-height:1.62;
+}
+
+/* Slight identity cue while retaining normal Desktop window language. */
+.msg-askmark-desktop-window .msg-desktop-window-dot {
+  background:var(--msg-gold,#f1d77a);
+}
+
+/* Desktop mode is intentionally unavailable on small viewports, matching
+   desktop-workspace.js. */
+@media(max-width:999px) {
+  .askmark-desktop-open-button {
+    display:none !important;
+  }
+}
