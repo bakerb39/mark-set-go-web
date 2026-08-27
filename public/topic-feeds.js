@@ -824,7 +824,21 @@
     // by #reader-frame so it cannot travel with the scrolling article.
     reader.classList.remove('topic-feed-story-header-managed');
 
-    return { readerFrame, header, spacer, meta, actionRow };
+    // CENTER-OF-THE-UNIVERSE invariant:
+    // the band itself never changes on scroll/state/theme. A separate sibling
+    // mask beneath it owns article-text occlusion.
+    let contentMask = readerFrame.querySelector(':scope > [data-topic-feed-story-content-mask]');
+    if (!contentMask) {
+      contentMask = document.createElement('div');
+      contentMask.className = 'topic-feed-story-content-mask';
+      contentMask.dataset.topicFeedStoryContentMask = '1';
+      contentMask.setAttribute('aria-hidden', 'true');
+      readerFrame.insertBefore(contentMask, header);
+    }
+
+    header.classList.remove('topic-feed-story-header-scrolled');
+
+    return { readerFrame, header, spacer, meta, actionRow, contentMask };
   }
 
   function scheduleTopicFeedStoryBookReflow() {
@@ -844,8 +858,8 @@
     const reader = document.querySelector('#reader');
     if (!reader) return;
 
-    const { readerFrame, header, spacer, meta, actionRow } = topicFeedStoryHeaderParts(reader);
-    if (!readerFrame || !header || !spacer || !meta) return;
+    const { readerFrame, header, spacer, meta, actionRow, contentMask } = topicFeedStoryHeaderParts(reader);
+    if (!readerFrame || !header || !spacer || !meta || !contentMask) return;
 
     const styles = getComputedStyle(reader);
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
@@ -858,28 +872,29 @@
       ? Math.max(1, (usableWidth - columnGap) / 2)
       : usableWidth;
 
-    // Anchor the header to the viewport/frame, never to #reader's scrollable
-    // content. Scrolling #reader therefore cannot move this band by one pixel.
+    // CENTER-OF-THE-UNIVERSE: establish the band geometry once per header
+    // instance, then NEVER move, resize, recolor, hide, or restyle it because
+    // of scrolling/app state. Everything else adapts around it.
     const frameRect = readerFrame.getBoundingClientRect();
     const readerRect = reader.getBoundingClientRect();
     const left = Math.max(0, readerRect.left - frameRect.left + paddingLeft);
+    const top = Math.max(0, readerRect.top - frameRect.top + paddingTop);
 
-    // The mask/header must begin at the physical top edge of the Reader.
-    // Previously it began at readerTop + paddingTop, leaving an uncovered strip
-    // where scrolling article text could bleed above the action row.
-    const top = Math.max(0, readerRect.top - frameRect.top);
-
-    header.style.setProperty('left', `${left}px`, 'important');
-    header.style.setProperty('top', `${top}px`, 'important');
-    header.style.setProperty('width', `${headerWidth}px`, 'important');
-    header.style.setProperty('max-width', `${headerWidth}px`, 'important');
-    header.style.setProperty('box-sizing', 'border-box', 'important');
-    header.style.setProperty('padding-top', `${paddingTop}px`, 'important');
-
-    // Use the actual rendered Reader page color, not a theme variable. This
-    // makes the occlusion surface visually disappear into the page.
-    const readerBackground = getComputedStyle(reader).backgroundColor || '#ffffff';
-    header.style.setProperty('--topic-feed-reader-page-color', readerBackground);
+    if (header.dataset.topicFeedUniverseLocked !== '1') {
+      header.dataset.topicFeedUniverseLocked = '1';
+      header.style.setProperty('left', `${left}px`, 'important');
+      header.style.setProperty('top', `${top}px`, 'important');
+      header.style.setProperty('width', `${headerWidth}px`, 'important');
+      header.style.setProperty('max-width', `${headerWidth}px`, 'important');
+      header.style.setProperty('box-sizing', 'border-box', 'important');
+      header.style.setProperty('margin', '0', 'important');
+      header.style.setProperty('padding', '0', 'important');
+      header.style.setProperty('background', 'transparent', 'important');
+      header.style.setProperty('background-image', 'none', 'important');
+      header.style.setProperty('box-shadow', 'none', 'important');
+      header.style.setProperty('border', '0', 'important');
+      header.style.setProperty('z-index', '12', 'important');
+    }
 
     // Undo inline positioning left behind by the broken direct-child version.
     if (actionRow?.isConnected) {
@@ -890,21 +905,36 @@
       actionRow.style.removeProperty('z-index');
     }
 
-    if (reader.dataset.topicFeedScrollCeilingBound !== '1') {
-      reader.dataset.topicFeedScrollCeilingBound = '1';
-      const syncTopicFeedScrollCeiling = () => {
-        if (!reader.isConnected || !header.isConnected) return;
-        const scrolled = (Number(reader.scrollTop) || 0) > 3;
-        header.classList.toggle('topic-feed-story-header-scrolled', scrolled);
-      };
-      reader.addEventListener('scroll', syncTopicFeedScrollCeiling, { passive: true });
-      syncTopicFeedScrollCeiling();
-    }
+    // Never allow a scrolled state to alter the band.
+    header.classList.remove('topic-feed-story-header-scrolled');
 
     window.requestAnimationFrame(() => {
       if (!reader.isConnected || !header.isConnected || !spacer.isConnected) return;
 
-      const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
+      const headerRect = header.getBoundingClientRect();
+      const lockedHeaderHeight = Math.ceil(headerRect.height || 0);
+
+      // The content mask is NOT the band. It sits beneath the immutable band
+      // and above scrolling article content, so the article disappears under
+      // the band without requiring the band itself to change.
+      const liveFrameRect = readerFrame.getBoundingClientRect();
+      const liveReaderRect = reader.getBoundingClientRect();
+      const maskLeft = Math.max(0, headerRect.left - liveFrameRect.left);
+      const maskTop = Math.max(0, headerRect.top - liveFrameRect.top);
+      const readerPageColor = getComputedStyle(reader).backgroundColor || '#ffffff';
+
+      contentMask.style.setProperty('left', `${maskLeft}px`, 'important');
+      contentMask.style.setProperty('top', `${maskTop}px`, 'important');
+      contentMask.style.setProperty('width', `${Math.ceil(headerRect.width)}px`, 'important');
+      contentMask.style.setProperty('height', `${lockedHeaderHeight + Math.max(6, Math.round(fontSize * .5))}px`, 'important');
+      contentMask.style.setProperty('background', readerPageColor, 'important');
+      contentMask.style.setProperty('background-image', 'none', 'important');
+      contentMask.style.setProperty('border', '0', 'important');
+      contentMask.style.setProperty('box-shadow', 'none', 'important');
+      contentMask.style.setProperty('pointer-events', 'none', 'important');
+      contentMask.style.setProperty('z-index', '11', 'important');
+
+      const headerHeight = lockedHeaderHeight;
       // Reserve the initial header footprint plus one text-line buffer. That
       // spacer scrolls away with the article; the external header never does.
       const requiredHeight = Math.max(fontSize * 2, headerHeight + fontSize);
@@ -948,6 +978,7 @@
     const reader = document.querySelector('#reader');
     const frame = reader?.closest('#reader-frame');
     frame?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
+    frame?.querySelector(':scope > [data-topic-feed-story-content-mask]')?.remove();
     reader?.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
     removeTopicBookDivider();
   }

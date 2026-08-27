@@ -1,23 +1,20 @@
-TOPIC FEED HEADER GEOMETRY FIX
+CENTER OF THE UNIVERSE FIX
 
-Replace BOTH matched files:
+Replace BOTH:
   public/topic-feeds.js
   public/explorer-reader-shell.css
 
-Why both:
-The bug was a JS/CSS generation mismatch plus a geometry gap.
+Hard invariant now encoded in code:
+- Topic Feed top band is locked after creation.
+- No scroll listener or scroll-state class changes the band.
+- Source/date/View original/share never hides.
+- Band background never changes.
+- Band does not move/resize because of scrolling/app state.
+- Legacy yellow/cream action-row backgrounds and pseudo-elements are neutralized.
+- A separate .topic-feed-story-content-mask sits beneath the band and above the
+  Reader article text. That mask hides text as it scrolls underneath.
+- The mask may adapt. The band may not.
 
-Corrected behavior:
-- external Topic Feed header starts at the physical top edge of #reader;
-- Reader top padding is inside the header instead of being an uncovered strip;
-- scrolling text cannot bleed above the actions;
-- Source/date/View original/share hides after scrolling;
-- the occlusion surface uses the Reader's actual computed background color;
-- no cream/yellow theme-variable band;
-- no full-width ::before strip behind the action row;
-- no MutationObserver.
-
+No MutationObserver.
 No fallback/recovery changes.
-No app.js.
-No read-anything.js.
-No Ask Beth or Media changes.
+No app.js/read-anything.js/Ask Beth/Media changes.

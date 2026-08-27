@@ -536,3 +536,70 @@ html[data-msg-experience-theme="explorer"]
   background: transparent !important;
   box-shadow: none !important;
 }
+
+
+/* ============================================================
+   MSG HARD INVARIANT — TOPIC FEED BAND = CENTER OF THE UNIVERSE
+   The band NEVER changes on scroll, theme, Reader mode, or app state.
+   Any article occlusion is owned by .topic-feed-story-content-mask.
+   ============================================================ */
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external,
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  position: absolute !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+
+/* Source/date/View original/share NEVER disappears. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > .topic-feed-story-meta-overlay,
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
+}
+
+/* Action row is visually transparent. Kill every legacy yellow/cream backing. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action,
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before,
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::after,
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, span[aria-hidden="true"]) {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before,
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Separate non-interactive content mask. This may adapt; the band may not. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-content-mask {
+  position: absolute !important;
+  pointer-events: none !important;
+}
