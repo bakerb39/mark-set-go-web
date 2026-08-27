@@ -986,16 +986,25 @@
     event?.preventDefault?.();
     event?.stopPropagation?.();
 
-    if (typeof window.MarkSetGoReadAnything?.render === 'function') {
-      window.MarkSetGoReadAnything.render();
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
-        const bookmarkletButton = document.querySelector('#read-anything-bookmarklet');
-        bookmarkletButton?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
-      }));
-      return;
+    // Always use the application's normal Read Anything route first.
+    // That route owns Reader/workspace behavior. Calling
+    // MarkSetGoReadAnything.render() directly replaces the Reader, which is
+    // specifically NOT what this Topic Feed helper should do.
+    let route = document.querySelector('[data-action="read-anything"]');
+    let temporaryRoute = false;
+
+    if (!route) {
+      route = document.createElement('button');
+      route.type = 'button';
+      route.hidden = true;
+      route.dataset.action = 'read-anything';
+      document.body.appendChild(route);
+      temporaryRoute = true;
     }
 
-    document.querySelector('[data-read="upload"], [data-action="read-anything"]')?.click?.();
+    route.click();
+
+    if (temporaryRoute) route.remove();
   }
 
   function decorateTopicFeedImportRecovery(payload = activeTopicFeedHeaderContext?.payload || {}) {

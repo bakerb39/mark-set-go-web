@@ -4,7 +4,6 @@
   const DOWNLOAD_URL = '/downloads/read-with-mark-auto-import-extension-v0.1.1.zip';
   const EXTENSIONS_URL = 'chrome://extensions';
   const CARD_ID = 'read-anything-extension-card';
-  const VERSION = '1.1.0';
 
   function api() {
     return window.MarkSetGoReadWithMarkExtensionFallback;
@@ -19,7 +18,7 @@
       <section class="read-anything-card read-anything-extension-card" id="${CARD_ID}">
         <span class="read-anything-icon">🧩</span>
         <h2>Read with Mark Extension</h2>
-        <p><strong>Recommended.</strong> Automatically recover readable full articles when the normal import cannot retrieve them.</p>
+        <p>Automatically recover more full articles when a publisher blocks the normal import.</p>
         <div class="read-anything-extension-status" data-rwm-install-status data-state="checking">
           Checking extension…
         </div>
@@ -40,60 +39,14 @@
 
     const setup = root.querySelector('#read-anything-extension-setup');
     if (setup) {
-      setup.textContent = ready ? 'Extension settings' : 'Install extension';
+      setup.textContent = ready ? 'Extension settings' : 'Set up extension';
     }
     return ready;
-  }
-
-  function updateBookmarkletCard() {
-    const button = document.querySelector('#read-anything-bookmarklet');
-    const card = button?.closest('.read-anything-card');
-    if (!card) return false;
-
-    const heading = card.querySelector('h2');
-    const description = card.querySelector('p');
-
-    if (heading) heading.textContent = 'Read with Mark Bookmarklet';
-    if (description) {
-      description.innerHTML =
-        '<strong>Manual fallback.</strong> Open any webpage and send the full page, ' +
-        'or highlight a passage first to send only that selection.';
-    }
-
-    if (button) {
-      button.textContent = 'Show Bookmarklet';
-      button.title =
-        'Manual fallback for pages the extension cannot recover automatically';
-    }
-    return true;
-  }
-
-  function updateBookmarkletWorkspace() {
-    const target = workspace();
-    if (!target || target.hidden) return false;
-
-    const heading = target.querySelector('h2');
-    const paragraph = target.querySelector('p');
-
-    if (heading && /Install [“"]?Read with Mark/i.test(heading.textContent || '')) {
-      heading.textContent = 'Read with Mark Bookmarklet';
-    }
-
-    if (paragraph && /Drag this button to your bookmarks bar/i.test(paragraph.textContent || '')) {
-      paragraph.innerHTML =
-        '<strong>Manual fallback:</strong> use the bookmarklet when the extension is not installed ' +
-        'or automatic recovery cannot retrieve a publisher page. Drag the button to your bookmarks bar. ' +
-        'Highlight text before clicking it to capture only that passage; otherwise it imports the full page. ' +
-        'On iPhone Safari, create a bookmark and replace its address with the code below.';
-    }
-    return true;
   }
 
   function installCard() {
     const grid = document.querySelector('.read-anything-grid');
     if (!grid) return false;
-    updateBookmarkletCard();
-
     if (grid.querySelector(`#${CARD_ID}`)) {
       updateStatus(grid);
       return true;
@@ -128,9 +81,8 @@
         <div>
           <h2>Read with Mark Extension</h2>
           <p>
-            <strong>Recommended for article recovery.</strong> The extension lets
-            Mark, Set, Go! recover readable article text directly from the publisher
-            page when the normal import is incomplete.
+            The extension lets Mark, Set, Go! recover readable article text directly
+            from the publisher page when the normal server import is incomplete.
           </p>
         </div>
 
@@ -148,9 +100,6 @@
           <button id="rwm-check-installation" class="secondary" type="button">
             Check installation
           </button>
-          <button id="rwm-show-bookmarklet-fallback" class="secondary" type="button">
-            Bookmarklet fallback
-          </button>
         </div>
 
         <ol>
@@ -163,12 +112,6 @@
         </ol>
 
         <p class="read-anything-extension-note">
-          <strong>Manual fallback:</strong> the Read with Mark Bookmarklet remains
-          available if you do not want to install the extension or if a particular
-          publisher page cannot be recovered automatically.
-        </p>
-
-        <p class="read-anything-extension-note">
           Chrome does not allow a website to silently install an unpacked extension.
           Once Read with Mark is published in the Chrome Web Store, this setup can
           become a normal one-click install link.
@@ -179,17 +122,6 @@
           paywalls, CAPTCHAs, or other access controls.
         </p>
       </div>`;
-
-    target.querySelector('#rwm-show-bookmarklet-fallback')?.addEventListener('click', () => {
-      const render = window.MarkSetGoReadAnything?.render;
-      if (typeof render === 'function') render();
-
-      window.setTimeout(() => {
-        updateBookmarkletCard();
-        document.querySelector('#read-anything-bookmarklet')?.click();
-        window.setTimeout(updateBookmarkletWorkspace, 0);
-      }, 60);
-    });
 
     target.querySelector('#rwm-copy-extensions-url')?.addEventListener('click', async (event) => {
       const button = event.currentTarget;
@@ -256,10 +188,6 @@
     ) {
       scheduleInstall();
     }
-
-    if (target.closest('#read-anything-bookmarklet')) {
-      window.setTimeout(updateBookmarkletWorkspace, 0);
-    }
   }, true);
 
   document.addEventListener('marksetgo:rwm-extension-ready', () => {
@@ -273,7 +201,7 @@
   window.addEventListener('pageshow', scheduleInstall);
 
   window.MarkSetGoReadWithMarkExtensionInstallUi = Object.freeze({
-    version:VERSION,
+    version:'1.0.0',
     open:renderSetup,
     refresh:() => updateStatus(document)
   });
