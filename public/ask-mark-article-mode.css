@@ -159,3 +159,9 @@
     padding-inline:7px;
   }
 }
+
+.askmark-article-actions-separator{
+  height:1px;
+  margin:.25rem .15rem;
+  background:rgba(20,63,96,.14);
+}

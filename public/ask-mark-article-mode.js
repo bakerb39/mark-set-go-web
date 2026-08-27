@@ -36,6 +36,11 @@
     }
   });
 
+  const SHARE_ACTIONS = Object.freeze({
+    chat:{ label:'Send to Chat' },
+    symposium:{ label:'Send to Symposium' }
+  });
+
   const $ = (selector, root = document) => root.querySelector(selector);
 
   function currentArticle() {
@@ -98,10 +103,6 @@
 
   function clearStaleLegacySelection() {
     const canonical = canonicalSelection();
-
-    // If the Reader exposes its canonical selection API, it is authoritative.
-    // An empty canonical range means the passage has been deselected, even if
-    // the older Ask Beth selection card still contains the previous quote.
     if (!canonical.available || canonical.text) return false;
 
     const panel = selectionPanel();
@@ -118,12 +119,7 @@
 
   function selectionText() {
     const canonical = canonicalSelection();
-
-    // Never fall back to stale legacy text when the canonical API exists.
     if (canonical.available) return canonical.text;
-
-    // Compatibility only for older Reader builds that do not expose
-    // getSelectionRange().
     return legacySelectionText();
   }
 
@@ -193,6 +189,14 @@
                 data-askmark-article-action="${key}"
               >${item.label}</button>
             `).join('')}
+            <div class="askmark-article-actions-separator" role="separator"></div>
+            ${Object.entries(SHARE_ACTIONS).map(([key,item]) => `
+              <button
+                type="button"
+                role="menuitem"
+                data-askmark-share-action="${key}"
+              >${item.label}</button>
+            `).join('')}
           </div>
         </div>
       </div>`;
@@ -260,11 +264,79 @@
     const scope = scopeInfo();
     closeActionsMenu();
 
-    // IMPORTANT: use the same composer as a normal reader question.
-    // ask-mark-hub.js already owns the routing rule:
-    // selection present -> selected passage
-    // no selection     -> whole article
     return submitThroughComposer(scope.selected ? item.selected : item.whole);
+  }
+
+  function sourceLabel(article) {
+    const source = article?.source || {};
+    const explicit = String(
+      source.sourceName ||
+      source.site ||
+      source.source ||
+      source.provider ||
+      ''
+    ).trim();
+    if (explicit) return explicit;
+
+    try {
+      const url = new URL(String(source.url || ''));
+      return url.hostname.replace(/^www\./,'');
+    } catch {
+      return 'Current article';
+    }
+  }
+
+  function sharePayload() {
+    clearStaleLegacySelection();
+
+    const article = currentArticle();
+    if (!article) return null;
+
+    const scope = scopeInfo();
+    const selected = selectionText();
+    const text = scope.selected ? selected : article.text;
+    if (!String(text || '').trim()) return null;
+
+    return {
+      type:scope.selected ? 'selection' : 'article',
+      title:article.title,
+      text:String(text || '').trim(),
+      context:'',
+      sourceLabel:sourceLabel(article),
+      sourceUrl:String(article.source?.url || ''),
+      documentId:String(article.current?.documentId || article.current?.id || ''),
+      chapter:String(article.current?.chapter || article.current?.section || ''),
+      metadata:{
+        scope:scope.label,
+        readerSourceType:article.type
+      }
+    };
+  }
+
+  async function runShareAction(destination) {
+    if (!articleAvailable()) return false;
+
+    const api = window.MSGContentShare;
+    const payload = sharePayload();
+    const key = String(destination || '').toLowerCase();
+    if (!payload || !api) return false;
+
+    closeActionsMenu();
+
+    try {
+      if (key === 'chat' && typeof api.toChat === 'function') {
+        await api.toChat(payload);
+        return true;
+      }
+
+      if (key === 'symposium' && typeof api.toSymposium === 'function') {
+        return Boolean(api.toSymposium(payload));
+      }
+    } catch (error) {
+      console.warn(`Ask Beth could not send content to ${key}.`, error);
+    }
+
+    return false;
   }
 
   function bindArticleControls(root) {
@@ -287,6 +359,16 @@
         event.preventDefault();
         event.stopPropagation();
         runAction(button.dataset.askmarkArticleAction);
+      });
+    });
+
+    root.querySelectorAll('[data-askmark-share-action]').forEach((button) => {
+      if (button.dataset.askmarkCompactBound === '1') return;
+      button.dataset.askmarkCompactBound = '1';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void runShareAction(button.dataset.askmarkShareAction);
       });
     });
   }
@@ -369,8 +451,6 @@
     });
   }
 
-  // Hide the introductory greeting as soon as the reader actually begins
-  // composing. Capture phase means this does not interfere with the Hub owner.
   document.addEventListener('input', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (
@@ -451,14 +531,13 @@
 
   window.addEventListener('pageshow', () => scheduleSync());
 
-  // Pop-out compatibility. These calls deliberately go through the normal
-  // composer, preserving the exact same selection-first routing rule.
   window.MarkSetGoArticleCompanion = Object.freeze({
     available:articleAvailable,
     scope:() => scopeInfo().key,
     scopeLabel:() => scopeInfo().label,
     ask:(question) => submitThroughComposer(question),
     action:runAction,
+    share:(destination) => runShareAction(destination),
     sync:syncArticleUi,
     actions:Object.fromEntries(
       Object.entries(ACTIONS).map(([key,value]) => [key,value.label])
