@@ -1,72 +1,78 @@
-ASK BETH — CONVERSATION-FIRST SIDEBAR
-=====================================
+READ WITH MARK — EXTENSION-FIRST ARTICLE FALLBACK TEST
+======================================================
 
-Upload these files:
+This package is based on the current feature/ask-mark-premium-phase-1 branch
+after the Ask Beth live-scope, media-toolbar, and white-title fixes.
 
-REPO ROOT
+WHAT THIS TEST DOES
+-------------------
+Normal topic/article server import remains FIRST.
+
+Only when the Reader sees the existing incomplete-article condition:
+  "Full article text could not be imported from the publisher."
+or the existing publisher-restricted message,
+the Reader checks whether the Read with Mark Auto Import extension is installed.
+
+IF INSTALLED
+1. Reader asks extension to recover the original article URL.
+2. Extension opens that URL in an inactive temporary Chrome tab.
+3. It waits briefly for client-rendered article text.
+4. It extracts visible headings/paragraphs/quotes/list text.
+5. It closes the temporary tab.
+6. It returns the result to the Reader.
+7. Reader opens the recovered text as the same topic/full article.
+
+IF NOT INSTALLED OR RECOVERY FAILS
+Nothing is removed. The current manual View Original / Read with Mark fallback
+remains available.
+
+ACCESS CONTROLS
+---------------
+This prototype intentionally does NOT attempt to bypass subscription/sign-in
+walls, CAPTCHAs, paywalls, or other access controls. A visible subscription or
+sign-in wall causes automatic recovery to stop.
+
+WEB APP FILES TO UPLOAD
+-----------------------
+REPO ROOT:
   apply-ui-cache-busters.js
 
-PUBLIC
-  public/ask-mark-window.js
-  public/ask-mark-window.css
-  public/ask-mark-article-mode.js
-  public/ask-mark-article-mode.css
+PUBLIC:
+  public/read-with-mark-extension-fallback.js
 
-WHAT CHANGES
-------------
-1. Expanded Ask Beth remains removed. Pop out is the large-chat option.
-2. Docked Ask Beth becomes conversation-first:
-   - compact ~58px header
-   - conversation gets almost all remaining height
-   - composer is permanently reserved at the bottom
-   - textarea grows automatically; the old drag handle is hidden
-3. The opening greeting is much smaller and disappears as soon as the reader
-   begins typing.
-4. The horizontal Explain / Summarize / Analyze / Simplify / Context / Compare
-   strip is replaced by one compact Actions dropdown.
-5. A dynamic context chip shows:
-     Selected passage
-   or
-     Whole article
-6. Typed questions AND Actions use the same existing Ask Beth composer owner.
-   That preserves the intended rule:
-     highlight exists -> selected passage
-     no highlight     -> whole article
-7. The startup cache-buster no longer patches ask-mark-hub.js into a
-   whole-article-always owner. That competing patch has been removed.
-8. The popup files are not replaced. The existing popup continues using the
-   live Ask Beth session.
+EXTENSION INSTALL
+-----------------
+Use the included:
+  read-with-mark-auto-import-extension-v0.1.0.zip
 
-WHY THE ROOT FILE MATTERS
--------------------------
-The previous apply-ui-cache-busters.js contained a startup patch that could
-force normal article questions to whole-article context. This replacement
-removes that patch and also gives the new sidebar files fresh cache versions.
+1. Download/unzip it.
+2. Open chrome://extensions
+3. Enable Developer mode.
+4. Click Load unpacked.
+5. Select the unzipped read-with-mark-auto-import-extension folder.
+6. Deploy the two web-app files above.
+7. Hard refresh Mark, Set, Go! with Ctrl+Shift+R.
 
 TEST
 ----
-After deployment, hard-refresh once (Ctrl+Shift+R), then:
+Open a topic/news story that currently produces:
+  Full article text could not be imported from the publisher.
 
-A. Article with nothing highlighted
-   - chip says Whole article
-   - type a question
-   - answer should use the article
-   - Actions should use the article
+Expected:
+- a small "Recovering full article with Read with Mark…" message;
+- Chrome briefly creates an inactive publisher tab;
+- the tab closes automatically;
+- if readable text was exposed, the Reader replaces the incomplete story with
+  the recovered full article;
+- Ask Beth then treats it as a normal full topic article.
 
-B. Highlight a sentence/passage
-   - chip changes to Selected passage
-   - type a question
-   - answer should focus on the highlight
-   - Actions should focus on the highlight
+If the extension cannot recover it, the incomplete article remains and the
+existing manual fallback is still available.
 
-C. Clear the highlight
-   - chip returns to Whole article
+DEVELOPER CONSOLE
+-----------------
+Check:
+  window.MarkSetGoReadWithMarkExtensionFallback.ready
 
-D. Long answer
-   - header stays compact
-   - answer area scrolls
-   - composer remains visible at the bottom
-
-E. Pop out
-   - popup still opens
-   - docked panel hides while popup is active
+Manual retry for the current incomplete article:
+  window.MarkSetGoReadWithMarkExtensionFallback.retry()

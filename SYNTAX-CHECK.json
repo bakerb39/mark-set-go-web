@@ -3,11 +3,15 @@
     "ok": true,
     "stderr": ""
   },
-  "ask-mark-popout-controller.js": {
+  "public/read-with-mark-extension-fallback.js": {
     "ok": true,
     "stderr": ""
   },
-  "ask-mark-popout-page.js": {
+  "read-with-mark-auto-import-extension/background.js": {
+    "ok": true,
+    "stderr": ""
+  },
+  "read-with-mark-auto-import-extension/content.js": {
     "ok": true,
     "stderr": ""
   }

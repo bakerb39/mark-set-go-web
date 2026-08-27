@@ -91,7 +91,6 @@ index = replaceAssetVersion(
   '20260826-v1.1.0-label-only'
 );
 
-
 index = replaceAssetVersion(
   index,
   'media-toolbar-responsive.css',
@@ -152,6 +151,12 @@ index = replaceAssetVersion(
   '20260826-v1.0.0-reader-workspace'
 );
 
+index = replaceAssetVersion(
+  index,
+  'read-with-mark-extension-fallback.js',
+  '20260826-v0.1.0-extension-first'
+);
+
 /* Stability rollback:
    Keep the asset slots so old runtime-injected tags get a NEW cache URL,
    but load a disabled/no-reparent implementation instead of Phase 2. */
@@ -174,7 +179,6 @@ index = ensureAfterAsset(
   '<link href="/media-toolbar-responsive.css?v=20260826-v1.0.0-toolbar-wrap" rel="stylesheet"/>'
 );
 
-
 index = ensureAfterAsset(
   index,
   'topic-feeds.css',
@@ -185,6 +189,12 @@ index = ensureAfterAsset(
   index,
   'read-anything.js',
   '  <script defer src="/topic-feed-title-stability.js?v=20260826-v1.0.0-first-paint"></script>'
+);
+
+index = ensureAfterAsset(
+  index,
+  'read-anything.js',
+  '  <script defer src="/read-with-mark-extension-fallback.js?v=20260826-v0.1.0-extension-first"></script>'
 );
 
 index = ensureAfterAsset(
@@ -243,7 +253,7 @@ index = ensureAfterAsset(
 
 if (index !== before) {
   fs.writeFileSync(indexPath, index, 'utf8');
-  console.log('ui cache: Ask Beth conversation-first popup-only sidebar current');
+  console.log('ui cache: Ask Beth + Read with Mark extension fallback current');
 } else {
-  console.log('ui cache: Ask Beth conversation-first assets already current');
+  console.log('ui cache: UI assets already current');
 }
