@@ -1,129 +1,538 @@
-/*
- * Mark, Set, Go! Explorer Reader visual skin v2.0
- *
- * SOURCE OWNERSHIP
- * - explorer-reader-shell-shared-mechanics.css owns Reader geometry for EVERY theme.
- * - topic-feeds.css + topic-feeds.js own Topic Feed header placement.
- * - this file owns Explorer-specific Reader COLORS / MATERIALS only.
- *
- * Deliberately contains NO:
- * - fixed navigation-pane height
- * - negative footer/playback margins
- * - Reader-frame top offsets
- * - Topic Feed occlusion/header layout
- * - body/app height math
- */
+/* Explorer Reader Shell Recovery v1.0.4 — collapse dead app-shell + header occlusion
+   Restore the original Reader's visual hierarchy first; Explorer scenery decorates
+   around the application instead of replacing its structural shell.
+   Presentation only: no Reader timing, pagination, mode, or word-DOM changes. */
 
+/* Retire the experimental movable "work surface" from Designer v1.x. */
 html[data-msg-experience-theme="explorer"] .msg-vd-center-work-surface,
 #msg-vd-surface-handle {
-  display:none !important;
+  display: none !important;
 }
 
-/* Reader shell visual surface only. */
+/* The illustrated world is the environment OUTSIDE the Reader application. */
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) body {
+  background: #e9dfc9 !important;
+  background-image: none !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art.msg-vd-designer-surface-active {
+  background: #e9dfc9 !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art::after,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art.msg-vd-designer-surface-active::after {
+  display: none !important;
+  content: none !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art__left,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art__right {
+  opacity: 1 !important;
+  filter: saturate(1.04) contrast(1.035) !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art__top {
+  opacity: .96 !important;
+  filter: saturate(1.02) contrast(1.02) !important;
+}
+
+/* Keep the app shell itself layout-only. The white/ivory Reader panel below is
+   the visual application card, matching the original composition. */
+html[data-msg-experience-theme="explorer"] .app-shell:has(.reader-page-panel) {
+  padding: 0 !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  isolation: auto !important;
+}
+
+/* Restore the single coherent Reader application shell. */
+html[data-msg-experience-theme="explorer"] #app > .reader-page-panel,
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel {
-  background:#fffdf7 !important;
-  background-image:none !important;
-  border-color:rgba(146,120,68,.42) !important;
+  position: relative !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 6px 16px 6px !important;
+  overflow: visible !important;
+  background: #fffdf7 !important;
+  background-image: none !important;
+  border: 1px solid rgba(146,120,68,.42) !important;
+  border-radius: 16px !important;
   box-shadow:
     0 18px 46px rgba(28,50,42,.20),
     inset 0 0 0 1px rgba(255,255,255,.82) !important;
+  backdrop-filter: none !important;
 }
-
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel::before,
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel::after {
-  content:none !important;
-  display:none !important;
+  display: none !important;
+  content: none !important;
 }
 
+/* Title belongs inside the shell, just like the original Reader. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-title-row {
+  min-height: 0 !important;
+  margin: 0 0 4px !important;
+  padding: 0 !important;
+  gap: 8px !important;
+  align-items: flex-start !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-title-copy h1 {
-  color:#143f3a !important;
+  margin: 0 0 2px !important;
+  line-height: 1.12 !important;
+  color: #143f3a !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-title-links {
+  margin: 0 !important;
+  line-height: 1.15 !important;
 }
 
-/* Working pane materials only. */
+/* The command row is a real row INSIDE the shell, not scenery and not a band
+   layered across the pane. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-toolbar {
+  margin: 0 !important;
+  padding: 0 !important;
+  min-height: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+  min-height: 58px !important;
+  margin: 5px 0 30px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls > .reader-pane-buttons {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Restore the original layout hierarchy: panes start together beneath controls. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-layout {
+  margin: 0 !important;
+  /* Keep a clean ivory breathing line between the command row and every pane. */
+  margin-top: 2px !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Individual working panes remain crisp white cards inside the larger shell. */
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel .navigation-pane {
-  background:#fffefa !important;
-  border-color:rgba(104,130,120,.24) !important;
-  box-shadow:0 8px 20px rgba(33,56,48,.10) !important;
+  background: #fffefa !important;
+  border: 1px solid rgba(104,130,120,.24) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 20px rgba(33,56,48,.10) !important;
 }
-
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel #reader-frame {
-  background:#fff !important;
-  border-color:rgba(126,140,133,.28) !important;
-  box-shadow:0 7px 18px rgba(31,52,45,.09) !important;
+  background: #fff !important;
+  border: 1px solid rgba(126,140,133,.28) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 7px 18px rgba(31,52,45,.09) !important;
 }
-
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel #reader {
-  background:#fff !important;
-  background-image:none !important;
+  background: #fff !important;
+  background-image: none !important;
 }
-
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel .mark-companion-panel {
-  box-shadow:0 8px 20px rgba(33,56,48,.10) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 20px rgba(33,56,48,.10) !important;
 }
 
-html[data-msg-experience-theme="explorer"] #app .reader-page-panel .mark-companion-panel .askmark-hero {
-  background:#317165 !important;
+/* Footer/page controls and playback remain part of the SAME white application
+   shell. No tan floor, green slab, or separate lower stage. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-viewer-footer {
+  min-height: 1.8rem !important;
+  margin: 0 !important;
+  padding: .35rem .15rem 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .playback-controls {
+  margin: 8px 0 0 !important;
+  padding: 0 !important;
+  gap: 8px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .playback-controls .status {
+  margin-left: .25rem !important;
 }
 
-/* Explorer control palette without changing geometry. */
+/* Explorer materials decorate controls without changing their row geometry. */
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel :is(#start-reader,#fs-start) {
-  border-color:#276257 !important;
-  background:linear-gradient(180deg,#347769,#20584f) !important;
-  color:#fff7dd !important;
-  box-shadow:0 2px 6px rgba(26,72,62,.17) !important;
+  border: 1px solid #276257 !important;
+  background: linear-gradient(180deg,#347769,#20584f) !important;
+  color: #fff7dd !important;
+  box-shadow: 0 2px 6px rgba(26,72,62,.17) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel :is(#pause-reader,#reset-reader,#fs-pause,#fs-reset) {
+  border: 1px solid rgba(164,129,61,.56) !important;
+  background: linear-gradient(180deg,#fffaf0,#eee2bd) !important;
+  color: #174d45 !important;
+  box-shadow: 0 2px 5px rgba(71,56,29,.10) !important;
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-side-toggle,
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .mark-pane-button {
+  border-color: rgba(164,129,61,.48) !important;
+  background: linear-gradient(180deg,#fffaf0,#f2e7c9) !important;
+  color: #174d45 !important;
 }
 
-html[data-msg-experience-theme="explorer"] #app .reader-page-panel
-:is(#pause-reader,#reset-reader,#fs-pause,#fs-reset) {
-  border-color:rgba(164,129,61,.56) !important;
-  background:linear-gradient(180deg,#fffaf0,#eee2bd) !important;
-  color:#174d45 !important;
-  box-shadow:0 2px 5px rgba(71,56,29,.10) !important;
+/* Preserve the already-correct compact top-right utility grouping. */
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-pane-buttons > .reader-topright-media-stack {
+  margin-left: auto !important;
 }
 
-html[data-msg-experience-theme="explorer"] #app .reader-page-panel
-:is(.reader-side-toggle,.mark-pane-button) {
-  border-color:rgba(164,129,61,.48) !important;
-  background:linear-gradient(180deg,#fffaf0,#f2e7c9) !important;
-  color:#174d45 !important;
+/* User-approved Designer JSON baseline (latest export, 2026-08-18).
+   These are the actual Explorer defaults, not settings the user must recreate. */
+@media (min-width: 861px) {
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel {
+    width: 100% !important;
+    margin-top: 3px !important;
+    margin-bottom: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+    transform: none !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-title-row {
+    margin-top: 14px !important;
+    margin-bottom: -1px !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls,
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-pane-controls.ask-mark-toolbar {
+    min-height: 58px !important;
+    margin-top: 6px !important;
+    margin-bottom: 30px !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel .navigation-pane {
+    height: 790px !important;
+    margin-top: 7px !important;
+    margin-bottom: -80px !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel #reader-frame {
+    margin-top: 7px !important;
+    background: #ffffff !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel #reader {
+    background: #ffffff !important;
+    background-image: none !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-viewer-footer {
+    margin-top: -24px !important;
+    padding-top: 29px !important;
+    padding-bottom: 29px !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel .playback-controls {
+    margin-top: -57px !important;
+    margin-bottom: 19px !important;
+  }
+}
+html[data-msg-experience-theme="explorer"] #app .reader-page-panel .mark-companion-panel .askmark-hero {
+  background: #317165 !important;
 }
 
-/* Scenery images remain image-only decoration. */
+/* Remove the obsolete center "wall" completely. The fixed Explorer world now
+   owns ONLY the scenic images; it no longer paints a tan/green rectangle through
+   the open space between the Reader shell and the footer. */
 html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art,
 html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art.msg-vd-designer-surface-active {
-  background:transparent !important;
-  background-image:none !important;
+  background: transparent !important;
+  background-image: none !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) body {
+  background: var(--explorer-global-surface,#fffdf7) !important;
+  background-image: none !important;
 }
 
+@media (max-width: 860px) {
+  html[data-msg-experience-theme="explorer"] #app > .reader-page-panel,
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel {
+    padding: 10px !important;
+    border-radius: 12px !important;
+  }
+}
+
+
+/* v1.0.4 — PROOF FIX 1: remove the empty Explorer wall below the Reader.
+   The base app gives .app-shell min-height:650px. Once Explorer made that shell
+   transparent, the unused minimum-height area exposed the scenery/background
+   between the Reader card and footer. Collapse that unused height completely. */
+html[data-msg-experience-theme="explorer"] body:has(#app .reader-page-panel) #app.app-shell,
+html[data-msg-experience-theme="explorer"] .app-shell:has(.reader-page-panel) {
+  min-height: 0 !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
+}
+
+/* The scenery container owns images only — never a center-colored slab. */
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art {
+  background: none !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
 html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art::before,
 html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art::after {
-  content:none !important;
-  display:none !important;
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) #app,
+html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .msg-workspace-primary {
+  background: transparent !important;
+  background-image: none !important;
 }
 
-html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel)
-:is(.explorer-world-art__left,.explorer-world-art__right) {
-  opacity:1 !important;
-  filter:saturate(1.04) contrast(1.035) !important;
+/* v1.0.4 — PROOF FIX 2: Topic Feed text disappears beneath the compact header.
+   No spanning bar: Source/share leaves after scrolling and only small opaque
+   pads immediately behind the action words occlude the document text. */
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external::after {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external .topic-feed-reader-credit,
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled > .topic-feed-story-meta-overlay {
+  display: none !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action .read-anything-inline-article-summary {
+  position: relative !important;
+  z-index: 2 !important;
+  background: #fff !important;
+  box-shadow: 0 0 0 3px #fff !important;
+}
+html[data-msg-experience-theme="explorer"] #reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action > span[aria-hidden="true"] {
+  position: relative !important;
+  z-index: 2 !important;
+  background: #fff !important;
+  box-shadow: 0 0 0 2px #fff !important;
 }
 
-html[data-msg-experience-theme="explorer"]:has(#app .reader-page-panel) .explorer-world-art__top {
-  display:block !important;
-  height:auto !important;
-  min-height:0 !important;
-  max-height:none !important;
-  margin-bottom:0 !important;
-  padding-bottom:0 !important;
-  vertical-align:top !important;
-  opacity:.96 !important;
-  filter:saturate(1.02) contrast(1.02) !important;
+
+/* v1.0.5 — THREE SURGICAL EXPLORER READER FIXES
+   1) Do not let #app flex-grow below the Reader shell.
+   2) Keep the real green footer, but remove the gap before it.
+   3) Music is a fixed overlay and must never participate in page flow. */
+
+/* FIX 1 — stop the Explorer Reader app container from stretching vertically. */
+html[data-msg-experience-theme="explorer"] body:has(#app .reader-page-panel) #app.app-shell,
+html[data-msg-experience-theme="explorer"] #app.app-shell:has(.reader-page-panel) {
+  flex: 0 0 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+  margin-bottom: 0 !important;
 }
 
-html[data-msg-experience-theme="explorer"] .explorer-world-art {
-  line-height:0 !important;
+/* FIX 2 — preserve the green footer itself, but remove all space before it. */
+html[data-msg-experience-theme="explorer"] body:has(#app .reader-page-panel) > .site-footer {
+  flex: 0 0 auto !important;
+  margin-top: 0 !important;
 }
 
+/* FIX 3 — undo explorer-theme.css's position:relative override on the music dock.
+   The dock must float above the page and never add height to the document. */
 html[data-msg-experience-theme="explorer"] .music-dock {
-  position:fixed !important;
-  z-index:9999 !important;
+  position: fixed !important;
+  z-index: 9999 !important;
+}
+
+
+/* v1.0.6 — TRUE LOCAL TOPIC ACTION OCCLUSION
+   Keep the external header transparent. Only the compact action cluster from
+   Summarize through Create Post gets an opaque footprint, so scrolling article
+   text disappears under those controls without creating a bar across the page. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {
+  position: relative !important;
+  z-index: 3 !important;
+  isolation: isolate !important;
+  display: inline-flex !important;
+  width: max-content !important;
+  max-width: 100% !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: .08rem !important;
+  margin: .08rem 0 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: -3px -5px !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  border-radius: 3px !important;
+  background: var(--msg-vd-reader-page-color, #ffffff) !important;
+  box-shadow: none !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, span[aria-hidden="true"]) {
+  position: relative !important;
+  z-index: 1 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* The Source/share row leaves once the document starts moving; the compact
+   action cluster above remains as the only local text ceiling. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay {
+  display: none !important;
+}
+
+
+/* v1.0.7 — CHROMIUM-VERIFIED NORMAL-FLOW SHELL + FIRST-PAGE TEXT CEILING
+   The Reader shell is never translated. The approved -10px visual lift is
+   represented by #app margin-top: 6px (base desktop 16px minus 10px), so the
+   footer can follow the shell immediately with no abandoned layout area. */
+@media (min-width: 861px) {
+  html[data-msg-experience-theme="explorer"] body:has(#app .reader-page-panel) #app.app-shell {
+    margin-top: 6px !important;
+    margin-bottom: 0 !important;
+  }
+  html[data-msg-experience-theme="explorer"] #app .reader-page-panel {
+    transform: none !important;
+    margin-bottom: 0 !important;
+  }
+}
+
+/* The action ceiling is the width of the FIRST READER PAGE, because the
+   external header itself is already sized to that page by topic-feeds.js.
+   This prevents chopped fragments to the right of Create Post while remaining
+   completely invisible on the white Reader surface. It never spans page two. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action {
+  position: relative !important;
+  z-index: 3 !important;
+  isolation: isolate !important;
+  display: flex !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  align-items: center !important;
+  flex-wrap: wrap !important;
+  gap: .08rem !important;
+  margin: .08rem 0 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: -3px 0 !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: var(--msg-vd-reader-page-color, #ffffff) !important;
+  box-shadow: none !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, span[aria-hidden="true"]) {
+  position: relative !important;
+  z-index: 1 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay {
+  display: none !important;
+}
+
+
+/* MSG TOPIC FEED GEOMETRY CORRECTION
+   Matched to the external-header topic-feeds.js baseline.
+   The header starts at the Reader's physical top edge. While scrolling, its
+   surface uses the Reader's actual computed page color, so text is occluded
+   without creating a differently colored cream/yellow band. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  z-index: 20 !important;
+  background: var(--topic-feed-reader-page-color, #ffffff) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay {
+  display: none !important;
+}
+
+/* The header itself owns occlusion. Do not paint a second full-width strip
+   behind Summarize / Analyze / Comprehension. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action::before {
+  content: none !important;
+  display: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Action labels remain visually native to the Reader page. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action
+:is(.read-anything-inline-article-summary, span[aria-hidden="true"]) {
+  background: transparent !important;
+  box-shadow: none !important;
 }

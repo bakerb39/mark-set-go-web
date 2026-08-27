@@ -824,26 +824,6 @@
     // by #reader-frame so it cannot travel with the scrolling article.
     reader.classList.remove('topic-feed-story-header-managed');
 
-    // Restore the original Topic Feed scroll-state contract. The external
-    // header stays fixed; once Reader content begins moving, CSS hides the
-    // Source/share row and provides the text ceiling so article text cannot
-    // bleed above or through the controls.
-    if (reader.dataset.topicFeedHeaderScrollBound !== '1') {
-      reader.dataset.topicFeedHeaderScrollBound = '1';
-
-      const syncTopicFeedHeaderScrollState = () => {
-        if (!reader.isConnected || !header.isConnected) return;
-        const moved =
-          (Number(reader.scrollTop) || 0) > 4 ||
-          (Number(reader.scrollLeft) || 0) > 4;
-
-        header.classList.toggle('topic-feed-story-header-scrolled', moved);
-      };
-
-      reader.addEventListener('scroll', syncTopicFeedHeaderScrollState, { passive: true });
-      syncTopicFeedHeaderScrollState();
-    }
-
     return { readerFrame, header, spacer, meta, actionRow };
   }
 
@@ -883,12 +863,23 @@
     const frameRect = readerFrame.getBoundingClientRect();
     const readerRect = reader.getBoundingClientRect();
     const left = Math.max(0, readerRect.left - frameRect.left + paddingLeft);
-    const top = Math.max(0, readerRect.top - frameRect.top + paddingTop);
+
+    // The mask/header must begin at the physical top edge of the Reader.
+    // Previously it began at readerTop + paddingTop, leaving an uncovered strip
+    // where scrolling article text could bleed above the action row.
+    const top = Math.max(0, readerRect.top - frameRect.top);
 
     header.style.setProperty('left', `${left}px`, 'important');
     header.style.setProperty('top', `${top}px`, 'important');
     header.style.setProperty('width', `${headerWidth}px`, 'important');
     header.style.setProperty('max-width', `${headerWidth}px`, 'important');
+    header.style.setProperty('box-sizing', 'border-box', 'important');
+    header.style.setProperty('padding-top', `${paddingTop}px`, 'important');
+
+    // Use the actual rendered Reader page color, not a theme variable. This
+    // makes the occlusion surface visually disappear into the page.
+    const readerBackground = getComputedStyle(reader).backgroundColor || '#ffffff';
+    header.style.setProperty('--topic-feed-reader-page-color', readerBackground);
 
     // Undo inline positioning left behind by the broken direct-child version.
     if (actionRow?.isConnected) {
@@ -897,6 +888,17 @@
       actionRow.style.removeProperty('position');
       actionRow.style.removeProperty('max-width');
       actionRow.style.removeProperty('z-index');
+    }
+
+    if (reader.dataset.topicFeedScrollCeilingBound !== '1') {
+      reader.dataset.topicFeedScrollCeilingBound = '1';
+      const syncTopicFeedScrollCeiling = () => {
+        if (!reader.isConnected || !header.isConnected) return;
+        const scrolled = (Number(reader.scrollTop) || 0) > 3;
+        header.classList.toggle('topic-feed-story-header-scrolled', scrolled);
+      };
+      reader.addEventListener('scroll', syncTopicFeedScrollCeiling, { passive: true });
+      syncTopicFeedScrollCeiling();
     }
 
     window.requestAnimationFrame(() => {

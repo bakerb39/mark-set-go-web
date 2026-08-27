@@ -1,18 +1,22 @@
-TOPIC FEED SCROLL-STATE FIX ONLY
+TOPIC FEED HEADER GEOMETRY FIX
 
-Replace:
+Replace BOTH matched files:
   public/topic-feeds.js
+  public/explorer-reader-shell.css
 
-Built directly from the restored known-good external-header baseline.
+Why both:
+The bug was a JS/CSS generation mismatch plus a geometry gap.
 
-Only change:
-- restores a passive Reader scroll listener that toggles
-  .topic-feed-story-header-scrolled when the Reader moves.
-- this activates the existing CSS that prevents article text from bleeding
-  above/through the Topic Feed header.
+Corrected behavior:
+- external Topic Feed header starts at the physical top edge of #reader;
+- Reader top padding is inside the header instead of being an uncovered strip;
+- scrolling text cannot bleed above the actions;
+- Source/date/View original/share hides after scrolling;
+- the occlusion surface uses the Reader's actual computed background color;
+- no cream/yellow theme-variable band;
+- no full-width ::before strip behind the action row;
+- no MutationObserver.
 
-No MutationObserver.
-No CSS replacement.
 No fallback/recovery changes.
 No app.js.
 No read-anything.js.
