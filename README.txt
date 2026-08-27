@@ -1,29 +1,51 @@
-READ WITH MARK INSTALL UI — LOADER ORDER FIX
+READ ANYTHING — READ WITH MARK DIRECT UI OWNER
+================================================
 
-You did not miss an upload.
+This fixes the case where Read Anything still showed only the old:
 
-The public install UI JS/CSS files are already in the branch.
-The problem was the root cache-buster ordering:
+  Read with Mark
+  Import a full webpage...
+  Show Bookmarklet
 
-BROKEN:
-  install UI JS after fallback JS
-  BEFORE fallback JS had been inserted into clean index.html
+The new UI no longer depends on one particular navigation path firing the
+install-UI enhancement.
 
-FIXED:
-  1. install UI CSS after read-anything.css
-  2. extension fallback JS after read-anything.js
-  3. install UI JS after extension fallback JS
+UPLOAD
 
-REPLACE ONLY:
-  repo root/apply-ui-cache-busters.js
+REPO ROOT
+  apply-ui-cache-busters.js
 
-Then deploy and hard-refresh with Ctrl+Shift+R.
+PUBLIC
+  read-anything-extension-card-owner.js   NEW
 
-Afterward, Read Anything should show:
+WHAT IT DOES
+
+Whenever Read Anything is rendered, it ensures the page contains:
+
   Read with Mark Extension
-  Recommended...
+  Recommended. Automatically recover readable full articles...
   ✓ Installed and connected
+  Extension settings
 
-and the old card should read:
+followed by:
+
   Read with Mark Bookmarklet
-  Manual fallback...
+  Manual fallback. Open any webpage...
+  Show Bookmarklet
+
+The extension card is inserted before the bookmarklet card.
+
+The owner also:
+- works when Read Anything is opened from a menu;
+- works when it is rendered programmatically;
+- works after workspace routing;
+- updates Installed / Not installed status;
+- provides its own extension setup if the existing helper is unavailable;
+- rewrites the bookmarklet setup text as Manual fallback;
+- uses no MutationObserver.
+
+This does NOT change article extraction/recovery itself.
+
+After deploy:
+  Ctrl+Shift+R
+  Reopen Read Anything.

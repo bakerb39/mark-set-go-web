@@ -131,6 +131,13 @@ index = replaceAssetVersion(
   '20260827-v1.1.0-extension-first-copy'
 );
 
+
+index = replaceAssetVersion(
+  index,
+  'read-anything-extension-card-owner.js',
+  '20260827-v1.0.0-direct-read-anything-owner'
+);
+
 index = replaceAssetVersion(
   index,
   'ask-mark-window.css',
@@ -201,6 +208,13 @@ index = replaceAssetVersion(
 );
 
 /* Other additive UI assets remain unchanged. */
+index = ensureAfterAsset(
+  index,
+  'read-anything.js',
+  '  <script defer src="/read-anything-extension-card-owner.js?v=20260827-v1.0.0-direct-read-anything-owner"></script>'
+);
+
+
 index = ensureAfterAsset(
   index,
   'read-anything.css',

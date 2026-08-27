@@ -1,4 +1,10 @@
 {
-  "ok": true,
-  "stderr": ""
+  "apply-ui-cache-busters.js": {
+    "ok": true,
+    "stderr": ""
+  },
+  "public/read-anything-extension-card-owner.js": {
+    "ok": true,
+    "stderr": ""
+  }
 }
