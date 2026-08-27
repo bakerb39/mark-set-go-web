@@ -824,6 +824,26 @@
     // by #reader-frame so it cannot travel with the scrolling article.
     reader.classList.remove('topic-feed-story-header-managed');
 
+    // Restore the original Topic Feed scroll-state contract. The external
+    // header stays fixed; once Reader content begins moving, CSS hides the
+    // Source/share row and provides the text ceiling so article text cannot
+    // bleed above or through the controls.
+    if (reader.dataset.topicFeedHeaderScrollBound !== '1') {
+      reader.dataset.topicFeedHeaderScrollBound = '1';
+
+      const syncTopicFeedHeaderScrollState = () => {
+        if (!reader.isConnected || !header.isConnected) return;
+        const moved =
+          (Number(reader.scrollTop) || 0) > 4 ||
+          (Number(reader.scrollLeft) || 0) > 4;
+
+        header.classList.toggle('topic-feed-story-header-scrolled', moved);
+      };
+
+      reader.addEventListener('scroll', syncTopicFeedHeaderScrollState, { passive: true });
+      syncTopicFeedHeaderScrollState();
+    }
+
     return { readerFrame, header, spacer, meta, actionRow };
   }
 

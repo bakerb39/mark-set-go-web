@@ -1,13 +1,19 @@
-RESTORE TO LAST KNOWN-GOOD TOPIC FEED BASELINE
+TOPIC FEED SCROLL-STATE FIX ONLY
 
-Replace only:
+Replace:
   public/topic-feeds.js
 
-This restores the external #reader-frame Topic Feed header implementation that:
-- keeps Source / date / View original / share at the top;
-- keeps the article actions with that external header;
-- strips trailing Source + URL provenance from the article body;
-- uses no MutationObserver;
-- does not touch app.js, read-anything.js, Ask Beth, Media, or theme CSS.
+Built directly from the restored known-good external-header baseline.
 
-This is a rollback/restoration only. No new fallback-card behavior is included yet.
+Only change:
+- restores a passive Reader scroll listener that toggles
+  .topic-feed-story-header-scrolled when the Reader moves.
+- this activates the existing CSS that prevents article text from bleeding
+  above/through the Topic Feed header.
+
+No MutationObserver.
+No CSS replacement.
+No fallback/recovery changes.
+No app.js.
+No read-anything.js.
+No Ask Beth or Media changes.
