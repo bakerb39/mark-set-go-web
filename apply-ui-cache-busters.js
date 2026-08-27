@@ -37,7 +37,7 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'topic-feeds.js',
-  '20260825-v2.5.7-boundary-gap-1px'
+  '20260827-v2.5.8-extension-copy'
 );
 
 
