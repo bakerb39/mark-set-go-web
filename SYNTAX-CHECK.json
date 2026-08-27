@@ -1,4 +1,14 @@
 {
-  "ok": true,
-  "stderr": ""
+  "apply-ui-cache-busters.js": {
+    "ok": true,
+    "stderr": ""
+  },
+  "public/read-with-mark-extension-fallback.js": {
+    "ok": true,
+    "stderr": ""
+  },
+  "public/read-with-mark-extension-install-ui.js": {
+    "ok": true,
+    "stderr": ""
+  }
 }

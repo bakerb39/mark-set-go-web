@@ -115,7 +115,20 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'read-with-mark-extension-fallback.js',
-  '20260827-v0.1.1-html-cleanup'
+  '20260827-v0.1.2-install-prompt'
+);
+
+
+index = replaceAssetVersion(
+  index,
+  'read-with-mark-extension-install-ui.css',
+  '20260827-v1.0.0-install-ui'
+);
+
+index = replaceAssetVersion(
+  index,
+  'read-with-mark-extension-install-ui.js',
+  '20260827-v1.0.0-install-ui'
 );
 
 index = replaceAssetVersion(
@@ -190,8 +203,21 @@ index = replaceAssetVersion(
 /* Other additive UI assets remain unchanged. */
 index = ensureAfterAsset(
   index,
+  'read-anything.css',
+  '<link href="/read-with-mark-extension-install-ui.css?v=20260827-v1.0.0-install-ui" rel="stylesheet"/>'
+);
+
+index = ensureAfterAsset(
+  index,
+  'read-with-mark-extension-fallback.js',
+  '  <script defer src="/read-with-mark-extension-install-ui.js?v=20260827-v1.0.0-install-ui"></script>'
+);
+
+
+index = ensureAfterAsset(
+  index,
   'read-anything.js',
-  '  <script defer src="/read-with-mark-extension-fallback.js?v=20260827-v0.1.1-html-cleanup"></script>'
+  '  <script defer src="/read-with-mark-extension-fallback.js?v=20260827-v0.1.2-install-prompt"></script>'
 );
 
 

@@ -1,0 +1,79 @@
+/* Read with Mark extension setup/status card */
+.read-anything-extension-card{
+  position:relative;
+}
+
+.read-anything-extension-status{
+  display:inline-flex;
+  align-items:center;
+  gap:.35rem;
+  margin:.3rem 0 .65rem;
+  padding:.26rem .52rem;
+  border:1px solid rgba(17,52,81,.14);
+  border-radius:999px;
+  background:rgba(255,255,255,.7);
+  color:#5c6973;
+  font-size:.72rem;
+  font-weight:750;
+}
+
+.read-anything-extension-status[data-state="installed"]{
+  color:#245c45;
+  border-color:rgba(36,92,69,.22);
+  background:#edf8f1;
+}
+
+.read-anything-extension-status[data-state="missing"]{
+  color:#8a6728;
+  border-color:rgba(213,164,71,.28);
+  background:#fff8e8;
+}
+
+.read-anything-extension-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.45rem;
+}
+
+.read-anything-extension-setup{
+  display:grid;
+  gap:.8rem;
+}
+
+.read-anything-extension-setup .extension-setup-status{
+  display:flex;
+  align-items:center;
+  gap:.45rem;
+  padding:.62rem .72rem;
+  border:1px solid rgba(17,52,81,.12);
+  border-radius:10px;
+  background:rgba(255,255,255,.66);
+}
+
+.read-anything-extension-setup .extension-setup-status[data-state="installed"]{
+  border-color:rgba(36,92,69,.22);
+  background:#edf8f1;
+  color:#245c45;
+}
+
+.read-anything-extension-setup ol{
+  margin:.1rem 0 .2rem 1.2rem;
+  padding:0;
+}
+
+.read-anything-extension-setup li{
+  margin:.34rem 0;
+  line-height:1.45;
+}
+
+.read-anything-extension-setup .source-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.5rem;
+}
+
+.read-anything-extension-note{
+  color:#6d7881;
+  font-size:.78rem;
+  line-height:1.45;
+}

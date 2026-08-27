@@ -1,19 +1,51 @@
-CACHE-BUSTER MEDIA ANCHOR FIX
+READ WITH MARK EXTENSION — READER INSTALL UI
+============================================
 
-The deploy error was caused by insertion order.
+This makes the working extension a visible, first-class feature inside Read Anything.
 
-Broken order:
-  1. Try to insert media-toolbar-simplify.css AFTER media-toolbar-responsive.css
-  2. media-toolbar-responsive.css had not been inserted into index.html yet
-  3. ensureAfterAsset() threw and Render stopped startup
+UPLOAD
 
-Corrected order:
-  1. Insert media-toolbar-responsive.css after the existing media-panel.css
-  2. Insert media-toolbar-simplify.css after media-toolbar-responsive.css
-  3. Insert media-toolbar-simplify.js after the existing media-panel.js
+REPO ROOT
+  apply-ui-cache-busters.js
 
-REPLACE ONLY:
-  repo root/apply-ui-cache-busters.js
+PUBLIC
+  read-with-mark-extension-fallback.js
+  read-with-mark-extension-install-ui.js      NEW
+  read-with-mark-extension-install-ui.css     NEW
+  downloads/read-with-mark-auto-import-extension-v0.1.1.zip  NEW
 
-Do not replace the extension or other public files again for this error.
-Once the deploy succeeds, continue testing the same article with extension v0.1.1.
+WHAT THE READER SEES
+--------------------
+Read Anything now includes:
+  Read with Mark Extension
+  [Installed and connected] or [Not installed]
+  Set up extension
+
+The setup panel provides:
+- Download extension
+- Copy chrome://extensions
+- Check installation
+- concise Chrome Developer Mode / Load unpacked instructions
+
+IF AN ARTICLE FAILS AND THE EXTENSION IS NOT INSTALLED
+------------------------------------------------------
+The existing article stays intact, but the Reader briefly says:
+  "Read with Mark can recover more full articles automatically.
+   Set up the extension in Read Anything."
+
+IF INSTALLED
+------------
+The card automatically changes to:
+  ✓ Installed and connected
+
+Chrome cannot silently install an unpacked extension from the website. This is
+the correct test/development flow. Once the extension is published to the Chrome
+Web Store, replace the download/setup flow with a normal Web Store install link.
+
+The included extension ZIP is the working v0.1.1 HTML-cleanup build.
+
+After deploy:
+  Ctrl+Shift+R
+Then open:
+  My Library -> Browse -> Read Anything
+(or your normal Read Anything route)

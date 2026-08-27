@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.1';
+  const VERSION = '0.1.2';
   const PING = 'MSG_RWM_EXTENSION_PING';
   const READY = 'MSG_RWM_EXTENSION_READY';
   const REQUEST = 'MSG_RWM_EXTENSION_IMPORT_REQUEST';
@@ -310,7 +310,13 @@
 
     const ready = await waitForExtension();
     if (!ready) {
-      // Extension is optional. Keep the existing manual fallback untouched.
+      // Extension is optional. Keep the existing manual fallback untouched,
+      // but tell the reader that automatic recovery is available.
+      showToast(
+        'Read with Mark can recover more full articles automatically. Set up the extension in Read Anything.',
+        'info',
+        6500
+      );
       return false;
     }
 
