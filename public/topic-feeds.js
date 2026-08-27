@@ -1,6 +1,8 @@
 (() => {
   'use strict';
 
+  // 20260822-v7.21-stability-consolidation: nonblocking feeds + explicit UI sync, no DOM mutation observers.
+
   const STORAGE_KEY = 'markSetGoTopicFeedsV1';
   const app = document.getElementById('app');
   const defaultTimezone = (() => {
@@ -21,11 +23,30 @@
   let dailyAutoOpenAttempted = false;
   let navFrame = 0;
 
+  // Cloud reads/writes can overlap authentication and the Topic editor. Track
+  // intentional local topic changes so an older cloud snapshot can never erase
+  // a topic the reader just saved. Local state remains authoritative until the
+  // same revision has been confirmed by a successful cloud write.
+  let localTopicRevision = 0;
+  let cloudSyncedTopicRevision = 0;
+  let cloudWriteChain = Promise.resolve(true);
+
+  function markLocalTopicRevision() {
+    localTopicRevision += 1;
+    return localTopicRevision;
+  }
+
   // New/Edit Topic is a transactional screen. Background cloud hydration,
   // authentication refreshes, and in-flight feed refreshes must never replace
   // it while the reader is typing.
   let topicManagerOpen = false;
   let deferredCloudState = null;
+
+  // The Topic editor keeps explicit AI recommendation choices separately from
+  // the topic's existing source rows. This prevents an older/polluted source
+  // list from being mistaken for the sources selected in the current edit.
+  let managerSelectedRecommendationSources = new Map();
+  let managerNewManualSourceIds = new Set();
 
   function topicManagerIsOpen() {
     return Boolean(
@@ -85,7 +106,14 @@
   }
 
   function normalizeState(value) {
-    const topics = repairTopicFeedSourceIds(Array.isArray(value?.topics) ? value.topics : []);
+    const topics = repairTopicFeedSourceIds(Array.isArray(value?.topics) ? value.topics : []).map((topic) => ({
+      ...topic,
+      sourceMode: topic?.sourceMode === 'ai' || topic?.sourceMode === 'hybrid' ? topic.sourceMode : 'manual',
+      aiSourcesUpdatedAt: topic?.aiSourcesUpdatedAt || null,
+      selectedSourceUrls: [...new Set((Array.isArray(topic?.selectedSourceUrls) ? topic.selectedSourceUrls : [])
+        .map((value) => cleanUrl(value)).filter(Boolean))].slice(0, 30),
+      dismissedArticleIds: [...new Set((Array.isArray(topic?.dismissedArticleIds) ? topic.dismissedArticleIds : []).map(String).filter(Boolean))].slice(-500)
+    }));
     return {
       topics,
       preferences: {
@@ -104,43 +132,207 @@
     return normalizeState({ topics: [] });
   }
 
-  function compactStateForStorage(value) {
+  function topicStateIdentity(value = state) {
+    // This signature is deliberately metadata-only: it is cheap enough for
+    // cross-pane synchronization but changes whenever the Reader navigation,
+    // source attribution, unread state, or topic configuration should change.
+    return JSON.stringify({
+      preferences: [
+        String(value?.preferences?.timezone || ''),
+        Number(value?.preferences?.morningHour ?? 5),
+        String(value?.preferences?.dailyOpenSourceId || '')
+      ],
+      topics: (value?.topics || []).map((topic) => [
+        String(topic?.id || ''),
+        String(topic?.name || ''),
+        String(topic?.sourceMode || ''),
+        String(topic?.cadence || ''),
+        Number(topic?.maxRecommended || 0),
+        String(topic?.preferences || ''),
+        String(topic?.aiSourcesUpdatedAt || ''),
+        (topic?.selectedSourceUrls || []).map(String),
+        String(topic?.lastRefresh || ''),
+        (topic?.dismissedArticleIds || []).map(String),
+        (topic?.sources || []).map((source) => [
+          String(source?.id || ''),
+          String(source?.name || ''),
+          String(source?.type || ''),
+          String(source?.url || ''),
+          String(source?.origin || '')
+        ]),
+        (topic?.articles || []).map((article) => [
+          String(article?.id || ''),
+          String(article?.sourceClientId || ''),
+          String(article?.sourceName || ''),
+          String(article?.url || ''),
+          String(article?.title || ''),
+          String(article?.published || article?.publishedAt || ''),
+          Boolean(article?.read),
+          Boolean(article?.prepared),
+          Boolean(article?.recommended)
+        ])
+      ])
+    });
+  }
+
+  function announceTopicStateChange() {
+    // localStorage's storage event updates sibling frames, while this message
+    // gives the outer app an immediate signal even when browser storage-event
+    // timing is delayed. Never send the full article payload through postMessage.
+    if (window.parent !== window) {
+      try {
+        window.parent.postMessage({ type:'msg-topic-feeds-state-changed' }, window.location.origin);
+      } catch {}
+    }
+  }
+
+  function adoptSharedTopicState() {
+    if (topicManagerIsOpen()) return false;
+    const incoming = loadState();
+    if (topicStateIdentity(incoming) === topicStateIdentity(state)) return false;
+
+    state = incoming;
+    if (!state.preferences.timezone) state.preferences.timezone = defaultTimezone;
+    if (!state.topics.some((topic) => topic.id === activeTopicId)) {
+      activeTopicId = state.topics[0]?.id || null;
+      activeSourceId = '';
+    }
+
+    // Treat a state received from another same-origin pane as a real local
+    // revision. Until cloud confirms it, a stale hydration response may not
+    // replace the topic list in this window.
+    markLocalTopicRevision();
+    scheduleReaderNavigation();
+
+    if (document.querySelector('.topic-feeds-page') && !topicManagerIsOpen()) {
+      render({ force:true });
+    }
+    if (cloudAuthenticated) void syncCloudNow();
+    return true;
+  }
+
+  const LOCAL_CACHE_TARGET_CHARS = 220000;
+  const LOCAL_CACHE_EMERGENCY_CHARS = 70000;
+
+  function compactTopicSourceForStorage(source) {
     return {
-      preferences: normalizeState(value).preferences,
-      topics: (Array.isArray(value?.topics) ? value.topics : []).map((topic) => ({
-        ...topic,
-        sources: (Array.isArray(topic?.sources) ? topic.sources : []).slice(0, 30),
-        articles: (Array.isArray(topic?.articles) ? topic.articles : [])
-          .slice(0, 180)
-          .map((article) => ({
-            id: article.id,
-            cloudId: article.cloudId || '',
-            title: String(article.title || '').slice(0, 500),
-            url: String(article.url || '').slice(0, 4000),
-            summary: String(article.summary || '').slice(0, 1600),
-            published: article.published || '',
-            author: article.author || '',
-            sourceName: article.sourceName || '',
-            sourceUrl: article.sourceUrl || '',
-            sourceType: article.sourceType || '',
-            sourceClientId: article.sourceClientId || '',
-            sourceRank: Number(article.sourceRank) || 0,
-            feedMode: article.feedMode || '',
-            recommended: Boolean(article.recommended),
-            prepared: Boolean(article.prepared),
-            read: Boolean(article.read)
-          }))
-      }))
+      id: String(source?.id || '').slice(0, 180),
+      name: String(source?.name || '').slice(0, 240),
+      type: String(source?.type || 'website').slice(0, 40),
+      url: String(source?.url || '').slice(0, 1600),
+      origin: String(source?.origin || '').slice(0, 80),
+      recommendationKey: String(source?.recommendationKey || '').slice(0, 160)
     };
   }
 
+  function compactTopicArticleForStorage(article, { includeSummary = true } = {}) {
+    return {
+      id: String(article?.id || '').slice(0, 220),
+      cloudId: String(article?.cloudId || '').slice(0, 220),
+      title: String(article?.title || '').slice(0, 420),
+      url: String(article?.url || '').slice(0, 1600),
+      summary: includeSummary ? String(article?.summary || '').slice(0, 420) : '',
+      published: String(article?.published || '').slice(0, 80),
+      author: String(article?.author || '').slice(0, 220),
+      sourceName: String(article?.sourceName || '').slice(0, 220),
+      sourceUrl: String(article?.sourceUrl || '').slice(0, 1200),
+      sourceType: String(article?.sourceType || '').slice(0, 50),
+      sourceClientId: String(article?.sourceClientId || '').slice(0, 180),
+      sourceRank: Number(article?.sourceRank) || 0,
+      feedMode: String(article?.feedMode || '').slice(0, 50),
+      recommended: Boolean(article?.recommended),
+      prepared: Boolean(article?.prepared),
+      read: Boolean(article?.read)
+    };
+  }
+
+  function compactTopicMetadataForStorage(topic) {
+    return {
+      id: String(topic?.id || '').slice(0, 180),
+      name: String(topic?.name || '').slice(0, 240),
+      cadence: topic?.cadence === 'weekly' ? 'weekly' : 'daily',
+      maxRecommended: Math.max(1, Math.min(25, Number(topic?.maxRecommended) || 8)),
+      preferences: String(topic?.preferences || '').slice(0, 700),
+      sourceMode: topic?.sourceMode === 'ai' || topic?.sourceMode === 'hybrid' ? topic.sourceMode : 'manual',
+      aiSourcesUpdatedAt: String(topic?.aiSourcesUpdatedAt || '').slice(0, 80),
+      selectedSourceUrls: [...new Set((Array.isArray(topic?.selectedSourceUrls) ? topic.selectedSourceUrls : [])
+        .map((value) => cleanUrl(value)).filter(Boolean))].slice(0, 30),
+      lastRefresh: String(topic?.lastRefresh || '').slice(0, 80),
+      preparedAt: String(topic?.preparedAt || '').slice(0, 80),
+      lastErrors: (Array.isArray(topic?.lastErrors) ? topic.lastErrors : [])
+        .slice(0, 8)
+        .map((item) => String(item || '').slice(0, 300)),
+      dismissedArticleIds: [...new Set((Array.isArray(topic?.dismissedArticleIds) ? topic.dismissedArticleIds : []).map(String).filter(Boolean))].slice(-500),
+      sources: (Array.isArray(topic?.sources) ? topic.sources : [])
+        .slice(0, 30)
+        .map(compactTopicSourceForStorage),
+      articles: []
+    };
+  }
+
+  function compactStateForStorage(value, { targetChars = LOCAL_CACHE_TARGET_CHARS, includeSummaries = true } = {}) {
+    const normalized = normalizeState(value);
+    const topics = (Array.isArray(value?.topics) ? value.topics : []).map(compactTopicMetadataForStorage);
+    const result = { preferences: normalized.preferences, topics };
+
+    // localStorage is only a lightweight/offline index. Full Topic Feed state
+    // and prepared article bodies remain in the cloud/server path. Add recent
+    // article metadata only while the serialized cache stays under a fixed
+    // budget so this feature can never consume the app's entire local quota.
+    let used = JSON.stringify(result).length;
+    const sourceTopics = Array.isArray(value?.topics) ? value.topics : [];
+    let added = true;
+    let articleIndex = 0;
+
+    while (added && used < targetChars) {
+      added = false;
+      for (let topicIndex = 0; topicIndex < sourceTopics.length; topicIndex += 1) {
+        const article = sourceTopics[topicIndex]?.articles?.[articleIndex];
+        if (!article) continue;
+        const compact = compactTopicArticleForStorage(article, { includeSummary: includeSummaries });
+        const cost = JSON.stringify(compact).length + 1;
+        if (used + cost > targetChars) continue;
+        result.topics[topicIndex].articles.push(compact);
+        used += cost;
+        added = true;
+      }
+      articleIndex += 1;
+      if (articleIndex >= 80) break;
+    }
+
+    return result;
+  }
+
   function saveLocalState() {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(compactStateForStorage(state)));
+    const write = (payload) => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      announceTopicStateChange();
       return true;
+    };
+
+    try {
+      return write(compactStateForStorage(state));
     } catch (error) {
-      console.warn('Topic Feed local cache could not be saved.', error);
-      return false;
+      const quota = error?.name === 'QuotaExceededError' || error?.name === 'NS_ERROR_DOM_QUOTA_REACHED';
+      if (!quota) {
+        console.warn('Topic Feed local cache could not be saved.', error);
+        return false;
+      }
+
+      // Self-heal an older oversized Topic Feed cache. Replacing this one key
+      // with a much smaller metadata-only snapshot frees quota immediately and
+      // leaves cloud state untouched.
+      try {
+        const emergency = compactStateForStorage(state, {
+          targetChars: LOCAL_CACHE_EMERGENCY_CHARS,
+          includeSummaries: false
+        });
+        try { localStorage.removeItem(STORAGE_KEY); } catch {}
+        return write(emergency);
+      } catch (retryError) {
+        console.warn('Topic Feed local cache could not be saved.', retryError);
+        return false;
+      }
     }
   }
 
@@ -151,26 +343,36 @@
     };
   }
 
-  async function syncCloudNow() {
-    if (!cloudAuthenticated) return false;
-    try {
-      const response = await fetch('/api/topic-feeds/state', {
-        method: 'PUT',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cloudPayload())
-      });
-      if (response.status === 401 || response.status === 503) {
-        cloudAuthenticated = false;
+  function syncCloudNow() {
+    if (!cloudAuthenticated) return Promise.resolve(false);
+
+    // Serialize account writes. Two PUTs completing out of order can otherwise
+    // put an older topic list back in the database after a newer Save Topic.
+    cloudWriteChain = cloudWriteChain.catch(() => false).then(async () => {
+      if (!cloudAuthenticated) return false;
+      const revisionBeingSaved = localTopicRevision;
+      const payloadBeingSaved = cloudPayload();
+      try {
+        const response = await fetch('/api/topic-feeds/state', {
+          method: 'PUT',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payloadBeingSaved)
+        });
+        if (response.status === 401 || response.status === 503) {
+          cloudAuthenticated = false;
+          return false;
+        }
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || 'Unable to sync Topic Feeds.');
+        cloudSyncedTopicRevision = Math.max(cloudSyncedTopicRevision, revisionBeingSaved);
+        return true;
+      } catch (error) {
+        console.warn('Topic Feed cloud sync was deferred.', error);
         return false;
       }
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Unable to sync Topic Feeds.');
-      return true;
-    } catch (error) {
-      console.warn('Topic Feed cloud sync was deferred.', error);
-      return false;
-    }
+    });
+    return cloudWriteChain;
   }
 
   function scheduleCloudSave() {
@@ -188,6 +390,7 @@
   async function hydrateCloudState() {
     if (cloudHydrating) return false;
     cloudHydrating = true;
+    const revisionWhenHydrationStarted = localTopicRevision;
     try {
       const response = await fetch('/api/topic-feeds/state', { credentials: 'same-origin' });
       if (response.status === 401 || response.status === 503 || response.status === 409) {
@@ -199,6 +402,15 @@
 
       cloudAuthenticated = true;
       let remote = normalizeState(payload);
+
+      // If the user saved/edited a topic while this GET was in flight, or a
+      // local topic revision has not yet been confirmed by cloud, this response
+      // is older by definition. Never let it replace the local topic list.
+      if (revisionWhenHydrationStarted !== localTopicRevision || localTopicRevision > cloudSyncedTopicRevision) {
+        void syncCloudNow();
+        return true;
+      }
+
       if (!remote.topics.length && state.topics.length) {
         const importResponse = await fetch('/api/topic-feeds/import', {
           method: 'POST',
@@ -309,33 +521,42 @@
     return overlap / Math.min(left.size, right.size);
   }
 
-  function articleScore(article, topic) {
-    const body = `${article.title} ${article.summary}`.toLowerCase();
+  function articleRelevance(article, topic) {
+    const body = `${article.title || ''} ${article.summary || ''}`.toLowerCase();
+    const title = String(article.title || '').toLowerCase();
     const topicTerms = textTokens(topic.name);
     const preferenceTerms = textTokens(topic.preferences);
-    let score = Math.max(0, 8 - (Number(article.sourceRank) || 0));
-    topicTerms.forEach((term) => { if (body.includes(term)) score += 8; });
-    preferenceTerms.forEach((term) => { if (body.includes(term)) score += 3; });
+    const phrase = String(topic.name || '').trim().toLowerCase();
+    const topicHits = topicTerms.reduce((count, term) => count + Number(body.includes(term)), 0);
+    const preferenceHits = preferenceTerms.reduce((count, term) => count + Number(body.includes(term)), 0);
+    const minimumHits = topicTerms.length ? Math.min(2, Math.max(1, Math.ceil(topicTerms.length * .35))) : 0;
+    const exactPhrase = phrase.length >= 4 && body.includes(phrase);
+    let score = Math.max(0, 6 - (Number(article.sourceRank) || 0));
+    score += topicHits * 12;
+    score += preferenceHits * 4;
+    if (exactPhrase) score += 22;
+    if (phrase && title.includes(phrase)) score += 14;
     const published = new Date(article.published || 0).getTime();
     if (Number.isFinite(published) && published > 0) {
       const ageHours = Math.max(0, (Date.now() - published) / 3600000);
-      score += Math.max(0, 14 - ageHours / 8);
+      score += Math.max(0, 10 - ageHours / 12);
     }
-    return score;
+    return { score, relevant: !topicTerms.length || exactPhrase || topicHits >= minimumHits };
   }
 
   function curate(topic) {
     const ranked = [...(topic.articles || [])]
-      .map((article) => ({ ...article, score: articleScore(article, topic) }))
+      .map((article) => ({ ...article, ...articleRelevance(article, topic) }))
       .sort((a, b) => b.score - a.score);
     const recommended = [];
     for (const article of ranked) {
+      if (!article.relevant) continue;
       if (recommended.some((picked) => titleSimilarity(picked.title, article.title) >= 0.66)) continue;
       recommended.push(article);
       if (recommended.length >= (Number(topic.maxRecommended) || 8)) break;
     }
     const ids = new Set(recommended.map((article) => article.id));
-    topic.articles = ranked.map((article) => ({ ...article, recommended: ids.has(article.id) }));
+    topic.articles = ranked.map(({ relevant, ...article }) => ({ ...article, recommended: ids.has(article.id) }));
   }
 
   function refreshIsDue(topic) {
@@ -360,15 +581,26 @@
     return request;
   }
 
-  async function refreshTopic({ forceLocal = false } = {}) {
+  function warmReaderArticlesInBackground(topic) {
+    const articles = Array.isArray(topic?.articles) ? topic.articles : [];
+    if (!articles.length) return;
+    const selected = [...articles]
+      .sort((a,b) => Number(b.recommended) - Number(a.recommended) || (Date.parse(b.published || '') || 0) - (Date.parse(a.published || '') || 0))
+      .slice(0, 16);
+    // Deliberately fire-and-forget. Refresh renders the new edition immediately;
+    // Reader extraction/cache warming must never hold the Topic Feeds UI hostage.
+    void prefetchArticles(selected, { wait: false });
+  }
+
+  async function refreshTopic({ forceLocal = false, preserveReader = false } = {}) {
     const topic = currentTopic();
-    if (!topic || loading || !topic.sources.length) return;
+    if (!topic || loading) return;
+    if (!topic.sources.length && topic.sourceMode !== 'ai' && topic.sourceMode !== 'hybrid') return;
     loading = true;
-    render();
+    if (preserveReader) scheduleReaderNavigation();
+    else render();
     try {
       if (cloudAuthenticated && !forceLocal) {
-        preparing = true;
-        render();
         const response = await fetch('/api/topic-feeds/refresh', {
           method: 'POST',
           credentials: 'same-origin',
@@ -385,10 +617,15 @@
           // Refresh owns downloaded article data, but it must NEVER own the
           // reader's source configuration. A stale server response therefore
           // cannot resurrect a feed that was just removed.
+          const dismissed = new Set((live.dismissedArticleIds || []).map(String));
+          const mode = live.sourceMode === 'ai' || live.sourceMode === 'hybrid' ? live.sourceMode : 'manual';
+          const refreshedSources = mode === 'manual'
+            ? live.sources
+            : (Array.isArray(payload.topic.sources) && payload.topic.sources.length ? payload.topic.sources : live.sources);
           const refreshedArticles = filterArticlesForSources(
             payload.topic.articles,
-            live.sources
-          );
+            refreshedSources
+          ).filter((article) => !dismissed.has(String(article?.id || '')));
 
           state.topics[index] = {
             ...payload.topic,
@@ -397,7 +634,11 @@
             cadence: live.cadence,
             maxRecommended: live.maxRecommended,
             preferences: live.preferences,
-            sources: live.sources,
+            sourceMode: mode,
+            aiSourcesUpdatedAt: payload.topic.aiSourcesUpdatedAt || live.aiSourcesUpdatedAt || null,
+            selectedSourceUrls: Array.isArray(live.selectedSourceUrls) ? live.selectedSourceUrls : [],
+            sources: refreshedSources,
+            dismissedArticleIds: [...dismissed],
             articles: refreshedArticles,
             lastErrors: Array.isArray(payload.topic.lastErrors)
               ? payload.topic.lastErrors
@@ -405,7 +646,20 @@
           };
         }
         saveState({ cloud: false });
+        warmReaderArticlesInBackground(state.topics[index] || currentTopic());
       } else {
+        if (!topic.sources.length && (topic.sourceMode === 'ai' || topic.sourceMode === 'hybrid')) {
+          const recResponse = await fetch(`/api/topic-feeds/recommend?topic=${encodeURIComponent(topic.name)}&preferences=${encodeURIComponent(topic.preferences || '')}`);
+          const recPayload = await recResponse.json().catch(() => ({}));
+          if (recResponse.ok && Array.isArray(recPayload.sources)) {
+            topic.sources = recPayload.sources.map((source) => ({
+              id: uid(), name: source.name || '', type:'website', url:cleanUrl(source.url || ''),
+              origin:'ai', recommendationKey:source.key || ''
+            })).filter((source) => source.name && source.url);
+            topic.aiSourcesUpdatedAt = new Date().toISOString();
+          }
+        }
+        if (!topic.sources.length) throw new Error('No topic-specific sources could be found yet. Try adding more detail to the topic or priorities.');
         const response = await fetch('/api/topic-feeds/fetch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -414,17 +668,16 @@
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.error || 'Unable to refresh topic feeds.');
         const existingRead = new Set((topic.articles || []).filter((article) => article.read).map((article) => article.url));
-        topic.articles = (payload.articles || []).map((article) => ({ ...article, read: existingRead.has(article.url) }));
+        const dismissed = new Set((topic.dismissedArticleIds || []).map(String));
+        topic.articles = (payload.articles || [])
+          .filter((article) => !dismissed.has(String(article?.id || '')))
+          .map((article) => ({ ...article, read: existingRead.has(article.url) }));
         topic.lastErrors = payload.sources?.filter?.((source) => !source.ok).map((source) => source.error) || [];
         topic.lastRefresh = new Date().toISOString();
+        topic.preparedAt = '';
         curate(topic);
         saveState();
-        preparing = true;
-        render();
-        const selected = [...topic.articles].sort((a,b) => Number(b.recommended)-Number(a.recommended)).slice(0,60);
-        await prefetchArticles(selected, { wait: true }).catch(() => null);
-        topic.preparedAt = new Date().toISOString();
-        saveState();
+        warmReaderArticlesInBackground(topic);
       }
     } catch (error) {
       const live = currentTopic();
@@ -432,7 +685,21 @@
     } finally {
       preparing = false;
       loading = false;
-      render();
+      if (preserveReader) {
+        const pane = document.querySelector('#navigation-pane');
+        const view = pane?.querySelector('[data-reader-view="contents"]');
+        if (view) {
+          // Rebuild only the My Topics list after refresh while preserving the
+          // Reader's native Bookmark button and the currently open article.
+          const bookmarkButton = view.querySelector('#add-bookmark');
+          if (bookmarkButton) bookmarkButton.remove();
+          view.querySelector('.topic-reader-nav')?.remove();
+          if (bookmarkButton) view.appendChild(bookmarkButton);
+        }
+        scheduleReaderNavigation();
+      } else {
+        render();
+      }
     }
   }
 
@@ -507,20 +774,36 @@
     });
   }
 
-  let topicFeedStoryHeaderObserver = null;
-  let topicFeedStoryHeaderReader = null;
   let topicFeedStoryHeaderReflowTimer = 0;
 
   function topicFeedStoryHeaderParts(reader = document.querySelector('#reader')) {
     if (!reader) return {};
 
-    // Clean up the previous nested-overlay implementation if this script is
-    // hot-reloaded in a browser session. Preserve the existing action-row node.
-    const legacyOverlay = reader.querySelector(':scope > [data-topic-feed-story-header]');
-    if (legacyOverlay) {
-      const legacyAction = legacyOverlay.querySelector('#read-anything-article-summary-action');
-      if (legacyAction) reader.prepend(legacyAction);
-      legacyOverlay.remove();
+    const readerFrame = reader.closest('#reader-frame');
+    if (!readerFrame) return {};
+
+    let header = readerFrame.querySelector(':scope > [data-topic-feed-story-header-external]');
+    if (!header) {
+      header = document.createElement('div');
+      header.className = 'topic-feed-story-header-external';
+      header.dataset.topicFeedStoryHeaderExternal = '1';
+      header.setAttribute('aria-label', 'Topic Feed article header');
+      readerFrame.insertBefore(header, reader);
+    }
+
+    // Recover nodes from the broken in-reader implementation without cloning
+    // them. The Reader action buttons keep their existing handlers when moved.
+    let meta = header.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
+    const inReaderMeta = reader.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
+    if (!meta && inReaderMeta) {
+      meta = inReaderMeta;
+      header.appendChild(meta);
+    }
+    if (!meta) {
+      meta = document.createElement('div');
+      meta.className = 'topic-feed-story-meta-overlay';
+      meta.dataset.topicFeedStoryMetaOverlay = '1';
+      header.appendChild(meta);
     }
 
     let spacer = reader.querySelector(':scope > [data-topic-feed-story-header-spacer]');
@@ -532,21 +815,16 @@
       reader.prepend(spacer);
     }
 
-    let meta = reader.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
-    if (!meta) {
-      meta = document.createElement('div');
-      meta.className = 'topic-feed-story-meta-overlay';
-      meta.dataset.topicFeedStoryMetaOverlay = '1';
-      reader.appendChild(meta);
+    const actionRow = document.querySelector('#read-anything-article-summary-action');
+    if (actionRow && actionRow.parentElement !== header) {
+      header.appendChild(actionRow);
     }
 
-    reader.classList.add('topic-feed-story-header-managed');
+    // Remove the later direct-child marker; this header is deliberately owned
+    // by #reader-frame so it cannot travel with the scrolling article.
+    reader.classList.remove('topic-feed-story-header-managed');
 
-    return {
-      spacer,
-      meta,
-      actionRow: document.querySelector('#read-anything-article-summary-action')
-    };
+    return { readerFrame, header, spacer, meta, actionRow };
   }
 
   function scheduleTopicFeedStoryBookReflow() {
@@ -554,120 +832,20 @@
     topicFeedStoryHeaderReflowTimer = window.setTimeout(() => {
       const reader = document.querySelector('#reader');
       if (!reader?.classList.contains('book-pages-layout')) return;
-
-      // Use the Reader's own resize/reflow path after the reserved first-page
-      // header height changes.
       window.requestAnimationFrame(() => {
         window.dispatchEvent(new Event('resize'));
       });
     }, 70);
   }
 
-
-  function ensureTopicFeedTransparentActionStyle() {
-    if (document.getElementById('msg-topic-feed-transparent-actions')) return;
-
-    const style = document.createElement('style');
-    style.id = 'msg-topic-feed-transparent-actions';
-    style.textContent = `
-      #reader.topic-feed-story-header-managed > #read-anything-article-summary-action {
-        background: transparent !important;
-        background-image: none !important;
-        border: 0 !important;
-        border-radius: 0 !important;
-        box-shadow: none !important;
-      }
-
-      #reader.topic-feed-story-header-managed > #read-anything-article-summary-action::before,
-      #reader.topic-feed-story-header-managed > #read-anything-article-summary-action::after {
-        content: none !important;
-        display: none !important;
-        background: transparent !important;
-        background-image: none !important;
-        box-shadow: none !important;
-        border: 0 !important;
-      }
-
-      #reader.topic-feed-story-header-managed > #read-anything-article-summary-action
-      :is(.read-anything-inline-article-summary, span[aria-hidden="true"]) {
-        position: relative !important;
-        z-index: 1 !important;
-        background: var(--msg-vd-reader-page-color, #fff) !important;
-        box-shadow: 0 0 0 2px var(--msg-vd-reader-page-color, #fff) !important;
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function relocateTopicFeedRecoveryCard(attempt = 0) {
-    if (!isTopicFeedReaderActive()) return;
-
-    const reader = document.querySelector('#reader');
-    if (!reader) {
-      if (attempt < 30) window.setTimeout(() => relocateTopicFeedRecoveryCard(attempt + 1), 100);
-      return;
-    }
-
-    // Find the actual recovery UI by its distinctive control, not by guessed
-    // generated classes or by paragraph structure.
-    const fallbackControl = [...document.querySelectorAll('button, a')]
-      .find((node) => String(node.textContent || '').trim() === 'Bookmarklet fallback');
-
-    if (!fallbackControl) {
-      if (attempt < 30) window.setTimeout(() => relocateTopicFeedRecoveryCard(attempt + 1), 100);
-      return;
-    }
-
-    let card = fallbackControl;
-    let cursor = fallbackControl.parentElement;
-
-    while (cursor && cursor !== document.body && cursor !== reader) {
-      const value = String(cursor.textContent || '').replace(/\s+/g, ' ').trim();
-      if (
-        value.includes('Automatic Read with Mark recovery') ||
-        value.includes('Manual fallback: open the original page') ||
-        value.includes('publisher page appears to require subscription or sign-in')
-      ) {
-        card = cursor;
-        break;
-      }
-      cursor = cursor.parentElement;
-    }
-
-    if (!(card instanceof HTMLElement)) return;
-
-    // The fallback article sentence is the last Reader text. Appending the
-    // recovery card therefore places it immediately after:
-    // "Full article text could not be imported from the publisher."
-    if (card.parentElement !== reader || reader.lastElementChild !== card) {
-      reader.appendChild(card);
-    }
-
-    card.dataset.topicFeedRecoveryRelocated = '1';
-    card.style.setProperty('position', 'relative', 'important');
-    card.style.setProperty('inset', 'auto', 'important');
-    card.style.setProperty('left', 'auto', 'important');
-    card.style.setProperty('right', 'auto', 'important');
-    card.style.setProperty('top', 'auto', 'important');
-    card.style.setProperty('bottom', 'auto', 'important');
-    card.style.setProperty('width', '100%', 'important');
-    card.style.setProperty('max-width', '100%', 'important');
-    card.style.setProperty('margin', '.75rem 0 0', 'important');
-    card.style.setProperty('box-sizing', 'border-box', 'important');
-
-    scheduleTopicFeedStoryBookReflow();
-  }
-
   function positionTopicFeedStoryHeader() {
-    ensureTopicFeedTransparentActionStyle();
     if (!isTopicFeedReaderActive()) return;
 
     const reader = document.querySelector('#reader');
     if (!reader) return;
 
-    const { spacer, meta } = topicFeedStoryHeaderParts(reader);
-    const actionRow = document.querySelector('#read-anything-article-summary-action');
-    if (!spacer || !meta) return;
+    const { readerFrame, header, spacer, meta, actionRow } = topicFeedStoryHeaderParts(reader);
+    if (!readerFrame || !header || !spacer || !meta) return;
 
     const styles = getComputedStyle(reader);
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
@@ -676,65 +854,46 @@
     const columnGap = Number.parseFloat(styles.columnGap) || 0;
     const fontSize = Number.parseFloat(styles.fontSize) || 14;
     const usableWidth = Math.max(1, reader.clientWidth - paddingLeft - paddingRight);
-
     const headerWidth = reader.classList.contains('book-pages-layout')
       ? Math.max(1, (usableWidth - columnGap) / 2)
       : usableWidth;
 
-    meta.style.left = `${paddingLeft}px`;
-    meta.style.top = `${paddingTop}px`;
-    meta.style.width = `${headerWidth}px`;
+    // Anchor the header to the viewport/frame, never to #reader's scrollable
+    // content. Scrolling #reader therefore cannot move this band by one pixel.
+    const frameRect = readerFrame.getBoundingClientRect();
+    const readerRect = reader.getBoundingClientRect();
+    const left = Math.max(0, readerRect.left - frameRect.left + paddingLeft);
+    const top = Math.max(0, readerRect.top - frameRect.top + paddingTop);
 
-    if (actionRow) {
-      // Read Anything deliberately requires this node to remain a direct child
-      // of #reader. Leave it there and change only its visual placement.
-      actionRow.style.setProperty('position', 'absolute', 'important');
-      actionRow.style.setProperty('left', `${paddingLeft}px`, 'important');
-      actionRow.style.setProperty('width', `${headerWidth}px`, 'important');
-      actionRow.style.setProperty('box-sizing', 'border-box', 'important');
-      actionRow.style.setProperty('margin', '0', 'important');
-      actionRow.style.setProperty('padding', '0', 'important');
-      actionRow.style.setProperty('break-inside', 'auto', 'important');
-      actionRow.style.setProperty('page-break-inside', 'auto', 'important');
-      actionRow.style.setProperty('z-index', '8', 'important');
+    header.style.setProperty('left', `${left}px`, 'important');
+    header.style.setProperty('top', `${top}px`, 'important');
+    header.style.setProperty('width', `${headerWidth}px`, 'important');
+    header.style.setProperty('max-width', `${headerWidth}px`, 'important');
+
+    // Undo inline positioning left behind by the broken direct-child version.
+    if (actionRow?.isConnected) {
+      actionRow.style.removeProperty('left');
+      actionRow.style.removeProperty('top');
+      actionRow.style.removeProperty('position');
+      actionRow.style.removeProperty('max-width');
+      actionRow.style.removeProperty('z-index');
     }
 
     window.requestAnimationFrame(() => {
-      if (!reader.isConnected || !meta.isConnected) return;
+      if (!reader.isConnected || !header.isConnected || !spacer.isConnected) return;
 
-      const metaHeight = Math.ceil(meta.getBoundingClientRect().height || 0);
-      const actionGap = Math.max(5, Math.round(fontSize * 0.35));
+      const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
+      // Reserve the initial header footprint plus one text-line buffer. That
+      // spacer scrolls away with the article; the external header never does.
+      const requiredHeight = Math.max(fontSize * 2, headerHeight + fontSize);
+      const previousHeight = Number.parseFloat(spacer.style.height) || 0;
+      spacer.style.width = '100%';
+      spacer.style.maxWidth = `${headerWidth}px`;
 
-      if (actionRow?.isConnected) {
-        actionRow.style.setProperty(
-          'top',
-          `${paddingTop + metaHeight + actionGap}px`,
-          'important'
-        );
+      if (Math.abs(requiredHeight - previousHeight) > 1) {
+        spacer.style.height = `${Math.ceil(requiredHeight)}px`;
+        scheduleTopicFeedStoryBookReflow();
       }
-
-      window.requestAnimationFrame(() => {
-        if (!reader.isConnected || !spacer.isConnected) return;
-
-        const actionHeight = actionRow?.isConnected
-          ? Math.ceil(actionRow.getBoundingClientRect().height || 0)
-          : 0;
-
-        // Source/share + small gap + actions + exactly one body-text line.
-        const requiredHeight = Math.max(
-          fontSize * 2,
-          metaHeight + actionGap + actionHeight + fontSize
-        );
-        const previousHeight = Number.parseFloat(spacer.style.height) || 0;
-
-        spacer.style.width = '100%';
-        spacer.style.maxWidth = `${headerWidth}px`;
-
-        if (Math.abs(requiredHeight - previousHeight) > 1) {
-          spacer.style.height = `${Math.ceil(requiredHeight)}px`;
-          scheduleTopicFeedStoryBookReflow();
-        }
-      });
     });
   }
 
@@ -742,42 +901,69 @@
     if (!isTopicFeedReaderActive()) return;
 
     const reader = document.querySelector('#reader');
-    const actionRow = document.querySelector('#read-anything-article-summary-action');
-    if (!reader || !actionRow) {
-      positionTopicFeedStoryHeader();
-      return;
-    }
+    if (!reader) return;
 
-    // Read Anything may re-prepend the row. That is expected and no longer a
-    // conflict: direct-child ownership is preserved, while CSS positioning puts
-    // it beneath the source/share divider.
-    if (actionRow.parentElement !== reader) {
-      reader.prepend(actionRow);
+    const parts = topicFeedStoryHeaderParts(reader);
+    if (!parts.header) return;
+
+    const actionRow = document.querySelector('#read-anything-article-summary-action');
+    if (actionRow && actionRow.parentElement !== parts.header) {
+      // Moving the existing node preserves all Read Anything click/hover/focus
+      // handlers. Do not clone, rebuild, or hide these controls.
+      parts.header.appendChild(actionRow);
     }
 
     positionTopicFeedStoryHeader();
   }
 
-  function observeTopicFeedStoryHeader() {
+
+  let activeTopicFeedHeaderContext = null;
+
+  function clearReaderArticleContext() {
+    activeTopicFeedHeaderContext = null;
+    window.MSGTopicFeedReaderContext = null;
+
     const reader = document.querySelector('#reader');
-    if (!reader || reader === topicFeedStoryHeaderReader) return;
+    const frame = reader?.closest('#reader-frame');
+    frame?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
+    reader?.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
+    removeTopicBookDivider();
+  }
 
-    topicFeedStoryHeaderObserver?.disconnect?.();
-    topicFeedStoryHeaderReader = reader;
+  function stripTrailingTopicFeedProvenance(text) {
+    const raw = String(text || '').trim();
+    if (!raw) return '';
+    return raw.replace(/\n{2,}\s*Source:\s*[^\n]+\nhttps?:\/\/\S+\s*$/i, '').trim();
+  }
 
-    topicFeedStoryHeaderObserver = new MutationObserver(() => {
-      if (!isTopicFeedReaderActive()) return;
-      window.requestAnimationFrame(() => {
-        keepTopicFeedArticleActionsInHeader();
-      });
-    });
+  function refreshActiveTopicFeedHeader() {
+    if (!isTopicFeedReaderActive()) return;
+    const context = activeTopicFeedHeaderContext;
+    if (!context?.topic || !context?.article) return;
+    topicFeedSourceCredit(context.topic, context.article, context.payload || {});
+  }
 
-    topicFeedStoryHeaderObserver.observe(reader, { childList: true });
+  function sourceHostLabel(value) {
+    try {
+      return new URL(String(value || '')).hostname.replace(/^www\./i, '');
+    } catch {
+      return '';
+    }
   }
 
   function topicFeedSourceCredit(topic, article, payload) {
-    const sourceName = String(article?.sourceName || 'Topic Feed').trim();
     const originalUrl = String(payload?.sourceUrl || article?.url || '').trim();
+    const configuredSource = (topic?.sources || []).find(
+      (source) => String(source?.id || '') === String(article?.sourceClientId || '')
+    );
+    const preparedSite = String(payload?.siteName || payload?.site || '').trim();
+    const sourceName = String(
+      preparedSite ||
+      configuredSource?.name ||
+      article?.sourceName ||
+      sourceHostLabel(originalUrl) ||
+      'Topic Feed'
+    ).trim();
     const rawDate = article?.published || article?.publishedAt || '';
     let dateLabel = '';
 
@@ -793,6 +979,7 @@
     }
 
     const apply = () => {
+      if (!isTopicFeedReaderActive()) return false;
       const reader =
         document.querySelector('#reader') ||
         document.querySelector('.reader, .interactive-reader');
@@ -906,10 +1093,9 @@
 
       meta.replaceChildren(credit);
 
-      // Read Anything keeps Summarize / Analyze as a direct child of #reader.
-      // We preserve that contract and position it visually below this source row.
+      // Keep the existing Read Anything action row in the permanent external
+      // header so it never moves with article scrolling.
       keepTopicFeedArticleActionsInHeader();
-      observeTopicFeedStoryHeader();
       positionTopicFeedStoryHeader();
 
       return true;
@@ -917,38 +1103,70 @@
 
     // The article action row may be installed just after openDocument(), so
     // retry long enough to place the credit beneath it rather than above it.
-    [0, 40, 100, 220, 480, 900].forEach((delay) => {
+    [0, 40, 100, 220, 480, 900, 1500, 2500].forEach((delay) => {
       window.setTimeout(() => {
         if (apply()) {
           keepTopicFeedArticleActionsInHeader();
           positionTopicFeedStoryHeader();
           decorateTopicFeedArticleFooter();
         }
-        relocateTopicFeedRecoveryCard();
       }, delay);
     });
   }
 
-  function openPreparedArticle(topic, article, payload) {
-    if (!window.MarkSetGoReadAnything?.openDocument) throw new Error('The Reader importer is not ready.');
+  function receiveWorkspaceArticleContext(topic, article, payload) {
+    // Synchronize state/context only. Do NOT render from this function: rendering
+    // the outer app here can destroy the workspace pane that initiated the read.
+    adoptSharedTopicState();
+    const liveTopic = state.topics.find((item) => String(item?.id || '') === String(topic?.id || '')) || topic;
+    const liveArticle = liveTopic?.articles?.find?.((item) => String(item?.id || '') === String(article?.id || '')) || article;
+    const sourceDisplayName = String(
+      payload?.siteName ||
+      payload?.site ||
+      (liveTopic?.sources || []).find((source) => String(source?.id || '') === String(liveArticle?.sourceClientId || ''))?.name ||
+      liveArticle?.sourceName ||
+      sourceHostLabel(payload?.sourceUrl || liveArticle?.url) ||
+      'Topic Feed'
+    ).trim();
+
     window.MSGTopicFeedReaderContext = {
-      topicId: topic?.id || '',
-      topicName: topic?.name || '',
-      sourceId: article.sourceClientId || '',
-      sourceName: article.sourceName || '',
-      articleId: article.id || '',
+      topicId: liveTopic?.id || '',
+      topicName: liveTopic?.name || '',
+      sourceId: liveArticle?.sourceClientId || '',
+      sourceName: sourceDisplayName,
+      articleId: liveArticle?.id || '',
       updatedAt: new Date().toISOString()
     };
-    window.MarkSetGoReadAnything.openDocument({
+    activeTopicFeedHeaderContext = { topic: liveTopic, article: liveArticle, payload };
+    return true;
+  }
+
+  function openPreparedArticle(topic, article, payload, options = {}) {
+    const isWorkspacePane = window.parent !== window && (
+      Boolean(window.__MSG_WORKSPACE_PANE__) ||
+      new URLSearchParams(window.location.search).has('msgWorkspaceMode')
+    );
+
+    const sourceDisplayName = String(
+      payload?.siteName ||
+      payload?.site ||
+      (topic?.sources || []).find((source) => String(source?.id || '') === String(article?.sourceClientId || ''))?.name ||
+      article.sourceName ||
+      sourceHostLabel(payload?.sourceUrl || article?.url) ||
+      'Topic Feed'
+    ).trim();
+
+    const readerText = stripTrailingTopicFeedProvenance(payload?.text);
+    const documentRecord = {
       title: payload.title || article.title,
-      author: article.author || article.sourceName,
-      text: payload.text,
+      author: payload?.author || article.author || sourceDisplayName,
+      text: readerText || String(article.feedText || article.summary || '').trim() || 'Open the original article to continue reading.',
       source: {
         type: 'topic-feed',
         url: payload.sourceUrl || article.url,
         topic: topic?.name || '',
         topicId: topic?.id || '',
-        feedSource: article.sourceName || '',
+        feedSource: sourceDisplayName,
         feedSourceId: article.sourceClientId || '',
         articleId: article.id || '',
         fullArticle: payload.fullArticle !== false,
@@ -956,12 +1174,55 @@
         documentToc: Array.isArray(payload.documentToc) ? payload.documentToc : [],
         importedAt: new Date().toISOString()
       }
-    });
+    };
+
+    // A Topic Feed page opened in the secondary workspace is a persistent source
+    // pane. Do not route this read through MSGWorkspaceReaderHandoff: that generic
+    // handoff is allowed to transition/replace the secondary pane. Instead invoke
+    // the OUTER app's Read Anything importer directly. The iframe that initiated
+    // the read is never navigated, rendered over, hidden, or closed here.
+    if (isWorkspacePane && !options.fromOuterWorkspacePane) {
+      announceTopicStateChange();
+      try {
+        const parentFeeds = window.parent.MarkSetGoTopicFeeds;
+        parentFeeds?.receiveWorkspaceArticleContext?.(topic, article, payload);
+
+        const parentImporter = window.parent.MarkSetGoReadAnything;
+        if (typeof parentImporter?.openDocument === 'function') {
+          parentImporter.openDocument(documentRecord);
+
+          // The parent Reader and article-action row finish in separate explicit
+          // passes. Re-apply Topic Feed chrome through bounded retries only; no
+          // DOM observer is used and the source workspace pane is left untouched.
+          [0, 80, 220, 520].forEach((delay) => {
+            window.parent.setTimeout(() => {
+              try { parentFeeds?.refreshReaderArticleChrome?.(); } catch {}
+            }, delay);
+          });
+          return true;
+        }
+      } catch (error) {
+        console.warn('Workspace could not open the Topic Feed article in the outer Reader.', error);
+      }
+      // If the outer importer is not ready, fall through to the existing local
+      // path so the action still works rather than silently doing nothing.
+    }
+
+    if (!window.MarkSetGoReadAnything?.openDocument) throw new Error('The Reader importer is not ready.');
+
+    window.MSGTopicFeedReaderContext = {
+      topicId: topic?.id || '',
+      topicName: topic?.name || '',
+      sourceId: article.sourceClientId || '',
+      sourceName: sourceDisplayName,
+      articleId: article.id || '',
+      updatedAt: new Date().toISOString()
+    };
+    activeTopicFeedHeaderContext = { topic, article, payload };
+    window.MarkSetGoReadAnything.openDocument(documentRecord);
     topicFeedSourceCredit(topic, article, payload);
-    [0, 100, 250, 500, 900, 1500].forEach((delay) => {
-      window.setTimeout(() => relocateTopicFeedRecoveryCard(), delay);
-    });
     scheduleReaderNavigation();
+    return true;
   }
 
   async function openArticle(article, trigger = null, topicOverride = null) {
@@ -990,7 +1251,7 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            url: article.url, title: article.title, summary: article.summary || '',
+            url: article.url, title: article.title, summary: article.summary || '', feedText: article.feedText || '',
             source: article.sourceName || 'Topic Feed', publisherUrl: article.sourceUrl || ''
           })
         });
@@ -1007,8 +1268,32 @@
     }
   }
 
+  function explicitReaderOwnsCurrentView() {
+    // 20260824 bookmarklet race guard: a background Topic Feed hydration must
+    // never replace content the user explicitly opened in the Reader. The
+    // capture hash can disappear immediately after a successful bookmarklet
+    // handoff, so also check the live Reader/view rather than relying on the hash.
+    if (String(location.hash || '').includes('read-anything-capture=')) return true;
+    if (app?.dataset?.viewKey === 'reader') return true;
+    if (document.querySelector('#reader')) return true;
+    try {
+      const current = window.MarkSetGoCurrentReaderDocument?.get?.();
+      if (current?.text || current?.source) return true;
+    } catch {}
+    return false;
+  }
+
   async function maybeAutoOpenDailyArticle() {
     if (!cloudAuthenticated || dailyAutoOpenAttempted || !state.preferences.dailyOpenSourceId) return;
+
+    // Daily auto-open is a startup convenience only. If an explicit Reader is
+    // already active (including Read with Mark), skip it for this app session.
+    // This prevents auth/cloud hydration from replacing a newly captured page.
+    if (explicitReaderOwnsCurrentView()) {
+      dailyAutoOpenAttempted = true;
+      return;
+    }
+
     dailyAutoOpenAttempted = true;
     try {
       const response = await fetch('/api/topic-feeds/daily-open', {
@@ -1024,6 +1309,9 @@
       if (localArticle) Object.assign(localArticle, result.article, { read: true, prepared: true });
       saveState({ cloud: false });
       const tryOpen = (attempt = 0) => {
+        // The Reader may have been opened while the daily-open request was in
+        // flight. Re-check immediately before takeover, not only before fetch.
+        if (explicitReaderOwnsCurrentView()) return;
         if (window.MarkSetGoReadAnything?.openDocument) {
           openPreparedArticle(topic, localArticle || result.article, result.payload);
         } else if (attempt < 5) {
@@ -1149,10 +1437,10 @@
       <section class="panel topic-feeds-page">
         <header class="topic-feeds-hero">
           <div><span class="source-category">My Topics</span><h1>${escapeHtml(topic.name)}</h1>
-          <p>${topic.cadence === 'weekly' ? 'Weekly' : 'Daily'} edition · ${topic.sources.length} feed${topic.sources.length === 1 ? '' : 's'} · ${all.length} article${all.length === 1 ? '' : 's'}${topic.preparedAt ? ' · downloaded and Reader-ready' : ''}</p></div>
+          <p>${topic.cadence === 'weekly' ? 'Weekly' : 'Daily'} edition · ${topic.sources.length} feed${topic.sources.length === 1 ? '' : 's'} · ${all.length} article${all.length === 1 ? '' : 's'}${topic.preparedAt ? ' · Reader cache warmed' : ''}</p></div>
           <div class="topic-feeds-hero-actions">
             <button class="secondary" id="topic-manage" type="button">Manage</button>
-            <button class="primary" id="topic-refresh" type="button" ${(loading || preparing) ? 'disabled' : ''}>${preparing ? 'Downloading articles…' : loading ? 'Refreshing…' : 'Refresh & download latest'}</button>
+            <button class="primary" id="topic-refresh" type="button" ${loading ? 'disabled' : ''}>${loading ? 'Refreshing…' : 'Refresh latest'}</button>
           </div>
         </header>
         <div class="topic-feeds-layout">
@@ -1179,14 +1467,17 @@
         </div>
       </section>`;
     bindMain();
-    if (!loading && topic.sources.length && refreshIsDue(topic) && !all.length) refreshTopic();
+    if (!loading && (topic.sources.length || topic.sourceMode === 'ai' || topic.sourceMode === 'hybrid') && refreshIsDue(topic) && !all.length) refreshTopic();
   }
 
   function sourceRow(source = { id: uid(), name: '', type: 'website', url: '', origin:'manual', recommendationKey:'' }) {
     const daily = state.preferences.dailyOpenSourceId === source.id;
+    const explicit = source.origin !== 'ai';
     return `
       <div class="topic-feed-source-row" data-source-id="${escapeHtml(source.id)}"
            data-source-origin="${escapeHtml(source.origin || 'manual')}"
+           data-source-explicit="${explicit ? '1' : '0'}"
+           data-source-session-added="${source.sessionAdded ? '1' : '0'}"
            data-recommendation-key="${escapeHtml(source.recommendationKey || '')}">
         <input class="topic-source-name" value="${escapeHtml(source.name)}" placeholder="Feed name" required>
         <select class="topic-source-type"><option value="website" ${source.type === 'website' ? 'selected' : ''}>Website URL</option><option value="rss" ${source.type === 'rss' ? 'selected' : ''}>RSS / Atom</option></select>
@@ -1197,35 +1488,65 @@
   }
 
   async function loadRecommendations(topicName) {
-    const container = document.getElementById('topic-feed-recommendations');
-    if (!container) return;
+    const websiteContainer = document.getElementById('topic-feed-recommendations');
+    const rssContainer = document.getElementById('topic-feed-rss-recommendations');
+    if (!websiteContainer && !rssContainer) return;
+
+    const setBoth = (websiteHtml, rssHtml = websiteHtml) => {
+      if (websiteContainer) websiteContainer.innerHTML = websiteHtml;
+      if (rssContainer) rssContainer.innerHTML = rssHtml;
+    };
     const name = String(topicName || '').trim();
     if (name.length < 2) {
-      container.innerHTML = '<p class="topic-recommendation-note">Enter a topic name and recommended feeds will appear here.</p>';
+      setBoth(
+        '<p class="topic-recommendation-note">Enter a topic name and recommended sources will appear here.</p>',
+        '<p class="topic-recommendation-note">Enter a topic name and verified RSS feeds will appear here.</p>'
+      );
       return;
     }
-    container.innerHTML = '<p class="topic-recommendation-note">Finding recommended feeds…</p>';
-    try {
-      const response = await fetch(`/api/topic-feeds/recommend?topic=${encodeURIComponent(name)}`);
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || 'Recommendations unavailable.');
-      const existing = new Set([...document.querySelectorAll('.topic-source-url')].map((input) => cleanUrl(input.value)).filter(Boolean));
-      const items = (payload.sources || []).filter((source) => !existing.has(cleanUrl(source.url)));
-      container.innerHTML = items.length ? items.map((source) => `
-        <article class="topic-feed-recommendation">
-          <div><strong>${escapeHtml(source.name)}</strong><p>${escapeHtml(source.description || '')}</p></div>
+    setBoth(
+      '<p class="topic-recommendation-note">Finding topic-specific sources…</p>',
+      '<p class="topic-recommendation-note">Discovering and verifying RSS feeds…</p>'
+    );
+
+    const renderItems = (items, emptyMessage) => items.length ? items.map((source) => {
+      const sourceUrl = cleanUrl(source.url);
+      const selected = Boolean(sourceUrl && managerSelectedRecommendationSources.has(sourceUrl));
+      return `
+        <article class="topic-feed-recommendation ${selected ? 'selected' : ''}">
+          <div><strong>${escapeHtml(source.name)}</strong><p>${escapeHtml(source.description || '')}</p>${source.reason ? `<small>${escapeHtml(source.reason)}</small>` : ''}</div>
           <button type="button" data-add-recommended-feed="${escapeHtml(source.key)}"
                   data-feed-name="${escapeHtml(source.name)}" data-feed-type="${escapeHtml(source.type || 'website')}"
-                  data-feed-url="${escapeHtml(source.url)}">Add</button>
-        </article>`).join('') : '<p class="topic-recommendation-note">You already added the recommended feeds shown for this topic.</p>';
+                  data-feed-url="${escapeHtml(source.url)}" data-selected="${selected ? '1' : '0'}" aria-pressed="${selected ? 'true' : 'false'}">${selected ? 'Selected' : 'Add'}</button>
+        </article>`;
+    }).join('') : `<p class="topic-recommendation-note">${escapeHtml(emptyMessage)}</p>`;
+
+    try {
+      const priorities = document.getElementById('topic-preferences')?.value?.trim() || '';
+      const response = await fetch(`/api/topic-feeds/recommend?topic=${encodeURIComponent(name)}&preferences=${encodeURIComponent(priorities)}`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.error || 'Recommendations unavailable.');
+
+      // Keep website recommendations and direct RSS/Atom feeds visibly separate.
+      // Both use the same explicit-selection Map, so the v2.4.8 invariant still
+      // applies: selecting N recommendations saves exactly those N URLs.
+      const websites = Array.isArray(payload.sources) ? payload.sources : [];
+      const rssFeeds = Array.isArray(payload.rssFeeds) ? payload.rssFeeds : [];
+      if (websiteContainer) websiteContainer.innerHTML = renderItems(websites, 'No website suggestions are available yet for this topic.');
+      if (rssContainer) rssContainer.innerHTML = renderItems(rssFeeds, 'No verified RSS / Atom feeds were found for these publishers yet.');
     } catch (error) {
-      container.innerHTML = `<p class="topic-recommendation-note">${escapeHtml(error.message)}</p>`;
+      setBoth(
+        `<p class="topic-recommendation-note">${escapeHtml(error.message)}</p>`,
+        `<p class="topic-recommendation-note">${escapeHtml(error.message)}</p>`
+      );
     }
   }
 
   function showManager() {
     topicManagerOpen = true;
     deferredCloudState = null;
+    managerSelectedRecommendationSources = new Map();
+    managerNewManualSourceIds = new Set();
 
     const topic = currentTopic();
     app.innerHTML = `
@@ -1236,18 +1557,31 @@
         </header>
         <form id="topic-feed-form" class="topic-feed-form">
           <label>Topic name<input id="topic-name" required value="${escapeHtml(topic?.name || '')}" placeholder="Artificial Intelligence"></label>
+          <label>Source discovery
+            <select id="topic-source-mode">
+              <option value="ai" ${(topic?.sourceMode || (!topic ? 'ai' : 'manual')) === 'ai' ? 'selected' : ''}>AI-managed — choose and maintain sources automatically</option>
+              <option value="hybrid" ${topic?.sourceMode === 'hybrid' ? 'selected' : ''}>AI + my own sources</option>
+              <option value="manual" ${(topic?.sourceMode || (!topic ? 'ai' : 'manual')) === 'manual' ? 'selected' : ''}>Selected sources only</option>
+            </select>
+          </label>
+          <p id="topic-source-mode-note" class="topic-source-help"></p>
           <section class="topic-feed-recommendation-box">
-            <div class="topic-feed-sidebar-head"><strong>Recommended feeds for this topic</strong><span>Optional</span></div>
+            <div class="topic-feed-sidebar-head"><strong>Recommended websites</strong><span>AI · topic-specific</span></div>
             <div id="topic-feed-recommendations"></div>
+          </section>
+          <section class="topic-feed-recommendation-box topic-feed-rss-recommendation-box">
+            <div class="topic-feed-sidebar-head"><strong>Recommended RSS feeds</strong><span>Verified direct feeds</span></div>
+            <p class="topic-source-help">These RSS / Atom URLs are discovered and validated from the recommended publishers, not guessed by AI.</p>
+            <div id="topic-feed-rss-recommendations"></div>
           </section>
           <div class="topic-feed-form-row">
             <label>Edition<select id="topic-cadence"><option value="daily" ${topic?.cadence !== 'weekly' ? 'selected' : ''}>Every day</option><option value="weekly" ${topic?.cadence === 'weekly' ? 'selected' : ''}>Every week</option></select></label>
             <label>Recommended articles<input id="topic-max" type="number" min="1" max="25" value="${Number(topic?.maxRecommended) || 8}"></label>
           </div>
           <label>What should be prioritized?<textarea id="topic-preferences" rows="3" placeholder="substantive analysis, policy changes, major product releases…">${escapeHtml(topic?.preferences || '')}</textarea></label>
-          <section class="topic-feed-source-editor">
+          <section class="topic-feed-source-editor" id="topic-manual-source-editor">
             <div class="topic-feed-sidebar-head"><strong>Your feeds</strong><button id="topic-add-source" type="button">+ Add your own</button></div>
-            <p class="topic-source-help">Select “Daily start” on one feed if you want its newest unread downloaded article to open automatically in the Reader once each day.</p>
+            <p class="topic-source-help">Selected sources live here. Choosing an AI suggestion explicitly uses only the sources you select unless you choose “AI + selected sources.”</p>
             <div id="topic-source-rows">${(topic?.sources || []).map(sourceRow).join('')}</div>
           </section>
           <div class="topic-morning-settings">
@@ -1266,40 +1600,122 @@
   }
 
   function bindManager(existing) {
+    const switchToExplicitSourceSelection = () => {
+      const select = document.getElementById('topic-source-mode');
+      if (!select || select.value !== 'ai') return false;
+
+      // Clicking a specific recommendation is an explicit choice. Never keep
+      // AI-managed mode in that case, because AI-managed intentionally replaces
+      // the source set with a broader AI-maintained collection.
+      select.value = 'manual';
+
+      // When converting an existing AI-managed topic to selected-only mode,
+      // discard only sources that AI added automatically. User-added/pinned
+      // sources remain available alongside the newly selected recommendation.
+      document.querySelectorAll('.topic-feed-source-row[data-source-origin="ai"]').forEach((row) => row.remove());
+      return true;
+    };
+
+    const syncSourceModeUi = () => {
+      const mode = document.getElementById('topic-source-mode')?.value || 'manual';
+      const editor = document.getElementById('topic-manual-source-editor');
+      if (editor) editor.hidden = mode === 'ai';
+      const note = document.getElementById('topic-source-mode-note');
+      if (note) note.textContent = mode === 'ai'
+        ? 'AI will choose highly topic-specific sources and refresh that source set periodically. You do not need to enter URLs.'
+        : mode === 'hybrid'
+          ? 'AI will maintain topic-specific sources while also keeping the feeds you add yourself.'
+          : 'Only the sources you select or add below will be used.';
+    };
+    document.getElementById('topic-source-mode')?.addEventListener('change', syncSourceModeUi);
+    syncSourceModeUi();
+    document.getElementById('topic-preferences')?.addEventListener('input', () => {
+      clearTimeout(recommendationTimer);
+      recommendationTimer = window.setTimeout(() => loadRecommendations(document.getElementById('topic-name')?.value || ''), 650);
+    });
     document.getElementById('topic-cancel')?.addEventListener('click', () => {
       // Cancel means discard unsaved edits. If a newer cloud snapshot arrived
       // while the form was open, it is now safe to apply it.
       leaveTopicManager({ applyDeferred: true });
       render({ force: true });
     });
-    document.getElementById('topic-add-source')?.addEventListener('click', () => {
-      document.getElementById('topic-source-rows')?.insertAdjacentHTML('beforeend', sourceRow());
+    document.getElementById('topic-add-source')?.addEventListener('click', (event) => {
+      // This is an editor action, never a form-submit/navigation action.
+      event.preventDefault();
+      event.stopPropagation();
+      if (switchToExplicitSourceSelection()) syncSourceModeUi();
+      const source = { id: uid(), name:'', type:'website', url:'', origin:'manual', recommendationKey:'', sessionAdded:true };
+      managerNewManualSourceIds.add(source.id);
+      document.getElementById('topic-source-rows')?.insertAdjacentHTML('beforeend', sourceRow(source));
     });
     document.getElementById('topic-name')?.addEventListener('input', (event) => {
       clearTimeout(recommendationTimer);
-      recommendationTimer = window.setTimeout(() => loadRecommendations(event.target.value), 350);
+      recommendationTimer = window.setTimeout(() => loadRecommendations(event.target.value), 650);
     });
-    document.getElementById('topic-feed-recommendations')?.addEventListener('click', (event) => {
-      const button = event.target.closest('[data-add-recommended-feed]');
-      if (!button) return;
-      const source = {
-        id: uid(), name: button.dataset.feedName || '', type: button.dataset.feedType === 'rss' ? 'rss' : 'website',
-        url: button.dataset.feedUrl || '', origin:'recommended', recommendationKey:button.dataset.addRecommendedFeed || ''
-      };
-      document.getElementById('topic-source-rows')?.insertAdjacentHTML('beforeend', sourceRow(source));
-      void loadRecommendations(document.getElementById('topic-name')?.value || '');
-    });
+    const bindRecommendationPicker = (containerId) => {
+      document.getElementById(containerId)?.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-add-recommended-feed]');
+        if (!button) return;
+
+        // Recommendation clicks are selection only. They never submit, refresh,
+        // navigate, or close a Topic Setup/workspace pane.
+        event.preventDefault();
+        event.stopPropagation();
+        if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation();
+
+        const url = cleanUrl(button.dataset.feedUrl || '');
+        if (!url) return;
+        const selected = managerSelectedRecommendationSources.has(url);
+
+        if (selected) {
+          managerSelectedRecommendationSources.delete(url);
+          button.dataset.selected = '0';
+          button.classList.remove('selected');
+          button.closest('.topic-feed-recommendation')?.classList.remove('selected');
+          button.textContent = 'Add';
+          button.setAttribute('aria-pressed', 'false');
+        } else {
+          managerSelectedRecommendationSources.set(url, {
+            id: uid(),
+            name: button.dataset.feedName || '',
+            type: button.dataset.feedType === 'rss' ? 'rss' : 'website',
+            url,
+            origin: 'recommended',
+            recommendationKey: button.dataset.addRecommendedFeed || ''
+          });
+          button.dataset.selected = '1';
+          button.classList.add('selected');
+          button.closest('.topic-feed-recommendation')?.classList.add('selected');
+          button.textContent = 'Selected';
+          button.setAttribute('aria-pressed', 'true');
+
+          // Reflect the contract in the selector without rebuilding either
+          // recommendation section. The explicit Map remains authoritative.
+          const modeSelect = document.getElementById('topic-source-mode');
+          if (modeSelect?.value === 'ai') modeSelect.value = 'manual';
+          const editor = document.getElementById('topic-manual-source-editor');
+          if (editor) editor.hidden = false;
+          const note = document.getElementById('topic-source-mode-note');
+          if (note) note.textContent = 'Only the sources you select or add below will be used.';
+        }
+      });
+    };
+    bindRecommendationPicker('topic-feed-recommendations');
+    bindRecommendationPicker('topic-feed-rss-recommendations');
+
     document.getElementById('topic-source-rows')?.addEventListener('click', (event) => {
       const remove = event.target.closest('.topic-source-remove');
       if (!remove) return;
       const row = remove.closest('.topic-feed-source-row');
       const removedId = row?.dataset.sourceId || '';
+      if (removedId) managerNewManualSourceIds.delete(removedId);
       row?.remove();
       if (state.preferences.dailyOpenSourceId === removedId) state.preferences.dailyOpenSourceId = '';
     });
     document.getElementById('topic-delete')?.addEventListener('click', () => {
       const removedSourceIds = new Set((existing.sources || []).map((source) => source.id));
       state.topics = state.topics.filter((item) => item.id !== existing.id);
+      markLocalTopicRevision();
       if (removedSourceIds.has(state.preferences.dailyOpenSourceId)) state.preferences.dailyOpenSourceId = '';
       activeTopicId = state.topics[0]?.id || null;
       activeSourceId = '';
@@ -1312,15 +1728,62 @@
     });
     document.getElementById('topic-feed-form')?.addEventListener('submit', async (event) => {
       event.preventDefault();
+
+      const requestedSourceMode = document.getElementById('topic-source-mode')?.value || 'manual';
       const rows = [...document.querySelectorAll('.topic-feed-source-row')];
-      const sources = rows.map((row) => ({
+      const rowSources = rows.map((row) => ({
         id: row.dataset.sourceId || uid(),
         name: row.querySelector('.topic-source-name').value.trim(),
         type: row.querySelector('.topic-source-type').value,
         url: cleanUrl(row.querySelector('.topic-source-url').value),
-        origin: row.dataset.sourceOrigin === 'recommended' ? 'recommended' : 'manual',
-        recommendationKey: row.dataset.recommendationKey || ''
+        origin: row.dataset.sourceOrigin === 'ai' ? 'ai' : row.dataset.sourceOrigin === 'recommended' ? 'recommended' : 'manual',
+        recommendationKey: row.dataset.recommendationKey || '',
+        sessionAdded: row.dataset.sourceSessionAdded === '1' || managerNewManualSourceIds.has(row.dataset.sourceId || '')
       })).filter((source) => source.name && source.url);
+      const selectedRecommendations = [...managerSelectedRecommendationSources.values()]
+        .map((source) => ({ ...source, url: cleanUrl(source.url) }))
+        .filter((source) => source.name && source.url);
+      const hasCurrentRecommendationSelection = selectedRecommendations.length > 0;
+
+      // Explicit clicks in THIS editor session are authoritative. A stale source
+      // row from an older AI-managed/polluted topic can never silently join them.
+      const sourceMode = requestedSourceMode === 'hybrid'
+        ? 'hybrid'
+        : hasCurrentRecommendationSelection
+          ? 'manual'
+          : requestedSourceMode;
+
+      const dedupeSourceList = (list) => {
+        const seen = new Set();
+        return list.filter((source) => {
+          const key = cleanUrl(source.url).replace(/\/+$/, '').toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      };
+
+      let sources = [];
+      if (sourceMode === 'hybrid') {
+        // Hybrid deliberately combines automatic AI sources with user-selected
+        // sources. Current explicit clicks are pinned alongside manual URL rows.
+        sources = dedupeSourceList([
+          ...rowSources.filter((source) => source.origin !== 'ai'),
+          ...selectedRecommendations
+        ]);
+      } else if (sourceMode === 'manual' && hasCurrentRecommendationSelection) {
+        // Critical invariant: if the reader clicked 1 or 2 recommendations, save
+        // exactly those clicks plus genuinely hand-entered URL rows. Do not carry
+        // old AI/recommended rows forward from a prior broken save.
+        sources = dedupeSourceList([
+          ...rowSources.filter((source) => source.origin === 'manual' && source.sessionAdded),
+          ...selectedRecommendations
+        ]);
+      } else if (sourceMode === 'manual') {
+        sources = dedupeSourceList(rowSources.filter((source) => source.origin !== 'ai'));
+      }
+
+      sources = sources.map(({ sessionAdded, ...source }) => source);
 
       const selectedDaily = document.querySelector('input[name="topic-daily-source"]:checked')?.value || '';
       const existingSourceIds = new Set(sources.map((source) => source.id));
@@ -1335,6 +1798,11 @@
         cadence: document.getElementById('topic-cadence').value,
         maxRecommended: Number(document.getElementById('topic-max').value) || 8,
         preferences: document.getElementById('topic-preferences').value.trim(),
+        sourceMode: sourceMode === 'ai' || sourceMode === 'hybrid' ? sourceMode : 'manual',
+        aiSourcesUpdatedAt: sourceMode === 'manual' ? null : (existing?.aiSourcesUpdatedAt || null),
+        selectedSourceUrls: sourceMode === 'manual'
+          ? sources.map((source) => cleanUrl(source.url)).filter(Boolean)
+          : [],
         sources
       };
 
@@ -1371,6 +1839,11 @@
         };
         state.topics.push(record);
       }
+
+      // From this point forward, no cloud hydration that began before this save
+      // may replace the local topic list. The revision is cleared only by a
+      // successful serialized PUT of this state (or a newer one).
+      markLocalTopicRevision();
 
       activeTopicId = record.id;
       activeSourceId = '';
@@ -1433,10 +1906,8 @@
   let topicPaneUserIntentUntil = 0;
 
   function markTopicPaneUserIntent(open) {
-    // Save the user's intent BEFORE app.js changes the layout. The My Topics
-    // MutationObserver can run during the same click; without this guard it can
-    // see the old "open" preference and immediately reopen a panel the user
-    // just closed.
+    // Save the user's intent BEFORE app.js changes the layout so the explicit
+    // post-click synchronization cannot immediately undo a close/open choice.
     saveTopicReaderPanePreference(open);
     topicPaneUserIntentUntil = Date.now() + 220;
 
@@ -1472,16 +1943,39 @@
     return Boolean(window.MSGTopicFeedReaderContext);
   }
 
+
+  function currentReaderSourceType() {
+    try {
+      return String(window.MarkSetGoCurrentReaderDocument?.get?.()?.source?.type || '').toLowerCase();
+    } catch {
+      return '';
+    }
+  }
+
+  function isCapturedArticleReaderActive() {
+    return ['bookmarklet', 'website'].includes(currentReaderSourceType());
+  }
+
+  function isArticleHubReaderActive() {
+    return isTopicFeedReaderActive() || isCapturedArticleReaderActive();
+  }
+
+  function capturedArticles() {
+    try {
+      const items = window.MarkSetGoReadAnything?.getCapturedArticles?.();
+      return Array.isArray(items) ? items : [];
+    } catch {
+      return [];
+    }
+  }
+
   let topicBookPageGeometryTimer = 0;
   let topicBookDividerResizeObserver = null;
-  let topicBookDividerClassObserver = null;
   let topicBookDividerFrame = null;
 
   function removeTopicBookDivider() {
     topicBookDividerResizeObserver?.disconnect?.();
     topicBookDividerResizeObserver = null;
-    topicBookDividerClassObserver?.disconnect?.();
-    topicBookDividerClassObserver = null;
 
     const frame = topicBookDividerFrame || document.querySelector('#reader-frame');
     frame?.querySelectorAll('[data-topic-feed-book-divider]').forEach((node) => node.remove());
@@ -1551,16 +2045,6 @@
         topicBookDividerResizeObserver.observe(reader);
       }
 
-      topicBookDividerClassObserver = new MutationObserver(() => {
-        window.requestAnimationFrame(() => {
-          positionTopicBookDivider();
-          positionTopicFeedStoryHeader();
-        });
-      });
-      topicBookDividerClassObserver.observe(reader, {
-        attributes: true,
-        attributeFilter: ['class', 'style']
-      });
     }
 
     positionTopicBookDivider();
@@ -1596,9 +2080,13 @@
 
       const readerWidth = Math.round(reader.getBoundingClientRect().width || 0);
       const paneWidth = Math.round(pane.getBoundingClientRect().width || 0);
-      const signature = `${readerWidth}:${paneWidth}`;
+      const contextKey = `${String(window.MSGTopicFeedReaderContext?.topicId || '')}:${String(window.MSGTopicFeedReaderContext?.articleId || '')}`;
+      const signature = `${contextKey}:${readerWidth}:${paneWidth}`;
 
-      // One sync per final geometry for this Reader DOM.
+      // One sync per article + final geometry. The Reader DOM can be reused when
+      // opening a different story, so width alone is not a safe cache key: a new
+      // article opened from the topic manager could otherwise inherit the prior
+      // article's "already synced" marker and leave its header at startup geometry.
       if (reader.dataset.topicFeedGeometrySynced === signature) return;
       reader.dataset.topicFeedGeometrySynced = signature;
 
@@ -1617,7 +2105,14 @@
           layout.style.removeProperty('--navigation-width');
         }
         window.dispatchEvent(new Event('resize'));
-        window.requestAnimationFrame(ensureTopicBookDivider);
+        window.requestAnimationFrame(() => {
+          // Re-anchor the permanent source/action header after the navigation
+          // pane and Book Pages have reached their final geometry. Do this
+          // explicitly rather than relying on a resize callback firing.
+          keepTopicFeedArticleActionsInHeader();
+          positionTopicFeedStoryHeader();
+          ensureTopicBookDivider();
+        });
       });
     };
 
@@ -1625,11 +2120,10 @@
   }
 
   function applyTopicReaderPanePreference() {
-    if (!isTopicFeedReaderActive()) return;
+    if (!isArticleHubReaderActive()) return;
 
     // A real user click always wins over automatic restoration. This prevents
-    // the close/open flicker caused by decorateReaderNavigation() running from
-    // MutationObserver changes during the same interaction.
+    // explicit post-click synchronization from undoing the reader's choice.
     if (Date.now() < topicPaneUserIntentUntil) return;
 
     const layout = document.querySelector('#reader-layout');
@@ -1640,7 +2134,7 @@
     const isOpen = !layout.classList.contains('navigation-hidden');
 
     if (shouldOpen === isOpen) {
-      if (shouldOpen) scheduleTopicBookPageGeometrySync();
+      if (shouldOpen && isTopicFeedReaderActive()) scheduleTopicBookPageGeometrySync();
       return;
     }
 
@@ -1651,7 +2145,7 @@
     } finally {
       window.setTimeout(() => {
         applyingTopicReaderPanePreference = false;
-        if (topicReaderPaneShouldBeOpen()) scheduleTopicBookPageGeometrySync();
+        if (topicReaderPaneShouldBeOpen() && isTopicFeedReaderActive()) scheduleTopicBookPageGeometrySync();
       }, 0);
     }
   }
@@ -1664,9 +2158,9 @@
       toggle.dataset.topicFeedStickyBound = '1';
 
       // Capture phase is deliberate: persist the desired state before app.js's
-      // own click handler changes classes and triggers MutationObserver work.
+      // own click handler changes the Reader layout.
       toggle.addEventListener('click', () => {
-        if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
+        if (applyingTopicReaderPanePreference || !isArticleHubReaderActive()) return;
 
         const layout = document.querySelector('#reader-layout');
         if (!layout) return;
@@ -1678,7 +2172,7 @@
     if (close && close.dataset.topicFeedStickyBound !== '1') {
       close.dataset.topicFeedStickyBound = '1';
       close.addEventListener('click', () => {
-        if (applyingTopicReaderPanePreference || !isTopicFeedReaderActive()) return;
+        if (applyingTopicReaderPanePreference || !isArticleHubReaderActive()) return;
         markTopicPaneUserIntent(false);
       }, true);
     }
@@ -1735,15 +2229,126 @@
     });
   }
 
+  function ensureTopicReaderDeleteStyles() {
+    if (document.getElementById('topic-reader-delete-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'topic-reader-delete-styles';
+    style.textContent = `
+      #app .topic-reader-article-row { position:relative; min-width:0; }
+      #app .topic-reader-article-row > .topic-reader-article { width:100%; padding-right:2rem !important; }
+      #app .topic-reader-captured .topic-reader-article { display:grid; gap:.1rem; text-align:left; }
+      #app .topic-reader-captured .topic-reader-article > small { font-size:.66rem; font-weight:500; opacity:.62; line-height:1.2; }
+      #app .topic-reader-captured .topic-reader-article-row[aria-current="true"] > .topic-reader-article {
+        background:rgba(201,137,0,.08); box-shadow:inset 2px 0 0 rgba(201,137,0,.55);
+      }
+      #app .topic-reader-article-delete {
+        position:absolute; top:.22rem; right:.22rem; z-index:4; width:1.3rem; height:1.3rem; min-width:1.3rem;
+        padding:0; border:0; border-radius:999px; display:grid; place-items:center;
+        background:transparent; color:inherit; opacity:.46; font:700 .86rem/1 system-ui,sans-serif; cursor:pointer;
+      }
+      #app .topic-reader-article-delete:hover { opacity:1; background:rgba(160,45,45,.11); color:#9f2222; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function rebuildTopicReaderContents() {
+    const view = document.querySelector('#navigation-pane [data-reader-view="contents"]');
+    if (!view) return;
+    const bookmark = view.querySelector('#add-bookmark');
+    if (bookmark) bookmark.remove();
+    view.querySelector('.topic-reader-nav')?.remove();
+    delete view.dataset.topicReaderNavigationSignature;
+    if (bookmark) view.appendChild(bookmark);
+    scheduleReaderNavigation();
+  }
+
+  async function deleteTopicReaderArticle(topicId, articleId) {
+    const topic = state.topics.find((item) => String(item.id) === String(topicId));
+    if (!topic || !articleId) return;
+    const id = String(articleId);
+    topic.dismissedArticleIds = [...new Set([...(topic.dismissedArticleIds || []).map(String), id])].slice(-500);
+    topic.articles = (topic.articles || []).filter((article) => String(article?.id || '') !== id);
+    saveState({ cloud: false });
+    rebuildTopicReaderContents();
+
+    if (cloudAuthenticated) {
+      try {
+        const response = await fetch(`/api/topic-feeds/article/${encodeURIComponent(id)}?topicId=${encodeURIComponent(String(topic.id || ''))}`, {
+          method:'DELETE', credentials:'same-origin'
+        });
+        if (!response.ok) throw new Error('Cloud delete failed.');
+      } catch (error) {
+        console.warn('Topic Feed article removal will sync on the next state save.', error);
+        scheduleCloudSave();
+      }
+    } else {
+      scheduleCloudSave();
+    }
+  }
+
+  function readerTopicNavigationSignature() {
+    // The Reader-side My Topics pane is long-lived. A newly created topic can
+    // therefore change state.topics while the old navigation DOM is still
+    // present. Build a lightweight structural signature so we refresh the pane
+    // only when its actual topic/article contents changed, not on every UI pass.
+    const captured = capturedArticles().map((article) => [
+      String(article?.key || ''),
+      String(article?.title || ''),
+      String(article?.importedAt || '')
+    ]);
+    const topics = state.topics.map((topic) => [
+      String(topic?.id || ''),
+      String(topic?.name || ''),
+      (topic?.sources || []).map((source) => [String(source?.id || ''), String(source?.name || '')]),
+      (topic?.articles || []).map((article) => [
+        String(article?.id || ''),
+        String(article?.title || ''),
+        String(article?.sourceClientId || '')
+      ])
+    ]);
+    return JSON.stringify([captured, topics]);
+  }
+
   function readerTopicListMarkup() {
+    const captured = capturedArticles();
+    const capturedActive = isCapturedArticleReaderActive();
+    const currentCapturedKey = (() => {
+      try {
+        return String(window.MarkSetGoCurrentReaderDocument?.get?.()?.source?.readAnythingKey || '');
+      } catch {
+        return '';
+      }
+    })();
+
+    const capturedMarkup = `<details class="topic-reader-group topic-reader-captured" ${capturedActive ? 'open' : ''}>
+      <summary><strong>Captured Articles</strong><span>${captured.length}</span></summary>
+      <div class="topic-reader-source" data-reader-captured-source>
+        ${captured.length ? captured.map((article) => `<div class="topic-reader-article-row"
+             ${String(article.key || '') === currentCapturedKey ? 'aria-current="true"' : ''}>
+             <button type="button"
+               class="topic-reader-article ${String(article.key || '') === currentCapturedKey ? 'is-read' : ''}"
+               data-reader-captured-article="${escapeHtml(article.key || '')}">
+               ${escapeHtml(article.title || 'Web Article')}
+               <small>${escapeHtml(article.sourceName || 'Web article')}${article.importedAt ? ` · ${escapeHtml(new Date(article.importedAt).toLocaleDateString(undefined, { month:'short', day:'numeric' }))}` : ''}</small>
+             </button>
+             <button type="button" class="topic-reader-article-delete"
+               data-reader-captured-delete="${escapeHtml(article.key || '')}"
+               aria-label="Remove ${escapeHtml(article.title || 'article')} from Captured Articles"
+               title="Remove from queue">×</button>
+           </div>`).join('') : '<small>No captured articles yet.</small>'}
+      </div>
+    </details>`;
+
     return `<div class="topic-reader-nav">
       <div class="topic-reader-nav-head">
         <h2>My Topics</h2>
         <div class="topic-reader-nav-actions">
           <span data-reader-bookmark-slot></span>
+          <button type="button" data-reader-refresh-topics ${loading ? 'disabled' : ''}>${loading ? 'Refreshing…' : 'Refresh'}</button>
           <button type="button" data-reader-manage-topics>Manage</button>
         </div>
       </div>
+      ${capturedMarkup}
       ${state.topics.length ? state.topics.map((topic) => `
         <details class="topic-reader-group" ${topic.id === window.MSGTopicFeedReaderContext?.topicId ? 'open' : ''}>
           <summary><strong>${escapeHtml(topic.name)}</strong><span>${(topic.articles || []).filter((a) => !a.read).length} unread</span></summary>
@@ -1754,12 +2359,19 @@
             const initialLimit = 10;
             return `<div class="topic-reader-source" data-reader-topic-source-block="${escapeHtml(source.id)}">
               <div class="topic-reader-source-head"><strong>${escapeHtml(source.name)}</strong><span>${sourceArticleCount(topic, source.id, true)} new</span></div>
-              ${articles.length ? articles.map((article, index) => `<button type="button"
-                 class="topic-reader-article ${article.read ? 'is-read' : ''}"
-                 ${index >= initialLimit ? 'hidden data-reader-topic-overflow="1"' : ''}
-                 data-reader-topic-article="${escapeHtml(article.id)}"
-                 data-reader-topic-parent="${escapeHtml(topic.id)}">
-                 ${escapeHtml(article.title)}</button>`).join('') : '<small>No downloaded articles yet.</small>'}
+              ${articles.length ? articles.map((article, index) => `<div class="topic-reader-article-row"
+                 ${index >= initialLimit ? 'hidden data-reader-topic-overflow="1"' : ''}>
+                 <button type="button"
+                   class="topic-reader-article ${article.read ? 'is-read' : ''}"
+                   data-reader-topic-article="${escapeHtml(article.id)}"
+                   data-reader-topic-parent="${escapeHtml(topic.id)}">
+                   ${escapeHtml(article.title)}</button>
+                 <button type="button" class="topic-reader-article-delete"
+                   data-reader-topic-delete="${escapeHtml(article.id)}"
+                   data-reader-topic-parent="${escapeHtml(topic.id)}"
+                   aria-label="Remove ${escapeHtml(article.title)} from My Topics"
+                   title="Remove from queue">×</button>
+               </div>`).join('') : '<small>No downloaded articles yet.</small>'}
               ${articles.length > initialLimit ? `<button type="button"
                  class="topic-reader-show-more"
                  data-reader-topic-more
@@ -1773,7 +2385,8 @@
   }
 
   function decorateReaderNavigation() {
-    if (!isTopicFeedReaderActive()) return;
+    if (!isArticleHubReaderActive()) return;
+    ensureTopicReaderDeleteStyles();
     const pane = document.querySelector('#navigation-pane');
     if (!pane) return;
     const tab = pane.querySelector('[data-reader-tab="contents"]');
@@ -1798,7 +2411,11 @@
 
     bindTopicReaderPanePreference();
 
-    if (!view.querySelector('.topic-reader-nav')) {
+    const navigationSignature = readerTopicNavigationSignature();
+    const navigationIsStale = !view.querySelector('.topic-reader-nav')
+      || view.dataset.topicReaderNavigationSignature !== navigationSignature;
+
+    if (navigationIsStale) {
       // IMPORTANT: renderNavigationPane() has already bound the Reader's
       // #add-bookmark button to its native addBookmark() function. Keep that
       // exact DOM node before replacing Contents so bookmarks continue to use
@@ -1806,6 +2423,7 @@
       const nativeBookmarkButton = view.querySelector('#add-bookmark');
 
       view.innerHTML = readerTopicListMarkup();
+      view.dataset.topicReaderNavigationSignature = navigationSignature;
 
       const bookmarkSlot = view.querySelector('[data-reader-bookmark-slot]');
       if (nativeBookmarkButton && bookmarkSlot) {
@@ -1816,9 +2434,49 @@
       }
     }
 
+    view.querySelector('[data-reader-refresh-topics]')?.addEventListener('click', () => {
+      const readerTopicId = String(window.MSGTopicFeedReaderContext?.topicId || '');
+      if (readerTopicId && state.topics.some((topic) => topic.id === readerTopicId)) {
+        activeTopicId = readerTopicId;
+      }
+      void refreshTopic({ preserveReader: true });
+    }, { once:true });
+
+    view.querySelectorAll('[data-reader-captured-article]').forEach((button) => {
+      if (button.dataset.bound === '1') return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', async () => {
+        try {
+          await window.MarkSetGoReadAnything?.openCapturedArticle?.(button.dataset.readerCapturedArticle);
+        } catch (error) {
+          console.warn('Captured article could not be opened.', error);
+        }
+      });
+    });
+
+    view.querySelectorAll('[data-reader-captured-delete]').forEach((button) => {
+      if (button.dataset.bound === '1') return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void window.MarkSetGoReadAnything?.deleteCapturedArticle?.(button.dataset.readerCapturedDelete);
+      });
+    });
+
     view.querySelector('[data-reader-manage-topics]')?.addEventListener('click', () => {
       render();
     }, { once:true });
+
+    view.querySelectorAll('[data-reader-topic-delete]').forEach((button) => {
+      if (button.dataset.bound === '1') return;
+      button.dataset.bound = '1';
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        void deleteTopicReaderArticle(button.dataset.readerTopicParent, button.dataset.readerTopicDelete);
+      });
+    });
 
     view.querySelectorAll('[data-reader-topic-article]').forEach((button) => {
       if (button.dataset.bound === '1') return;
@@ -1849,21 +2507,20 @@
       });
     });
 
-    // app.js starts Reader side panes closed when a Reader view is rebuilt.
-    // Topic Feed articles restore the reader's explicit My Topics preference.
+    // My Topics is the shared navigation pane for Topic Feed and Captured
+    // Articles. Only Topic Feed stories receive Topic Feed page geometry/header
+    // treatment; captured articles keep their Read Anything chrome.
     window.setTimeout(applyTopicReaderPanePreference, 0);
-    scheduleTopicBookPageGeometrySync();
-    window.setTimeout(ensureTopicBookDivider, 0);
-    window.setTimeout(ensureTopicBookDivider, 160);
-    window.setTimeout(ensureTopicBookDivider, 420);
-
-    // Opening another story rebuilds the Reader DOM. Put My Topics back at the
-    // exact place the reader was browsing instead of resetting to the top.
-    scheduleTopicReaderScrollRestore();
-
-    // Reader mode/word-count changes rebuild .reader-group elements. Reapply
-    // the small provenance footer treatment without altering currentText.
-    decorateTopicFeedArticleFooter();
+    if (isTopicFeedReaderActive()) {
+      scheduleTopicBookPageGeometrySync();
+      window.setTimeout(ensureTopicBookDivider, 0);
+      window.setTimeout(ensureTopicBookDivider, 160);
+      window.setTimeout(ensureTopicBookDivider, 420);
+      scheduleTopicReaderScrollRestore();
+      decorateTopicFeedArticleFooter();
+    } else {
+      removeTopicBookDivider();
+    }
   }
 
   function scheduleReaderNavigation() {
@@ -1871,16 +2528,80 @@
     navFrame = requestAnimationFrame(decorateReaderNavigation);
   }
 
-  const appObserver = app ? new MutationObserver(() => scheduleReaderNavigation()) : null;
-  if (appObserver && app) appObserver.observe(app, { childList:true, subtree:true });
+  // Keep Topic Feed navigation/header geometry synchronized through explicit
+  // app events and user interactions. Do not observe DOM mutations.
+  const scheduleTopicFeedUiSync = () => {
+    // Topic Setup is a transaction. Reader-side click/change synchronization
+    // must stay completely dormant while the form is open.
+    if (topicManagerIsOpen()) return;
+    if (!isTopicFeedReaderActive()) return;
+    window.setTimeout(() => {
+      scheduleReaderNavigation();
+      keepTopicFeedArticleActionsInHeader();
+      positionTopicFeedStoryHeader();
+      ensureTopicBookDivider();
+    }, 0);
+  };
+
+  document.addEventListener('click', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest?.('#app')) return;
+    scheduleTopicFeedUiSync();
+  }, true);
+
+  document.addEventListener('change', (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    if (!target?.closest?.('#app')) return;
+    scheduleTopicFeedUiSync();
+  }, true);
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== STORAGE_KEY) return;
+    adoptSharedTopicState();
+  });
+
+  window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin) return;
+    if (event.data?.type !== 'msg-topic-feeds-state-changed') return;
+    adoptSharedTopicState();
+  });
 
   document.addEventListener('marksetgo:auth-changed', (event) => {
     if (event.detail?.authenticated) void hydrateCloudState();
     else cloudAuthenticated = false;
   });
 
+  document.addEventListener('marksetgo:article-actions-updated', () => {
+    if (!isTopicFeedReaderActive()) return;
+    // Read Anything explicitly announces when it creates/rebuilds the row.
+    // Re-home that same node without observing DOM mutations.
+    [0, 40, 120].forEach((delay) => {
+      window.setTimeout(() => {
+        keepTopicFeedArticleActionsInHeader();
+        positionTopicFeedStoryHeader();
+      }, delay);
+    });
+  });
+
   document.addEventListener('marksetgo:document-available', () => {
     window.setTimeout(scheduleReaderNavigation, 40);
+    if (!isTopicFeedReaderActive()) {
+      activeTopicFeedHeaderContext = null;
+      return;
+    }
+    // openDocument() can rebuild the Reader after the first source/header pass.
+    // Re-attach Topic Feed provenance only while the current Reader source is
+    // still a Topic Feed article. Each delayed callback rechecks that invariant.
+    [40, 140, 360, 820, 1600].forEach((delay) => {
+      window.setTimeout(() => {
+        if (isTopicFeedReaderActive()) refreshActiveTopicFeedHeader();
+      }, delay);
+    });
+  });
+
+  document.addEventListener('marksetgo:article-queue-updated', () => {
+    if (!isArticleHubReaderActive()) return;
+    rebuildTopicReaderContents();
   });
 
   document.addEventListener('click', (event) => {
@@ -1914,6 +2635,10 @@
     details.open = !details.open;
   });
 
+  // Rewrite any legacy oversized Topic Feed local cache using the bounded
+  // metadata format even before the next manual refresh.
+  window.setTimeout(() => { saveLocalState(); }, 250);
+
   window.addEventListener('DOMContentLoaded', () => {
     if (window.MarkSetGoAuth?.session?.authenticated) void hydrateCloudState();
     else window.setTimeout(() => {
@@ -1930,10 +2655,25 @@
     }
   });
 
+  function refreshReaderArticleChrome() {
+    if (!isTopicFeedReaderActive() || !activeTopicFeedHeaderContext) return false;
+    refreshActiveTopicFeedHeader();
+    scheduleReaderNavigation();
+    return true;
+  }
+
   window.MarkSetGoTopicFeeds = Object.freeze({
     render,
     refresh: refreshTopic,
     hydrate: hydrateCloudState,
-    state: () => state
+    state: () => state,
+    refreshReaderNavigation: () => {
+      if (isArticleHubReaderActive()) scheduleReaderNavigation();
+    },
+    clearReaderArticleContext,
+    openPreparedArticle,
+    receiveWorkspaceArticleContext,
+    refreshReaderArticleChrome,
+    syncSharedState: adoptSharedTopicState
   });
 })();
