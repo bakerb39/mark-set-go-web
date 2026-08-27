@@ -1,17 +1,26 @@
-TARGETED FIX — ONLY THE TWO VISIBLE FAILURES
+CORRECTED — TOPIC FEED + ASK BETH ACTIONS ONLY
 
-Replace these files in public/:
+Upload into public/:
+- topic-feeds.js
 - ask-mark-article-mode.js
 - ask-mark-article-mode.css
-- topic-feeds.js
 
-1) Ask Beth Actions menu
-   Adds the missing Send to Chat and Send to Symposium menu items in the actual Actions-menu owner and uses the existing MSGContentShare handoff.
+Topic Feed:
+- restores the newer stable external-header implementation
+- Source/date/View original/share stays at the top before scrolling
+- header is transparent at rest (no cream/card block)
+- when article text scrolls, Source/share leaves and the compact actions remain
+  as the first-page text ceiling using the Reader page color
+- strips duplicate trailing Source/URL provenance from article text
+- no MutationObserver added
 
-2) Topic Feed header/band
-   Uses the newer direct-owner header implementation, keeps source/share/actions inside the Reader page surface, removes separate card styling, reserves body space so text starts below it, and replaces MutationObserver header watching with bounded deterministic retries.
+Ask Beth Actions:
+- Send to Chat
+- Send to Symposium
+- uses existing MSGContentShare APIs
 
-No app.js replacement.
-No read-anything.js replacement.
-No media files.
-No unrelated changes.
+This intentionally does NOT include:
+- app.js
+- read-anything.js
+- media files
+- old direct-owner topic-feeds.js
