@@ -1,17 +1,15 @@
-TOPIC FEED HEADER + READ WITH MARK COPY FIX
+MSG four-issue targeted fix package
 
-Upload to repo root:
-  package.json
-  apply-topic-feed-reader-fixes.js
+Replace these files in public/:
+- app.js
+- topic-feeds.js
+- read-anything.js
 
-Fixes:
-1. Header overlap: measures actual header.bottom - firstText.top after layout
-   and grows the spacer by the real overlap plus a small gap.
-2. Fallback copy: Read with Mark Extension is recommended first;
-   View original + Bookmarklet is the manual fallback.
+Changes:
+1. Read Anything: preserves pending-capture race fix; improves Read with Mark install/copy UI.
+2. Topic Feeds: strengthens external header spacing without moving it into Reader; adds View Original / Read with Mark fallback copy.
+3. Media: right-aligns controls only in Beside mode; accepts multiple YouTube search API result shapes.
+4. Ask Beth/Mark: keeps Send to Chat / Discuss in Symposium actions and adds a late-load fallback event instead of silently doing nothing.
 
-Fresh browser key:
-  /topic-feeds.js?v=20260827-v2.5.8-header-overlap-and-extension-copy
-
-The patcher changes only those two exact blocks, syntax-checks topic-feeds.js,
-and rolls back if validation fails.
+No MutationObserver was added.
+No reader-core architecture was replaced.

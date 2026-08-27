@@ -12,6 +12,7 @@
   let activeImportedDocument = null;
   let activeImportedVersion = 'original';
   let formatControlAttachTimers = [];
+  let defaultArticleBookPagesKey = '';
   let pendingImportedRender = false;
 
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -1414,278 +1415,6 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     return result;
   }
 
-
-  function buildSocialPostArticleContext() {
-    if (!activeImportedDocument) return null;
-    const articleText = String(
-      activeImportedDocument.versions?.original ||
-      activeImportedDocument.originalText ||
-      ''
-    ).trim();
-    if (articleText.length < 40) return null;
-    return {
-      title: activeImportedDocument.baseTitle || activeImportedDocument.title || 'Current article',
-      sourceUrl: activeImportedDocument.source?.url || '',
-      articleText,
-      companion: activeArticleCompanionIdentity()
-    };
-  }
-
-  function socialPostPrompt(style = 'default', currentDraft = '') {
-    const instructions = {
-      default: 'Create an engaging social-media post based on this article. Capture the most interesting or useful insight, stay faithful to the article, and write in a natural human voice. Do not invent facts. Keep it concise enough to work on most social platforms. If a source URL is supplied, end with that URL on its own line.',
-      shorter: 'Rewrite the current social-media draft to be substantially shorter and punchier while preserving its main insight, factual accuracy, and any source URL already present.',
-      professional: 'Rewrite the current social-media draft in a polished, professional tone suitable for LinkedIn while keeping it natural, factual, and not overly corporate. Preserve any source URL already present.',
-      casual: 'Rewrite the current social-media draft in a more conversational, approachable tone while preserving the article meaning, factual accuracy, and any source URL already present.'
-    };
-    const instruction = instructions[style] || instructions.default;
-    return currentDraft ? `${instruction}\n\nCurrent draft:\n${currentDraft}` : instruction;
-  }
-
-  function socialShareUrl(platform, text, sourceUrl = '') {
-    const value = String(text || '').trim();
-    const encodedText = encodeURIComponent(value);
-    const encodedUrl = encodeURIComponent(String(sourceUrl || '').trim());
-    switch (platform) {
-      case 'x':
-        return `https://twitter.com/intent/tweet?text=${encodedText}`;
-      case 'linkedin':
-        return sourceUrl ? `https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}` : 'https://www.linkedin.com/feed/';
-      case 'facebook':
-        return sourceUrl ? `https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}` : 'https://www.facebook.com/';
-      case 'threads':
-        return `https://www.threads.net/intent/post?text=${encodedText}`;
-      case 'bluesky':
-        return `https://bsky.app/intent/compose?text=${encodedText}`;
-      default:
-        return '';
-    }
-  }
-
-  function ensureSocialPostComposer() {
-    let modal = document.getElementById('msg-social-post-modal');
-    if (modal) return modal;
-
-    modal = document.createElement('div');
-    modal.id = 'msg-social-post-modal';
-    modal.hidden = true;
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-labelledby', 'msg-social-post-title');
-    modal.style.cssText = [
-      'position:fixed','inset:0','z-index:2147483000','background:rgba(5,18,38,.48)',
-      'display:flex','align-items:center','justify-content:center','padding:18px','box-sizing:border-box'
-    ].join(';');
-
-    modal.innerHTML = `
-      <section style="width:min(680px,96vw);max-height:90vh;overflow:auto;background:#fff;color:#102a43;border:1px solid rgba(18,78,125,.18);border-radius:14px;box-shadow:0 22px 70px rgba(0,0,0,.26);padding:18px;box-sizing:border-box;">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:10px;">
-          <div>
-            <div style="font-size:.76rem;text-transform:uppercase;letter-spacing:.08em;color:#53708a;font-weight:700;">Whole article</div>
-            <h2 id="msg-social-post-title" style="margin:.15rem 0 0;font-size:1.18rem;color:#0d3154;">Create Post</h2>
-          </div>
-          <button type="button" data-social-close aria-label="Close Create Post" title="Close" style="border:0;background:transparent;color:#0d3154;font-size:1.35rem;line-height:1;cursor:pointer;padding:4px 7px;">×</button>
-        </div>
-        <div data-social-article-title style="font-size:.9rem;font-weight:700;margin:0 0 10px;color:#385a76;"></div>
-        <div data-social-status style="font-size:.9rem;margin:0 0 10px;color:#53708a;"></div>
-        <textarea data-social-draft rows="9" aria-label="Editable social media post" style="width:100%;box-sizing:border-box;resize:vertical;font:inherit;line-height:1.5;padding:11px 12px;border:1px solid #b7c9d8;border-radius:9px;background:#fff;color:#102a43;outline:none;"></textarea>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 12px;">
-          <button type="button" data-social-rewrite="default" class="msg-post-btn">Regenerate</button>
-          <button type="button" data-social-rewrite="shorter" class="msg-post-btn">Shorter</button>
-          <button type="button" data-social-rewrite="professional" class="msg-post-btn">Professional</button>
-          <button type="button" data-social-rewrite="casual" class="msg-post-btn">Casual</button>
-        </div>
-        <div style="font-size:.84rem;font-weight:800;margin-bottom:6px;color:#294e6b;">Post to</div>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
-          <button type="button" data-social-platform="x" class="msg-post-btn">X</button>
-          <button type="button" data-social-platform="linkedin" class="msg-post-btn">LinkedIn</button>
-          <button type="button" data-social-platform="facebook" class="msg-post-btn">Facebook</button>
-          <button type="button" data-social-platform="threads" class="msg-post-btn">Threads</button>
-          <button type="button" data-social-platform="bluesky" class="msg-post-btn">Bluesky</button>
-          <button type="button" data-social-copy class="msg-post-btn msg-post-btn-primary">Copy</button>
-        </div>
-        <p style="margin:10px 0 0;font-size:.78rem;color:#607d94;line-height:1.4;">Edit anything you like before sharing. LinkedIn and Facebook copy the complete draft first; paste it into their post box so your text appears above the article link.</p>
-      </section>`;
-
-    const style = document.createElement('style');
-    style.textContent = `
-      #msg-social-post-modal[hidden]{display:none !important;}
-      #msg-social-post-modal .msg-post-btn{appearance:none;border:1px solid #1769aa;background:#eef6fd;color:#0d5f9d;border-radius:7px;padding:5px 9px;font:600 .8rem/1.2 inherit;cursor:pointer;min-height:28px;box-shadow:none;}
-      #msg-social-post-modal .msg-post-btn:hover{background:#dceefa;}
-      #msg-social-post-modal .msg-post-btn:focus-visible{outline:2px solid #1769aa;outline-offset:2px;}
-      #msg-social-post-modal .msg-post-btn:disabled{opacity:.55;cursor:wait;}
-      #msg-social-post-modal .msg-post-btn-primary{background:#1769aa;color:#fff;}
-      #msg-social-post-modal .msg-post-btn-primary:hover{background:#11568d;}
-    `;
-    document.head.appendChild(style);
-    document.body.appendChild(modal);
-
-    const draft = modal.querySelector('[data-social-draft]');
-    const status = modal.querySelector('[data-social-status]');
-
-    modal.querySelector('[data-social-close]')?.addEventListener('click', () => {
-      modal.hidden = true;
-    });
-
-    modal.addEventListener('click', (event) => {
-      if (event.target === modal) modal.hidden = true;
-    });
-
-    modal.querySelector('[data-social-copy]')?.addEventListener('click', async (event) => {
-      const button = event.currentTarget;
-      const text = String(draft?.value || '').trim();
-      if (!text) return;
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        draft?.focus();
-        draft?.select();
-        document.execCommand('copy');
-      }
-      const old = button.textContent;
-      button.textContent = 'Copied';
-      window.setTimeout(() => { if (button.isConnected) button.textContent = old; }, 1100);
-    });
-
-    modal.querySelectorAll('[data-social-platform]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const text = String(draft?.value || '').trim();
-        if (!text) return;
-        const context = buildSocialPostArticleContext();
-        const platform = button.dataset.socialPlatform;
-        const url = socialShareUrl(platform, text, context?.sourceUrl || '');
-        if (!url) return;
-
-        // LinkedIn's public share URL can carry the article URL, but it does not
-        // prefill arbitrary commentary. Copy the complete edited draft BEFORE
-        // opening LinkedIn so the reader can paste the text above the link in one step.
-        if (platform === 'linkedin') {
-          try {
-            navigator.clipboard?.writeText?.(text).catch(() => {});
-          } catch {}
-          if (status) status.textContent = 'LinkedIn draft copied — paste it into the post box (Ctrl+V).';
-        }
-
-        // Facebook has the same public-share limitation, so preserve the helpful
-        // copy behavior there too.
-        if (platform === 'facebook') {
-          try {
-            navigator.clipboard?.writeText?.(text).catch(() => {});
-          } catch {}
-          if (status) status.textContent = 'Facebook draft copied — paste it into the share box (Ctrl+V).';
-        }
-
-        // Open synchronously inside the user gesture so popup blockers do not
-        // treat the share as an asynchronous popup.
-        window.open(url, '_blank', 'noopener,noreferrer');
-      });
-    });
-
-    modal.querySelectorAll('[data-social-rewrite]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const current = String(draft?.value || '').trim();
-        if (!current) return;
-        const old = button.textContent;
-        button.disabled = true;
-        button.textContent = 'Writing…';
-        if (status) status.textContent = 'Updating the draft…';
-        try {
-          const updated = await requestSocialPostDraft(button.dataset.socialRewrite || 'default', current);
-          if (draft) draft.value = updated;
-          if (status) status.textContent = 'Draft updated. You can edit it before sharing.';
-        } catch (error) {
-          if (status) status.textContent = error?.message || 'The draft could not be updated.';
-        } finally {
-          button.disabled = false;
-          button.textContent = old;
-        }
-      });
-    });
-
-    return modal;
-  }
-
-  function showSocialPostComposer({ title = '', draft = '', statusText = '', busy = false } = {}) {
-    const modal = ensureSocialPostComposer();
-    const titleNode = modal.querySelector('[data-social-article-title]');
-    const draftNode = modal.querySelector('[data-social-draft]');
-    const statusNode = modal.querySelector('[data-social-status]');
-    if (titleNode) titleNode.textContent = title;
-    if (draftNode) draftNode.value = draft;
-    if (statusNode) statusNode.textContent = statusText;
-    modal.querySelectorAll('button[data-social-rewrite],button[data-social-platform],button[data-social-copy]').forEach((button) => {
-      button.disabled = Boolean(busy);
-    });
-    modal.hidden = false;
-    if (!busy) window.setTimeout(() => draftNode?.focus(), 0);
-    return modal;
-  }
-
-  async function requestSocialPostDraft(style = 'default', currentDraft = '') {
-    const context = buildSocialPostArticleContext();
-    if (!context) throw new Error('The original article text is unavailable.');
-
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort(), 90000);
-    let response;
-    try {
-      response = await fetch('/api/read-anything/article-followup', {
-        method: 'POST',
-        signal: controller.signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          companion: context.companion.id,
-          title: context.title,
-          sourceUrl: context.sourceUrl,
-          articleText: context.articleText,
-          analysis: {},
-          history: [],
-          question: socialPostPrompt(style, currentDraft)
-        })
-      });
-    } catch (error) {
-      if (error?.name === 'AbortError') throw new Error('Creating the post took too long. Please try again.');
-      throw error;
-    } finally {
-      window.clearTimeout(timeout);
-    }
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.detail || payload.error || 'The post could not be created.');
-    const draft = String(payload.result?.response || payload.result?.text || '').trim();
-    if (!draft) throw new Error('The post response was empty. Please try again.');
-    return draft;
-  }
-
-  async function createSocialPostFromArticle() {
-    const context = buildSocialPostArticleContext();
-    if (!context) throw new Error('The original article text is unavailable.');
-    showSocialPostComposer({
-      title: context.title,
-      draft: '',
-      statusText: `${context.companion.name} is drafting a post from this article…`,
-      busy: true
-    });
-    try {
-      const draft = await requestSocialPostDraft('default', '');
-      showSocialPostComposer({
-        title: context.title,
-        draft,
-        statusText: 'Draft ready. Edit it, rewrite it, copy it, or choose a social platform.',
-        busy: false
-      });
-      return draft;
-    } catch (error) {
-      showSocialPostComposer({
-        title: context.title,
-        draft: '',
-        statusText: error?.message || 'The post could not be created.',
-        busy: false
-      });
-      throw error;
-    }
-  }
-
   function installArticleSummaryButton() {
     const existing = document.querySelector('#read-anything-article-summary-action');
 
@@ -1695,14 +1424,14 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
     }
 
     const reader = document.querySelector('#app #reader');
-    const readerFrame = reader?.closest('#reader-frame');
-    const documentColumn = readerFrame?.parentElement;
-    if (!reader || !readerFrame || !documentColumn) return;
+    if (!reader) return;
 
-    // Article-level actions look like part of the document, but are deliberately
-    // NOT children of #reader. They occupy their own row immediately above the
-    // Reader frame, so the text is pushed down visually without changing Reader
-    // width, height, pagination columns, animation DOM, or word geometry.
+    // Keep the action inside the Reader, but visually separate from article prose.
+    // It belongs above the first line rather than participating in the text flow.
+    // These are article-level controls, not article prose. They should remain
+    // available whenever the article is reopened or resumed, even if Continue
+    // Reading starts at word/page index > 0. Keep them above the first VISIBLE
+    // line of the current Reader view instead of restricting them to index 0.
     let actionRow = existing;
 
     if (!actionRow) {
@@ -1715,10 +1444,10 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         'display:block',
         'width:100%',
         'box-sizing:border-box',
-        'margin:0 0 .32rem 0',
-        'padding:.28rem clamp(.75rem,2vw,1.5rem) .18rem',
-        'min-height:1.65rem',
-        'background:transparent',
+        'margin:0 0 .85em 0',
+        'padding:0',
+        'break-inside:avoid',
+        'page-break-inside:avoid',
         'position:relative',
         'z-index:3'
       ].join(';');
@@ -1780,17 +1509,11 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         'Analyze',
         'Analyze this whole article'
       );
-      const postSeparator = separator.cloneNode(true);
-      const createPostLink = makeArticleLink(
-        'create-social-post',
-        'Create Post',
-        'Create an editable social media post from this whole article'
-      );
 
-      actionRow.append(summaryLink, separator, investorLink, postSeparator, createPostLink);
-      documentColumn.insertBefore(actionRow, readerFrame);
-    } else if (actionRow.parentElement !== documentColumn || actionRow.nextElementSibling !== readerFrame) {
-      documentColumn.insertBefore(actionRow, readerFrame);
+      actionRow.append(summaryLink, separator, investorLink);
+      reader.prepend(actionRow);
+    } else if (actionRow.parentElement !== reader) {
+      reader.prepend(actionRow);
     }
 
     const link = actionRow.querySelector('[data-action="summarize-whole-article"]');
@@ -1861,71 +1584,62 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
         }
       };
     }
-
-    const createPostLink = actionRow.querySelector('[data-action="create-social-post"]');
-    if (createPostLink) {
-      createPostLink.textContent = 'Create Post';
-      createPostLink.setAttribute('aria-label', 'Create an editable social media post from this whole article');
-      createPostLink.title = 'Draft an editable social post from the whole article.';
-      createPostLink.onclick = async (event) => {
-        event?.preventDefault?.();
-        event?.stopPropagation?.();
-        const originalLabel = createPostLink.textContent;
-        createPostLink.disabled = true;
-        createPostLink.textContent = 'Creating…';
-        try {
-          await createSocialPostFromArticle();
-        } catch (error) {
-          console.warn('Create Post failed:', error);
-        } finally {
-          if (createPostLink.isConnected) {
-            createPostLink.disabled = false;
-            createPostLink.textContent = originalLabel;
-          }
-        }
-      };
-    }
   }
 
-  function refreshInlineArticleActions() {
-    // Explicit lifecycle hook only; never watch Reader DOM mutations.
+  function observeInlineArticleSummary() {
+    // Intentionally observer-free. Repeated MutationObserver callbacks on the
+    // Reader can feed DOM changes back into the control installer and cause
+    // visible flicker while an imported article is settling. Deterministic,
+    // bounded retries in scheduleFormatControlAttach() handle late Reader DOM.
     installArticleSummaryButton();
   }
 
   function installDefaultArticleBookPages() {
     if (!activeImportedDocument || !isWholeArticleDocument()) return;
 
-    const bookPages = document.querySelector('#app #book-pages');
-    if (!bookPages || bookPages.disabled || bookPages.checked) return;
+    // Auto-enable Book Pages only once for a given imported article. Dispatching
+    // the Reader's change handler on every attachment retry can create a
+    // render -> document-available -> attach -> change loop that visibly blinks.
+    const articleKey = String(
+      activeImportedDocument.source?.readAnythingKey ||
+      activeImportedDocument.source?.readerDocumentId ||
+      importedDocumentKey(activeImportedDocument)
+    );
+    if (articleKey && defaultArticleBookPagesKey === articleKey) return;
 
-    // Use the Reader's existing Book Pages change handler rather than changing
-    // Reader internals directly. This keeps layout, pagination, position, and
-    // persisted Reader state synchronized with the normal control.
+    const bookPages = document.querySelector('#app #book-pages');
+    if (!bookPages || bookPages.disabled) return;
+
+    // Mark this article before dispatching the change event so a synchronous
+    // Reader rebuild cannot re-enter and dispatch it a second time.
+    if (articleKey) defaultArticleBookPagesKey = articleKey;
+    if (bookPages.checked) return;
+
     bookPages.checked = true;
     bookPages.dispatchEvent(new Event('change', { bubbles: true }));
   }
 
   function scheduleFormatControlAttach() {
-    document.querySelector('#read-anything-format-control')?.remove();
     document.dispatchEvent(new CustomEvent('marksetgo:transform-state', { detail: { version: activeImportedVersion, label: versionLabel(activeImportedVersion), active: Boolean(activeImportedDocument) } }));
-    [0, 100, 350, 800].forEach((delay) => window.setTimeout(() => {
+
+    // Keep retries bounded and idempotent. Do not remove/reinsert controls and do
+    // not observe the Reader. A new schedule replaces the previous retry set.
+    formatControlAttachTimers.forEach((timer) => window.clearTimeout(timer));
+    formatControlAttachTimers = [];
+
+    const attach = () => {
+      if (!activeImportedDocument) return;
       installDisplayFormatControl();
       installArticleSummaryButton();
-      refreshInlineArticleActions();
       installDefaultArticleBookPages();
-    }, delay));
-    return;
-  }
+    };
 
-  document.addEventListener('marksetgo:document-available', () => {
-    [0, 60, 180, 420].forEach((delay) => window.setTimeout(refreshInlineArticleActions, delay));
-  });
-  document.addEventListener('marksetgo:transform-state', () => {
-    window.setTimeout(refreshInlineArticleActions, 0);
-  });
-  window.addEventListener('resize', () => {
-    if (activeImportedDocument && isWholeArticleDocument()) window.setTimeout(refreshInlineArticleActions, 0);
-  });
+    attach();
+    [120, 400, 900].forEach((delay) => {
+      const timer = window.setTimeout(attach, delay);
+      formatControlAttachTimers.push(timer);
+    });
+  }
 
   function installFormatControl() {
     if (!activeImportedDocument) return;
@@ -2139,7 +1853,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
           </section>
           <section class="read-anything-card">
             <span class="read-anything-icon">🔖</span><h2>Read with Mark</h2><p>Import a full webpage, or highlight a passage first to send only the selection.</p>
-            <button id="read-anything-bookmarklet" class="secondary" type="button">Show Bookmarklet</button>
+            <button id="read-anything-bookmarklet" class="secondary" type="button">Install Read with Mark</button>
           </section>
           <section class="read-anything-card">
             <span class="read-anything-icon">G</span><h2>Project Gutenberg</h2><p>Search public-domain books already supported by the app.</p>
@@ -2214,8 +1928,25 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
       const workspace = app.querySelector('#read-anything-workspace');
       const code = bookmarkletCode();
       workspace.hidden = false;
-      workspace.innerHTML = `<h2>Install “Read with Mark”</h2><p>Drag this button to your bookmarks bar. Highlight text before clicking it to capture only that passage; otherwise it imports the full page. On iPhone Safari, create a bookmark and replace its address with the code below.</p><p><a class="primary button-link" href="${escapeHtml(code)}">Read with Mark</a></p><label>Bookmark address<textarea id="bookmarklet-code" rows="6" readonly>${escapeHtml(code)}</textarea></label>`;
-      workspace.querySelector('#bookmarklet-code').addEventListener('focus', (event) => event.currentTarget.select());
+      workspace.innerHTML = `<h2>Install “Read with Mark”</h2><p>Drag <strong>Read with Mark</strong> to your bookmarks bar. If text is highlighted, only that passage is imported; otherwise the full page is imported. On iPhone Safari, create a bookmark and replace its address with the code below.</p><p><a class="primary button-link" href="${escapeHtml(code)}">Read with Mark</a> <button id="bookmarklet-copy" class="secondary" type="button">Copy bookmark code</button></p><label>Bookmark address<textarea id="bookmarklet-code" rows="6" readonly>${escapeHtml(code)}</textarea></label><p id="bookmarklet-copy-status" class="status" aria-live="polite"></p>`;
+      const codeBox = workspace.querySelector('#bookmarklet-code');
+      codeBox.addEventListener('focus', (event) => event.currentTarget.select());
+      workspace.querySelector('#bookmarklet-copy')?.addEventListener('click', async (event) => {
+        const button = event.currentTarget;
+        const status = workspace.querySelector('#bookmarklet-copy-status');
+        try {
+          await navigator.clipboard.writeText(code);
+          button.textContent = 'Copied';
+          if (status) status.textContent = 'Bookmark code copied.';
+        } catch {
+          codeBox.focus();
+          codeBox.select();
+          if (status) status.textContent = 'Press Ctrl+C (or Cmd+C) to copy the selected code.';
+        }
+        window.setTimeout(() => {
+          if (button.isConnected) button.textContent = 'Copy bookmark code';
+        }, 1600);
+      });
     });
   }
 
@@ -2313,7 +2044,7 @@ Return only the complete cleaned text. Do not include a report, commentary, mark
 
         scheduleFormatControlAttach();
         installArticleSummaryButton();
-        refreshInlineArticleActions();
+        observeInlineArticleSummary();
 
         if (activeImportedDocument && isWholeArticleDocument()) {
           complete = true;

@@ -1191,7 +1191,300 @@ const musicPlayerWrap = document.querySelector('#music-player-wrap');
 const musicNowTitle = document.querySelector('#music-now-title');
 const musicNowSource = document.querySelector('#music-now-source');
 const musicNextButton = document.querySelector('#music-next');
+
+function installVideoBesideReaderUi() {
+  if (!musicDock) return;
+
+  let resizer = document.querySelector('#music-side-resizer');
+  if (!resizer) {
+    resizer = document.createElement('div');
+    resizer.id = 'music-side-resizer';
+    resizer.className = 'music-side-resizer';
+    resizer.hidden = true;
+    resizer.tabIndex = 0;
+    resizer.setAttribute('role', 'separator');
+    resizer.setAttribute('aria-orientation', 'vertical');
+    resizer.setAttribute('aria-label', 'Resize video side panel');
+    musicDock.insertBefore(resizer, musicDock.firstChild);
+  }
+
+  const actions = musicDock.querySelector('.music-dock-actions');
+  if (actions && !document.querySelector('#music-beside-reader')) {
+    const button = document.createElement('button');
+    button.id = 'music-beside-reader';
+    button.type = 'button';
+    button.className = 'music-beside-reader-button';
+    button.textContent = 'Play beside reader';
+    button.setAttribute('aria-label', 'Play beside reader');
+    button.setAttribute('aria-pressed', 'false');
+    button.title = 'Keep this media beside the Reader while you turn pages';
+    const next = document.querySelector('#music-next');
+    if (next && next.parentNode === actions) actions.insertBefore(button, next);
+    else actions.insertBefore(button, actions.firstChild);
+  }
+
+  if (!document.querySelector('#msg-video-beside-reader-styles')) {
+    const style = document.createElement('style');
+    style.id = 'msg-video-beside-reader-styles';
+    style.textContent = `
+      :root {
+        --msg-video-side-width: 480px;
+        --msg-video-side-collapsed-width: 330px;
+      }
+
+      .music-dock-actions {
+        align-items: center;
+        flex-shrink: 0;
+      }
+
+      /* MSG fix: only Beside mode right-aligns the media toolbar.
+         Floating/default media keeps its existing layout. */
+      .music-dock.beside-reader .music-dock-actions {
+        margin-left: auto;
+        justify-content: flex-end;
+        width: 100%;
+      }
+
+      .music-dock-actions .music-beside-reader-button {
+        width: auto;
+        min-width: 0;
+        padding: 0 .62rem;
+        font-size: .68rem;
+        font-weight: 760;
+        white-space: nowrap;
+      }
+
+      .music-dock-actions .music-beside-reader-button[aria-pressed="true"] {
+        background: #315f86;
+      }
+
+      .music-side-resizer {
+        display: none;
+      }
+
+      body.resizing-video-side-panel {
+        cursor: col-resize;
+        user-select: none;
+      }
+
+      @media (min-width: 1051px) {
+        body.video-beside-reader {
+          --msg-video-side-active-width: var(--msg-video-side-width);
+          --msg-video-reader-width: min(1000px, calc(100vw - var(--msg-video-side-active-width) - 3rem));
+          --msg-video-reader-edge: max(1rem, calc((100vw - var(--msg-video-side-active-width) - var(--msg-video-reader-width)) / 2));
+        }
+
+        body.video-beside-reader.video-side-collapsed {
+          --msg-video-side-active-width: var(--msg-video-side-collapsed-width);
+        }
+
+        body.video-beside-reader #app {
+          width: var(--msg-video-reader-width);
+          margin-left: var(--msg-video-reader-edge);
+          margin-right: calc(var(--msg-video-side-active-width) + var(--msg-video-reader-edge));
+          transition: width .18s ease, margin .18s ease;
+        }
+
+        body.resizing-video-side-panel #app {
+          transition: none;
+        }
+
+        .music-dock.beside-reader {
+          top: 4.25rem;
+          right: .75rem;
+          bottom: auto;
+          width: var(--msg-video-side-width);
+          max-width: min(720px, 55vw);
+          border-radius: .75rem;
+          overflow: visible;
+          transition: width .18s ease;
+        }
+
+        body.resizing-video-side-panel .music-dock.beside-reader {
+          transition: none;
+        }
+
+        .music-dock.beside-reader.side-collapsed {
+          width: var(--msg-video-side-collapsed-width);
+        }
+
+        .music-dock.beside-reader .music-dock-bar,
+        .music-dock.beside-reader .music-player-wrap {
+          overflow: hidden;
+        }
+
+        .music-dock.beside-reader .music-dock-bar {
+          border-radius: .7rem .7rem 0 0;
+        }
+
+        .music-dock.beside-reader .music-player-wrap {
+          border-radius: 0 0 .7rem .7rem;
+        }
+
+        .music-dock.beside-reader .music-side-resizer {
+          position: absolute;
+          z-index: 3;
+          top: 0;
+          bottom: 0;
+          left: -8px;
+          display: block;
+          width: 16px;
+          cursor: col-resize;
+          touch-action: none;
+        }
+
+        .music-dock.beside-reader .music-side-resizer::before {
+          content: "";
+          position: absolute;
+          top: .4rem;
+          bottom: .4rem;
+          left: 7px;
+          width: 2px;
+          border-radius: 999px;
+          background: rgba(255,255,255,.22);
+        }
+
+        .music-dock.beside-reader .music-side-resizer:hover::before,
+        .music-dock.beside-reader .music-side-resizer:focus-visible::before,
+        body.resizing-video-side-panel .music-side-resizer::before {
+          background: #78b7ea;
+        }
+
+        .music-dock.beside-reader .music-side-resizer:focus-visible {
+          outline: 2px solid #78b7ea;
+          outline-offset: -2px;
+        }
+
+        .music-dock.beside-reader.minimized {
+          width: var(--msg-video-side-width);
+        }
+      }
+
+      @media (max-width: 1050px) {
+        body.video-beside-reader #app {
+          width: min(1000px, calc(100% - 2rem));
+          margin: 2rem auto;
+        }
+
+        .music-dock.beside-reader,
+        .music-dock.beside-reader.side-collapsed {
+          top: auto;
+          right: .5rem;
+          bottom: .5rem;
+          width: min(480px, calc(100vw - 1rem));
+          max-width: none;
+        }
+
+        .music-dock.beside-reader .music-side-resizer {
+          display: none !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
+installVideoBesideReaderUi();
+const musicBesideReaderButton = document.querySelector('#music-beside-reader');
+const musicSideResizer = document.querySelector('#music-side-resizer');
+const musicMinimizeButton = document.querySelector('#music-minimize');
+const VIDEO_SIDE_PANEL_WIDTH_KEY = 'markSetGoVideoSidePanelWidthV1';
+const VIDEO_SIDE_PANEL_DEFAULT_WIDTH = 480;
+const VIDEO_SIDE_PANEL_MIN_WIDTH = 360;
+const VIDEO_SIDE_PANEL_COLLAPSED_WIDTH = 330;
 let musicSearchState = null;
+let videoSidePanelWidth = VIDEO_SIDE_PANEL_DEFAULT_WIDTH;
+
+function maxVideoSidePanelWidth() {
+  const viewportLimit = Math.floor(window.innerWidth * 0.55);
+  const readerSpaceLimit = Math.max(VIDEO_SIDE_PANEL_MIN_WIDTH, window.innerWidth - 480);
+  return Math.max(
+    VIDEO_SIDE_PANEL_MIN_WIDTH,
+    Math.min(720, viewportLimit, readerSpaceLimit)
+  );
+}
+
+function applyVideoSidePanelWidth(value, { persist = false } = {}) {
+  const numeric = Number(value);
+  const requested = Number.isFinite(numeric) ? numeric : VIDEO_SIDE_PANEL_DEFAULT_WIDTH;
+  const width = Math.round(Math.max(
+    VIDEO_SIDE_PANEL_MIN_WIDTH,
+    Math.min(requested, maxVideoSidePanelWidth())
+  ));
+  videoSidePanelWidth = width;
+  document.documentElement.style.setProperty('--msg-video-side-width', `${width}px`);
+  if (persist) {
+    try { localStorage.setItem(VIDEO_SIDE_PANEL_WIDTH_KEY, String(width)); } catch {}
+  }
+  return width;
+}
+
+function updateMusicBesideReaderButton(active) {
+  if (!musicBesideReaderButton) return;
+  musicBesideReaderButton.setAttribute('aria-pressed', active ? 'true' : 'false');
+  musicBesideReaderButton.setAttribute('aria-label', active ? 'Return to floating player' : 'Play beside reader');
+  musicBesideReaderButton.textContent = active ? 'Float player' : 'Play beside reader';
+  musicBesideReaderButton.title = active
+    ? 'Return this media to the floating player'
+    : 'Keep this media beside the Reader while you turn pages';
+}
+
+function setMusicBesideReader(enabled) {
+  if (!musicDock) return false;
+  const active = Boolean(enabled);
+  musicDock.classList.toggle('beside-reader', active);
+  document.body.classList.toggle('video-beside-reader', active);
+
+  if (!active) {
+    musicDock.classList.remove('side-collapsed');
+    document.body.classList.remove('video-side-collapsed', 'resizing-video-side-panel');
+  } else {
+    musicDock.classList.remove('minimized');
+    if (musicPlayerWrap) musicPlayerWrap.hidden = false;
+    applyVideoSidePanelWidth(videoSidePanelWidth);
+  }
+
+  if (musicSideResizer) musicSideResizer.hidden = !active;
+  if (musicMinimizeButton) {
+    musicMinimizeButton.textContent = '—';
+    musicMinimizeButton.setAttribute(
+      'aria-label',
+      active ? 'Collapse video side panel' : 'Minimize media player'
+    );
+  }
+  updateMusicBesideReaderButton(active);
+  return active;
+}
+
+function toggleVideoSidePanelCollapsed() {
+  if (!musicDock?.classList.contains('beside-reader')) return false;
+  const collapsed = musicDock.classList.toggle('side-collapsed');
+  document.body.classList.toggle('video-side-collapsed', collapsed);
+  // Keep the iframe mounted and visible. Resizing it does not interrupt playback.
+  if (musicPlayerWrap) musicPlayerWrap.hidden = false;
+  if (musicMinimizeButton) {
+    musicMinimizeButton.textContent = collapsed ? '□' : '—';
+    musicMinimizeButton.setAttribute(
+      'aria-label',
+      collapsed ? 'Expand video side panel' : 'Collapse video side panel'
+    );
+  }
+  return collapsed;
+}
+
+try {
+  const savedVideoSidePanelWidth = Number(localStorage.getItem(VIDEO_SIDE_PANEL_WIDTH_KEY));
+  applyVideoSidePanelWidth(savedVideoSidePanelWidth || VIDEO_SIDE_PANEL_DEFAULT_WIDTH);
+} catch {
+  applyVideoSidePanelWidth(VIDEO_SIDE_PANEL_DEFAULT_WIDTH);
+}
+
+window.MarkSetGoVideoPlayer = {
+  playBesideReader: () => setMusicBesideReader(true),
+  useFloatingPlayer: () => setMusicBesideReader(false),
+  toggleBesideReader: () => setMusicBesideReader(!musicDock?.classList.contains('beside-reader')),
+  get besideReader() { return Boolean(musicDock?.classList.contains('beside-reader')); }
+};
 
 function musicSearchQuery(choice) {
   return choice.searchQuery || `${choice.title || 'reading music'} YouTube`;
@@ -1286,8 +1579,25 @@ async function playYouTubeSearch(query, title = 'YouTube search') {
   if (musicNextButton) musicNextButton.hidden = true;
   try {
     const payload = await loadApiPayload(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`);
-    const videoIds = Array.isArray(payload.videoIds) ? payload.videoIds : [];
-    if (!videoIds.length) throw new Error('No playable results were found.');
+
+    // MSG fix: accept the API shapes used by both the original endpoint and
+    // newer proxy/search implementations. Normalize to unique YouTube ids.
+    const rawResults = Array.isArray(payload?.videoIds)
+      ? payload.videoIds
+      : Array.isArray(payload?.videos)
+        ? payload.videos
+        : Array.isArray(payload?.items)
+          ? payload.items
+          : Array.isArray(payload?.results)
+            ? payload.results
+            : [];
+
+    const videoIds = [...new Set(rawResults.map((item) => {
+      if (typeof item === 'string') return item;
+      return item?.videoId || item?.id?.videoId || item?.id || item?.youtubeId || '';
+    }).map((value) => String(value || '').trim()).filter((value) => /^[\w-]{6,20}$/.test(value)))];
+
+    if (!videoIds.length) throw new Error('No playable YouTube results were found.');
     musicSearchState = { query: cleanQuery, title, videoIds, index: 0 };
     playMusicSearchCandidate(0);
   } catch (error) {
@@ -1350,6 +1660,7 @@ function playMusic(choiceOrParsed) {
 function stopMusic() {
   musicSearchState = null;
   if (musicNextButton) musicNextButton.hidden = true;
+  setMusicBesideReader(false);
   musicPlayer.src = '';
   musicDock.hidden = true;
   try { localStorage.removeItem('markSetGoMusic'); } catch {}
@@ -11554,8 +11865,25 @@ function renderMarkResult(result, action){
         chapter:selected?.chapter || '',
         startIndex:Number(selected?.startIndex) || 0
       };
-      if(button.dataset.markShareResponse==='symposium') window.MSGContentShare?.toSymposium?.(payload);
-      else window.MSGContentShare?.toChat?.(payload);
+      const target = button.dataset.markShareResponse === 'symposium' ? 'symposium' : 'chat';
+      const bridge = window.MSGContentShare;
+      const handler = target === 'symposium' ? bridge?.toSymposium : bridge?.toChat;
+
+      if (typeof handler === 'function') {
+        handler.call(bridge, payload);
+      } else {
+        // Stable fallback for the Ask Beth pop-out / late-loaded sharing bridge.
+        // A listener can complete the handoff as soon as that surface is ready.
+        document.dispatchEvent(new CustomEvent('marksetgo:share-content', {
+          detail: { target, payload }
+        }));
+      }
+
+      button.textContent = target === 'symposium' ? '🏛 Sent to Symposium' : '💬 Sent to Chat';
+      window.setTimeout(() => {
+        if (!button.isConnected) return;
+        button.textContent = target === 'symposium' ? '🏛 Discuss in Symposium' : '💬 Send to Chat';
+      }, 1400);
     }));
   });
   notifyAskMarkLegacyUpdated('response');
@@ -24543,12 +24871,63 @@ document.addEventListener('visibilitychange', () => {
 musicNextButton?.addEventListener('click', () => {
   if (musicSearchState) playMusicSearchCandidate(musicSearchState.index + 1);
 });
+musicBesideReaderButton?.addEventListener('click', () => {
+  setMusicBesideReader(!musicDock?.classList.contains('beside-reader'));
+});
 document.querySelector('#music-close')?.addEventListener('click', stopMusic);
-document.querySelector('#music-minimize')?.addEventListener('click', () => {
+musicMinimizeButton?.addEventListener('click', () => {
+  if (musicDock?.classList.contains('beside-reader')) {
+    toggleVideoSidePanelCollapsed();
+    return;
+  }
   const minimized = musicDock.classList.toggle('minimized');
   musicPlayerWrap.hidden = minimized;
-  document.querySelector('#music-minimize').textContent = minimized ? '□' : '—';
-  document.querySelector('#music-minimize').setAttribute('aria-label', minimized ? 'Restore music player' : 'Minimize music player');
+  musicMinimizeButton.textContent = minimized ? '□' : '—';
+  musicMinimizeButton.setAttribute('aria-label', minimized ? 'Restore media player' : 'Minimize media player');
+});
+
+musicSideResizer?.addEventListener('pointerdown', (event) => {
+  if (!musicDock?.classList.contains('beside-reader')) return;
+  if (event.pointerType === 'mouse' && event.button !== 0) return;
+  event.preventDefault();
+  musicDock.classList.remove('side-collapsed');
+  document.body.classList.remove('video-side-collapsed');
+  document.body.classList.add('resizing-video-side-panel');
+  try { musicSideResizer.setPointerCapture(event.pointerId); } catch {}
+
+  const move = (moveEvent) => {
+    applyVideoSidePanelWidth(window.innerWidth - moveEvent.clientX);
+  };
+  const finish = (finishEvent) => {
+    musicSideResizer.removeEventListener('pointermove', move);
+    musicSideResizer.removeEventListener('pointerup', finish);
+    musicSideResizer.removeEventListener('pointercancel', finish);
+    document.body.classList.remove('resizing-video-side-panel');
+    try { musicSideResizer.releasePointerCapture(finishEvent.pointerId); } catch {}
+    applyVideoSidePanelWidth(videoSidePanelWidth, { persist: true });
+  };
+
+  musicSideResizer.addEventListener('pointermove', move);
+  musicSideResizer.addEventListener('pointerup', finish);
+  musicSideResizer.addEventListener('pointercancel', finish);
+});
+
+musicSideResizer?.addEventListener('keydown', (event) => {
+  if (!musicDock?.classList.contains('beside-reader')) return;
+  let delta = 0;
+  if (event.key === 'ArrowLeft') delta = 24;
+  if (event.key === 'ArrowRight') delta = -24;
+  if (!delta) return;
+  event.preventDefault();
+  musicDock.classList.remove('side-collapsed');
+  document.body.classList.remove('video-side-collapsed');
+  applyVideoSidePanelWidth(videoSidePanelWidth + delta, { persist: true });
+});
+
+window.addEventListener('resize', () => {
+  if (musicDock?.classList.contains('beside-reader')) {
+    applyVideoSidePanelWidth(videoSidePanelWidth);
+  }
 });
 try {
   const savedMusic = JSON.parse(localStorage.getItem('markSetGoMusic') || 'null');
