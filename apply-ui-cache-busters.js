@@ -91,10 +91,17 @@ index = replaceAssetVersion(
   '20260826-v1.1.0-label-only'
 );
 
+
+index = replaceAssetVersion(
+  index,
+  'media-toolbar-responsive.css',
+  '20260826-v1.0.0-toolbar-wrap'
+);
+
 index = replaceAssetVersion(
   index,
   'ask-mark-window.css',
-  '20260826-v1.5.2-conversation-scroll-geometry'
+  '20260826-v1.5.3-white-companion-title'
 );
 
 index = replaceAssetVersion(
@@ -161,6 +168,13 @@ index = replaceAssetVersion(
 );
 
 /* Other additive UI assets remain unchanged. */
+index = ensureAfterAsset(
+  index,
+  'media-panel.css',
+  '<link href="/media-toolbar-responsive.css?v=20260826-v1.0.0-toolbar-wrap" rel="stylesheet"/>'
+);
+
+
 index = ensureAfterAsset(
   index,
   'topic-feeds.css',

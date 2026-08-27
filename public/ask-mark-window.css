@@ -355,3 +355,12 @@ html.msg-askmark-expanded body::after{
   height:0 !important;
   overflow-y:scroll !important;
 }
+
+
+/* v1.5.3 — Companion title must stay readable on the dark/burgundy header.
+   Theme text rules must not recolor "Ask Beth" (or another companion name). */
+.mark-companion-panel .askmark-hero .askmark-brand-copy h2{
+  color:#fff !important;
+  -webkit-text-fill-color:#fff !important;
+  opacity:1 !important;
+}

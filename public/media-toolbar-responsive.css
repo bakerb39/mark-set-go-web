@@ -1,0 +1,75 @@
+/* Mark, Set, Go! — responsive floating media toolbar
+   Keeps every top control visible on narrow floating players. */
+
+.music-dock.msg-media-floating .music-dock-bar{
+  box-sizing:border-box !important;
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) !important;
+  align-items:center !important;
+  width:100% !important;
+  max-width:100% !important;
+  height:auto !important;
+  min-height:0 !important;
+  gap:.34rem !important;
+  padding:.42rem .48rem !important;
+  overflow:visible !important;
+}
+
+.music-dock.msg-media-floating .music-dock-bar > div:first-child{
+  min-width:0 !important;
+  max-width:100% !important;
+}
+
+.music-dock.msg-media-floating .music-dock-actions{
+  box-sizing:border-box !important;
+  display:flex !important;
+  flex-wrap:wrap !important;
+  align-items:center !important;
+  justify-content:flex-start !important;
+  width:100% !important;
+  min-width:0 !important;
+  max-width:100% !important;
+  gap:.28rem !important;
+  overflow:visible !important;
+}
+
+.music-dock.msg-media-floating .music-dock-actions > button{
+  flex:0 0 auto !important;
+  min-width:2rem !important;
+  max-width:100% !important;
+}
+
+.music-dock.msg-media-floating .music-dock-actions #msg-media-panel-toggle,
+.music-dock.msg-media-floating .music-dock-actions #music-beside-reader,
+.music-dock.msg-media-floating .music-dock-actions #msg-media-expand,
+.music-dock.msg-media-floating .music-dock-actions #msg-media-save-current{
+  width:auto !important;
+  min-width:0 !important;
+  height:2rem !important;
+  padding:0 .48rem !important;
+  font-size:.68rem !important;
+  white-space:nowrap !important;
+}
+
+/* At the common compact floating width, squeeze spacing slightly before
+   allowing the next control to wrap to row 2. */
+@container (max-width:400px){
+  .music-dock.msg-media-floating .music-dock-actions{
+    gap:.22rem !important;
+  }
+
+  .music-dock.msg-media-floating .music-dock-actions #msg-media-panel-toggle,
+  .music-dock.msg-media-floating .music-dock-actions #music-beside-reader,
+  .music-dock.msg-media-floating .music-dock-actions #msg-media-expand,
+  .music-dock.msg-media-floating .music-dock-actions #msg-media-save-current{
+    padding:0 .4rem !important;
+    font-size:.65rem !important;
+  }
+}
+
+/* Fallback for browsers where the dock is not a size container. */
+@media (max-width:700px){
+  .music-dock.msg-media-floating .music-dock-actions{
+    flex-wrap:wrap !important;
+  }
+}
