@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.1.1';
   const PING = 'MSG_RWM_EXTENSION_PING';
   const READY = 'MSG_RWM_EXTENSION_READY';
   const REQUEST = 'MSG_RWM_EXTENSION_IMPORT_REQUEST';
@@ -20,6 +20,71 @@
 
   function clean(value = '') {
     return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function sanitizeRecoveredText(value = '') {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    const looksLikeHtml =
+      /<\/?(?:a|p|div|section|article|blockquote|figure|figcaption|h[1-6]|li|ul|ol|br|span)\b/i.test(raw) ||
+      /&(?:#\d+|#x[0-9a-f]+|nbsp|amp|lt|gt|quot|apos|hellip|mdash|ndash);/i.test(raw);
+
+    if (!looksLikeHtml) {
+      return raw
+        .replace(/\u00a0/g, ' ')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<body>${raw}</body>`, 'text/html');
+
+      doc.querySelectorAll(
+        'script,style,noscript,nav,aside,footer,form,button,input,select,textarea,' +
+        'svg,canvas,iframe,figure,figcaption,[aria-hidden="true"],' +
+        '[class*="share" i],[class*="social" i],[class*="newsletter" i],' +
+        '[class*="advert" i],[class*="promo" i]'
+      ).forEach((node) => node.remove());
+
+      const blocks = [];
+      const seen = new Set();
+
+      doc.body.querySelectorAll('h1,h2,h3,h4,p,li').forEach((node) => {
+        let text = String(node.textContent || '')
+          .replace(/\u00a0/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (!text || seen.has(text)) return;
+        seen.add(text);
+
+        if (node.tagName === 'LI') text = `• ${text}`;
+        blocks.push(text);
+      });
+
+      let text = blocks.join('\n\n').trim();
+      if (!text) {
+        text = String(doc.body.textContent || '')
+          .replace(/\u00a0/g, ' ')
+          .replace(/[ \t]+/g, ' ')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+      }
+
+      return text;
+    } catch {
+      return raw
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
   }
 
   function normalizeUrl(value = '') {
@@ -204,7 +269,7 @@
       throw new Error('Read Anything is not ready to open the recovered article.');
     }
 
-    const text = String(payload?.text || '').trim();
+    const text = sanitizeRecoveredText(payload?.text || '');
     const words = text.split(/\s+/).filter(Boolean).length;
     if (text.length < 700 || words < 100) {
       throw new Error('The publisher page did not expose enough readable article text.');

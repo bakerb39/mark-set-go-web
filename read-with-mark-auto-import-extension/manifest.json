@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Read with Mark Auto Import",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Lets Mark, Set, Go! automatically recover readable article text from the original publisher page when normal import fails.",
   "permissions": [
     "tabs"

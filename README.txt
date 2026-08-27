@@ -1,43 +1,52 @@
-MEDIA TOOLBAR — BESIDE ONLY
-============================
+READ WITH MARK HTML CLEANUP — v0.1.1
+===================================
 
-Upload:
+The automatic extension fallback is working, but some publishers expose their
+article as an HTML-formatted payload. v0.1.1 cleans that content before it reaches
+the Reader.
+
+UPLOAD TO WEB APP
 
 REPO ROOT
   apply-ui-cache-busters.js
 
 PUBLIC
-  public/media-toolbar-simplify.css   NEW
-  public/media-toolbar-simplify.js    NEW
+  read-with-mark-extension-fallback.js
+  media-toolbar-simplify.css
+  media-toolbar-simplify.js
 
-WHAT CHANGED
-------------
-Top media toolbar is simplified to:
-  Media | Beside | existing utility icons / close
+The media files are included only because this root cache-buster is consolidated
+with the latest Beside-only media toolbar package. If those files are already
+uploaded, replacing them with these identical copies is harmless.
 
-Removed:
-  Expand
-  top-level Save
+UPDATE THE CHROME EXTENSION
 
-WHY SAVE WAS REMOVED
---------------------
-The old top-level Save button saved the currently playing media item to the
-current book/article. That functionality already exists inside Media on each
-search result, where Save is much clearer in context. Saved items remain under
-"My saved media."
+Use:
+  read-with-mark-auto-import-extension-v0.1.1.zip
 
-BESIDE BEHAVIOR
----------------
-Beside places the player on the RIGHT side of the Reader, using the existing
-side layout.
+If v0.1.0 is already loaded unpacked:
+1. unzip v0.1.1 over/into a new folder;
+2. chrome://extensions
+3. click Reload for Read with Mark Auto Import, or remove and Load unpacked again.
 
-While it is beside the Reader, the button becomes:
-  Float
+WHAT IS CLEANED
+- <a>, <p>, <div>, headings, list and blockquote markup
+- href/target/rel attributes
+- HTML entities such as &#8212;
+- figures and figcaptions
+- scripts/styles/navigation
+- obvious social/share/newsletter/promo blocks
 
-so the reader has one obvious way to return it to a floating window.
+Paragraphs/headings/list structure is retained as plain readable text.
 
-Any previously saved "expanded" media mode is automatically migrated to the
-normal Beside mode. No media playback/search/save database code was changed.
+A SECOND CLEANUP PASS also runs in the Reader bridge. This means even if an
+unusual publisher somehow returns raw markup through the extension, it should
+be cleaned before MarkSetGoReadAnything.openDocument() receives it.
 
-After deploy:
-  Ctrl+Shift+R
+TEST
+1. Reopen the same article that produced raw <a>, <p>, <blockquote> markup.
+2. Automatic recovery should occur as before.
+3. The Reader should now contain clean prose, not HTML tags.
+4. Quotations and paragraph breaks should remain readable.
+
+No Ask Beth, media playback, article selection, or server import behavior was changed.

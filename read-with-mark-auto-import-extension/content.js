@@ -25,6 +25,82 @@
     return clean(value).split(/\s+/).filter(Boolean).length;
   }
 
+  function htmlPayloadToText(value = '') {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    const looksLikeHtml =
+      /<\/?(?:a|p|div|section|article|blockquote|figure|figcaption|h[1-6]|li|ul|ol|br|span)\b/i.test(raw) ||
+      /&(?:#\d+|#x[0-9a-f]+|nbsp|amp|lt|gt|quot|apos|hellip|mdash|ndash);/i.test(raw);
+
+    if (!looksLikeHtml) {
+      return raw
+        .replace(/\u00a0/g, ' ')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
+
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(`<body>${raw}</body>`, 'text/html');
+
+      doc.querySelectorAll(
+        'script,style,noscript,nav,aside,footer,form,button,input,select,textarea,' +
+        'svg,canvas,iframe,figure,figcaption,[aria-hidden="true"],' +
+        '[class*="share" i],[class*="social" i],[class*="newsletter" i],' +
+        '[class*="advert" i],[class*="promo" i]'
+      ).forEach((node) => node.remove());
+
+      const blocks = [];
+      const seen = new Set();
+
+      doc.body.querySelectorAll('h1,h2,h3,h4,p,li').forEach((node) => {
+        let text = String(node.textContent || '')
+          .replace(/\u00a0/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (!text || seen.has(text)) return;
+        seen.add(text);
+
+        if (node.tagName === 'LI') text = `• ${text}`;
+        blocks.push(text);
+      });
+
+      let text = blocks.join('\n\n').trim();
+      if (!text) {
+        text = String(doc.body.textContent || '')
+          .replace(/\u00a0/g, ' ')
+          .replace(/[ \t]+/g, ' ')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+      }
+
+      return text;
+    } catch {
+      return raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+  }
+
+  function isVisible(node) {
+    if (!(node instanceof Element)) return true;
+
+    try {
+      const style = getComputedStyle(node);
+      const rect = node.getBoundingClientRect();
+      return (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        Number(style.opacity || 1) > 0 &&
+        rect.width > 1 &&
+        rect.height > 1
+      );
+    } catch {
+      return true;
+    }
+  }
+
   function appPage() {
     return ALLOWED_APP_HOSTS.has(location.hostname);
   }
@@ -70,7 +146,8 @@
     let bestScore = -1;
 
     for (const node of candidates) {
-      const text = clean(node.innerText || '');
+      if (!isVisible(node)) continue;
+      const text = htmlPayloadToText(node.innerText || node.textContent || '');
       if (!text) continue;
       const paragraphs = node.querySelectorAll('p').length;
       const score = text.length + paragraphs * 180;
@@ -110,7 +187,8 @@
     const nodes = clone.querySelectorAll('h1,h2,h3,p,blockquote,li');
 
     nodes.forEach((node) => {
-      let text = clean(node.innerText || node.textContent || '');
+      let text = htmlPayloadToText(node.innerText || node.textContent || '');
+      text = clean(text);
       if (text.length <= 20 || seen.has(text)) return;
       seen.add(text);
 
@@ -130,10 +208,14 @@
 
     // If the page uses a text-heavy container without standard paragraph tags,
     // fall back to its visible text rather than returning an empty capture.
-    let text = blocks.join('\n\n').trim();
+    let text = htmlPayloadToText(blocks.join('\n\n').trim());
+
     if (text.length < 700) {
-      text = clean(clone.innerText || clone.textContent || '');
+      text = htmlPayloadToText(clone.innerText || clone.textContent || '');
     }
+
+    // Final extension-side guard: raw markup must never leave the extension.
+    text = htmlPayloadToText(text);
 
     const words = wordCount(text);
     if (text.length < 700 || words < 100) {

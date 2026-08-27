@@ -111,6 +111,13 @@ index = replaceAssetVersion(
   '20260827-v1.0.0-beside-only'
 );
 
+
+index = replaceAssetVersion(
+  index,
+  'read-with-mark-extension-fallback.js',
+  '20260827-v0.1.1-html-cleanup'
+);
+
 index = replaceAssetVersion(
   index,
   'ask-mark-window.css',
@@ -181,6 +188,13 @@ index = replaceAssetVersion(
 );
 
 /* Other additive UI assets remain unchanged. */
+index = ensureAfterAsset(
+  index,
+  'read-anything.js',
+  '  <script defer src="/read-with-mark-extension-fallback.js?v=20260827-v0.1.1-html-cleanup"></script>'
+);
+
+
 index = ensureAfterAsset(
   index,
   'media-toolbar-responsive.css',
