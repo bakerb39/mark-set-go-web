@@ -11,6 +11,14 @@ function replaceAssetVersion(content, asset, version) {
   return content.replace(pattern, `/${asset}?v=${version}`);
 }
 
+
+function ensureAfterAsset(content, asset, tag) {
+  if (content.includes(tag.match(/src="([^"]+)"/)?.[1] || tag)) return content;
+  const escaped = asset.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const pattern = new RegExp(`(^[\\t ]*<script[^>]+src="/${escaped}(?:\\?v=[^"]+)?[^>]*></script>[\\t ]*$)`, 'm');
+  return content.replace(pattern, `$1\n${tag}`);
+}
+
 let index = fs.readFileSync(indexPath, 'utf8');
 const before = index;
 
@@ -30,6 +38,13 @@ index = replaceAssetVersion(
   index,
   'topic-feeds.js',
   '20260825-v2.5.7-boundary-gap-1px'
+);
+
+
+index = ensureAfterAsset(
+  index,
+  'read-anything.js',
+  '  <script defer src="/read-with-mark-extension-fallback.js?v=20260827-v0.1.1-html-cleanup"></script>'
 );
 
 if (index !== before) {
