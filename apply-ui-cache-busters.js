@@ -5,6 +5,145 @@ const path = require('node:path');
 
 const indexPath = path.join(__dirname, 'public', 'index.html');
 
+const readAnythingPath = path.join(__dirname, 'public', 'read-anything.js');
+
+function patchReadAnythingExtensionUi() {
+  let source = fs.readFileSync(readAnythingPath, 'utf8');
+  const before = source;
+
+  const legacyCard = `          <section class="read-anything-card">
+            <span class="read-anything-icon">🔖</span><h2>Read with Mark</h2><p>Import a full webpage, or highlight a passage first to send only the selection.</p>
+            <button id="read-anything-bookmarklet" class="secondary" type="button">Show Bookmarklet</button>
+          </section>`;
+
+  const extensionFirstCards = `          <section class="read-anything-card read-anything-extension-card" id="read-anything-extension-card">
+            <span class="read-anything-icon">🧩</span><h2>Read with Mark Extension</h2><p><strong>Recommended.</strong> Automatically recover readable full articles when the normal import cannot retrieve them.</p>
+            <div class="read-anything-extension-status" id="read-anything-extension-status" data-state="checking">Checking extension…</div>
+            <button id="read-anything-extension-setup" class="secondary" type="button">Install Extension</button>
+          </section>
+          <section class="read-anything-card">
+            <span class="read-anything-icon">🔖</span><h2>Read with Mark Bookmarklet</h2><p><strong>Manual fallback.</strong> Open any webpage and send the full page, or highlight a passage first to send only that selection.</p>
+            <button id="read-anything-bookmarklet" class="secondary" type="button">Show Bookmarklet</button>
+          </section>`;
+
+  if (source.includes(legacyCard)) {
+    source = source.replace(legacyCard, extensionFirstCards);
+  } else if (!source.includes('id="read-anything-extension-card"')) {
+    throw new Error('ui cache: could not locate the native Read with Mark card in public/read-anything.js');
+  }
+
+  const legacyBookmarkletWorkspace =
+    'workspace.innerHTML = `<h2>Install “Read with Mark”</h2><p>Drag this button to your bookmarks bar. Highlight text before clicking it to capture only that passage; otherwise it imports the full page. On iPhone Safari, create a bookmark and replace its address with the code below.</p><p><a class="primary button-link" href="${escapeHtml(code)}">Read with Mark</a></p><label>Bookmark address<textarea id="bookmarklet-code" rows="6" readonly>${escapeHtml(code)}</textarea></label>`;';
+
+  const updatedBookmarkletWorkspace =
+    'workspace.innerHTML = `<h2>Read with Mark Bookmarklet</h2><p><strong>Manual fallback:</strong> use the bookmarklet when the extension is not installed or automatic recovery cannot retrieve a publisher page. Drag this button to your bookmarks bar. Highlight text before clicking it to capture only that passage; otherwise it imports the full page. On iPhone Safari, create a bookmark and replace its address with the code below.</p><p><a class="primary button-link" href="${escapeHtml(code)}">Read with Mark</a></p><label>Bookmark address<textarea id="bookmarklet-code" rows="6" readonly>${escapeHtml(code)}</textarea></label>`;';
+
+  if (source.includes(legacyBookmarkletWorkspace)) {
+    source = source.replace(legacyBookmarkletWorkspace, updatedBookmarkletWorkspace);
+  }
+
+  const statusAnchor = "    const status = app.querySelector('#read-anything-status');\n";
+  const nativeExtensionOwner = `    const status = app.querySelector('#read-anything-status');
+
+    const extensionStatus = app.querySelector('#read-anything-extension-status');
+    const extensionSetup = app.querySelector('#read-anything-extension-setup');
+
+    const syncReadWithMarkExtensionStatus = () => {
+      const ready = Boolean(window.MarkSetGoReadWithMarkExtensionFallback?.ready);
+      if (extensionStatus) {
+        extensionStatus.dataset.state = ready ? 'installed' : 'missing';
+        extensionStatus.textContent = ready ? '✓ Installed and connected' : 'Not installed';
+      }
+      if (extensionSetup) {
+        extensionSetup.textContent = ready ? 'Extension Settings' : 'Install Extension';
+      }
+      return ready;
+    };
+
+    extensionSetup?.addEventListener('click', () => {
+      const workspace = app.querySelector('#read-anything-workspace');
+      const ready = syncReadWithMarkExtensionStatus();
+      workspace.hidden = false;
+      workspace.innerHTML = \`
+        <div class="read-anything-extension-setup">
+          <h2>Read with Mark Extension</h2>
+          <p><strong>Recommended for article recovery.</strong> The extension automatically recovers readable full articles when the normal import cannot retrieve them.</p>
+          <div class="extension-setup-status" id="read-anything-extension-setup-status" data-state="\${ready ? 'installed' : 'missing'}">
+            \${ready ? '✓ Installed and connected' : 'Not installed'}
+          </div>
+          <div class="source-actions">
+            <a class="primary button-link" href="/downloads/read-with-mark-auto-import-extension-v0.1.1.zip" download>Download Extension</a>
+            <button id="read-anything-extension-copy-url" class="secondary" type="button">Copy chrome://extensions</button>
+            <button id="read-anything-extension-check" class="secondary" type="button">Check Installation</button>
+            <button id="read-anything-extension-bookmarklet" class="secondary" type="button">Bookmarklet Fallback</button>
+          </div>
+          <ol>
+            <li>Download and unzip the extension.</li>
+            <li>Open <code>chrome://extensions</code>.</li>
+            <li>Turn on <strong>Developer mode</strong>.</li>
+            <li>Choose <strong>Load unpacked</strong>.</li>
+            <li>Select the unzipped <code>read-with-mark-auto-import-extension</code> folder.</li>
+            <li>Return here and click <strong>Check Installation</strong>.</li>
+          </ol>
+          <p><small><strong>Manual fallback:</strong> use the Read with Mark Bookmarklet if you do not want to install the extension or a particular publisher page cannot be recovered automatically.</small></p>
+        </div>\`;
+
+      workspace.querySelector('#read-anything-extension-copy-url')?.addEventListener('click', async (event) => {
+        try {
+          await navigator.clipboard.writeText('chrome://extensions');
+          event.currentTarget.textContent = 'Copied';
+          window.setTimeout(() => {
+            if (event.currentTarget.isConnected) event.currentTarget.textContent = 'Copy chrome://extensions';
+          }, 1500);
+        } catch {
+          event.currentTarget.textContent = 'chrome://extensions';
+        }
+      });
+
+      workspace.querySelector('#read-anything-extension-check')?.addEventListener('click', async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        button.textContent = 'Checking…';
+        window.MarkSetGoReadWithMarkExtensionFallback?.ping?.();
+        await new Promise((resolve) => window.setTimeout(resolve, 750));
+        const installed = syncReadWithMarkExtensionStatus();
+        const setupStatus = workspace.querySelector('#read-anything-extension-setup-status');
+        if (setupStatus) {
+          setupStatus.dataset.state = installed ? 'installed' : 'missing';
+          setupStatus.textContent = installed ? '✓ Installed and connected' : 'Not detected — reload the extension';
+        }
+        button.disabled = false;
+        button.textContent = 'Check Installation';
+      });
+
+      workspace.querySelector('#read-anything-extension-bookmarklet')?.addEventListener('click', () => {
+        app.querySelector('#read-anything-bookmarklet')?.click();
+      });
+
+      workspace.scrollIntoView({ behavior:'smooth', block:'nearest' });
+    });
+
+    syncReadWithMarkExtensionStatus();
+    window.setTimeout(syncReadWithMarkExtensionStatus, 500);
+    window.setTimeout(syncReadWithMarkExtensionStatus, 1500);
+`;
+
+  if (!source.includes('const syncReadWithMarkExtensionStatus = () => {')) {
+    if (!source.includes(statusAnchor)) {
+      throw new Error('ui cache: could not locate Read Anything status owner');
+    }
+    source = source.replace(statusAnchor, nativeExtensionOwner);
+  }
+
+  if (source !== before) {
+    fs.writeFileSync(readAnythingPath, source, 'utf8');
+    console.log('ui cache: patched native Read Anything extension/bookmarklet UI');
+  } else {
+    console.log('ui cache: native Read Anything extension/bookmarklet UI already current');
+  }
+}
+
+
 function replaceAssetVersion(content, asset, version) {
   const escaped = asset.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = new RegExp(`/${escaped}(?:\\?v=[^"'\\s>]+)?`, 'g');
@@ -45,8 +184,17 @@ function ensureAfterAsset(content, anchorAsset, html) {
   created a second behavior owner. This version leaves the Hub source intact.
 */
 
+patchReadAnythingExtensionUi();
+
 let index = fs.readFileSync(indexPath, 'utf8');
 const before = index;
+
+/* Native public/read-anything.js now owns the extension/bookmarklet cards.
+   Remove the superseded runtime card owner if an earlier build inserted it. */
+index = index.replace(
+  /\s*<script[^>]+src=["']\/read-anything-extension-card-owner\.js(?:\?[^"']*)?["'][^>]*><\/script>\s*/gi,
+  '\n'
+);
 
 /* Preserve current direct-owner versions. */
 index = replaceAssetVersion(
@@ -78,6 +226,13 @@ index = replaceAssetVersion(
   'topic-feeds.js',
   '20260825-v2.5.7-boundary-gap-1px'
 );
+
+index = replaceAssetVersion(
+  index,
+  'read-anything.js',
+  '20260827-v2.5.7-native-extension-ui'
+);
+
 
 index = replaceAssetVersion(
   index,
@@ -208,13 +363,6 @@ index = replaceAssetVersion(
 );
 
 /* Other additive UI assets remain unchanged. */
-index = ensureAfterAsset(
-  index,
-  'read-anything.js',
-  '  <script defer src="/read-anything-extension-card-owner.js?v=20260827-v1.0.0-direct-read-anything-owner"></script>'
-);
-
-
 index = ensureAfterAsset(
   index,
   'read-anything.css',

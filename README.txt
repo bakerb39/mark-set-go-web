@@ -1,51 +1,50 @@
-READ ANYTHING — READ WITH MARK DIRECT UI OWNER
-================================================
+READ ANYTHING — NATIVE EXTENSION UI FIX
+=======================================
 
-This fixes the case where Read Anything still showed only the old:
+This is the definitive fix for the unchanged Read with Mark card.
 
-  Read with Mark
-  Import a full webpage...
-  Show Bookmarklet
+WHY THE PRIOR FIXES DID NOT SHOW
+--------------------------------
+They were browser-side enhancement scripts attempting to alter a page after
+public/read-anything.js had already rendered its original markup.
 
-The new UI no longer depends on one particular navigation path firing the
-install-UI enhancement.
-
-UPLOAD
-
-REPO ROOT
-  apply-ui-cache-busters.js
-
-PUBLIC
-  read-anything-extension-card-owner.js   NEW
-
-WHAT IT DOES
-
-Whenever Read Anything is rendered, it ensures the page contains:
+This version patches public/read-anything.js itself DURING THE RENDER BUILD.
+That means the deployed source that renders Read Anything now directly contains:
 
   Read with Mark Extension
-  Recommended. Automatically recover readable full articles...
-  ✓ Installed and connected
-  Extension settings
+  Recommended...
+  Installed / Not installed
+  Install Extension
 
 followed by:
 
   Read with Mark Bookmarklet
-  Manual fallback. Open any webpage...
+  Manual fallback...
   Show Bookmarklet
 
-The extension card is inserted before the bookmarklet card.
+It also directly changes the bookmarklet setup text and owns the extension
+setup/check-installation UI inside Read Anything.
 
-The owner also:
-- works when Read Anything is opened from a menu;
-- works when it is rendered programmatically;
-- works after workspace routing;
-- updates Installed / Not installed status;
-- provides its own extension setup if the existing helper is unavailable;
-- rewrites the bookmarklet setup text as Manual fallback;
-- uses no MutationObserver.
+UPLOAD ONLY
+-----------
+REPO ROOT:
+  apply-ui-cache-busters.js
 
-This does NOT change article extraction/recovery itself.
+No new public file is required for this fix.
 
-After deploy:
+The build script:
+- patches public/read-anything.js;
+- bumps the read-anything.js browser version;
+- removes the superseded runtime card-owner script from the built index;
+- leaves the working extension recovery fallback intact.
+
+EXPECTED RENDER LOG
+-------------------
+ui cache: patched native Read Anything extension/bookmarklet UI
+
+Then:
   Ctrl+Shift+R
-  Reopen Read Anything.
+  close/reopen Read Anything
+
+If the source was already patched on a later deploy, the log says:
+ui cache: native Read Anything extension/bookmarklet UI already current
