@@ -1,54 +1,59 @@
-READ ANYTHING — DEDICATED STARTUP INSTALLER
-===========================================
+READ ANYTHING — CACHE ORDER ROOT FIX
+===================================
 
-This replaces the unreliable cache-buster-only approach.
+ROOT CAUSE CONFIRMED BY LIVE DIAGNOSTIC
 
-UPLOAD TO REPO ROOT:
+The live server DOES contain the patched Read Anything source:
+  servedFileHasExtension: true
+  servedFileHasMarker: true
+
+But the live page was loading:
+  /read-anything.js?v=20260827-v2.5.7-native-extension-ui
+
+That URL had already been used by an earlier deployment, so the browser could
+continue using the old cached JS.
+
+WHY IT HAPPENED
+
+prestart previously ran:
+  apply-read-anything-extension-ui.js
+  THEN apply-ui-cache-busters.js
+
+The dedicated installer correctly bumped read-anything.js, but the general
+cache-buster ran afterward and changed its version BACK to:
+  20260827-v2.5.7-native-extension-ui
+
+FIX
+
+prestart now runs:
+  1. apply-beta-feedback.js
+  2. apply-ui-cache-busters.js
+  3. apply-read-anything-extension-ui.js   <-- LAST owner of read-anything.js
+  4. apply-topic-feed-performance.js
+
+The dedicated installer now uses a brand-new cache key:
+  /read-anything.js?v=20260827-v2.5.8-native-rwm-extension-final
+
+UPLOAD TO REPO ROOT
   package.json
-  apply-read-anything-extension-ui.js   NEW
-
-WHAT CHANGES
-------------
-package.json now explicitly runs:
-
-  node apply-read-anything-extension-ui.js
-
-during both prestart and predev.
-
-The installer directly patches:
-  public/read-anything.js
-and directly bumps:
-  /read-anything.js?v=20260827-v2.5.7-native-rwm-extension
-inside public/index.html.
+  apply-read-anything-extension-ui.js
 
 EXPECTED RENDER LOG
--------------------
-read anything: installed native Read with Mark Extension + Bookmarklet UI
-read anything: browser asset bumped to 20260827-v2.5.7-native-rwm-extension
+  read anything: native Read with Mark Extension UI already installed
+  OR
+  read anything: installed native Read with Mark Extension + Bookmarklet UI
 
-EXPECTED UI
------------
-Read with Mark Extension
-Recommended. Automatically recover readable full articles...
-Installed / Not installed
-Install Extension / Extension Settings
+AND:
+  read anything: browser asset bumped to 20260827-v2.5.8-native-rwm-extension-final
 
-Read with Mark Bookmarklet
-Manual fallback...
-Show Bookmarklet
+AFTER DEPLOY
 
-The bookmarklet setup screen is also relabeled as a manual fallback.
+Do Ctrl+Shift+R once.
 
-WHY THIS SHOULD BE DIFFERENT
-----------------------------
-This installer is an explicit prestart command. It is no longer buried inside
-apply-ui-cache-busters.js. If it cannot find the exact current native card, the
-Render deploy fails with a specific Read Anything installer error instead of
-silently serving the old UI.
+Optional console verification:
+  [...document.scripts].find(s => s.src.includes('/read-anything.js'))?.src
 
-TESTED
-------
-- installer JavaScript syntax checked
-- installer executed against a mock of the current native card
-- patched read-anything.js syntax checked
-- required new labels verified
+It MUST end in:
+  ?v=20260827-v2.5.8-native-rwm-extension-final
+
+This is the root-cause fix; it does not add another runtime UI owner.

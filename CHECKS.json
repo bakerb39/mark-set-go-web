@@ -1,14 +1,5 @@
 {
-  "installer_syntax": {
-    "ok": true,
-    "stderr": ""
-  },
-  "mock_install": {
-    "ok": true,
-    "stdout": "read anything: installed native Read with Mark Extension + Bookmarklet UI\nread anything: browser asset bumped to 20260827-v2.5.7-native-rwm-extension",
-    "stderr": ""
-  },
-  "patched_mock_syntax": {
+  "apply-read-anything-extension-ui.js": {
     "ok": true,
     "stderr": ""
   }

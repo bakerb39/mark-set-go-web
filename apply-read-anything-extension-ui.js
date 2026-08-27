@@ -8,7 +8,7 @@ const root = __dirname;
 const readAnythingPath = path.join(root, 'public', 'read-anything.js');
 const indexPath = path.join(root, 'public', 'index.html');
 const MARKER = 'READ_WITH_MARK_EXTENSION_NATIVE_V1';
-const ASSET_VERSION = '20260827-v2.5.7-native-rwm-extension';
+const ASSET_VERSION = '20260827-v2.5.8-native-rwm-extension-final';
 
 function patchReadAnything() {
   const original = fs.readFileSync(readAnythingPath, 'utf8');
