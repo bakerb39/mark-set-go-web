@@ -1,12 +1,6 @@
 {
-  "syntax": {
+  "patcher_syntax": {
     "ok": true,
     "stderr": ""
-  },
-  "mock_run": {
-    "ok": true,
-    "stdout": "read anything: final browser cache key -> 20260827-v2.5.10-rwm-native-final",
-    "stderr": "",
-    "result": "<script defer src=\"/read-anything.js?v=20260827-v2.5.10-rwm-native-final\"></script>\\n"
   }
 }

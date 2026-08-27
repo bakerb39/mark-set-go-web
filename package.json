@@ -5,9 +5,9 @@
   "description": "Mark, Set, Go! unified document manager with cloud/local document resolution and protected reader architecture.",
   "main": "server.js",
   "scripts": {
-    "prestart": "node apply-beta-feedback.js && node apply-ui-cache-busters.js && node apply-read-anything-cache-finalizer.js && node apply-topic-feed-performance.js",
+    "prestart": "node apply-beta-feedback.js && node apply-ui-cache-busters.js && node apply-read-anything-cache-finalizer.js && node apply-topic-feed-reader-fixes.js && node apply-topic-feed-performance.js",
     "start": "node -r ./cloud-content-preload.js server.js",
-    "predev": "node apply-beta-feedback.js && node apply-ui-cache-busters.js && node apply-read-anything-cache-finalizer.js && node apply-topic-feed-performance.js",
+    "predev": "node apply-beta-feedback.js && node apply-ui-cache-busters.js && node apply-read-anything-cache-finalizer.js && node apply-topic-feed-reader-fixes.js && node apply-topic-feed-performance.js",
     "dev": "node --watch -r ./cloud-content-preload.js server.js",
     "db:migrate": "node scripts/migrate.js"
   },
