@@ -3,11 +3,11 @@
     "ok": true,
     "stderr": ""
   },
-  "ask-mark-window.js": {
+  "ask-mark-popout-controller.js": {
     "ok": true,
     "stderr": ""
   },
-  "ask-mark-article-mode.js": {
+  "ask-mark-popout-page.js": {
     "ok": true,
     "stderr": ""
   }

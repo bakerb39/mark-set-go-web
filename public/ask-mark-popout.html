@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Reading Companion</title>
-  <link rel="stylesheet" href="/ask-mark-popout.css?v=20260826-v1.2.0-article-first">
+  <link rel="stylesheet" href="/ask-mark-popout.css?v=20260826-v1.3.0-live-scope">
+  <link rel="stylesheet" href="/ask-mark-popout-scope.css?v=20260826-v1.0.0-live-scope">
 </head>
 <body>
   <main class="companion-popout" data-popout-shell>
@@ -28,8 +29,14 @@
       <small data-connection-status>Connecting…</small>
     </section>
 
-    <section class="popout-article-actions" data-popout-article-actions hidden aria-label="Whole article actions">
-      <span>Whole article</span>
+    <section
+      class="popout-article-actions"
+      data-popout-article-actions
+      data-scope="article"
+      hidden
+      aria-label="Article actions"
+    >
+      <span data-popout-scope>Whole article</span>
       <div>
         <button type="button" data-popout-article-action="explain">Explain</button>
         <button type="button" data-popout-article-action="summarize">Summarize</button>
@@ -40,17 +47,25 @@
       </div>
     </section>
 
-    <section class="popout-conversation" data-popout-conversation aria-live="polite">
+    <section
+      class="popout-conversation"
+      data-popout-conversation
+      aria-live="polite"
+    >
       <div class="popout-empty">
         Open Ask Beth in the Reader, then use this window on your second screen.
       </div>
     </section>
 
     <footer class="popout-composer">
-      <textarea data-popout-input rows="1" placeholder="Ask about the current reading…"></textarea>
+      <textarea
+        data-popout-input
+        rows="1"
+        placeholder="Ask about the current reading…"
+      ></textarea>
       <button type="button" data-popout-send aria-label="Send">➜</button>
     </footer>
   </main>
-  <script src="/ask-mark-popout-page.js?v=20260826-v1.2.1-always-typeable"></script>
+  <script src="/ask-mark-popout-page.js?v=20260826-v1.3.0-live-scope"></script>
 </body>
 </html>

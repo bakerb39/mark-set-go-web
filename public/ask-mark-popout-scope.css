@@ -1,0 +1,12 @@
+/* Ask Beth pop-out live scope indicator */
+.popout-article-actions[data-scope="selection"] > [data-popout-scope]{
+  color:#184c72;
+  border:1px solid rgba(31,95,149,.20);
+  background:#eaf4ff;
+}
+
+.popout-article-actions[data-scope="article"] > [data-popout-scope]{
+  color:#8a6728;
+  border:1px solid rgba(213,164,71,.18);
+  background:#fffaf0;
+}

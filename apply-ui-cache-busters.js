@@ -137,7 +137,7 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'ask-mark-popout-controller.js',
-  '20260826-v1.3.0-article-owner'
+  '20260826-v1.4.0-live-scope'
 );
 
 index = replaceAssetVersion(
@@ -232,7 +232,7 @@ index = ensureAfterAsset(
 index = ensureAfterAsset(
   index,
   'ask-mark-article-mode.js',
-  '  <script defer src="/ask-mark-popout-controller.js?v=20260826-v1.3.0-article-owner"></script>'
+  '  <script defer src="/ask-mark-popout-controller.js?v=20260826-v1.4.0-live-scope"></script>'
 );
 
 index = ensureAfterAsset(

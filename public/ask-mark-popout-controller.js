@@ -6,6 +6,7 @@
   const POPUP_URL = '/ask-mark-popout.html';
   const BUTTON_SELECTOR = '[data-askmark-popout]';
   const MAX_SYNC_MS = 95000;
+  const ARTICLE_TYPES = new Set(['topic-feed','bookmarklet','website']);
 
   let channel = null;
   let popupWindow = null;
@@ -13,6 +14,7 @@
   let activeSyncStartedAt = 0;
   let lastSentSignature = '';
   let pendingQuestionId = '';
+  let selectionSyncTimer = 0;
 
   function makeId(prefix = 'id') {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
@@ -35,11 +37,16 @@
     return { id:'', name, ask:title, avatar };
   }
 
-  function currentReading() {
+  function currentReaderRecord() {
     const current = window.MarkSetGoCurrentReaderDocument?.get?.() || {};
     const source = current.source && typeof current.source === 'object'
       ? current.source
       : {};
+    return { current, source };
+  }
+
+  function currentReading() {
+    const { current, source } = currentReaderRecord();
     const fallbackTitle =
       document.querySelector('.reader-title-copy h1')?.textContent?.trim() ||
       document.querySelector('#reader-title')?.textContent?.trim() ||
@@ -54,12 +61,72 @@
     };
   }
 
-  function conversationNode() {
-    return document.querySelector('.mark-companion-panel [data-askmark-conversation]');
+  function canonicalSelectionText() {
+    const api = window.MarkSetGoCurrentReaderDocument;
+    if (typeof api?.getSelectionRange === 'function') {
+      try {
+        return String(api.getSelectionRange()?.text || '').trim();
+      } catch {}
+    }
+
+    return document
+      .querySelector('.mark-companion-panel #mark-selection-panel .mark-selection-card blockquote')
+      ?.textContent
+      ?.trim() || '';
   }
 
-  function conversationHtml() {
-    return conversationNode()?.innerHTML || '';
+  function isFullArticleSource() {
+    // Attached Ask Beth's article bridge is the preferred authority.
+    if (typeof window.MarkSetGoArticleCompanion?.available === 'function') {
+      try { return Boolean(window.MarkSetGoArticleCompanion.available()); }
+      catch {}
+    }
+
+    // Exact compatibility fallback mirrors ask-mark-article-mode.js.
+    const { current, source } = currentReaderRecord();
+    const type = String(source.type || '').toLowerCase();
+    const text = String(current.text || '').trim();
+
+    if (!ARTICLE_TYPES.has(type)) return false;
+    if (source.fullArticle === false || source.captureType === 'selection') return false;
+    return text.length >= 40;
+  }
+
+  function currentScope() {
+    const selectionText = canonicalSelectionText();
+    const articleMode = isFullArticleSource();
+
+    if (selectionText) {
+      return {
+        key:'selection',
+        label:'Selected passage',
+        selected:true,
+        articleMode,
+        selectionLength:selectionText.length
+      };
+    }
+
+    if (articleMode) {
+      return {
+        key:'article',
+        label:'Whole article',
+        selected:false,
+        articleMode:true,
+        selectionLength:0
+      };
+    }
+
+    return {
+      key:'reading',
+      label:'Current reading',
+      selected:false,
+      articleMode:false,
+      selectionLength:0
+    };
+  }
+
+  function conversationNode() {
+    return document.querySelector('.mark-companion-panel [data-askmark-conversation]');
   }
 
   function conversationSignature() {
@@ -77,6 +144,7 @@
     const companion = companionConfig();
     const reading = currentReading();
     const conversation = conversationNode();
+    const scope = currentScope();
 
     return {
       type:'STATE',
@@ -84,15 +152,16 @@
       at:Date.now(),
       companion,
       reading,
+      scopeKey:scope.key,
+      scopeLabel:scope.label,
+      hasSelection:scope.selected,
+      selectionLength:scope.selectionLength,
+      articleMode:scope.articleMode,
       conversationHtml:conversation?.innerHTML || '',
       conversationText:conversation?.textContent || '',
       busy:Boolean(
         conversation?.querySelector('.is-thinking') ||
         conversation?.querySelector('[data-askmark-legacy-pending="1"]')
-      ),
-      articleMode:Boolean(
-        window.MarkSetGoAskMarkHub?.isWholeArticle?.() ||
-        window.MarkSetGoArticleCompanion?.available?.()
       ),
       panelVisible:!document.getElementById('reader-layout')?.classList.contains('word-panel-hidden')
     };
@@ -100,19 +169,22 @@
 
   function ensureChannel() {
     if (channel || !('BroadcastChannel' in window)) return channel;
-    channel = new BroadcastChannel(CHANNEL_NAME);
 
+    channel = new BroadcastChannel(CHANNEL_NAME);
     channel.addEventListener('message', (event) => {
       const message = event.data || {};
       if (!message || typeof message !== 'object') return;
 
       if (message.type === 'READY' || message.type === 'REQUEST_STATE') {
-        sendState(message.type.toLowerCase());
+        sendState(message.type.toLowerCase(), true);
         return;
       }
 
       if (message.type === 'ASK') {
-        submitFromPopout(String(message.question || ''), String(message.requestId || ''));
+        submitFromPopout(
+          String(message.question || ''),
+          String(message.requestId || '')
+        );
         return;
       }
 
@@ -141,6 +213,8 @@
     const signature = [
       state.reading.documentId,
       state.reading.title,
+      state.scopeKey,
+      state.selectionLength,
       state.conversationHtml,
       state.busy,
       state.panelVisible
@@ -150,6 +224,19 @@
     lastSentSignature = signature;
     post(state);
     return true;
+  }
+
+  function scheduleScopeSync(reason = 'selection') {
+    if (selectionSyncTimer) window.clearTimeout(selectionSyncTimer);
+
+    // The Reader can finish updating its canonical selection just after the
+    // browser selection event, so sync immediately and once more shortly after.
+    sendState(`${reason}:0`, true);
+
+    selectionSyncTimer = window.setTimeout(() => {
+      selectionSyncTimer = 0;
+      sendState(`${reason}:settled`, true);
+    }, 120);
   }
 
   function stopActiveSync(reason = 'done') {
@@ -193,7 +280,9 @@
         now - activeSyncStartedAt >= MAX_SYNC_MS
       ) {
         stopActiveSync(
-          now - activeSyncStartedAt >= MAX_SYNC_MS ? `${reason}:timeout` : `${reason}:complete`
+          now - activeSyncStartedAt >= MAX_SYNC_MS
+            ? `${reason}:timeout`
+            : `${reason}:complete`
         );
       }
     }, 350);
@@ -211,8 +300,8 @@
     const layout = document.getElementById('reader-layout');
     if (!layout) return false;
 
-    // Keep the live Companion DOM/session mounted, but remove the duplicate
-    // visible surface while the dedicated second-screen window is in use.
+    // Keep the actual Companion/session mounted. The pop-out is only another
+    // view/controller of that same live Reader conversation.
     layout.classList.add('word-panel-hidden');
 
     const markButton = document.getElementById('toggle-mark-panel');
@@ -222,7 +311,6 @@
     toolsButton?.setAttribute('aria-pressed', 'false');
     markButton?.classList.add('pane-closed');
     toolsButton?.classList.add('pane-closed');
-
     return true;
   }
 
@@ -231,6 +319,10 @@
     const send = askSendButton();
 
     if (input && send) {
+      input.disabled = false;
+      input.readOnly = false;
+      input.removeAttribute('disabled');
+      input.removeAttribute('readonly');
       input.value = question;
       input.dispatchEvent(new Event('input', { bubbles:true }));
       send.click();
@@ -239,21 +331,17 @@
       post({
         type:'ASK_ACCEPTED',
         requestId:pendingQuestionId,
+        scopeKey:currentScope().key,
         at:Date.now()
       });
       startActiveSync('popout-question');
       return true;
     }
 
-    // The popup can remain open while the docked Companion is closed. Normally
-    // the premium DOM remains mounted, but if Reader rebuilt it, ask the Reader
-    // to recreate the Companion shell and retry a few bounded times.
     if (attempt === 0) {
       const toggle = document.getElementById('toggle-mark-panel');
       if (toggle) {
         try {
-          // Let the Reader rebuild the live Companion shell if necessary, then
-          // immediately re-hide the docked surface before the next paint.
           toggle.click();
           hideDockedCompanion();
         } catch {}
@@ -284,26 +372,50 @@
     hideDockedCompanion();
     const id = requestId || makeId('question');
 
+    /*
+      IMPORTANT:
+      Never call AskMarkHub.askWholeArticle() from the pop-out.
+
+      For a full article, use the SAME ArticleCompanion bridge as attached
+      Ask Beth. That bridge sends through the normal composer, where:
+        selection present -> selected passage
+        no selection      -> whole article
+    */
     if (
-      window.MarkSetGoAskMarkHub?.isWholeArticle?.() &&
-      typeof window.MarkSetGoAskMarkHub?.askWholeArticle === 'function'
+      isFullArticleSource() &&
+      typeof window.MarkSetGoArticleCompanion?.ask === 'function'
     ) {
       pendingQuestionId = id;
-      post({ type:'ASK_ACCEPTED', requestId:id, at:Date.now() });
+      const scope = currentScope();
+
+      post({
+        type:'ASK_ACCEPTED',
+        requestId:id,
+        scopeKey:scope.key,
+        at:Date.now()
+      });
       startActiveSync('popout-article-question');
 
-      Promise.resolve(window.MarkSetGoAskMarkHub.askWholeArticle(clean, clean))
-        .catch((error) => {
-          post({
-            type:'ASK_ERROR',
-            requestId:id,
-            error:error?.message || 'The article question could not be sent.',
-            at:Date.now()
-          });
+      try {
+        const submitted = window.MarkSetGoArticleCompanion.ask(clean);
+        if (!submitted) {
+          throw new Error('The article question could not be sent.');
+        }
+        return true;
+      } catch (error) {
+        post({
+          type:'ASK_ERROR',
+          requestId:id,
+          error:error?.message || 'The article question could not be sent.',
+          at:Date.now()
         });
-      return true;
+        stopActiveSync('popout-article-question:error');
+        return false;
+      }
     }
 
+    // Books and other sources use the normal selection owner. There is no
+    // whole-document fallback here.
     return trySubmitQuestion(clean, id, 0);
   }
 
@@ -311,13 +423,13 @@
     const id = requestId || makeId('article-action');
 
     if (
-      !window.MarkSetGoAskMarkHub?.isWholeArticle?.() &&
-      !window.MarkSetGoArticleCompanion?.available?.()
+      !isFullArticleSource() ||
+      typeof window.MarkSetGoArticleCompanion?.action !== 'function'
     ) {
       post({
         type:'ASK_ERROR',
         requestId:id,
-        error:'Whole-article actions are available only when the Reader contains a full article.',
+        error:'Article actions are available only for a full article in the Reader.',
         at:Date.now()
       });
       return false;
@@ -325,19 +437,32 @@
 
     hideDockedCompanion();
     pendingQuestionId = id;
-    post({ type:'ASK_ACCEPTED', requestId:id, at:Date.now() });
+    const scope = currentScope();
+
+    post({
+      type:'ASK_ACCEPTED',
+      requestId:id,
+      scopeKey:scope.key,
+      at:Date.now()
+    });
     startActiveSync('popout-article-action');
 
-    Promise.resolve(window.MarkSetGoArticleCompanion.action(action))
-      .catch((error) => {
-        post({
-          type:'ASK_ERROR',
-          requestId:id,
-          error:error?.message || 'The article action could not be completed.',
-          at:Date.now()
-        });
+    try {
+      const submitted = window.MarkSetGoArticleCompanion.action(action);
+      if (!submitted) {
+        throw new Error('The article action could not be completed.');
+      }
+      return true;
+    } catch (error) {
+      post({
+        type:'ASK_ERROR',
+        requestId:id,
+        error:error?.message || 'The article action could not be completed.',
+        at:Date.now()
       });
-    return true;
+      stopActiveSync('popout-article-action:error');
+      return false;
+    }
   }
 
   function openPopout() {
@@ -359,17 +484,15 @@
     );
 
     if (!popupWindow) {
-      window.alert('The browser blocked the Companion pop-out. Allow pop-ups for this site, then try again.');
+      window.alert(
+        'The browser blocked the Companion pop-out. Allow pop-ups for this site, then try again.'
+      );
       return null;
     }
 
-    // Pop-out is now the visible chat surface. Keep the same Companion session
-    // mounted in Reader, but close its docked UI so answers are not duplicated.
     hideDockedCompanion();
-
     try { popupWindow.focus(); } catch {}
 
-    // The new document needs a moment to install BroadcastChannel.
     [80,220,550,1100].forEach((delay) => {
       window.setTimeout(() => sendState('popup-open', true), delay);
     });
@@ -378,7 +501,9 @@
   }
 
   function ensurePopoutButton() {
-    const actions = document.querySelector('.mark-companion-panel .askmark-header-actions');
+    const actions = document.querySelector(
+      '.mark-companion-panel .askmark-header-actions'
+    );
     if (!actions) return null;
 
     let button = actions.querySelector(BUTTON_SELECTOR);
@@ -387,7 +512,9 @@
       actions;
 
     if (button) {
-      if (button.parentElement !== windowActions) windowActions.appendChild(button);
+      if (button.parentElement !== windowActions) {
+        windowActions.appendChild(button);
+      }
       return button;
     }
 
@@ -397,10 +524,10 @@
     button.dataset.askmarkPopout = '1';
     button.textContent = '↗';
     button.title = 'Pop out Reading Companion to another screen';
-    button.setAttribute('aria-label','Pop out Reading Companion to another screen');
-
-    // Expand/Restore and Pop out are both window actions, so keep the two
-    // arrows together instead of splitting them around Notebook/Format/Settings.
+    button.setAttribute(
+      'aria-label',
+      'Pop out Reading Companion to another screen'
+    );
     windowActions.appendChild(button);
 
     button.addEventListener('click', (event) => {
@@ -418,7 +545,7 @@
     });
   }
 
-  // Keep pop-out synchronized when questions originate in the main window too.
+  // Main-window conversation changes.
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -452,6 +579,15 @@
     }
   }, true);
 
+  // Live Reader selection -> pop-out scope synchronization.
+  document.addEventListener('selectionchange', () => {
+    scheduleScopeSync('selectionchange');
+  });
+
+  document.addEventListener('pointerup', () => {
+    scheduleScopeSync('pointerup');
+  }, true);
+
   [
     'marksetgo:askmark-legacy-updated',
     'marksetgo:askmark-article-updated',
@@ -463,6 +599,10 @@
       scheduleButtonInstall();
       window.setTimeout(() => sendState(name, true), 0);
     });
+  });
+
+  window.addEventListener('focus', () => {
+    scheduleScopeSync('reader-focus');
   });
 
   window.addEventListener('pageshow', () => {
@@ -481,13 +621,16 @@
   scheduleButtonInstall();
 
   window.MarkSetGoAskMarkPopout = Object.freeze({
+    version:'1.4.0-live-scope',
     open:openPopout,
     submit:submitFromPopout,
     hideDocked:hideDockedCompanion,
     snapshot,
+    scope:currentScope,
     sync:() => sendState('manual', true),
     get connected(){
-      try { return Boolean(popupWindow && !popupWindow.closed); } catch { return false; }
+      try { return Boolean(popupWindow && !popupWindow.closed); }
+      catch { return false; }
     }
   });
 })();
