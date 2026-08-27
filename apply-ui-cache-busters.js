@@ -37,7 +37,7 @@ index = replaceAssetVersion(
 index = replaceAssetVersion(
   index,
   'topic-feeds.js',
-  '20260827-v2.5.8-extension-copy'
+  '20260827-v2.5.9-extension-links'
 );
 
 

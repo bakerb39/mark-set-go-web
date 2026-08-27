@@ -1020,12 +1020,10 @@
     notice.dataset.topicFeedImportRecovery = '1';
     notice.setAttribute('role', 'note');
     notice.innerHTML = `<br><br><strong>Want the full article?</strong>
-      Use the <strong>Read with Mark Extension</strong> to import the publisher page directly into the Reader.
-      If the extension is unavailable, use <strong>View original</strong> above and the
-      <strong>Read with Mark</strong> bookmarklet as a fallback.
-      The bookmarklet is also handy when you are browsing the web and want to send any page into the Reader.
-      You can find it in the
-      <a href="#read-anything" data-topic-feed-open-read-anything>Read Anything section</a>.`;
+      Use the <a href="#read-anything" data-topic-feed-open-read-anything><strong>Read with Mark Extension</strong></a>
+      to import the publisher page. If needed, use <strong>View original</strong> and the
+      <a href="#read-anything" data-topic-feed-open-read-anything><strong>Read with Mark bookmarklet</strong></a>
+      instead. The bookmarklet also works for importing pages while browsing the web.`;
 
     notice.querySelector('[data-topic-feed-open-read-anything]')
       ?.addEventListener('click', openReadAnythingFromTopicFeed);
