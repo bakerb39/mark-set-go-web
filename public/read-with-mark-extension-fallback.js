@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.2';
+  const VERSION = '0.1.3';
   const PING = 'MSG_RWM_EXTENSION_PING';
   const READY = 'MSG_RWM_EXTENSION_READY';
   const REQUEST = 'MSG_RWM_EXTENSION_IMPORT_REQUEST';
@@ -132,6 +132,105 @@
       normalizeUrl(source.url || ''),
       String(current?.title || '')
     ].join('|');
+  }
+
+  function removeRecoveryBanner() {
+    document.querySelector('[data-rwm-article-recovery-banner]')?.remove();
+  }
+
+  function openReadAnythingExtensionSetup() {
+    try {
+      window.MarkSetGoReadAnything?.render?.();
+      window.setTimeout(() => {
+        window.MarkSetGoReadWithMarkExtensionInstallUi?.open?.();
+      }, 80);
+    } catch {}
+  }
+
+  function openBookmarkletHelp() {
+    try {
+      window.MarkSetGoReadAnything?.render?.();
+      window.setTimeout(() => {
+        document.querySelector('#read-anything-bookmarklet')?.click();
+      }, 80);
+    } catch {}
+  }
+
+  function renderRecoveryBanner({
+    automaticFailed = false,
+    error = ''
+  } = {}) {
+    const current = currentDocument();
+
+    if (!isRecoverableIncompleteArticle(current)) {
+      removeRecoveryBanner();
+      return false;
+    }
+
+    const reader =
+      document.querySelector('#app #reader') ||
+      document.querySelector('#reader');
+
+    if (!reader) return false;
+
+    let banner = reader.querySelector('[data-rwm-article-recovery-banner]');
+    if (!banner) {
+      banner = document.createElement('aside');
+      banner.dataset.rwmArticleRecoveryBanner = '1';
+      banner.className = 'rwm-article-recovery-banner';
+      banner.setAttribute('role', 'note');
+      reader.prepend(banner);
+    }
+
+    const sourceUrl = normalizeUrl(current.source?.url || '');
+    const installed = extensionReady;
+
+    let message = '';
+    if (!installed) {
+      message =
+        '<strong>Full article unavailable.</strong> ' +
+        '<strong>Recommended:</strong> install the Read with Mark Extension to ' +
+        'automatically recover more publisher pages. ' +
+        '<span>Manual fallback: open the original page and use the Read with Mark Bookmarklet.</span>';
+    } else if (automaticFailed) {
+      message =
+        '<strong>Automatic Read with Mark recovery could not retrieve this page.</strong> ' +
+        '<span>Manual fallback: open the original page and use the Read with Mark Bookmarklet.</span>';
+    } else {
+      message =
+        '<strong>Recovering the full article with Read with Mark…</strong>';
+    }
+
+    banner.innerHTML = `
+      <div class="rwm-article-recovery-copy">${message}</div>
+      <div class="rwm-article-recovery-actions">
+        ${!installed ? '<button type="button" data-rwm-setup-extension>Install extension</button>' : ''}
+        ${sourceUrl ? '<button type="button" data-rwm-view-original>View original</button>' : ''}
+        <button type="button" data-rwm-bookmarklet-help>Bookmarklet fallback</button>
+      </div>
+      ${error ? `<small>${clean(error)}</small>` : ''}
+    `;
+
+    banner.querySelector('[data-rwm-setup-extension]')?.addEventListener(
+      'click',
+      openReadAnythingExtensionSetup
+    );
+
+    banner.querySelector('[data-rwm-view-original]')?.addEventListener(
+      'click',
+      () => {
+        if (sourceUrl) {
+          window.open(sourceUrl, '_blank', 'noopener,noreferrer');
+        }
+      }
+    );
+
+    banner.querySelector('[data-rwm-bookmarklet-help]')?.addEventListener(
+      'click',
+      openBookmarkletHelp
+    );
+
+    return true;
   }
 
   function showToast(message, kind = 'working', timeout = 0) {
@@ -310,17 +409,18 @@
 
     const ready = await waitForExtension();
     if (!ready) {
-      // Extension is optional. Keep the existing manual fallback untouched,
-      // but tell the reader that automatic recovery is available.
+      // Extension first; bookmarklet remains the manual fallback.
+      renderRecoveryBanner();
       showToast(
-        'Read with Mark can recover more full articles automatically. Set up the extension in Read Anything.',
+        'Full article unavailable. Install the Read with Mark Extension for automatic recovery; the bookmarklet remains the manual fallback.',
         'info',
         6500
       );
       return false;
     }
 
-    showToast('Recovering full article with Read with Mark…');
+    renderRecoveryBanner();
+    showToast('Recovering full article with the Read with Mark Extension…');
 
     const snapshot = {
       documentId:String(current.documentId || ''),
@@ -330,12 +430,14 @@
 
     const result = await requestExtensionImport(current);
     if (!result?.ok) {
+      renderRecoveryBanner({
+        automaticFailed:true,
+        error:result?.error || ''
+      });
       showToast(
-        result?.error
-          ? `Read with Mark could not recover this article. ${result.error}`
-          : 'Read with Mark could not recover this article.',
+        'Automatic recovery could not retrieve this article. Open the original page and use the Read with Mark Bookmarklet as the manual fallback.',
         'error',
-        5200
+        6500
       );
       return false;
     }
@@ -352,17 +454,22 @@
 
     try {
       importRecoveredArticle(result, snapshot);
-      showToast('Full article recovered with Read with Mark.', 'success', 2800);
+      removeRecoveryBanner();
+      showToast('Full article recovered with the Read with Mark Extension.', 'success', 2800);
       document.dispatchEvent(new CustomEvent(
         'marksetgo:read-with-mark-auto-recovered',
         { detail:{ url:expectedUrl, reason } }
       ));
       return true;
     } catch (error) {
+      renderRecoveryBanner({
+        automaticFailed:true,
+        error:error?.message || ''
+      });
       showToast(
-        error?.message || 'The recovered article could not be opened.',
+        'The recovered article could not be opened. Use View original and the Read with Mark Bookmarklet as the manual fallback.',
         'error',
-        5200
+        6500
       );
       return false;
     }
@@ -400,12 +507,25 @@
   });
 
   document.addEventListener('marksetgo:document-available', () => {
+    removeRecoveryBanner();
     scheduleRecovery('document-available');
+    window.setTimeout(() => {
+      if (isRecoverableIncompleteArticle(currentDocument())) {
+        renderRecoveryBanner();
+      }
+    }, 180);
   });
 
   window.addEventListener('pageshow', () => {
     pingExtension();
     scheduleRecovery('pageshow');
+    window.setTimeout(() => {
+      if (isRecoverableIncompleteArticle(currentDocument())) {
+        renderRecoveryBanner();
+      } else {
+        removeRecoveryBanner();
+      }
+    }, 220);
   });
 
   window.MarkSetGoReadWithMarkExtensionFallback = Object.freeze({
