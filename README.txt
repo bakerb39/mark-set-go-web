@@ -1,51 +1,29 @@
-READ WITH MARK EXTENSION — READER INSTALL UI
-============================================
+READ WITH MARK INSTALL UI — LOADER ORDER FIX
 
-This makes the working extension a visible, first-class feature inside Read Anything.
+You did not miss an upload.
 
-UPLOAD
+The public install UI JS/CSS files are already in the branch.
+The problem was the root cache-buster ordering:
 
-REPO ROOT
-  apply-ui-cache-busters.js
+BROKEN:
+  install UI JS after fallback JS
+  BEFORE fallback JS had been inserted into clean index.html
 
-PUBLIC
-  read-with-mark-extension-fallback.js
-  read-with-mark-extension-install-ui.js      NEW
-  read-with-mark-extension-install-ui.css     NEW
-  downloads/read-with-mark-auto-import-extension-v0.1.1.zip  NEW
+FIXED:
+  1. install UI CSS after read-anything.css
+  2. extension fallback JS after read-anything.js
+  3. install UI JS after extension fallback JS
 
-WHAT THE READER SEES
---------------------
-Read Anything now includes:
+REPLACE ONLY:
+  repo root/apply-ui-cache-busters.js
+
+Then deploy and hard-refresh with Ctrl+Shift+R.
+
+Afterward, Read Anything should show:
   Read with Mark Extension
-  [Installed and connected] or [Not installed]
-  Set up extension
-
-The setup panel provides:
-- Download extension
-- Copy chrome://extensions
-- Check installation
-- concise Chrome Developer Mode / Load unpacked instructions
-
-IF AN ARTICLE FAILS AND THE EXTENSION IS NOT INSTALLED
-------------------------------------------------------
-The existing article stays intact, but the Reader briefly says:
-  "Read with Mark can recover more full articles automatically.
-   Set up the extension in Read Anything."
-
-IF INSTALLED
-------------
-The card automatically changes to:
+  Recommended...
   ✓ Installed and connected
 
-Chrome cannot silently install an unpacked extension from the website. This is
-the correct test/development flow. Once the extension is published to the Chrome
-Web Store, replace the download/setup flow with a normal Web Store install link.
-
-The included extension ZIP is the working v0.1.1 HTML-cleanup build.
-
-After deploy:
-  Ctrl+Shift+R
-Then open:
-  My Library -> Browse -> Read Anything
-(or your normal Read Anything route)
+and the old card should read:
+  Read with Mark Bookmarklet
+  Manual fallback...

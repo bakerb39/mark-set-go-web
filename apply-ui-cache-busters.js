@@ -207,17 +207,18 @@ index = ensureAfterAsset(
   '<link href="/read-with-mark-extension-install-ui.css?v=20260827-v1.1.0-extension-first-copy" rel="stylesheet"/>'
 );
 
-index = ensureAfterAsset(
-  index,
-  'read-with-mark-extension-fallback.js',
-  '  <script defer src="/read-with-mark-extension-install-ui.js?v=20260827-v1.1.0-extension-first-copy"></script>'
-);
-
-
+/* Install the extension recovery bridge first because the install/status UI
+   deliberately loads after and talks to that bridge. */
 index = ensureAfterAsset(
   index,
   'read-anything.js',
   '  <script defer src="/read-with-mark-extension-fallback.js?v=20260827-v0.1.3-extension-first-copy"></script>'
+);
+
+index = ensureAfterAsset(
+  index,
+  'read-with-mark-extension-fallback.js',
+  '  <script defer src="/read-with-mark-extension-install-ui.js?v=20260827-v1.1.0-extension-first-copy"></script>'
 );
 
 
