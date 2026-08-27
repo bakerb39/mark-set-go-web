@@ -1,26 +1,17 @@
-CORRECTED — TOPIC FEED + ASK BETH ACTIONS ONLY
+TWO SURGICAL TOPIC FEED FIXES ONLY
 
-Upload into public/:
-- topic-feeds.js
-- ask-mark-article-mode.js
-- ask-mark-article-mode.css
+Replace:
+public/topic-feeds.js
 
-Topic Feed:
-- restores the newer stable external-header implementation
-- Source/date/View original/share stays at the top before scrolling
-- header is transparent at rest (no cream/card block)
-- when article text scrolls, Source/share leaves and the compact actions remain
-  as the first-page text ceiling using the Reader page color
-- strips duplicate trailing Source/URL provenance from article text
-- no MutationObserver added
+1. Moves the yellow Read with Mark recovery panel immediately after:
+   "Full article text could not be imported from the publisher."
 
-Ask Beth Actions:
-- Send to Chat
-- Send to Symposium
-- uses existing MSGContentShare APIs
+2. Removes the full-width cream/yellow strip behind:
+   "Summarize · Analyze · Comprehension"
+   The header/action surface remains transparent.
 
-This intentionally does NOT include:
-- app.js
-- read-anything.js
-- media files
-- old direct-owner topic-feeds.js
+No MutationObserver.
+No app.js.
+No read-anything.js.
+No Ask Beth changes.
+No Media changes.

@@ -843,15 +843,17 @@
         const readerStyle = getComputedStyle(reader);
         const pageColor = readerStyle.backgroundColor || '#fff';
 
-        header.style.setProperty('background', scrolled ? pageColor : 'transparent', 'important');
+        // Keep the Topic Feed action surface transparent. No full-width
+        // cream/yellow strip behind Summarize · Analyze · Comprehension.
+        header.style.setProperty('background', 'transparent', 'important');
         header.style.setProperty('background-image', 'none', 'important');
         header.style.setProperty('border', '0', 'important');
         header.style.setProperty('border-radius', '0', 'important');
-        header.style.setProperty('box-shadow', scrolled ? `0 7px 0 ${pageColor}` : 'none', 'important');
+        header.style.setProperty('box-shadow', 'none', 'important');
 
         const liveActionRow = header.querySelector(':scope > #read-anything-article-summary-action');
         if (liveActionRow) {
-          liveActionRow.style.setProperty('background', scrolled ? pageColor : 'transparent', 'important');
+          liveActionRow.style.setProperty('background', 'transparent', 'important');
           liveActionRow.style.setProperty('border', '0', 'important');
           liveActionRow.style.setProperty('border-radius', '0', 'important');
           liveActionRow.style.setProperty('box-shadow', 'none', 'important');
@@ -946,6 +948,53 @@
         scheduleTopicFeedStoryBookReflow();
       }
     });
+
+    relocateTopicFeedRecoveryPanel();
+  }
+
+  function relocateTopicFeedRecoveryPanel(attempt = 0) {
+    if (!isTopicFeedReaderActive()) return;
+
+    const reader = document.querySelector('#reader');
+    if (!reader) {
+      if (attempt < 30) window.setTimeout(() => relocateTopicFeedRecoveryPanel(attempt + 1), 100);
+      return;
+    }
+
+    const fallbackNeedle = 'Full article text could not be imported from the publisher.';
+    const recoveryNeedles = [
+      'Automatic Read with Mark recovery',
+      'Bookmarklet fallback',
+      'Manual fallback: open the original page'
+    ];
+
+    const fallback = [...reader.querySelectorAll('*')]
+      .filter((node) => String(node.textContent || '').replace(/\s+/g, ' ').includes(fallbackNeedle))
+      .sort((a, b) => String(a.textContent || '').length - String(b.textContent || '').length)[0];
+
+    const recovery = [...document.querySelectorAll('body *')]
+      .filter((node) => {
+        if (!(node instanceof HTMLElement) || reader.contains(node)) return false;
+        const value = String(node.textContent || '').replace(/\s+/g, ' ').trim();
+        if (!value || value.length > 1200) return false;
+        return recoveryNeedles.some((needle) => value.includes(needle));
+      })
+      .sort((a, b) => String(a.textContent || '').length - String(b.textContent || '').length)[0];
+
+    if (!fallback || !recovery) {
+      if (attempt < 30) window.setTimeout(() => relocateTopicFeedRecoveryPanel(attempt + 1), 100);
+      return;
+    }
+
+    recovery.dataset.topicFeedRecoveryRelocated = '1';
+    recovery.style.setProperty('position', 'relative', 'important');
+    recovery.style.setProperty('inset', 'auto', 'important');
+    recovery.style.setProperty('width', '100%', 'important');
+    recovery.style.setProperty('max-width', '100%', 'important');
+    recovery.style.setProperty('margin', '.65rem 0 0', 'important');
+
+    fallback.insertAdjacentElement('afterend', recovery);
+    scheduleTopicFeedStoryBookReflow();
   }
 
   function keepTopicFeedArticleActionsInHeader() {
