@@ -986,25 +986,16 @@
     event?.preventDefault?.();
     event?.stopPropagation?.();
 
-    // Always use the application's normal Read Anything route first.
-    // That route owns Reader/workspace behavior. Calling
-    // MarkSetGoReadAnything.render() directly replaces the Reader, which is
-    // specifically NOT what this Topic Feed helper should do.
-    let route = document.querySelector('[data-action="read-anything"]');
-    let temporaryRoute = false;
-
-    if (!route) {
-      route = document.createElement('button');
-      route.type = 'button';
-      route.hidden = true;
-      route.dataset.action = 'read-anything';
-      document.body.appendChild(route);
-      temporaryRoute = true;
+    if (typeof window.MarkSetGoReadAnything?.render === 'function') {
+      window.MarkSetGoReadAnything.render();
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        const bookmarkletButton = document.querySelector('#read-anything-bookmarklet');
+        bookmarkletButton?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      }));
+      return;
     }
 
-    route.click();
-
-    if (temporaryRoute) route.remove();
+    document.querySelector('[data-read="upload"], [data-action="read-anything"]')?.click?.();
   }
 
   function decorateTopicFeedImportRecovery(payload = activeTopicFeedHeaderContext?.payload || {}) {
@@ -1029,10 +1020,9 @@
     notice.dataset.topicFeedImportRecovery = '1';
     notice.setAttribute('role', 'note');
     notice.innerHTML = `<br><br><strong>Want the full article?</strong>
-      Use the <a href="#read-anything" data-topic-feed-open-read-anything><strong>Read with Mark Extension</strong></a>
-      to import the publisher page. If needed, use <strong>View original</strong> and the
-      <a href="#read-anything" data-topic-feed-open-read-anything><strong>Read with Mark bookmarklet</strong></a>
-      instead. The bookmarklet also works for importing pages while browsing the web.`;
+      Use the <strong>Read with Mark Extension</strong> to import the publisher page.
+      If needed, use <strong>View original</strong> and the <strong>Read with Mark bookmarklet</strong> instead.
+      The bookmarklet also works for importing pages while browsing the web.`;
 
     notice.querySelector('[data-topic-feed-open-read-anything]')
       ?.addEventListener('click', openReadAnythingFromTopicFeed);
