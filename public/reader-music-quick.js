@@ -27,8 +27,6 @@
   function preferredMusic() {
     const storeItems = window.MSGMusicStore?.getCached?.();
     if (Array.isArray(storeItems)) return storeItems;
-
-    // Legacy fallback only while the IndexedDB store is still initializing.
     try {
       const saved = JSON.parse(localStorage.getItem(PREFERRED_KEY) || '[]');
       return Array.isArray(saved) ? saved.filter((item) => item && item.id && item.title) : [];
@@ -42,7 +40,6 @@
     } catch {}
     return String(document.querySelector('.reader-title-copy h1')?.textContent || '').trim();
   }
-
 
   function currentReaderDocument() {
     try {
@@ -63,7 +60,6 @@
     const doc = currentReaderDocument();
     if (!doc?.title) return null;
 
-    // Prefer the app's long-standing recommendation engine when it is available.
     try {
       const recommend = window.recommendedPlayerChoice;
       if (typeof recommend === 'function') {
@@ -78,7 +74,6 @@
       }
     } catch {}
 
-    // Safe fallback if the main recommendation helper is not exposed globally.
     const sample = `${doc.title} ${doc.text.slice(0, 10000)}`.toLowerCase();
     let moodQuery = `${doc.title} atmospheric instrumental reading music`;
     if (/mystery|detective|murder|crime|suspense|noir|sherlock|gothic|horror/.test(sample)) moodQuery = 'dark Victorian mystery ambience instrumental reading music';
@@ -209,21 +204,72 @@
     return true;
   }
 
+  async function requestYouTubeSearch(query, attempts = 3) {
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        const response = await fetch(
+          `/api/youtube/search?q=${encodeURIComponent(query)}&_=${Date.now()}`,
+          {
+            method:'GET',
+            credentials:'same-origin',
+            cache:'no-store',
+            headers:{ 'Accept':'application/json' }
+          }
+        );
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload.error || `Music search failed (${response.status}).`);
+        }
+
+        const videoIds = Array.isArray(payload.videoIds)
+          ? payload.videoIds
+              .map((id) => String(id || '').trim())
+              .filter((id) => /^[\w-]{6,20}$/.test(id))
+          : [];
+
+        if (!videoIds.length) throw new Error('No playable YouTube results were found.');
+        return videoIds;
+      } catch (error) {
+        lastError = error;
+        if (attempt < attempts) {
+          await new Promise((resolve) => window.setTimeout(resolve, 450 * attempt));
+        }
+      }
+    }
+
+    throw lastError || new Error('Video search is temporarily unavailable.');
+  }
+
   async function searchYouTubeInMainPlayer(query, title = 'Suggested music') {
     const cleanQuery = String(query || '').trim();
     if (!cleanQuery) return false;
+
     const parts = playerParts();
     if (!parts.dock || !parts.iframe) return false;
 
-    // React immediately to the click. Even if the server lookup fails, the user
-    // should never be left with a link that appears dead.
-    if (chooser && !chooser.hidden) closeChooser({ keepDock: true, keepPosition: true });
+    const previous = {
+      title:String(parts.title?.textContent || ''),
+      source:String(parts.source?.textContent || ''),
+      src:String(parts.iframe.getAttribute('src') || ''),
+      dockHidden:Boolean(parts.dock.hidden),
+      wrapHidden:Boolean(parts.wrap?.hidden)
+    };
+    const hadPlayback = Boolean(previous.src);
+
+    if (chooser && !chooser.hidden) {
+      closeChooser({ keepDock:true, keepPosition:true });
+    }
+
     if (speedButton) positionChooserDock();
     else resetChooserDockPosition();
+
     controllerSearchState = null;
     if (parts.title) parts.title.textContent = String(title || 'Suggested music');
     if (parts.source) parts.source.textContent = 'Searching YouTube…';
-    parts.iframe.src = '';
+
+    // Do NOT clear a playing iframe while a lookup is in flight.
     parts.dock.hidden = false;
     parts.dock.classList.remove('minimized');
     if (parts.wrap) parts.wrap.hidden = false;
@@ -234,23 +280,33 @@
     }
 
     try {
-      const response = await fetch(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`, {
-        method: 'GET',
-        credentials: 'same-origin',
-        headers: { 'Accept': 'application/json' }
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload.error || `Music search failed (${response.status}).`);
-      const videoIds = Array.isArray(payload.videoIds)
-        ? payload.videoIds.map((id) => String(id || '').trim()).filter((id) => /^[\w-]{6,20}$/.test(id))
-        : [];
-      if (!videoIds.length) throw new Error('No playable YouTube results were found.');
-      controllerSearchState = { query: cleanQuery, title: String(title || 'Suggested music'), videoIds, index: 0 };
+      const videoIds = await requestYouTubeSearch(cleanQuery, 3);
+      controllerSearchState = {
+        query:cleanQuery,
+        title:String(title || 'Suggested music'),
+        videoIds,
+        index:0
+      };
       return playControllerSearchCandidate(0);
     } catch (error) {
       controllerSearchState = null;
-      if (parts.source) parts.source.textContent = error?.message || 'Music search failed.';
-      if (parts.iframe) parts.iframe.src = '';
+
+      if (hadPlayback) {
+        if (parts.title) parts.title.textContent = previous.title || 'Music';
+        if (parts.source) parts.source.textContent =
+          'Video search is temporarily unavailable — current media kept playing.';
+        if (parts.iframe && parts.iframe.getAttribute('src') !== previous.src) {
+          parts.iframe.src = previous.src;
+        }
+        if (parts.wrap) parts.wrap.hidden = previous.wrapHidden;
+        parts.dock.hidden = previous.dockHidden;
+      } else {
+        if (parts.source) parts.source.textContent =
+          'Video search is temporarily unavailable. Try again in a moment.';
+        if (parts.iframe) parts.iframe.removeAttribute('src');
+      }
+
+      console.warn('Reader media search failed after retries.', error);
       return false;
     }
   }
@@ -508,10 +564,6 @@
   }
 
   function removeLegacyWpmMusicControls() {
-    // Previous releases placed the music button under the visible WPM stepper
-    // and, even earlier, beneath the hidden #speed field. Remove either shape
-    // every time the Reader DOM is rebuilt so only the top-right control exists.
-
     document.querySelectorAll('#app .reader-viewer-footer [data-reader-wpm-music-toggle]').forEach((button) => {
       if (!button.closest('.reader-topright-media-stack')) button.remove();
     });
@@ -522,9 +574,7 @@
 
     document.querySelectorAll('#app .reader-viewer-music-stack').forEach((stack) => {
       const wpm = stack.querySelector('.viewer-wpm-control');
-      if (wpm && stack.parentNode) {
-        stack.parentNode.insertBefore(wpm, stack);
-      }
+      if (wpm && stack.parentNode) stack.parentNode.insertBefore(wpm, stack);
       stack.remove();
     });
 
@@ -545,14 +595,10 @@
       return;
     }
 
-    // Remove any older top-row font widget before installing the single shared
-    // control below. This never touches the Reader footer/WPM or Settings panel.
     paneControls.querySelectorAll('.reader-font-size-control, .reader-font-control, .reader-text-size-control, [data-reader-font-size-control], [data-reader-text-size-control], [role="group"][aria-label*="font size" i], [role="group"][aria-label*="text size" i]').forEach((node) => {
       if (!node.classList.contains('reader-topright-font-control')) node.remove();
     });
 
-    // One owner, one layout: text size, music, and Full screen are literal
-    // siblings in this same div. No control is absolutely positioned.
     let stack = paneControls.querySelector('.reader-topright-media-stack');
     if (!stack) {
       stack = document.createElement('div');
@@ -560,10 +606,6 @@
       stack.setAttribute('aria-label', 'Reader text, music, and fullscreen controls');
     }
 
-    // The utility cluster is part of the SAME command row as Marks & Contents /
-    // Ask Mark.  Keeping it inside .reader-pane-buttons means one flex row owns
-    // both sides: normal Reader controls on the left and text/music/fullscreen on
-    // the far right.  No floating/translate positioning is necessary.
     if (stack.parentElement !== paneButtons) paneButtons.appendChild(stack);
 
     const textSize = ensureTopRightFontControl(stack);
@@ -587,7 +629,6 @@
       });
     }
 
-    // Enforce exact sibling order on every sync.
     if (textSize && textSize.parentElement !== stack) stack.appendChild(textSize);
     if (button.parentElement !== stack) stack.appendChild(button);
     if (fullscreenButton.parentElement !== stack) stack.appendChild(fullscreenButton);
@@ -617,7 +658,6 @@
     ensureChooser();
     sync();
 
-    // Finite/event-driven resyncs only. No MutationObserver.
     [80, 250, 700, 1500].forEach((delay) => window.setTimeout(sync, delay));
     document.addEventListener('marksetgo:document-available', () => window.setTimeout(sync, 0));
     window.addEventListener('pageshow', () => window.setTimeout(sync, 0));
@@ -635,8 +675,6 @@
         return;
       }
 
-      // Reader/menu navigation can rebuild the Reader. Schedule a finite sync
-      // after those explicit user actions instead of watching DOM mutations.
       if (event.target instanceof Element && event.target.closest('[data-action="reader"], [data-action="home"], [data-action="music"]')) {
         window.setTimeout(sync, 80);
         window.setTimeout(sync, 260);

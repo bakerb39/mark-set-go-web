@@ -1,19 +1,56 @@
-/* Mark, Set, Go! Media Panel v1.0 */
+/* Mark, Set, Go! Media Panel v1.3 — direct owner */
 
 :root{
   --msg-media-side-width:480px;
   --msg-media-collapsed-width:330px;
 }
 
-.music-dock-actions{
+/*
+  The media bar has one owner:
+    title / source on the left
+    Media | Beside/Float | minimize | close on the right
+*/
+.music-dock .music-dock-bar{
+  display:flex;
   align-items:center;
+  justify-content:space-between;
+  gap:.65rem;
+  min-width:0;
+}
+
+.music-dock .music-dock-bar > :first-child{
+  flex:1 1 auto;
+  min-width:0;
+  overflow:hidden;
+}
+
+.music-dock .music-dock-bar > :first-child strong,
+.music-dock .music-dock-bar > :first-child span{
+  display:block;
+  min-width:0;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.music-dock-actions{
+  display:flex;
+  flex:0 0 auto;
+  align-items:center;
+  justify-content:flex-end;
+  gap:.3rem;
+  margin-left:auto;
   flex-wrap:nowrap;
 }
 
-.music-dock-actions #msg-media-panel-toggle,
-.music-dock-actions #music-beside-reader,
+/* Retired top-level controls. Saving still exists on each Media result card. */
 .music-dock-actions #msg-media-expand,
 .music-dock-actions #msg-media-save-current{
+  display:none !important;
+}
+
+.music-dock-actions #msg-media-panel-toggle,
+.music-dock-actions #music-beside-reader{
   width:auto;
   min-width:0;
   padding:0 .52rem;
@@ -110,9 +147,7 @@
   gap:.38rem;
 }
 
-.msg-media-section{
-  margin-top:.7rem;
-}
+.msg-media-section{margin-top:.7rem}
 
 .msg-media-section-heading{
   display:flex;
@@ -186,9 +221,7 @@
 }
 
 .msg-media-result-copy,
-.msg-media-saved-card>div{
-  min-width:0;
-}
+.msg-media-saved-card>div{min-width:0}
 
 .msg-media-result-copy strong,
 .msg-media-saved-card strong{
@@ -287,8 +320,6 @@ body.msg-media-resizing{
     bottom:auto !important;
     transform:none !important;
     margin:0 !important;
-    right:.75rem;
-    bottom:auto;
     display:flex;
     flex-direction:column;
     width:var(--msg-media-side-width) !important;
@@ -299,8 +330,9 @@ body.msg-media-resizing{
     transition:width .18s ease;
   }
 
+  /* Legacy expanded state is rendered exactly like Beside. */
   .music-dock.msg-media-expanded{
-    width:max(var(--msg-media-side-width),min(720px,58vw)) !important;
+    width:var(--msg-media-side-width) !important;
   }
 
   .music-dock.msg-media-beside.msg-media-collapsed,
@@ -327,10 +359,6 @@ body.msg-media-resizing{
     flex:1 1 auto;
     max-height:none;
     overflow:auto;
-  }
-
-  .music-dock.msg-media-expanded .music-player-wrap iframe{
-    min-height:380px;
   }
 
   .music-dock.msg-media-collapsed .msg-media-panel{
@@ -395,14 +423,11 @@ body.msg-media-resizing{
     display:none !important;
   }
 
-  .msg-media-panel{
-    max-height:42vh;
-  }
+  .msg-media-panel{max-height:42vh}
 }
 
 @media (max-width:560px){
-  .music-dock-actions #music-beside-reader,
-  .music-dock-actions #msg-media-expand{
+  .music-dock-actions #music-beside-reader{
     display:none;
   }
 
@@ -419,10 +444,7 @@ body.msg-media-resizing{
     height:50px;
   }
 
-  .msg-media-section-heading{
-    display:block;
-  }
-
+  .msg-media-section-heading{display:block}
   .msg-media-section-heading span{
     display:block;
     max-width:none;
@@ -430,7 +452,6 @@ body.msg-media-resizing{
     text-align:left;
   }
 }
-
 
 /* Float mode behaves like a movable desktop window. */
 .music-dock.msg-media-floating .music-dock-bar{
@@ -450,17 +471,10 @@ body.msg-media-float-dragging{
   cursor:pointer;
 }
 
-body.msg-media-float-dragging{
-  user-select:none;
-}
+body.msg-media-float-dragging{user-select:none}
 
-
-/* v1.2 — closing, bottom-ribbon boundary and player resize */
-
-/* This MUST win over later side/expanded display:flex rules. */
-.music-dock[hidden]{
-  display:none !important;
-}
+/* Closing, bottom-ribbon boundary and player resize. */
+.music-dock[hidden]{display:none !important}
 
 .music-dock.msg-media-custom-video-size .music-player-wrap{
   aspect-ratio:auto !important;
@@ -486,6 +500,7 @@ body.msg-media-float-dragging{
   cursor:nwse-resize;
   touch-action:none;
 }
+
 .msg-media-player-resize-grip::before{
   content:"";
   position:absolute;
@@ -497,20 +512,20 @@ body.msg-media-float-dragging{
   border-bottom:2px solid rgba(255,255,255,.72);
   border-radius:0 0 2px 0;
 }
+
 .msg-media-player-resize-grip:focus-visible{
   outline:2px solid #78b7ea;
   outline-offset:1px;
   border-radius:4px;
 }
 
-/* Side/Expanded already resize width from the left edge; the corner grip there
-   adjusts video height, so put it at the lower-left instead. */
 .music-dock.msg-media-beside .msg-media-player-resize-grip,
 .music-dock.msg-media-expanded .msg-media-player-resize-grip{
   left:-3px;
   right:auto;
   cursor:ns-resize;
 }
+
 .music-dock.msg-media-beside .msg-media-player-resize-grip::before,
 .music-dock.msg-media-expanded .msg-media-player-resize-grip::before{
   left:4px;
@@ -521,21 +536,44 @@ body.msg-media-float-dragging{
   border-radius:0 0 0 2px;
 }
 
-body.msg-media-player-resizing-active{
-  user-select:none !important;
-}
-.music-dock.msg-media-player-resizing{
-  transition:none !important;
-}
+body.msg-media-player-resizing-active{user-select:none !important}
+.music-dock.msg-media-player-resizing{transition:none !important}
 
-/* Side/Expanded contents must scroll INSIDE the capped dock rather than extend
-   beneath the shared bottom ribbon. */
 .music-dock.msg-media-beside,
 .music-dock.msg-media-expanded{
   overflow:hidden !important;
 }
+
 .music-dock.msg-media-beside .msg-media-panel,
 .music-dock.msg-media-expanded .msg-media-panel{
   min-height:0 !important;
   overflow-y:auto !important;
+}
+
+
+/* Direct owner must win over any older cached toolbar helper stylesheet. */
+html body #music-dock.music-dock.msg-media-floating .music-dock-bar{
+  display:flex !important;
+  grid-template-columns:none !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:.65rem !important;
+  padding:.42rem .48rem !important;
+}
+
+html body #music-dock.music-dock.msg-media-floating .music-dock-actions{
+  display:flex !important;
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+  justify-content:flex-end !important;
+  width:auto !important;
+  min-width:max-content !important;
+  margin-left:auto !important;
+  overflow:visible !important;
+}
+
+html body #music-dock.music-dock.msg-media-floating .music-dock-bar > div:first-child{
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  max-width:none !important;
 }
