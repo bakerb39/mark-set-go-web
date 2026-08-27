@@ -1,22 +1,4 @@
 {
-  "apply-ui-cache-busters.js": {
-    "ok": true,
-    "stderr": ""
-  },
-  "public/read-with-mark-extension-fallback.js": {
-    "ok": true,
-    "stderr": ""
-  },
-  "public/media-toolbar-simplify.js": {
-    "ok": true,
-    "stderr": ""
-  },
-  "read-with-mark-auto-import-extension/background.js": {
-    "ok": true,
-    "stderr": ""
-  },
-  "read-with-mark-auto-import-extension/content.js": {
-    "ok": true,
-    "stderr": ""
-  }
+  "ok": true,
+  "stderr": ""
 }

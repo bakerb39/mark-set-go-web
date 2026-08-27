@@ -195,6 +195,15 @@ index = ensureAfterAsset(
 );
 
 
+/* Media assets must be installed in dependency order.
+   media-panel.css is a stable index.html asset; media-toolbar-responsive.css
+   is additive, so it cannot safely be used as an anchor until after we insert it. */
+index = ensureAfterAsset(
+  index,
+  'media-panel.css',
+  '<link href="/media-toolbar-responsive.css?v=20260826-v1.0.0-toolbar-wrap" rel="stylesheet"/>'
+);
+
 index = ensureAfterAsset(
   index,
   'media-toolbar-responsive.css',
@@ -205,13 +214,6 @@ index = ensureAfterAsset(
   index,
   'media-panel.js',
   '  <script defer src="/media-toolbar-simplify.js?v=20260827-v1.0.0-beside-only"></script>'
-);
-
-
-index = ensureAfterAsset(
-  index,
-  'media-panel.css',
-  '<link href="/media-toolbar-responsive.css?v=20260826-v1.0.0-toolbar-wrap" rel="stylesheet"/>'
 );
 
 
