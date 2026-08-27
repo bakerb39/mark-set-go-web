@@ -91,10 +91,24 @@ index = replaceAssetVersion(
   '20260826-v1.1.0-label-only'
 );
 
+
 index = replaceAssetVersion(
   index,
   'media-toolbar-responsive.css',
   '20260826-v1.0.0-toolbar-wrap'
+);
+
+
+index = replaceAssetVersion(
+  index,
+  'media-toolbar-simplify.css',
+  '20260827-v1.0.0-beside-only'
+);
+
+index = replaceAssetVersion(
+  index,
+  'media-toolbar-simplify.js',
+  '20260827-v1.0.0-beside-only'
 );
 
 index = replaceAssetVersion(
@@ -151,12 +165,6 @@ index = replaceAssetVersion(
   '20260826-v1.0.0-reader-workspace'
 );
 
-index = replaceAssetVersion(
-  index,
-  'read-with-mark-extension-fallback.js',
-  '20260826-v0.1.0-extension-first'
-);
-
 /* Stability rollback:
    Keep the asset slots so old runtime-injected tags get a NEW cache URL,
    but load a disabled/no-reparent implementation instead of Phase 2. */
@@ -175,9 +183,23 @@ index = replaceAssetVersion(
 /* Other additive UI assets remain unchanged. */
 index = ensureAfterAsset(
   index,
+  'media-toolbar-responsive.css',
+  '<link href="/media-toolbar-simplify.css?v=20260827-v1.0.0-beside-only" rel="stylesheet"/>'
+);
+
+index = ensureAfterAsset(
+  index,
+  'media-panel.js',
+  '  <script defer src="/media-toolbar-simplify.js?v=20260827-v1.0.0-beside-only"></script>'
+);
+
+
+index = ensureAfterAsset(
+  index,
   'media-panel.css',
   '<link href="/media-toolbar-responsive.css?v=20260826-v1.0.0-toolbar-wrap" rel="stylesheet"/>'
 );
+
 
 index = ensureAfterAsset(
   index,
@@ -189,12 +211,6 @@ index = ensureAfterAsset(
   index,
   'read-anything.js',
   '  <script defer src="/topic-feed-title-stability.js?v=20260826-v1.0.0-first-paint"></script>'
-);
-
-index = ensureAfterAsset(
-  index,
-  'read-anything.js',
-  '  <script defer src="/read-with-mark-extension-fallback.js?v=20260826-v0.1.0-extension-first"></script>'
 );
 
 index = ensureAfterAsset(
@@ -253,7 +269,7 @@ index = ensureAfterAsset(
 
 if (index !== before) {
   fs.writeFileSync(indexPath, index, 'utf8');
-  console.log('ui cache: Ask Beth + Read with Mark extension fallback current');
+  console.log('ui cache: Ask Beth conversation-first popup-only sidebar current');
 } else {
-  console.log('ui cache: UI assets already current');
+  console.log('ui cache: Ask Beth conversation-first assets already current');
 }

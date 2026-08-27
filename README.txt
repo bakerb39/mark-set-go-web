@@ -1,78 +1,43 @@
-READ WITH MARK — EXTENSION-FIRST ARTICLE FALLBACK TEST
-======================================================
+MEDIA TOOLBAR — BESIDE ONLY
+============================
 
-This package is based on the current feature/ask-mark-premium-phase-1 branch
-after the Ask Beth live-scope, media-toolbar, and white-title fixes.
+Upload:
 
-WHAT THIS TEST DOES
--------------------
-Normal topic/article server import remains FIRST.
-
-Only when the Reader sees the existing incomplete-article condition:
-  "Full article text could not be imported from the publisher."
-or the existing publisher-restricted message,
-the Reader checks whether the Read with Mark Auto Import extension is installed.
-
-IF INSTALLED
-1. Reader asks extension to recover the original article URL.
-2. Extension opens that URL in an inactive temporary Chrome tab.
-3. It waits briefly for client-rendered article text.
-4. It extracts visible headings/paragraphs/quotes/list text.
-5. It closes the temporary tab.
-6. It returns the result to the Reader.
-7. Reader opens the recovered text as the same topic/full article.
-
-IF NOT INSTALLED OR RECOVERY FAILS
-Nothing is removed. The current manual View Original / Read with Mark fallback
-remains available.
-
-ACCESS CONTROLS
----------------
-This prototype intentionally does NOT attempt to bypass subscription/sign-in
-walls, CAPTCHAs, paywalls, or other access controls. A visible subscription or
-sign-in wall causes automatic recovery to stop.
-
-WEB APP FILES TO UPLOAD
------------------------
-REPO ROOT:
+REPO ROOT
   apply-ui-cache-busters.js
 
-PUBLIC:
-  public/read-with-mark-extension-fallback.js
+PUBLIC
+  public/media-toolbar-simplify.css   NEW
+  public/media-toolbar-simplify.js    NEW
 
-EXTENSION INSTALL
------------------
-Use the included:
-  read-with-mark-auto-import-extension-v0.1.0.zip
+WHAT CHANGED
+------------
+Top media toolbar is simplified to:
+  Media | Beside | existing utility icons / close
 
-1. Download/unzip it.
-2. Open chrome://extensions
-3. Enable Developer mode.
-4. Click Load unpacked.
-5. Select the unzipped read-with-mark-auto-import-extension folder.
-6. Deploy the two web-app files above.
-7. Hard refresh Mark, Set, Go! with Ctrl+Shift+R.
+Removed:
+  Expand
+  top-level Save
 
-TEST
-----
-Open a topic/news story that currently produces:
-  Full article text could not be imported from the publisher.
+WHY SAVE WAS REMOVED
+--------------------
+The old top-level Save button saved the currently playing media item to the
+current book/article. That functionality already exists inside Media on each
+search result, where Save is much clearer in context. Saved items remain under
+"My saved media."
 
-Expected:
-- a small "Recovering full article with Read with Mark…" message;
-- Chrome briefly creates an inactive publisher tab;
-- the tab closes automatically;
-- if readable text was exposed, the Reader replaces the incomplete story with
-  the recovered full article;
-- Ask Beth then treats it as a normal full topic article.
+BESIDE BEHAVIOR
+---------------
+Beside places the player on the RIGHT side of the Reader, using the existing
+side layout.
 
-If the extension cannot recover it, the incomplete article remains and the
-existing manual fallback is still available.
+While it is beside the Reader, the button becomes:
+  Float
 
-DEVELOPER CONSOLE
------------------
-Check:
-  window.MarkSetGoReadWithMarkExtensionFallback.ready
+so the reader has one obvious way to return it to a floating window.
 
-Manual retry for the current incomplete article:
-  window.MarkSetGoReadWithMarkExtensionFallback.retry()
+Any previously saved "expanded" media mode is automatically migrated to the
+normal Beside mode. No media playback/search/save database code was changed.
+
+After deploy:
+  Ctrl+Shift+R

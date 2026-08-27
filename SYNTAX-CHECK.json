@@ -3,15 +3,7 @@
     "ok": true,
     "stderr": ""
   },
-  "public/read-with-mark-extension-fallback.js": {
-    "ok": true,
-    "stderr": ""
-  },
-  "read-with-mark-auto-import-extension/background.js": {
-    "ok": true,
-    "stderr": ""
-  },
-  "read-with-mark-auto-import-extension/content.js": {
+  "media-toolbar-simplify.js": {
     "ok": true,
     "stderr": ""
   }

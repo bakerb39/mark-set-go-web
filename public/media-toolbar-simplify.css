@@ -1,0 +1,28 @@
+/* Media toolbar simplification:
+   Media | Beside/Float | existing utility controls.
+   Expand and top-level Save are intentionally retired. */
+
+#music-dock .music-dock-actions #msg-media-expand,
+#music-dock .music-dock-actions #msg-media-save-current{
+  display:none !important;
+}
+
+/* With the redundant text buttons gone, keep the remaining toolbar compact. */
+#music-dock.msg-media-floating .music-dock-actions{
+  flex-wrap:nowrap !important;
+  align-items:center !important;
+}
+
+#music-dock.msg-media-floating .music-dock-actions #msg-media-panel-toggle,
+#music-dock.msg-media-floating .music-dock-actions #music-beside-reader{
+  width:auto !important;
+  min-width:0 !important;
+  padding:0 .5rem !important;
+  white-space:nowrap !important;
+}
+
+@media (max-width:390px){
+  #music-dock.msg-media-floating .music-dock-actions{
+    flex-wrap:wrap !important;
+  }
+}
