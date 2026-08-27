@@ -824,21 +824,7 @@
     // by #reader-frame so it cannot travel with the scrolling article.
     reader.classList.remove('topic-feed-story-header-managed');
 
-    // CENTER-OF-THE-UNIVERSE invariant:
-    // the band itself never changes on scroll/state/theme. A separate sibling
-    // mask beneath it owns article-text occlusion.
-    let contentMask = readerFrame.querySelector(':scope > [data-topic-feed-story-content-mask]');
-    if (!contentMask) {
-      contentMask = document.createElement('div');
-      contentMask.className = 'topic-feed-story-content-mask';
-      contentMask.dataset.topicFeedStoryContentMask = '1';
-      contentMask.setAttribute('aria-hidden', 'true');
-      readerFrame.insertBefore(contentMask, header);
-    }
-
-    header.classList.remove('topic-feed-story-header-scrolled');
-
-    return { readerFrame, header, spacer, meta, actionRow, contentMask };
+    return { readerFrame, header, spacer, meta, actionRow };
   }
 
   function scheduleTopicFeedStoryBookReflow() {
@@ -858,8 +844,8 @@
     const reader = document.querySelector('#reader');
     if (!reader) return;
 
-    const { readerFrame, header, spacer, meta, actionRow, contentMask } = topicFeedStoryHeaderParts(reader);
-    if (!readerFrame || !header || !spacer || !meta || !contentMask) return;
+    const { readerFrame, header, spacer, meta, actionRow } = topicFeedStoryHeaderParts(reader);
+    if (!readerFrame || !header || !spacer || !meta) return;
 
     const styles = getComputedStyle(reader);
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
@@ -872,29 +858,27 @@
       ? Math.max(1, (usableWidth - columnGap) / 2)
       : usableWidth;
 
-    // CENTER-OF-THE-UNIVERSE: establish the band geometry once per header
-    // instance, then NEVER move, resize, recolor, hide, or restyle it because
-    // of scrolling/app state. Everything else adapts around it.
+    // The opaque Topic Feed header owns the ENTIRE top ceiling of #reader-frame.
+    // Previously the header box itself began at contentTop, leaving the strip
+    // above it uncovered and allowing scrolling prose to show through.
+    //
+    // Start the opaque header at frame top, then retain the old visual position
+    // of Source / View original / article actions with equivalent top padding.
     const frameRect = readerFrame.getBoundingClientRect();
     const readerRect = reader.getBoundingClientRect();
     const left = Math.max(0, readerRect.left - frameRect.left + paddingLeft);
-    const top = Math.max(0, readerRect.top - frameRect.top + paddingTop);
+    const contentTop = Math.max(0, readerRect.top - frameRect.top + paddingTop);
+    // Leave a tiny gap so the Reader's own top boundary line remains visible.
+    // Reduce internal padding by the same amount so Source/actions do not move.
+    const boundaryGap = 1;
+    const headerTop = Math.min(boundaryGap, contentTop);
+    const headerContentPadding = Math.max(0, contentTop - headerTop);
 
-    if (header.dataset.topicFeedUniverseLocked !== '1') {
-      header.dataset.topicFeedUniverseLocked = '1';
-      header.style.setProperty('left', `${left}px`, 'important');
-      header.style.setProperty('top', `${top}px`, 'important');
-      header.style.setProperty('width', `${headerWidth}px`, 'important');
-      header.style.setProperty('max-width', `${headerWidth}px`, 'important');
-      header.style.setProperty('box-sizing', 'border-box', 'important');
-      header.style.setProperty('margin', '0', 'important');
-      header.style.setProperty('padding', '0', 'important');
-      header.style.setProperty('background', 'transparent', 'important');
-      header.style.setProperty('background-image', 'none', 'important');
-      header.style.setProperty('box-shadow', 'none', 'important');
-      header.style.setProperty('border', '0', 'important');
-      header.style.setProperty('z-index', '12', 'important');
-    }
+    header.style.setProperty('left', `${left}px`, 'important');
+    header.style.setProperty('top', `${headerTop}px`, 'important');
+    header.style.setProperty('padding-top', `${headerContentPadding}px`, 'important');
+    header.style.setProperty('width', `${headerWidth}px`, 'important');
+    header.style.setProperty('max-width', `${headerWidth}px`, 'important');
 
     // Undo inline positioning left behind by the broken direct-child version.
     if (actionRow?.isConnected) {
@@ -905,39 +889,15 @@
       actionRow.style.removeProperty('z-index');
     }
 
-    // Never allow a scrolled state to alter the band.
-    header.classList.remove('topic-feed-story-header-scrolled');
-
     window.requestAnimationFrame(() => {
       if (!reader.isConnected || !header.isConnected || !spacer.isConnected) return;
 
-      const headerRect = header.getBoundingClientRect();
-      const lockedHeaderHeight = Math.ceil(headerRect.height || 0);
-
-      // The content mask is NOT the band. It sits beneath the immutable band
-      // and above scrolling article content, so the article disappears under
-      // the band without requiring the band itself to change.
-      const liveFrameRect = readerFrame.getBoundingClientRect();
-      const liveReaderRect = reader.getBoundingClientRect();
-      const maskLeft = Math.max(0, headerRect.left - liveFrameRect.left);
-      const maskTop = Math.max(0, headerRect.top - liveFrameRect.top);
-      const readerPageColor = getComputedStyle(reader).backgroundColor || '#ffffff';
-
-      contentMask.style.setProperty('left', `${maskLeft}px`, 'important');
-      contentMask.style.setProperty('top', `${maskTop}px`, 'important');
-      contentMask.style.setProperty('width', `${Math.ceil(headerRect.width)}px`, 'important');
-      contentMask.style.setProperty('height', `${lockedHeaderHeight + Math.max(6, Math.round(fontSize * .5))}px`, 'important');
-      contentMask.style.setProperty('background', readerPageColor, 'important');
-      contentMask.style.setProperty('background-image', 'none', 'important');
-      contentMask.style.setProperty('border', '0', 'important');
-      contentMask.style.setProperty('box-shadow', 'none', 'important');
-      contentMask.style.setProperty('pointer-events', 'none', 'important');
-      contentMask.style.setProperty('z-index', '11', 'important');
-
-      const headerHeight = lockedHeaderHeight;
-      // Reserve the initial header footprint plus one text-line buffer. That
-      // spacer scrolls away with the article; the external header never does.
-      const requiredHeight = Math.max(fontSize * 2, headerHeight + fontSize);
+      const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
+      // headerHeight now includes the opaque ceiling ABOVE the Reader text.
+      // Exclude that ceiling padding from the in-document spacer so the article
+      // stays at the same starting position.
+      const contentHeaderHeight = Math.max(0, headerHeight - headerContentPadding);
+      const requiredHeight = Math.max(fontSize * 2, contentHeaderHeight + fontSize);
       const previousHeight = Number.parseFloat(spacer.style.height) || 0;
       spacer.style.width = '100%';
       spacer.style.maxWidth = `${headerWidth}px`;
@@ -978,8 +938,8 @@
     const reader = document.querySelector('#reader');
     const frame = reader?.closest('#reader-frame');
     frame?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
-    frame?.querySelector(':scope > [data-topic-feed-story-content-mask]')?.remove();
     reader?.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
+    reader?.querySelectorAll('[data-topic-feed-import-recovery]').forEach((node) => node.remove());
     removeTopicBookDivider();
   }
 
@@ -987,6 +947,97 @@
     const raw = String(text || '').trim();
     if (!raw) return '';
     return raw.replace(/\n{2,}\s*Source:\s*[^\n]+\nhttps?:\/\/\S+\s*$/i, '').trim();
+  }
+
+  const TOPIC_FEED_IMPORT_FALLBACK_TEXT = 'Full article text could not be imported from the publisher.';
+
+  function topicFeedImportFallbackNeeded(payload = {}) {
+    const warning = String(payload?.warning || '');
+    const body = String(payload?.text || '');
+    return Boolean(
+      payload?.fullArticle === false ||
+      warning.includes(TOPIC_FEED_IMPORT_FALLBACK_TEXT) ||
+      body.includes(TOPIC_FEED_IMPORT_FALLBACK_TEXT)
+    );
+  }
+
+  function ensureTopicFeedImportRecoveryStyles() {
+    if (document.getElementById('topic-feed-import-recovery-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'topic-feed-import-recovery-styles';
+    style.textContent = `
+      .topic-feed-import-recovery-inline {
+        font-size: .94em;
+        line-height: 1.4;
+        color: var(--msg-theme-ink, inherit);
+      }
+      .topic-feed-import-recovery-inline a {
+        color: var(--msg-theme-accent, currentColor);
+        font-weight: 700;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        cursor: pointer;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  function openReadAnythingFromTopicFeed(event) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    if (typeof window.MarkSetGoReadAnything?.render === 'function') {
+      window.MarkSetGoReadAnything.render();
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => {
+        const bookmarkletButton = document.querySelector('#read-anything-bookmarklet');
+        bookmarkletButton?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      }));
+      return;
+    }
+
+    document.querySelector('[data-read="upload"], [data-action="read-anything"]')?.click?.();
+  }
+
+  function decorateTopicFeedImportRecovery(payload = activeTopicFeedHeaderContext?.payload || {}) {
+    const reader = document.querySelector('#reader');
+    if (!reader) return false;
+
+    const existing = reader.querySelector('[data-topic-feed-import-recovery]');
+    if (!isTopicFeedReaderActive() || !topicFeedImportFallbackNeeded(payload)) {
+      existing?.remove();
+      return false;
+    }
+    if (existing) return true;
+
+    ensureTopicFeedImportRecoveryStyles();
+
+    // Important: keep this INLINE. The Reader's multicolumn/layout engine can assign
+    // very large used heights to direct block children even when they have zero
+    // padding. An inline note stays in the normal article text flow and cannot
+    // become a 200+ px callout slot.
+    const notice = document.createElement('span');
+    notice.className = 'topic-feed-import-recovery-inline';
+    notice.dataset.topicFeedImportRecovery = '1';
+    notice.setAttribute('role', 'note');
+    notice.innerHTML = `<br><br><strong>Want the full article?</strong>
+      Click <strong>View original</strong> above, then use the
+      <strong>Read with Mark</strong> bookmarklet to import the publisher page.
+      You can find the bookmarklet in the
+      <a href="#read-anything" data-topic-feed-open-read-anything>Read Anything section</a>.`;
+
+    notice.querySelector('[data-topic-feed-open-read-anything]')
+      ?.addEventListener('click', openReadAnythingFromTopicFeed);
+
+    reader.appendChild(notice);
+    return true;
+  }
+
+  function scheduleTopicFeedImportRecovery(payload = activeTopicFeedHeaderContext?.payload || {}) {
+    [0, 80, 220, 520, 900].forEach((delay) => {
+      window.setTimeout(() => {
+        if (isTopicFeedReaderActive()) decorateTopicFeedImportRecovery(payload);
+      }, delay);
+    });
   }
 
   function refreshActiveTopicFeedHeader() {
@@ -1274,6 +1325,7 @@
     activeTopicFeedHeaderContext = { topic, article, payload };
     window.MarkSetGoReadAnything.openDocument(documentRecord);
     topicFeedSourceCredit(topic, article, payload);
+    scheduleTopicFeedImportRecovery(payload);
     scheduleReaderNavigation();
     return true;
   }
@@ -2711,6 +2763,7 @@
   function refreshReaderArticleChrome() {
     if (!isTopicFeedReaderActive() || !activeTopicFeedHeaderContext) return false;
     refreshActiveTopicFeedHeader();
+    scheduleTopicFeedImportRecovery(activeTopicFeedHeaderContext.payload || {});
     scheduleReaderNavigation();
     return true;
   }
