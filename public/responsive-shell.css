@@ -282,5 +282,6 @@ body.msg-primary-reader-standalone:not(.msg-desktop-workspace-active) #app.app-s
 }
 
 
-/* v1.4 — single-Reader width controls disengage completely when
-   a second visible Reader is present. Multi-Reader layout remains native. */
+/* v1.5 — Reader 1 width is independent of Reader 2.
+   In a multi-Reader workspace, #app stays under native workspace control;
+   only the primary Reader shell may resize inside its assigned pane. */

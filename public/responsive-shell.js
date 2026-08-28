@@ -169,25 +169,9 @@
   let readerEdgeLeft = null;
   let readerEdgeRight = null;
 
-  function visibleReaderShells() {
-    return [...document.querySelectorAll('#app .reader-page-panel')].filter((shell) => {
-      const rect = shell.getBoundingClientRect();
-      const style = getComputedStyle(shell);
-      return rect.width > 0
-        && rect.height > 0
-        && style.display !== 'none'
-        && style.visibility !== 'hidden';
-    });
-  }
-
-  function singleReaderSurfaceActive() {
-    return visibleReaderShells().length === 1;
-  }
-
   function standardReaderAvailable() {
     return !document.body.classList.contains('msg-desktop-workspace-active')
-      && window.innerWidth > 760
-      && singleReaderSurfaceActive();
+      && window.innerWidth > 760;
   }
 
   function readerShell() {
@@ -202,10 +186,17 @@
   }
 
 
+  function secondaryWorkspaceReaderActive() {
+    return !!document.querySelector(
+      '.msg-workspace-secondary .msg-workspace-secondary-reader-page.msg-workspace-panel-active, ' +
+      '.msg-workspace-secondary .msg-workspace-aux-reader-page.msg-workspace-panel-active'
+    );
+  }
+
   function standaloneReaderActive() {
     return document.body.classList.contains('msg-primary-reader-standalone')
       && !document.body.classList.contains('msg-desktop-workspace-active')
-      && singleReaderSurfaceActive();
+      && !secondaryWorkspaceReaderActive();
   }
 
   function standaloneReaderChromeWidth() {
@@ -238,6 +229,7 @@
   }
 
   function clearStandaloneAppWidth() {
+    if (!standaloneReaderActive()) return;
     ['box-sizing','width','max-width','margin-left','margin-right'].forEach((prop) => {
       app.style.removeProperty(prop);
     });
@@ -308,6 +300,8 @@
 
     if (standaloneReaderActive()) {
       setStandaloneAppWidthForReader(width);
+    } else if (secondaryWorkspaceReaderActive()) {
+      clearStandaloneAppWidth();
     }
 
     setShellWidthImportant(shell, `${width}px`);
@@ -569,6 +563,11 @@
       event.preventDefault();
       event.stopPropagation();
 
+      if (secondaryWorkspaceReaderActive()) {
+        document.querySelector('.msg-workspace-shell')?.classList.remove('msg-reader-focus-mode');
+        clearStandaloneAppWidth();
+      }
+
       readerWidthDrag = {
         pointerId: event.pointerId,
         startX: event.clientX,
@@ -625,11 +624,16 @@
     retireObsoleteReaderSurfaceHandle();
     document.querySelectorAll('.msg-primary-reader-resize-grip').forEach((grip) => grip.remove());
     removeLegacyReaderEdgeOverlays();
+
+    if (secondaryWorkspaceReaderActive()) {
+      document.querySelector('.msg-workspace-shell')?.classList.remove('msg-reader-focus-mode');
+      clearStandaloneAppWidth();
+    }
+
     normalizeReaderTopicsToggle();
 
     const shell = readerShell();
     if (!shell) {
-      clearStandaloneAppWidth();
       return;
     }
 
@@ -643,7 +647,6 @@
 
     if (!standardReaderAvailable()) {
       clearShellWidth(shell);
-      clearStandaloneAppWidth();
       updateReaderWindowButton();
       return;
     }
