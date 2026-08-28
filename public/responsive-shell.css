@@ -131,28 +131,6 @@ body:not(.msg-desktop-workspace-active) .msg-reader-window-edge {
   touch-action: none;
   background: transparent;
 }
-body:not(.msg-desktop-workspace-active) .msg-reader-window-edge::after {
-  content: "";
-  position: absolute;
-  top: 40%;
-  bottom: 40%;
-  width: 2px;
-  border-radius: 999px;
-  background: currentColor;
-  opacity: 0;
-  transition: opacity .12s ease;
-  pointer-events: none;
-}
-body:not(.msg-desktop-workspace-active) .msg-reader-window-edge-left::after {
-  right: 3px;
-}
-body:not(.msg-desktop-workspace-active) .msg-reader-window-edge-right::after {
-  left: 3px;
-}
-body:not(.msg-desktop-workspace-active) .msg-reader-window-edge:hover::after,
-body.msg-reader-window-resizing .msg-reader-window-edge::after {
-  opacity: .28;
-}
 body.msg-reader-window-resizing {
   cursor: ew-resize !important;
   user-select: none !important;
@@ -245,4 +223,19 @@ body.msg-reader-window-resizing {
   inset: auto !important;
   margin: 0 !important;
   transform: none !important;
+}
+
+
+/* v0.9 — Reader resize edges are interaction-only.
+   No visible tab, bar, line, pill, or semicircle should ever render. */
+.msg-reader-window-edge::before,
+.msg-reader-window-edge::after {
+  content: none !important;
+  display: none !important;
+}
+.msg-reader-window-edge {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
 }
