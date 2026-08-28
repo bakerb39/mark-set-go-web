@@ -231,7 +231,6 @@
   }
 
   function clearStandaloneAppWidth() {
-    if (!standaloneReaderActive()) return;
     ['box-sizing','width','max-width','margin-left','margin-right'].forEach((prop) => {
       app.style.removeProperty(prop);
     });
@@ -341,14 +340,12 @@
     }
 
     updateReaderWindowButton();
-    try { window.dispatchEvent(new Event('resize')); } catch {}
   }
 
   function snapReaderSmaller() {
     setReaderWidth(storedReaderWidth() || comfortableReaderWidth(), true);
     try { localStorage.setItem(READER_COLLAPSED_KEY, '1'); } catch {}
     updateReaderWindowButton();
-    try { window.dispatchEvent(new Event('resize')); } catch {}
   }
 
   function retireObsoleteReaderSurfaceHandle() {
@@ -635,6 +632,10 @@
 
     if (secondaryWorkspaceReaderActive()) {
       document.querySelector('.msg-workspace-shell')?.classList.remove('msg-reader-focus-mode');
+      clearStandaloneAppWidth();
+    }
+
+    if (!document.body.classList.contains('msg-primary-reader-standalone')) {
       clearStandaloneAppWidth();
     }
 
