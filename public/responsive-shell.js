@@ -107,7 +107,6 @@
         : drag.startWidth - (delta * 2);
 
       setWidth(next, false);
-      try { window.dispatchEvent(new Event('resize')); } catch {}
     });
 
     const finish = (event) => {
@@ -117,7 +116,6 @@
       drag = null;
       document.body.classList.remove('msg-desktop-shell-resizing');
       try { handle.releasePointerCapture(event.pointerId); } catch {}
-      try { window.dispatchEvent(new Event('resize')); } catch {}
     };
 
     handle.addEventListener('pointerup', finish);
@@ -126,7 +124,6 @@
     handle.addEventListener('dblclick', () => {
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
       setWidth(Math.min(1180, safeMaxWidth()), true);
-      try { window.dispatchEvent(new Event('resize')); } catch {}
     });
   }
 
@@ -170,7 +167,7 @@
   let readerEdgeRight = null;
 
   function standardReaderAvailable() {
-    return !document.body.classList.contains('msg-desktop-workspace-active')
+    return !desktopWorkspaceActive()
       && window.innerWidth > 760;
   }
 
@@ -193,9 +190,14 @@
     );
   }
 
+  function desktopWorkspaceActive() {
+    return document.body.classList.contains('msg-desktop-workspace-active')
+      || !!document.querySelector('.msg-workspace-shell.msg-desktop-workspace');
+  }
+
   function standaloneReaderActive() {
     return document.body.classList.contains('msg-primary-reader-standalone')
-      && !document.body.classList.contains('msg-desktop-workspace-active')
+      && !desktopWorkspaceActive()
       && !secondaryWorkspaceReaderActive();
   }
 
@@ -603,7 +605,6 @@
       document.body.classList.remove('msg-reader-window-resizing');
       shell.style.cursor = '';
       try { shell.releasePointerCapture(event.pointerId); } catch {}
-      try { window.dispatchEvent(new Event('resize')); } catch {}
     };
 
     shell.addEventListener('pointerup', finish);
@@ -624,6 +625,13 @@
     retireObsoleteReaderSurfaceHandle();
     document.querySelectorAll('.msg-primary-reader-resize-grip').forEach((grip) => grip.remove());
     removeLegacyReaderEdgeOverlays();
+
+    if (desktopWorkspaceActive()) {
+      clearStandaloneAppWidth();
+      const shell = readerShell();
+      if (shell) clearShellWidth(shell);
+      return;
+    }
 
     if (secondaryWorkspaceReaderActive()) {
       document.querySelector('.msg-workspace-shell')?.classList.remove('msg-reader-focus-mode');

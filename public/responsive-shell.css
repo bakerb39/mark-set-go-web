@@ -285,3 +285,14 @@ body.msg-primary-reader-standalone:not(.msg-desktop-workspace-active) #app.app-s
 /* v1.5 — Reader 1 width is independent of Reader 2.
    In a multi-Reader workspace, #app stays under native workspace control;
    only the primary Reader shell may resize inside its assigned pane. */
+
+
+/* v1.6 — Desktop workspace owns its own geometry.
+   Never let Standard Reader outer-shell sizing constrain the whole Desktop canvas. */
+body.msg-desktop-workspace-active #app.app-shell,
+#app.app-shell:has(.msg-workspace-shell.msg-desktop-workspace) {
+  width: auto !important;
+  max-width: none !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
