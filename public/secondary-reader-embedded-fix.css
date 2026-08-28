@@ -1,4 +1,4 @@
-/* Mark, Set, Go! — embedded Reader 2+ containment v3.4
+/* Mark, Set, Go! — embedded Reader 2+ containment v3.2
    Applies only inside auxiliary Reader documents loaded in the workspace. */
 html.msg-secondary-reader-document,
 html.msg-secondary-reader-document body {
@@ -57,4 +57,21 @@ html.msg-secondary-reader-document #msg-reader-window-toggle,
 html.msg-secondary-reader-document .msg-reader-window-control-group,
 html.msg-secondary-reader-document .msg-primary-reader-resize-grip {
   display: none !important;
+}
+
+
+/* v3.5 — secondary Reader first-paint ownership.
+   Higher specificity than experience-theme body rules; permanent by design. */
+html.msg-actual-frame-context.msg-secondary-reader-document,
+html.msg-actual-frame-context.msg-secondary-reader-document > body {
+  background: #fff !important;
+  background-color: #fff !important;
+  background-image: none !important;
+}
+html.msg-actual-frame-context.msg-secondary-reader-document .explorer-world-art,
+html.msg-actual-frame-context.msg-secondary-reader-document .msg-vd-center-work-surface,
+html.msg-actual-frame-context.msg-secondary-reader-document #msg-vd-surface-handle {
+  display: none !important;
+  background: none !important;
+  background-image: none !important;
 }

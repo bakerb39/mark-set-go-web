@@ -61,15 +61,10 @@
     });
   }
 
-  function releaseFirstPaintShield() {
-    document.documentElement.classList.remove('msg-secondary-reader-booting');
-  }
-
   function normalizeEmbeddedReader() {
     clearEmbeddedStandaloneWidth();
     clearEmbeddedThemeBackground();
-    const readerReady = forceEmbeddedLightReader();
-    if (readerReady) releaseFirstPaintShield();
+    forceEmbeddedLightReader();
   }
 
   function scheduleNormalize() {
