@@ -272,3 +272,10 @@ body .msg-primary-reader-resize-grip,
   content: none !important;
   display: none !important;
 }
+
+
+/* v1.2 — standalone Reader may expand beyond the normal app-shell width.
+   The Reader itself stays centered and never exceeds the viewport safe gutter. */
+body.msg-primary-reader-standalone #app {
+  overflow: visible !important;
+}

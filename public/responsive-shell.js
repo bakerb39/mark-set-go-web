@@ -200,7 +200,17 @@
   }
 
   function maxReaderWidth() {
-    return readerShellParentWidth();
+    const shell = readerShell();
+    const parentWidth = readerShellParentWidth();
+    if (!shell) return parentWidth;
+
+    const standalone = document.body.classList.contains('msg-primary-reader-standalone');
+    if (!standalone) return parentWidth;
+
+    // Standalone Reader may expand beyond the normal app-shell width while
+    // preserving a small safe gutter at both viewport edges.
+    const safeViewportWidth = Math.max(0, Math.floor(window.innerWidth - 32));
+    return Math.max(parentWidth, safeViewportWidth);
   }
 
   function minReaderWidth() {
@@ -222,13 +232,23 @@
   function setShellWidthImportant(shell, value) {
     shell.style.setProperty('box-sizing', 'border-box', 'important');
     shell.style.setProperty('width', value, 'important');
-    shell.style.setProperty('max-width', '100%', 'important');
-    shell.style.setProperty('margin-left', 'auto', 'important');
-    shell.style.setProperty('margin-right', 'auto', 'important');
+
+    const standalone = document.body.classList.contains('msg-primary-reader-standalone');
+    if (standalone) {
+      shell.style.setProperty('max-width', 'calc(100vw - 32px)', 'important');
+      shell.style.setProperty('margin-left', '50%', 'important');
+      shell.style.setProperty('margin-right', '0', 'important');
+      shell.style.setProperty('transform', 'translateX(-50%)', 'important');
+    } else {
+      shell.style.setProperty('max-width', '100%', 'important');
+      shell.style.setProperty('margin-left', 'auto', 'important');
+      shell.style.setProperty('margin-right', 'auto', 'important');
+      shell.style.removeProperty('transform');
+    }
   }
 
   function clearShellWidth(shell) {
-    ['box-sizing','width','max-width','margin-left','margin-right'].forEach((prop) => {
+    ['box-sizing','width','max-width','margin-left','margin-right','transform'].forEach((prop) => {
       shell.style.removeProperty(prop);
     });
   }
