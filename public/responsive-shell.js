@@ -252,7 +252,6 @@
       } catch {}
     }
 
-    positionReaderEdges();
     updateReaderWindowButton();
   }
 
@@ -274,7 +273,6 @@
       } catch {}
     }
 
-    positionReaderEdges();
     updateReaderWindowButton();
     try { window.dispatchEvent(new Event('resize')); } catch {}
   }
@@ -465,52 +463,37 @@
     button.setAttribute('aria-pressed', isSmaller ? 'true' : 'false');
   }
 
-  function ensureReaderEdges() {
-    if (!readerEdgeLeft) {
-      readerEdgeLeft = document.createElement('div');
-      readerEdgeLeft.className = 'msg-reader-window-edge msg-reader-window-edge-left';
-      readerEdgeLeft.dataset.readerWindowEdge = 'left';
-      readerEdgeLeft.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(readerEdgeLeft);
-      bindReaderEdge(readerEdgeLeft);
-    }
-
-    if (!readerEdgeRight) {
-      readerEdgeRight = document.createElement('div');
-      readerEdgeRight.className = 'msg-reader-window-edge msg-reader-window-edge-right';
-      readerEdgeRight.dataset.readerWindowEdge = 'right';
-      readerEdgeRight.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(readerEdgeRight);
-      bindReaderEdge(readerEdgeRight);
-    }
-  }
-
-  function positionReaderEdges() {
+  function ensureReaderEdgeResizeBinding() {
     const shell = readerShell();
-    if (!shell || !readerEdgeLeft || !readerEdgeRight || !standardReaderAvailable()) {
-      if (readerEdgeLeft) readerEdgeLeft.style.display = 'none';
-      if (readerEdgeRight) readerEdgeRight.style.display = 'none';
-      return;
+    if (!shell || shell.dataset.readerEdgeResizeBound === '1') return;
+
+    shell.dataset.readerEdgeResizeBound = '1';
+
+    const EDGE_HIT_PX = 10;
+
+    function edgeForPointer(event) {
+      if (!standardReaderAvailable()) return null;
+      const rect = shell.getBoundingClientRect();
+      const leftDistance = Math.abs(event.clientX - rect.left);
+      const rightDistance = Math.abs(rect.right - event.clientX);
+
+      if (leftDistance <= EDGE_HIT_PX) return 'left';
+      if (rightDistance <= EDGE_HIT_PX) return 'right';
+      return null;
     }
 
-    const rect = shell.getBoundingClientRect();
-    const top = Math.max(0, Math.round(rect.top));
-    const height = Math.max(0, Math.round(rect.height));
+    shell.addEventListener('pointermove', (event) => {
+      if (readerWidthDrag) return;
+      shell.style.cursor = edgeForPointer(event) ? 'ew-resize' : '';
+    });
 
-    readerEdgeLeft.style.display = 'block';
-    readerEdgeRight.style.display = 'block';
-    readerEdgeLeft.style.left = `${Math.round(rect.left - 6)}px`;
-    readerEdgeRight.style.left = `${Math.round(rect.right - 6)}px`;
-    readerEdgeLeft.style.top = `${top}px`;
-    readerEdgeRight.style.top = `${top}px`;
-    readerEdgeLeft.style.height = `${height}px`;
-    readerEdgeRight.style.height = `${height}px`;
-  }
+    shell.addEventListener('pointerleave', () => {
+      if (!readerWidthDrag) shell.style.cursor = '';
+    });
 
-  function bindReaderEdge(edge) {
-    edge.addEventListener('pointerdown', (event) => {
-      const shell = readerShell();
-      if (!shell || !standardReaderAvailable()) return;
+    shell.addEventListener('pointerdown', (event) => {
+      const edge = edgeForPointer(event);
+      if (!edge || !standardReaderAvailable()) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -519,17 +502,18 @@
         pointerId: event.pointerId,
         startX: event.clientX,
         startWidth: shell.getBoundingClientRect().width,
-        edge: edge.dataset.readerWindowEdge
+        edge
       };
 
-      try { edge.setPointerCapture(event.pointerId); } catch {}
+      try { shell.setPointerCapture(event.pointerId); } catch {}
       document.body.classList.add('msg-reader-window-resizing');
+      shell.style.cursor = 'ew-resize';
     });
 
-    edge.addEventListener('pointermove', (event) => {
+    shell.addEventListener('pointermove', (event) => {
       if (!readerWidthDrag || readerWidthDrag.pointerId !== event.pointerId) return;
-      event.preventDefault();
 
+      event.preventDefault();
       const delta = event.clientX - readerWidthDrag.startX;
       const next = readerWidthDrag.edge === 'right'
         ? readerWidthDrag.startWidth + (delta * 2)
@@ -540,43 +524,52 @@
 
     const finish = (event) => {
       if (!readerWidthDrag || readerWidthDrag.pointerId !== event.pointerId) return;
-      event.preventDefault();
 
-      const shell = readerShell();
-      if (shell) setReaderWidth(shell.getBoundingClientRect().width, true);
+      event.preventDefault();
+      setReaderWidth(shell.getBoundingClientRect().width, true);
 
       readerWidthDrag = null;
       document.body.classList.remove('msg-reader-window-resizing');
-      try { edge.releasePointerCapture(event.pointerId); } catch {}
+      shell.style.cursor = '';
+      try { shell.releasePointerCapture(event.pointerId); } catch {}
       try { window.dispatchEvent(new Event('resize')); } catch {}
     };
 
-    edge.addEventListener('pointerup', finish);
-    edge.addEventListener('pointercancel', finish);
-    edge.addEventListener('dblclick', () => restoreReaderFullWidth(true));
+    shell.addEventListener('pointerup', finish);
+    shell.addEventListener('pointercancel', finish);
+
+    shell.addEventListener('dblclick', (event) => {
+      if (edgeForPointer(event)) restoreReaderFullWidth(true);
+    });
+  }
+
+  function removeLegacyReaderEdgeOverlays() {
+    document.querySelectorAll('.msg-reader-window-edge').forEach((edge) => edge.remove());
+    readerEdgeLeft = null;
+    readerEdgeRight = null;
   }
 
   function syncStandardReaderWindow() {
     retireObsoleteReaderSurfaceHandle();
+    removeLegacyReaderEdgeOverlays();
     normalizeReaderTopicsToggle();
 
     const shell = readerShell();
     if (!shell) {
-      positionReaderEdges();
       return;
     }
 
     try { ensureReaderWindowButton(); } catch (error) {
       console.warn('Reader width button could not be placed.', error);
     }
-    try { ensureReaderEdges(); } catch (error) {
-      console.warn('Reader width edge controls could not be initialized.', error);
+    removeLegacyReaderEdgeOverlays();
+    try { ensureReaderEdgeResizeBinding(); } catch (error) {
+      console.warn('Reader edge resizing could not be initialized.', error);
     }
 
     if (!standardReaderAvailable()) {
       clearShellWidth(shell);
       updateReaderWindowButton();
-      positionReaderEdges();
       return;
     }
 
@@ -587,7 +580,6 @@
     }
 
     updateReaderWindowButton();
-    requestAnimationFrame(positionReaderEdges);
   }
 
   /* Bounded resyncs only. */
@@ -604,8 +596,7 @@
     if (!shell) return;
 
     if (readerWidthDrag) {
-      requestAnimationFrame(positionReaderEdges);
-      return;
+        return;
     }
 
     if (standardReaderAvailable() && readerCollapsed()) {
@@ -614,10 +605,8 @@
       clearShellWidth(shell);
     }
 
-    requestAnimationFrame(positionReaderEdges);
   }, { passive: true });
 
-  window.addEventListener('scroll', () => requestAnimationFrame(positionReaderEdges), { passive: true });
 
   [0, 100, 300, 700, 1200].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
 

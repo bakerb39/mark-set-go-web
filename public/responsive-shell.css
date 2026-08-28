@@ -239,3 +239,12 @@ body.msg-reader-window-resizing {
   box-shadow: none !important;
   outline: 0 !important;
 }
+
+
+/* v1.0 — no separate Reader-edge overlay elements.
+   Edge resizing is handled directly by the Reader shell. */
+.msg-reader-window-edge {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
