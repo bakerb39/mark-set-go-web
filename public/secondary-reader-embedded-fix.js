@@ -49,8 +49,8 @@
     const body = document.body;
     [html, body].forEach((node) => {
       if (!node) return;
-      node.style.setProperty('background', 'transparent', 'important');
-      node.style.setProperty('background-color', 'transparent', 'important');
+      node.style.setProperty('background', '#fff', 'important');
+      node.style.setProperty('background-color', '#fff', 'important');
       node.style.setProperty('background-image', 'none', 'important');
     });
 

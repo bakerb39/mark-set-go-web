@@ -9,8 +9,8 @@ html.msg-secondary-reader-document body {
   min-height: 0 !important;
   margin: 0 !important;
   padding: 0 !important;
-  background: transparent !important;
-  background-color: transparent !important;
+  background: #fff !important;
+  background-color: #fff !important;
   background-image: none !important;
 }
 
