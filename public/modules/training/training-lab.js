@@ -197,39 +197,21 @@
     let i=0; const next=()=>{ if(i>=steps.length)return; const s=steps[i++]; s.go(); if(s.ms) runtime.timer=setTimeout(next,s.ms); }; next();
   }
 
-  function injectLaunchButton(){
-    // The Reader UI is rendered dynamically. Never fall back to the permanent
-    // site header: doing so can create the button before the Reader exists and
-    // then prevent it from ever being attached to the Reader controls.
-    const readerEl=$('#reader');
-    const readerPanel=readerEl?.closest('.reader-page-panel, .panel, section, main');
-    const anchor=readerPanel?.querySelector('.reader-pane-buttons') || null;
-    if(!anchor)return false;
-
-    let b=$('#training-lab-launch');
-    if(!b){
-      b=document.createElement('button');
-      b.id='training-lab-launch';
-      b.type='button';
-      b.className='training-lab-launch-button';
-      b.innerHTML='<span aria-hidden="true">◈</span> Training Lab';
-      b.addEventListener('click',()=>openLab('today'));
-    }
-    if(b.parentElement!==anchor) anchor.appendChild(b);
-    return true;
+  function boot(){
+    buildLab();
+    document.addEventListener('click',e=>{
+      const trigger=e.target.closest('[data-action="training-lab"]');
+      if(!trigger)return;
+      e.preventDefault();
+      openLab('today');
+      const menu=trigger.closest('details.top-nav-menu');
+      if(menu)menu.open=false;
+    });
+    window.addEventListener('keydown',e=>{
+      if(e.key==='Escape'&&!$('#training-lab-shell')?.hidden)closeLab();
+    });
+    dispatch('marksetgo:training-ready');
   }
-  function scheduleLaunchButton(){
-    // Short bounded retry handles the app's synchronous/dynamic Reader render
-    // without MutationObserver and without continuously polling the page.
-    let attempts=0;
-    const tryAttach=()=>{
-      attempts+=1;
-      if(injectLaunchButton() || attempts>=20)return;
-      setTimeout(tryAttach,100);
-    };
-    setTimeout(tryAttach,0);
-  }
-  function boot(){ buildLab(); scheduleLaunchButton(); document.addEventListener('marksetgo:document-available',scheduleLaunchButton); document.addEventListener('marksetgo:reader-session-changed',scheduleLaunchButton); document.addEventListener('click',e=>{ if(e.target.closest('[data-action="reader"], [data-read], [data-action="reading-skills"]')) scheduleLaunchButton(); }); window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#training-lab-shell')?.hidden)closeLab();}); dispatch('marksetgo:training-ready'); }
 
   window.MarkSetGoTrainingLab={version:VERSION,open:openLab,close:closeLab,run:runExercise,stop:clearRuntime,getProgress:()=>typeof structuredClone==='function'?structuredClone(data):JSON.parse(JSON.stringify(data)),recordAssessment:submitAssessment,setWpm};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
