@@ -293,6 +293,38 @@
     return true;
   }
 
+  function normalizeReaderTopicsToggle() {
+    const toggle = document.querySelector('#app .reader-pane-buttons #toggle-navigation-pane');
+    if (!toggle) return false;
+
+    // Keep the native My Topics control in the toolbar. Some existing Reader/topic
+    // styles turn this same button into a left-edge semicircular tab after a
+    // workspace transition; manual Reader resizing makes that presentation obsolete.
+    const props = {
+      position: 'static',
+      inset: 'auto',
+      left: 'auto',
+      right: 'auto',
+      top: 'auto',
+      bottom: 'auto',
+      transform: 'none',
+      translate: 'none',
+      width: 'auto',
+      height: 'auto',
+      margin: '0',
+      clipPath: 'none'
+    };
+    Object.entries(props).forEach(([key, value]) => {
+      toggle.style.setProperty(
+        key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`),
+        value,
+        'important'
+      );
+    });
+    toggle.classList.add('msg-reader-topics-toolbar-normalized');
+    return true;
+  }
+
   function visibleReaderCloseButton() {
     const shell = readerShell();
     if (!shell) return null;
@@ -335,8 +367,8 @@
     const shell = readerShell();
     if (!shell) return null;
 
-    let button = shell.querySelector('#msg-reader-window-toggle');
     const closeButton = visibleReaderCloseButton();
+    let button = shell.querySelector('#msg-reader-window-toggle');
 
     if (!button) {
       button = document.createElement('button');
@@ -358,13 +390,52 @@
     }
 
     if (closeButton?.parentNode) {
-      // Match the existing Reader X styling without copying any close action/data.
+      let group = shell.querySelector('.msg-reader-window-control-group');
+
+      if (!group) {
+        group = document.createElement('div');
+        group.className = 'msg-reader-window-control-group';
+      }
+
+      // Capture the X's current window-level position before moving it. The group
+      // assumes that position; both child buttons then become ordinary static controls.
+      const closeStyle = getComputedStyle(closeButton);
+      const parent = closeButton.parentNode;
+
+      if (group.parentNode !== parent) {
+        parent.insertBefore(group, closeButton);
+      }
+
+      const copied = ['position','top','right','bottom','left','z-index'];
+      copied.forEach((prop) => {
+        const value = closeStyle.getPropertyValue(prop);
+        if (value && value !== 'auto') group.style.setProperty(prop, value);
+      });
+
+      group.style.setProperty('display', 'inline-flex', 'important');
+      group.style.setProperty('align-items', 'center', 'important');
+      group.style.setProperty('gap', '4px', 'important');
+
+      if (button.parentNode !== group) group.appendChild(button);
+      if (closeButton.parentNode !== group) group.appendChild(closeButton);
+
+      // Preserve the existing X classes/handler but neutralize its old absolute
+      // positioning now that the wrapper owns the window-control position.
+      [button, closeButton].forEach((control) => {
+        control.style.setProperty('position', 'static', 'important');
+        control.style.setProperty('inset', 'auto', 'important');
+        control.style.setProperty('top', 'auto', 'important');
+        control.style.setProperty('right', 'auto', 'important');
+        control.style.setProperty('bottom', 'auto', 'important');
+        control.style.setProperty('left', 'auto', 'important');
+        control.style.setProperty('transform', 'none', 'important');
+        control.style.setProperty('margin', '0', 'important');
+      });
+
+      // Match the X's visual classes without copying any close-specific data attrs.
       const closeClasses = [...closeButton.classList]
         .filter((name) => !/^msg-reader-window-/.test(name));
       button.className = [...new Set([...closeClasses, 'msg-reader-window-toggle'])].join(' ');
-      if (button.parentNode !== closeButton.parentNode || button.nextSibling !== closeButton) {
-        closeButton.parentNode.insertBefore(button, closeButton);
-      }
     }
 
     return button;
@@ -477,6 +548,7 @@
 
   function syncStandardReaderWindow() {
     retireObsoleteReaderSurfaceHandle();
+    normalizeReaderTopicsToggle();
 
     const shell = readerShell();
     if (!shell) {
