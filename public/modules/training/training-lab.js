@@ -7,9 +7,9 @@
   'use strict';
   if (window.MarkSetGoTrainingLab) return;
 
-  const VERSION = '0.1.1';
+  const VERSION = '0.2.0-reader-integrated';
   const STORAGE_KEY = 'markSetGoTrainingLabV1';
-  const runtime = { raf:0, timer:0, mode:'', startedAt:0, startIndex:0, startWpm:0, burstPhase:0, overlay:null, hud:null, session:null };
+  const runtime = { raf:0, timer:0, mode:'', startedAt:0, startIndex:0, startWpm:0, burstPhase:0, overlay:null, hud:null, session:null, scopedNodes:null, fixationCursor:0, peripheralCursor:0 };
   const DEFAULTS = {
     baselineWpm: 300, comprehension: 85, trainingWpm: 330, stretchWpm: 390,
     visualSpan: 3, fixationsPerLine: 4, regressionLevel: 'soft',
@@ -17,8 +17,8 @@
   };
 
   const EXERCISES = [
-    {id:'fixation',group:'eyes',title:'Fixation Trainer',tag:'Ready',desc:'Places 2–5 fixation targets across each rendered line so the eyes practice fewer, larger jumps.'},
-    {id:'peripheral',group:'eyes',title:'Peripheral Span',tag:'Ready',desc:'Keeps a central fixation cue while expanding the amount of text that must be captured around it.'},
+    {id:'fixation',group:'eyes',title:'Fixation Trainer',tag:'Ready',desc:'Guides your eyes through fixation points on the text you are actually reading, using highlighted text when you select a passage.'},
+    {id:'peripheral',group:'eyes',title:'Peripheral Span',tag:'Ready',desc:'Uses words from your current Reader passage and expands the phrase around a fixed center word.'},
     {id:'regression',group:'eyes',title:'Regression Control',tag:'Ready',desc:'Progressively fades words behind the reading position to discourage unnecessary backward jumps.'},
     {id:'edge',group:'eyes',title:'Edge Avoidance',tag:'Experimental',desc:'Encourages fixation inside the line rather than on its first and last words; implemented through target placement.'},
     {id:'burst',group:'speed',title:'Speed Bursts',tag:'Ready',desc:'Alternates training and stretch WPM to create progressive overload without sustaining an unrealistic pace.'},
@@ -40,6 +40,26 @@
   function clamp(n,min,max){ return Math.min(max,Math.max(min,Number(n)||0)); }
   function reader(){ return $('#reader'); }
   function wordNodes(){ return $$('#reader .reader-word[data-index]'); }
+  function selectedReaderWordNodes(){
+    const selection=window.getSelection?.();
+    if(!selection || selection.rangeCount===0 || selection.isCollapsed) return [];
+    const r=reader(); if(!r) return [];
+    const range=selection.getRangeAt(0);
+    if(!r.contains(range.commonAncestorContainer)) return [];
+    return wordNodes().filter(node=>{
+      try { return range.intersectsNode(node); } catch { return false; }
+    });
+  }
+  function exerciseWordNodes(){
+    if(Array.isArray(runtime.scopedNodes) && runtime.scopedNodes.length) return runtime.scopedNodes.filter(n=>n?.isConnected);
+    const selected=selectedReaderWordNodes();
+    if(selected.length){ runtime.scopedNodes=selected; return selected; }
+    return wordNodes();
+  }
+  function captureExerciseScope(){
+    runtime.scopedNodes=selectedReaderWordNodes();
+    return runtime.scopedNodes.length ? 'Highlighted text' : 'Current Reader text';
+  }
   function currentIndex(){
     try { if (typeof state !== 'undefined' && Number.isFinite(Number(state.index))) return Number(state.index); } catch {}
     const active = $('#reader .reader-word.active, #reader .reader-word.current, #reader .reader-word.is-active');
@@ -70,7 +90,7 @@
   }
   function clearRuntime(){
     cancelAnimationFrame(runtime.raf); clearTimeout(runtime.timer); runtime.raf=0; runtime.timer=0;
-    const r=reader(); if(r){ r.classList.remove('training-regression-soft','training-regression-medium','training-regression-strict'); wordNodes().forEach(n=>n.classList.remove('tl-read')); }
+    const r=reader(); if(r){ r.classList.remove('training-regression-soft','training-regression-medium','training-regression-strict'); wordNodes().forEach(n=>n.classList.remove('tl-read','tl-fixation-active','tl-peripheral-word','tl-peripheral-center-word')); runtime.scopedNodes=null; runtime.fixationCursor=0; runtime.peripheralCursor=0; }
     $('#training-runtime-layer')?.remove(); runtime.overlay=null; runtime.hud=null; runtime.mode='';
     dispatch('marksetgo:training-stopped');
   }
@@ -82,21 +102,55 @@
   }
   function escapeHtml(v){ return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c])); }
 
-  function visualLines(){
-    const nodes=wordNodes().filter(n=>{ const r=n.getBoundingClientRect(); return r.width && r.height && r.bottom>0 && r.top<innerHeight; });
+  function visualLines(nodes=exerciseWordNodes()){
+    const rr=reader()?.getBoundingClientRect();
+    const visible=nodes.filter(n=>{ const r=n.getBoundingClientRect(); return r.width && r.height && rr && r.bottom>rr.top && r.top<rr.bottom && r.right>rr.left && r.left<rr.right; });
     const lines=[]; const tol=6;
-    for(const n of nodes){ const r=n.getBoundingClientRect(); let line=lines.find(x=>Math.abs(x.top-r.top)<tol); if(!line){ line={top:r.top,bottom:r.bottom,nodes:[]}; lines.push(line); } line.nodes.push(n); line.bottom=Math.max(line.bottom,r.bottom); }
+    for(const n of visible){ const r=n.getBoundingClientRect(); let line=lines.find(x=>Math.abs(x.top-r.top)<tol); if(!line){ line={top:r.top,bottom:r.bottom,nodes:[]}; lines.push(line); } line.nodes.push(n); line.bottom=Math.max(line.bottom,r.bottom); }
     return lines.sort((a,b)=>a.top-b.top);
   }
+  function fixationTargets(nodes, perLine){
+    const lines=[]; const tol=6;
+    for(const n of nodes){ const r=n.getBoundingClientRect(); let line=lines.find(x=>Math.abs(x.top-r.top)<tol); if(!line){ line={top:r.top,nodes:[]}; lines.push(line); } line.nodes.push(n); }
+    const targets=[];
+    for(const line of lines){
+      const count=Math.min(perLine,line.nodes.length);
+      for(let i=0;i<count;i++){
+        const pos=Math.min(line.nodes.length-1,Math.round(((i+.5)/count)*(line.nodes.length-1)));
+        const node=line.nodes[pos]; if(node && !targets.includes(node)) targets.push(node);
+      }
+    }
+    return targets;
+  }
   function runFixation({targets=data.fixationsPerLine||4}={}){
-    if(!hasDocument()) return notifyNeedReader(); clearRuntime(); runtime.mode='fixation'; hud('Fixation Trainer',`${targets} targets per visual line`);
+    if(!hasDocument()) return notifyNeedReader(); clearRuntime(); runtime.mode='fixation';
+    const scope=captureExerciseScope();
+    const nodes=exerciseWordNodes();
+    const targetNodes=fixationTargets(nodes,Math.max(2,Math.min(5,targets)));
+    if(!targetNodes.length) return notifyNeedReader();
     const layer=ensureRuntimeLayer();
-    const paint=()=>{ if(runtime.mode!=='fixation')return; $$('.tl-fixation-dot',layer).forEach(n=>n.remove()); const lines=visualLines(); for(const line of lines){ const nodes=line.nodes; if(nodes.length<2)continue; const count=Math.min(targets,nodes.length); for(let i=0;i<count;i++){ const pos=Math.round(((i+.5)/count)*(nodes.length-1)); const rect=nodes[pos].getBoundingClientRect(); const dot=document.createElement('span'); dot.className='tl-fixation-dot'; dot.style.left=`${rect.left+rect.width/2}px`; dot.style.top=`${line.bottom+7}px`; layer.appendChild(dot); } } runtime.raf=requestAnimationFrame(paint); };
-    paint(); dispatch('marksetgo:training-started',{exercise:'fixation'});
+    const dot=document.createElement('span'); dot.className='tl-fixation-dot tl-fixation-dot-active'; layer.appendChild(dot);
+    hud('Fixation Trainer',`${scope} · ${Math.max(2,Math.min(5,targets))} fixations/line`);
+    const step=()=>{
+      if(runtime.mode!=='fixation') return;
+      wordNodes().forEach(n=>n.classList.remove('tl-fixation-active'));
+      const node=targetNodes[runtime.fixationCursor % targetNodes.length];
+      if(!node?.isConnected){ clearRuntime(); return; }
+      node.scrollIntoView({block:'nearest',inline:'nearest'});
+      const rect=node.getBoundingClientRect(); const rr=reader().getBoundingClientRect();
+      dot.style.left=`${Math.max(rr.left+6,Math.min(rr.right-6,rect.left+rect.width/2))}px`;
+      dot.style.top=`${Math.max(rr.top+6,Math.min(rr.bottom-6,rect.bottom+5))}px`;
+      node.classList.add('tl-fixation-active');
+      runtime.fixationCursor++;
+      const wordsPerFix=Math.max(1,Math.round(nodes.length/Math.max(1,targetNodes.length)));
+      const delay=Math.max(180,Math.round((60000/currentWpm())*wordsPerFix));
+      runtime.timer=setTimeout(step,delay);
+    };
+    step(); dispatch('marksetgo:training-started',{exercise:'fixation',scope});
   }
   function runRegression(level=data.regressionLevel||'soft'){
-    if(!hasDocument()) return notifyNeedReader(); clearRuntime(); runtime.mode='regression'; const r=reader(); r.classList.add(`training-regression-${level}`); hud('Regression Control',`${level[0].toUpperCase()+level.slice(1)} fade behind current position`);
-    const paint=()=>{ if(runtime.mode!=='regression')return; const idx=currentIndex(); wordNodes().forEach(n=>n.classList.toggle('tl-read',Number(n.dataset.index)<idx)); runtime.raf=requestAnimationFrame(paint); }; paint(); dispatch('marksetgo:training-started',{exercise:'regression',level});
+    if(!hasDocument()) return notifyNeedReader(); clearRuntime(); runtime.mode='regression'; const scope=captureExerciseScope(); const r=reader(); r.classList.add(`training-regression-${level}`); hud('Regression Control',`${scope} · ${level[0].toUpperCase()+level.slice(1)} fade behind current position`);
+    const paint=()=>{ if(runtime.mode!=='regression')return; const idx=currentIndex(); const scoped=new Set(exerciseWordNodes()); wordNodes().forEach(n=>n.classList.toggle('tl-read',scoped.has(n) && Number(n.dataset.index)<idx)); runtime.raf=requestAnimationFrame(paint); }; paint(); dispatch('marksetgo:training-started',{exercise:'regression',level});
   }
   function runTunnel(){
     if(!hasDocument())return notifyNeedReader(); clearRuntime(); runtime.mode='tunnel'; const layer=ensureRuntimeLayer(); const box=document.createElement('div'); box.className='tl-focus-tunnel'; layer.appendChild(box); hud('Focus Tunnel','Active line stays visually dominant');
@@ -108,10 +162,25 @@
     const start=Math.max(0,idx-Math.floor(count/2)); return words.slice(start,start+count).map(w=>typeof w==='string'?w:(w?.text||String(w||'')));
   }
   function runPeripheral(){
-    if(!hasDocument())return notifyNeedReader(); clearRuntime(); runtime.mode='peripheral'; const layer=ensureRuntimeLayer(); let span=Math.max(3,data.visualSpan||3); const stage=document.createElement('div'); stage.className='tl-peripheral-stage'; layer.appendChild(stage); let trial=0;
-    const render=()=>{ if(runtime.mode!=='peripheral')return; const words=getWordsAround(span); const mid=Math.floor(words.length/2); stage.innerHTML=`<div class="tl-peripheral-phrase">${words.map((w,i)=>`<span class="${i===mid?'tl-peripheral-center':''}">${escapeHtml(w)}</span>`).join(' ')}</div><div class="tl-peripheral-cue">Keep your eyes on the underlined center word. Try to perceive the entire phrase without moving your gaze.</div><div class="tl-card-actions" style="justify-content:center;margin-top:18px"><button class="tl-secondary" data-span-less type="button">Too wide</button><button class="tl-primary" data-span-more type="button">I captured it</button><button class="tl-secondary" data-span-stop type="button">Finish</button></div>`;
-      $('[data-span-more]',stage).onclick=()=>{trial++;span=Math.min(13,span+2);render();}; $('[data-span-less]',stage).onclick=()=>{span=Math.max(3,span-2); data.visualSpan=span;save(data);render();}; $('[data-span-stop]',stage).onclick=()=>{data.visualSpan=Math.max(3,span-2);save(data);clearRuntime();openLab('progress');}; };
-    render(); dispatch('marksetgo:training-started',{exercise:'peripheral'});
+    if(!hasDocument())return notifyNeedReader(); clearRuntime(); runtime.mode='peripheral';
+    const scope=captureExerciseScope(); const nodes=exerciseWordNodes(); let span=Math.max(3,data.visualSpan||3); if(span%2===0)span++;
+    let cursor=Math.max(0,nodes.findIndex(n=>Number(n.dataset.index)>=currentIndex())); if(cursor<0)cursor=0; runtime.peripheralCursor=cursor;
+    const panel=hud('Peripheral Span',`${scope} · keep your gaze on the center word`);
+    const controls=document.createElement('div'); controls.className='tl-runtime-actions';
+    controls.innerHTML='<button class="tl-secondary" data-span-less type="button">Too wide</button><button class="tl-primary" data-span-more type="button">Captured</button><button class="tl-secondary" data-span-next type="button">Next phrase</button>';
+    panel.appendChild(controls);
+    const render=()=>{
+      if(runtime.mode!=='peripheral')return;
+      wordNodes().forEach(n=>n.classList.remove('tl-peripheral-word','tl-peripheral-center-word'));
+      const half=Math.floor(span/2); const center=Math.min(nodes.length-1,Math.max(0,runtime.peripheralCursor));
+      const a=Math.max(0,center-half), b=Math.min(nodes.length,center+half+1);
+      nodes.slice(a,b).forEach(n=>n.classList.add('tl-peripheral-word'));
+      nodes[center]?.classList.add('tl-peripheral-center-word'); nodes[center]?.scrollIntoView({block:'nearest'});
+    };
+    $('[data-span-more]',controls).onclick=()=>{span=Math.min(13,span+2);data.visualSpan=span;save(data);render();};
+    $('[data-span-less]',controls).onclick=()=>{span=Math.max(3,span-2);data.visualSpan=span;save(data);render();};
+    $('[data-span-next]',controls).onclick=()=>{runtime.peripheralCursor=Math.min(nodes.length-1,runtime.peripheralCursor+span);render();};
+    render(); dispatch('marksetgo:training-started',{exercise:'peripheral',scope});
   }
   function runPhrase(){
     if(!hasDocument())return notifyNeedReader(); clearRuntime(); setSelect('#mode-select','flash'); setSelect('#fs-mode-select','flash'); setCheck('#meaningful-chunks',true); setCheck('#fs-meaningful-chunks',true); const wc=$('#word-count'); if(wc){wc.value=String(clamp(Math.round(currentWpm()/100),3,7));wc.dispatchEvent(new Event('change',{bubbles:true}));} hud('Phrase RSVP','Flash + meaningful chunks configured'); runtime.mode='phrase'; startReaderIfPossible(); dispatch('marksetgo:training-started',{exercise:'phrase'});
@@ -146,7 +215,7 @@
   function showPreview(){
     if(!hasDocument())return notifyNeedReader(); const p=localPreview(); const view=$('#training-view-comprehension'); const box=$('#tl-comprehension-output');
     box.innerHTML=`<div class="tl-result"><h4>${escapeHtml(p.title)} — quick map</h4>${p.headings.length?`<p><strong>Visible structure:</strong> ${p.headings.map(escapeHtml).join(' · ')}</p>`:''}<p><strong>Opening ideas near your position:</strong> ${escapeHtml(p.sentences.join(' '))}</p><p><small>This is the local fallback. The lab also dispatched <code>marksetgo:training-ai-request</code> so your existing AI layer can later return a richer preview.</small></p></div>`;
-    dispatch('marksetgo:training-ai-request',{task:'preview',text:getWordsAround(500).join(' '),title:p.title}); openLab('comprehension');
+    const scoped=selectedReaderWordNodes(); const previewText=(scoped.length?scoped.map(n=>n.textContent.trim()):getWordsAround(500)).join(' '); dispatch('marksetgo:training-ai-request',{task:'preview',text:previewText,title:p.title}); openLab('comprehension');
   }
   function promptRecall(){
     if(!hasDocument())return notifyNeedReader(); pauseReaderIfPossible(); openLab('comprehension'); const box=$('#tl-comprehension-output'); box.innerHTML=`<div class="tl-card"><h4>Active Recall</h4><p>Without looking back, write the 2–4 most important ideas from what you just read.</p><div class="tl-field"><textarea id="tl-recall-text" placeholder="What do you remember?"></textarea></div><div class="tl-card-actions"><button class="tl-primary" id="tl-save-recall" type="button">Save recall</button></div></div>`; $('#tl-save-recall').onclick=()=>{const text=$('#tl-recall-text').value.trim();if(!text)return;recordSession({type:'recall',response:text.slice(0,1200)});box.insertAdjacentHTML('beforeend','<div class="tl-result">Recall saved. In a later refinement, Ask Mark can score concept coverage against the source passage.</div>');dispatch('marksetgo:training-ai-request',{task:'score-recall',response:text});};
