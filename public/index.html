@@ -65,7 +65,7 @@
   };
 })();
 </script>
-<style id="msg-secondary-reader-first-paint-v36">
+<style id="msg-secondary-reader-first-paint-v37">
 /* Reader 2+ owns no experience scenery. This rule is intentionally permanent
    and loads before theme bootstrap so there is no scenic first paint. */
 html.msg-actual-frame-context.msg-secondary-reader-document,
@@ -80,6 +80,15 @@ html.msg-actual-frame-context.msg-secondary-reader-document #msg-vd-surface-hand
   display: none !important;
   background: none !important;
   background-image: none !important;
+}
+
+/* v3.7 — parent-side iframe paint containment.
+   Reader 2+ iframe is opaque white even before its child document paints. */
+iframe[src*="msgSecondaryReader=1"],
+iframe[src*="msgReaderNumber=2"],
+iframe[title^="Reader 2"] {
+  background: #fff !important;
+  background-color: #fff !important;
 }
 </style>
 <script src="/experience-theme-bootstrap.js?v=20260822-v9.3-unified-ui"></script>

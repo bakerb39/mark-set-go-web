@@ -75,3 +75,12 @@ html.msg-actual-frame-context.msg-secondary-reader-document #msg-vd-surface-hand
   background: none !important;
   background-image: none !important;
 }
+
+
+/* v3.7 — parent document owns a permanently opaque Reader 2+ iframe surface. */
+iframe[src*="msgSecondaryReader=1"],
+iframe[src*="msgReaderNumber=2"],
+iframe[title^="Reader 2"] {
+  background: #fff !important;
+  background-color: #fff !important;
+}
