@@ -296,3 +296,24 @@ body.msg-desktop-workspace-active #app.app-shell,
   margin-left: auto !important;
   margin-right: auto !important;
 }
+
+
+/* v2.0 — standalone Reader polish.
+   1) The Topic Feed top band remains structurally untouched but transparent,
+      so it always visually matches the Reader/article background beneath it.
+   2) The workspace close control is not shown in standalone Reader mode.
+      It remains available in actual workspace layouts. */
+
+body.msg-primary-reader-standalone .topic-feed-reader-page .topic-feed-reader-credit,
+body.msg-primary-reader-standalone .topic-feed-reader-page .topic-feed-reader-meta,
+body.msg-primary-reader-standalone .topic-feed-reader-page .topic-feed-reader-source,
+body.msg-primary-reader-standalone .topic-feed-reader-page .reader-title-row {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+body.msg-primary-reader-standalone .msg-workspace-close {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
