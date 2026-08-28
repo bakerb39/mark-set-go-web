@@ -3,12 +3,35 @@
 (function registerSessionManager(global) {
   const namespace = global.MarkSetGoReader = global.MarkSetGoReader || {};
 
+  function runtimeReaderId() {
+    const explicit = String(global.__MSG_READER_ID__ || '').trim();
+    if (explicit) return explicit;
+
+    const number = Number.parseInt(global.__MSG_READER_NUMBER__ || '', 10);
+    if (Number.isFinite(number) && number >= 2) return `reader-${number}`;
+
+    return 'reader-1';
+  }
+
   class SessionManager {
-    constructor({ dbName = 'markSetGoReaderSessionDB', storeName = 'sessions', key = 'current', fallbackKey = 'markSetGoReaderSessionFallback' } = {}) {
-      this.dbName = dbName;
-      this.storeName = storeName;
-      this.key = key;
-      this.fallbackKey = fallbackKey;
+    constructor(options = {}) {
+      const readerId = runtimeReaderId();
+      const auxiliary = readerId !== 'reader-1';
+
+      /*
+       * Reader 1 keeps the historical keys exactly as-is for backward
+       * compatibility. Reader 2+ receive independent keys inside the same
+       * IndexedDB store so destroying/recreating an auxiliary Reader iframe
+       * cannot overwrite another Reader's current-session snapshot.
+       */
+      this.dbName = options.dbName || 'markSetGoReaderSessionDB';
+      this.storeName = options.storeName || 'sessions';
+      this.key = options.key || (auxiliary ? `current:${readerId}` : 'current');
+      this.fallbackKey = options.fallbackKey
+        || (auxiliary ? `markSetGoReaderSessionFallback:${readerId}` : 'markSetGoReaderSessionFallback');
+      this.hasSessionKey = options.hasSessionKey
+        || (auxiliary ? `markSetGoHasReaderSession:${readerId}` : 'markSetGoHasReaderSession');
+      this.readerId = readerId;
     }
 
     open() {
@@ -33,9 +56,12 @@
           tx.onerror = () => reject(tx.error);
         });
         db.close();
-        localStorage.setItem('markSetGoHasReaderSession', '1');
+        localStorage.setItem(this.hasSessionKey, '1');
       } catch {
-        try { localStorage.setItem(this.fallbackKey, JSON.stringify(snapshot)); } catch {}
+        try {
+          localStorage.setItem(this.fallbackKey, JSON.stringify(snapshot));
+          localStorage.setItem(this.hasSessionKey, '1');
+        } catch {}
       }
     }
 
@@ -51,7 +77,7 @@
         db.close();
       } catch {}
       try { localStorage.removeItem(this.fallbackKey); } catch {}
-      try { localStorage.removeItem('markSetGoHasReaderSession'); } catch {}
+      try { localStorage.removeItem(this.hasSessionKey); } catch {}
     }
 
     async read() {
