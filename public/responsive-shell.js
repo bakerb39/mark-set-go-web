@@ -669,13 +669,32 @@
     updateReaderWindowButton();
   }
 
-  /* Bounded resyncs only. */
-  document.addEventListener('click', () => {
-    [0, 80, 220].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
-  }, { passive: true });
+  /* Reader initialization is bounded and Reader-specific.
+     Do not use a document-wide click as an initialization trigger: unrelated
+     navigation (including the Readers menu) must never cause Reader/workspace
+     state to be re-synchronized. */
+  function syncStandardReaderWhenReady(attempt = 0) {
+    const MAX_ATTEMPTS = 24;
+    const shell = readerShell();
+
+    // If Desktop workspace is active, standard Reader chrome does not belong here.
+    // Wait for an explicit layout-mode event rather than mutating either mode.
+    if (desktopWorkspaceActive()) return;
+
+    if (shell) {
+      syncStandardReaderWindow();
+      return;
+    }
+
+    if (attempt >= MAX_ATTEMPTS) return;
+    const delay = attempt < 6 ? 100 : 250;
+    window.setTimeout(() => syncStandardReaderWhenReady(attempt + 1), delay);
+  }
 
   document.addEventListener(MODE_EVENT, () => {
-    [0, 80, 220].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+    [0, 80, 220].forEach((delay) => window.setTimeout(() => {
+      if (!desktopWorkspaceActive()) syncStandardReaderWhenReady();
+    }, delay));
   });
 
   window.addEventListener('resize', () => {
@@ -696,24 +715,7 @@
   }, { passive: true });
 
 
-  function scheduleStandardReaderStartupSyncs() {
-    [0, 100, 300, 700, 1200, 1800, 2600, 4000].forEach((delay) =>
-      window.setTimeout(syncStandardReaderWindow, delay)
-    );
-  }
-
-  // The Reader/workspace DOM can finish settling after this module has loaded.
-  // Re-run the EXISTING sync on normal lifecycle signals so initial geometry
-  // matches the already-correct post-click state without requiring user input.
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', scheduleStandardReaderStartupSyncs, { once: true });
-  } else {
-    scheduleStandardReaderStartupSyncs();
-  }
-  window.addEventListener('load', scheduleStandardReaderStartupSyncs, { once: true });
-  window.addEventListener('pageshow', scheduleStandardReaderStartupSyncs);
-  document.addEventListener('marksetgo:reader-session-changed', () => {
-    [0, 80, 220, 500].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
-  });
+  // Initial boot: wait only for the standard Reader itself. No global click dependency.
+  [0, 120, 350].forEach((delay) => window.setTimeout(syncStandardReaderWhenReady, delay));
 
 })();
