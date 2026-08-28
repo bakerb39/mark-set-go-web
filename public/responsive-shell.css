@@ -96,15 +96,15 @@ body.msg-desktop-shell-resizing {
 
 
 /* ============================================================
-   Standard Reader — window-style width control
+   Standard Reader — OUTER Reader shell width control
+   Presentation only. Does not alter workspace split or Reader engine.
    ============================================================ */
 
-body:not(.msg-desktop-workspace-active) #reader-frame.msg-reader-window-width {
-  box-sizing: border-box !important;
-  width: min(100%, var(--msg-reader-window-width, 100%)) !important;
-  max-width: 100% !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
+/* Retire the obsolete movable-work-surface side tab shown on the Reader edge. */
+#msg-vd-surface-handle {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* Window-like make-smaller / restore control. */
@@ -118,17 +118,14 @@ body:not(.msg-desktop-workspace-active) #reader-frame.msg-reader-window-width {
   font-size: 17px;
   line-height: 1;
 }
-
-/* Keep Full Screen immediately after the size control. */
 .reader-pane-controls #msg-reader-window-toggle + .viewer-fullscreen-button {
   margin-left: 0 !important;
 }
 
-/* Reader-only edge handles. These do not alter the existing workspace divider. */
+/* Invisible hit areas along the actual OUTER Reader shell edges. */
 .msg-reader-window-edge {
   display: none;
 }
-
 body:not(.msg-desktop-workspace-active) .msg-reader-window-edge {
   position: fixed;
   z-index: 2147481500;
@@ -137,42 +134,35 @@ body:not(.msg-desktop-workspace-active) .msg-reader-window-edge {
   touch-action: none;
   background: transparent;
 }
-
 body:not(.msg-desktop-workspace-active) .msg-reader-window-edge::after {
   content: "";
   position: absolute;
-  top: 38%;
-  bottom: 38%;
+  top: 40%;
+  bottom: 40%;
   width: 2px;
   border-radius: 999px;
-  background: rgba(255,255,255,.32);
+  background: currentColor;
   opacity: 0;
   transition: opacity .12s ease;
+  pointer-events: none;
 }
-
 body:not(.msg-desktop-workspace-active) .msg-reader-window-edge-left::after {
   right: 3px;
 }
-
 body:not(.msg-desktop-workspace-active) .msg-reader-window-edge-right::after {
   left: 3px;
 }
-
 body:not(.msg-desktop-workspace-active) .msg-reader-window-edge:hover::after,
 body.msg-reader-window-resizing .msg-reader-window-edge::after {
-  opacity: 1;
+  opacity: .28;
 }
-
 body.msg-reader-window-resizing {
   cursor: ew-resize !important;
   user-select: none !important;
 }
 
-/* On compact screens, let responsiveness own the width. */
+/* Compact screens remain fully responsive and do not expose manual sizing. */
 @media (max-width: 760px) {
-  body:not(.msg-desktop-workspace-active) #reader-frame.msg-reader-window-width {
-    width: 100% !important;
-  }
   .msg-reader-window-edge,
   #msg-reader-window-toggle {
     display: none !important;

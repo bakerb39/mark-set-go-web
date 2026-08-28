@@ -160,10 +160,11 @@
 
 
   /* ------------------------------------------------------------
-     Standard Reader window-style width
+     Standard Reader OUTER shell window-style width
+     MSG constraint: presentation only; no Reader engine/state changes.
      ------------------------------------------------------------ */
-  const READER_WIDTH_KEY = 'msg-standard-reader-window-width-v1';
-  const READER_COLLAPSED_KEY = 'msg-standard-reader-window-collapsed-v1';
+  const READER_WIDTH_KEY = 'msg-standard-reader-outer-width-v1';
+  const READER_COLLAPSED_KEY = 'msg-standard-reader-outer-collapsed-v1';
   let readerWidthDrag = null;
   let readerEdgeLeft = null;
   let readerEdgeRight = null;
@@ -173,12 +174,15 @@
       && window.innerWidth > 760;
   }
 
-  function readerFrame() {
-    return document.querySelector('#reader-frame');
+  function readerShell() {
+    return document.querySelector('#app .reader-page-panel');
   }
 
-  function readerCenterColumn() {
-    return document.querySelector('.reader-center-column');
+  function readerShellParentWidth() {
+    const shell = readerShell();
+    const parent = shell?.parentElement;
+    const width = parent?.getBoundingClientRect().width || shell?.getBoundingClientRect().width || 0;
+    return Math.max(0, Math.floor(width));
   }
 
   function storedReaderWidth() {
@@ -196,19 +200,17 @@
   }
 
   function maxReaderWidth() {
-    const column = readerCenterColumn();
-    const measured = column?.getBoundingClientRect().width || readerFrame()?.parentElement?.getBoundingClientRect().width || 0;
-    return Math.max(0, Math.floor(measured));
+    return readerShellParentWidth();
   }
 
   function minReaderWidth() {
     const max = maxReaderWidth();
-    return Math.min(max, Math.max(460, Math.min(620, Math.round(max * .58))));
+    return Math.min(max, Math.max(520, Math.min(700, Math.round(max * .55))));
   }
 
   function comfortableReaderWidth() {
     const max = maxReaderWidth();
-    return Math.max(minReaderWidth(), Math.min(760, Math.round(max * .72)));
+    return Math.max(minReaderWidth(), Math.min(820, Math.round(max * .72)));
   }
 
   function clampReaderWidth(value) {
@@ -217,19 +219,31 @@
     return Math.max(minReaderWidth(), Math.min(max, Math.round(value)));
   }
 
+  function setShellWidthImportant(shell, value) {
+    shell.style.setProperty('box-sizing', 'border-box', 'important');
+    shell.style.setProperty('width', value, 'important');
+    shell.style.setProperty('max-width', '100%', 'important');
+    shell.style.setProperty('margin-left', 'auto', 'important');
+    shell.style.setProperty('margin-right', 'auto', 'important');
+  }
+
+  function clearShellWidth(shell) {
+    ['box-sizing','width','max-width','margin-left','margin-right'].forEach((prop) => {
+      shell.style.removeProperty(prop);
+    });
+  }
+
   function setReaderWidth(value, persist = false) {
-    const frame = readerFrame();
-    if (!frame) return;
+    const shell = readerShell();
+    if (!shell) return;
 
     if (!standardReaderAvailable()) {
-      frame.classList.remove('msg-reader-window-width');
-      frame.style.removeProperty('--msg-reader-window-width');
+      clearShellWidth(shell);
       return;
     }
 
     const width = clampReaderWidth(value);
-    frame.classList.add('msg-reader-window-width');
-    frame.style.setProperty('--msg-reader-window-width', `${width}px`);
+    setShellWidthImportant(shell, `${width}px`);
 
     if (persist) {
       try {
@@ -243,16 +257,23 @@
   }
 
   function restoreReaderFullWidth(persist = true) {
-    const frame = readerFrame();
-    if (!frame) return;
-    frame.classList.add('msg-reader-window-width');
-    frame.style.setProperty('--msg-reader-window-width', '100%');
+    const shell = readerShell();
+    if (!shell) return;
+
+    if (!standardReaderAvailable()) {
+      clearShellWidth(shell);
+      return;
+    }
+
+    setShellWidthImportant(shell, '100%');
+
     if (persist) {
       try {
         localStorage.removeItem(READER_WIDTH_KEY);
         localStorage.setItem(READER_COLLAPSED_KEY, '0');
       } catch {}
     }
+
     positionReaderEdges();
     updateReaderWindowButton();
     try { window.dispatchEvent(new Event('resize')); } catch {}
@@ -265,34 +286,16 @@
     try { window.dispatchEvent(new Event('resize')); } catch {}
   }
 
-  function removeLegacyReaderWidthControl() {
-    const roots = [
-      document.querySelector('.reader-pane-controls'),
-      document.querySelector('.reader-toolbar'),
-      document.querySelector('.reader-page-panel')
-    ].filter(Boolean);
-
-    for (const root of roots) {
-      for (const label of root.querySelectorAll('label')) {
-        const ownText = [...label.childNodes]
-          .filter((node) => node.nodeType === Node.TEXT_NODE)
-          .map((node) => node.textContent)
-          .join(' ')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .toLowerCase();
-
-        if (ownText === 'width' && label.querySelector('select')) {
-          label.remove();
-          return true;
-        }
-      }
-    }
-    return false;
+  function retireObsoleteReaderSurfaceHandle() {
+    const handle = document.getElementById('msg-vd-surface-handle');
+    if (!handle) return false;
+    handle.remove();
+    return true;
   }
 
   function ensureReaderWindowButton() {
-    const controls = document.querySelector('.reader-pane-controls');
+    const shell = readerShell();
+    const controls = shell?.querySelector('.reader-pane-controls');
     const fullscreen = controls?.querySelector('#toggle-reader-fullscreen');
     if (!controls || !fullscreen) return null;
 
@@ -308,9 +311,9 @@
       controls.insertBefore(button, fullscreen);
 
       button.addEventListener('click', () => {
-        const frame = readerFrame();
-        if (!frame || !standardReaderAvailable()) return;
-        const current = frame.getBoundingClientRect().width;
+        const currentShell = readerShell();
+        if (!currentShell || !standardReaderAvailable()) return;
+        const current = currentShell.getBoundingClientRect().width;
         const max = maxReaderWidth();
         if (current >= max - 8) snapReaderSmaller();
         else restoreReaderFullWidth(true);
@@ -322,11 +325,11 @@
 
   function updateReaderWindowButton() {
     const button = document.querySelector('#msg-reader-window-toggle');
-    const frame = readerFrame();
-    if (!button || !frame) return;
+    const shell = readerShell();
+    if (!button || !shell) return;
 
     const isSmaller = standardReaderAvailable()
-      && frame.getBoundingClientRect().width < maxReaderWidth() - 8;
+      && shell.getBoundingClientRect().width < maxReaderWidth() - 8;
 
     button.innerHTML = `<span class="msg-reader-window-icon" aria-hidden="true">${isSmaller ? '□' : '▣'}</span>`;
     button.title = isSmaller ? 'Restore Reader width' : 'Make Reader smaller';
@@ -355,14 +358,14 @@
   }
 
   function positionReaderEdges() {
-    const frame = readerFrame();
-    if (!frame || !readerEdgeLeft || !readerEdgeRight || !standardReaderAvailable()) {
+    const shell = readerShell();
+    if (!shell || !readerEdgeLeft || !readerEdgeRight || !standardReaderAvailable()) {
       if (readerEdgeLeft) readerEdgeLeft.style.display = 'none';
       if (readerEdgeRight) readerEdgeRight.style.display = 'none';
       return;
     }
 
-    const rect = frame.getBoundingClientRect();
+    const rect = shell.getBoundingClientRect();
     const top = Math.max(0, Math.round(rect.top));
     const height = Math.max(0, Math.round(rect.height));
 
@@ -378,8 +381,8 @@
 
   function bindReaderEdge(edge) {
     edge.addEventListener('pointerdown', (event) => {
-      const frame = readerFrame();
-      if (!frame || !standardReaderAvailable()) return;
+      const shell = readerShell();
+      if (!shell || !standardReaderAvailable()) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -387,7 +390,7 @@
       readerWidthDrag = {
         pointerId: event.pointerId,
         startX: event.clientX,
-        startWidth: frame.getBoundingClientRect().width,
+        startWidth: shell.getBoundingClientRect().width,
         edge: edge.dataset.readerWindowEdge
       };
 
@@ -412,8 +415,8 @@
       if (!readerWidthDrag || readerWidthDrag.pointerId !== event.pointerId) return;
       event.preventDefault();
 
-      const frame = readerFrame();
-      if (frame) setReaderWidth(frame.getBoundingClientRect().width, true);
+      const shell = readerShell();
+      if (shell) setReaderWidth(shell.getBoundingClientRect().width, true);
 
       readerWidthDrag = null;
       document.body.classList.remove('msg-reader-window-resizing');
@@ -423,15 +426,14 @@
 
     edge.addEventListener('pointerup', finish);
     edge.addEventListener('pointercancel', finish);
-
     edge.addEventListener('dblclick', () => restoreReaderFullWidth(true));
   }
 
   function syncStandardReaderWindow() {
-    removeLegacyReaderWidthControl();
-    const frame = readerFrame();
+    retireObsoleteReaderSurfaceHandle();
 
-    if (!frame) {
+    const shell = readerShell();
+    if (!shell) {
       positionReaderEdges();
       return;
     }
@@ -440,8 +442,7 @@
     ensureReaderEdges();
 
     if (!standardReaderAvailable()) {
-      frame.classList.remove('msg-reader-window-width');
-      frame.style.removeProperty('--msg-reader-window-width');
+      clearShellWidth(shell);
       updateReaderWindowButton();
       positionReaderEdges();
       return;
@@ -457,16 +458,25 @@
     requestAnimationFrame(positionReaderEdges);
   }
 
+  /* Bounded resyncs only. */
   document.addEventListener('click', () => {
     [0, 80, 220].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
   }, { passive: true });
 
+  document.addEventListener(MODE_EVENT, () => {
+    [0, 80, 220].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+  });
+
   window.addEventListener('resize', () => {
-    const frame = readerFrame();
-    if (!frame) return;
+    const shell = readerShell();
+    if (!shell) return;
+
     if (standardReaderAvailable() && readerCollapsed()) {
       setReaderWidth(storedReaderWidth() || comfortableReaderWidth(), false);
+    } else if (!standardReaderAvailable()) {
+      clearShellWidth(shell);
     }
+
     requestAnimationFrame(positionReaderEdges);
   }, { passive: true });
 
