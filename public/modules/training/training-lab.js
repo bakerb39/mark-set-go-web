@@ -200,9 +200,10 @@
   function boot(){
     buildLab();
     document.addEventListener('click',e=>{
-      const trigger=e.target.closest('[data-action="training-lab"]');
+      const trigger=e.target.closest('[data-training-lab-launch]');
       if(!trigger)return;
       e.preventDefault();
+      e.stopPropagation();
       openLab('today');
       const menu=trigger.closest('details.top-nav-menu');
       if(menu)menu.open=false;

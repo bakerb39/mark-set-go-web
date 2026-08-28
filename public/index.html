@@ -127,6 +127,7 @@ iframe[title^="Reader 2"] {
 <link href="/reader-action-hierarchy.css?v=1.0.0-passage-action-hierarchy" rel="stylesheet"/>
 <link href="/page-theme-polish.css?v=1.0.5-runtime-standalone-close" rel="stylesheet"/>
 <link href="/secondary-reader-embedded-fix.css?v=20260828-v3.6-no-transparent-document" rel="stylesheet"/>
+<link href="/modules/training/training-lab.css?v=0.2.2-safe-learn-menu" rel="stylesheet"/>
   <script defer src="/workspace-pane-cache-refresh.js?v=20260822-v7.21-stability-consolidation"></script>
 <script defer src="/workspace-experiment.js?v=0.15.8-home-reader1-route"></script>
 <script defer src="/workspace-auth-guard.js?v=20260825-v1.0.0"></script>
@@ -150,6 +151,7 @@ iframe[title^="Reader 2"] {
 <script defer src="/app.js?v=20260825-v2.7.3-home-dismiss-hard"></script>
 <script defer src="/reader-theme-inherit-guard.js?v=20260828-v3.1-new-reader-inherit"></script>
 <script defer src="/secondary-reader-embedded-fix.js?v=20260828-v3.6-no-transparent-document"></script>
+<script defer src="/modules/training/training-lab.js?v=0.2.2-safe-learn-menu"></script>
 <script defer src="/reader-tooltip-cleanup.js?v=20260823-v7.33.5-reader2-layout-polish"></script>
 <script defer src="/workspace-music-handoff.js?v=0.11.2-main-dock"></script>
 <script defer src="/music-save-reliability.js?v=2.0.1-no-mo"></script>
@@ -296,6 +298,11 @@ iframe[title^="Reader 2"] {
   <button data-action="reading-skills" type="button" role="menuitem">
     <span class="menu-icon">◎</span>
     <span class="menu-copy"><strong>Reading Skills</strong><small>Speed, comprehension, memory, and deeper study</small></span>
+  </button>
+
+  <button data-training-lab-launch type="button" role="menuitem">
+    <span class="menu-icon">◈</span>
+    <span class="menu-copy"><strong>Training Lab</strong><small>Practice speed, eye movement, comprehension, and retention</small></span>
   </button>
 
   <details class="library-browse-submenu learn-skills-submenu">
