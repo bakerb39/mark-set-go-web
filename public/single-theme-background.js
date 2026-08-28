@@ -12,6 +12,13 @@
  * the outer application remains the background owner.
  */
 (() => {
+  // Auxiliary Reader 2+ is embedded inside the parent workspace.
+  // It must never own or repaint the application's scenic experience background.
+  if (window.__MSG_SECONDARY_READER__ ||
+      document.documentElement.classList.contains('msg-secondary-reader-document')) {
+    return;
+  }
+
   const root = document.documentElement;
 
   const BACKGROUNDS = Object.freeze({
