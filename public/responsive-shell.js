@@ -696,6 +696,24 @@
   }, { passive: true });
 
 
-  [0, 100, 300, 700, 1200].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+  function scheduleStandardReaderStartupSyncs() {
+    [0, 100, 300, 700, 1200, 1800, 2600, 4000].forEach((delay) =>
+      window.setTimeout(syncStandardReaderWindow, delay)
+    );
+  }
+
+  // The Reader/workspace DOM can finish settling after this module has loaded.
+  // Re-run the EXISTING sync on normal lifecycle signals so initial geometry
+  // matches the already-correct post-click state without requiring user input.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', scheduleStandardReaderStartupSyncs, { once: true });
+  } else {
+    scheduleStandardReaderStartupSyncs();
+  }
+  window.addEventListener('load', scheduleStandardReaderStartupSyncs, { once: true });
+  window.addEventListener('pageshow', scheduleStandardReaderStartupSyncs);
+  document.addEventListener('marksetgo:reader-session-changed', () => {
+    [0, 80, 220, 500].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+  });
 
 })();
