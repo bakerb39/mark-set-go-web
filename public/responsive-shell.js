@@ -727,4 +727,52 @@
 
   [0, 100, 300, 700, 1200].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
 
+  // v2.9: Reader window controls can be mounted after the broader Reader shell.
+  // Retry ONLY control installation during startup so the resize button is
+  // present on load without requiring an unrelated document click. This does
+  // not rerun workspace mode/geometry synchronization.
+  function installReaderWindowControlsWhenReady() {
+    if (desktopWorkspaceActive()) return true;
+
+    const shell = readerShell();
+    if (!shell) return false;
+
+    const existing = shell.querySelector('#msg-reader-window-toggle');
+    if (existing && existing.isConnected) {
+      try { ensureReaderEdgeResizeBinding(); } catch (error) {
+        console.warn('Reader edge resizing could not be initialized.', error);
+      }
+      updateReaderWindowButton();
+      return true;
+    }
+
+    // Placement intentionally waits for the Reader's native close control so
+    // we reuse its established window-control wrapper instead of inventing one.
+    if (!visibleReaderCloseButton()) return false;
+
+    try { ensureReaderWindowButton(); } catch (error) {
+      console.warn('Reader width button could not be placed.', error);
+      return false;
+    }
+
+    try { ensureReaderEdgeResizeBinding(); } catch (error) {
+      console.warn('Reader edge resizing could not be initialized.', error);
+    }
+    updateReaderWindowButton();
+
+    const button = shell.querySelector('#msg-reader-window-toggle');
+    return !!(button && button.isConnected);
+  }
+
+  const readerControlStartupDelays = [0, 120, 300, 600, 1000, 1600, 2400, 3400, 4600];
+  readerControlStartupDelays.forEach((delay) => {
+    window.setTimeout(() => installReaderWindowControlsWhenReady(), delay);
+  });
+
+  window.addEventListener('load', () => {
+    [0, 180, 500, 1100].forEach((delay) => {
+      window.setTimeout(() => installReaderWindowControlsWhenReady(), delay);
+    });
+  }, { once: true });
+
 })();
