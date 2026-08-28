@@ -44,8 +44,26 @@
     document.querySelectorAll('.msg-primary-reader-resize-grip').forEach((node) => node.remove());
   }
 
+  function clearEmbeddedThemeBackground() {
+    const html = document.documentElement;
+    const body = document.body;
+    [html, body].forEach((node) => {
+      if (!node) return;
+      node.style.setProperty('background', 'transparent', 'important');
+      node.style.setProperty('background-color', 'transparent', 'important');
+      node.style.setProperty('background-image', 'none', 'important');
+    });
+
+    document.querySelectorAll('.explorer-world-art, .msg-vd-center-work-surface, #msg-vd-surface-handle').forEach((node) => {
+      node.style.setProperty('display', 'none', 'important');
+      node.style.setProperty('background', 'none', 'important');
+      node.style.setProperty('background-image', 'none', 'important');
+    });
+  }
+
   function normalizeEmbeddedReader() {
     clearEmbeddedStandaloneWidth();
+    clearEmbeddedThemeBackground();
     forceEmbeddedLightReader();
   }
 
@@ -80,6 +98,8 @@
   window.addEventListener('pageshow', scheduleNormalize);
   document.addEventListener('marksetgo:document-available', scheduleNormalize);
   document.addEventListener('marksetgo:reader-session-changed', scheduleNormalize);
+  document.addEventListener('marksetgo:experience-profile-changed', scheduleNormalize);
+  document.addEventListener('marksetgo:experience-theme-changed', scheduleNormalize);
 
   scheduleNormalize();
 })();

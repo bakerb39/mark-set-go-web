@@ -167,7 +167,9 @@
   let readerEdgeRight = null;
 
   function standardReaderAvailable() {
-    return !desktopWorkspaceActive()
+    return !window.__MSG_SECONDARY_READER__
+      && !document.documentElement.classList.contains('msg-secondary-reader-document')
+      && !desktopWorkspaceActive()
       && window.innerWidth > 760;
   }
 
@@ -631,6 +633,18 @@
   }
 
   function syncStandardReaderWindow() {
+    // Reader 2+ lives inside a parent-owned workspace iframe. It must never
+    // participate in Reader 1's standalone width/window-control system.
+    if (window.__MSG_SECONDARY_READER__ || document.documentElement.classList.contains('msg-secondary-reader-document')) {
+      clearStandaloneAppWidth();
+      const embeddedShell = readerShell();
+      if (embeddedShell) clearShellWidth(embeddedShell);
+      document.querySelector('#msg-reader-window-toggle')?.remove();
+      document.querySelectorAll('.msg-primary-reader-resize-grip').forEach((node) => node.remove());
+      removeLegacyReaderEdgeOverlays();
+      return;
+    }
+
     retireObsoleteReaderSurfaceHandle();
     document.querySelectorAll('.msg-primary-reader-resize-grip').forEach((grip) => grip.remove());
     removeLegacyReaderEdgeOverlays();
@@ -732,6 +746,7 @@
   // present on load without requiring an unrelated document click. This does
   // not rerun workspace mode/geometry synchronization.
   function installReaderWindowControlsWhenReady() {
+    if (window.__MSG_SECONDARY_READER__ || document.documentElement.classList.contains('msg-secondary-reader-document')) return true;
     if (desktopWorkspaceActive()) return true;
 
     const shell = readerShell();
