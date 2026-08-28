@@ -669,32 +669,13 @@
     updateReaderWindowButton();
   }
 
-  /* Reader initialization is bounded and Reader-specific.
-     Do not use a document-wide click as an initialization trigger: unrelated
-     navigation (including the Readers menu) must never cause Reader/workspace
-     state to be re-synchronized. */
-  function syncStandardReaderWhenReady(attempt = 0) {
-    const MAX_ATTEMPTS = 24;
-    const shell = readerShell();
-
-    // If Desktop workspace is active, standard Reader chrome does not belong here.
-    // Wait for an explicit layout-mode event rather than mutating either mode.
-    if (desktopWorkspaceActive()) return;
-
-    if (shell) {
-      syncStandardReaderWindow();
-      return;
-    }
-
-    if (attempt >= MAX_ATTEMPTS) return;
-    const delay = attempt < 6 ? 100 : 250;
-    window.setTimeout(() => syncStandardReaderWhenReady(attempt + 1), delay);
-  }
+  /* Bounded resyncs only. */
+  document.addEventListener('click', () => {
+    [0, 80, 220].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+  }, { passive: true });
 
   document.addEventListener(MODE_EVENT, () => {
-    [0, 80, 220].forEach((delay) => window.setTimeout(() => {
-      if (!desktopWorkspaceActive()) syncStandardReaderWhenReady();
-    }, delay));
+    [0, 80, 220].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
   });
 
   window.addEventListener('resize', () => {
@@ -715,7 +696,6 @@
   }, { passive: true });
 
 
-  // Initial boot: wait only for the standard Reader itself. No global click dependency.
-  [0, 120, 350].forEach((delay) => window.setTimeout(syncStandardReaderWhenReady, delay));
+  [0, 100, 300, 700, 1200].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
 
 })();
