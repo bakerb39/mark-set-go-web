@@ -185,6 +185,48 @@
     return Math.max(0, Math.floor(width));
   }
 
+
+  function standaloneReaderActive() {
+    return document.body.classList.contains('msg-primary-reader-standalone')
+      && !document.body.classList.contains('msg-desktop-workspace-active');
+  }
+
+  function standaloneReaderChromeWidth() {
+    const shell = readerShell();
+    if (!shell || !standaloneReaderActive()) return 0;
+
+    const appRect = app.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    return Math.max(0, Math.round(appRect.width - shellRect.width));
+  }
+
+  function safeStandaloneAppWidth() {
+    return Math.max(0, Math.floor(window.innerWidth - 32));
+  }
+
+  function setStandaloneAppWidthForReader(readerWidth) {
+    if (!standaloneReaderActive()) return;
+
+    const chrome = readerWidthDrag?.chromeWidth ?? standaloneReaderChromeWidth();
+    const desiredAppWidth = Math.min(
+      safeStandaloneAppWidth(),
+      Math.max(0, Math.round(readerWidth + chrome))
+    );
+
+    app.style.setProperty('box-sizing', 'border-box', 'important');
+    app.style.setProperty('width', `${desiredAppWidth}px`, 'important');
+    app.style.setProperty('max-width', 'calc(100vw - 32px)', 'important');
+    app.style.setProperty('margin-left', 'auto', 'important');
+    app.style.setProperty('margin-right', 'auto', 'important');
+  }
+
+  function clearStandaloneAppWidth() {
+    if (!standaloneReaderActive()) return;
+    ['box-sizing','width','max-width','margin-left','margin-right'].forEach((prop) => {
+      app.style.removeProperty(prop);
+    });
+  }
+
   function storedReaderWidth() {
     try {
       const n = Number(localStorage.getItem(READER_WIDTH_KEY));
@@ -200,17 +242,10 @@
   }
 
   function maxReaderWidth() {
-    const shell = readerShell();
-    const parentWidth = readerShellParentWidth();
-    if (!shell) return parentWidth;
+    if (!standaloneReaderActive()) return readerShellParentWidth();
 
-    const standalone = document.body.classList.contains('msg-primary-reader-standalone');
-    if (!standalone) return parentWidth;
-
-    // Standalone Reader may expand beyond the normal app-shell width while
-    // preserving a small safe gutter at both viewport edges.
-    const safeViewportWidth = Math.max(0, Math.floor(window.innerWidth - 32));
-    return Math.max(parentWidth, safeViewportWidth);
+    const chrome = readerWidthDrag?.chromeWidth ?? standaloneReaderChromeWidth();
+    return Math.max(0, safeStandaloneAppWidth() - chrome);
   }
 
   function minReaderWidth() {
@@ -232,23 +267,13 @@
   function setShellWidthImportant(shell, value) {
     shell.style.setProperty('box-sizing', 'border-box', 'important');
     shell.style.setProperty('width', value, 'important');
-
-    const standalone = document.body.classList.contains('msg-primary-reader-standalone');
-    if (standalone) {
-      shell.style.setProperty('max-width', 'calc(100vw - 32px)', 'important');
-      shell.style.setProperty('margin-left', '50%', 'important');
-      shell.style.setProperty('margin-right', '0', 'important');
-      shell.style.setProperty('transform', 'translateX(-50%)', 'important');
-    } else {
-      shell.style.setProperty('max-width', '100%', 'important');
-      shell.style.setProperty('margin-left', 'auto', 'important');
-      shell.style.setProperty('margin-right', 'auto', 'important');
-      shell.style.removeProperty('transform');
-    }
+    shell.style.setProperty('max-width', '100%', 'important');
+    shell.style.setProperty('margin-left', 'auto', 'important');
+    shell.style.setProperty('margin-right', 'auto', 'important');
   }
 
   function clearShellWidth(shell) {
-    ['box-sizing','width','max-width','margin-left','margin-right','transform'].forEach((prop) => {
+    ['box-sizing','width','max-width','margin-left','margin-right'].forEach((prop) => {
       shell.style.removeProperty(prop);
     });
   }
@@ -259,10 +284,16 @@
 
     if (!standardReaderAvailable()) {
       clearShellWidth(shell);
+      clearStandaloneAppWidth();
       return;
     }
 
     const width = clampReaderWidth(value);
+
+    if (standaloneReaderActive()) {
+      setStandaloneAppWidthForReader(width);
+    }
+
     setShellWidthImportant(shell, `${width}px`);
 
     if (persist) {
@@ -281,9 +312,13 @@
 
     if (!standardReaderAvailable()) {
       clearShellWidth(shell);
+      clearStandaloneAppWidth();
       return;
     }
 
+    if (standaloneReaderActive()) {
+      clearStandaloneAppWidth();
+    }
     setShellWidthImportant(shell, '100%');
 
     if (persist) {
@@ -522,6 +557,7 @@
         pointerId: event.pointerId,
         startX: event.clientX,
         startWidth: shell.getBoundingClientRect().width,
+        chromeWidth: standaloneReaderChromeWidth(),
         edge
       };
 
@@ -624,6 +660,7 @@
       setReaderWidth(storedReaderWidth() || comfortableReaderWidth(), false);
     } else if (!standardReaderAvailable()) {
       clearShellWidth(shell);
+      clearStandaloneAppWidth();
     }
 
   }, { passive: true });

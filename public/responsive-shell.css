@@ -274,8 +274,9 @@ body .msg-primary-reader-resize-grip,
 }
 
 
-/* v1.2 — standalone Reader may expand beyond the normal app-shell width.
-   The Reader itself stays centered and never exceeds the viewport safe gutter. */
-body.msg-primary-reader-standalone #app {
-  overflow: visible !important;
+/* v1.3 — when Standard standalone Reader is manually resized,
+   responsive-shell.js couples #app width to Reader width.
+   Keep the outer window centered and viewport-safe. */
+body.msg-primary-reader-standalone:not(.msg-desktop-workspace-active) #app.app-shell {
+  min-width: 0 !important;
 }
