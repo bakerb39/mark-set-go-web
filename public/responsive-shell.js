@@ -390,27 +390,36 @@
     }
 
     if (closeButton?.parentNode) {
-      let group = shell.querySelector('.msg-reader-window-control-group');
+      // Reuse the wrapper that already owns the X on later syncs. Without this
+      // guard, closeButton.parentNode can itself be the group, and attempting
+      // group.insertBefore(group, closeButton) throws HierarchyRequestError.
+      let group = closeButton.closest('.msg-reader-window-control-group')
+        || shell.querySelector('.msg-reader-window-control-group');
 
       if (!group) {
         group = document.createElement('div');
         group.className = 'msg-reader-window-control-group';
       }
 
-      // Capture the X's current window-level position before moving it. The group
-      // assumes that position; both child buttons then become ordinary static controls.
+      // Capture the X's current window-level position before its FIRST move only.
+      // On subsequent syncs the group already owns the window position.
       const closeStyle = getComputedStyle(closeButton);
       const parent = closeButton.parentNode;
 
-      if (group.parentNode !== parent) {
+      if (!group.contains(closeButton) && group.parentNode !== parent) {
+        parent.insertBefore(group, closeButton);
+      } else if (!group.isConnected && parent && parent !== group) {
         parent.insertBefore(group, closeButton);
       }
 
       const copied = ['position','top','right','bottom','left','z-index'];
-      copied.forEach((prop) => {
-        const value = closeStyle.getPropertyValue(prop);
-        if (value && value !== 'auto') group.style.setProperty(prop, value);
-      });
+      if (!group.dataset.readerWindowPositionCaptured) {
+        copied.forEach((prop) => {
+          const value = closeStyle.getPropertyValue(prop);
+          if (value && value !== 'auto') group.style.setProperty(prop, value);
+        });
+        group.dataset.readerWindowPositionCaptured = '1';
+      }
 
       group.style.setProperty('display', 'inline-flex', 'important');
       group.style.setProperty('align-items', 'center', 'important');
