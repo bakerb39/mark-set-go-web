@@ -126,7 +126,7 @@ iframe[title^="Reader 2"] {
 <link href="/multi-reader-final.css?v=1.2.0-themed-close-no-minimize" rel="stylesheet"/>
 <link href="/reader-action-hierarchy.css?v=1.0.0-passage-action-hierarchy" rel="stylesheet"/>
 <link href="/page-theme-polish.css?v=1.0.5-runtime-standalone-close" rel="stylesheet"/>
-<link href="/secondary-reader-embedded-fix.css?v=20260828-v3.8-no-scenery-owner" rel="stylesheet"/>
+<link href="/secondary-reader-embedded-fix.css?v=20260828-v3.6-no-transparent-document" rel="stylesheet"/>
   <script defer src="/workspace-pane-cache-refresh.js?v=20260822-v7.21-stability-consolidation"></script>
 <script defer src="/workspace-experiment.js?v=0.15.8-home-reader1-route"></script>
 <script defer src="/workspace-auth-guard.js?v=20260825-v1.0.0"></script>
@@ -149,7 +149,7 @@ iframe[title^="Reader 2"] {
 <script defer src="/read-with-mark-bridge.js?v=20260824-v2.5.1-shell-rescue"></script>
 <script defer src="/app.js?v=20260825-v2.7.3-home-dismiss-hard"></script>
 <script defer src="/reader-theme-inherit-guard.js?v=20260828-v3.1-new-reader-inherit"></script>
-<script defer src="/secondary-reader-embedded-fix.js?v=20260828-v3.8-no-scenery-owner"></script>
+<script defer src="/secondary-reader-embedded-fix.js?v=20260828-v3.6-no-transparent-document"></script>
 <script defer src="/reader-tooltip-cleanup.js?v=20260823-v7.33.5-reader2-layout-polish"></script>
 <script defer src="/workspace-music-handoff.js?v=0.11.2-main-dock"></script>
 <script defer src="/music-save-reliability.js?v=2.0.1-no-mo"></script>
@@ -182,15 +182,7 @@ iframe[title^="Reader 2"] {
   <script defer src="/developer-data.js?v=9.6.4"></script>
   <script defer src="/developer-tools.js?v=9.6.6"></script>
   <script defer src="/experience-themes.js?v=20260822-v7.30-theme-swatches"></script>
-  <script>
-  // v3.8: the scenic single-background owner belongs only to the primary app.
-  // Reader 2+ is an embedded auxiliary Reader and must never paint its own
-  // experience scenery. Keep the primary Reader script in the same parser
-  // position/order; simply omit it for auxiliary Reader documents.
-  if (!window.__MSG_SECONDARY_READER__) {
-    document.write('<script defer src="/single-theme-background.js?v=1.0.0-center-image-owner"><\/script>');
-  }
-  </script>
+  <script defer src="/single-theme-background.js?v=1.0.0-center-image-owner"></script>
   <script defer src="/explorer-visual-designer.js?v=20260825-v3.5-unified-settings-api"></script>
   <script defer src="/user-settings.js?v=20260825-v1.2.0-desktop-workspace"></script>
   <script defer src="/cloud-content-sync.js?v=20260825-v1.0.2-no-background-reload"></script>
