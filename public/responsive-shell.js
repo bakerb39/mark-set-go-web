@@ -308,7 +308,12 @@
       button.innerHTML = '<span class="msg-reader-window-icon" aria-hidden="true">▣</span>';
       button.title = 'Make Reader smaller';
       button.setAttribute('aria-label', 'Make Reader smaller');
-      controls.insertBefore(button, fullscreen);
+      const insertionParent = fullscreen.parentNode;
+      if (insertionParent && insertionParent.nodeType === Node.ELEMENT_NODE) {
+        insertionParent.insertBefore(button, fullscreen);
+      } else {
+        controls.appendChild(button);
+      }
 
       button.addEventListener('click', () => {
         const currentShell = readerShell();
@@ -438,8 +443,12 @@
       return;
     }
 
-    ensureReaderWindowButton();
-    ensureReaderEdges();
+    try { ensureReaderWindowButton(); } catch (error) {
+      console.warn('Reader width button could not be placed.', error);
+    }
+    try { ensureReaderEdges(); } catch (error) {
+      console.warn('Reader width edge controls could not be initialized.', error);
+    }
 
     if (!standardReaderAvailable()) {
       clearShellWidth(shell);
