@@ -322,6 +322,13 @@
       );
     });
     toggle.classList.add('msg-reader-topics-toolbar-normalized');
+
+    // Legacy edge-tab decoration can be carried by inline border/radius rules.
+    ['border-radius','border-top-left-radius','border-bottom-left-radius',
+     'border-top-right-radius','border-bottom-right-radius'].forEach((prop) => {
+      toggle.style.removeProperty(prop);
+    });
+
     return true;
   }
 
@@ -401,9 +408,6 @@
         group.className = 'msg-reader-window-control-group';
       }
 
-      // Capture the X's current window-level position before its FIRST move only.
-      // On subsequent syncs the group already owns the window position.
-      const closeStyle = getComputedStyle(closeButton);
       const parent = closeButton.parentNode;
 
       if (!group.contains(closeButton) && group.parentNode !== parent) {
@@ -412,18 +416,15 @@
         parent.insertBefore(group, closeButton);
       }
 
-      const copied = ['position','top','right','bottom','left','z-index'];
-      if (!group.dataset.readerWindowPositionCaptured) {
-        copied.forEach((prop) => {
-          const value = closeStyle.getPropertyValue(prop);
-          if (value && value !== 'auto') group.style.setProperty(prop, value);
-        });
-        group.dataset.readerWindowPositionCaptured = '1';
-      }
-
-      group.style.setProperty('display', 'inline-flex', 'important');
-      group.style.setProperty('align-items', 'center', 'important');
-      group.style.setProperty('gap', '4px', 'important');
+      // The group is anchored directly to the Reader shell by CSS.
+      // Do not inherit stale absolute positioning from the legacy X.
+      group.style.removeProperty('top');
+      group.style.removeProperty('right');
+      group.style.removeProperty('bottom');
+      group.style.removeProperty('left');
+      group.style.removeProperty('z-index');
+      group.style.removeProperty('position');
+      group.style.removeProperty('transform');
 
       if (button.parentNode !== group) group.appendChild(button);
       if (closeButton.parentNode !== group) group.appendChild(closeButton);
