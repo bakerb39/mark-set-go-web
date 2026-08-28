@@ -248,3 +248,27 @@ body.msg-reader-window-resizing {
   visibility: hidden !important;
   pointer-events: none !important;
 }
+
+
+/* v1.1 — retire the legacy standalone Reader resize grip.
+   Manual Reader resizing is now handled directly at the Reader shell edges. */
+.msg-primary-reader-resize-grip,
+body .msg-primary-reader-resize-grip,
+#app .msg-primary-reader-resize-grip {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: none !important;
+}
+.msg-primary-reader-resize-grip::before,
+.msg-primary-reader-resize-grip::after {
+  content: none !important;
+  display: none !important;
+}

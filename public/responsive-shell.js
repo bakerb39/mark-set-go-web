@@ -551,6 +551,7 @@
 
   function syncStandardReaderWindow() {
     retireObsoleteReaderSurfaceHandle();
+    document.querySelectorAll('.msg-primary-reader-resize-grip').forEach((grip) => grip.remove());
     removeLegacyReaderEdgeOverlays();
     normalizeReaderTopicsToggle();
 
