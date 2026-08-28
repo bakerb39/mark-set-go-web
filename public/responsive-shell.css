@@ -1,0 +1,95 @@
+/* Mark, Set, Go! responsive outer shell — first visual test
+   Standard: centered automatic width with visible background gutters.
+   Desktop Workspace only: user may resize the OUTER app shell from either edge. */
+
+:root {
+  --msg-shell-preferred-max: 1180px;
+  --msg-shell-safe-gutter: clamp(20px, 4vw, 64px);
+}
+
+/* All normal pages share one centered, viewport-safe outer shell. */
+body:not(.msg-desktop-workspace-active) #app.app-shell {
+  box-sizing: border-box !important;
+  width: min(var(--msg-shell-preferred-max), calc(100vw - var(--msg-shell-safe-gutter))) !important;
+  max-width: calc(100vw - var(--msg-shell-safe-gutter)) !important;
+  min-width: 0 !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Children may shrink instead of pushing the shell offscreen. */
+#app.app-shell > *,
+#app.app-shell .reader-page-panel,
+#app.app-shell #reader-frame,
+#app.app-shell #reader,
+#app.app-shell .msg-workspace-shell,
+#app.app-shell .msg-workspace-primary,
+#app.app-shell .msg-workspace-secondary,
+#app.app-shell .msg-workspace-panel {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* As screens get tighter, sacrifice background gutter before readability. */
+@media (max-width: 1000px) {
+  :root { --msg-shell-safe-gutter: 24px; }
+}
+@media (max-width: 760px) {
+  :root { --msg-shell-safe-gutter: 12px; }
+}
+
+/* Desktop Workspace owns the manual outer-shell size. This deliberately
+   overrides desktop-workspace.css's old calc(100vw - 24px) rule. */
+body.msg-desktop-workspace-active #app.app-shell {
+  position: relative !important;
+  box-sizing: border-box !important;
+  width: min(var(--msg-desktop-shell-width, 1180px), calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px) !important;
+  min-width: min(760px, calc(100vw - 24px)) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Outer handles exist only in Desktop mode. */
+.msg-desktop-shell-resize-handle {
+  display: none;
+}
+body.msg-desktop-workspace-active .msg-desktop-shell-resize-handle {
+  position: fixed;
+  z-index: 2147482000;
+  top: 108px;
+  bottom: 12px;
+  display: block;
+  width: 10px;
+  cursor: ew-resize;
+  touch-action: none;
+  background: transparent;
+}
+body.msg-desktop-workspace-active .msg-desktop-shell-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 42%;
+  bottom: 42%;
+  width: 2px;
+  border-radius: 2px;
+  background: rgba(255,255,255,.28);
+  opacity: 0;
+  transition: opacity .12s ease;
+}
+body.msg-desktop-workspace-active .msg-desktop-shell-resize-handle:hover::after,
+body.msg-desktop-shell-resizing .msg-desktop-shell-resize-handle::after {
+  opacity: 1;
+}
+.msg-desktop-shell-resize-left::after { right: 2px; }
+.msg-desktop-shell-resize-right::after { left: 2px; }
+body.msg-desktop-shell-resizing {
+  cursor: ew-resize !important;
+  user-select: none !important;
+}
+
+/* Never expose manual resize affordances below Desktop Workspace's own
+   supported width. */
+@media (max-width: 999px) {
+  .msg-desktop-shell-resize-handle { display: none !important; }
+}
