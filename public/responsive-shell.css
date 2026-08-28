@@ -280,3 +280,7 @@ body .msg-primary-reader-resize-grip,
 body.msg-primary-reader-standalone:not(.msg-desktop-workspace-active) #app.app-shell {
   min-width: 0 !important;
 }
+
+
+/* v1.4 — single-Reader width controls disengage completely when
+   a second visible Reader is present. Multi-Reader layout remains native. */

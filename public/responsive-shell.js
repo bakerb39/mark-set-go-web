@@ -169,9 +169,25 @@
   let readerEdgeLeft = null;
   let readerEdgeRight = null;
 
+  function visibleReaderShells() {
+    return [...document.querySelectorAll('#app .reader-page-panel')].filter((shell) => {
+      const rect = shell.getBoundingClientRect();
+      const style = getComputedStyle(shell);
+      return rect.width > 0
+        && rect.height > 0
+        && style.display !== 'none'
+        && style.visibility !== 'hidden';
+    });
+  }
+
+  function singleReaderSurfaceActive() {
+    return visibleReaderShells().length === 1;
+  }
+
   function standardReaderAvailable() {
     return !document.body.classList.contains('msg-desktop-workspace-active')
-      && window.innerWidth > 760;
+      && window.innerWidth > 760
+      && singleReaderSurfaceActive();
   }
 
   function readerShell() {
@@ -188,7 +204,8 @@
 
   function standaloneReaderActive() {
     return document.body.classList.contains('msg-primary-reader-standalone')
-      && !document.body.classList.contains('msg-desktop-workspace-active');
+      && !document.body.classList.contains('msg-desktop-workspace-active')
+      && singleReaderSurfaceActive();
   }
 
   function standaloneReaderChromeWidth() {
@@ -221,7 +238,6 @@
   }
 
   function clearStandaloneAppWidth() {
-    if (!standaloneReaderActive()) return;
     ['box-sizing','width','max-width','margin-left','margin-right'].forEach((prop) => {
       app.style.removeProperty(prop);
     });
@@ -613,6 +629,7 @@
 
     const shell = readerShell();
     if (!shell) {
+      clearStandaloneAppWidth();
       return;
     }
 
@@ -626,6 +643,7 @@
 
     if (!standardReaderAvailable()) {
       clearShellWidth(shell);
+      clearStandaloneAppWidth();
       updateReaderWindowButton();
       return;
     }
