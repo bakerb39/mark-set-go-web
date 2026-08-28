@@ -190,6 +190,17 @@
     );
   }
 
+  // Any active Standard-mode side panel (Notebook, Music, etc.) means the
+  // Reader is no longer a true standalone surface. Do not let standalone
+  // Reader sizing constrain the outer #app width while that panel is open.
+  function standardWorkspacePanelActive() {
+    return !!document.querySelector(
+      '.msg-workspace-shell:not(.msg-desktop-workspace) .msg-workspace-secondary .msg-workspace-panel-active, ' +
+      '.msg-workspace-shell:not(.msg-desktop-workspace) .msg-workspace-secondary iframe, ' +
+      '.msg-workspace-shell:not(.msg-desktop-workspace) .msg-workspace-secondary [data-msg-workspace-tab]'
+    );
+  }
+
   function desktopWorkspaceActive() {
     return document.body.classList.contains('msg-desktop-workspace-active')
       || !!document.querySelector('.msg-workspace-shell.msg-desktop-workspace');
@@ -198,7 +209,8 @@
   function standaloneReaderActive() {
     return document.body.classList.contains('msg-primary-reader-standalone')
       && !desktopWorkspaceActive()
-      && !secondaryWorkspaceReaderActive();
+      && !secondaryWorkspaceReaderActive()
+      && !standardWorkspacePanelActive();
   }
 
   function standaloneReaderChromeWidth() {
@@ -635,6 +647,12 @@
       clearStandaloneAppWidth();
     }
 
+    // Standard workspace side panels own the remaining horizontal space.
+    // Release any standalone Reader width from #app immediately when one is open.
+    if (standardWorkspacePanelActive()) {
+      clearStandaloneAppWidth();
+    }
+
     if (!document.body.classList.contains('msg-primary-reader-standalone')) {
       clearStandaloneAppWidth();
     }
@@ -672,6 +690,17 @@
   /* Bounded resyncs only. */
   document.addEventListener('click', () => {
     [0, 80, 220].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+  }, { passive: true });
+
+  // When a Standard workspace panel is opened, release standalone #app width
+  // as soon as that panel is mounted instead of waiting for a later unrelated click.
+  document.addEventListener('click', (event) => {
+    if (!(event.target instanceof Element)) return;
+    const workspaceOpen = event.target.closest(
+      '[data-action="mark-notebook"], [data-action="music"], [data-msg-workspace-tab], [data-msg-workspace-open]'
+    );
+    if (!workspaceOpen) return;
+    [0, 60, 160, 320].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
   }, { passive: true });
 
   document.addEventListener(MODE_EVENT, () => {
