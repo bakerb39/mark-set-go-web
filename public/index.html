@@ -19,7 +19,7 @@
   window.__MSG_SECONDARY_READER__ = true; // backwards compatibility
   window.__MSG_READER_NUMBER__ = readerNumber;
   window.__MSG_READER_ID__ = `reader-${readerNumber}`;
-  document.documentElement.classList.add('msg-secondary-reader-document');
+  document.documentElement.classList.add('msg-secondary-reader-document', 'msg-secondary-reader-booting');
   document.documentElement.dataset.msgReaderId = window.__MSG_READER_ID__;
 
   // Keep Reader 2+ on the same live experience palette as Reader 1. This copies
@@ -65,6 +65,22 @@
   };
 })();
 </script>
+<style id="msg-secondary-reader-first-paint-shield">
+/* Reader 2+ first-paint shield v3.4: prevent parent experience scenery from
+   flashing while the auxiliary Reader bootstraps. Removed after normalization. */
+html.msg-secondary-reader-document.msg-secondary-reader-booting {
+  background: #fff !important;
+  background-image: none !important;
+}
+html.msg-secondary-reader-document.msg-secondary-reader-booting::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  pointer-events: none;
+  background: #fff;
+}
+</style>
 <script src="/experience-theme-bootstrap.js?v=20260822-v9.3-unified-ui"></script>
 <link href="/styles.css?v=20260822-v7.28.1-share-toolbar" rel="stylesheet"/>
 <link href="/read-anything.css?v=8.8.0" rel="stylesheet"/>
@@ -100,7 +116,7 @@
 <link href="/multi-reader-final.css?v=1.2.0-themed-close-no-minimize" rel="stylesheet"/>
 <link href="/reader-action-hierarchy.css?v=1.0.0-passage-action-hierarchy" rel="stylesheet"/>
 <link href="/page-theme-polish.css?v=1.0.5-runtime-standalone-close" rel="stylesheet"/>
-<link href="/secondary-reader-embedded-fix.css?v=20260828-v3.3-embedded-reader" rel="stylesheet"/>
+<link href="/secondary-reader-embedded-fix.css?v=20260828-v3.4-first-paint" rel="stylesheet"/>
   <script defer src="/workspace-pane-cache-refresh.js?v=20260822-v7.21-stability-consolidation"></script>
 <script defer src="/workspace-experiment.js?v=0.15.8-home-reader1-route"></script>
 <script defer src="/workspace-auth-guard.js?v=20260825-v1.0.0"></script>
@@ -123,7 +139,7 @@
 <script defer src="/read-with-mark-bridge.js?v=20260824-v2.5.1-shell-rescue"></script>
 <script defer src="/app.js?v=20260825-v2.7.3-home-dismiss-hard"></script>
 <script defer src="/reader-theme-inherit-guard.js?v=20260828-v3.1-new-reader-inherit"></script>
-<script defer src="/secondary-reader-embedded-fix.js?v=20260828-v3.3-embedded-reader"></script>
+<script defer src="/secondary-reader-embedded-fix.js?v=20260828-v3.4-first-paint"></script>
 <script defer src="/reader-tooltip-cleanup.js?v=20260823-v7.33.5-reader2-layout-polish"></script>
 <script defer src="/workspace-music-handoff.js?v=0.11.2-main-dock"></script>
 <script defer src="/music-save-reliability.js?v=2.0.1-no-mo"></script>
