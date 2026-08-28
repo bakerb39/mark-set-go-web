@@ -131,6 +131,28 @@ body:not(.msg-desktop-workspace-active) .msg-reader-window-edge {
   touch-action: none;
   background: transparent;
 }
+body:not(.msg-desktop-workspace-active) .msg-reader-window-edge::after {
+  content: "";
+  position: absolute;
+  top: 40%;
+  bottom: 40%;
+  width: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity .12s ease;
+  pointer-events: none;
+}
+body:not(.msg-desktop-workspace-active) .msg-reader-window-edge-left::after {
+  right: 3px;
+}
+body:not(.msg-desktop-workspace-active) .msg-reader-window-edge-right::after {
+  left: 3px;
+}
+body:not(.msg-desktop-workspace-active) .msg-reader-window-edge:hover::after,
+body.msg-reader-window-resizing .msg-reader-window-edge::after {
+  opacity: .28;
+}
 body.msg-reader-window-resizing {
   cursor: ew-resize !important;
   user-select: none !important;
@@ -142,178 +164,4 @@ body.msg-reader-window-resizing {
   #msg-reader-window-toggle {
     display: none !important;
   }
-}
-
-
-/* v0.6 — keep the native My Topics control in the Reader toolbar.
-   This is the SAME #toggle-navigation-pane button that legacy styles can turn
-   into a left-edge semicircular tab after workspace transitions. */
-#app .reader-pane-buttons #toggle-navigation-pane.msg-reader-topics-toolbar-normalized {
-  position: static !important;
-  inset: auto !important;
-  left: auto !important;
-  right: auto !important;
-  top: auto !important;
-  bottom: auto !important;
-  transform: none !important;
-  translate: none !important;
-  width: auto !important;
-  height: auto !important;
-  margin: 0 !important;
-  clip-path: none !important;
-}
-
-/* Reader window controls: one positioned group, two ordinary child controls. */
-#app .reader-page-panel .msg-reader-window-control-group {
-  display: inline-flex !important;
-  align-items: center !important;
-  gap: 4px !important;
-}
-#app .reader-page-panel .msg-reader-window-control-group > #msg-reader-window-toggle,
-#app .reader-page-panel .msg-reader-window-control-group > button:not(#msg-reader-window-toggle) {
-  position: static !important;
-  inset: auto !important;
-  transform: none !important;
-  margin: 0 !important;
-}
-
-
-/* v0.8 — permanently retire the legacy My Topics edge-tab presentation.
-   Keep the native button functional, but never let it become an edge handle. */
-#app #toggle-navigation-pane {
-  position: static !important;
-  inset: auto !important;
-  left: auto !important;
-  right: auto !important;
-  top: auto !important;
-  bottom: auto !important;
-  transform: none !important;
-  translate: none !important;
-  width: auto !important;
-  height: auto !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-  clip-path: none !important;
-}
-#app #toggle-navigation-pane::before,
-#app #toggle-navigation-pane::after {
-  content: none !important;
-  display: none !important;
-}
-
-/* Native Reader window-control group: fixed to the Reader shell itself. */
-#app .reader-page-panel {
-  position: relative;
-}
-#app .reader-page-panel .msg-reader-window-control-group {
-  position: absolute !important;
-  top: 8px !important;
-  right: 10px !important;
-  left: auto !important;
-  bottom: auto !important;
-  z-index: 60 !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: flex-end !important;
-  gap: 6px !important;
-  transform: none !important;
-}
-#app .reader-page-panel .msg-reader-window-control-group > button {
-  position: static !important;
-  inset: auto !important;
-  margin: 0 !important;
-  transform: none !important;
-}
-
-
-/* v0.9 — Reader resize edges are interaction-only.
-   No visible tab, bar, line, pill, or semicircle should ever render. */
-.msg-reader-window-edge::before,
-.msg-reader-window-edge::after {
-  content: none !important;
-  display: none !important;
-}
-.msg-reader-window-edge {
-  background: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  outline: 0 !important;
-}
-
-
-/* v1.0 — no separate Reader-edge overlay elements.
-   Edge resizing is handled directly by the Reader shell. */
-.msg-reader-window-edge {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
-
-/* v1.1 — retire the legacy standalone Reader resize grip.
-   Manual Reader resizing is now handled directly at the Reader shell edges. */
-.msg-primary-reader-resize-grip,
-body .msg-primary-reader-resize-grip,
-#app .msg-primary-reader-resize-grip {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  width: 0 !important;
-  height: 0 !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-  border: 0 !important;
-  box-shadow: none !important;
-  background: none !important;
-}
-.msg-primary-reader-resize-grip::before,
-.msg-primary-reader-resize-grip::after {
-  content: none !important;
-  display: none !important;
-}
-
-
-/* v1.3 — when Standard standalone Reader is manually resized,
-   responsive-shell.js couples #app width to Reader width.
-   Keep the outer window centered and viewport-safe. */
-body.msg-primary-reader-standalone:not(.msg-desktop-workspace-active) #app.app-shell {
-  min-width: 0 !important;
-}
-
-
-/* v1.5 — Reader 1 width is independent of Reader 2.
-   In a multi-Reader workspace, #app stays under native workspace control;
-   only the primary Reader shell may resize inside its assigned pane. */
-
-
-/* v1.6 — Desktop workspace owns its own geometry.
-   Never let Standard Reader outer-shell sizing constrain the whole Desktop canvas. */
-body.msg-desktop-workspace-active #app.app-shell,
-#app.app-shell:has(.msg-workspace-shell.msg-desktop-workspace) {
-  width: auto !important;
-  max-width: none !important;
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
-
-
-/* v2.0 — standalone Reader polish.
-   1) The Topic Feed top band remains structurally untouched but transparent,
-      so it always visually matches the Reader/article background beneath it.
-   2) The workspace close control is not shown in standalone Reader mode.
-      It remains available in actual workspace layouts. */
-
-body.msg-primary-reader-standalone .topic-feed-reader-page .topic-feed-reader-credit,
-body.msg-primary-reader-standalone .topic-feed-reader-page .topic-feed-reader-meta,
-body.msg-primary-reader-standalone .topic-feed-reader-page .topic-feed-reader-source,
-body.msg-primary-reader-standalone .topic-feed-reader-page .reader-title-row {
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-body.msg-primary-reader-standalone .msg-workspace-close {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
 }
