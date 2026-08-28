@@ -107,7 +107,6 @@
         : drag.startWidth - (delta * 2);
 
       setWidth(next, false);
-      try { window.dispatchEvent(new Event('resize')); } catch {}
     });
 
     const finish = (event) => {
@@ -117,7 +116,6 @@
       drag = null;
       document.body.classList.remove('msg-desktop-shell-resizing');
       try { handle.releasePointerCapture(event.pointerId); } catch {}
-      try { window.dispatchEvent(new Event('resize')); } catch {}
     };
 
     handle.addEventListener('pointerup', finish);
@@ -126,7 +124,6 @@
     handle.addEventListener('dblclick', () => {
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
       setWidth(Math.min(1180, safeMaxWidth()), true);
-      try { window.dispatchEvent(new Event('resize')); } catch {}
     });
   }
 
@@ -170,7 +167,7 @@
   let readerEdgeRight = null;
 
   function standardReaderAvailable() {
-    return !document.body.classList.contains('msg-desktop-workspace-active')
+    return !desktopWorkspaceActive()
       && window.innerWidth > 760;
   }
 
@@ -183,6 +180,60 @@
     const parent = shell?.parentElement;
     const width = parent?.getBoundingClientRect().width || shell?.getBoundingClientRect().width || 0;
     return Math.max(0, Math.floor(width));
+  }
+
+
+  function secondaryWorkspaceReaderActive() {
+    return !!document.querySelector(
+      '.msg-workspace-secondary .msg-workspace-secondary-reader-page.msg-workspace-panel-active, ' +
+      '.msg-workspace-secondary .msg-workspace-aux-reader-page.msg-workspace-panel-active'
+    );
+  }
+
+  function desktopWorkspaceActive() {
+    return document.body.classList.contains('msg-desktop-workspace-active')
+      || !!document.querySelector('.msg-workspace-shell.msg-desktop-workspace');
+  }
+
+  function standaloneReaderActive() {
+    return document.body.classList.contains('msg-primary-reader-standalone')
+      && !desktopWorkspaceActive()
+      && !secondaryWorkspaceReaderActive();
+  }
+
+  function standaloneReaderChromeWidth() {
+    const shell = readerShell();
+    if (!shell || !standaloneReaderActive()) return 0;
+
+    const appRect = app.getBoundingClientRect();
+    const shellRect = shell.getBoundingClientRect();
+    return Math.max(0, Math.round(appRect.width - shellRect.width));
+  }
+
+  function safeStandaloneAppWidth() {
+    return Math.max(0, Math.floor(window.innerWidth - 32));
+  }
+
+  function setStandaloneAppWidthForReader(readerWidth) {
+    if (!standaloneReaderActive()) return;
+
+    const chrome = readerWidthDrag?.chromeWidth ?? standaloneReaderChromeWidth();
+    const desiredAppWidth = Math.min(
+      safeStandaloneAppWidth(),
+      Math.max(0, Math.round(readerWidth + chrome))
+    );
+
+    app.style.setProperty('box-sizing', 'border-box', 'important');
+    app.style.setProperty('width', `${desiredAppWidth}px`, 'important');
+    app.style.setProperty('max-width', 'calc(100vw - 32px)', 'important');
+    app.style.setProperty('margin-left', 'auto', 'important');
+    app.style.setProperty('margin-right', 'auto', 'important');
+  }
+
+  function clearStandaloneAppWidth() {
+    ['box-sizing','width','max-width','margin-left','margin-right'].forEach((prop) => {
+      app.style.removeProperty(prop);
+    });
   }
 
   function storedReaderWidth() {
@@ -200,7 +251,10 @@
   }
 
   function maxReaderWidth() {
-    return readerShellParentWidth();
+    if (!standaloneReaderActive()) return readerShellParentWidth();
+
+    const chrome = readerWidthDrag?.chromeWidth ?? standaloneReaderChromeWidth();
+    return Math.max(0, safeStandaloneAppWidth() - chrome);
   }
 
   function minReaderWidth() {
@@ -239,10 +293,18 @@
 
     if (!standardReaderAvailable()) {
       clearShellWidth(shell);
+      clearStandaloneAppWidth();
       return;
     }
 
     const width = clampReaderWidth(value);
+
+    if (standaloneReaderActive()) {
+      setStandaloneAppWidthForReader(width);
+    } else if (secondaryWorkspaceReaderActive()) {
+      clearStandaloneAppWidth();
+    }
+
     setShellWidthImportant(shell, `${width}px`);
 
     if (persist) {
@@ -252,7 +314,6 @@
       } catch {}
     }
 
-    positionReaderEdges();
     updateReaderWindowButton();
   }
 
@@ -262,9 +323,13 @@
 
     if (!standardReaderAvailable()) {
       clearShellWidth(shell);
+      clearStandaloneAppWidth();
       return;
     }
 
+    if (standaloneReaderActive()) {
+      clearStandaloneAppWidth();
+    }
     setShellWidthImportant(shell, '100%');
 
     if (persist) {
@@ -274,22 +339,58 @@
       } catch {}
     }
 
-    positionReaderEdges();
     updateReaderWindowButton();
-    try { window.dispatchEvent(new Event('resize')); } catch {}
   }
 
   function snapReaderSmaller() {
     setReaderWidth(storedReaderWidth() || comfortableReaderWidth(), true);
     try { localStorage.setItem(READER_COLLAPSED_KEY, '1'); } catch {}
     updateReaderWindowButton();
-    try { window.dispatchEvent(new Event('resize')); } catch {}
   }
 
   function retireObsoleteReaderSurfaceHandle() {
     const handle = document.getElementById('msg-vd-surface-handle');
     if (!handle) return false;
     handle.remove();
+    return true;
+  }
+
+  function normalizeReaderTopicsToggle() {
+    const toggle = document.querySelector('#app .reader-pane-buttons #toggle-navigation-pane');
+    if (!toggle) return false;
+
+    // Keep the native My Topics control in the toolbar. Some existing Reader/topic
+    // styles turn this same button into a left-edge semicircular tab after a
+    // workspace transition; manual Reader resizing makes that presentation obsolete.
+    const props = {
+      position: 'static',
+      inset: 'auto',
+      left: 'auto',
+      right: 'auto',
+      top: 'auto',
+      bottom: 'auto',
+      transform: 'none',
+      translate: 'none',
+      width: 'auto',
+      height: 'auto',
+      margin: '0',
+      clipPath: 'none'
+    };
+    Object.entries(props).forEach(([key, value]) => {
+      toggle.style.setProperty(
+        key.replace(/[A-Z]/g, (m) => `-${m.toLowerCase()}`),
+        value,
+        'important'
+      );
+    });
+    toggle.classList.add('msg-reader-topics-toolbar-normalized');
+
+    // Legacy edge-tab decoration can be carried by inline border/radius rules.
+    ['border-radius','border-top-left-radius','border-bottom-left-radius',
+     'border-top-right-radius','border-bottom-right-radius'].forEach((prop) => {
+      toggle.style.removeProperty(prop);
+    });
+
     return true;
   }
 
@@ -335,8 +436,8 @@
     const shell = readerShell();
     if (!shell) return null;
 
-    let button = shell.querySelector('#msg-reader-window-toggle');
     const closeButton = visibleReaderCloseButton();
+    let button = shell.querySelector('#msg-reader-window-toggle');
 
     if (!button) {
       button = document.createElement('button');
@@ -358,13 +459,55 @@
     }
 
     if (closeButton?.parentNode) {
-      // Match the existing Reader X styling without copying any close action/data.
+      // Reuse the wrapper that already owns the X on later syncs. Without this
+      // guard, closeButton.parentNode can itself be the group, and attempting
+      // group.insertBefore(group, closeButton) throws HierarchyRequestError.
+      let group = closeButton.closest('.msg-reader-window-control-group')
+        || shell.querySelector('.msg-reader-window-control-group');
+
+      if (!group) {
+        group = document.createElement('div');
+        group.className = 'msg-reader-window-control-group';
+      }
+
+      const parent = closeButton.parentNode;
+
+      if (!group.contains(closeButton) && group.parentNode !== parent) {
+        parent.insertBefore(group, closeButton);
+      } else if (!group.isConnected && parent && parent !== group) {
+        parent.insertBefore(group, closeButton);
+      }
+
+      // The group is anchored directly to the Reader shell by CSS.
+      // Do not inherit stale absolute positioning from the legacy X.
+      group.style.removeProperty('top');
+      group.style.removeProperty('right');
+      group.style.removeProperty('bottom');
+      group.style.removeProperty('left');
+      group.style.removeProperty('z-index');
+      group.style.removeProperty('position');
+      group.style.removeProperty('transform');
+
+      if (button.parentNode !== group) group.appendChild(button);
+      if (closeButton.parentNode !== group) group.appendChild(closeButton);
+
+      // Preserve the existing X classes/handler but neutralize its old absolute
+      // positioning now that the wrapper owns the window-control position.
+      [button, closeButton].forEach((control) => {
+        control.style.setProperty('position', 'static', 'important');
+        control.style.setProperty('inset', 'auto', 'important');
+        control.style.setProperty('top', 'auto', 'important');
+        control.style.setProperty('right', 'auto', 'important');
+        control.style.setProperty('bottom', 'auto', 'important');
+        control.style.setProperty('left', 'auto', 'important');
+        control.style.setProperty('transform', 'none', 'important');
+        control.style.setProperty('margin', '0', 'important');
+      });
+
+      // Match the X's visual classes without copying any close-specific data attrs.
       const closeClasses = [...closeButton.classList]
         .filter((name) => !/^msg-reader-window-/.test(name));
       button.className = [...new Set([...closeClasses, 'msg-reader-window-toggle'])].join(' ');
-      if (button.parentNode !== closeButton.parentNode || button.nextSibling !== closeButton) {
-        closeButton.parentNode.insertBefore(button, closeButton);
-      }
     }
 
     return button;
@@ -384,71 +527,63 @@
     button.setAttribute('aria-pressed', isSmaller ? 'true' : 'false');
   }
 
-  function ensureReaderEdges() {
-    if (!readerEdgeLeft) {
-      readerEdgeLeft = document.createElement('div');
-      readerEdgeLeft.className = 'msg-reader-window-edge msg-reader-window-edge-left';
-      readerEdgeLeft.dataset.readerWindowEdge = 'left';
-      readerEdgeLeft.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(readerEdgeLeft);
-      bindReaderEdge(readerEdgeLeft);
-    }
-
-    if (!readerEdgeRight) {
-      readerEdgeRight = document.createElement('div');
-      readerEdgeRight.className = 'msg-reader-window-edge msg-reader-window-edge-right';
-      readerEdgeRight.dataset.readerWindowEdge = 'right';
-      readerEdgeRight.setAttribute('aria-hidden', 'true');
-      document.body.appendChild(readerEdgeRight);
-      bindReaderEdge(readerEdgeRight);
-    }
-  }
-
-  function positionReaderEdges() {
+  function ensureReaderEdgeResizeBinding() {
     const shell = readerShell();
-    if (!shell || !readerEdgeLeft || !readerEdgeRight || !standardReaderAvailable()) {
-      if (readerEdgeLeft) readerEdgeLeft.style.display = 'none';
-      if (readerEdgeRight) readerEdgeRight.style.display = 'none';
-      return;
+    if (!shell || shell.dataset.readerEdgeResizeBound === '1') return;
+
+    shell.dataset.readerEdgeResizeBound = '1';
+
+    const EDGE_HIT_PX = 10;
+
+    function edgeForPointer(event) {
+      if (!standardReaderAvailable()) return null;
+      const rect = shell.getBoundingClientRect();
+      const leftDistance = Math.abs(event.clientX - rect.left);
+      const rightDistance = Math.abs(rect.right - event.clientX);
+
+      if (leftDistance <= EDGE_HIT_PX) return 'left';
+      if (rightDistance <= EDGE_HIT_PX) return 'right';
+      return null;
     }
 
-    const rect = shell.getBoundingClientRect();
-    const top = Math.max(0, Math.round(rect.top));
-    const height = Math.max(0, Math.round(rect.height));
+    shell.addEventListener('pointermove', (event) => {
+      if (readerWidthDrag) return;
+      shell.style.cursor = edgeForPointer(event) ? 'ew-resize' : '';
+    });
 
-    readerEdgeLeft.style.display = 'block';
-    readerEdgeRight.style.display = 'block';
-    readerEdgeLeft.style.left = `${Math.round(rect.left - 6)}px`;
-    readerEdgeRight.style.left = `${Math.round(rect.right - 6)}px`;
-    readerEdgeLeft.style.top = `${top}px`;
-    readerEdgeRight.style.top = `${top}px`;
-    readerEdgeLeft.style.height = `${height}px`;
-    readerEdgeRight.style.height = `${height}px`;
-  }
+    shell.addEventListener('pointerleave', () => {
+      if (!readerWidthDrag) shell.style.cursor = '';
+    });
 
-  function bindReaderEdge(edge) {
-    edge.addEventListener('pointerdown', (event) => {
-      const shell = readerShell();
-      if (!shell || !standardReaderAvailable()) return;
+    shell.addEventListener('pointerdown', (event) => {
+      const edge = edgeForPointer(event);
+      if (!edge || !standardReaderAvailable()) return;
 
       event.preventDefault();
       event.stopPropagation();
+
+      if (secondaryWorkspaceReaderActive()) {
+        document.querySelector('.msg-workspace-shell')?.classList.remove('msg-reader-focus-mode');
+        clearStandaloneAppWidth();
+      }
 
       readerWidthDrag = {
         pointerId: event.pointerId,
         startX: event.clientX,
         startWidth: shell.getBoundingClientRect().width,
-        edge: edge.dataset.readerWindowEdge
+        chromeWidth: standaloneReaderChromeWidth(),
+        edge
       };
 
-      try { edge.setPointerCapture(event.pointerId); } catch {}
+      try { shell.setPointerCapture(event.pointerId); } catch {}
       document.body.classList.add('msg-reader-window-resizing');
+      shell.style.cursor = 'ew-resize';
     });
 
-    edge.addEventListener('pointermove', (event) => {
+    shell.addEventListener('pointermove', (event) => {
       if (!readerWidthDrag || readerWidthDrag.pointerId !== event.pointerId) return;
-      event.preventDefault();
 
+      event.preventDefault();
       const delta = event.clientX - readerWidthDrag.startX;
       const next = readerWidthDrag.edge === 'right'
         ? readerWidthDrag.startWidth + (delta * 2)
@@ -459,42 +594,69 @@
 
     const finish = (event) => {
       if (!readerWidthDrag || readerWidthDrag.pointerId !== event.pointerId) return;
-      event.preventDefault();
 
-      const shell = readerShell();
-      if (shell) setReaderWidth(shell.getBoundingClientRect().width, true);
+      event.preventDefault();
+      setReaderWidth(shell.getBoundingClientRect().width, true);
 
       readerWidthDrag = null;
       document.body.classList.remove('msg-reader-window-resizing');
-      try { edge.releasePointerCapture(event.pointerId); } catch {}
-      try { window.dispatchEvent(new Event('resize')); } catch {}
+      shell.style.cursor = '';
+      try { shell.releasePointerCapture(event.pointerId); } catch {}
     };
 
-    edge.addEventListener('pointerup', finish);
-    edge.addEventListener('pointercancel', finish);
-    edge.addEventListener('dblclick', () => restoreReaderFullWidth(true));
+    shell.addEventListener('pointerup', finish);
+    shell.addEventListener('pointercancel', finish);
+
+    shell.addEventListener('dblclick', (event) => {
+      if (edgeForPointer(event)) restoreReaderFullWidth(true);
+    });
+  }
+
+  function removeLegacyReaderEdgeOverlays() {
+    document.querySelectorAll('.msg-reader-window-edge').forEach((edge) => edge.remove());
+    readerEdgeLeft = null;
+    readerEdgeRight = null;
   }
 
   function syncStandardReaderWindow() {
     retireObsoleteReaderSurfaceHandle();
+    document.querySelectorAll('.msg-primary-reader-resize-grip').forEach((grip) => grip.remove());
+    removeLegacyReaderEdgeOverlays();
+
+    if (desktopWorkspaceActive()) {
+      clearStandaloneAppWidth();
+      const shell = readerShell();
+      if (shell) clearShellWidth(shell);
+      return;
+    }
+
+    if (secondaryWorkspaceReaderActive()) {
+      document.querySelector('.msg-workspace-shell')?.classList.remove('msg-reader-focus-mode');
+      clearStandaloneAppWidth();
+    }
+
+    if (!document.body.classList.contains('msg-primary-reader-standalone')) {
+      clearStandaloneAppWidth();
+    }
+
+    normalizeReaderTopicsToggle();
 
     const shell = readerShell();
     if (!shell) {
-      positionReaderEdges();
       return;
     }
 
     try { ensureReaderWindowButton(); } catch (error) {
       console.warn('Reader width button could not be placed.', error);
     }
-    try { ensureReaderEdges(); } catch (error) {
-      console.warn('Reader width edge controls could not be initialized.', error);
+    removeLegacyReaderEdgeOverlays();
+    try { ensureReaderEdgeResizeBinding(); } catch (error) {
+      console.warn('Reader edge resizing could not be initialized.', error);
     }
 
     if (!standardReaderAvailable()) {
       clearShellWidth(shell);
       updateReaderWindowButton();
-      positionReaderEdges();
       return;
     }
 
@@ -505,7 +667,6 @@
     }
 
     updateReaderWindowButton();
-    requestAnimationFrame(positionReaderEdges);
   }
 
   /* Bounded resyncs only. */
@@ -522,20 +683,18 @@
     if (!shell) return;
 
     if (readerWidthDrag) {
-      requestAnimationFrame(positionReaderEdges);
-      return;
+        return;
     }
 
     if (standardReaderAvailable() && readerCollapsed()) {
       setReaderWidth(storedReaderWidth() || comfortableReaderWidth(), false);
     } else if (!standardReaderAvailable()) {
       clearShellWidth(shell);
+      clearStandaloneAppWidth();
     }
 
-    requestAnimationFrame(positionReaderEdges);
   }, { passive: true });
 
-  window.addEventListener('scroll', () => requestAnimationFrame(positionReaderEdges), { passive: true });
 
   [0, 100, 300, 700, 1200].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
 
