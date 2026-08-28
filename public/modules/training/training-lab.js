@@ -7,7 +7,7 @@
   'use strict';
   if (window.MarkSetGoTrainingLab) return;
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.1.1';
   const STORAGE_KEY = 'markSetGoTrainingLabV1';
   const runtime = { raf:0, timer:0, mode:'', startedAt:0, startIndex:0, startWpm:0, burstPhase:0, overlay:null, hud:null, session:null };
   const DEFAULTS = {
@@ -198,9 +198,38 @@
   }
 
   function injectLaunchButton(){
-    if($('#training-lab-launch'))return; const anchor=$('.reader-pane-buttons')||$('.reader-toolbar')||$('.top-reader-return')?.parentElement; if(!anchor)return; const b=document.createElement('button'); b.id='training-lab-launch'; b.type='button'; b.className='secondary'; b.innerHTML='<span aria-hidden="true">◈</span> Training Lab'; b.addEventListener('click',()=>openLab('today')); anchor.appendChild(b);
+    // The Reader UI is rendered dynamically. Never fall back to the permanent
+    // site header: doing so can create the button before the Reader exists and
+    // then prevent it from ever being attached to the Reader controls.
+    const readerEl=$('#reader');
+    const readerPanel=readerEl?.closest('.reader-page-panel, .panel, section, main');
+    const anchor=readerPanel?.querySelector('.reader-pane-buttons') || null;
+    if(!anchor)return false;
+
+    let b=$('#training-lab-launch');
+    if(!b){
+      b=document.createElement('button');
+      b.id='training-lab-launch';
+      b.type='button';
+      b.className='training-lab-launch-button';
+      b.innerHTML='<span aria-hidden="true">◈</span> Training Lab';
+      b.addEventListener('click',()=>openLab('today'));
+    }
+    if(b.parentElement!==anchor) anchor.appendChild(b);
+    return true;
   }
-  function boot(){ buildLab(); injectLaunchButton(); document.addEventListener('marksetgo:document-available',()=>setTimeout(injectLaunchButton,50)); document.addEventListener('marksetgo:reader-session-changed',()=>setTimeout(injectLaunchButton,50)); window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#training-lab-shell')?.hidden)closeLab();}); dispatch('marksetgo:training-ready'); }
+  function scheduleLaunchButton(){
+    // Short bounded retry handles the app's synchronous/dynamic Reader render
+    // without MutationObserver and without continuously polling the page.
+    let attempts=0;
+    const tryAttach=()=>{
+      attempts+=1;
+      if(injectLaunchButton() || attempts>=20)return;
+      setTimeout(tryAttach,100);
+    };
+    setTimeout(tryAttach,0);
+  }
+  function boot(){ buildLab(); scheduleLaunchButton(); document.addEventListener('marksetgo:document-available',scheduleLaunchButton); document.addEventListener('marksetgo:reader-session-changed',scheduleLaunchButton); document.addEventListener('click',e=>{ if(e.target.closest('[data-action="reader"], [data-read], [data-action="reading-skills"]')) scheduleLaunchButton(); }); window.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#training-lab-shell')?.hidden)closeLab();}); dispatch('marksetgo:training-ready'); }
 
   window.MarkSetGoTrainingLab={version:VERSION,open:openLab,close:closeLab,run:runExercise,stop:clearRuntime,getProgress:()=>typeof structuredClone==='function'?structuredClone(data):JSON.parse(JSON.stringify(data)),recordAssessment:submitAssessment,setWpm};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();

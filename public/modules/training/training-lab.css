@@ -1,6 +1,6 @@
-/* Mark, Set, Go! Training Lab v0.1.0 — additive styles only */
+/* Mark, Set, Go! Training Lab v0.1.2 — isolated additive styles only */
 :root{--tl-bg:#071526;--tl-panel:#10243c;--tl-panel2:#162d49;--tl-text:#f7f3e8;--tl-muted:#b9c7d7;--tl-gold:#e9b949;--tl-blue:#6fb3ff;--tl-good:#70d6a6;--tl-danger:#ff8989;--tl-border:rgba(255,255,255,.14)}
-#training-lab-launch{margin-left:.45rem}
+#training-lab-launch.training-lab-launch-button{appearance:none!important;position:static!important;inset:auto!important;float:none!important;width:auto!important;height:auto!important;min-width:0!important;min-height:0!important;margin:0 0 0 .45rem!important;padding:.45rem .7rem!important;border-radius:.45rem!important;transform:none!important;clip-path:none!important;overflow:visible!important;display:inline-flex!important;align-items:center!important;gap:.35rem!important;white-space:nowrap!important;z-index:auto!important}
 .training-lab-shell{position:fixed;inset:0;z-index:2147482800;background:rgba(2,8,16,.78);backdrop-filter:blur(7px);display:grid;place-items:center;padding:24px}
 .training-lab-shell[hidden]{display:none!important}
 .training-lab-dialog{width:min(1180px,96vw);height:min(850px,92vh);background:linear-gradient(180deg,var(--tl-bg),#0a1b2d);color:var(--tl-text);border:1px solid var(--tl-border);border-radius:22px;box-shadow:0 28px 90px rgba(0,0,0,.5);overflow:hidden;display:grid;grid-template-rows:auto 1fr}
