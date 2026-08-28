@@ -107,19 +107,16 @@ body.msg-desktop-shell-resizing {
   pointer-events: none !important;
 }
 
-/* Window-like make-smaller / restore control. */
+/* Window-like make-smaller / restore control.
+   The runtime copies the visible Reader X classes so these appear as a pair. */
 #msg-reader-window-toggle {
-  min-width: 34px;
-  padding: .3rem .55rem;
-  margin-left: auto;
+  flex: 0 0 auto;
 }
 #msg-reader-window-toggle .msg-reader-window-icon {
   display: inline-block;
-  font-size: 17px;
+  font-size: inherit;
   line-height: 1;
-}
-.reader-pane-controls #msg-reader-window-toggle + .viewer-fullscreen-button {
-  margin-left: 0 !important;
+  pointer-events: none;
 }
 
 /* Invisible hit areas along the actual OUTER Reader shell edges. */

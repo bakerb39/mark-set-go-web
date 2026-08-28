@@ -293,27 +293,59 @@
     return true;
   }
 
+  function visibleReaderCloseButton() {
+    const shell = readerShell();
+    if (!shell) return null;
+    const shellRect = shell.getBoundingClientRect();
+
+    const candidates = [...shell.querySelectorAll('button')].filter((button) => {
+      if (button.id === 'msg-reader-window-toggle') return false;
+      if (button.matches('#fullscreen-mark-close, #close-reader-controls, [data-askmark-close]')) return false;
+
+      const rect = button.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return false;
+
+      const style = getComputedStyle(button);
+      if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0) return false;
+
+      const text = (button.textContent || '').trim();
+      const aria = (button.getAttribute('aria-label') || '').toLowerCase();
+      const title = (button.getAttribute('title') || '').toLowerCase();
+      const looksLikeClose = text === '×' || text === 'x' || aria.includes('close reader') || title.includes('close reader');
+      if (!looksLikeClose) return false;
+
+      // Only consider window-level controls near the outer Reader's top-right.
+      return rect.top <= shellRect.top + 150 && rect.left >= shellRect.left + (shellRect.width * .55);
+    });
+
+    if (!candidates.length) return null;
+
+    candidates.sort((a, b) => {
+      const ar = a.getBoundingClientRect();
+      const br = b.getBoundingClientRect();
+      const ad = Math.abs(shellRect.right - ar.right) + Math.abs(ar.top - shellRect.top);
+      const bd = Math.abs(shellRect.right - br.right) + Math.abs(br.top - shellRect.top);
+      return ad - bd;
+    });
+
+    return candidates[0];
+  }
+
   function ensureReaderWindowButton() {
     const shell = readerShell();
-    const controls = shell?.querySelector('.reader-pane-controls');
-    const fullscreen = controls?.querySelector('#toggle-reader-fullscreen');
-    if (!controls || !fullscreen) return null;
+    if (!shell) return null;
 
-    let button = controls.querySelector('#msg-reader-window-toggle');
+    let button = shell.querySelector('#msg-reader-window-toggle');
+    const closeButton = visibleReaderCloseButton();
+
     if (!button) {
       button = document.createElement('button');
       button.id = 'msg-reader-window-toggle';
       button.type = 'button';
-      button.className = 'secondary pane-toggle';
-      button.innerHTML = '<span class="msg-reader-window-icon" aria-hidden="true">▣</span>';
+      button.className = 'msg-reader-window-toggle';
+      button.innerHTML = '<span class="msg-reader-window-icon" aria-hidden="true">□</span>';
       button.title = 'Make Reader smaller';
       button.setAttribute('aria-label', 'Make Reader smaller');
-      const insertionParent = fullscreen.parentNode;
-      if (insertionParent && insertionParent.nodeType === Node.ELEMENT_NODE) {
-        insertionParent.insertBefore(button, fullscreen);
-      } else {
-        controls.appendChild(button);
-      }
 
       button.addEventListener('click', () => {
         const currentShell = readerShell();
@@ -323,6 +355,16 @@
         if (current >= max - 8) snapReaderSmaller();
         else restoreReaderFullWidth(true);
       });
+    }
+
+    if (closeButton?.parentNode) {
+      // Match the existing Reader X styling without copying any close action/data.
+      const closeClasses = [...closeButton.classList]
+        .filter((name) => !/^msg-reader-window-/.test(name));
+      button.className = [...new Set([...closeClasses, 'msg-reader-window-toggle'])].join(' ');
+      if (button.parentNode !== closeButton.parentNode || button.nextSibling !== closeButton) {
+        closeButton.parentNode.insertBefore(button, closeButton);
+      }
     }
 
     return button;
@@ -336,7 +378,7 @@
     const isSmaller = standardReaderAvailable()
       && shell.getBoundingClientRect().width < maxReaderWidth() - 8;
 
-    button.innerHTML = `<span class="msg-reader-window-icon" aria-hidden="true">${isSmaller ? '□' : '▣'}</span>`;
+    button.innerHTML = `<span class="msg-reader-window-icon" aria-hidden="true">${isSmaller ? '▣' : '□'}</span>`;
     button.title = isSmaller ? 'Restore Reader width' : 'Make Reader smaller';
     button.setAttribute('aria-label', isSmaller ? 'Restore Reader width' : 'Make Reader smaller');
     button.setAttribute('aria-pressed', isSmaller ? 'true' : 'false');
@@ -413,7 +455,6 @@
         : readerWidthDrag.startWidth - (delta * 2);
 
       setReaderWidth(next, false);
-      try { window.dispatchEvent(new Event('resize')); } catch {}
     });
 
     const finish = (event) => {
@@ -479,6 +520,11 @@
   window.addEventListener('resize', () => {
     const shell = readerShell();
     if (!shell) return;
+
+    if (readerWidthDrag) {
+      requestAnimationFrame(positionReaderEdges);
+      return;
+    }
 
     if (standardReaderAvailable() && readerCollapsed()) {
       setReaderWidth(storedReaderWidth() || comfortableReaderWidth(), false);
