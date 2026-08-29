@@ -153,3 +153,33 @@
   margin-left: 14px !important;
   transform: translateX(23px) !important;
 }
+
+
+/* v6.9 — final micro-alignment + subtle action hover
+   User-tuned horizontal alignment: +1px for the complete two-line header. */
+
+.topic-feed-story-header-external {
+  transform: translateX(8px) !important;
+}
+
+/* Keep Summarize / Analyze / Comprehension lightweight on hover.
+   Remove the oversized blue hover block while retaining a clear text cue. */
+#read-anything-article-summary-action
+:is(button, a, .read-anything-inline-article-summary):hover {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  transform: none !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+}
+
+/* Keyboard focus stays visible without becoming a large filled block. */
+#read-anything-article-summary-action
+:is(button, a, .read-anything-inline-article-summary):focus-visible {
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  outline: 1px solid currentColor !important;
+  outline-offset: 2px !important;
+}
