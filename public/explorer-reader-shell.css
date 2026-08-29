@@ -815,3 +815,146 @@ html[data-msg-experience-theme="explorer"]
 .reader-center-column > #reader-frame {
   margin-top: 0 !important;
 }
+
+
+/* v1.1.6 / v6.4 — Topic Feed strip occupies the REAL open toolbar slot:
+   My Topics / Ask Beth | Topic Feed strip | top-right media stack. */
+.topic-feed-reader-page > .reader-pane-controls > .reader-pane-buttons {
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external,
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  min-height: 36px !important;
+  margin: 0 14px 0 24px !important;
+  padding: 0 !important;
+  gap: 12px !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+  z-index: auto !important;
+}
+
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external::before,
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external::after {
+  content: none !important;
+  display: none !important;
+}
+
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external
+> .topic-feed-story-meta-overlay {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.topic-feed-reader-page .topic-feed-reader-credit {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  white-space: nowrap !important;
+}
+
+.topic-feed-reader-page .topic-feed-reader-share {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-left: 14px !important;
+  flex: 0 0 auto !important;
+}
+
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 6px !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external
+> #read-anything-article-summary-action::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Preserve the pre-existing right-side control stack as the final flex item. */
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .reader-topright-media-stack {
+  margin-left: auto !important;
+  flex: 0 0 auto !important;
+}
+
+/* Topic Feed no longer needs the 30px desktop air gap under this toolbar. */
+@media (min-width: 861px) {
+  #app .topic-feed-reader-page > .reader-pane-controls,
+  #app .topic-feed-reader-page > .reader-pane-controls.ask-mark-toolbar {
+    margin-bottom: 4px !important;
+  }
+
+  #app .topic-feed-reader-page #reader-frame {
+    margin-top: 0 !important;
+  }
+}
+
+/* If an old center-column copy briefly exists during a render, remove it from
+   layout rather than showing a duplicate second row. */
+.topic-feed-reader-page .reader-center-column > .topic-feed-story-header-external {
+  display: none !important;
+}

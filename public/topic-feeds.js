@@ -782,32 +782,40 @@
     const readerFrame = reader.closest('#reader-frame');
     if (!readerFrame) return {};
 
-    // The Topic Feed information belongs ABOVE the fixed-height Reader frame,
-    // not inside it. #reader-frame owns a fixed viewport and #reader is 100%
-    // height, so inserting another child there can either overlap the text or
-    // steal/clamp Reader space depending on the active theme.
-    const headerHost = readerFrame.parentElement;
+    const readerPage = readerFrame.closest('.reader-page-panel');
+    const paneControls = readerPage?.querySelector(':scope > .reader-pane-controls');
+    const paneButtons = paneControls?.querySelector(':scope > .reader-pane-buttons');
+    const mediaStack = paneButtons?.querySelector(':scope > .reader-topright-media-stack');
+
+    // Topic Feed strip belongs in the same toolbar row as My Topics / Ask Beth,
+    // directly BEFORE the already-grouped top-right media stack.
+    const toolbarHost = paneButtons && mediaStack ? paneButtons : null;
+    const fallbackHost = readerFrame.parentElement;
+    const headerHost = toolbarHost || fallbackHost;
     if (!headerHost) return {};
 
-    let header = headerHost.querySelector(':scope > [data-topic-feed-story-header-external]');
-    const legacyHeader = readerFrame.querySelector(':scope > [data-topic-feed-story-header-external]');
-
-    if (!header && legacyHeader) header = legacyHeader;
+    let header =
+      headerHost.querySelector(':scope > [data-topic-feed-story-header-external]') ||
+      document.querySelector('[data-topic-feed-story-header-external]');
 
     if (!header) {
       header = document.createElement('div');
       header.className = 'topic-feed-story-header-external';
       header.dataset.topicFeedStoryHeaderExternal = '1';
-      header.setAttribute('aria-label', 'Topic Feed article information');
+      header.setAttribute('aria-label', 'Topic Feed article header');
     }
 
-    // Moving the existing node preserves all existing meta/action handlers.
-    // Its final DOM position is immediately before the Reader frame.
-    if (header.parentElement !== headerHost || header.nextElementSibling !== readerFrame) {
-      headerHost.insertBefore(header, readerFrame);
+    if (toolbarHost) {
+      if (header.parentElement !== toolbarHost || header.nextElementSibling !== mediaStack) {
+        toolbarHost.insertBefore(header, mediaStack);
+      }
+    } else if (
+      header.parentElement !== fallbackHost ||
+      header.nextElementSibling !== readerFrame
+    ) {
+      fallbackHost.insertBefore(header, readerFrame);
     }
 
-    // Recover existing nodes without cloning so all action handlers survive.
     let meta = header.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
     const inReaderMeta = reader.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
     if (!meta && inReaderMeta) {
@@ -821,8 +829,6 @@
       header.appendChild(meta);
     }
 
-    // Retire the former compensation spacer. With the header in normal flow the
-    // Reader begins below it naturally, so no fake content is needed.
     reader.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
 
     const actionRow = document.querySelector('#read-anything-article-summary-action');
@@ -833,13 +839,22 @@
     reader.classList.remove('topic-feed-story-header-managed');
     header.classList.remove('topic-feed-story-header-scrolled');
 
-    return { readerFrame, headerHost, header, meta, actionRow };
+    return {
+      readerFrame,
+      readerPage,
+      paneControls,
+      paneButtons,
+      mediaStack,
+      headerHost,
+      header,
+      meta,
+      actionRow
+    };
   }
 
-  // v6.0: The Reader shell can be rebuilt shortly after a Topic Feed story is
-  // populated. Re-anchor the existing header to the CURRENT #reader-frame using
-  // bounded retries so it cannot be stranded after the Reader at the bottom.
-  // No MutationObserver is used.
+  // v6.4: The Reader toolbar and media stack can settle after article render.
+  // Re-seat the same header node into the proven toolbar slot using bounded
+  // retries only. No MutationObserver.
   let topicFeedHeaderPlacementTimers = [];
 
   function stabilizeTopicFeedHeaderPlacement() {
@@ -855,38 +870,16 @@
         const liveHost = liveFrame?.parentElement;
         if (!liveReader || !liveFrame || !liveHost) return;
 
-        // v6.3: live diagnostics proved this container is sometimes forced to
-        // CSS grid by runtime layout code. Apply the known-good vertical flex
-        // model directly to the live center column.
+        // Keep the proven center-column correction in case runtime layout code
+        // has forced it back to grid.
         if (liveHost.classList.contains('reader-center-column')) {
           liveHost.style.setProperty('display', 'flex', 'important');
           liveHost.style.setProperty('flex-direction', 'column', 'important');
           liveHost.style.setProperty('grid-template-rows', 'none', 'important');
         }
 
-        let liveHeader =
-          liveHost.querySelector(':scope > [data-topic-feed-story-header-external]') ||
-          document.querySelector('[data-topic-feed-story-header-external]');
-
-        if (!liveHeader) {
-          const parts = topicFeedStoryHeaderParts(liveReader);
-          liveHeader = parts.header;
-        }
-
-        if (!liveHeader) return;
-
-        // This is the actual layout contract: header immediately precedes the
-        // live Reader frame in DOM order.
-        if (liveHeader.parentElement !== liveHost || liveHeader.nextElementSibling !== liveFrame) {
-          liveHost.insertBefore(liveHeader, liveFrame);
-        }
-
-        // Do not allow prior flex ordering rules to counteract the DOM order.
-        liveHeader.style.setProperty('order', '0', 'important');
-        liveFrame.style.setProperty('order', '0', 'important');
-
-        const toolbar = liveHost.querySelector(':scope > .reader-frame-toolbar');
-        if (toolbar) toolbar.style.setProperty('order', '0', 'important');
+        const parts = topicFeedStoryHeaderParts(liveReader);
+        if (!parts.header) return;
 
         positionTopicFeedStoryHeader();
       }, delay);
@@ -912,21 +905,30 @@
     const reader = document.querySelector('#reader');
     if (!reader) return;
 
-    const { readerFrame, header, meta, actionRow } = topicFeedStoryHeaderParts(reader);
+    const { readerFrame, paneButtons, mediaStack, header, meta, actionRow } =
+      topicFeedStoryHeaderParts(reader);
+
     if (!readerFrame || !header || !meta) return;
 
-    // Remove every remnant of the former overlay geometry. The header is now a
-    // true normal-flow block above #reader and consumes its own layout height.
+    header.classList.remove('topic-feed-story-header-scrolled');
+
+    // Toolbar placement is ordinary flex flow. Strip all legacy overlay geometry.
     for (const property of [
       'left', 'right', 'top', 'bottom', 'inset', 'width', 'max-width',
-      'position', 'transform', 'z-index'
+      'position', 'transform', 'z-index', 'padding-top'
     ]) {
       header.style.removeProperty(property);
     }
-    header.classList.remove('topic-feed-story-header-scrolled');
+
+    if (paneButtons && mediaStack &&
+        (header.parentElement !== paneButtons || header.nextElementSibling !== mediaStack)) {
+      paneButtons.insertBefore(header, mediaStack);
+    }
 
     if (actionRow?.isConnected) {
-      for (const property of ['left', 'right', 'top', 'bottom', 'position', 'max-width', 'z-index']) {
+      for (const property of [
+        'left', 'right', 'top', 'bottom', 'position', 'max-width', 'z-index'
+      ]) {
         actionRow.style.removeProperty(property);
       }
     }
@@ -962,9 +964,7 @@
     window.MSGTopicFeedReaderContext = null;
 
     const reader = document.querySelector('#reader');
-    const frame = reader?.closest('#reader-frame');
-    frame?.parentElement?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
-    frame?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
+    document.querySelectorAll('[data-topic-feed-story-header-external]').forEach((node) => node.remove());
     reader?.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
     removeTopicBookDivider();
   }
