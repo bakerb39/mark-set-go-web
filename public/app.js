@@ -72,6 +72,13 @@ function secondaryReaderAllowsDocumentRender() {
   return !isSecondaryReaderWorkspace() || secondaryReaderLocalIntent;
 }
 
+// Reader 2+ must paint its own empty Reader shell immediately. This does NOT
+// authorize a document render and therefore does not copy Reader 1's document
+// or session into the auxiliary Reader.
+function secondaryReaderAllowsShellRender() {
+  return true;
+}
+
 
 const { BookModel, SessionManager, ReaderEngine, VirtualRenderer } = window.MarkSetGoReader || {};
 if (!BookModel || !SessionManager || !ReaderEngine || !VirtualRenderer) {
@@ -5616,8 +5623,16 @@ function setProfileTickerEnabled(apiName, storageKey, enabled) {
 }
 
 function renderProfilePreferences() {
-  finalizeReadingSession();
-  stopReader();
+  // Profile is an application settings surface. A stale Reader/session cleanup
+  // must never prevent it from rendering.
+  try { finalizeReadingSession(); } catch (error) {
+    console.warn('Profile could not finalize the current reading session.', error);
+  }
+  try { stopReader(); } catch (error) {
+    console.warn('Profile could not stop the current Reader cleanly.', error);
+  }
+
+  app.dataset.viewKey = 'profile-preferences';
   let current=getExperienceProfile();
 
   const featureRows=[
@@ -5869,12 +5884,34 @@ function renderProfilePreferences() {
 
   // Every Profile appearance button gets the same direct click handler.
   // There is no Default/Explorer special case: all eight call the one theme engine.
+  const reflectAppearanceSelection=(selectedKey='')=>{
+    app.querySelectorAll('[data-profile-appearance]').forEach((button)=>{
+      const active=button.dataset.profileAppearance===selectedKey;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',String(active));
+      const check=button.querySelector('.profile-preset-check');
+      if(check) check.textContent=active ? '✓' : '';
+    });
+  };
+
   app.querySelectorAll('[data-profile-appearance]').forEach((button)=>{
     button.addEventListener('click',(event)=>{
       event.preventDefault();
       const key=String(button.dataset.profileAppearance || '').trim();
       if(!EXPERIENCE_APPEARANCES[key]) return;
+
+      const saved=saveExperienceProfile({
+        preset:current.preset,
+        appearance:key,
+        features:{...(current.features || {})}
+      });
+      current=normalizeExperienceProfile(saved);
+      reflectAppearanceSelection(key);
+
+      // The dedicated theme engine owns semantic colors/backgrounds. Profile owns
+      // the user's selected appearance so it survives navigation and restart.
       window.MarkSetGoExperienceThemes?.apply?.(key);
+      announceSave(saved,EXPERIENCE_APPEARANCES[key].label);
     });
   });
 
@@ -6095,6 +6132,7 @@ function renderProfilePreferences() {
     current=normalizeExperienceProfile(event.detail?.profile || getExperienceProfile());
     reflectPresetSelection(current.preset === 'custom' ? '' : current.preset);
     reflectFeatureControls(current);
+    reflectAppearanceSelection(current.appearance);
   };
   document.addEventListener('marksetgo:experience-profile-changed',onProfileChange);
 }
@@ -6801,11 +6839,31 @@ function getExperienceProfile() {
     return normalizeExperienceProfile(activeExperienceProfile);
   }
 
+  const rootTheme = String(
+    document.documentElement.dataset.msgExperienceTheme
+    || document.documentElement.dataset.experienceAppearance
+    || ''
+  ).trim();
+
   try {
     const saved=JSON.parse(localStorage.getItem(PROFILE_EXPERIENCE_KEY)||'null');
-    activeExperienceProfile=normalizeExperienceProfile(saved || { preset:'full' });
+    const candidate=saved || { preset:'full' };
+    // The early theme bootstrap may already have restored the user's real theme
+    // from its own storage before app.js runs. Preserve that value when an older
+    // Profile record has no appearance (or only the legacy default).
+    if (
+      EXPERIENCE_APPEARANCES[rootTheme]
+      && (!candidate.appearance || candidate.appearance === 'default')
+      && rootTheme !== 'default'
+    ) {
+      candidate.appearance=rootTheme;
+    }
+    activeExperienceProfile=normalizeExperienceProfile(candidate);
   } catch {
-    activeExperienceProfile=normalizeExperienceProfile({ preset:'full' });
+    activeExperienceProfile=normalizeExperienceProfile({
+      preset:'full',
+      appearance:EXPERIENCE_APPEARANCES[rootTheme] ? rootTheme : 'default'
+    });
   }
   return normalizeExperienceProfile(activeExperienceProfile);
 }
@@ -6866,6 +6924,43 @@ window.MarkSetGoExperienceProfile = Object.freeze({
   appearances:EXPERIENCE_APPEARANCES,
   apply:applyExperienceProfile
 });
+
+
+// Restore the application Profile on every load. The early theme bootstrap has
+// already run before app.js; deferred experience-themes.js loads later. Apply
+// feature gates now, then reconcile the visual theme after all deferred scripts
+// have initialized.
+(function restoreExperienceProfileRuntime(){
+  const profile=getExperienceProfile();
+  applyExperienceProfile(profile);
+
+  const reconcileAppearance=()=>{
+    const current=getExperienceProfile();
+    const key=String(current.appearance || '').trim();
+    if(!EXPERIENCE_APPEARANCES[key]) return;
+
+    const root=document.documentElement;
+    const live=String(root.dataset.msgExperienceTheme || root.dataset.experienceAppearance || '').trim();
+
+    if(typeof window.MarkSetGoExperienceThemes?.apply === 'function'){
+      // Only call the theme engine when runtime appearance is missing/different.
+      if(live !== key) window.MarkSetGoExperienceThemes.apply(key);
+    } else {
+      // Minimal non-destructive fallback: expose the saved appearance to the CSS
+      // theme system without manufacturing colors/backgrounds here.
+      if(!live){
+        root.dataset.msgExperienceTheme=key;
+        root.dataset.experienceAppearance=key;
+      }
+    }
+  };
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', reconcileAppearance, { once:true });
+  } else {
+    window.setTimeout(reconcileAppearance,0);
+  }
+})();
 
 
 function readLearningActivity() {
@@ -27501,7 +27596,9 @@ if (isSecondaryReaderWorkspace()) {
   document.documentElement.classList.add('msg-secondary-reader-document');
   app.classList.add('msg-secondary-reader-app');
   app.dataset.viewKey = 'reader-secondary';
-  renderEmptyReader();
+  // Paint the auxiliary Reader frame immediately. Document loading remains
+  // protected by secondaryReaderAllowsDocumentRender().
+  if (secondaryReaderAllowsShellRender()) renderEmptyReader();
 } else if (/read-anything-capture=/.test(String(window.location.hash || ''))) {
   // A Read with Mark capture is about to be opened by read-anything.js. Do not
   // paint Home first; that brief Home -> Reader swap was the visible import flash.
