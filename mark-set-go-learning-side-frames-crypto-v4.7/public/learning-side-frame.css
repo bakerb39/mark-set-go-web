@@ -1,0 +1,155 @@
+/* Mark, Set, Go! — Learning side-frame experiment v1.0
+   Uses the Reader's existing right-side grid slot, but keeps the implementation
+   separate from app.js / responsive-shell.js / workspace geometry code. */
+
+.msg-learning-side-frame[hidden] { display:none !important; }
+
+@media (min-width:1051px) {
+  #reader-layout.msg-learning-side-frame-open,
+  .reader-layout.msg-learning-side-frame-open {
+    --msg-learning-frame-width:min(760px,52vw);
+    grid-template-columns:
+      var(--navigation-width)
+      8px
+      minmax(0,1fr)
+      8px
+      var(--msg-learning-frame-width) !important;
+  }
+
+  #reader-layout.msg-learning-side-frame-open.navigation-hidden,
+  .reader-layout.msg-learning-side-frame-open.navigation-hidden {
+    grid-template-columns:
+      minmax(0,1fr)
+      8px
+      var(--msg-learning-frame-width) !important;
+  }
+
+  .msg-learning-side-frame-open #word-panel {
+    display:none !important;
+  }
+
+  .msg-learning-side-frame-open .msg-learning-side-frame {
+    display:flex !important;
+    min-width:0;
+    height:min(64vh,660px,calc(100dvh - 220px));
+    min-height:300px;
+    max-height:calc(100dvh - 220px);
+    overflow:hidden;
+    box-sizing:border-box;
+    flex-direction:column;
+    align-self:start;
+    border:1px solid var(--border,#cbd3db);
+    border-radius:.65rem;
+    background:var(--surface,#fff);
+    color:var(--ink,#18212b);
+    box-shadow:0 10px 28px rgba(15,23,42,.10);
+  }
+}
+
+@media (max-width:1050px) {
+  .msg-learning-side-frame-open .msg-learning-side-frame {
+    display:flex !important;
+    width:100%;
+    min-height:420px;
+    max-height:70dvh;
+    flex-direction:column;
+    overflow:hidden;
+    border:1px solid var(--border,#cbd3db);
+    border-radius:.65rem;
+    background:var(--surface,#fff);
+  }
+  .msg-learning-side-frame-open #word-panel { display:none !important; }
+}
+
+.msg-learning-frame-head {
+  flex:0 0 auto;
+  min-height:42px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:7px 10px 7px 12px;
+  border-bottom:1px solid var(--border,#cbd3db);
+  background:color-mix(in srgb,var(--surface,#fff) 94%,var(--accent,#2f75b5) 6%);
+}
+
+.msg-learning-frame-title {
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--ink,#18212b);
+}
+.msg-learning-frame-title > span {
+  color:var(--accent,#2f75b5);
+  font-weight:800;
+}
+.msg-learning-frame-title strong {
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+
+.msg-learning-frame-head [data-learning-frame-close] {
+  flex:0 0 auto;
+  width:30px;
+  height:30px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:var(--ink,#18212b);
+  font-size:1.2rem;
+  cursor:pointer;
+}
+.msg-learning-frame-head [data-learning-frame-close]:hover {
+  background:color-mix(in srgb,var(--accent,#2f75b5) 10%,transparent);
+}
+
+.msg-learning-frame-body {
+  flex:1 1 auto;
+  min-height:0;
+  overflow:auto;
+  background:var(--surface,#fff);
+}
+
+.msg-learning-frame-status {
+  margin:16px;
+  color:var(--muted,#64717f);
+}
+
+/* Training Lab when hosted in the page-style frame. */
+.msg-learning-frame-body > .training-lab-shell.training-lab-frame-hosted,
+.msg-learning-frame-body > .training-lab-shell {
+  position:relative !important;
+  inset:auto !important;
+  z-index:auto !important;
+  width:100% !important;
+  height:100% !important;
+  padding:0 !important;
+  display:block !important;
+  background:transparent !important;
+}
+.msg-learning-frame-body .training-lab-dialog {
+  width:100% !important;
+  max-width:none !important;
+  height:100% !important;
+  max-height:none !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+}
+
+/* Ask Beth/Mark comparison frame: preserve the real live shell and handlers. */
+.msg-learning-frame-body > .reader-control-shell.mark-shell.msg-askbeth-frame-hosted {
+  width:100% !important;
+  height:100% !important;
+  max-height:none !important;
+  min-height:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  overflow:hidden !important;
+}

@@ -1,0 +1,302 @@
+/* Mark, Set, Go! Training Lab v0.1.2 — isolated additive styles only */
+:root{--tl-bg:#071526;--tl-panel:#10243c;--tl-panel2:#162d49;--tl-text:#f7f3e8;--tl-muted:#b9c7d7;--tl-gold:#e9b949;--tl-blue:#6fb3ff;--tl-good:#70d6a6;--tl-danger:#ff8989;--tl-border:rgba(255,255,255,.14)}
+#training-lab-launch.training-lab-launch-button{appearance:none!important;position:static!important;inset:auto!important;float:none!important;width:auto!important;height:auto!important;min-width:0!important;min-height:0!important;margin:0 0 0 .45rem!important;padding:.45rem .7rem!important;border-radius:.45rem!important;transform:none!important;clip-path:none!important;overflow:visible!important;display:inline-flex!important;align-items:center!important;gap:.35rem!important;white-space:nowrap!important;z-index:auto!important}
+.training-lab-shell{position:fixed;inset:0;z-index:2147482800;background:rgba(2,8,16,.78);backdrop-filter:blur(7px);display:grid;place-items:center;padding:24px}
+.training-lab-shell[hidden]{display:none!important}
+.training-lab-dialog{width:min(1180px,96vw);height:min(850px,92vh);background:linear-gradient(180deg,var(--tl-bg),#0a1b2d);color:var(--tl-text);border:1px solid var(--tl-border);border-radius:22px;box-shadow:0 28px 90px rgba(0,0,0,.5);overflow:hidden;display:grid;grid-template-rows:auto 1fr}
+.training-lab-header{display:flex;justify-content:space-between;gap:20px;align-items:center;padding:22px 26px;border-bottom:1px solid var(--tl-border);background:rgba(255,255,255,.025)}
+.training-lab-eyebrow{color:var(--tl-gold);font-size:.78rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase}.training-lab-header h2{margin:.25rem 0 0;font-size:1.8rem}.training-lab-header p{margin:.35rem 0 0;color:var(--tl-muted)}
+.training-lab-close{border:0;background:transparent;color:var(--tl-text);font-size:2rem;line-height:1;cursor:pointer;padding:8px 12px}
+.training-lab-body{min-height:0;display:grid;grid-template-columns:220px 1fr}.training-lab-nav{padding:18px;border-right:1px solid var(--tl-border);display:flex;flex-direction:column;gap:8px;background:rgba(0,0,0,.12)}
+.training-lab-nav button{border:1px solid transparent;background:transparent;color:var(--tl-muted);text-align:left;padding:11px 12px;border-radius:10px;cursor:pointer;font-weight:700}.training-lab-nav button:hover,.training-lab-nav button.is-active{background:rgba(233,185,73,.12);border-color:rgba(233,185,73,.28);color:var(--tl-text)}
+.training-lab-main{min-width:0;overflow:auto;padding:24px 28px 34px}.training-lab-view[hidden]{display:none!important}.training-lab-view h3{font-size:1.45rem;margin:0 0 6px}.training-lab-sub{margin:0 0 22px;color:var(--tl-muted)}
+.tl-hero{border:1px solid rgba(233,185,73,.28);background:linear-gradient(135deg,rgba(233,185,73,.11),rgba(111,179,255,.08));border-radius:18px;padding:22px;margin-bottom:22px}.tl-hero-row{display:flex;justify-content:space-between;gap:20px;align-items:center}.tl-hero h4{font-size:1.3rem;margin:0 0 6px}.tl-hero p{color:var(--tl-muted);margin:0;max-width:720px}
+.tl-primary,.tl-secondary,.tl-danger{border-radius:10px;padding:10px 15px;font-weight:800;cursor:pointer;border:1px solid transparent}.tl-primary{background:var(--tl-gold);color:#102033}.tl-secondary{background:rgba(255,255,255,.07);color:var(--tl-text);border-color:var(--tl-border)}.tl-danger{background:rgba(255,137,137,.12);color:#ffd2d2;border-color:rgba(255,137,137,.3)}
+.tl-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.tl-card{border:1px solid var(--tl-border);border-radius:15px;background:rgba(255,255,255,.035);padding:16px;display:flex;flex-direction:column;gap:10px}.tl-card h4{margin:0;font-size:1.03rem}.tl-card p{margin:0;color:var(--tl-muted);font-size:.91rem;line-height:1.45;flex:1}.tl-card small{color:#8fa5ba}.tl-card-actions{display:flex;gap:8px;flex-wrap:wrap}.tl-badge{display:inline-flex;align-items:center;width:max-content;border:1px solid var(--tl-border);border-radius:999px;padding:4px 8px;font-size:.72rem;color:var(--tl-muted)}.tl-badge.ready{color:var(--tl-good);border-color:rgba(112,214,166,.3)}.tl-badge.experimental{color:#ffd789;border-color:rgba(233,185,73,.3)}
+.tl-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}.tl-metric{background:rgba(255,255,255,.035);border:1px solid var(--tl-border);border-radius:14px;padding:15px}.tl-metric span{display:block;color:var(--tl-muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.06em}.tl-metric strong{display:block;font-size:1.45rem;margin-top:6px}.tl-metric small{color:var(--tl-muted)}
+.tl-session-steps{display:grid;gap:9px;margin:16px 0}.tl-step{display:grid;grid-template-columns:36px 1fr auto;align-items:center;gap:12px;padding:11px 13px;border:1px solid var(--tl-border);border-radius:12px;background:rgba(255,255,255,.025)}.tl-step-number{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(111,179,255,.13);color:var(--tl-blue);font-weight:900}.tl-step.is-current{border-color:rgba(233,185,73,.5);background:rgba(233,185,73,.08)}.tl-step.is-done{opacity:.7}.tl-step small{color:var(--tl-muted)}
+.tl-form-row{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:12px 0}.tl-field{display:grid;gap:5px}.tl-field label{font-size:.8rem;color:var(--tl-muted);font-weight:700}.tl-field input,.tl-field select,.tl-field textarea{border:1px solid var(--tl-border);background:#0a1c30;color:var(--tl-text);border-radius:9px;padding:9px 10px;min-width:110px}.tl-field textarea{width:min(650px,75vw);min-height:100px;resize:vertical}
+.tl-notice{border-left:3px solid var(--tl-blue);background:rgba(111,179,255,.08);padding:12px 14px;border-radius:7px;color:var(--tl-muted);margin:14px 0}.tl-result{border:1px solid rgba(112,214,166,.25);background:rgba(112,214,166,.07);padding:14px;border-radius:12px;margin-top:14px}.tl-progress-bar{height:8px;background:rgba(255,255,255,.08);border-radius:99px;overflow:hidden}.tl-progress-bar>span{display:block;height:100%;background:var(--tl-gold);width:0;transition:width .2s linear}
+/* Runtime training overlays */
+#training-runtime-layer{position:fixed;inset:0;pointer-events:none;z-index:2147482700}.tl-fixation-dot{position:fixed;width:9px;height:9px;border-radius:50%;background:var(--tl-gold);box-shadow:0 0 0 3px rgba(233,185,73,.18);transform:translate(-50%,-50%)}
+.tl-focus-tunnel{position:fixed;border:2px solid rgba(233,185,73,.55);border-radius:12px;box-shadow:0 0 0 9999px rgba(3,9,17,.54),0 0 24px rgba(233,185,73,.18);transition:top .09s linear,left .09s linear,width .09s linear,height .09s linear}
+.reader.training-regression-soft .reader-word.tl-read{opacity:.52;transition:opacity .2s}.reader.training-regression-medium .reader-word.tl-read{opacity:.20;transition:opacity .2s}.reader.training-regression-strict .reader-word.tl-read{opacity:.025;transition:opacity .2s}
+.tl-peripheral-stage{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);min-width:min(760px,90vw);padding:32px 40px;text-align:center;border:1px solid rgba(233,185,73,.35);background:rgba(5,17,31,.95);border-radius:18px;box-shadow:0 25px 80px rgba(0,0,0,.5);pointer-events:auto;color:var(--tl-text)}.tl-peripheral-phrase{font-size:clamp(1.6rem,4vw,3.2rem);line-height:1.3;letter-spacing:.02em}.tl-peripheral-center{display:inline-block;border-bottom:3px solid var(--tl-gold);font-weight:850}.tl-peripheral-cue{color:var(--tl-muted);margin-top:14px;font-size:.9rem}
+.tl-runtime-hud{position:fixed;right:18px;bottom:18px;pointer-events:auto;background:rgba(5,17,31,.94);border:1px solid var(--tl-border);border-radius:13px;padding:10px 12px;min-width:235px;color:var(--tl-text);box-shadow:0 12px 40px rgba(0,0,0,.35)}.tl-runtime-hud-row{display:flex;justify-content:space-between;gap:14px}.tl-runtime-hud small{color:var(--tl-muted)}.tl-runtime-hud button{margin-top:8px;width:100%}
+@media(max-width:850px){.training-lab-shell{padding:8px}.training-lab-dialog{width:100%;height:96vh;border-radius:15px}.training-lab-body{grid-template-columns:1fr}.training-lab-nav{border-right:0;border-bottom:1px solid var(--tl-border);flex-direction:row;overflow:auto;padding:10px}.training-lab-nav button{white-space:nowrap}.training-lab-main{padding:18px}.tl-grid{grid-template-columns:1fr}.tl-metrics{grid-template-columns:repeat(2,1fr)}.tl-hero-row{align-items:flex-start;flex-direction:column}}
+
+/* v4.3 — Reader-integrated exercise cues. These decorate Reader content only; they do not alter Reader geometry. */
+#training-runtime-layer .tl-fixation-dot-active{width:10px;height:10px;box-shadow:0 0 0 4px rgba(233,185,73,.20),0 0 14px rgba(233,185,73,.55)}
+#reader .reader-word.tl-fixation-active{background:rgba(233,185,73,.16);border-radius:.2em;box-shadow:inset 0 -2px 0 rgba(233,185,73,.75)}
+#reader .reader-word.tl-peripheral-word{background:rgba(111,179,255,.10);border-radius:.2em}
+#reader .reader-word.tl-peripheral-center-word{background:rgba(233,185,73,.20);box-shadow:inset 0 -3px 0 rgba(233,185,73,.9);font-weight:800}
+.tl-runtime-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}.tl-runtime-actions button{flex:1;min-width:78px}
+
+
+/* v0.3.0 — Training Lab embedded in Ask Beth.
+   The Reader remains visible. The lab inherits the active application theme. */
+.training-lab-shell.training-lab-embedded{
+  position:relative !important;
+  inset:auto !important;
+  z-index:auto !important;
+  width:100% !important;
+  height:100% !important;
+  min-height:0 !important;
+  padding:0 !important;
+  display:block !important;
+  place-items:unset !important;
+  background:transparent !important;
+  backdrop-filter:none !important;
+
+  --tl-bg:var(--surface,#fff);
+  --tl-panel:var(--surface,#fff);
+  --tl-panel2:color-mix(in srgb,var(--surface,#fff) 92%,var(--accent,#2f75b5) 8%);
+  --tl-text:var(--ink,#18212b);
+  --tl-muted:var(--muted,#64717f);
+  --tl-gold:var(--msg-gold,#e8cc76);
+  --tl-blue:var(--msg-blue,var(--accent,#2f75b5));
+  --tl-good:#2d7a58;
+  --tl-danger:var(--danger,#a52a2a);
+  --tl-border:var(--border,#cbd3db);
+}
+
+.training-lab-askbeth-view{
+  min-height:0 !important;
+  overflow:hidden !important;
+}
+
+.training-lab-askbeth-host{
+  width:100%;
+  height:100%;
+  min-height:0;
+  overflow:hidden;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-dialog{
+  width:100% !important;
+  max-width:none !important;
+  height:100% !important;
+  max-height:none !important;
+  min-height:0 !important;
+  border:0 !important;
+  border-radius:0 !important;
+  box-shadow:none !important;
+  background:var(--surface,#fff) !important;
+  color:var(--ink,#18212b) !important;
+  grid-template-rows:auto 1fr !important;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-header{
+  padding:12px 14px !important;
+  gap:10px !important;
+  border-bottom:1px solid var(--border,#cbd3db) !important;
+  background:color-mix(in srgb,var(--surface,#fff) 94%,var(--accent,#2f75b5) 6%) !important;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-eyebrow{
+  color:var(--accent,#2f75b5) !important;
+  font-size:.66rem !important;
+  letter-spacing:.1em !important;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-header h2{
+  color:var(--ink,#18212b) !important;
+  font-size:1.05rem !important;
+  margin:.12rem 0 0 !important;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-header p{
+  color:var(--muted,#64717f) !important;
+  font-size:.78rem !important;
+  line-height:1.3 !important;
+  margin:.18rem 0 0 !important;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-close{
+  color:var(--ink,#18212b) !important;
+  font-size:1.25rem !important;
+  padding:5px 8px !important;
+  border-radius:7px !important;
+}
+.training-lab-shell.training-lab-embedded .training-lab-close:hover{
+  background:color-mix(in srgb,var(--accent,#2f75b5) 10%,transparent) !important;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-body{
+  min-height:0 !important;
+  grid-template-columns:112px minmax(0,1fr) !important;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-nav{
+  min-width:0 !important;
+  padding:9px 7px !important;
+  gap:4px !important;
+  border-right:1px solid var(--border,#cbd3db) !important;
+  background:color-mix(in srgb,var(--surface,#fff) 96%,var(--accent,#2f75b5) 4%) !important;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-nav button{
+  padding:8px 7px !important;
+  border-radius:7px !important;
+  color:var(--muted,#64717f) !important;
+  font-size:.72rem !important;
+  line-height:1.2 !important;
+}
+.training-lab-shell.training-lab-embedded .training-lab-nav button:hover,
+.training-lab-shell.training-lab-embedded .training-lab-nav button.is-active{
+  color:var(--ink,#18212b) !important;
+  background:color-mix(in srgb,var(--accent,#2f75b5) 10%,transparent) !important;
+  border-color:color-mix(in srgb,var(--accent,#2f75b5) 28%,transparent) !important;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-main{
+  min-height:0 !important;
+  padding:14px 14px 22px !important;
+  overflow:auto !important;
+  color:var(--ink,#18212b) !important;
+}
+
+.training-lab-shell.training-lab-embedded .training-lab-view h3{
+  font-size:1.05rem !important;
+  color:var(--ink,#18212b) !important;
+}
+.training-lab-shell.training-lab-embedded .training-lab-sub{
+  color:var(--muted,#64717f) !important;
+  font-size:.78rem !important;
+  margin-bottom:12px !important;
+}
+
+.training-lab-shell.training-lab-embedded .tl-hero,
+.training-lab-shell.training-lab-embedded .tl-card,
+.training-lab-shell.training-lab-embedded .tl-metric,
+.training-lab-shell.training-lab-embedded .tl-step{
+  background:var(--surface,#fff) !important;
+  color:var(--ink,#18212b) !important;
+  border-color:var(--border,#cbd3db) !important;
+  box-shadow:none !important;
+}
+
+.training-lab-shell.training-lab-embedded .tl-hero{
+  padding:13px !important;
+  margin-bottom:12px !important;
+  border-radius:10px !important;
+  background:color-mix(in srgb,var(--surface,#fff) 92%,var(--msg-gold,#e8cc76) 8%) !important;
+}
+
+.training-lab-shell.training-lab-embedded .tl-grid{
+  grid-template-columns:1fr !important;
+  gap:8px !important;
+}
+
+.training-lab-shell.training-lab-embedded .tl-card{
+  padding:11px !important;
+  gap:7px !important;
+  border-radius:9px !important;
+}
+
+.training-lab-shell.training-lab-embedded .tl-card p,
+.training-lab-shell.training-lab-embedded .tl-card small,
+.training-lab-shell.training-lab-embedded .tl-hero p,
+.training-lab-shell.training-lab-embedded .tl-metric small,
+.training-lab-shell.training-lab-embedded .tl-step small,
+.training-lab-shell.training-lab-embedded .tl-notice{
+  color:var(--muted,#64717f) !important;
+}
+
+.training-lab-shell.training-lab-embedded .tl-primary{
+  background:var(--accent,#2f75b5) !important;
+  color:#fff !important;
+}
+.training-lab-shell.training-lab-embedded .tl-secondary{
+  background:var(--surface,#fff) !important;
+  color:var(--ink,#18212b) !important;
+  border-color:var(--border,#cbd3db) !important;
+}
+.training-lab-shell.training-lab-embedded .tl-secondary:hover{
+  background:color-mix(in srgb,var(--accent,#2f75b5) 8%,var(--surface,#fff)) !important;
+}
+
+.training-lab-shell.training-lab-embedded .tl-field input,
+.training-lab-shell.training-lab-embedded .tl-field select,
+.training-lab-shell.training-lab-embedded .tl-field textarea{
+  min-width:0 !important;
+  width:100% !important;
+  background:var(--surface,#fff) !important;
+  color:var(--ink,#18212b) !important;
+  border-color:var(--border,#cbd3db) !important;
+}
+
+.training-lab-shell.training-lab-embedded .tl-metrics{
+  grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  gap:7px !important;
+  margin:10px 0 !important;
+}
+.training-lab-shell.training-lab-embedded .tl-metric{
+  padding:9px !important;
+  border-radius:8px !important;
+}
+.training-lab-shell.training-lab-embedded .tl-metric strong{
+  font-size:1.05rem !important;
+}
+
+/* Training button added to Ask Beth's existing tool group. */
+.askmark-header-actions [data-training-lab-askbeth-button]{
+  font-weight:800 !important;
+}
+
+/* If Ask Beth is unusually narrow, keep the section selector usable without
+   turning the Reader into a separate page. */
+@media(max-width:520px){
+  .training-lab-shell.training-lab-embedded .training-lab-body{
+    grid-template-columns:1fr !important;
+  }
+  .training-lab-shell.training-lab-embedded .training-lab-nav{
+    flex-direction:row !important;
+    overflow-x:auto !important;
+    border-right:0 !important;
+    border-bottom:1px solid var(--border,#cbd3db) !important;
+  }
+  .training-lab-shell.training-lab-embedded .training-lab-nav button{
+    white-space:nowrap !important;
+  }
+}
+
+
+/* v0.3.1 — Training Lab gets a deliberately wide Ask Beth workspace.
+   Normal Ask Beth keeps its existing width. Desktop Reader default is 380px;
+   Training Lab opens at 760px (2x) where viewport space allows. */
+@media (min-width:1500px){
+  #reader-layout.training-lab-wide-open,
+  .reader-layout.training-lab-wide-open{
+    --word-panel-width:760px !important;
+  }
+}
+
+/* Still substantially wider on medium desktop screens without forcing the
+   Reader completely off-screen. The app's <=1050px stacked layout remains untouched. */
+@media (min-width:1051px) and (max-width:1499px){
+  #reader-layout.training-lab-wide-open,
+  .reader-layout.training-lab-wide-open{
+    --word-panel-width:min(760px,52vw) !important;
+  }
+}
+
+#word-panel.training-lab-wide-open{
+  min-width:0 !important;
+}
+
+/* Use the additional horizontal space for exercises rather than leaving
+   everything in a single narrow card column. */
+@media (min-width:1051px){
+  .training-lab-wide-open .training-lab-shell.training-lab-embedded .tl-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+
+  .training-lab-wide-open .training-lab-shell.training-lab-embedded .tl-metrics{
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  }
+
+  .training-lab-wide-open .training-lab-shell.training-lab-embedded .training-lab-body{
+    grid-template-columns:128px minmax(0,1fr) !important;
+  }
+}
