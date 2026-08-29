@@ -958,3 +958,106 @@ html[data-msg-experience-theme="explorer"]
 .topic-feed-reader-page .reader-center-column > .topic-feed-story-header-external {
   display: none !important;
 }
+
+
+/* v1.1.7 / v6.5 — Final Topic Feed toolbar composition:
+   Row 1: Source / site / date / View original / social
+   Row 2: Summarize / Analyze / Comprehension
+   Both rows stay inside the SAME toolbar band as My Topics / Ask Beth. */
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external,
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  min-height: 42px !important;
+  width: auto !important;
+  max-width: none !important;
+  margin: 0 14px 0 24px !important;
+  padding: 0 !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external
+> .topic-feed-story-meta-overlay {
+  display: block !important;
+  width: auto !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.15 !important;
+}
+
+.topic-feed-reader-page .topic-feed-reader-credit {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 5px !important;
+  width: auto !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+}
+
+/* Social buttons stay just a few spaces after View original. */
+.topic-feed-reader-page .topic-feed-reader-share {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  margin: 0 0 0 14px !important;
+  padding: 0 !important;
+  flex: 0 0 auto !important;
+  transform: none !important;
+}
+
+/* Second row sits immediately under Source row — no artificial gap. */
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 6px !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 1px 0 0 0 !important;
+  padding: 0 !important;
+  line-height: 1.15 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+/* Keep the toolbar itself compact enough that the Reader starts directly below. */
+@media (min-width: 861px) {
+  #app .topic-feed-reader-page > .reader-pane-controls,
+  #app .topic-feed-reader-page > .reader-pane-controls.ask-mark-toolbar {
+    min-height: 48px !important;
+    margin-bottom: 2px !important;
+    padding-bottom: 0 !important;
+  }
+
+  #app .topic-feed-reader-page #reader-frame {
+    margin-top: 0 !important;
+  }
+}
