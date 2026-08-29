@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.10 — Ask Beth initial chat activation
+ * Mark, Set, Go! Workspace Experiment v0.15.11 — Ask Beth panel handoff
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -1245,8 +1245,22 @@
         closeButton?.click();
       } catch {}
 
+      const wordPanel = document.querySelector('#word-panel');
+      const readerLayout = document.querySelector('#reader-layout');
+
       shell.classList.add('msg-workspace-native-askbeth-shell');
       host.appendChild(shell);
+
+      // Ask Beth used to live inside #word-panel. Once the live shell moves into
+      // the real workspace, the old Reader-side column must be released or it
+      // remains as the empty dark rectangle visible beside the Reader.
+      if (wordPanel) {
+        wordPanel.hidden = true;
+        wordPanel.setAttribute('aria-hidden', 'true');
+        wordPanel.classList.remove('is-open', 'open', 'active', 'training-lab-wide-open');
+      }
+      readerLayout?.classList.add('word-panel-hidden');
+      readerLayout?.classList.remove('training-lab-wide-open');
 
       // Moving the already-configured live companion shell does not rebuild its
       // handlers, but it can preserve a stale secondary-view presentation from
@@ -1279,6 +1293,13 @@
         node,
         cleanup() {
           shell.classList.remove('msg-workspace-native-askbeth-shell');
+          const wordPanel = document.querySelector('#word-panel');
+          const readerLayout = document.querySelector('#reader-layout');
+          if (wordPanel) {
+            wordPanel.hidden = true;
+            wordPanel.setAttribute('aria-hidden', 'true');
+          }
+          readerLayout?.classList.add('word-panel-hidden');
           try {
             if (originalNext?.parentNode === originalParent) {
               originalParent.insertBefore(shell, originalNext);

@@ -70,3 +70,46 @@
   box-shadow:none !important;
   overflow:hidden !important;
 }
+
+
+/* v1.1 — Ask Beth workspace presentation.
+   The workspace version is a normal white page surface, independent of the
+   Reader's dark companion-panel chrome. */
+.msg-workspace-native-askbeth,
+.msg-workspace-native-askbeth .msg-workspace-native-learning-host,
+.msg-workspace-native-askbeth .reader-control-shell.mark-shell,
+.msg-workspace-native-askbeth .askmark-premium,
+.msg-workspace-native-askbeth .askmark-stage,
+.msg-workspace-native-askbeth .askmark-view {
+  background:#fff !important;
+  color:#18212b !important;
+}
+
+.msg-workspace-native-askbeth .askmark-hero {
+  background:#fff !important;
+  color:#18212b !important;
+  border-bottom:1px solid var(--border,#cbd3db) !important;
+}
+
+.msg-workspace-native-askbeth .askmark-eyebrow,
+.msg-workspace-native-askbeth .askmark-brand-copy,
+.msg-workspace-native-askbeth .askmark-brand-copy h2,
+.msg-workspace-native-askbeth .askmark-brand-copy strong {
+  color:#18212b !important;
+}
+
+.msg-workspace-native-askbeth .askmark-header-actions button,
+.msg-workspace-native-askbeth .askmark-close {
+  background:#fff !important;
+  color:#18212b !important;
+  border-color:var(--border,#cbd3db) !important;
+}
+
+.msg-workspace-native-askbeth .askmark-message > div,
+.msg-workspace-native-askbeth .askmark-composer {
+  background:#fff !important;
+}
+
+.msg-workspace-native-askbeth .askmark-conversation {
+  background:#fff !important;
+}
