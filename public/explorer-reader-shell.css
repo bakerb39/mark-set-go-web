@@ -723,39 +723,38 @@ html[data-msg-experience-theme="explorer"]
 }
 
 
-/* v1.1.5 / v6.2 — Topic Feed metadata uses the existing Reader command row.
-   It occupies the open horizontal space after Ask Beth and before Full screen,
-   so it adds no extra vertical band above the Reader. */
-.reader-pane-controls {
+/* v1.1.5 / v6.3 — Compact Topic Feed information into ONE row directly
+   above the Reader. This preserves Source/date/share/actions while reclaiming
+   the entire second header row. */
+.reader-center-column > .topic-feed-story-header-external,
+.reader-center-column > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
   position: relative !important;
-}
-
-.reader-pane-controls > .topic-feed-story-header-external,
-.reader-pane-controls > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
-  box-sizing: border-box !important;
   display: flex !important;
   align-items: center !important;
   justify-content: flex-start !important;
-  gap: 12px !important;
-  min-width: 0 !important;
-  min-height: 30px !important;
-  margin: 0 !important;
-  padding: 0 !important;
+  flex-wrap: nowrap !important;
+  gap: 14px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 32px !important;
+  margin: 0 0 4px 0 !important;
+  padding: 2px 10px 2px 10px !important;
   background: transparent !important;
   background-image: none !important;
   border: 0 !important;
   box-shadow: none !important;
   overflow: visible !important;
-  white-space: nowrap !important;
+  z-index: auto !important;
 }
 
-.reader-pane-controls > .topic-feed-story-header-external::before,
-.reader-pane-controls > .topic-feed-story-header-external::after {
+.reader-center-column > .topic-feed-story-header-external::before,
+.reader-center-column > .topic-feed-story-header-external::after {
   content: none !important;
   display: none !important;
 }
 
-.reader-pane-controls > .topic-feed-story-header-external
+.reader-center-column > .topic-feed-story-header-external
 > .topic-feed-story-meta-overlay {
   position: static !important;
   display: flex !important;
@@ -769,7 +768,7 @@ html[data-msg-experience-theme="explorer"]
   box-shadow: none !important;
 }
 
-.reader-pane-controls .topic-feed-reader-credit {
+.reader-center-column .topic-feed-reader-credit {
   display: flex !important;
   align-items: center !important;
   flex-wrap: nowrap !important;
@@ -780,7 +779,7 @@ html[data-msg-experience-theme="explorer"]
   white-space: nowrap !important;
 }
 
-.reader-pane-controls .topic-feed-reader-share {
+.reader-center-column .topic-feed-reader-share {
   display: inline-flex !important;
   align-items: center !important;
   gap: 6px !important;
@@ -788,13 +787,14 @@ html[data-msg-experience-theme="explorer"]
   flex: 0 0 auto !important;
 }
 
-.reader-pane-controls > .topic-feed-story-header-external
+.reader-center-column > .topic-feed-story-header-external
 > #read-anything-article-summary-action {
   position: static !important;
   display: flex !important;
   align-items: center !important;
   flex-wrap: nowrap !important;
   gap: 6px !important;
+  flex: 0 0 auto !important;
   width: auto !important;
   max-width: none !important;
   min-width: 0 !important;
@@ -805,22 +805,13 @@ html[data-msg-experience-theme="explorer"]
   white-space: nowrap !important;
 }
 
-.reader-pane-controls > .topic-feed-story-header-external
+.reader-center-column > .topic-feed-story-header-external
 > #read-anything-article-summary-action::before {
   content: none !important;
   display: none !important;
 }
 
-/* Once moved to the command row, the old center-column Topic Feed block must
-   contribute no layout height if a stale node briefly survives a render. */
-.reader-center-column > .topic-feed-story-header-external {
-  margin: 0 !important;
-}
-
-/* On narrower screens, allow the strip to be hidden rather than collide with
-   core Reader controls. Desktop behavior remains unchanged. */
-@media (max-width: 1100px) {
-  .reader-pane-controls > .topic-feed-story-header-external {
-    display: none !important;
-  }
+/* Ensure the Reader follows immediately after the single compact row. */
+.reader-center-column > #reader-frame {
+  margin-top: 0 !important;
 }
