@@ -84,7 +84,8 @@ html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-tit
 }
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-title-copy h1 {
   margin: 0 0 2px !important;
-  line-height: 1.12 !important;
+  font-size: 1.2rem !important;
+  line-height: 1.2 !important;
   color: #143f3a !important;
 }
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-title-links {
@@ -662,4 +663,22 @@ html[data-msg-experience-theme="explorer"]
    briefly during a navigation/render handoff. */
 #reader-frame > .topic-feed-story-header-external {
   display: none !important;
+}
+
+
+/* v1.1.1 — Explicit center-column sequence.
+   Keep the established Reader toolbar first, Topic Feed information directly
+   below it, and the fixed-height Reader frame after both. The Topic block
+   remains OUTSIDE #reader-frame. */
+.reader-center-column > .reader-frame-toolbar {
+  order: -2 !important;
+}
+
+.reader-center-column > .topic-feed-story-header-external,
+.reader-center-column > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  order: -1 !important;
+}
+
+.reader-center-column > #reader-frame {
+  order: 0 !important;
 }
