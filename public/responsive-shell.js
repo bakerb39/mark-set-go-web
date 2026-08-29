@@ -739,7 +739,24 @@
   }, { passive: true });
 
 
-  [0, 100, 300, 700, 1200].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+  [0, 100, 300, 700, 1200, 1800, 2600, 4000].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+
+  // v5.3: Standard-workspace panels such as Notebook can mount their iframe
+  // after the original startup retry window. The first unrelated document click
+  // was then the event that finally released Reader 1's standalone width.
+  //
+  // Re-run the EXISTING geometry sync when a workspace iframe finishes loading.
+  // This is event-driven and bounded; no DOM observer and no width formula changes.
+  document.addEventListener('load', (event) => {
+    const frame = event.target;
+    if (!(frame instanceof HTMLIFrameElement)) return;
+    if (!frame.closest?.('.msg-workspace-secondary')) return;
+    [0, 60, 180, 360].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+  }, true);
+
+  window.addEventListener('pageshow', () => {
+    [0, 80, 220].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+  });
 
   // v2.9: Reader window controls can be mounted after the broader Reader shell.
   // Retry ONLY control installation during startup so the resize button is
