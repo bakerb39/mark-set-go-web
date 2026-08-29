@@ -836,6 +836,56 @@
     return { readerFrame, headerHost, header, meta, actionRow };
   }
 
+  // v6.0: The Reader shell can be rebuilt shortly after a Topic Feed story is
+  // populated. Re-anchor the existing header to the CURRENT #reader-frame using
+  // bounded retries so it cannot be stranded after the Reader at the bottom.
+  // No MutationObserver is used.
+  let topicFeedHeaderPlacementTimers = [];
+
+  function stabilizeTopicFeedHeaderPlacement() {
+    topicFeedHeaderPlacementTimers.forEach((timer) => window.clearTimeout(timer));
+    topicFeedHeaderPlacementTimers = [];
+
+    [0, 40, 120, 260, 520, 900].forEach((delay) => {
+      const timer = window.setTimeout(() => {
+        if (!isTopicFeedReaderActive()) return;
+
+        const liveReader = document.querySelector('#reader');
+        const liveFrame = liveReader?.closest('#reader-frame');
+        const liveHost = liveFrame?.parentElement;
+        if (!liveReader || !liveFrame || !liveHost) return;
+
+        let liveHeader =
+          liveHost.querySelector(':scope > [data-topic-feed-story-header-external]') ||
+          document.querySelector('[data-topic-feed-story-header-external]');
+
+        if (!liveHeader) {
+          const parts = topicFeedStoryHeaderParts(liveReader);
+          liveHeader = parts.header;
+        }
+
+        if (!liveHeader) return;
+
+        // This is the actual layout contract: header immediately precedes the
+        // live Reader frame in DOM order.
+        if (liveHeader.parentElement !== liveHost || liveHeader.nextElementSibling !== liveFrame) {
+          liveHost.insertBefore(liveHeader, liveFrame);
+        }
+
+        // Do not allow prior flex ordering rules to counteract the DOM order.
+        liveHeader.style.setProperty('order', '0', 'important');
+        liveFrame.style.setProperty('order', '0', 'important');
+
+        const toolbar = liveHost.querySelector(':scope > .reader-frame-toolbar');
+        if (toolbar) toolbar.style.setProperty('order', '0', 'important');
+
+        positionTopicFeedStoryHeader();
+      }, delay);
+
+      topicFeedHeaderPlacementTimers.push(timer);
+    });
+  }
+
   function scheduleTopicFeedStoryBookReflow() {
     window.clearTimeout(topicFeedStoryHeaderReflowTimer);
     topicFeedStoryHeaderReflowTimer = window.setTimeout(() => {
@@ -892,6 +942,7 @@
     }
 
     positionTopicFeedStoryHeader();
+    stabilizeTopicFeedHeaderPlacement();
   }
 
 
@@ -1076,6 +1127,7 @@
       // header so it never moves with article scrolling.
       keepTopicFeedArticleActionsInHeader();
       positionTopicFeedStoryHeader();
+      stabilizeTopicFeedHeaderPlacement();
 
       return true;
     };

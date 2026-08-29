@@ -692,3 +692,19 @@ html[data-msg-experience-theme="explorer"]
   margin-top: 0 !important;
   margin-bottom: 2px !important;
 }
+
+
+/* v1.1.3 — DOM order owns Topic Feed placement.
+   v6.0 re-anchors the header immediately before the live #reader-frame, so
+   historical flex order values must not rearrange those siblings. */
+.reader-center-column > .reader-frame-toolbar,
+.reader-center-column > .topic-feed-story-header-external,
+.reader-center-column > .topic-feed-story-header-external.topic-feed-story-header-scrolled,
+.reader-center-column > #reader-frame {
+  order: 0 !important;
+}
+
+/* Give the social/share cluster a little breathing room after View original. */
+.topic-feed-reader-credit .topic-feed-reader-share {
+  margin-left: 12px !important;
+}
