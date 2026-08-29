@@ -7,7 +7,7 @@
   'use strict';
   if (window.MarkSetGoTrainingLab) return;
 
-  const VERSION = '0.3.3-side-frame-grid-fix';
+  const VERSION = '0.3.4-native-workspace-panel';
   const STORAGE_KEY = 'markSetGoTrainingLabV1';
   const runtime = { raf:0, timer:0, mode:'', startedAt:0, startIndex:0, startWpm:0, burstPhase:0, overlay:null, hud:null, session:null, scopedNodes:null, fixationCursor:0, peripheralCursor:0, fixationResizeObserver:null, fixationWindowResize:null };
   const DEFAULTS = {
@@ -481,8 +481,8 @@
 
   function closeLab(){
     const shell=$('#training-lab-shell');
-    if(shell?.classList.contains('training-lab-frame-hosted')){
-      document.dispatchEvent(new CustomEvent('marksetgo:learning-frame-close-request'));
+    if(shell?.classList.contains('training-lab-frame-hosted') || shell?.classList.contains('training-lab-workspace-hosted')){
+      try { window.MSGWorkspaceExperiment?.close?.(); } catch {}
       shell.hidden=false;
     }else if(shell?.classList.contains('training-lab-embedded')){
       activateAskBethView('chat');

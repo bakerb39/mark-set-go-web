@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.8 — Home Reader 1 route
+ * Mark, Set, Go! Workspace Experiment v0.15.9 — Native learning panels
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -1003,10 +1003,13 @@
     syncWorkspacePanelMode(shell, body, key);
     const wasClosed = shell.classList.contains('is-closed');
     const auxiliaryReaderNumber = readerNumberFromPanelKey(key);
+    const requestedSecondaryWidth = Number(record.secondaryWidth) || 0;
     if (wasClosed) {
       secondaryWidth = auxiliaryReaderNumber >= 2
         ? preferredSecondaryReaderWidth(shell)
-        : MIN_SECONDARY_WIDTH;
+        : Math.max(MIN_SECONDARY_WIDTH, requestedSecondaryWidth || MIN_SECONDARY_WIDTH);
+    } else if (!auxiliaryReaderNumber && requestedSecondaryWidth) {
+      secondaryWidth = Math.max(MIN_SECONDARY_WIDTH, requestedSecondaryWidth);
     }
     shell.classList.remove('is-closed');
     shell.classList.remove('msg-primary-reader-hidden');
@@ -1036,9 +1039,16 @@
     return true;
   }
 
-  function registerPanel(key, label, node) {
+  function registerPanel(key, label, node, options = {}) {
     if (!PANELS.has(key)) PANEL_ORDER.push(key);
-    PANELS.set(key, { key, label, node });
+    PANELS.set(key, {
+      key,
+      label,
+      node,
+      cleanup: typeof options.cleanup === 'function' ? options.cleanup : null,
+      secondaryWidth: Number(options.secondaryWidth) || 0,
+      nativeKind: String(options.nativeKind || '')
+    });
     syncAddReaderControl();
     renderReadersMenu();
     ensurePrimaryReaderStandaloneControls();
@@ -1049,6 +1059,9 @@
     const index = PANEL_ORDER.indexOf(key);
     const wasActive = key === activePanelKey;
     const record = PANELS.get(key);
+    try { record?.cleanup?.(); } catch (error) {
+      console.warn('Workspace panel cleanup failed.', error);
+    }
     if (record?.node?.isConnected) record.node.remove();
     PANELS.delete(key);
     if (index >= 0) PANEL_ORDER.splice(index, 1);
@@ -1158,6 +1171,119 @@
       try { frame?.contentWindow?.dispatchEvent?.(new Event('resize')); } catch {}
     });
     return true;
+  }
+
+
+  function createNativeLearningPanel(kind) {
+    const node = document.createElement('div');
+    node.className = `msg-workspace-panel msg-workspace-native-learning msg-workspace-native-${kind}`;
+    const host = document.createElement('div');
+    host.className = 'msg-workspace-native-learning-host';
+    host.dataset.msgWorkspaceNativeLearningHost = kind;
+    node.appendChild(host);
+
+    if (kind === 'training') {
+      let lab = null;
+
+      const mountTraining = () => {
+        window.MSGTrainingLabFrameHost = host;
+        if (!window.MarkSetGoTrainingLab?.open) return false;
+        window.MarkSetGoTrainingLab.open('today');
+        lab = document.querySelector('#training-lab-shell');
+        lab?.classList.add('training-lab-workspace-hosted');
+        return true;
+      };
+
+      if (!mountTraining()) {
+        host.innerHTML = '<p class="msg-workspace-native-status">Training Lab is loading…</p>';
+        let tries = 0;
+        const retry = () => {
+          tries += 1;
+          if (!node.isConnected) return;
+          if (window.MarkSetGoTrainingLab?.open) {
+            host.replaceChildren();
+            mountTraining();
+            return;
+          }
+          if (tries < 90) window.requestAnimationFrame(retry);
+        };
+        window.requestAnimationFrame(retry);
+      }
+
+      return {
+        node,
+        cleanup() {
+          try { delete window.MSGTrainingLabFrameHost; }
+          catch { window.MSGTrainingLabFrameHost = null; }
+          lab = document.querySelector('#training-lab-shell');
+          if (lab) {
+            lab.classList.remove('training-lab-workspace-hosted','training-lab-frame-hosted');
+            lab.remove();
+          }
+        }
+      };
+    }
+
+    if (kind === 'askbeth') {
+      let shell = document.querySelector('.reader-control-shell.mark-shell');
+      if (!shell) {
+        document.querySelector('#toggle-mark-panel')?.click();
+        shell = document.querySelector('.reader-control-shell.mark-shell');
+      }
+
+      if (!shell) {
+        host.innerHTML = '<p class="msg-workspace-native-status">Ask Beth is not available in this Reader yet.</p>';
+        return { node, cleanup() {} };
+      }
+
+      const originalParent = shell.parentNode;
+      const originalNext = shell.nextSibling;
+
+      // Close the old Reader side-panel presentation before moving the live shell.
+      try {
+        const closeButton = shell.querySelector('#close-reader-controls, .reader-panel-close');
+        closeButton?.click();
+      } catch {}
+
+      shell.classList.add('msg-workspace-native-askbeth-shell');
+      host.appendChild(shell);
+
+      return {
+        node,
+        cleanup() {
+          shell.classList.remove('msg-workspace-native-askbeth-shell');
+          try {
+            if (originalNext?.parentNode === originalParent) {
+              originalParent.insertBefore(shell, originalNext);
+            } else {
+              originalParent?.appendChild(shell);
+            }
+          } catch {}
+        }
+      };
+    }
+
+    host.innerHTML = '<p class="msg-workspace-native-status">This learning panel is unavailable.</p>';
+    return { node, cleanup() {} };
+  }
+
+  function openNativeLearningPanel(kind) {
+    if (!hasReader()) {
+      window.alert('Open something in the Reader first.');
+      return false;
+    }
+
+    const normalized = kind === 'askbeth' ? 'askbeth' : 'training';
+    const key = `tool:${normalized === 'askbeth' ? 'ask-beth' : 'training-lab'}`;
+    if (PANELS.has(key)) return activatePanel(key);
+
+    const panel = createNativeLearningPanel(normalized);
+    const label = normalized === 'askbeth' ? 'Ask Beth' : 'Training Lab';
+    return registerPanel(key, label, panel.node, {
+      cleanup: panel.cleanup,
+      secondaryWidth: 760,
+      nativeKind: normalized
+    });
   }
 
   function openAppPage(mode, value, label = '') {
@@ -1573,6 +1699,17 @@
       return;
     }
 
+    const learningSideFrame = event.target.closest?.('[data-learning-side-frame]');
+    if (learningSideFrame) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      try { closeMenus?.(); } catch {}
+      const menu = learningSideFrame.closest?.('details.top-nav-menu');
+      if (menu) menu.open = false;
+      openNativeLearningPanel(learningSideFrame.dataset.learningSideFrame);
+      return;
+    }
+
     const navTarget = event.target.closest?.('[data-action], [data-read], [data-test]');
     if (!navTarget || !isTopLevelNavigation(navTarget)) return;
 
@@ -1646,6 +1783,7 @@
   window.MSGWorkspaceExperiment = Object.freeze({
     open: showWorkspacePanel,
     openPage: openAppPage,
+    openLearning: openNativeLearningPanel,
     close: closeWorkspacePanel,
     browser: () => showWorkspacePanel('browser'),
     symposium: (handoff = null) => showWorkspacePanel('symposium', { handoff }),
