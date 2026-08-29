@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>MSG Docs</title>
+  <link rel="stylesheet" href="/msg-docs.css?v=20260829-v1.0">
+</head>
+<body>
+  <main class="msg-docs-app">
+    <aside class="msg-docs-sidebar">
+      <div class="msg-docs-brand">
+        <div>
+          <span class="msg-docs-kicker">MARK, SET, GO!</span>
+          <h1>Developer Docs</h1>
+        </div>
+        <a class="msg-docs-back" href="/" target="_top">Reader</a>
+      </div>
+      <label class="msg-docs-search-wrap">
+        <span>Search docs</span>
+        <input id="msg-docs-search" type="search" placeholder="Search…" autocomplete="off">
+      </label>
+      <nav id="msg-docs-list" class="msg-docs-list" aria-label="Documentation"></nav>
+    </aside>
+
+    <section class="msg-docs-main">
+      <header class="msg-docs-toolbar">
+        <div>
+          <span class="msg-docs-kicker">DOCUMENT</span>
+          <strong id="msg-docs-title">MSG Developer Docs</strong>
+        </div>
+        <div class="msg-docs-actions">
+          <button id="msg-docs-copy" type="button">Copy Markdown</button>
+          <button id="msg-docs-raw" type="button">View Raw</button>
+        </div>
+      </header>
+      <div id="msg-docs-status" class="msg-docs-status" aria-live="polite"></div>
+      <article id="msg-docs-content" class="msg-docs-content"></article>
+    </section>
+  </main>
+  <script src="/msg-docs.js?v=20260829-v1.0"></script>
+</body>
+</html>

@@ -1334,6 +1334,22 @@
     });
   }
 
+
+  function openDocsPanel() {
+    const key = 'tool:msg-docs';
+    if (PANELS.has(key)) return activatePanel(key);
+
+    if (!hasReader()) {
+      window.location.assign('/msg-docs.html');
+      return true;
+    }
+
+    const node = document.createElement('div');
+    node.className = 'msg-workspace-panel msg-workspace-app-page msg-workspace-docs-page';
+    node.innerHTML = '<iframe class="msg-workspace-page-frame msg-workspace-docs-frame" title="MSG Docs" src="/msg-docs.html" loading="eager"></iframe>';
+    return registerPanel(key, 'MSG Docs', node, { secondaryWidth: 760, nativeKind:'docs' });
+  }
+
   function openAppPage(mode, value, label = '') {
     if (!hasReader()) return false;
     const readerNumber = mode === 'reader' ? normalizeReaderNumber(value) : 0;
@@ -1747,6 +1763,17 @@
       return;
     }
 
+    const docsLaunch = event.target.closest?.('[data-msg-docs-launch]');
+    if (docsLaunch) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      try { closeMenus?.(); } catch {}
+      const menu = docsLaunch.closest?.('details.top-nav-menu');
+      if (menu) menu.open = false;
+      openDocsPanel();
+      return;
+    }
+
     const learningSideFrame = event.target.closest?.('[data-learning-side-frame]');
     if (learningSideFrame) {
       event.preventDefault();
@@ -1832,6 +1859,7 @@
     open: showWorkspacePanel,
     openPage: openAppPage,
     openLearning: openNativeLearningPanel,
+    docs: openDocsPanel,
     close: closeWorkspacePanel,
     browser: () => showWorkspacePanel('browser'),
     symposium: (handoff = null) => showWorkspacePanel('symposium', { handoff }),
