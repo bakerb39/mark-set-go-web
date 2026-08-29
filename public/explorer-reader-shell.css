@@ -582,3 +582,84 @@ html[data-msg-experience-theme="explorer"]
   margin: 0 !important;
   padding: 0 !important;
 }
+
+
+/* v1.1.0 — TOPIC FEED HEADER ABOVE THE READER FRAME, ALL THEMES
+   The article source/share/action block is now a sibling immediately before
+   #reader-frame. This rule is intentionally NOT scoped to Explorer: the layout
+   contract must be identical under Default, Scholar, Patriotic, Artistic,
+   Modern, Galactic, Expedition, and Explorer. */
+.reader-center-column > .topic-feed-story-header-external,
+.reader-center-column > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  position: relative !important;
+  inset: auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: auto !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: none !important;
+  flex: 0 0 auto !important;
+  margin: 0 0 8px !important;
+  padding: 0 2px !important;
+  background: transparent !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+}
+
+.reader-center-column > .topic-feed-story-header-external::before,
+.reader-center-column > .topic-feed-story-header-external::after {
+  content: none !important;
+  display: none !important;
+}
+
+.reader-center-column > .topic-feed-story-header-external
+> .topic-feed-story-meta-overlay,
+.reader-center-column > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay {
+  display: block !important;
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.reader-center-column > .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  position: relative !important;
+  inset: auto !important;
+  z-index: auto !important;
+  isolation: auto !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  flex-wrap: wrap !important;
+  margin: 3px 0 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.reader-center-column > .topic-feed-story-header-external
+> #read-anything-article-summary-action::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Legacy in-frame header should never remain visible if stale DOM survives
+   briefly during a navigation/render handoff. */
+#reader-frame > .topic-feed-story-header-external {
+  display: none !important;
+}

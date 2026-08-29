@@ -782,17 +782,29 @@
     const readerFrame = reader.closest('#reader-frame');
     if (!readerFrame) return {};
 
-    let header = readerFrame.querySelector(':scope > [data-topic-feed-story-header-external]');
+    // The Topic Feed information belongs ABOVE the fixed-height Reader frame,
+    // not inside it. #reader-frame owns a fixed viewport and #reader is 100%
+    // height, so inserting another child there can either overlap the text or
+    // steal/clamp Reader space depending on the active theme.
+    const headerHost = readerFrame.parentElement;
+    if (!headerHost) return {};
+
+    let header = headerHost.querySelector(':scope > [data-topic-feed-story-header-external]');
+    const legacyHeader = readerFrame.querySelector(':scope > [data-topic-feed-story-header-external]');
+
+    if (!header && legacyHeader) header = legacyHeader;
+
     if (!header) {
       header = document.createElement('div');
       header.className = 'topic-feed-story-header-external';
       header.dataset.topicFeedStoryHeaderExternal = '1';
       header.setAttribute('aria-label', 'Topic Feed article information');
-      // The Topic Feed information is a normal-flow sibling immediately above
-      // the Reader. It must never overlay or participate in #reader scrolling.
-      readerFrame.insertBefore(header, reader);
-    } else if (header.nextElementSibling !== reader) {
-      readerFrame.insertBefore(header, reader);
+    }
+
+    // Moving the existing node preserves all existing meta/action handlers.
+    // Its final DOM position is immediately before the Reader frame.
+    if (header.parentElement !== headerHost || header.nextElementSibling !== readerFrame) {
+      headerHost.insertBefore(header, readerFrame);
     }
 
     // Recover existing nodes without cloning so all action handlers survive.
@@ -821,7 +833,7 @@
     reader.classList.remove('topic-feed-story-header-managed');
     header.classList.remove('topic-feed-story-header-scrolled');
 
-    return { readerFrame, header, meta, actionRow };
+    return { readerFrame, headerHost, header, meta, actionRow };
   }
 
   function scheduleTopicFeedStoryBookReflow() {
@@ -891,6 +903,7 @@
 
     const reader = document.querySelector('#reader');
     const frame = reader?.closest('#reader-frame');
+    frame?.parentElement?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
     frame?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
     reader?.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
     removeTopicBookDivider();
