@@ -708,3 +708,16 @@ html[data-msg-experience-theme="explorer"]
 .topic-feed-reader-credit .topic-feed-reader-share {
   margin-left: 12px !important;
 }
+
+
+/* v1.1.4 — Restore the Reader center column's intended layout model.
+   Live diagnostics showed this element was being computed as display:grid,
+   which visually placed #reader-frame above the Topic Feed header even though
+   the header correctly precedes the frame in the DOM. The base Reader shell
+   originally defines this container as a vertical flex column. */
+.reader-layout .reader-center-column,
+.reader-center-column {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+}
