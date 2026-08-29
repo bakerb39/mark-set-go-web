@@ -721,3 +721,106 @@ html[data-msg-experience-theme="explorer"]
   flex-direction: column !important;
   align-items: stretch !important;
 }
+
+
+/* v1.1.5 / v6.2 — Topic Feed metadata uses the existing Reader command row.
+   It occupies the open horizontal space after Ask Beth and before Full screen,
+   so it adds no extra vertical band above the Reader. */
+.reader-pane-controls {
+  position: relative !important;
+}
+
+.reader-pane-controls > .topic-feed-story-header-external,
+.reader-pane-controls > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+
+.reader-pane-controls > .topic-feed-story-header-external::before,
+.reader-pane-controls > .topic-feed-story-header-external::after {
+  content: none !important;
+  display: none !important;
+}
+
+.reader-pane-controls > .topic-feed-story-header-external
+> .topic-feed-story-meta-overlay {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.reader-pane-controls .topic-feed-reader-credit {
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 5px !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  white-space: nowrap !important;
+}
+
+.reader-pane-controls .topic-feed-reader-share {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin-left: 14px !important;
+  flex: 0 0 auto !important;
+}
+
+.reader-pane-controls > .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  position: static !important;
+  display: flex !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 6px !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  white-space: nowrap !important;
+}
+
+.reader-pane-controls > .topic-feed-story-header-external
+> #read-anything-article-summary-action::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Once moved to the command row, the old center-column Topic Feed block must
+   contribute no layout height if a stale node briefly survives a render. */
+.reader-center-column > .topic-feed-story-header-external {
+  margin: 0 !important;
+}
+
+/* On narrower screens, allow the strip to be hidden rather than collide with
+   core Reader controls. Desktop behavior remains unchanged. */
+@media (max-width: 1100px) {
+  .reader-pane-controls > .topic-feed-story-header-external {
+    display: none !important;
+  }
+}

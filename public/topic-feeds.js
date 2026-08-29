@@ -782,17 +782,20 @@
     const readerFrame = reader.closest('#reader-frame');
     if (!readerFrame) return {};
 
-    // The Topic Feed information belongs ABOVE the fixed-height Reader frame,
-    // not inside it. #reader-frame owns a fixed viewport and #reader is 100%
-    // height, so inserting another child there can either overlap the text or
-    // steal/clamp Reader space depending on the active theme.
-    const headerHost = readerFrame.parentElement;
+    // v6.2: Topic Feed information belongs in the already-existing Reader
+    // command row, in the open space after Ask Beth and before Full screen.
+    // This avoids consuming any additional vertical Reader space.
+    const commandBar =
+      document.querySelector('.reader-pane-controls.ask-mark-toolbar') ||
+      document.querySelector('.reader-pane-controls');
+
+    const fallbackHost = readerFrame.parentElement;
+    const headerHost = commandBar || fallbackHost;
     if (!headerHost) return {};
 
-    let header = headerHost.querySelector(':scope > [data-topic-feed-story-header-external]');
-    const legacyHeader = readerFrame.querySelector(':scope > [data-topic-feed-story-header-external]');
-
-    if (!header && legacyHeader) header = legacyHeader;
+    let header =
+      headerHost.querySelector(':scope > [data-topic-feed-story-header-external]') ||
+      document.querySelector('[data-topic-feed-story-header-external]');
 
     if (!header) {
       header = document.createElement('div');
@@ -801,13 +804,19 @@
       header.setAttribute('aria-label', 'Topic Feed article information');
     }
 
-    // Moving the existing node preserves all existing meta/action handlers.
-    // Its final DOM position is immediately before the Reader frame.
-    if (header.parentElement !== headerHost || header.nextElementSibling !== readerFrame) {
-      headerHost.insertBefore(header, readerFrame);
+    if (commandBar) {
+      const fullscreen = commandBar.querySelector('#toggle-reader-fullscreen');
+      if (header.parentElement !== commandBar ||
+          (fullscreen && header.nextElementSibling !== fullscreen)) {
+        commandBar.insertBefore(header, fullscreen || null);
+      }
+    } else if (
+      header.parentElement !== fallbackHost ||
+      header.nextElementSibling !== readerFrame
+    ) {
+      fallbackHost.insertBefore(header, readerFrame);
     }
 
-    // Recover existing nodes without cloning so all action handlers survive.
     let meta = header.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
     const inReaderMeta = reader.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
     if (!meta && inReaderMeta) {
@@ -821,8 +830,6 @@
       header.appendChild(meta);
     }
 
-    // Retire the former compensation spacer. With the header in normal flow the
-    // Reader begins below it naturally, so no fake content is needed.
     reader.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
 
     const actionRow = document.querySelector('#read-anything-article-summary-action');
@@ -833,14 +840,49 @@
     reader.classList.remove('topic-feed-story-header-managed');
     header.classList.remove('topic-feed-story-header-scrolled');
 
-    return { readerFrame, headerHost, header, meta, actionRow };
+    return { readerFrame, headerHost, commandBar, header, meta, actionRow };
   }
 
-  // v6.0: The Reader shell can be rebuilt shortly after a Topic Feed story is
-  // populated. Re-anchor the existing header to the CURRENT #reader-frame using
-  // bounded retries so it cannot be stranded after the Reader at the bottom.
-  // No MutationObserver is used.
+  // v6.2: Reader controls can settle after the Topic Feed article is rendered.
+  // Re-place the existing header in the command row with bounded retries.
+  // No MutationObserver.
   let topicFeedHeaderPlacementTimers = [];
+
+  function positionTopicFeedHeaderInCommandBar(commandBar, header) {
+    if (!commandBar || !header) return false;
+
+    const visibleButtons = [...commandBar.querySelectorAll('.reader-pane-buttons button')]
+      .filter((button) => {
+        const style = window.getComputedStyle(button);
+        const rect = button.getBoundingClientRect();
+        return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0;
+      });
+
+    const lastButton = visibleButtons[visibleButtons.length - 1];
+    const fullscreen = commandBar.querySelector('#toggle-reader-fullscreen');
+
+    const barRect = commandBar.getBoundingClientRect();
+    const lastRect = lastButton?.getBoundingClientRect();
+    const fullscreenRect = fullscreen?.getBoundingClientRect();
+
+    const left = lastRect
+      ? Math.max(0, Math.ceil(lastRect.right - barRect.left + 16))
+      : 0;
+
+    const right = fullscreenRect
+      ? Math.max(0, Math.ceil(barRect.right - fullscreenRect.left + 12))
+      : 0;
+
+    header.style.setProperty('position', 'absolute', 'important');
+    header.style.setProperty('top', '6px', 'important');
+    header.style.setProperty('left', `${left}px`, 'important');
+    header.style.setProperty('right', `${right}px`, 'important');
+    header.style.setProperty('width', 'auto', 'important');
+    header.style.setProperty('max-width', 'none', 'important');
+    header.style.setProperty('z-index', '4', 'important');
+
+    return true;
+  }
 
   function stabilizeTopicFeedHeaderPlacement() {
     topicFeedHeaderPlacementTimers.forEach((timer) => window.clearTimeout(timer));
@@ -852,32 +894,15 @@
 
         const liveReader = document.querySelector('#reader');
         const liveFrame = liveReader?.closest('#reader-frame');
-        const liveHost = liveFrame?.parentElement;
-        if (!liveReader || !liveFrame || !liveHost) return;
+        if (!liveReader || !liveFrame) return;
 
-        let liveHeader =
-          liveHost.querySelector(':scope > [data-topic-feed-story-header-external]') ||
-          document.querySelector('[data-topic-feed-story-header-external]');
-
-        if (!liveHeader) {
-          const parts = topicFeedStoryHeaderParts(liveReader);
-          liveHeader = parts.header;
-        }
-
+        const parts = topicFeedStoryHeaderParts(liveReader);
+        const liveHeader = parts.header;
         if (!liveHeader) return;
 
-        // This is the actual layout contract: header immediately precedes the
-        // live Reader frame in DOM order.
-        if (liveHeader.parentElement !== liveHost || liveHeader.nextElementSibling !== liveFrame) {
-          liveHost.insertBefore(liveHeader, liveFrame);
+        if (parts.commandBar) {
+          positionTopicFeedHeaderInCommandBar(parts.commandBar, liveHeader);
         }
-
-        // Do not allow prior flex ordering rules to counteract the DOM order.
-        liveHeader.style.setProperty('order', '0', 'important');
-        liveFrame.style.setProperty('order', '0', 'important');
-
-        const toolbar = liveHost.querySelector(':scope > .reader-frame-toolbar');
-        if (toolbar) toolbar.style.setProperty('order', '0', 'important');
 
         positionTopicFeedStoryHeader();
       }, delay);
@@ -903,18 +928,23 @@
     const reader = document.querySelector('#reader');
     if (!reader) return;
 
-    const { readerFrame, header, meta, actionRow } = topicFeedStoryHeaderParts(reader);
+    const { readerFrame, commandBar, header, meta, actionRow } =
+      topicFeedStoryHeaderParts(reader);
+
     if (!readerFrame || !header || !meta) return;
 
-    // Remove every remnant of the former overlay geometry. The header is now a
-    // true normal-flow block above #reader and consumes its own layout height.
-    for (const property of [
-      'left', 'right', 'top', 'bottom', 'inset', 'width', 'max-width',
-      'position', 'transform', 'z-index'
-    ]) {
-      header.style.removeProperty(property);
-    }
     header.classList.remove('topic-feed-story-header-scrolled');
+
+    if (commandBar) {
+      positionTopicFeedHeaderInCommandBar(commandBar, header);
+    } else {
+      for (const property of [
+        'left', 'right', 'top', 'bottom', 'inset', 'width', 'max-width',
+        'position', 'transform', 'z-index'
+      ]) {
+        header.style.removeProperty(property);
+      }
+    }
 
     if (actionRow?.isConnected) {
       for (const property of ['left', 'right', 'top', 'bottom', 'position', 'max-width', 'z-index']) {
@@ -954,8 +984,7 @@
 
     const reader = document.querySelector('#reader');
     const frame = reader?.closest('#reader-frame');
-    frame?.parentElement?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
-    frame?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
+    document.querySelectorAll('[data-topic-feed-story-header-external]').forEach((node) => node.remove());
     reader?.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
     removeTopicBookDivider();
   }
