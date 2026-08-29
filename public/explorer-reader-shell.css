@@ -1061,3 +1061,62 @@ html[data-msg-experience-theme="explorer"]
     margin-top: 0 !important;
   }
 }
+
+
+/* v1.1.8 / v6.6 — Repair the Source row itself.
+   Legacy Topic Feed CSS can leave the share cluster positioned, causing the
+   icons to overlap View original. Keep every Source-row item in normal flow. */
+.topic-feed-reader-page .topic-feed-reader-credit > * {
+  position: static !important;
+  flex: 0 0 auto !important;
+  min-width: max-content !important;
+  transform: none !important;
+}
+
+.topic-feed-reader-page .topic-feed-reader-credit > a {
+  display: inline-block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: auto !important;
+  max-width: none !important;
+  overflow: visible !important;
+  white-space: nowrap !important;
+}
+
+.topic-feed-reader-page .topic-feed-reader-credit > .topic-feed-reader-share {
+  position: static !important;
+  inset: auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  margin: 0 0 0 14px !important;
+  padding: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: max-content !important;
+  flex: 0 0 auto !important;
+  translate: none !important;
+  transform: none !important;
+  float: none !important;
+}
+
+/* Keep the two lines compact and directly adjacent. */
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external {
+  row-gap: 0 !important;
+}
+
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  margin-top: 1px !important;
+  margin-bottom: 0 !important;
+}
