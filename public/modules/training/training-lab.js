@@ -7,7 +7,7 @@
   'use strict';
   if (window.MarkSetGoTrainingLab) return;
 
-  const VERSION = '0.3.1-ask-beth-wide';
+  const VERSION = '0.3.2-side-frame-compatible';
   const STORAGE_KEY = 'markSetGoTrainingLabV1';
   const runtime = { raf:0, timer:0, mode:'', startedAt:0, startIndex:0, startWpm:0, burstPhase:0, overlay:null, hud:null, session:null, scopedNodes:null, fixationCursor:0, peripheralCursor:0, fixationResizeObserver:null, fixationWindowResize:null };
   const DEFAULTS = {
@@ -374,10 +374,24 @@
   }
 
   function mountLabInsideAskBeth(){
-    const host=ensureAskBethTrainingView();
+    const externalHost=window.MSGTrainingLabFrameHost;
     const lab=$('#training-lab-shell');
+    if(externalHost?.isConnected && lab){
+      if(lab.parentElement!==externalHost)externalHost.appendChild(lab);
+      lab.classList.add('training-lab-embedded','training-lab-frame-hosted');
+      const close=$('[data-tl-close]',lab);
+      if(close){
+        close.textContent='×';
+        close.setAttribute('aria-label','Close Training Lab frame');
+        close.title='Close Training Lab frame';
+      }
+      return true;
+    }
+
+    const host=ensureAskBethTrainingView();
     if(!host || !lab)return false;
     if(lab.parentElement!==host)host.appendChild(lab);
+    lab.classList.remove('training-lab-frame-hosted');
     lab.classList.add('training-lab-embedded');
     const close=$('[data-tl-close]',lab);
     if(close){
@@ -423,7 +437,8 @@
   function onLabClick(e){ const v=e.target.closest('[data-tl-view]');if(v){openLab(v.dataset.tlView);return;} const b=e.target.closest('[data-tl-run]');if(b){runExercise(b.dataset.tlRun);} }
   function runExercise(id){ closeLab(); ({fixation:runFixation,peripheral:runPeripheral,regression:()=>runRegression(data.regressionLevel),edge:runEdge,burst:runBurst,phrase:runPhrase,tunnel:runTunnel,adaptive:()=>{openLab('speed');$('#tl-assess-wpm').value=currentWpm();$('#tl-assess-comp').focus();},preview:showPreview,recall:promptRecall,prediction:promptPrediction,semantic:runSemantic}[id]||(()=>{}))(); }
   function openLab(view='today'){
-    openAskBethPanel();
+    const externalHost=window.MSGTrainingLabFrameHost;
+    if(!externalHost?.isConnected)openAskBethPanel();
     buildLab();
 
     const reveal=()=>{
@@ -455,7 +470,10 @@
 
   function closeLab(){
     const shell=$('#training-lab-shell');
-    if(shell?.classList.contains('training-lab-embedded')){
+    if(shell?.classList.contains('training-lab-frame-hosted')){
+      document.dispatchEvent(new CustomEvent('marksetgo:learning-frame-close-request'));
+      shell.hidden=false;
+    }else if(shell?.classList.contains('training-lab-embedded')){
       activateAskBethView('chat');
       shell.hidden=false;
     }else if(shell){
