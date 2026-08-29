@@ -632,6 +632,40 @@
     readerEdgeRight = null;
   }
 
+  // v5.4: Do not paint a Standard secondary workspace panel in its temporary
+  // pre-sync position. visibility:hidden preserves its layout box so the existing
+  // geometry calculations can measure it without a visible "next to Reader" jump.
+  const WORKSPACE_INIT_CLASS = 'msg-workspace-secondary-initializing';
+
+  function ensureWorkspaceInitializationStyle() {
+    if (document.querySelector('#msg-workspace-initialization-style')) return;
+    const style = document.createElement('style');
+    style.id = 'msg-workspace-initialization-style';
+    style.textContent = `
+      html.${WORKSPACE_INIT_CLASS} .msg-workspace-secondary {
+        visibility: hidden !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+  }
+
+  function beginWorkspaceInitialization() {
+    if (window.__MSG_SECONDARY_READER__ || document.documentElement.classList.contains('msg-secondary-reader-document')) return;
+    ensureWorkspaceInitializationStyle();
+    document.documentElement.classList.add(WORKSPACE_INIT_CLASS);
+  }
+
+  function finishWorkspaceInitialization() {
+    if (!document.documentElement.classList.contains(WORKSPACE_INIT_CLASS)) return;
+    // Let the existing sync write its geometry, then reveal after layout has had
+    // two animation frames to settle. No dimensions are changed here.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        document.documentElement.classList.remove(WORKSPACE_INIT_CLASS);
+      });
+    });
+  }
+
   function syncStandardReaderWindow() {
     // Reader 2+ lives inside a parent-owned workspace iframe. It must never
     // participate in Reader 1's standalone width/window-control system.
@@ -699,6 +733,10 @@
     }
 
     updateReaderWindowButton();
+
+    if (standardWorkspacePanelActive()) {
+      finishWorkspaceInitialization();
+    }
   }
 
   /* Bounded resyncs only. */
@@ -706,16 +744,18 @@
     [0, 80, 220].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
   }, { passive: true });
 
-  // When a Standard workspace panel is opened, release standalone #app width
-  // as soon as that panel is mounted instead of waiting for a later unrelated click.
+  // When a Standard workspace panel is opened, hide only the secondary pane
+  // before the app's normal click handler can mount/paint it. Then let the
+  // existing geometry sync place it correctly and reveal it.
   document.addEventListener('click', (event) => {
     if (!(event.target instanceof Element)) return;
     const workspaceOpen = event.target.closest(
       '[data-action="mark-notebook"], [data-action="music"], [data-msg-workspace-tab], [data-msg-workspace-open]'
     );
     if (!workspaceOpen) return;
+    beginWorkspaceInitialization();
     [0, 60, 160, 320].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
-  }, { passive: true });
+  }, { capture: true, passive: true });
 
   document.addEventListener(MODE_EVENT, () => {
     [0, 80, 220].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
@@ -739,7 +779,17 @@
   }, { passive: true });
 
 
-  [0, 100, 300, 700, 1200, 1800, 2600, 4000].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
+  // Cover restored-on-load workspaces as well as panels opened by a click.
+  // The class is harmless when no secondary pane exists.
+  beginWorkspaceInitialization();
+  [0, 100, 300, 700, 1200, 1800, 2600, 4000].forEach((delay) => window.setTimeout(() => {
+    syncStandardReaderWindow();
+    // If no Standard secondary panel exists, do not leave the initialization
+    // class behind.
+    if (!standardWorkspacePanelActive()) {
+      document.documentElement.classList.remove(WORKSPACE_INIT_CLASS);
+    }
+  }, delay));
 
   // v5.3: Standard-workspace panels such as Notebook can mount their iframe
   // after the original startup retry window. The first unrelated document click
@@ -751,6 +801,7 @@
     const frame = event.target;
     if (!(frame instanceof HTMLIFrameElement)) return;
     if (!frame.closest?.('.msg-workspace-secondary')) return;
+    beginWorkspaceInitialization();
     [0, 60, 180, 360].forEach((delay) => window.setTimeout(syncStandardReaderWindow, delay));
   }, true);
 
