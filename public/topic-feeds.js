@@ -776,68 +776,6 @@
 
   let topicFeedStoryHeaderReflowTimer = 0;
 
-  const TOPIC_READER_OCCLUSION_STYLE_ID = 'msg-topic-reader-occlusion-style';
-
-  function ensureTopicReaderOcclusionStyle() {
-    if (document.getElementById(TOPIC_READER_OCCLUSION_STYLE_ID)) return;
-    const style = document.createElement('style');
-    style.id = TOPIC_READER_OCCLUSION_STYLE_ID;
-    style.textContent = `
-      #reader .reader-word[data-index],
-      #reader .reader-group[data-start-index],
-      #reader .reader-paragraph-break {
-        scroll-margin-top: var(--msg-reader-top-occlusion, 0px);
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  function clearTopicReaderOcclusion(reader = document.querySelector('#reader')) {
-    if (!reader) return;
-    reader.style.removeProperty('--msg-reader-top-occlusion');
-    reader.style.removeProperty('scroll-padding-top');
-    delete reader.dataset.msgReaderTopOcclusion;
-  }
-
-  function syncTopicReaderOcclusion(reader, header) {
-    if (!reader || !header || !reader.isConnected || !header.isConnected) {
-      clearTopicReaderOcclusion(reader);
-      return 0;
-    }
-
-    ensureTopicReaderOcclusionStyle();
-
-    const headerStyle = getComputedStyle(header);
-    const headerRect = header.getBoundingClientRect();
-    const readerRect = reader.getBoundingClientRect();
-    const visible = headerStyle.display !== 'none'
-      && headerStyle.visibility !== 'hidden'
-      && Number(headerStyle.opacity || 1) !== 0
-      && headerRect.width > 0
-      && headerRect.height > 0;
-
-    if (!visible) {
-      clearTopicReaderOcclusion(reader);
-      return 0;
-    }
-
-    // Only reserve the portion that actually covers the Reader. The extra
-    // buffer matches the opaque lower edge/shadow of the Topic Feed band.
-    const coveredBottom = Math.min(readerRect.bottom, headerRect.bottom + 8);
-    const overlap = Math.max(0, Math.ceil(coveredBottom - readerRect.top));
-
-    if (overlap <= 0) {
-      clearTopicReaderOcclusion(reader);
-      return 0;
-    }
-
-    const value = `${overlap}px`;
-    reader.style.setProperty('--msg-reader-top-occlusion', value);
-    reader.style.setProperty('scroll-padding-top', value, 'important');
-    reader.dataset.msgReaderTopOcclusion = String(overlap);
-    return overlap;
-  }
-
   function topicFeedStoryHeaderParts(reader = document.querySelector('#reader')) {
     if (!reader) return {};
 
@@ -849,12 +787,15 @@
       header = document.createElement('div');
       header.className = 'topic-feed-story-header-external';
       header.dataset.topicFeedStoryHeaderExternal = '1';
-      header.setAttribute('aria-label', 'Topic Feed article header');
+      header.setAttribute('aria-label', 'Topic Feed article information');
+      // The Topic Feed information is a normal-flow sibling immediately above
+      // the Reader. It must never overlay or participate in #reader scrolling.
+      readerFrame.insertBefore(header, reader);
+    } else if (header.nextElementSibling !== reader) {
       readerFrame.insertBefore(header, reader);
     }
 
-    // Recover nodes from the broken in-reader implementation without cloning
-    // them. The Reader action buttons keep their existing handlers when moved.
+    // Recover existing nodes without cloning so all action handlers survive.
     let meta = header.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
     const inReaderMeta = reader.querySelector(':scope > [data-topic-feed-story-meta-overlay]');
     if (!meta && inReaderMeta) {
@@ -868,25 +809,19 @@
       header.appendChild(meta);
     }
 
-    let spacer = reader.querySelector(':scope > [data-topic-feed-story-header-spacer]');
-    if (!spacer) {
-      spacer = document.createElement('div');
-      spacer.className = 'topic-feed-story-header-spacer';
-      spacer.dataset.topicFeedStoryHeaderSpacer = '1';
-      spacer.setAttribute('aria-hidden', 'true');
-      reader.prepend(spacer);
-    }
+    // Retire the former compensation spacer. With the header in normal flow the
+    // Reader begins below it naturally, so no fake content is needed.
+    reader.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
 
     const actionRow = document.querySelector('#read-anything-article-summary-action');
     if (actionRow && actionRow.parentElement !== header) {
       header.appendChild(actionRow);
     }
 
-    // Remove the later direct-child marker; this header is deliberately owned
-    // by #reader-frame so it cannot travel with the scrolling article.
     reader.classList.remove('topic-feed-story-header-managed');
+    header.classList.remove('topic-feed-story-header-scrolled');
 
-    return { readerFrame, header, spacer, meta, actionRow };
+    return { readerFrame, header, meta, actionRow };
   }
 
   function scheduleTopicFeedStoryBookReflow() {
@@ -906,58 +841,26 @@
     const reader = document.querySelector('#reader');
     if (!reader) return;
 
-    const { readerFrame, header, spacer, meta, actionRow } = topicFeedStoryHeaderParts(reader);
-    if (!readerFrame || !header || !spacer || !meta) return;
+    const { readerFrame, header, meta, actionRow } = topicFeedStoryHeaderParts(reader);
+    if (!readerFrame || !header || !meta) return;
 
-    const styles = getComputedStyle(reader);
-    const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
-    const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
-    const paddingTop = Number.parseFloat(styles.paddingTop) || 0;
-    const columnGap = Number.parseFloat(styles.columnGap) || 0;
-    const fontSize = Number.parseFloat(styles.fontSize) || 14;
-    const usableWidth = Math.max(1, reader.clientWidth - paddingLeft - paddingRight);
-    const headerWidth = reader.classList.contains('book-pages-layout')
-      ? Math.max(1, (usableWidth - columnGap) / 2)
-      : usableWidth;
+    // Remove every remnant of the former overlay geometry. The header is now a
+    // true normal-flow block above #reader and consumes its own layout height.
+    for (const property of [
+      'left', 'right', 'top', 'bottom', 'inset', 'width', 'max-width',
+      'position', 'transform', 'z-index'
+    ]) {
+      header.style.removeProperty(property);
+    }
+    header.classList.remove('topic-feed-story-header-scrolled');
 
-    // Anchor the header to the viewport/frame, never to #reader's scrollable
-    // content. Scrolling #reader therefore cannot move this band by one pixel.
-    const frameRect = readerFrame.getBoundingClientRect();
-    const readerRect = reader.getBoundingClientRect();
-    const left = Math.max(0, readerRect.left - frameRect.left + paddingLeft);
-    const top = Math.max(0, readerRect.top - frameRect.top + paddingTop);
-
-    header.style.setProperty('left', `${left}px`, 'important');
-    header.style.setProperty('top', `${top}px`, 'important');
-    header.style.setProperty('width', `${headerWidth}px`, 'important');
-    header.style.setProperty('max-width', `${headerWidth}px`, 'important');
-
-    // Undo inline positioning left behind by the broken direct-child version.
     if (actionRow?.isConnected) {
-      actionRow.style.removeProperty('left');
-      actionRow.style.removeProperty('top');
-      actionRow.style.removeProperty('position');
-      actionRow.style.removeProperty('max-width');
-      actionRow.style.removeProperty('z-index');
+      for (const property of ['left', 'right', 'top', 'bottom', 'position', 'max-width', 'z-index']) {
+        actionRow.style.removeProperty(property);
+      }
     }
 
-    window.requestAnimationFrame(() => {
-      if (!reader.isConnected || !header.isConnected || !spacer.isConnected) return;
-
-      const headerHeight = Math.ceil(header.getBoundingClientRect().height || 0);
-      syncTopicReaderOcclusion(reader, header);
-      // Reserve the initial header footprint plus one text-line buffer. That
-      // spacer scrolls away with the article; the external header never does.
-      const requiredHeight = Math.max(fontSize * 2, headerHeight + fontSize);
-      const previousHeight = Number.parseFloat(spacer.style.height) || 0;
-      spacer.style.width = '100%';
-      spacer.style.maxWidth = `${headerWidth}px`;
-
-      if (Math.abs(requiredHeight - previousHeight) > 1) {
-        spacer.style.height = `${Math.ceil(requiredHeight)}px`;
-        scheduleTopicFeedStoryBookReflow();
-      }
-    });
+    reader.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
   }
 
   function keepTopicFeedArticleActionsInHeader() {
@@ -988,7 +891,6 @@
 
     const reader = document.querySelector('#reader');
     const frame = reader?.closest('#reader-frame');
-    clearTopicReaderOcclusion(reader);
     frame?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
     reader?.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
     removeTopicBookDivider();
@@ -2651,7 +2553,6 @@
     window.setTimeout(scheduleReaderNavigation, 40);
     if (!isTopicFeedReaderActive()) {
       activeTopicFeedHeaderContext = null;
-      clearTopicReaderOcclusion();
       return;
     }
     // openDocument() can rebuild the Reader after the first source/header pass.

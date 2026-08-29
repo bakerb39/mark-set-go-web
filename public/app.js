@@ -30,6 +30,48 @@ if (missingFeatureFunctions.length) {
 const app = document.querySelector('#app');
 app.dataset.viewKey = 'home';
 
+// A secondary Reader is the one workspace page that is allowed to own its own
+// Reader state. Ordinary workspace pages continue handing readable content to
+// the outer Reader so existing navigation behavior is preserved.
+function isSecondaryReaderWorkspace() {
+  if (window.parent === window) return false;
+  const params = new URLSearchParams(window.location.search);
+  return params.get('msgSecondaryReader') === '1'
+    || (params.get('msgWorkspaceMode') === 'reader'
+      && params.get('msgWorkspaceValue') === 'secondary');
+}
+
+function shouldDelegateReaderToWorkspaceParent() {
+  if (window.parent === window || isSecondaryReaderWorkspace()) return false;
+  return new URLSearchParams(window.location.search).has('msgWorkspaceMode');
+}
+
+window.MSGSecondaryReaderWorkspace = Object.freeze({
+  active: isSecondaryReaderWorkspace,
+  shouldDelegate: shouldDelegateReaderToWorkspaceParent
+});
+
+// Reader 2+ starts blank. Ignore automatic startup/resume renders until the
+// user has deliberately interacted with this numbered Reader iframe.
+let secondaryReaderLocalIntent = !isSecondaryReaderWorkspace();
+if (isSecondaryReaderWorkspace()) {
+  const markSecondaryReaderIntent = (event) => {
+    // Reader 2+ must stay blank on boot. Startup scripts can dispatch synthetic
+    // change/click events while they initialize; those are NOT permission to
+    // copy Reader 1's document into this independent Reader. Only a real user
+    // interaction inside this Reader can unlock a document render.
+    if (!event?.isTrusted) return;
+    if (event.type === 'keydown' && !['Enter', ' ', 'Spacebar'].includes(event.key)) return;
+    secondaryReaderLocalIntent = true;
+  };
+  document.addEventListener('pointerdown', markSecondaryReaderIntent, true);
+  document.addEventListener('keydown', markSecondaryReaderIntent, true);
+  document.addEventListener('change', markSecondaryReaderIntent, true);
+}
+function secondaryReaderAllowsDocumentRender() {
+  return !isSecondaryReaderWorkspace() || secondaryReaderLocalIntent;
+}
+
 
 const { BookModel, SessionManager, ReaderEngine, VirtualRenderer } = window.MarkSetGoReader || {};
 if (!BookModel || !SessionManager || !ReaderEngine || !VirtualRenderer) {
@@ -400,14 +442,23 @@ function navigationViewKey({ action, read, test } = {}) {
 
 
 async function writeReaderSession(snapshot) {
+  // The legacy SessionManager store is the single persistent checkpoint for
+  // Reader 1. Auxiliary Readers are independent live iframe sessions and must
+  // never overwrite that shared checkpoint.
+  if (isSecondaryReaderWorkspace()) return snapshot || null;
   return readerSessionManager.write(snapshot);
 }
 
 async function readReaderSession() {
+  // Most importantly, Reader 2+ must never hydrate itself from Reader 1's
+  // persistent checkpoint. Its own document lives only in its mounted iframe
+  // until dedicated multi-Reader persistence is implemented.
+  if (isSecondaryReaderWorkspace()) return null;
   return readerSessionManager.read();
 }
 
 async function clearReaderSession() {
+  if (isSecondaryReaderWorkspace()) return;
   await readerSessionManager.clear();
   try { localStorage.removeItem(READER_SESSION_META_KEY); } catch {}
 }
@@ -574,25 +625,16 @@ function readModernGuideLibrary() {
 }
 
 function writeModernGuideLibrary(items) {
+  // Modern Guides are already discoverable from the canonical saved-document
+  // and reading-progress records. Do not maintain a second localStorage cache:
+  // that duplicate registry previously exhausted the browser storage quota.
   const compact = (Array.isArray(items) ? items : [])
     .map(compactModernGuideLibraryItem)
     .filter((item) => item.documentId && item.title)
     .slice(0, 50);
 
-  try {
-    if (!compact.length) {
-      localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY);
-      return [];
-    }
-    localStorage.setItem(MODERN_GUIDE_LIBRARY_KEY, JSON.stringify(compact));
-    return compact;
-  } catch (error) {
-    // The registry is only a lightweight cache. Existing document/progress
-    // storage remains authoritative, so never break the Reader on quota errors.
-    try { localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY); } catch {}
-    console.warn('Modern Guide cache was skipped because browser storage is full.', error);
-    return compact;
-  }
+  try { localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY); } catch {}
+  return compact;
 }
 
 function registerModernGuideLibraryItem({
@@ -628,55 +670,6 @@ function registerModernGuideLibraryItem({
 }
 
 const MODERN_GUIDE_ACTIONS_KEY = 'markSetGoModernGuideActionsV1';
-
-function readModernGuideLibrary() {
-  try {
-    const value = JSON.parse(localStorage.getItem(MODERN_GUIDE_LIBRARY_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeModernGuideLibrary(items) {
-  const normalized = Array.isArray(items) ? items : [];
-  localStorage.setItem(MODERN_GUIDE_LIBRARY_KEY, JSON.stringify(normalized));
-  return normalized;
-}
-
-function registerModernGuideLibraryItem({
-  documentId = state?.documentId || '',
-  title = state?.title || '',
-  source = state?.source || null,
-  text = state?.currentText || ''
-} = {}) {
-  if (!documentId || !title || source?.type !== 'modern-guide') return null;
-
-  const items = readModernGuideLibrary();
-  const existingIndex = items.findIndex((item) => String(item.documentId || '') === String(documentId));
-  const now = new Date().toISOString();
-  const existing = existingIndex >= 0 ? items[existingIndex] : {};
-
-  const record = {
-    ...existing,
-    documentId,
-    title,
-    originalTitle: source?.originalTitle || existing.originalTitle || title.replace(/\s+—\s+Mark,\s*Set,\s*Go!\s+Guide$/i,''),
-    author: source?.originalAuthor || existing.author || '',
-    source,
-    wordCount: Array.isArray(state?.words) && state.words.length ? state.words.length : splitWords(text || '').length,
-    firstOpenedAt: existing.firstOpenedAt || now,
-    lastOpenedAt: now,
-    customGuide: Boolean(source?.customGuide),
-    buyUrl: source?.buyUrl || existing.buyUrl || ''
-  };
-
-  if (existingIndex >= 0) items[existingIndex] = record;
-  else items.unshift(record);
-
-  writeModernGuideLibrary(items.slice(0, 200));
-  return record;
-}
 
 function readModernGuideActions() {
   try {
@@ -921,6 +914,18 @@ const BROWSE_LIBRARY_SOURCES = [
   { provider: 'archive', title: 'Internet Archive', note: 'Scans, OCR, and borrowable texts', icon: 'IA' },
   { provider: 'openlibrary', title: 'Open Library', note: 'Borrow, preview, and edition discovery', icon: 'OL' },
   { provider: 'google', title: 'Google Books', note: 'Preview modern and public-domain titles', icon: 'GB' }
+];
+
+
+const FOUNDING_DOCUMENTS_CATALOG = [{"id":"founding-1","title":"Magna Carta (1215)","author":"King John / English barons","era":"Colonial Foundations","year":1215,"topics":"rights law liberty charter","query":"Magna Carta 1215","sourceUrl":"https://www.archives.gov/founding-docs"},{"id":"founding-2","title":"Petition of Right","author":"Parliament of England","era":"Colonial Foundations","year":1628,"topics":"rights taxation due process","query":"Petition of Right 1628","sourceUrl":"https://avalon.law.yale.edu/17th_century/petright.asp"},{"id":"founding-3","title":"Mayflower Compact","author":"Pilgrims at Plymouth","era":"Colonial Foundations","year":1620,"topics":"self government covenant compact","query":"Mayflower Compact","sourceUrl":"https://www.loc.gov/resource/rbpe.03302400/"},{"id":"founding-4","title":"Massachusetts Body of Liberties","author":"Massachusetts Bay Colony","era":"Colonial Foundations","year":1641,"topics":"rights liberties colonial law","query":"Massachusetts Body of Liberties 1641","sourceUrl":"https://avalon.law.yale.edu/17th_century/mass01.asp"},{"id":"founding-5","title":"Fundamental Orders of Connecticut","author":"Connecticut Colony","era":"Colonial Foundations","year":1639,"topics":"constitution self government Connecticut","query":"Fundamental Orders of Connecticut","sourceUrl":"https://avalon.law.yale.edu/17th_century/order.asp"},{"id":"founding-6","title":"English Bill of Rights","author":"Parliament of England","era":"Colonial Foundations","year":1689,"topics":"rights parliament monarchy","query":"English Bill of Rights 1689","sourceUrl":"https://avalon.law.yale.edu/17th_century/england.asp"},{"id":"founding-7","title":"Two Treatises of Government","author":"John Locke","era":"Colonial Foundations","year":1689,"topics":"natural rights government consent property","query":"Locke Two Treatises Government","sourceUrl":"https://www.gutenberg.org/ebooks/7370"},{"id":"founding-8","title":"Cato's Letters","author":"John Trenchard & Thomas Gordon","era":"Colonial Foundations","year":1720,"topics":"liberty republicanism corruption","query":"Cato Letters Trenchard Gordon","sourceUrl":"https://oll.libertyfund.org/title/trenchard-cato-s-letters-vol-1"},{"id":"founding-9","title":"Albany Plan of Union","author":"Benjamin Franklin","era":"Road to Revolution","year":1754,"topics":"union colonies Franklin","query":"Albany Plan of Union","sourceUrl":"https://avalon.law.yale.edu/18th_century/albany.asp"},{"id":"founding-10","title":"Resolutions of the Stamp Act Congress","author":"Stamp Act Congress","era":"Road to Revolution","year":1765,"topics":"taxation representation rights","query":"Stamp Act Congress resolutions 1765","sourceUrl":"https://avalon.law.yale.edu/18th_century/resolu65.asp"},{"id":"founding-11","title":"Virginia Resolves on the Stamp Act","author":"Patrick Henry / Virginia House of Burgesses","era":"Road to Revolution","year":1765,"topics":"taxation representation Virginia","query":"Virginia Resolves Stamp Act","sourceUrl":"https://avalon.law.yale.edu/18th_century/virginia_resolutions_1765.asp"},{"id":"founding-12","title":"Letters from a Farmer in Pennsylvania","author":"John Dickinson","era":"Road to Revolution","year":1767,"topics":"taxation liberty parliament","query":"Letters Farmer Pennsylvania Dickinson","sourceUrl":"https://oll.libertyfund.org/title/dickinson-letters-from-a-farmer-in-pennsylvania"},{"id":"founding-13","title":"Massachusetts Circular Letter","author":"Samuel Adams / James Otis","era":"Road to Revolution","year":1768,"topics":"taxation colonial rights","query":"Massachusetts Circular Letter 1768","sourceUrl":"https://avalon.law.yale.edu/18th_century/mass_circ_let_1768.asp"},{"id":"founding-14","title":"Declaration and Resolves of the First Continental Congress","author":"Continental Congress","era":"Road to Revolution","year":1774,"topics":"rights grievances congress","query":"Declaration Resolves First Continental Congress","sourceUrl":"https://avalon.law.yale.edu/18th_century/resolves.asp"},{"id":"founding-15","title":"Articles of Association","author":"First Continental Congress","era":"Road to Revolution","year":1774,"topics":"boycott association congress","query":"Continental Association 1774","sourceUrl":"https://avalon.law.yale.edu/18th_century/contcong_10-20-74.asp"},{"id":"founding-16","title":"Patrick Henry's 'Give Me Liberty' Speech","author":"Patrick Henry","era":"Road to Revolution","year":1775,"topics":"liberty revolution speech","query":"Patrick Henry Give Me Liberty speech","sourceUrl":"https://avalon.law.yale.edu/18th_century/patrick.asp"},{"id":"founding-17","title":"Olive Branch Petition","author":"Second Continental Congress","era":"Road to Revolution","year":1775,"topics":"petition George III reconciliation","query":"Olive Branch Petition 1775","sourceUrl":"https://avalon.law.yale.edu/18th_century/olive.asp"},{"id":"founding-18","title":"Common Sense","author":"Thomas Paine","era":"Road to Revolution","year":1776,"topics":"independence monarchy republic","query":"Thomas Paine Common Sense","sourceUrl":"https://www.gutenberg.org/ebooks/147"},{"id":"founding-19","title":"Virginia Declaration of Rights","author":"George Mason","era":"Independence","year":1776,"topics":"rights liberty Virginia Mason","query":"Virginia Declaration of Rights","sourceUrl":"https://www.archives.gov/founding-docs/virginia-declaration-of-rights"},{"id":"founding-20","title":"Lee Resolution","author":"Richard Henry Lee","era":"Independence","year":1776,"topics":"independence resolution congress","query":"Lee Resolution independence 1776","sourceUrl":"https://www.archives.gov/milestone-documents/lee-resolution"},{"id":"founding-21","title":"Declaration of Independence","author":"Continental Congress / Thomas Jefferson","era":"Independence","year":1776,"topics":"independence natural rights equality","query":"Declaration of Independence","sourceUrl":"https://www.archives.gov/founding-docs/declaration"},{"id":"founding-22","title":"Jefferson's Rough Draft of the Declaration","author":"Thomas Jefferson","era":"Independence","year":1776,"topics":"declaration draft Jefferson","query":"Jefferson rough draft Declaration Independence","sourceUrl":"https://www.loc.gov/exhibits/declara/ruffdrft.html"},{"id":"founding-23","title":"Articles of Confederation","author":"Continental Congress","era":"Revolutionary Government","year":1777,"topics":"confederation first constitution states","query":"Articles of Confederation","sourceUrl":"https://guides.loc.gov/articles-of-confederation"},{"id":"founding-24","title":"Pennsylvania Constitution of 1776","author":"Pennsylvania Convention","era":"Revolutionary Government","year":1776,"topics":"state constitution Pennsylvania","query":"Pennsylvania Constitution 1776","sourceUrl":"https://avalon.law.yale.edu/18th_century/pa08.asp"},{"id":"founding-25","title":"Massachusetts Constitution of 1780","author":"John Adams / Massachusetts Convention","era":"Revolutionary Government","year":1780,"topics":"state constitution Adams rights","query":"Massachusetts Constitution 1780","sourceUrl":"https://malegislature.gov/Laws/Constitution"},{"id":"founding-26","title":"Virginia Plan","author":"Edmund Randolph / James Madison","era":"Constitutional Convention","year":1787,"topics":"Virginia Plan convention representation","query":"Virginia Plan 1787","sourceUrl":"https://avalon.law.yale.edu/18th_century/vatexta.asp"},{"id":"founding-27","title":"New Jersey Plan","author":"William Paterson","era":"Constitutional Convention","year":1787,"topics":"New Jersey Plan convention representation","query":"New Jersey Plan 1787","sourceUrl":"https://avalon.law.yale.edu/18th_century/patexta.asp"},{"id":"founding-28","title":"Hamilton Plan","author":"Alexander Hamilton","era":"Constitutional Convention","year":1787,"topics":"Hamilton Plan convention executive","query":"Hamilton Plan 1787","sourceUrl":"https://avalon.law.yale.edu/18th_century/hamtexta.asp"},{"id":"founding-29","title":"Madison's Notes of the Constitutional Convention","author":"James Madison","era":"Constitutional Convention","year":1787,"topics":"convention debates Madison notes","query":"Madison Notes Constitutional Convention","sourceUrl":"https://avalon.law.yale.edu/subject_menus/debcont.asp"},{"id":"founding-30","title":"Committee of Detail Draft","author":"Constitutional Convention","era":"Constitutional Convention","year":1787,"topics":"constitution draft committee detail","query":"Committee of Detail Draft Constitution 1787","sourceUrl":"https://avalon.law.yale.edu/18th_century/const08.asp"},{"id":"founding-31","title":"Constitution of the United States","author":"Constitutional Convention","era":"Constitutional Convention","year":1787,"topics":"constitution federal government articles","query":"United States Constitution","sourceUrl":"https://www.archives.gov/founding-docs/constitution"},{"id":"founding-32","title":"George Mason's Objections to the Constitution","author":"George Mason","era":"Ratification Debate","year":1787,"topics":"anti federalist objections rights","query":"George Mason objections Constitution 1787","sourceUrl":"https://avalon.law.yale.edu/18th_century/mason.asp"},{"id":"founding-33","title":"Brutus I","author":"Robert Yates (attributed)","era":"Ratification Debate","year":1787,"topics":"anti federalist Brutus consolidated government","query":"Brutus I anti federalist","sourceUrl":"https://teachingamericanhistory.org/document/brutus-i/"},{"id":"founding-34","title":"Centinel I","author":"Samuel Bryan (attributed)","era":"Ratification Debate","year":1787,"topics":"anti federalist Centinel liberty","query":"Centinel I anti federalist","sourceUrl":"https://teachingamericanhistory.org/document/centinel-i/"},{"id":"founding-35","title":"Federal Farmer I","author":"Federal Farmer (traditionally Richard Henry Lee)","era":"Ratification Debate","year":1787,"topics":"anti federalist Federal Farmer","query":"Federal Farmer Letter I","sourceUrl":"https://teachingamericanhistory.org/document/letters-from-the-federal-farmer-letter-i/"},{"id":"founding-36","title":"Cato III","author":"Cato (attributed)","era":"Ratification Debate","year":1787,"topics":"anti federalist executive presidency","query":"Cato III anti federalist","sourceUrl":"https://teachingamericanhistory.org/document/cato-iii/"},{"id":"founding-37","title":"Luther Martin's Genuine Information","author":"Luther Martin","era":"Ratification Debate","year":1788,"topics":"anti federalist convention Maryland","query":"Luther Martin Genuine Information","sourceUrl":"https://avalon.law.yale.edu/18th_century/martin.asp"},{"id":"founding-38","title":"James Madison's Proposed Amendments","author":"James Madison","era":"Rights & Amendments","year":1789,"topics":"bill rights amendments Madison","query":"Madison proposed amendments 1789","sourceUrl":"https://www.archives.gov/founding-docs/bill-of-rights/how-did-it-happen"},{"id":"founding-39","title":"Bill of Rights (12 Proposed Amendments)","author":"First Congress","era":"Rights & Amendments","year":1789,"topics":"bill rights twelve proposed amendments","query":"Bill of Rights 1789 proposed twelve amendments","sourceUrl":"https://www.archives.gov/founding-docs/bill-of-rights"},{"id":"founding-40","title":"Bill of Rights (First Ten Amendments)","author":"United States","era":"Rights & Amendments","year":1791,"topics":"bill rights amendments liberty","query":"Bill of Rights first ten amendments","sourceUrl":"https://www.archives.gov/founding-docs/bill-of-rights"},{"id":"founding-41","title":"Washington's First Inaugural Address","author":"George Washington","era":"Early Republic","year":1789,"topics":"inaugural executive republic Washington","query":"George Washington First Inaugural Address","sourceUrl":"https://avalon.law.yale.edu/18th_century/wash1.asp"},{"id":"founding-42","title":"Washington's Farewell Address","author":"George Washington","era":"Early Republic","year":1796,"topics":"farewell parties foreign alliances","query":"Washington Farewell Address","sourceUrl":"https://avalon.law.yale.edu/18th_century/washing.asp"},{"id":"founding-43","title":"Alien and Sedition Acts","author":"Fifth Congress","era":"Early Republic","year":1798,"topics":"sedition aliens civil liberties","query":"Alien Sedition Acts 1798","sourceUrl":"https://avalon.law.yale.edu/subject_menus/alsedact.asp"},{"id":"founding-44","title":"Kentucky Resolutions","author":"Thomas Jefferson (drafted)","era":"Early Republic","year":1798,"topics":"states rights nullification Kentucky","query":"Kentucky Resolutions 1798","sourceUrl":"https://avalon.law.yale.edu/18th_century/kenres.asp"},{"id":"founding-45","title":"Virginia Resolutions","author":"James Madison (drafted)","era":"Early Republic","year":1798,"topics":"states rights Virginia resolutions","query":"Virginia Resolutions 1798","sourceUrl":"https://avalon.law.yale.edu/18th_century/virres.asp"},{"id":"founding-46","title":"Jefferson's First Inaugural Address","author":"Thomas Jefferson","era":"Early Republic","year":1801,"topics":"inaugural republican government Jefferson","query":"Jefferson First Inaugural Address","sourceUrl":"https://avalon.law.yale.edu/19th_century/jefinau1.asp"},{"id":"founding-47","title":"Marbury v. Madison","author":"U.S. Supreme Court / John Marshall","era":"Early Republic","year":1803,"topics":"judicial review supreme court","query":"Marbury v Madison opinion","sourceUrl":"https://www.loc.gov/resource/llst.008/?sp=137"},{"id":"founding-48","title":"McCulloch v. Maryland","author":"U.S. Supreme Court / John Marshall","era":"Early Republic","year":1819,"topics":"implied powers supremacy bank","query":"McCulloch v Maryland opinion","sourceUrl":"https://www.loc.gov/resource/llst.017/?sp=316"},{"id":"founding-49","title":"Monroe Doctrine","author":"James Monroe","era":"Early Republic","year":1823,"topics":"foreign policy Americas Europe","query":"Monroe Doctrine 1823","sourceUrl":"https://avalon.law.yale.edu/19th_century/monroe.asp"},{"id":"federalist-1","title":"Federalist No. 1","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 1","query":"Federalist No. 1 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-2","title":"Federalist No. 2","author":"John Jay","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 2","query":"Federalist No. 2 John Jay","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-3","title":"Federalist No. 3","author":"John Jay","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 3","query":"Federalist No. 3 John Jay","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-4","title":"Federalist No. 4","author":"John Jay","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 4","query":"Federalist No. 4 John Jay","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-5","title":"Federalist No. 5","author":"John Jay","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 5","query":"Federalist No. 5 John Jay","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-6","title":"Federalist No. 6","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 6","query":"Federalist No. 6 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-7","title":"Federalist No. 7","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 7","query":"Federalist No. 7 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-8","title":"Federalist No. 8","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 8","query":"Federalist No. 8 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-9","title":"Federalist No. 9","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 9","query":"Federalist No. 9 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-10","title":"Federalist No. 10","author":"James Madison","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 10","query":"Federalist No. 10 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-1-10"},{"id":"federalist-11","title":"Federalist No. 11","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 11","query":"Federalist No. 11 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-12","title":"Federalist No. 12","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 12","query":"Federalist No. 12 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-13","title":"Federalist No. 13","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 13","query":"Federalist No. 13 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-14","title":"Federalist No. 14","author":"James Madison","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 14","query":"Federalist No. 14 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-15","title":"Federalist No. 15","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 15","query":"Federalist No. 15 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-16","title":"Federalist No. 16","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 16","query":"Federalist No. 16 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-17","title":"Federalist No. 17","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 17","query":"Federalist No. 17 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-18","title":"Federalist No. 18","author":"James Madison & Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 18","query":"Federalist No. 18 James Madison & Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-19","title":"Federalist No. 19","author":"James Madison & Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 19","query":"Federalist No. 19 James Madison & Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-20","title":"Federalist No. 20","author":"James Madison & Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 20","query":"Federalist No. 20 James Madison & Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-11-20"},{"id":"federalist-21","title":"Federalist No. 21","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 21","query":"Federalist No. 21 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-22","title":"Federalist No. 22","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 22","query":"Federalist No. 22 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-23","title":"Federalist No. 23","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 23","query":"Federalist No. 23 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-24","title":"Federalist No. 24","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 24","query":"Federalist No. 24 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-25","title":"Federalist No. 25","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 25","query":"Federalist No. 25 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-26","title":"Federalist No. 26","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 26","query":"Federalist No. 26 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-27","title":"Federalist No. 27","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 27","query":"Federalist No. 27 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-28","title":"Federalist No. 28","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 28","query":"Federalist No. 28 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-29","title":"Federalist No. 29","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 29","query":"Federalist No. 29 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-30","title":"Federalist No. 30","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 30","query":"Federalist No. 30 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-21-30"},{"id":"federalist-31","title":"Federalist No. 31","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 31","query":"Federalist No. 31 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-32","title":"Federalist No. 32","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 32","query":"Federalist No. 32 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-33","title":"Federalist No. 33","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 33","query":"Federalist No. 33 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-34","title":"Federalist No. 34","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 34","query":"Federalist No. 34 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-35","title":"Federalist No. 35","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 35","query":"Federalist No. 35 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-36","title":"Federalist No. 36","author":"Alexander Hamilton","era":"Ratification Debate","year":1787,"topics":"Federalist Publius ratification Constitution essay 36","query":"Federalist No. 36 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-37","title":"Federalist No. 37","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 37","query":"Federalist No. 37 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-38","title":"Federalist No. 38","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 38","query":"Federalist No. 38 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-39","title":"Federalist No. 39","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 39","query":"Federalist No. 39 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-40","title":"Federalist No. 40","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 40","query":"Federalist No. 40 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-31-40"},{"id":"federalist-41","title":"Federalist No. 41","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 41","query":"Federalist No. 41 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-42","title":"Federalist No. 42","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 42","query":"Federalist No. 42 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-43","title":"Federalist No. 43","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 43","query":"Federalist No. 43 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-44","title":"Federalist No. 44","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 44","query":"Federalist No. 44 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-45","title":"Federalist No. 45","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 45","query":"Federalist No. 45 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-46","title":"Federalist No. 46","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 46","query":"Federalist No. 46 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-47","title":"Federalist No. 47","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 47","query":"Federalist No. 47 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-48","title":"Federalist No. 48","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 48","query":"Federalist No. 48 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-49","title":"Federalist No. 49","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 49","query":"Federalist No. 49 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-50","title":"Federalist No. 50","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 50","query":"Federalist No. 50 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-41-50"},{"id":"federalist-51","title":"Federalist No. 51","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 51","query":"Federalist No. 51 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-52","title":"Federalist No. 52","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 52","query":"Federalist No. 52 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-53","title":"Federalist No. 53","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 53","query":"Federalist No. 53 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-54","title":"Federalist No. 54","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 54","query":"Federalist No. 54 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-55","title":"Federalist No. 55","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 55","query":"Federalist No. 55 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-56","title":"Federalist No. 56","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 56","query":"Federalist No. 56 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-57","title":"Federalist No. 57","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 57","query":"Federalist No. 57 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-58","title":"Federalist No. 58","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 58","query":"Federalist No. 58 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-59","title":"Federalist No. 59","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 59","query":"Federalist No. 59 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-60","title":"Federalist No. 60","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 60","query":"Federalist No. 60 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-51-60"},{"id":"federalist-61","title":"Federalist No. 61","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 61","query":"Federalist No. 61 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-62","title":"Federalist No. 62","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 62","query":"Federalist No. 62 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-63","title":"Federalist No. 63","author":"James Madison","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 63","query":"Federalist No. 63 James Madison","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-64","title":"Federalist No. 64","author":"John Jay","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 64","query":"Federalist No. 64 John Jay","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-65","title":"Federalist No. 65","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 65","query":"Federalist No. 65 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-66","title":"Federalist No. 66","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 66","query":"Federalist No. 66 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-67","title":"Federalist No. 67","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 67","query":"Federalist No. 67 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-68","title":"Federalist No. 68","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 68","query":"Federalist No. 68 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-69","title":"Federalist No. 69","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 69","query":"Federalist No. 69 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-70","title":"Federalist No. 70","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 70","query":"Federalist No. 70 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-61-70"},{"id":"federalist-71","title":"Federalist No. 71","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 71","query":"Federalist No. 71 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-72","title":"Federalist No. 72","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 72","query":"Federalist No. 72 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-73","title":"Federalist No. 73","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 73","query":"Federalist No. 73 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-74","title":"Federalist No. 74","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 74","query":"Federalist No. 74 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-75","title":"Federalist No. 75","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 75","query":"Federalist No. 75 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-76","title":"Federalist No. 76","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 76","query":"Federalist No. 76 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-77","title":"Federalist No. 77","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 77","query":"Federalist No. 77 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-78","title":"Federalist No. 78","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 78","query":"Federalist No. 78 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-79","title":"Federalist No. 79","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 79","query":"Federalist No. 79 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-80","title":"Federalist No. 80","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 80","query":"Federalist No. 80 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-71-80"},{"id":"federalist-81","title":"Federalist No. 81","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 81","query":"Federalist No. 81 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-81-85"},{"id":"federalist-82","title":"Federalist No. 82","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 82","query":"Federalist No. 82 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-81-85"},{"id":"federalist-83","title":"Federalist No. 83","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 83","query":"Federalist No. 83 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-81-85"},{"id":"federalist-84","title":"Federalist No. 84","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 84","query":"Federalist No. 84 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-81-85"},{"id":"federalist-85","title":"Federalist No. 85","author":"Alexander Hamilton","era":"Ratification Debate","year":1788,"topics":"Federalist Publius ratification Constitution essay 85","query":"Federalist No. 85 Alexander Hamilton","sourceUrl":"https://guides.loc.gov/federalist-papers/text-81-85"}];
+
+const FOUNDING_READING_PATHS = [
+  { id:'essential', label:'Essential 10', query:'Declaration Constitution Bill of Rights Federalist 10 Federalist 51 Common Sense Virginia Declaration Articles Confederation Farewell Brutus I' },
+  { id:'independence', label:'Road to Independence', era:'Road to Revolution' },
+  { id:'constitution', label:'Creating the Constitution', era:'Constitutional Convention' },
+  { id:'ratification', label:'Federalists vs. Anti-Federalists', era:'Ratification Debate' },
+  { id:'rights', label:'Origins of the Bill of Rights', era:'Rights & Amendments' },
+  { id:'republic', label:'Early Republic', era:'Early Republic' }
 ];
 
 const BROWSE_COLLECTIONS = [
@@ -1238,6 +1243,35 @@ const musicNowTitle = document.querySelector('#music-now-title');
 const musicNowSource = document.querySelector('#music-now-source');
 const musicNextButton = document.querySelector('#music-next');
 let musicSearchState = null;
+let activeMediaContext = null;
+
+function currentMediaReadingContext(explicit = null) {
+  const value = explicit && typeof explicit === 'object'
+    ? explicit
+    : window.MarkSetGoCurrentReaderDocument?.get?.();
+
+  if (!value || typeof value !== 'object') {
+    return {
+      documentId:String(state?.documentId || ''),
+      title:String(state?.title || ''),
+      source:{ ...(state?.source || {}) }
+    };
+  }
+
+  return {
+    documentId:String(value.documentId || ''),
+    title:String(value.title || state?.title || ''),
+    source:value.source && typeof value.source === 'object'
+      ? { ...value.source }
+      : {}
+  };
+}
+
+function emitMediaEvent(name, detail = {}) {
+  document.dispatchEvent(new CustomEvent(`marksetgo:media-${name}`, {
+    detail
+  }));
+}
 
 function musicSearchQuery(choice) {
   return choice.searchQuery || `${choice.title || 'reading music'} YouTube`;
@@ -1306,11 +1340,32 @@ function parseYouTubeInput(rawValue) {
   return { title: 'YouTube video', src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}?playsinline=1&rel=0` };
 }
 
-async function playYouTubeSearch(query, title = 'YouTube search') {
+async function playYouTubeSearch(query, title = 'YouTube search', contextOverride = null) {
   const cleanQuery = String(query || '').trim();
+  const workspaceParams = new URLSearchParams(location.search);
+  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+  if (isWorkspacePane) {
+    try {
+      window.parent.postMessage({
+        type:'msg-workspace-music-search',
+        query:cleanQuery,
+        title:String(title || 'YouTube search'),
+        context:currentMediaReadingContext(contextOverride)
+      }, window.location.origin);
+    } catch (error) {
+      console.warn('Workspace could not hand music search to the outer player.', error);
+    }
+    return;
+  }
   if (!cleanQuery) return;
+  activeMediaContext = currentMediaReadingContext(contextOverride);
   musicNowTitle.textContent = title;
   musicNowSource.textContent = 'Searching YouTube…';
+  emitMediaEvent('search-start', {
+    query:cleanQuery,
+    title:String(title || 'YouTube search'),
+    context:{ ...activeMediaContext }
+  });
   musicDock.hidden = false;
   musicDock.classList.remove('minimized');
   musicPlayerWrap.hidden = false;
@@ -1320,12 +1375,30 @@ async function playYouTubeSearch(query, title = 'YouTube search') {
     const payload = await loadApiPayload(`/api/youtube/search?q=${encodeURIComponent(cleanQuery)}`);
     const videoIds = Array.isArray(payload.videoIds) ? payload.videoIds : [];
     if (!videoIds.length) throw new Error('No playable results were found.');
-    musicSearchState = { query: cleanQuery, title, videoIds, index: 0 };
+    musicSearchState = {
+      query:cleanQuery,
+      title,
+      videoIds,
+      index:0,
+      context:{ ...activeMediaContext }
+    };
+    emitMediaEvent('search-results', {
+      query:cleanQuery,
+      title:String(title || 'YouTube search'),
+      videoIds:[...videoIds],
+      context:{ ...activeMediaContext }
+    });
     playMusicSearchCandidate(0);
   } catch (error) {
     musicSearchState = null;
     musicNowSource.textContent = error?.message || 'Music search failed';
     musicPlayer.src = '';
+    emitMediaEvent('search-error', {
+      query:cleanQuery,
+      title:String(title || 'YouTube search'),
+      error:error?.message || 'Media search failed',
+      context:{ ...activeMediaContext }
+    });
   }
 }
 
@@ -1341,6 +1414,22 @@ function playMusicSearchCandidate(index) {
   musicDock.classList.remove('minimized');
   musicPlayerWrap.hidden = false;
   if (musicNextButton) musicNextButton.hidden = musicSearchState.videoIds.length < 2;
+  const playing = {
+    provider:'youtube',
+    videoId,
+    title:String(musicSearchState.title || 'YouTube video'),
+    displayTitle:`YouTube result ${safeIndex + 1}`,
+    source:musicNowSource.textContent,
+    query:String(musicSearchState.query || ''),
+    resultIndex:safeIndex,
+    resultCount:musicSearchState.videoIds.length,
+    src:musicPlayer.src,
+    watchUrl:`https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
+    thumbnailUrl:`https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`,
+    context:currentMediaReadingContext(musicSearchState.context)
+  };
+  activeMediaContext = { ...playing.context };
+  emitMediaEvent('playing', playing);
   try {
     localStorage.setItem('markSetGoMusic', JSON.stringify({
       title: musicNowTitle.textContent,
@@ -1351,8 +1440,29 @@ function playMusicSearchCandidate(index) {
   } catch {}
 }
 
-function playMusic(choiceOrParsed) {
+function playMusic(choiceOrParsed, contextOverride = null) {
+  const workspaceParams = new URLSearchParams(location.search);
+  const isWorkspacePane = window.parent !== window && workspaceParams.has('msgWorkspaceMode');
+  if (isWorkspacePane) {
+    try {
+      window.parent.postMessage({
+        type:'msg-workspace-music-play',
+        choice:choiceOrParsed && typeof choiceOrParsed === 'object' ? choiceOrParsed : {},
+        context:currentMediaReadingContext(contextOverride)
+      }, window.location.origin);
+    } catch (error) {
+      console.warn('Workspace could not hand music playback to the outer player.', error);
+    }
+    return;
+  }
+
+  activeMediaContext = currentMediaReadingContext(
+    contextOverride || choiceOrParsed?.context || choiceOrParsed?.search?.context
+  );
   musicSearchState = choiceOrParsed?.search || null;
+  if (musicSearchState && !musicSearchState.context) {
+    musicSearchState.context = { ...activeMediaContext };
+  }
   if (musicNextButton) musicNextButton.hidden = !musicSearchState?.videoIds?.length;
   const isChoice = Boolean(choiceOrParsed?.youtubeId);
   const src = isChoice ? youtubeEmbedFromChoice(choiceOrParsed) : choiceOrParsed.src;
@@ -1362,16 +1472,74 @@ function playMusic(choiceOrParsed) {
   musicDock.hidden = false;
   musicDock.classList.remove('minimized');
   musicPlayerWrap.hidden = false;
-  try { localStorage.setItem('markSetGoMusic', JSON.stringify({ title: musicNowTitle.textContent, source: musicNowSource.textContent, provider: choiceOrParsed.provider || (isChoice ? 'youtube' : ''), src })); } catch {}
+  const provider = choiceOrParsed.provider || (isChoice ? 'youtube' : '');
+  const videoId = isChoice
+    ? String(choiceOrParsed.youtubeId || '')
+    : (() => {
+        const match = String(src || '').match(/youtube(?:-nocookie)?\.com\/embed\/([\w-]{6,20})/i);
+        return match?.[1] || '';
+      })();
+  emitMediaEvent('playing', {
+    provider,
+    videoId,
+    title:String(choiceOrParsed.title || musicNowTitle.textContent || 'Media'),
+    displayTitle:String(choiceOrParsed.title || musicNowTitle.textContent || 'Media'),
+    source:String(musicNowSource.textContent || ''),
+    src,
+    watchUrl:choiceOrParsed.originalUrl || (videoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}` : ''),
+    thumbnailUrl:videoId ? `https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg` : '',
+    context:{ ...activeMediaContext }
+  });
+  try { localStorage.setItem('markSetGoMusic', JSON.stringify({ title: musicNowTitle.textContent, source: musicNowSource.textContent, provider, src })); } catch {}
 }
 
 function stopMusic() {
   musicSearchState = null;
+  activeMediaContext = null;
   if (musicNextButton) musicNextButton.hidden = true;
   musicPlayer.src = '';
   musicDock.hidden = true;
+  emitMediaEvent('stopped', {});
   try { localStorage.removeItem('markSetGoMusic'); } catch {}
 }
+
+window.MarkSetGoMedia = Object.freeze({
+  search:(query,title='YouTube search',context=null)=>playYouTubeSearch(query,title,context),
+  play:(choice,context=null)=>playMusic(choice,context),
+  playCandidate:(index)=>playMusicSearchCandidate(index),
+  stop:()=>stopMusic(),
+  getContext:()=>currentMediaReadingContext(activeMediaContext),
+  getSearchState:()=>musicSearchState
+    ? {
+        ...musicSearchState,
+        videoIds:[...(musicSearchState.videoIds || [])],
+        context:currentMediaReadingContext(musicSearchState.context)
+      }
+    : null
+});
+
+window.addEventListener('message', (event) => {
+  if (window.parent !== window) return;
+  if (event.origin !== window.location.origin) return;
+  const message = event.data;
+  if (!message || typeof message !== 'object') return;
+
+  if (message.type === 'msg-workspace-music-search') {
+    void playYouTubeSearch(
+      String(message.query || ''),
+      String(message.title || 'YouTube search'),
+      message.context && typeof message.context === 'object' ? message.context : null
+    );
+    return;
+  }
+
+  if (message.type === 'msg-workspace-music-play') {
+    playMusic(
+      message.choice && typeof message.choice === 'object' ? message.choice : {},
+      message.context && typeof message.context === 'object' ? message.context : null
+    );
+  }
+});
 
 function renderMusicLibrary() {
   stopReader();
@@ -3145,20 +3313,336 @@ const CLASSIC_GUIDES = Object.freeze({
   "Voltaire Candide": { id:"classic-voltaire-candide", slug:"voltaire-candide", title:"Candide", author:"Voltaire" },
   "Rousseau Discourse Inequality": { id:"classic-rousseau-discourse-on-inequality", slug:"rousseau-discourse-on-inequality", title:"Discourse on Inequality", author:"Jean-Jacques Rousseau" },
   "Rousseau Social Contract": { id:"classic-rousseau-political-writings-social-contract", slug:"rousseau-political-writings-social-contract", title:"Political Writings including The Social Contract", author:"Jean-Jacques Rousseau" },
-  "Rousseau Social Contract": { id:"classic-rousseau-social-contract", slug:"rousseau-social-contract", title:"The Social Contract", author:"Jean-Jacques Rousseau" }
+  "Rousseau Social Contract": { id:"classic-rousseau-social-contract", slug:"rousseau-social-contract", title:"The Social Contract", author:"Jean-Jacques Rousseau" },
+  "Montesquieu Spirit Laws": { id:"classic-montesquieu-spirit-of-laws", slug:"montesquieu-spirit-of-laws", title:"The Spirit of Laws", author:"Montesquieu" },
+  "Adam Smith Wealth Nations": { id:"classic-adam-smith-wealth-of-nations", slug:"adam-smith-wealth-of-nations", title:"The Wealth of Nations", author:"Adam Smith" },
+  "Gibbon Decline Fall Roman Empire::The Decline and Fall of the Roman Empire, Volume I": { id:"classic-gibbon-decline-fall-volume-i", slug:"gibbon-decline-fall-volume-i", title:"The Decline and Fall of the Roman Empire, Volume I", author:"Edward Gibbon" },
+  "Gibbon Decline Fall Roman Empire::The Decline and Fall of the Roman Empire, Volume II": { id:"classic-gibbon-decline-fall-volume-ii", slug:"gibbon-decline-fall-volume-ii", title:"The Decline and Fall of the Roman Empire, Volume II", author:"Edward Gibbon" },
+  "Kant Critique Pure Reason Major Critical and Moral Works": { id:"classic-kant-major-critical-moral-works", slug:"kant-major-critical-moral-works", title:"Major Critical and Moral Works", author:"Immanuel Kant" },
+  "Federalist Papers": { id:"classic-federalist-papers", slug:"federalist-papers", title:"The Federalist Papers", author:"Alexander Hamilton, James Madison, and John Jay" },
+  "Mill On Liberty": { id:"classic-mill-on-liberty", slug:"mill-on-liberty", title:"On Liberty", author:"John Stuart Mill" },
+  "John Stuart Mill On Liberty": { id:"classic-mill-on-liberty", slug:"mill-on-liberty", title:"On Liberty", author:"John Stuart Mill" },
+  "Mill Utilitarianism": { id:"classic-mill-utilitarianism", slug:"mill-utilitarianism", title:"Utilitarianism", author:"John Stuart Mill" },
+  "United States Constitution Declaration Independence": { id:"classic-american-founding-state-papers", slug:"american-founding-state-papers", title:"Declaration, Articles of Confederation, and Constitution", author:"United States founding generation" },
+  "Boswell Life Samuel Johnson": { id:"classic-boswell-life-samuel-johnson", slug:"boswell-life-samuel-johnson", title:"The Life of Samuel Johnson", author:"James Boswell" },
+  "Lavoisier Elements Chemistry": { id:"classic-lavoisier-elements-chemistry", slug:"lavoisier-elements-chemistry", title:"Elements of Chemistry", author:"Antoine Lavoisier" },
+  "Faraday Experimental Researches Electricity": { id:"classic-faraday-experimental-researches-electricity", slug:"faraday-experimental-researches-electricity", title:"Experimental Researches in Electricity", author:"Michael Faraday" },
+  "Hegel Philosophy Right History": { id:"classic-hegel-philosophy-right-history", slug:"hegel-philosophy-right-history", title:"The Philosophy of Right and The Philosophy of History", author:"G. W. F. Hegel" },
+  "Hegel Philosophy Right": { id:"classic-hegel-philosophy-right", slug:"hegel-philosophy-right", title:"The Philosophy of Right", author:"G. W. F. Hegel" },
+  "Hegel Philosophy History": { id:"classic-hegel-philosophy-history", slug:"hegel-philosophy-history", title:"The Philosophy of History", author:"G. W. F. Hegel" },
+  "Kierkegaard Fear Trembling": { id:"classic-kierkegaard-fear-trembling", slug:"kierkegaard-fear-trembling", title:"Fear and Trembling", author:"Søren Kierkegaard" },
+  "Nietzsche Beyond Good Evil": { id:"classic-nietzsche-beyond-good-evil", slug:"nietzsche-beyond-good-evil", title:"Beyond Good and Evil", author:"Friedrich Nietzsche" },
+  "Tocqueville Democracy America": { id:"classic-tocqueville-democracy-america", slug:"tocqueville-democracy-america", title:"Democracy in America", author:"Alexis de Tocqueville" },
+  "Goethe Faust": { id:"classic-goethe-faust", slug:"goethe-faust", title:"Faust", author:"Johann Wolfgang von Goethe" },
+  "Balzac Cousin Bette": { id:"classic-balzac-cousin-bette", slug:"balzac-cousin-bette", title:"Cousin Bette", author:"Honoré de Balzac" },
+  "Jane Austen Emma": { id:"classic-austen-emma", slug:"austen-emma", title:"Emma", author:"Jane Austen" },
+  "George Eliot Middlemarch": { id:"classic-eliot-middlemarch", slug:"eliot-middlemarch", title:"Middlemarch", author:"George Eliot" },
+  "Dickens Little Dorrit": { id:"classic-dickens-little-dorrit", slug:"dickens-little-dorrit", title:"Little Dorrit", author:"Charles Dickens" },
+  "Melville Moby Dick": { id:"classic-melville-moby-dick", slug:"melville-moby-dick", title:"Moby-Dick", author:"Herman Melville" },
+  "Mark Twain Huckleberry Finn": { id:"classic-twain-huckleberry-finn", slug:"twain-huckleberry-finn", title:"Adventures of Huckleberry Finn", author:"Mark Twain" },
+  "Darwin Origin Species": { id:"classic-darwin-origin-species", slug:"darwin-origin-species", title:"The Origin of Species", author:"Charles Darwin" },
+  "Darwin Descent Man": { id:"classic-darwin-descent-man", slug:"darwin-descent-man", title:"The Descent of Man", author:"Charles Darwin" },
+  "Communist Manifesto Marx Engels": { id:"classic-marx-engels-communist-manifesto", slug:"marx-engels-communist-manifesto", title:"Manifesto of the Communist Party", author:"Karl Marx & Friedrich Engels" },
+  "Marx Capital Volume 1": { id:"classic-marx-capital-volume-1", slug:"marx-capital-volume-1", title:"Capital, Vol. 1", author:"Karl Marx" },
+  "Tolstoy War Peace": { id:"classic-tolstoy-war-and-peace", slug:"tolstoy-war-and-peace", title:"War and Peace", author:"Leo Tolstoy" },
+  "Dostoevsky Brothers Karamazov": { id:"classic-dostoevsky-brothers-karamazov", slug:"dostoevsky-brothers-karamazov", title:"The Brothers Karamazov", author:"Fyodor Dostoevsky" },
+  "Ibsen plays": { id:"classic-ibsen-dolls-house", slug:"ibsen-dolls-house", title:"A Doll’s House", author:"Henrik Ibsen" },
+  "William James Principles Psychology": { id:"classic-william-james-principles-psychology", slug:"william-james-principles-psychology", title:"The Principles of Psychology", author:"William James" },
+  "Freud Interpretation Dreams": { id:"classic-freud-interpretation-dreams", slug:"freud-interpretation-dreams", title:"The Interpretation of Dreams", author:"Sigmund Freud" },
+  "Freud Civilization Discontents": { id:"classic-freud-civilization-discontents", slug:"freud-civilization-discontents", title:"Civilization and Its Discontents", author:"Sigmund Freud" },
+  "William James Pragmatism": { id:"classic-william-james-pragmatism", slug:"william-james-pragmatism", title:"Pragmatism", author:"William James" },
+  "Dewey Experience Education": { id:"classic-dewey-experience-education", slug:"dewey-experience-education", title:"Experience and Education", author:"John Dewey" },
+  "Whitehead Science Modern World": { id:"classic-whitehead-science-modern-world", slug:"whitehead-science-modern-world", title:"Science and the Modern World", author:"Alfred North Whitehead" },
+  "Russell Problems Philosophy": { id:"classic-russell-problems-philosophy", slug:"russell-problems-philosophy", title:"The Problems of Philosophy", author:"Bertrand Russell" },
+  "Wittgenstein Philosophical Investigations": { id:"classic-wittgenstein-philosophical-investigations", slug:"wittgenstein-philosophical-investigations", title:"Philosophical Investigations", author:"Ludwig Wittgenstein" },
+  "Einstein Relativity": { id:"classic-einstein-relativity", slug:"einstein-relativity", title:"Relativity: The Special and the General Theory", author:"Albert Einstein" },
+  "Homer Odyssey": { id:"classic-homer-odyssey", slug:"homer-odyssey", title:"The Odyssey", author:"Homer" },
+  "Plato Seventh Letter": { id:"classic-plato-seventh-letter", slug:"plato-seventh-letter", title:"The Seventh Letter", author:"Plato" },
+  "Heisenberg Physics Philosophy": { id:"classic-heisenberg-physics-philosophy", slug:"heisenberg-physics-philosophy", title:"Physics and Philosophy", author:"Werner Heisenberg" },
+  "Schrodinger What Is Life": { id:"classic-schrodinger-what-is-life", slug:"schrodinger-what-is-life", title:"What Is Life?", author:"Erwin Schrödinger" },
+  "Veblen Leisure Class": { id:"classic-veblen-theory-leisure-class", slug:"veblen-theory-leisure-class", title:"The Theory of the Leisure Class", author:"Thorstein Veblen" },
+  "Keynes General Theory": { id:"classic-keynes-general-theory", slug:"keynes-general-theory", title:"The General Theory of Employment, Interest and Money", author:"John Maynard Keynes" },
+  "Frazer Golden Bough": { id:"classic-frazer-golden-bough-selections", slug:"frazer-golden-bough-selections", title:"The Golden Bough (Selections)", author:"James George Frazer" },
+  "Weber Essays Sociology": { id:"classic-weber-essays-sociology-selections", slug:"weber-essays-sociology-selections", title:"Essays in Sociology (Selections)", author:"Max Weber" },
+  "Huizinga Waning Middle Ages": { id:"classic-huizinga-waning-middle-ages", slug:"huizinga-waning-middle-ages", title:"The Waning of the Middle Ages", author:"Johan Huizinga" },
+  "Conrad Heart Darkness": { id:"classic-conrad-heart-darkness", slug:"conrad-heart-darkness", title:"Heart of Darkness", author:"Joseph Conrad" },
+  "Chekhov Uncle Vanya": { id:"classic-chekhov-uncle-vanya", slug:"chekhov-uncle-vanya", title:"Uncle Vanya", author:"Anton Chekhov" },
+  "Joyce Portrait Artist": { id:"classic-joyce-portrait-artist", slug:"joyce-portrait-artist", title:"A Portrait of the Artist as a Young Man", author:"James Joyce" },
+  "Woolf To Lighthouse": { id:"classic-woolf-to-the-lighthouse", slug:"woolf-to-the-lighthouse", title:"To the Lighthouse", author:"Virginia Woolf" },
+  "Kafka Metamorphosis": { id:"classic-kafka-metamorphosis", slug:"kafka-metamorphosis", title:"The Metamorphosis", author:"Franz Kafka" },
+  "Eliot Waste Land": { id:"classic-eliot-waste-land", slug:"eliot-waste-land", title:"The Waste Land", author:"T. S. Eliot" },
+  "Fitzgerald Great Gatsby": { id:"classic-fitzgerald-great-gatsby", slug:"fitzgerald-great-gatsby", title:"The Great Gatsby", author:"F. Scott Fitzgerald" },
+  "Orwell Animal Farm": { id:"classic-orwell-animal-farm", slug:"orwell-animal-farm", title:"Animal Farm", author:"George Orwell" },
+  "Beckett Waiting Godot": { id:"classic-beckett-waiting-godot", slug:"beckett-waiting-godot", title:"Waiting for Godot", author:"Samuel Beckett" },
+  "Whitehead Introduction Mathematics": { id:"classic-whitehead-introduction-mathematics", slug:"whitehead-introduction-mathematics", title:"An Introduction to Mathematics", author:"Alfred North Whitehead" },
+  "Eddington Expanding Universe": { id:"classic-eddington-expanding-universe", slug:"eddington-expanding-universe", title:"The Expanding Universe", author:"Arthur Eddington" },
+  "Waddington Nature Life": { id:"classic-waddington-nature-life", slug:"waddington-nature-life", title:"The Nature of Life", author:"C. H. Waddington" },
+  "Hardy Mathematicians Apology": { id:"classic-hardy-mathematicians-apology", slug:"hardy-mathematicians-apology", title:"A Mathematician’s Apology", author:"G. H. Hardy" },
+  "Poincare Science Hypothesis": { id:"classic-poincare-science-hypothesis", slug:"poincare-science-hypothesis", title:"Science and Hypothesis", author:"Henri Poincaré" },
+  "Planck Scientific Autobiography": { id:"classic-planck-scientific-autobiography-papers", slug:"planck-scientific-autobiography-papers", title:"Scientific Autobiography and Other Papers", author:"Max Planck" },
+  "Bohr Atomic Theory": { id:"classic-bohr-atomic-theory-selected-essays", slug:"bohr-atomic-theory-selected-essays", title:"Atomic Theory and Selected Essays", author:"Niels Bohr" },
+  "Dobzhansky Genetics Origin Species": { id:"classic-dobzhansky-genetics-origin-species", slug:"dobzhansky-genetics-origin-species", title:"Genetics and the Origin of Species", author:"Theodosius Dobzhansky" },
+  "Hardy Mathematician Apology": { id:"classic-hardy-mathematicians-apology", slug:"hardy-mathematicians-apology", title:"A Mathematician’s Apology", author:"G. H. Hardy" },
+  "Kant Major Critical Moral": { id:"classic-kant-major-critical-moral", slug:"kant-major-critical-moral", title:"Major Critical and Moral Works", author:"Immanuel Kant" },
+  "Tawney Acquisitive Society": { id:"classic-tawney-acquisitive-society", slug:"tawney-acquisitive-society", title:"The Acquisitive Society", author:"R. H. Tawney" },
+  "Levi Strauss Structural Anthropology": { id:"classic-levi-strauss-structural-anthropology", slug:"levi-strauss-structural-anthropology", title:"Structural Anthropology (Selections)", author:"Claude Lévi-Strauss" },
+  "Shaw Saint Joan": { id:"classic-shaw-saint-joan", slug:"shaw-saint-joan", title:"Saint Joan", author:"George Bernard Shaw" },
+  "James Beast Jungle": { id:"classic-james-beast-jungle", slug:"james-beast-jungle", title:"The Beast in the Jungle", author:"Henry James" },
+  "Pirandello Six Characters": { id:"classic-pirandello-six-characters", slug:"pirandello-six-characters", title:"Six Characters in Search of an Author", author:"Luigi Pirandello" },
+  "Proust Swann Love": { id:"classic-proust-swann-love", slug:"proust-swann-love", title:"Swann in Love", author:"Marcel Proust" },
+  "Mann Death Venice": { id:"classic-mann-death-venice", slug:"mann-death-venice", title:"Death in Venice", author:"Thomas Mann" },
+  "Cather Lost Lady": { id:"classic-cather-lost-lady", slug:"cather-lost-lady", title:"A Lost Lady", author:"Willa Cather" },
+  "Brecht Mother Courage": { id:"classic-brecht-mother-courage", slug:"brecht-mother-courage", title:"Mother Courage and Her Children", author:"Bertolt Brecht" },
+  "Lawrence Prussian Officer": { id:"classic-lawrence-prussian-officer", slug:"lawrence-prussian-officer", title:"The Prussian Officer", author:"D. H. Lawrence" },
+  "Hemingway Macomber": { id:"classic-hemingway-short-happy-life-macomber", slug:"hemingway-short-happy-life-macomber", title:"The Short Happy Life of Francis Macomber", author:"Ernest Hemingway" },
+  "ONeill Mourning Electra": { id:"classic-oneill-mourning-electra", slug:"oneill-mourning-electra", title:"Mourning Becomes Electra", author:"Eugene O’Neill" },
+  "Faulkner Rose Emily": { id:"classic-faulkner-rose-emily", slug:"faulkner-rose-emily", title:"A Rose for Emily", author:"William Faulkner" },
+  "Kant Critique Pure Reason": { id:"classic-kant-major-critical-moral-works", slug:"kant-major-critical-moral-works", title:"Major Critical and Moral Works", author:"Immanuel Kant" },
+  "Keynes General Theory Employment Interest Money": { id:"classic-keynes-general-theory", slug:"keynes-general-theory", title:"The General Theory of Employment, Interest and Money", author:"John Maynard Keynes" },
+  "Veblen Theory Leisure Class": { id:"classic-veblen-theory-leisure-class", slug:"veblen-theory-leisure-class", title:"The Theory of the Leisure Class", author:"Thorstein Veblen" },
+  "Max Weber Sociology Essays": { id:"classic-weber-essays-sociology-selections", slug:"weber-essays-sociology-selections", title:"Essays in Sociology (Selections)", author:"Max Weber" },
+  "Henry James Beast Jungle": { id:"classic-james-beast-jungle", slug:"james-beast-jungle", title:"The Beast in the Jungle", author:"Henry James" },
+  "Joyce Portrait Artist Young Man": { id:"classic-joyce-portrait-artist", slug:"joyce-portrait-artist", title:"A Portrait of the Artist as a Young Man", author:"James Joyce" },
+  "Proust Swann in Love": { id:"classic-proust-swanna-love", slug:"proust-swann-love", title:"Swann in Love", author:"Marcel Proust" },
+  "Thomas Mann Death Venice": { id:"classic-mann-death-venice", slug:"mann-death-venice", title:"Death in Venice", author:"Thomas Mann" },
+  "Willa Cather Lost Lady": { id:"classic-cather-lost-lady", slug:"cather-lost-lady", title:"A Lost Lady", author:"Willa Cather" },
+  "Hemingway Francis Macomber": { id:"classic-hemingway-short-happy-life-macomber", slug:"hemingway-short-happy-life-macomber", title:"The Short Happy Life of Francis Macomber", author:"Ernest Hemingway" },
+  "O'Neill Mourning Becomes Electra": { id:"classic-oneill-mourning-electra", slug:"oneill-mourning-electra", title:"Mourning Becomes Electra", author:"Eugene O’Neill" },
+  "Bergson Introduction Metaphysics": { id:"classic-bergson-introduction-metaphysics", slug:"bergson-introduction-metaphysics", title:"An Introduction to Metaphysics", author:"Henri Bergson" },
+  "Karl Barth Word God Word Man": { id:"classic-barth-word-god-word-man", slug:"barth-word-god-word-man", title:"The Word of God and the Word of Man", author:"Karl Barth" },
+  "Heidegger What Is Metaphysics": { id:"classic-heidegger-what-is-metaphysics", slug:"heidegger-what-is-metaphysics", title:"What Is Metaphysics?", author:"Martin Heidegger" },
 });
 
 function classicGuideForGreatBook(book) {
-  const query = String(book?.query || '');
-  const titleKey = `${query}::${String(book?.title || '')}`;
-  return CLASSIC_GUIDES[titleKey] || CLASSIC_GUIDES[query] || null;
+  const query = String(book?.query || '').trim();
+  const title = String(book?.title || '').trim();
+  const author = String(book?.author || '').trim();
+  const titleKey = `${query}::${title}`;
+
+  const direct = CLASSIC_GUIDES[titleKey] || CLASSIC_GUIDES[query];
+  if (direct) return direct;
+
+  // Great Books queries have changed over time. Do not hide an existing guide
+  // merely because its legacy query key differs from the current card query.
+  const normalize = (value) => String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u2018\u2019\u02BC\u2032]/g, "'")
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  const wantedTitle = normalize(title);
+  const wantedAuthor = normalize(author);
+  const authorTokens = wantedAuthor
+    .split(/\s+/)
+    .filter((token) => token.length > 2);
+
+  let best = null;
+  let bestScore = -1;
+
+  Object.values(CLASSIC_GUIDES).forEach((guide) => {
+    if (!guide || typeof guide !== 'object') return;
+
+    const guideTitle = normalize(guide.title);
+    const guideAuthor = normalize(guide.author);
+    let score = 0;
+
+    if (wantedTitle && guideTitle === wantedTitle) {
+      score += 100;
+    } else if (
+      wantedTitle &&
+      guideTitle &&
+      (guideTitle.includes(wantedTitle) || wantedTitle.includes(guideTitle))
+    ) {
+      score += 55;
+    }
+
+    if (authorTokens.length) {
+      const matches = authorTokens.filter((token) => guideAuthor.includes(token)).length;
+      score += matches * 15;
+      if (matches === authorTokens.length) score += 20;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = guide;
+    }
+  });
+
+  return bestScore >= 100 ? best : null;
 }
 
 function classicGuidePathForGreatBook(book) {
   return classicGuideForGreatBook(book) ? '#reader' : '';
 }
 
+
+
+const GREAT_BOOK_BIBLE_GUIDE_ALIASES = Object.freeze({
+  'genesis': 'Genesis',
+  'exodus': 'Exodus',
+  'leviticus': 'Leviticus',
+  'numbers': 'Numbers',
+  'deuteronomy': 'Deuteronomy',
+  'joshua': 'Joshua',
+  'judges': 'Judges',
+  'ruth': 'Ruth',
+  '1 samuel': '1 Samuel',
+  '2 samuel': '2 Samuel',
+  '1 kings': '1 Kings',
+  '2 kings': '2 Kings',
+  '1 chronicles': '1 Chronicles',
+  '2 chronicles': '2 Chronicles',
+  'ezra': 'Ezra',
+  'nehemiah': 'Nehemiah',
+  'esther': 'Esther',
+  'job': 'Job',
+  'psalms': 'Psalms',
+  'proverbs': 'Proverbs',
+  'ecclesiastes': 'Ecclesiastes',
+  'song of solomon': 'Song of Solomon',
+  'song of songs': 'Song of Solomon',
+
+  // Great Books page title variants used by Volume 0.
+  'the acts of the apostles': 'Acts',
+  'acts of the apostles': 'Acts',
+  'the epistle to the romans': 'Romans',
+  'epistle to the romans': 'Romans',
+  'the gospel according to matthew': 'Matthew',
+  'gospel according to matthew': 'Matthew',
+  'the gospel according to mark': 'Mark',
+  'gospel according to mark': 'Mark',
+  'the gospel according to luke': 'Luke',
+  'gospel according to luke': 'Luke',
+  'the gospel according to john': 'John',
+  'gospel according to john': 'John',
+  'the revelation of st john the divine': 'Revelation',
+  'revelation': 'Revelation',
+  'isaiah': 'Isaiah'
+});
+
+function bibleGuideForGreatBook(book = {}) {
+  if (String(book?.author || '').trim().toLowerCase() !== 'the bible') return null;
+
+  const normalizedTitle = String(book?.title || '')
+    .normalize('NFKD')
+    .replace(/[\u2018\u2019\u02BC\u2032]/g, "'")
+    .replace(/[^a-zA-Z0-9]+/g, ' ')
+    .trim()
+    .toLowerCase();
+
+  const canonicalTitle = GREAT_BOOK_BIBLE_GUIDE_ALIASES[normalizedTitle] || book.title;
+  return BIBLE_GUIDES?.[canonicalTitle] || null;
+}
+
+async function openBibleGuideForGreatBook(book = {}) {
+  const meta = bibleGuideForGreatBook(book);
+  if (!meta) throw new Error('This Bible Guide is not available yet.');
+  await openBibleGuideInReader(meta.title);
+}
+
+function classicGuideGreatIdea(meta = {}) {
+  const title = String(meta.title || '').toLowerCase();
+  const author = String(meta.author || '').toLowerCase();
+  const haystack = `${title} ${author}`;
+
+  const rules = [
+    [/bergson|introduction to metaphysics/, 'Metaphysics'],
+    [/barth|word of god and the word of man/, 'Religion'],
+    [/heidegger|what is metaphysics/, 'Being'],
+
+    [/\bodyssey\b|\bhomer\b/, 'Fate'],
+    [/seventh letter|plato/, 'Philosophy'],
+    [/heisenberg|physics and philosophy/, 'Physics'],
+    [/schr[oö]dinger|what is life/, 'Life and Death'],
+    [/veblen|leisure class/, 'Wealth'],
+    [/keynes|general theory/, 'Wealth'],
+    [/frazer|golden bough/, 'Religion'],
+    [/weber|sociology/, 'State'],
+    [/huizinga|middle ages/, 'History'],
+    [/heart of darkness|conrad/, 'Good and Evil'],
+    [/uncle vanya|chekhov/, 'Happiness'],
+    [/portrait of the artist|joyce/, 'Art'],
+    [/to the lighthouse|woolf/, 'Memory and Imagination'],
+    [/metamorphosis|kafka/, 'Man'],
+    [/waste land|eliot/, 'Poetry'],
+    [/great gatsby|fitzgerald/, 'Wealth'],
+    [/animal farm|orwell/, 'Tyranny'],
+    [/waiting for godot|beckett/, 'Time'],
+    [/origin of species|darwin/, 'Evolution'],
+    [/descent of man/, 'Evolution'],
+    [/communist manifesto|capital, vol|marx|engels/, 'Labor'],
+    [/war and peace|tolstoy/, 'War and Peace'],
+    [/brothers karamazov|dostoevsky/, 'Good and Evil'],
+    [/doll.?s house|ibsen/, 'Freedom'],
+    [/principles of psychology|william james/, 'Mind'],
+    [/interpretation of dreams|freud/, 'Mind'],
+    [/civilization and its discontents/, 'Custom and Convention'],
+    [/pragmatism/, 'Truth'],
+    [/experience and education|dewey/, 'Education'],
+    [/science and the modern world|whitehead/, 'Science'],
+    [/problems of philosophy|russell/, 'Knowledge'],
+    [/philosophical investigations|wittgenstein/, 'Language'],
+    [/relativity|einstein/, 'Space'],
+    [/democracy in america|tocqueville/, 'Democracy'],
+    [/beyond good and evil|nietzsche/, 'Good and Evil'],
+    [/fear and trembling|kierkegaard/, 'Faith'],
+    [/philosophy of right|hegel/, 'State'],
+    [/philosophy of history/, 'History'],
+    [/faust|goethe/, 'Will'],
+    [/emma|austen/, 'Judgment'],
+    [/middlemarch|george eliot/, 'Judgment'],
+    [/little dorrit|dickens/, 'Wealth'],
+    [/moby-dick|melville/, 'Nature'],
+    [/huckleberry finn|twain/, 'Freedom'],
+    [/wealth of nations|adam smith/, 'Wealth'],
+    [/decline and fall|gibbon/, 'History'],
+    [/kant/, 'Duty'],
+    [/federalist/, 'Constitution'],
+    [/on liberty|mill/, 'Liberty'],
+    [/utilitarianism/, 'Happiness'],
+    [/lavoisier/, 'Science'],
+    [/faraday/, 'Physics'],
+    [/spirit of laws|montesquieu/, 'Law']
+  ];
+
+  for (const [pattern, idea] of rules) {
+    if (pattern.test(haystack)) return idea;
+  }
+  return 'Philosophy';
+}
+
+function findGreatBookIndexForClassicGuide(meta = {}) {
+  const wantedTitle = String(meta.title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  const wantedAuthor = String(meta.author || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+
+  let bestIndex = -1;
+  let bestScore = -1;
+
+  greatBooksCatalog.forEach((book, index) => {
+    const title = String(book.title || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    const author = String(book.author || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+    let score = 0;
+
+    if (title === wantedTitle) score += 100;
+    else if (title.includes(wantedTitle) || wantedTitle.includes(title)) score += 60;
+
+    if (wantedAuthor && author) {
+      const tokens = wantedAuthor.split(/\s+/).filter((token) => token.length > 2);
+      score += tokens.filter((token) => author.includes(token)).length * 10;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  });
+
+  return bestScore >= 60 ? bestIndex : -1;
+}
+
 function classicGuideSource(meta = {}) {
+  const greatIdea = classicGuideGreatIdea(meta);
   return {
     type:'modern-guide',
     classicGuide:true,
@@ -3167,7 +3651,18 @@ function classicGuideSource(meta = {}) {
     originalTitle:meta.title,
     originalAuthor:meta.author,
     buyUrl:`https://www.amazon.com/s?k=${encodeURIComponent(`${meta.author} ${meta.title}`)}`,
-    subtitle:'An Independent Mark, Set, Go! Classic Guide'
+    subtitle:'An Independent Mark, Set, Go! Classic Guide',
+    guideInteractions:{
+      greatIdea,
+      actionTitle:`Apply one insight from ${meta.title || 'this Classic Guide'}`,
+      actionType:'reflection',
+      dueDays:3,
+      dueHour:19,
+      priority:'normal',
+      repeat:'none',
+      reminder:'day1',
+      actionNote:`Choose one important idea from ${meta.title || 'this Classic Guide'} and turn it into a concrete reflection or action.`
+    }
   };
 }
 
@@ -3222,11 +3717,11 @@ function normalizedChunkWord(word) {
 }
 
 function modeSupportsMeaningfulChunks(mode) {
-  return ['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
+  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
 }
 
 function modeSupportsBookPages(mode) {
-  return ['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee'].includes(mode);
+  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'line-sweep', 'pointing-guide', 'marquee'].includes(mode);
 }
 
 function chooseMeaningfulChunkEnd(startIndex, maximumEnd) {
@@ -3446,7 +3941,7 @@ function renderFocusAnchorPhrase(element, words) {
 }
 
 function modeSupportsFocusAnchorOverlay(mode) {
-  return ['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
+  return ['highlight', 'manual', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'flash'].includes(mode);
 }
 
 function refreshFocusAnchorStyle() {
@@ -3639,7 +4134,8 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
   if (!snapshot?.title || !snapshot?.currentText) return false;
   const controls = snapshot.controls || {};
 
-  renderReaderWithText(snapshot.title, snapshot.currentText, snapshot.source || { type: 'restored' });
+  const renderResult = renderReaderWithText(snapshot.title, snapshot.currentText, snapshot.source || { type: 'restored' });
+  if (isSecondaryReaderWorkspace() && renderResult === false) return false;
 
   state.originalText = snapshot.originalText || snapshot.currentText;
   state.currentText = snapshot.currentText;
@@ -3833,6 +4329,218 @@ function applyReaderSessionSnapshot(snapshot, { resumePlayback = true } = {}) {
 
 const BOOK_BUILDER_DRAFT_KEY = 'markSetGoBookBuilderDraftV1';
 
+const BOOK_BUILDER_DRAFT_TEXT_CACHE_KEY = 'book-builder:draft-text:v1';
+const BOOK_BUILDER_ORIGINAL_PREFIX = 'markSetGoBookBuilderOriginalV1:';
+
+let bookBuilderDraftTextCache = '';
+let bookBuilderDraftTextHydrated = false;
+let bookBuilderStorageMigrationPromise = null;
+
+function readLegacyBookBuilderDraft() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(BOOK_BUILDER_DRAFT_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeBookBuilderDraftMetadata(value = {}) {
+  const metadata = value && typeof value === 'object' ? { ...value } : {};
+  delete metadata.text;
+  try {
+    localStorage.setItem(BOOK_BUILDER_DRAFT_KEY, JSON.stringify(metadata));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function persistBookBuilderDraftText(text) {
+  const value = String(text || '');
+  bookBuilderDraftTextCache = value;
+  bookBuilderDraftTextHydrated = true;
+
+  if (typeof cacheReadingBook !== 'function') return false;
+  const ok = await cacheReadingBook({
+    key: BOOK_BUILDER_DRAFT_TEXT_CACHE_KEY,
+    type: 'book-builder-draft-text',
+    text: value,
+    updatedAt: new Date().toISOString()
+  });
+
+  if (ok) {
+    // Once the large text is safe in IndexedDB, ensure the legacy draft record
+    // retains only its small synchronous metadata.
+    const legacy = readLegacyBookBuilderDraft();
+    if (Object.prototype.hasOwnProperty.call(legacy, 'text')) {
+      writeBookBuilderDraftMetadata(legacy);
+    }
+  }
+  return Boolean(ok);
+}
+
+async function getBookBuilderDraftText() {
+  if (bookBuilderDraftTextHydrated) return bookBuilderDraftTextCache;
+
+  const legacy = readLegacyBookBuilderDraft();
+  if (typeof legacy.text === 'string' && legacy.text) {
+    bookBuilderDraftTextCache = legacy.text;
+    bookBuilderDraftTextHydrated = true;
+    // Migrate without delaying the caller.
+    void persistBookBuilderDraftText(legacy.text);
+    return bookBuilderDraftTextCache;
+  }
+
+  try {
+    const cached = typeof getCachedReadingBook === 'function'
+      ? await getCachedReadingBook(BOOK_BUILDER_DRAFT_TEXT_CACHE_KEY)
+      : null;
+    bookBuilderDraftTextCache = String(cached?.text || '');
+  } catch {
+    bookBuilderDraftTextCache = '';
+  }
+
+  bookBuilderDraftTextHydrated = true;
+  return bookBuilderDraftTextCache;
+}
+
+async function clearBookBuilderDraftStorage() {
+  bookBuilderDraftTextCache = '';
+  bookBuilderDraftTextHydrated = true;
+  try { localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY); } catch {}
+  if (typeof removeCachedReadingBook === 'function') {
+    await removeCachedReadingBook(BOOK_BUILDER_DRAFT_TEXT_CACHE_KEY);
+  }
+  return true;
+}
+
+async function persistBookBuilderOriginal(originalKey, text) {
+  const key = String(originalKey || '');
+  const value = String(text || '');
+  if (!key || !value) return false;
+
+  if (typeof cacheReadingBook === 'function') {
+    const ok = await cacheReadingBook({
+      key,
+      type: 'book-builder-original',
+      text: value,
+      updatedAt: new Date().toISOString()
+    });
+    if (ok) {
+      try { localStorage.removeItem(key); } catch {}
+      return true;
+    }
+  }
+
+  // Last-resort compatibility fallback. This preserves the original if
+  // IndexedDB is unavailable, while still avoiding localStorage in the normal path.
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (error) {
+    console.warn('Original book-builder text could not be preserved.', error);
+    return false;
+  }
+}
+
+async function getBookBuilderOriginal(originalKey) {
+  const key = String(originalKey || '');
+  if (!key) return '';
+
+  try {
+    const legacy = localStorage.getItem(key) || '';
+    if (legacy) {
+      void persistBookBuilderOriginal(key, legacy);
+      return legacy;
+    }
+  } catch {}
+
+  try {
+    const cached = typeof getCachedReadingBook === 'function'
+      ? await getCachedReadingBook(key)
+      : null;
+    return String(cached?.text || '');
+  } catch {
+    return '';
+  }
+}
+
+async function removeBookBuilderOriginal(originalKey) {
+  const key = String(originalKey || '');
+  if (!key) return false;
+  try { localStorage.removeItem(key); } catch {}
+  if (typeof removeCachedReadingBook === 'function') {
+    await removeCachedReadingBook(key);
+  }
+  return true;
+}
+
+async function migrateLegacyBookBuilderStorage() {
+  if (bookBuilderStorageMigrationPromise) return bookBuilderStorageMigrationPromise;
+
+  bookBuilderStorageMigrationPromise = (async () => {
+    let draftMigrated = false;
+    let originalsMigrated = 0;
+    let failed = 0;
+
+    const draft = readLegacyBookBuilderDraft();
+    if (typeof draft.text === 'string' && draft.text) {
+      const ok = await persistBookBuilderDraftText(draft.text);
+      if (ok) draftMigrated = true;
+      else failed += 1;
+    }
+
+    const originalKeys = [];
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index) || '';
+        if (key.startsWith(BOOK_BUILDER_ORIGINAL_PREFIX)) originalKeys.push(key);
+      }
+    } catch {}
+
+    for (const key of originalKeys) {
+      let value = '';
+      try { value = localStorage.getItem(key) || ''; } catch {}
+      if (!value) continue;
+      const ok = await persistBookBuilderOriginal(key, value);
+      if (ok) originalsMigrated += 1;
+      else failed += 1;
+    }
+
+    return { draftMigrated, originalsMigrated, failed };
+  })();
+
+  return bookBuilderStorageMigrationPromise;
+}
+
+window.MarkSetGoBookBuilderStorage = Object.freeze({
+  getDraftText: getBookBuilderDraftText,
+  clearDraft: clearBookBuilderDraftStorage,
+  getOriginal: getBookBuilderOriginal,
+  removeOriginal: removeBookBuilderOriginal,
+  migrateLegacy: migrateLegacyBookBuilderStorage,
+  status: () => {
+    const draft = readLegacyBookBuilderDraft();
+    let legacyOriginalCount = 0;
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        if ((localStorage.key(index) || '').startsWith(BOOK_BUILDER_ORIGINAL_PREFIX)) {
+          legacyOriginalCount += 1;
+        }
+      }
+    } catch {}
+    return {
+      draftTextHydrated: bookBuilderDraftTextHydrated,
+      draftTextCharacters: bookBuilderDraftTextCache.length,
+      legacyDraftContainsText: typeof draft.text === 'string' && draft.text.length > 0,
+      legacyOriginalCount
+    };
+  }
+});
+
+window.setTimeout(() => { void migrateLegacyBookBuilderStorage(); }, 0);
+
 function normalizeBuilderText(value) {
   return String(value || '')
     .replace(/\r\n?/g, '\n')
@@ -3995,8 +4703,7 @@ function normalizeImportedBookText(text, options = {}) {
 
 function renderBookBuilder() {
   stopReader();
-  let draft = {};
-  try { draft = JSON.parse(localStorage.getItem(BOOK_BUILDER_DRAFT_KEY) || '{}') || {}; } catch {}
+  const draft = readLegacyBookBuilderDraft();
   app.innerHTML = `
     <section class="platform-page book-builder-page">
       <header class="book-builder-header">
@@ -4170,22 +4877,30 @@ function renderBookBuilder() {
     status.textContent = `${file.name} loaded. Choose a cleanup level, then Clean & Preview.`;
   };
 
+  let draftTextSaveTimer = null;
   const saveDraft = () => {
-    try {
-      localStorage.setItem(BOOK_BUILDER_DRAFT_KEY, JSON.stringify({
-        mode:selectedMode(),
-        title:titleInput.value,
-        author:authorInput.value,
-        text:textInput.value,
-        cleanupLevel:selectedCleanupLevel(),
-        importedSource,
-        cleanToc:cleanTocInput.checked,
-        cleanHeaders:cleanHeadersInput.checked,
-        rights:rightsInput.checked,
-        guideDepth:guideDepthInput?.value || 'extended',
-        guideIdea:guideIdeaInput?.value || ''
-      }));
-    } catch {}
+    writeBookBuilderDraftMetadata({
+      mode:selectedMode(),
+      title:titleInput.value,
+      author:authorInput.value,
+      cleanupLevel:selectedCleanupLevel(),
+      importedSource,
+      cleanToc:cleanTocInput.checked,
+      cleanHeaders:cleanHeadersInput.checked,
+      rights:rightsInput.checked,
+      guideDepth:guideDepthInput?.value || 'extended',
+      guideIdea:guideIdeaInput?.value || ''
+    });
+
+    // The large text payload is kept out of localStorage. Coalesce rapid typing
+    // so IndexedDB receives one current snapshot instead of a full-book write on
+    // every keystroke.
+    bookBuilderDraftTextCache = textInput.value;
+    bookBuilderDraftTextHydrated = true;
+    window.clearTimeout(draftTextSaveTimer);
+    draftTextSaveTimer = window.setTimeout(() => {
+      void persistBookBuilderDraftText(bookBuilderDraftTextCache);
+    }, 450);
   };
   const analyze = () => {
     const analysisSource = cleanedPreview?.text || textInput.value;
@@ -4252,9 +4967,10 @@ function renderBookBuilder() {
     finally { button.disabled = false; }
   });
   app.querySelector('#builder-analyze').addEventListener('click', analyze);
-  app.querySelector('#builder-clear').addEventListener('click', () => {
+  app.querySelector('#builder-clear').addEventListener('click', async () => {
     if (!window.confirm('Clear this book-builder draft?')) return;
-    localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+    window.clearTimeout(draftTextSaveTimer);
+    await clearBookBuilderDraftStorage();
     renderBookBuilder();
   });
   const createInteractiveGuide = async () => {
@@ -4329,7 +5045,8 @@ function renderBookBuilder() {
         actionNote: guide.actionNote || `Choose one useful idea from ${title} and turn it into a concrete next step.`
       };
 
-      localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+      window.clearTimeout(draftTextSaveTimer);
+      await clearBookBuilderDraftStorage();
       renderReaderWithText(`${title} — Mark, Set, Go! Guide`, guideText, {
         type:'modern-guide',
         id:guideId,
@@ -4373,26 +5090,38 @@ function renderBookBuilder() {
     if (!rightsInput.checked) { status.textContent = 'Confirm that you have the right to use this text.'; return rightsInput.focus(); }
     const displayTitle = author ? `${title} — ${author}` : title;
     const rawOriginal = textInput.value.trim();
-    const originalKey = `markSetGoBookBuilderOriginalV1:${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
-    try { localStorage.setItem(originalKey, rawOriginal); } catch (error) { console.warn('Original book-builder text could not be preserved separately.', error); }
+    const originalKey = `${BOOK_BUILDER_ORIGINAL_PREFIX}${Date.now().toString(36)}-${Math.random().toString(36).slice(2,8)}`;
+    const originalPreserved = await persistBookBuilderOriginal(originalKey, rawOriginal);
     const source = {
       type: 'book-builder',
       ...(importedSource || {}),
       author,
       cleanupLevel: selectedCleanupLevel(),
-      originalPreserved: true,
-      originalKey,
+      originalPreserved,
+      originalKey: originalPreserved ? originalKey : '',
       createdAt: new Date().toISOString(),
       documentToc: detectTableOfContents(text),
       cleanup: normalized?.report || {},
       private: true
     };
-    localStorage.removeItem(BOOK_BUILDER_DRAFT_KEY);
+    window.clearTimeout(draftTextSaveTimer);
+    await clearBookBuilderDraftStorage();
     renderReaderWithText(displayTitle, text, source);
   });
 
   applyBuilderMode();
+
   if (selectedMode() === 'book' && textInput.value.trim()) analyze();
+
+  // After Phase 4 migration, the large draft text may exist only in IndexedDB.
+  // Populate it once without delaying page construction or overwriting new input.
+  if (!textInput.value) {
+    void getBookBuilderDraftText().then((storedText) => {
+      if (!storedText || !textInput.isConnected || textInput.value) return;
+      textInput.value = storedText;
+      if (selectedMode() === 'book') analyze();
+    });
+  }
 }
 
 function renderEmptyReader() {
@@ -4625,6 +5354,13 @@ function renderCurrentReader() {
 
 function renderHome() {
   stopReader();
+  app.dataset.viewKey = 'home';
+
+  // Home owns a local close control only in the top-level app. Workspace/frame
+  // pages rely on their outer pane chrome and must not get a duplicate X.
+  const showStandaloneHomeClose = window.parent === window
+    && !window.__MSG_WORKSPACE_PANE__
+    && !window.MSGWorkspacePane;
 
   let resumeMeta = null;
   try { resumeMeta = JSON.parse(localStorage.getItem(READER_SESSION_META_KEY) || 'null'); } catch {}
@@ -4632,8 +5368,64 @@ function renderHome() {
     ? Math.min(100, Math.max(0, Math.round((Number(resumeMeta.index) || 0) / Number(resumeMeta.totalWords) * 100)))
     : null;
 
+  const bindHomeReaderActions = () => {
+    app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));
+
+    app.querySelector('#resume-last-reading')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      if (button.disabled) return;
+      const original = button.innerHTML;
+      button.disabled = true;
+      button.textContent = 'Loading saved reading…';
+      try {
+        const saved = await readReaderSession();
+        if (!saved?.title || !saved?.currentText) {
+          await clearReaderSession();
+          window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
+          button.disabled = false;
+          button.innerHTML = original;
+          return;
+        }
+
+        if (!applyReaderSessionSnapshot(saved, { resumePlayback: false })) {
+          await clearReaderSession();
+          window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
+          button.disabled = false;
+          button.innerHTML = original;
+        }
+      } catch (error) {
+        console.error('Resume reading failed:', error);
+        window.alert('The saved reading session could not be opened. You can still reopen the book from Library or Reading Progress.');
+        button.disabled = false;
+        button.innerHTML = original;
+      }
+    });
+
+    app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
+      await clearReaderSession();
+      clearActiveReaderPane();
+      renderHome();
+    });
+
+    app.querySelectorAll('[data-home-resume-document]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const documentId = button.dataset.homeResumeDocument;
+        if (!documentId) return;
+        const data = await getStoredReaderDocument(documentId);
+        if (!data?.text) {
+          renderReadingList();
+          return;
+        }
+        renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
+        const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
+        requestAnimationFrame(() => jumpToWordIndex(record?.lastWord || 0));
+      });
+    });
+  };
+
   app.innerHTML = `
     <section class="home-simple">
+      ${showStandaloneHomeClose ? `<button class="msg-home-page-close" data-home-panel-close type="button" aria-label="Close Home" title="Close">×</button>` : ''}
       <header class="home-simple-brand">
         <h1><span class="home-speed-mark" aria-hidden="true">≡</span>Mark, Set, Go!</h1>
         <p class="home-simple-tagline">Read Faster. Understand Deeper. Remember Longer. Apply Daily.</p>
@@ -4698,41 +5490,16 @@ function renderHome() {
 
     </section>`;
 
-  app.querySelector('[data-start-home]')?.addEventListener('click', () => renderWpmTest('wpm'));
-  app.querySelector('#resume-last-reading')?.addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    const original = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Loading saved reading…';
-    try {
-      const saved = await readReaderSession();
-      if (!saved?.title || !saved?.currentText) {
-        await clearReaderSession();
-        window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
-        button.disabled = false;
-        button.textContent = original;
-        return;
-      }
-
-      if (!applyReaderSessionSnapshot(saved, { resumePlayback: false })) {
-        await clearReaderSession();
-        window.alert('No resumable reading session was found. Open a book from Library or Reading Progress first.');
-        button.disabled = false;
-        button.textContent = original;
-      }
-    } catch (error) {
-      console.error('Resume reading failed:', error);
-      window.alert('The saved reading session could not be opened. You can still reopen the book from Library or Reading Progress.');
-      button.disabled = false;
-      button.textContent = original;
-    }
-  });
-  app.querySelector('#forget-last-reading')?.addEventListener('click', async () => {
-    await clearReaderSession();
-    clearActiveReaderPane();
-    renderHome();
+  app.querySelector('[data-home-panel-close]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    // Closing Home is dismissal only. Never hand this click to the generic
+    // page-close / Reader-return path, even when a live Reader snapshot exists.
+    app.replaceChildren();
+    app.dataset.viewKey = 'closed';
   });
 
+  bindHomeReaderActions();
 }
 
 const WPM_TEST_OPTIONS = [
@@ -4756,8 +5523,7 @@ function readingSkillBooks() {
 
 async function readingSkillBookText(book) {
   if (!book?.documentId) return null;
-  let data = null;
-  try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${book.documentId}`) || 'null'); } catch {}
+  const data = await getStoredReaderDocument(book.documentId);
   if (data?.text) return { title:data.title || book.title, text:data.text, source:data.source || book.source || {} };
 
   if (book.source?.type === 'modern-guide') {
@@ -4785,6 +5551,69 @@ function readingSkillBookOptions(books, placeholder = 'Choose a book…') {
   ).join('')}`;
 }
 
+
+
+function renderExperienceThemeSwatches(themeKey) {
+  const colors = window.MarkSetGoExperienceThemes?.themes?.[themeKey]?.colors;
+  if (!Array.isArray(colors) || !colors.length) {
+    return '<span class="visual-theme-preview-empty">Theme palette</span>';
+  }
+  return colors.slice(0,5).map((color) =>
+    `<span style="background:${escapeHtml(String(color))}"></span>`
+  ).join('');
+}
+
+
+const PROFILE_CRYPTO_TICKER_STORAGE_KEY = 'markSetGoCryptoTickerEnabledV1';
+const PROFILE_MARKET_INDEXES_STORAGE_KEY = 'markSetGoMarketIndexesEnabledV1';
+
+function profilePreferenceHostWindow() {
+  try {
+    if (window.parent && window.parent !== window && window.parent.document) return window.parent;
+  } catch {}
+  return window;
+}
+
+function profileTickerEnabled(apiName, storageKey) {
+  const host = profilePreferenceHostWindow();
+  try {
+    const api = host?.[apiName] || window?.[apiName];
+    if (typeof api?.enabled === 'function') return Boolean(api.enabled());
+  } catch {}
+  try {
+    const stored = host.localStorage?.getItem(storageKey) ?? localStorage.getItem(storageKey);
+    if (stored === '1') return true;
+    if (stored === '0') return false;
+  } catch {}
+  return false;
+}
+
+function setProfileTickerEnabled(apiName, storageKey, enabled) {
+  const host = profilePreferenceHostWindow();
+  let applied = false;
+
+  try {
+    const api = host?.[apiName] || window?.[apiName];
+    if (typeof api?.setEnabled === 'function') {
+      api.setEnabled(Boolean(enabled));
+      applied = true;
+    }
+  } catch (error) {
+    console.warn(`${apiName} could not be updated through its public API.`, error);
+  }
+
+  try {
+    host.localStorage?.setItem(storageKey, enabled ? '1' : '0');
+    if (host !== window) localStorage.setItem(storageKey, enabled ? '1' : '0');
+    applied = true;
+  } catch {}
+
+  document.dispatchEvent(new CustomEvent('marksetgo:profile-display-option-changed', {
+    detail:{ apiName, storageKey, enabled:Boolean(enabled) }
+  }));
+
+  return applied;
+}
 
 function renderProfilePreferences() {
   finalizeReadingSession();
@@ -4830,6 +5659,77 @@ function renderProfilePreferences() {
         <p id="profile-save-status" class="status profile-save-status" role="status" aria-live="polite"></p>
       </section>
 
+      <section class="profile-preset-card visual-theme-profile-card">
+        <div class="section-heading visual-theme-heading">
+          <div><span class="source-category">Appearance</span><h2>Choose an experience style</h2><p>Change the atmosphere of the app without changing your reader settings or enabled features.</p></div>
+        </div>
+        <div class="visual-theme-grid" role="group" aria-label="Experience style">
+          ${Object.entries(EXPERIENCE_APPEARANCES).map(([key,appearance])=>`
+            <button class="profile-preset-option visual-theme-option ${current.appearance===key?'active':''}" type="button" data-profile-appearance="${escapeHtml(key)}" aria-pressed="${current.appearance===key}">
+              <span class="profile-preset-check" aria-hidden="true">${current.appearance===key?'✓':''}</span>
+              <span class="visual-theme-preview" aria-hidden="true">${renderExperienceThemeSwatches(key)}</span>
+              <strong>${escapeHtml(appearance.label)}</strong>
+              <small>${escapeHtml(appearance.description)}</small>
+            </button>`).join('')}
+        </div>
+      </section>
+
+      <section class="profile-feature-card visual-designer-profile-card">
+        <div class="section-heading">
+          <div><span class="source-category">Appearance</span><h2>Visual Designer</h2><p>Create and save your own palette and Reader layout without changing the underlying Reader engine.</p></div>
+        </div>
+        <button class="secondary visual-designer-profile-action" type="button" data-open-visual-designer>
+          <span class="visual-designer-profile-icon" aria-hidden="true">✦</span>
+          <span><strong>Design my own theme</strong><small>Starts from Explorer, then saves your custom colors and optional Reader layout overrides in this browser.</small></span>
+        </button>
+      </section>
+
+      <section class="profile-feature-card unified-settings-card" data-user-settings-card>
+        <div class="section-heading">
+          <div>
+            <span class="source-category">Account &amp; preferences</span>
+            <h2>My Settings</h2>
+            <p>Save how you like the app to behave. Signed-in users can automatically carry these preferences to another device.</p>
+          </div>
+          <span class="unified-settings-sync-badge" data-user-settings-sync-badge>Checking sync…</span>
+        </div>
+
+        <div class="unified-settings-category-grid" aria-label="Settings included">
+          <article><strong>Appearance</strong><small>Theme, Visual Designer, interface text size</small></article>
+          <article><strong>Reader defaults</strong><small>Mode, WPM, font, Book Pages, pointer and focus</small></article>
+          <article><strong>Learning</strong><small>Study language and push-training preferences</small></article>
+          <article><strong>App behavior</strong><small>Companion, list layouts, notifications and feed pane</small></article>
+        </div>
+
+        <label class="unified-settings-sync-toggle">
+          <span><strong>Sync settings across devices</strong><small>When signed in, changes are saved to your account automatically.</small></span>
+          <input type="checkbox" data-user-settings-sync checked>
+        </label>
+
+        <div class="unified-content-sync-summary">
+          <div>
+            <strong>Books &amp; learning data</strong>
+            <small>Books, reading position, Mark Notebook, annotations, saved studies and quiz history sync separately from preferences.</small>
+          </div>
+          <span data-user-content-sync-status>Cloud content sync is automatic when signed in.</span>
+        </div>
+
+        <div class="unified-settings-actions">
+          <button type="button" class="primary" data-user-settings-save>Save current settings</button>
+          <button type="button" class="secondary" data-user-content-sync-now>Sync books &amp; learning data</button>
+          <button type="button" class="secondary" data-user-settings-restore>Restore saved settings</button>
+          <button type="button" class="secondary" data-user-settings-export>Export settings</button>
+          <button type="button" class="secondary" data-user-settings-import>Import settings</button>
+          <button type="button" class="secondary unified-settings-reset" data-user-settings-reset>Reset settings</button>
+          <input type="file" accept="application/json,.json" data-user-settings-file hidden>
+        </div>
+
+        <p class="unified-settings-note">
+          Settings and account content are intentionally separate. A background chosen from your local computer remains on that browser unless you choose it again on another device.
+        </p>
+        <p class="status unified-settings-status" data-user-settings-status role="status" aria-live="polite"></p>
+      </section>
+
       <section class="profile-feature-card">
         <div class="section-heading">
           <div><span class="source-category">Interface</span><h2>Choose what appears</h2><p>These choices control navigation and feature visibility across the app.</p></div>
@@ -4840,6 +5740,30 @@ function renderProfilePreferences() {
               <span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(description)}</small></span>
               <input type="checkbox" data-profile-feature="${escapeHtml(key)}" ${current.features[key]!==false?'checked':''}>
             </label>`).join('')}
+
+          <label class="profile-feature-row" data-crypto-ticker-setting="1">
+            <span>
+              <strong>Cryptocurrency Ticker</strong>
+              <small>Show live Bitcoin, Ethereum, Solana, XRP, and Dogecoin prices below the top navigation.</small>
+            </span>
+            <input
+              type="checkbox"
+              data-crypto-ticker-toggle
+              aria-label="Show cryptocurrency ticker"
+              ${profileTickerEnabled('MarkSetGoCryptoTicker',PROFILE_CRYPTO_TICKER_STORAGE_KEY)?'checked':''}>
+          </label>
+
+          <label class="profile-feature-row" data-market-indexes-setting="1">
+            <span>
+              <strong>Major Stock Indexes</strong>
+              <small>Show the S&amp;P 500, Dow, Nasdaq Composite, and Russell 2000 below the top navigation.</small>
+            </span>
+            <input
+              type="checkbox"
+              data-market-indexes-toggle
+              aria-label="Show major stock indexes"
+              ${profileTickerEnabled('MarkSetGoMarketIndexes',PROFILE_MARKET_INDEXES_STORAGE_KEY)?'checked':''}>
+          </label>
         </div>
       </section>
 
@@ -4883,7 +5807,7 @@ function renderProfilePreferences() {
       features[input.dataset.profileFeature]=Boolean(input.checked);
     });
 
-    const saved=saveExperienceProfile({preset:'custom',features});
+    const saved=saveExperienceProfile({preset:'custom',appearance:current.appearance,features});
     current=normalizeExperienceProfile(saved);
     reflectPresetSelection('');
     announceSave(saved,'Custom experience');
@@ -4892,6 +5816,36 @@ function renderProfilePreferences() {
   app.querySelectorAll('[data-profile-feature]').forEach((input)=>{
     input.addEventListener('change',saveFromControls);
   });
+
+  app.querySelector('[data-crypto-ticker-toggle]')?.addEventListener('change',(event)=>{
+    const enabled=Boolean(event.currentTarget.checked);
+    const saved=setProfileTickerEnabled(
+      'MarkSetGoCryptoTicker',
+      PROFILE_CRYPTO_TICKER_STORAGE_KEY,
+      enabled
+    );
+    if(status){
+      status.className=`status profile-save-status ${saved?'success':''}`;
+      status.textContent=`Cryptocurrency Ticker is ${enabled?'on':'off'}.`;
+    }
+  });
+
+  app.querySelector('[data-market-indexes-toggle]')?.addEventListener('change',(event)=>{
+    const enabled=Boolean(event.currentTarget.checked);
+    const saved=setProfileTickerEnabled(
+      'MarkSetGoMarketIndexes',
+      PROFILE_MARKET_INDEXES_STORAGE_KEY,
+      enabled
+    );
+    if(status){
+      status.className=`status profile-save-status ${saved?'success':''}`;
+      status.textContent=`Major Stock Indexes is ${enabled?'on':'off'}.`;
+    }
+  });
+
+  document.dispatchEvent(new CustomEvent('marksetgo:profile-rendered',{
+    detail:{view:'profile-preferences'}
+  }));
 
   app.querySelectorAll('[data-profile-preset]').forEach((button)=>{
     button.addEventListener('click',(event)=>{
@@ -4902,6 +5856,7 @@ function renderProfilePreferences() {
 
       const saved=saveExperienceProfile({
         preset:key,
+        appearance:current.appearance,
         features:{...preset.features}
       });
 
@@ -4912,13 +5867,236 @@ function renderProfilePreferences() {
     });
   });
 
+  // Every Profile appearance button gets the same direct click handler.
+  // There is no Default/Explorer special case: all eight call the one theme engine.
+  app.querySelectorAll('[data-profile-appearance]').forEach((button)=>{
+    button.addEventListener('click',(event)=>{
+      event.preventDefault();
+      const key=String(button.dataset.profileAppearance || '').trim();
+      if(!EXPERIENCE_APPEARANCES[key]) return;
+      window.MarkSetGoExperienceThemes?.apply?.(key);
+    });
+  });
+
+  app.querySelector('[data-open-visual-designer]')?.addEventListener('click',(event)=>{
+    event.preventDefault();
+    // If Profile is open in the workspace, the Designer must operate on the
+    // outer Reader rather than on the small Profile iframe.
+    const host = window.parent !== window ? window.parent : window;
+    try {
+      window.MarkSetGoExperienceThemes?.apply?.('explorer');
+      const designer = host.MarkSetGoVisualDesigner || host.MarkSetGoExplorerVisualDesigner;
+      if (typeof designer?.open !== 'function') throw new Error('Visual Designer is not loaded.');
+      designer.open();
+    } catch (error) {
+      console.warn('Visual Designer could not open.', error);
+      window.alert('The Visual Designer could not open. Refresh after the updated files finish deploying.');
+    }
+  });
+
+  const settingsHost = window.parent !== window ? window.parent : window;
+  const settingsApi = settingsHost.MarkSetGoUserSettings || window.MarkSetGoUserSettings;
+  const settingsStatus = app.querySelector('[data-user-settings-status]');
+  const settingsSync = app.querySelector('[data-user-settings-sync]');
+  const settingsBadge = app.querySelector('[data-user-settings-sync-badge]');
+  const settingsFile = app.querySelector('[data-user-settings-file]');
+
+  const showSettingsMessage = (message, success = false) => {
+    if (!settingsStatus) return;
+    settingsStatus.className = `status unified-settings-status ${success ? 'success' : ''}`;
+    settingsStatus.textContent = String(message || '');
+  };
+
+  const refreshSettingsStatus = () => {
+    if (!settingsApi?.status) {
+      if (settingsBadge) settingsBadge.textContent = 'Settings service unavailable';
+      return;
+    }
+    const info = settingsApi.status();
+    if (settingsSync) settingsSync.checked = info.syncEnabled !== false;
+    if (settingsBadge) {
+      settingsBadge.textContent = info.authenticated
+        ? (info.syncEnabled !== false ? 'Account sync on' : 'Account sync off')
+        : 'Saved on this browser';
+      settingsBadge.classList.toggle('is-synced', Boolean(info.authenticated && info.syncEnabled !== false));
+    }
+  };
+
+  refreshSettingsStatus();
+
+  const contentSyncApi = settingsHost.MarkSetGoCloudContentSync || window.MarkSetGoCloudContentSync;
+  const contentSyncStatus = app.querySelector('[data-user-content-sync-status]');
+
+  const refreshContentSyncStatus = () => {
+    const api = settingsHost.MarkSetGoCloudContentSync || window.MarkSetGoCloudContentSync;
+    if (!contentSyncStatus || !api?.status) return;
+    const info = api.status();
+    if (!info.authenticated) {
+      contentSyncStatus.textContent = 'Sign in to sync books and learning data across devices.';
+      return;
+    }
+    if (info.syncing) {
+      contentSyncStatus.textContent = 'Syncing books and learning data…';
+      return;
+    }
+    if (info.lastError) {
+      contentSyncStatus.textContent = `Sync needs attention: ${info.lastError}`;
+      return;
+    }
+    const details = [];
+    if (Number(info.cloudRecords)) details.push(`${info.cloudRecords} cloud learning record${Number(info.cloudRecords)===1?'':'s'}`);
+    if (Number(info.cloudBooks)) details.push(`${info.cloudBooks} cloud book${Number(info.cloudBooks)===1?'':'s'}`);
+    if (Number(info.oversizeDocuments)) details.push(`${info.oversizeDocuments} book${Number(info.oversizeDocuments)===1?'':'s'} over cloud text limit`);
+    contentSyncStatus.textContent = details.length
+      ? `Account content synced · ${details.join(' · ')}`
+      : 'Account content sync is ready.';
+  };
+
+  app.querySelector('[data-user-content-sync-now]')?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    const api = settingsHost.MarkSetGoCloudContentSync || window.MarkSetGoCloudContentSync;
+    if (!api?.syncNow) return showSettingsMessage('Cloud content sync is not available yet.');
+    const button = event.currentTarget;
+    const original = button.textContent;
+    button.disabled = true;
+    button.textContent = 'Syncing…';
+    try {
+      const result = await api.syncNow({ manual:true });
+      showSettingsMessage(
+        result?.authenticated === false
+          ? 'Sign in to sync books and learning data across devices.'
+          : 'Books and learning data are synchronized.',
+        Boolean(result?.authenticated !== false)
+      );
+      refreshContentSyncStatus();
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Books and learning data could not be synchronized.');
+    } finally {
+      if (button.isConnected) {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    }
+  });
+
+  document.addEventListener('marksetgo:cloud-content-status', refreshContentSyncStatus);
+  refreshContentSyncStatus();
+
+  app.querySelector('[data-user-settings-save]')?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    if (!settingsApi?.saveCurrent) return showSettingsMessage('Settings service is not available.');
+    const button = event.currentTarget;
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = 'Saving…';
+    try {
+      const result = await settingsApi.saveCurrent({ reason:'profile-button' });
+      showSettingsMessage(
+        result?.cloudSaved
+          ? 'Current settings saved to this browser and your account.'
+          : 'Current settings saved to this browser.',
+        true
+      );
+      refreshSettingsStatus();
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Settings could not be saved.');
+    } finally {
+      button.disabled = false;
+      button.textContent = original;
+    }
+  });
+
+  app.querySelector('[data-user-settings-restore]')?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    if (!settingsApi?.restore) return showSettingsMessage('Settings service is not available.');
+    const button = event.currentTarget;
+    button.disabled = true;
+    const original = button.textContent;
+    button.textContent = 'Restoring…';
+    try {
+      const result = await settingsApi.restore({ preferCloud:true });
+      showSettingsMessage(
+        result?.source === 'cloud'
+          ? 'Account settings restored.'
+          : 'Browser settings restored.',
+        true
+      );
+      window.setTimeout(() => renderProfilePreferences(), 120);
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Saved settings could not be restored.');
+    } finally {
+      if (button.isConnected) {
+        button.disabled = false;
+        button.textContent = original;
+      }
+    }
+  });
+
+  app.querySelector('[data-user-settings-export]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    try {
+      settingsApi?.export?.();
+      showSettingsMessage('Settings JSON exported.', true);
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Settings could not be exported.');
+    }
+  });
+
+  app.querySelector('[data-user-settings-import]')?.addEventListener('click', (event) => {
+    event.preventDefault();
+    settingsFile?.click();
+  });
+
+  settingsFile?.addEventListener('change', async () => {
+    const file = settingsFile.files?.[0];
+    settingsFile.value = '';
+    if (!file || !settingsApi?.importFile) return;
+    try {
+      await settingsApi.importFile(file, { apply:true, save:true });
+      showSettingsMessage('Imported settings applied and saved.', true);
+      window.setTimeout(() => renderProfilePreferences(), 120);
+    } catch (error) {
+      showSettingsMessage(error?.message || 'That settings file could not be imported.');
+    }
+  });
+
+  app.querySelector('[data-user-settings-reset]')?.addEventListener('click', async (event) => {
+    event.preventDefault();
+    if (!settingsApi?.reset) return showSettingsMessage('Settings service is not available.');
+    if (!window.confirm('Reset app preferences to their defaults? Your books, progress, notebooks, annotations, and other saved content will not be deleted.')) return;
+    try {
+      await settingsApi.reset({ sync:true });
+      showSettingsMessage('Settings reset to defaults.', true);
+      window.setTimeout(() => location.reload(), 180);
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Settings could not be reset.');
+    }
+  });
+
+  settingsSync?.addEventListener('change', async () => {
+    try {
+      await settingsApi?.setSyncEnabled?.(Boolean(settingsSync.checked));
+      refreshSettingsStatus();
+      showSettingsMessage(
+        settingsSync.checked
+          ? 'Automatic settings sync is on.'
+          : 'Automatic settings sync is off. Settings still save on this browser.',
+        true
+      );
+    } catch (error) {
+      showSettingsMessage(error?.message || 'Sync preference could not be changed.');
+    }
+  });
+
+  document.addEventListener('marksetgo:user-settings-status', refreshSettingsStatus);
+
   // Keep the page synchronized if the profile is changed by another app control.
   const onProfileChange=(event)=>{
     current=normalizeExperienceProfile(event.detail?.profile || getExperienceProfile());
     reflectPresetSelection(current.preset === 'custom' ? '' : current.preset);
     reflectFeatureControls(current);
   };
-  document.addEventListener('marksetgo:experience-profile-changed',onProfileChange,{once:true});
+  document.addEventListener('marksetgo:experience-profile-changed',onProfileChange);
 }
 
 function renderReadingSkillsHub() {
@@ -5464,6 +6642,12 @@ function isReaderRunning() {
   if (state.renderedMode === 'digital-sign') {
     return Boolean(state.tickerFrame) && !state.tickerPaused;
   }
+  // Line Sweep is animation-driven rather than timeout-driven. Treat its live
+  // Web Animation as active playback so the Reader's existing double-click
+  // pause/resume gesture behaves exactly like the other guided modes.
+  if (state.renderedMode === 'line-sweep') {
+    return Boolean(state.lineSweepAnimation) && state.lineSweepAnimation.playState === 'running';
+  }
   return Boolean(state.interval);
 }
 
@@ -5486,6 +6670,41 @@ const READING_AWARDS_KEY = 'markSetGoReadingAwardsV1';
 const LEARNING_ACTIVITY_KEY = 'markSetGoLearningActivityV1';
 
 const PROFILE_EXPERIENCE_KEY = 'markSetGoExperienceProfileV1';
+
+const EXPERIENCE_APPEARANCES = Object.freeze({
+  default:{
+    label:'Default',
+    description:'The current Mark, Set, Go! navy, blue, and white presentation.'
+  },
+  explorer:{
+    label:'Explorer / Discovery',
+    description:'Sage green, parchment, brass, maps, mountains, and waterfall scenery.'
+  },
+  patriotic:{
+    label:'Patriotic',
+    description:'American history, navy, ivory, restrained red and brass.'
+  },
+  scholar:{
+    label:'Scholar',
+    description:'Old library, manuscripts, walnut, burgundy and parchment.'
+  },
+  artistic:{
+    label:'Artistic',
+    description:'Studio and gallery atmosphere with warm creative color.'
+  },
+  modern:{
+    label:'Modern',
+    description:'Clean architecture, restrained geometry and minimal surfaces.'
+  },
+  galactic:{
+    label:'Galactic',
+    description:'Original space-opera atmosphere with stars and luminous instruments.'
+  },
+  expedition:{
+    label:'Expedition',
+    description:'Original archaeology-adventure atmosphere with maps, ruins and field journals.'
+  }
+});
 
 const EXPERIENCE_PRESETS = Object.freeze({
   simple:{
@@ -5562,9 +6781,12 @@ function normalizeExperienceProfile(value = {}) {
   const requestedPreset=String(value?.preset || '').trim();
   const presetKey=EXPERIENCE_PRESETS[requestedPreset] ? requestedPreset : (requestedPreset === 'custom' ? 'custom' : 'full');
   const basePreset=presetKey === 'custom' ? EXPERIENCE_PRESETS.full : EXPERIENCE_PRESETS[presetKey];
+  const requestedAppearance=String(value?.appearance || '').trim();
+  const appearanceKey=EXPERIENCE_APPEARANCES[requestedAppearance] ? requestedAppearance : 'default';
 
   return {
     preset:presetKey,
+    appearance:appearanceKey,
     features:{
       ...basePreset.features,
       ...(value.features && typeof value.features === 'object' ? value.features : {})
@@ -5641,6 +6863,7 @@ window.MarkSetGoExperienceProfile = Object.freeze({
   save:saveExperienceProfile,
   enabled:experienceFeatureEnabled,
   presets:EXPERIENCE_PRESETS,
+  appearances:EXPERIENCE_APPEARANCES,
   apply:applyExperienceProfile
 });
 
@@ -6077,6 +7300,43 @@ function lineChartSvg(data, valueKey, { label = '', suffix = '', empty = 'No tre
   </svg>`;
 }
 
+function yearlyPerformanceChartSvg(data, valueKey, { label = '', suffix = '', goal = 0, kind = 'speed' } = {}) {
+  const width=920,height=270,left=54,right=24,top=20,bottom=42;
+  const values=data.map((row)=>Number(row[valueKey])||0);
+  const hasData=values.some((value)=>value>0);
+  const baseMax=kind==='comprehension' ? 100 : Math.max(400, goal, ...values);
+  const max=kind==='comprehension' ? 100 : Math.ceil(baseMax/50)*50;
+  const min=0;
+  const usableW=width-left-right, usableH=height-top-bottom;
+  const x=(index)=>left+(data.length===1?usableW/2:index*usableW/Math.max(1,data.length-1));
+  const y=(value)=>top+usableH-((Math.max(min,Math.min(max,Number(value)||0))-min)/Math.max(1,max-min))*usableH;
+  const points=data.map((row,index)=>({x:x(index),y:y(row[valueKey]),row,value:Number(row[valueKey])||0}));
+  const valid=points.filter((point)=>point.value>0);
+  const linePoints=valid.map((point)=>`${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
+  const areaPath=valid.length>1
+    ? `M ${valid[0].x.toFixed(1)} ${top+usableH} L ${valid.map((point)=>`${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' L ')} L ${valid[valid.length-1].x.toFixed(1)} ${top+usableH} Z`
+    : '';
+  const goalY=y(goal);
+  const gradientId=`performance-${kind}-gradient`;
+  const lineClass=kind==='comprehension'?'performance-line-comprehension':'performance-line-speed';
+  const areaClass=kind==='comprehension'?'performance-area-comprehension':'performance-area-speed';
+  return `<svg class="progress-chart yearly-performance-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeSvg(label)}">
+    <defs>
+      <linearGradient id="${gradientId}" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" class="${areaClass}-start"/><stop offset="100%" class="${areaClass}-end"/>
+      </linearGradient>
+    </defs>
+    ${[0,.25,.5,.75,1].map((ratio)=>{const value=Math.round(min+(max-min)*ratio);const gy=y(value);return `<line x1="${left}" y1="${gy}" x2="${width-right}" y2="${gy}" class="performance-grid"/><text x="${left-10}" y="${gy+4}" text-anchor="end" class="performance-axis-label">${value}${kind==='comprehension'?'%':''}</text>`;}).join('')}
+    <line x1="${left}" y1="${goalY}" x2="${width-right}" y2="${goalY}" class="performance-goal-line"/>
+    <g class="performance-goal-label"><rect x="${width-right-102}" y="${Math.max(2,goalY-23)}" width="100" height="20" rx="10"/><text x="${width-right-52}" y="${Math.max(16,goalY-9)}" text-anchor="middle">Goal ${goal}${escapeSvg(suffix)}</text></g>
+    ${areaPath?`<path d="${areaPath}" fill="url(#${gradientId})" class="performance-area"/>`:''}
+    ${valid.length>1?`<polyline points="${linePoints}" class="performance-line ${lineClass}"/>`:''}
+    ${valid.map((point)=>`<circle cx="${point.x}" cy="${point.y}" r="5" class="performance-point ${lineClass}"><title>${escapeSvg(point.row.label)}: ${point.value.toLocaleString()}${escapeSvg(suffix)}</title></circle>`).join('')}
+    ${!hasData?`<text x="${width/2}" y="${height/2}" text-anchor="middle" class="chart-empty">Your ${kind==='comprehension'?'comprehension':'reading speed'} trend will appear here as you build a reading record.</text>`:''}
+    ${points.map((point)=>`<text x="${point.x}" y="${height-14}" text-anchor="middle" class="performance-month-label">${escapeSvg(point.row.label)}</text>`).join('')}
+  </svg>`;
+}
+
 function barChartSvg(data, valueKey, { label = '', suffix = '' } = {}) {
   const width=760,height=165,left=42,right=12,top=10,bottom=28;
   const max=Math.max(1,...data.map((row)=>Number(row[valueKey])||0));
@@ -6164,6 +7424,80 @@ function localProgressRecommendations({ daily, weekly, awards, comprehension, go
   if (!recommendations.length) recommendations.push({title:'Keep building evidence',text:'Complete several reading sessions and comprehension checks so the dashboard can identify meaningful trends.'});
   return recommendations.slice(0,4);
 }
+function readerWorkspaceYearData() {
+  const currentYear=new Date().getFullYear();
+  const formatter=new Intl.DateTimeFormat(undefined,{month:'short'});
+  const rows=Array.from({length:12},(_,month)=>({
+    month,
+    label:formatter.format(new Date(currentYear,month,1)),
+    words:0,
+    seconds:0,
+    wpm:0,
+    comprehensionTotal:0,
+    comprehensionCount:0,
+    comprehension:0
+  }));
+  readStoredArray(READING_ACTIVITY_KEY).forEach((item)=>{
+    const date=new Date(item.endedAt || item.startedAt || 0);
+    if(!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
+    const row=rows[date.getMonth()];
+    row.words += Number(item.wordsRead)||0;
+    row.seconds += Number(item.seconds)||0;
+  });
+  getComprehensionResults().forEach((item)=>{
+    const date=new Date(item.createdAt || 0);
+    if(!Number.isFinite(date.getTime()) || date.getFullYear()!==currentYear) return;
+    const score=Number(item.scorePercent);
+    if(!Number.isFinite(score)) return;
+    const row=rows[date.getMonth()];
+    row.comprehensionTotal += score;
+    row.comprehensionCount += 1;
+  });
+  rows.forEach((row)=>{
+    row.wpm=row.seconds?Math.round(row.words/(row.seconds/60)):0;
+    row.comprehension=row.comprehensionCount?Math.round(row.comprehensionTotal/row.comprehensionCount):0;
+  });
+  return rows;
+}
+
+function readerWorkspaceCurrentTextStats() {
+  const documentId=String(state.documentId || '');
+  const activity=readStoredArray(READING_ACTIVITY_KEY).filter((item)=>String(item.documentId||'')===documentId);
+  const comprehension=getComprehensionResults().filter((item)=>String(item.documentId||'')===documentId);
+  const progress=readStoredObject(READING_PROGRESS_KEY)[documentId] || {};
+  const totalWords=Math.max(0,Number(progress.totalWords)||Number(state.words?.length)||0);
+  const currentIndex=Math.max(Number(progress.lastWord)||0,Number(progress.furthestWord)||0,Number(state.index)||0);
+  const percent=totalWords?Math.min(100,Math.round(currentIndex/totalWords*100)):0;
+  const latestComp=Number(comprehension[0]?.scorePercent)||0;
+  const selectedPace=Math.max(0,Math.round(Number(state.wpm)||Number(app.querySelector('#speed')?.value)||0));
+  const completedSeconds=activity.reduce((sum,item)=>sum+(Number(item.seconds)||0),0);
+  let liveSeconds=0;
+  if(state.sessionActive && Number(state.sessionStartedAt)) liveSeconds=Math.max(0,(Date.now()-Number(state.sessionStartedAt))/1000);
+  const sessionSeconds=liveSeconds || Number(activity[0]?.seconds)||0;
+  const effective=latestComp && selectedPace ? Math.round(selectedPace*(latestComp/100)) : 0;
+  return {
+    documentId,
+    title:state.title || progress.title || activity[0]?.title || 'Current text',
+    percent,
+    pace:selectedPace,
+    comprehension:latestComp,
+    effective,
+    sessionSeconds,
+    totalSeconds:completedSeconds+liveSeconds,
+    sessions:activity.length + (state.sessionActive?1:0)
+  };
+}
+
+function readerWorkspaceSpeedGoal() {
+  const stored = Number(localStorage.getItem('markSetGoReadingSpeedGoalV1'));
+  return Number.isFinite(stored) && stored >= 100 && stored <= 2000 ? Math.round(stored) : 350;
+}
+
+function readerWorkspaceComprehensionGoal() {
+  const stored = Number(localStorage.getItem('markSetGoReadingComprehensionGoalV1'));
+  return Number.isFinite(stored) && stored >= 1 && stored <= 100 ? Math.round(stored) : 85;
+}
+
 function renderProgressDashboard() {
   finalizeReadingSession();
   stopReader();
@@ -6188,13 +7522,101 @@ function renderProgressDashboard() {
   const goalPercent=Math.min(100,Math.round(awards.completed/Math.max(1,goal)*100));
   const learning=learningMetricsSummary();
 
+  // Primary performance dashboard restored.
+  const yearlyRows = readerWorkspaceYearData();
+  const speedGoal = readerWorkspaceSpeedGoal();
+  const comprehensionGoal = readerWorkspaceComprehensionGoal();
+  const latestYearWpm = [...yearlyRows].reverse().find((row)=>Number(row.wpm)>0)?.wpm || averageWpm || 0;
+  const latestYearComprehension = [...yearlyRows].reverse().find((row)=>Number(row.comprehension)>0)?.comprehension || awards.compAverage || 0;
+  const primaryEffectiveWpm = latestYearWpm && latestYearComprehension
+    ? Math.round(latestYearWpm * (latestYearComprehension / 100))
+    : effectiveWpm || 0;
+
+  const recentPaceRows = activity
+    .filter((row)=>Number(row.seconds)>0 && Number(row.wordsRead)>0)
+    .slice(0, 12);
+  const recentSplit = Math.max(1, Math.floor(recentPaceRows.length / 2));
+  const paceForRows = (rows) => {
+    const words = rows.reduce((sum,row)=>sum+(Number(row.wordsRead)||0),0);
+    const seconds = rows.reduce((sum,row)=>sum+(Number(row.seconds)||0),0);
+    return seconds ? Math.round(words/(seconds/60)) : 0;
+  };
+  const recentPace = paceForRows(recentPaceRows.slice(0,recentSplit));
+  const priorPace = paceForRows(recentPaceRows.slice(recentSplit));
+  const paceChange = priorPace ? Math.round(((recentPace-priorPace)/priorPace)*100) : 0;
+
+  const currentStats = readerWorkspaceCurrentTextStats();
+  let currentText = {
+    title: currentStats.title || '',
+    documentId: currentStats.documentId || '',
+    percent: Number(currentStats.percent)||0,
+    pace: Number(currentStats.pace)||0,
+    comprehension: Number(currentStats.comprehension)||0,
+    effective: Number(currentStats.effective)||0,
+    totalSeconds: Number(currentStats.totalSeconds)||0,
+    sessions: Number(currentStats.sessions)||0
+  };
+
+  if (!currentText.documentId) {
+    const fallback = [...progress].sort((a,b)=>new Date(b.updatedAt||b.lastReadAt||0)-new Date(a.updatedAt||a.lastReadAt||0))[0];
+    if (fallback) {
+      const id = String(fallback.documentId||'');
+      const rows = activity.filter((row)=>String(row.documentId||'')===id);
+      const comps = comprehension.filter((row)=>String(row.documentId||'')===id);
+      const seconds = rows.reduce((sum,row)=>sum+(Number(row.seconds)||0),0);
+      const words = rows.reduce((sum,row)=>sum+(Number(row.wordsRead)||0),0);
+      const comp = comps.length
+        ? Math.round(comps.reduce((sum,row)=>sum+(Number(row.scorePercent)||0),0)/comps.length)
+        : 0;
+      const totalWordsForBook = Math.max(0,Number(fallback.totalWords)||0);
+      const position = Math.max(0,Number(fallback.lastWord)||0,Number(fallback.furthestWord)||0);
+      const pace = seconds ? Math.round(words/(seconds/60)) : 0;
+      currentText = {
+        title:fallback.title||'Most recent text',
+        documentId:id,
+        percent:totalWordsForBook ? Math.min(100,Math.round(position/totalWordsForBook*100)) : 0,
+        pace,
+        comprehension:comp,
+        effective:pace&&comp ? Math.round(pace*(comp/100)) : 0,
+        totalSeconds:seconds,
+        sessions:rows.length
+      };
+    }
+  }
+
+  const performanceByText = progress.map((book)=>{
+    const id=String(book.documentId||'');
+    const rows=activity.filter((row)=>String(row.documentId||'')===id);
+    const comps=comprehension.filter((row)=>String(row.documentId||'')===id);
+    const seconds=rows.reduce((sum,row)=>sum+(Number(row.seconds)||0),0);
+    const words=rows.reduce((sum,row)=>sum+(Number(row.wordsRead)||0),0);
+    const wpm=seconds?Math.round(words/(seconds/60)):0;
+    const comp=comps.length?Math.round(comps.reduce((sum,row)=>sum+(Number(row.scorePercent)||0),0)/comps.length):0;
+    const effective=wpm&&comp?Math.round(wpm*(comp/100)):0;
+    const totalWordsForBook=Math.max(0,Number(book.totalWords)||0);
+    const position=Math.max(0,Number(book.lastWord)||0,Number(book.furthestWord)||0);
+    return {
+      id,
+      title:book.title||'Untitled',
+      wpm,
+      comprehension:comp,
+      effective,
+      sessions:rows.length,
+      percent:totalWordsForBook?Math.min(100,Math.round(position/totalWordsForBook*100)):0
+    };
+  }).filter((row)=>row.sessions||row.percent||row.comprehension)
+    .sort((a,b)=>b.sessions-a.sessions||b.percent-a.percent)
+    .slice(0,8);
+
   const modeCounts = activity.reduce((map,item)=>{
     const label=({
       highlight:'Highlight',
+      manual:'Manual Pace',
       'pointing-guide':'Pointing Guide',
       'bold-focus':'Bold Focus',
       flash:'Flash',
       'smooth-glide':'Smooth Glide',
+      'line-sweep':'Line Sweep',
       marquee:'Marquee',
       'digital-sign':'Digital Sign',
       'auto-scroll':'Auto Scroll'
@@ -6215,6 +7637,84 @@ function renderProgressDashboard() {
         <button class="secondary" type="button" data-action="my-reading">My Reading List</button>
         <button id="clear-reading-progress" class="secondary" type="button">Clear recorded history</button>
       </div>
+    </div>
+
+    <section class="progress-primary-kpis">
+      <article class="progress-primary-kpi">
+        <span>Reading Speed</span>
+        <strong>${latestYearWpm || '—'}${latestYearWpm ? '<small> WPM</small>' : ''}</strong>
+        <p>Current recorded pace</p>
+        <div class="progress-goal-track"><i style="width:${latestYearWpm ? Math.min(100,Math.round(latestYearWpm/Math.max(1,speedGoal)*100)) : 0}%"></i></div>
+        <small>Goal: ${speedGoal} WPM</small>
+      </article>
+      <article class="progress-primary-kpi">
+        <span>Comprehension</span>
+        <strong>${latestYearComprehension || '—'}${latestYearComprehension ? '%' : ''}</strong>
+        <p>Current recorded understanding</p>
+        <div class="progress-goal-track"><i style="width:${latestYearComprehension ? Math.min(100,Math.round(latestYearComprehension/Math.max(1,comprehensionGoal)*100)) : 0}%"></i></div>
+        <small>Goal: ${comprehensionGoal}%</small>
+      </article>
+      <article class="progress-primary-kpi">
+        <span>Effective WPM</span>
+        <strong>${primaryEffectiveWpm || '—'}</strong>
+        <p>Speed adjusted for comprehension</p>
+        <small>Use this to avoid trading understanding for speed.</small>
+      </article>
+      <article class="progress-primary-kpi">
+        <span>Recent Pace Change</span>
+        <strong>${priorPace ? `${paceChange>0?'+':''}${paceChange}%` : '—'}</strong>
+        <p>${priorPace ? `${priorPace} → ${recentPace || 0} WPM` : 'More sessions needed'}</p>
+        <small>Recent sessions vs. the preceding group</small>
+      </article>
+    </section>
+
+    <section class="progress-performance-section">
+      <div class="section-heading">
+        <div><span class="source-category">Your reading year</span><h2>Speed &amp; comprehension over time</h2><p>Monthly performance with your current goals shown as reference lines.</p></div>
+      </div>
+      <div class="progress-performance-charts">
+        <article class="analytics-card progress-performance-chart">
+          <div class="analytics-heading"><div><h2>Reading speed</h2><p>${new Date().getFullYear()} monthly average</p></div><strong>${speedGoal} WPM goal</strong></div>
+          ${yearlyPerformanceChartSvg(yearlyRows,'wpm',{label:'Reading speed progress this year',suffix:' WPM',goal:speedGoal,kind:'speed'})}
+        </article>
+        <article class="analytics-card progress-performance-chart">
+          <div class="analytics-heading"><div><h2>Comprehension</h2><p>${new Date().getFullYear()} monthly average</p></div><strong>${comprehensionGoal}% goal</strong></div>
+          ${yearlyPerformanceChartSvg(yearlyRows,'comprehension',{label:'Comprehension progress this year',suffix:'%',goal:comprehensionGoal,kind:'comprehension'})}
+        </article>
+      </div>
+    </section>
+
+    <section class="progress-current-text">
+      <div class="section-heading">
+        <div><span class="source-category">Current text</span><h2>${escapeHtml(currentText.title || 'No current text yet')}</h2><p>How you are performing in the book or document you are reading now.</p></div>
+      </div>
+      <div class="current-text-kpis">
+        <article><span>Progress</span><strong>${currentText.documentId ? `${currentText.percent}%` : '—'}</strong><small>through this text</small></article>
+        <article><span>Reading pace</span><strong>${currentText.pace || '—'}</strong><small>${currentText.pace ? 'WPM' : 'no session yet'}</small></article>
+        <article><span>Comprehension</span><strong>${currentText.comprehension || '—'}${currentText.comprehension ? '%' : ''}</strong><small>quiz/check average</small></article>
+        <article><span>Effective WPM</span><strong>${currentText.effective || '—'}</strong><small>pace × comprehension</small></article>
+        <article><span>Reading time</span><strong>${currentText.totalSeconds ? formatDuration(currentText.totalSeconds) : '—'}</strong><small>${currentText.sessions} session${currentText.sessions===1?'':'s'}</small></article>
+      </div>
+    </section>
+
+    <section class="progress-by-text">
+      <div class="section-heading"><div><span class="source-category">Overall reading KPIs</span><h2>Performance by text</h2><p>Compare pace, understanding, and effective reading across the books and documents you have actually read.</p></div></div>
+      ${performanceByText.length ? `<div class="performance-table-wrap"><table class="performance-by-text-table">
+        <thead><tr><th>Text</th><th>Progress</th><th>WPM</th><th>Comprehension</th><th>Effective WPM</th><th>Sessions</th></tr></thead>
+        <tbody>${performanceByText.map((row)=>`<tr>
+          <td>${escapeHtml(row.title)}</td>
+          <td>${row.percent}%</td>
+          <td>${row.wpm||'—'}</td>
+          <td>${row.comprehension ? `${row.comprehension}%` : '—'}</td>
+          <td>${row.effective||'—'}</td>
+          <td>${row.sessions}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>` : `<p class="navigation-empty">Read a few sessions to build text-by-text performance history.</p>`}
+    </section>
+
+    <div class="progress-secondary-heading">
+      <span class="source-category">Lifetime &amp; supporting metrics</span>
+      <h2>Your broader reading record</h2>
     </div>
 
     <div class="progress-stat-grid">
@@ -6405,10 +7905,9 @@ function renderProgressDashboard() {
     renderProgressDashboard();
   });
 
-  app.querySelectorAll('[data-progress-open]').forEach((button)=>button.addEventListener('click',()=>{
+  app.querySelectorAll('[data-progress-open]').forEach((button)=>button.addEventListener('click',async ()=>{
     const documentId=button.dataset.progressOpen;
-    let data=null;
-    try{data=JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`)||'null');}catch{}
+    const data=await getStoredReaderDocument(documentId);
     if(!data?.text) return window.alert('That text is not stored in this browser. Open it again from My Reading or its original library.');
     renderReaderWithText(data.title,data.text,data.source||{type:'saved'});
     const record=readStoredObject(READING_PROGRESS_KEY)[documentId];
@@ -6488,7 +7987,121 @@ function comprehensionPassage() {
     startIndex,
     endIndex,
     words: passageWords.length,
-    passage: passageWords.join(' ')
+    passage: passageWords.join(' '),
+    scope: 'passage',
+    scopeLabel: 'Recent reading'
+  };
+}
+
+function comprehensionSelectionRange() {
+  const selection = state?.markSelection || state?.markPersistentSelection;
+  if (!selection) return null;
+  const startIndex = Math.max(0, Math.min(state.words.length, Number(selection.startIndex) || 0));
+  const endIndex = Math.max(startIndex, Math.min(state.words.length, Number(selection.endIndex) || startIndex));
+  if (endIndex <= startIndex) return null;
+  const words = state.words.slice(startIndex, endIndex).filter((word) => !isModernGuideActionToken(word));
+  return words.length ? { startIndex, endIndex, words } : null;
+}
+
+function comprehensionSectionRange(wordIndex = state.index) {
+  const target = Math.max(0, Math.min(state.words.length, Number(wordIndex) || 0));
+  const toc = (Array.isArray(state.toc) ? state.toc : [])
+    .filter((entry) => Number.isFinite(Number(entry?.index)))
+    .map((entry) => ({ ...entry, index: Math.max(0, Number(entry.index) || 0) }))
+    .sort((a, b) => a.index - b.index);
+
+  if (!toc.length) {
+    const structures = (Array.isArray(state.structure) ? state.structure : [])
+      .filter((entry) => Number.isFinite(Number(entry?.start)) && ['chapter', 'part', 'book', 'section', 'article', 'canto', 'act'].includes(String(entry?.type || '').toLowerCase()))
+      .map((entry) => ({ title: entry.title || '', index: Math.max(0, Number(entry.start) || 0) }))
+      .sort((a, b) => a.index - b.index);
+    toc.push(...structures);
+  }
+
+  if (!toc.length) {
+    const startIndex = Math.max(0, target - 900);
+    const endIndex = Math.min(state.words.length, Math.max(target + 1, startIndex + 1200));
+    return { startIndex, endIndex, title: 'Current section' };
+  }
+
+  let currentPosition = 0;
+  for (let index = 0; index < toc.length; index += 1) {
+    if (toc[index].index <= target) currentPosition = index;
+    else break;
+  }
+  const current = toc[currentPosition];
+  const next = toc[currentPosition + 1];
+  return {
+    startIndex: Math.max(0, current.index),
+    endIndex: Math.min(state.words.length, next ? Math.max(current.index + 1, next.index) : state.words.length),
+    title: String(current.title || 'Current section').trim() || 'Current section'
+  };
+}
+
+function sampleComprehensionWords(words, maxWords = 11500) {
+  const cleaned = (Array.isArray(words) ? words : []).filter((word) => !isModernGuideActionToken(word));
+  if (cleaned.length <= maxWords) return cleaned;
+
+  // Preserve broad coverage for long works: sample equal windows from across the
+  // requested scope instead of truncating to only the opening or ending pages.
+  const windows = 12;
+  const windowSize = Math.max(120, Math.floor(maxWords / windows));
+  const sampled = [];
+  for (let windowIndex = 0; windowIndex < windows; windowIndex += 1) {
+    const progress = windows === 1 ? 0 : windowIndex / (windows - 1);
+    const center = Math.round(progress * Math.max(0, cleaned.length - 1));
+    const start = Math.max(0, Math.min(cleaned.length - windowSize, center - Math.floor(windowSize / 2)));
+    sampled.push(...cleaned.slice(start, Math.min(cleaned.length, start + windowSize)));
+  }
+  return sampled.slice(0, maxWords);
+}
+
+function buildComprehensionContext(scope = 'current_section') {
+  const totalWords = state.words.length;
+  const currentIndex = Math.max(0, Math.min(totalWords, Number(state.index) || 0));
+  let startIndex = 0;
+  let endIndex = currentIndex;
+  let scopeLabel = 'Everything read so far';
+  let rawWords = [];
+
+  if (scope === 'selection') {
+    const selection = comprehensionSelectionRange();
+    if (!selection) throw new Error('Highlight a passage first, then choose Selected passage.');
+    startIndex = selection.startIndex;
+    endIndex = selection.endIndex;
+    rawWords = selection.words;
+    scopeLabel = 'Selected passage';
+  } else if (scope === 'current_section') {
+    const section = comprehensionSectionRange(currentIndex);
+    startIndex = section.startIndex;
+    endIndex = section.endIndex;
+    rawWords = state.words.slice(startIndex, endIndex);
+    scopeLabel = section.title || 'Current section';
+  } else if (scope === 'whole_text') {
+    startIndex = 0;
+    endIndex = totalWords;
+    rawWords = state.words.slice(0, totalWords);
+    scopeLabel = 'Entire text';
+  } else if (scope === 'recent') {
+    return comprehensionPassage();
+  } else {
+    startIndex = 0;
+    endIndex = Math.max(1, currentIndex);
+    rawWords = state.words.slice(startIndex, endIndex);
+    scopeLabel = 'Everything read so far';
+  }
+
+  const cleanedWords = rawWords.filter((word) => !isModernGuideActionToken(word));
+  const sampledWords = sampleComprehensionWords(cleanedWords);
+  return {
+    startIndex,
+    endIndex,
+    words: cleanedWords.length,
+    sampledWords: sampledWords.length,
+    passage: sampledWords.join(' '),
+    scope,
+    scopeLabel,
+    sampled: sampledWords.length < cleanedWords.length
   };
 }
 
@@ -6507,10 +8120,12 @@ function renderComprehensionQuiz(quiz, context) {
     inference: 'Inference',
     deeper_understanding: 'Deeper understanding'
   };
+  const scopeText = context.scopeLabel ? `${context.scopeLabel} · ` : '';
+  const sampleText = context.sampled ? ` · balanced sample of ${context.sampledWords.toLocaleString()} words` : '';
 
   dialog.innerHTML = `<form method="dialog" class="comprehension-card" id="comprehension-form">
     <div class="comprehension-heading">
-      <div><span class="comprehension-kicker">Learning check</span><h2>Comprehension Check</h2><p>${context.words.toLocaleString()} words · ${escapeHtml(state.title)}</p></div>
+      <div><span class="comprehension-kicker">Learning check</span><h2>Comprehension Check</h2><p>${escapeHtml(scopeText)}${context.words.toLocaleString()} words${sampleText} · ${escapeHtml(state.title)}</p></div>
       <button class="comprehension-close" value="cancel" type="submit" aria-label="Close">×</button>
     </div>
     <div class="comprehension-questions">
@@ -6532,7 +8147,7 @@ function renderComprehensionQuiz(quiz, context) {
   dialog.showModal();
 
   dialog.querySelector('#randomize-whole-guide')?.addEventListener('click', () => {
-    showModernGuideWholeQuizSetup(context.guideSource || state?.source || {});
+    void showModernGuideWholeQuizSetup(context.guideSource || state?.source || {});
   });
 
   dialog.querySelector('#score-comprehension')?.addEventListener('click', () => {
@@ -6568,6 +8183,8 @@ function renderComprehensionQuiz(quiz, context) {
       startIndex: context.startIndex,
       endIndex: context.endIndex,
       wordsTested: context.words,
+      scope: context.scope || 'passage',
+      scopeLabel: context.scopeLabel || '',
       correct,
       total: quiz.questions.length,
       scorePercent: percent,
@@ -6588,22 +8205,96 @@ function renderComprehensionQuiz(quiz, context) {
   });
 }
 
-async function startComprehensionCheck() {
-  if (!state.documentId || !state.words.length) return;
-  const context = comprehensionPassage();
+function showComprehensionSetup() {
+  const dialog = app.querySelector('#comprehension-dialog');
+  if (!dialog || !state.documentId || !state.words.length) return;
+  const hasSelection = Boolean(comprehensionSelectionRange());
+  const section = comprehensionSectionRange(state.index);
+  const readWords = Math.max(0, Math.min(state.words.length, Number(state.index) || 0));
+
+  dialog.innerHTML = `<form method="dialog" class="comprehension-card comprehension-setup-card" id="comprehension-setup-form">
+    <div class="comprehension-heading">
+      <div><span class="comprehension-kicker">Reader Companion</span><h2>Check Comprehension</h2><p>Choose what Mark should quiz you on and how many questions you want.</p></div>
+      <button class="comprehension-close" value="cancel" type="submit" aria-label="Close">×</button>
+    </div>
+    <div class="comprehension-setup-grid">
+      <fieldset class="comprehension-question comprehension-setup-fieldset">
+        <legend><span>1</span><div><small>Quiz scope</small>What should the quiz cover?</div></legend>
+        <div class="comprehension-scope-options">
+          <label class="comprehension-scope-option ${hasSelection ? '' : 'is-disabled'}">
+            <input type="radio" name="comprehension-scope" value="selection" ${hasSelection ? 'checked' : 'disabled'}>
+            <span><strong>Selected passage</strong><small>${hasSelection ? 'Use the passage you highlighted.' : 'Highlight a passage in the Reader to enable this.'}</small></span>
+          </label>
+          <label class="comprehension-scope-option">
+            <input type="radio" name="comprehension-scope" value="current_section" ${hasSelection ? '' : 'checked'}>
+            <span><strong>Current section / chapter</strong><small>${escapeHtml(section.title || 'Use the section around your current position.')}</small></span>
+          </label>
+          <label class="comprehension-scope-option">
+            <input type="radio" name="comprehension-scope" value="read_so_far">
+            <span><strong>Everything read so far</strong><small>${readWords.toLocaleString()} words from the beginning through your current position.</small></span>
+          </label>
+          <label class="comprehension-scope-option">
+            <input type="radio" name="comprehension-scope" value="whole_text">
+            <span><strong>Entire text</strong><small>Build a cumulative quiz across the whole book or document.</small></span>
+          </label>
+          <label class="comprehension-scope-option">
+            <input type="radio" name="comprehension-scope" value="recent">
+            <span><strong>Recent reading</strong><small>Use the material since your last comprehension check.</small></span>
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset class="comprehension-question comprehension-setup-fieldset">
+        <legend><span>2</span><div><small>Length</small>How many questions?</div></legend>
+        <label class="comprehension-count-control">Questions
+          <input id="comprehension-question-count" type="number" min="4" max="25" step="1" value="4" inputmode="numeric">
+          <small>Choose 4–25. Ten works well for a chapter; use more for cumulative reviews.</small>
+        </label>
+        <div class="comprehension-count-presets" aria-label="Question count shortcuts">
+          ${[4, 6, 10, 15, 20].map((count) => `<button type="button" class="secondary" data-comprehension-count="${count}">${count}</button>`).join('')}
+        </div>
+      </fieldset>
+    </div>
+    <div class="comprehension-actions">
+      <span id="comprehension-status" class="status"></span>
+      <button id="generate-comprehension-quiz" class="primary" type="button">Generate Quiz</button>
+      <button class="secondary" value="cancel" type="submit">Close</button>
+    </div>
+  </form>`;
+  if (!dialog.open) dialog.showModal();
+
+  const countInput = dialog.querySelector('#comprehension-question-count');
+  dialog.querySelectorAll('[data-comprehension-count]').forEach((button) => button.addEventListener('click', () => {
+    if (countInput) countInput.value = button.dataset.comprehensionCount || '4';
+  }));
+  dialog.querySelector('#generate-comprehension-quiz')?.addEventListener('click', () => generateComprehensionCheckFromSetup());
+}
+
+async function generateComprehensionCheckFromSetup() {
+  const dialog = app.querySelector('#comprehension-dialog');
+  if (!dialog) return;
+  const scope = String(dialog.querySelector('input[name="comprehension-scope"]:checked')?.value || 'current_section');
+  const requestedCount = Number(dialog.querySelector('#comprehension-question-count')?.value);
+  const questionCount = Number.isInteger(requestedCount) ? Math.max(4, Math.min(25, requestedCount)) : 4;
+  const status = dialog.querySelector('#comprehension-status');
+  const generateButton = dialog.querySelector('#generate-comprehension-quiz');
+
+  let context;
+  try {
+    context = buildComprehensionContext(scope);
+  } catch (error) {
+    if (status) status.textContent = error.message;
+    return;
+  }
   if (context.words < 120) {
-    window.alert(`Read a little farther first. You currently have ${context.words} new words available; a comprehension check needs at least 120.`);
+    if (status) status.textContent = `This scope contains ${context.words} words. Choose at least 120 words for a useful comprehension check.`;
     return;
   }
 
-  const button = app.querySelector('#check-comprehension');
-  const fsButton = app.querySelector('#fs-check-comprehension');
-  const original = button?.textContent;
-  if (button) { button.disabled = true; button.textContent = 'Generating…'; }
-  if (fsButton) { fsButton.disabled = true; fsButton.textContent = 'Generating…'; }
-
-  const wasRunning = isReaderRunning();
-  if (wasRunning) pauseReader();
+  if (generateButton) { generateButton.disabled = true; generateButton.textContent = 'Generating…'; }
+  if (status) status.textContent = context.sampled
+    ? `Building a balanced ${questionCount}-question quiz across ${context.words.toLocaleString()} words…`
+    : `Building ${questionCount} questions from ${context.scopeLabel.toLowerCase()}…`;
 
   try {
     const response = await fetch('/api/comprehension', {
@@ -6611,19 +8302,29 @@ async function startComprehensionCheck() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         title: state.title,
-        passage: context.passage
+        passage: context.passage,
+        scope: context.scope,
+        scopeLabel: context.scopeLabel,
+        questionCount,
+        sampled: context.sampled,
+        sourceWordCount: context.words
       })
     });
     const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
-    if (!Array.isArray(payload.questions) || payload.questions.length !== 4) throw new Error('The quiz response was incomplete.');
+    if (!Array.isArray(payload.questions) || payload.questions.length !== questionCount) throw new Error('The quiz response was incomplete.');
     renderComprehensionQuiz(payload, context);
   } catch (error) {
-    window.alert(`Comprehension check unavailable: ${error.message}`);
-  } finally {
-    if (button) { button.disabled = false; button.textContent = original || '🧠 Comprehension'; }
-    if (fsButton) { fsButton.disabled = false; fsButton.textContent = 'Check comprehension'; }
+    if (status) status.textContent = `Comprehension check unavailable: ${error.message}`;
+    if (generateButton) { generateButton.disabled = false; generateButton.textContent = 'Generate Quiz'; }
   }
+}
+
+function startComprehensionCheck() {
+  if (!state.documentId || !state.words.length) return;
+  const wasRunning = isReaderRunning();
+  if (wasRunning) pauseReader();
+  showComprehensionSetup();
 }
 
 function vocabularyDue(item) {
@@ -6695,6 +8396,10 @@ function normalizeLookupWord(value) {
 // the Reader while IndexedDB provides the durable store.
 const READER_DEFINITIONS_CACHE_KEY = 'reader-annotations:definitions:v1';
 const READER_NOTES_CACHE_KEY = 'reader-annotations:notes:v1';
+const READER_HIGHLIGHTS_CACHE_KEY = 'reader-annotations:passage-highlights:v1';
+const READER_WRITING_CACHE_KEY = 'reader-annotations:written-overlays:v1';
+const READER_DRAWING_CACHE_KEY = 'reader-annotations:free-draw:v1';
+const READER_WORKSPACE_CACHE_KEY = 'reader-annotations:workspaces:v1';
 
 function readLegacyAnnotationArray(key) {
   try {
@@ -6707,6 +8412,10 @@ function readLegacyAnnotationArray(key) {
 
 let savedDefinitionsCache = readLegacyAnnotationArray(SAVED_DEFINITIONS_KEY).slice(0, 500);
 let readerNotesCache = readLegacyAnnotationArray(NOTE_STORAGE_KEY).slice(0, 1000);
+let readerHighlightsCache = [];
+let readerWritingCache = [];
+let readerDrawingCache = [];
+let readerWorkspaceCache = [];
 let readerAnnotationHydrated = false;
 
 async function persistReaderAnnotationRecord(key, items) {
@@ -6725,13 +8434,21 @@ async function hydrateReaderAnnotationStores() {
   readerAnnotationHydrated = true;
 
   try {
-    const [definitionRecord, noteRecord] = await Promise.all([
+    const [definitionRecord, noteRecord, highlightRecord, writingRecord, drawingRecord, workspaceRecord] = await Promise.all([
       getCachedReadingBook(READER_DEFINITIONS_CACHE_KEY),
-      getCachedReadingBook(READER_NOTES_CACHE_KEY)
+      getCachedReadingBook(READER_NOTES_CACHE_KEY),
+      getCachedReadingBook(READER_HIGHLIGHTS_CACHE_KEY),
+      getCachedReadingBook(READER_WRITING_CACHE_KEY),
+      getCachedReadingBook(READER_DRAWING_CACHE_KEY),
+      getCachedReadingBook(READER_WORKSPACE_CACHE_KEY)
     ]);
 
     const indexedDefinitions = Array.isArray(definitionRecord?.items) ? definitionRecord.items : [];
     const indexedNotes = Array.isArray(noteRecord?.items) ? noteRecord.items : [];
+    const indexedHighlights = Array.isArray(highlightRecord?.items) ? highlightRecord.items : [];
+    const indexedWriting = Array.isArray(writingRecord?.items) ? writingRecord.items : [];
+    const indexedDrawing = Array.isArray(drawingRecord?.items) ? drawingRecord.items : [];
+    const indexedWorkspaces = Array.isArray(workspaceRecord?.items) ? workspaceRecord.items : [];
 
     // If IndexedDB already has data, it is authoritative. Otherwise migrate the
     // legacy localStorage arrays once.
@@ -6741,6 +8458,11 @@ async function hydrateReaderAnnotationStores() {
     if (indexedNotes.length) readerNotesCache = indexedNotes;
     else if (readerNotesCache.length) await persistReaderAnnotationRecord(READER_NOTES_CACHE_KEY, readerNotesCache);
 
+    readerHighlightsCache = indexedHighlights.slice(0, 5000);
+    readerWritingCache = indexedWriting.slice(0, 3000);
+    readerDrawingCache = indexedDrawing.slice(0, 5000);
+    readerWorkspaceCache = indexedWorkspaces.slice(0, 1000);
+
     // Remove the bulky legacy copies only after IndexedDB has had a chance to
     // receive them. This also gives localStorage quota back to the rest of app.
     try { localStorage.removeItem(SAVED_DEFINITIONS_KEY); } catch {}
@@ -6749,6 +8471,10 @@ async function hydrateReaderAnnotationStores() {
     if (app.querySelector('#reader')) {
       renderNavigationPane();
       applySavedDefinitionHighlights();
+      applySavedPassageHighlights();
+      applySavedReaderWritingOverlays();
+      applySavedReaderDrawings();
+      applySavedReaderWorkspaces();
     }
   } catch (error) {
     console.warn('Reader annotation migration could not complete.', error);
@@ -6780,6 +8506,1072 @@ function applySavedDefinitionHighlights() {
   app.querySelectorAll('.reader-word[data-index]').forEach((element) => {
     element.classList.toggle('saved-definition-word', indexes.has(element.dataset.index));
   });
+}
+
+
+function normalizePassageHighlightColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : '#F7D34A';
+}
+
+function passageHighlightsForCurrentDocument() {
+  if (!state.documentId) return [];
+  return readerHighlightsCache.filter((item) => item.documentId === state.documentId);
+}
+
+function savePassageHighlights(items) {
+  readerHighlightsCache = (Array.isArray(items) ? items : []).slice(0, 5000);
+  void persistReaderAnnotationRecord(READER_HIGHLIGHTS_CACHE_KEY, readerHighlightsCache);
+  return true;
+}
+
+function mergePassageHighlightRanges(items) {
+  const sorted = [...items].sort((a,b) => Number(a.startIndex)-Number(b.startIndex) || Number(a.endIndex)-Number(b.endIndex));
+  const merged = [];
+  for (const item of sorted) {
+    const start = Math.max(0, Number(item.startIndex) || 0);
+    const end = Math.max(start + 1, Number(item.endIndex) || start + 1);
+    const color = normalizePassageHighlightColor(item.color);
+    const previous = merged[merged.length - 1];
+    if (previous && previous.documentId === item.documentId && previous.color === color && start <= previous.endIndex) {
+      previous.endIndex = Math.max(previous.endIndex, end);
+      previous.updatedAt = new Date().toISOString();
+    } else {
+      merged.push({...item, startIndex:start, endIndex:end, color});
+    }
+  }
+  return merged;
+}
+
+function subtractPassageHighlightRange(items, documentId, startIndex, endIndex) {
+  const result = [];
+  for (const item of items) {
+    if (item.documentId !== documentId) { result.push(item); continue; }
+    const start = Number(item.startIndex) || 0;
+    const end = Math.max(start + 1, Number(item.endIndex) || start + 1);
+    if (end <= startIndex || start >= endIndex) { result.push(item); continue; }
+    if (start < startIndex) {
+      result.push({...item, id:`${item.id || 'hl'}-l-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, endIndex:startIndex});
+    }
+    if (end > endIndex) {
+      result.push({...item, id:`${item.id || 'hl'}-r-${Date.now()}-${Math.random().toString(36).slice(2,6)}`, startIndex:endIndex});
+    }
+  }
+  return result;
+}
+
+function applySavedPassageHighlights() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return;
+  const highlights = passageHighlightsForCurrentDocument();
+
+  reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]').forEach((element) => {
+    element.classList.remove('saved-passage-highlight');
+    element.style.removeProperty('--saved-passage-highlight-color');
+    delete element.dataset.savedPassageHighlight;
+
+    const elementStart = Number(element.dataset.index ?? element.dataset.startIndex);
+    const explicitEnd = Number(element.dataset.endIndex);
+    const elementEnd = Number.isFinite(explicitEnd) ? explicitEnd : elementStart + 1;
+    if (!Number.isFinite(elementStart)) return;
+
+    // Later highlights win if old records somehow overlap.
+    const hit = [...highlights].reverse().find((item) => {
+      const start = Number(item.startIndex) || 0;
+      const end = Math.max(start + 1, Number(item.endIndex) || start + 1);
+      return elementStart < end && elementEnd > start;
+    });
+    if (!hit) return;
+
+    element.classList.add('saved-passage-highlight');
+    element.style.setProperty('--saved-passage-highlight-color', normalizePassageHighlightColor(hit.color));
+    element.dataset.savedPassageHighlight = hit.id || 'saved';
+  });
+}
+
+function addSavedPassageHighlight(selectionData, color) {
+  if (!selectionData?.documentId) return false;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  let items = subtractPassageHighlightRange(readerHighlightsCache, selectionData.documentId, startIndex, endIndex);
+  items.push({
+    id:`passage-highlight-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    documentId:selectionData.documentId,
+    title:selectionData.title || state.title || '',
+    chapter:selectionData.chapter || '',
+    text:selectionData.text || '',
+    startIndex,
+    endIndex,
+    color:normalizePassageHighlightColor(color),
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  });
+  savePassageHighlights(mergePassageHighlightRanges(items));
+  applySavedPassageHighlights();
+  return true;
+}
+
+function eraseSavedPassageHighlight(selectionData) {
+  if (!selectionData?.documentId) return false;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  const next = subtractPassageHighlightRange(readerHighlightsCache, selectionData.documentId, startIndex, endIndex);
+  const changed = next.length !== readerHighlightsCache.length || next.some((item, index) => {
+    const before = readerHighlightsCache[index];
+    return !before || before.startIndex !== item.startIndex || before.endIndex !== item.endIndex;
+  });
+  savePassageHighlights(mergePassageHighlightRanges(next));
+  applySavedPassageHighlights();
+  return changed;
+}
+
+
+function normalizeReaderWritingFontSize(value) {
+  const size = Math.round(Number(value) || 16);
+  return Math.min(32, Math.max(12, size));
+}
+
+function normalizeReaderWritingColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : '#C98900';
+}
+
+function readerWritingForCurrentDocument() {
+  if (!state.documentId) return [];
+  return readerWritingCache.filter((item) => item.documentId === state.documentId);
+}
+
+function saveReaderWriting(items) {
+  readerWritingCache = (Array.isArray(items) ? items : []).slice(0, 3000);
+  void persistReaderAnnotationRecord(READER_WRITING_CACHE_KEY, readerWritingCache);
+  return true;
+}
+
+function ensureReaderWritingLayer(reader) {
+  if (!reader) return null;
+  let layer = reader.querySelector(':scope > [data-reader-writing-layer]');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.className = 'reader-writing-layer';
+    layer.dataset.readerWritingLayer = 'true';
+    layer.setAttribute('aria-label','Written annotations');
+    reader.appendChild(layer);
+  }
+  return layer;
+}
+
+function readerElementRange(element) {
+  const start = Number(element?.dataset?.index ?? element?.dataset?.startIndex);
+  if (!Number.isFinite(start)) return null;
+  const explicitEnd = Number(element?.dataset?.endIndex);
+  return { start, end:Number.isFinite(explicitEnd) ? explicitEnd : start + 1 };
+}
+
+function findReaderAnchorForWriting(reader, item) {
+  const startIndex = Math.max(0, Number(item.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(item.endIndex) || startIndex + 1);
+  const candidates = reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]');
+  let firstOverlap = null;
+  for (const element of candidates) {
+    const range = readerElementRange(element);
+    if (!range) continue;
+    if (range.start <= startIndex && range.end > startIndex) return element;
+    if (!firstOverlap && range.start < endIndex && range.end > startIndex) firstOverlap = element;
+  }
+  return firstOverlap;
+}
+
+function positionReaderWritingOverlay(reader, element, item) {
+  const anchor = findReaderAnchorForWriting(reader, item);
+  if (!anchor) {
+    element.hidden = true;
+    return;
+  }
+  element.hidden = false;
+  const readerRect = reader.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+  const computed = getComputedStyle(reader);
+  const lineHeight = parseFloat(computed.lineHeight) || anchorRect.height || 24;
+  const rawLeft = anchorRect.left - readerRect.left + reader.scrollLeft;
+  // Keep the annotation box inside the visible reader width. The fixed minimum
+  // width prevents ordinary note text from collapsing into a vertical column.
+  const overlayWidth = Math.min(360, Math.max(180, reader.clientWidth * .28));
+  const maxLeft = Math.max(reader.scrollLeft, reader.scrollLeft + reader.clientWidth - overlayWidth - 12);
+  const left = Math.min(Math.max(reader.scrollLeft + 6, rawLeft), maxLeft);
+  // Place the writing just above the selected line when room exists; otherwise
+  // float it immediately below. It never changes document layout.
+  const preferredTop = anchorRect.top - readerRect.top + reader.scrollTop - Math.max(16, lineHeight * .72);
+  const belowTop = anchorRect.bottom - readerRect.top + reader.scrollTop + 2;
+  const top = preferredTop >= reader.scrollTop + 2 ? preferredTop : belowTop;
+  element.style.left = `${Math.max(0,left)}px`;
+  element.style.top = `${Math.max(0,top)}px`;
+  element.style.setProperty('--reader-writing-color', normalizeReaderWritingColor(item.color));
+  element.style.setProperty('--reader-writing-font-size', `${normalizeReaderWritingFontSize(item.fontSize)}px`);
+}
+
+function applySavedReaderWritingOverlays() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return;
+  const items = readerWritingForCurrentDocument();
+  let layer = reader.querySelector(':scope > [data-reader-writing-layer]');
+  if (!items.length) {
+    layer?.remove();
+    return;
+  }
+  layer = ensureReaderWritingLayer(reader);
+  if (!layer) return;
+
+  const liveIds = new Set(items.map((item)=>String(item.id)));
+  layer.querySelectorAll('[data-reader-writing-id]').forEach((element)=>{
+    if (!liveIds.has(element.dataset.readerWritingId)) element.remove();
+  });
+
+  for (const item of items) {
+    let element = layer.querySelector(`[data-reader-writing-id="${CSS.escape(String(item.id))}"]`);
+    if (!element) {
+      element = document.createElement('span');
+      element.className = 'reader-written-annotation';
+      element.dataset.readerWritingId = String(item.id);
+      element.setAttribute('role','note');
+      layer.appendChild(element);
+    }
+    element.textContent = String(item.text || '').trim();
+    element.title = `Written annotation: ${String(item.text || '').trim()}`;
+    positionReaderWritingOverlay(reader, element, item);
+  }
+}
+
+function addSavedReaderWriting(selectionData, text, color, fontSize = 16) {
+  if (!selectionData?.documentId) return false;
+  const cleanText = String(text || '').trim();
+  if (!cleanText) return false;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  readerWritingCache.push({
+    id:`reader-writing-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    documentId:selectionData.documentId,
+    title:selectionData.title || state.title || '',
+    chapter:selectionData.chapter || '',
+    anchorText:selectionData.text || '',
+    startIndex,
+    endIndex,
+    text:cleanText.slice(0,500),
+    color:normalizeReaderWritingColor(color),
+    fontSize:normalizeReaderWritingFontSize(fontSize),
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  });
+  saveReaderWriting(readerWritingCache);
+  applySavedReaderWritingOverlays();
+  return true;
+}
+
+function eraseSavedReaderWriting(selectionData) {
+  if (!selectionData?.documentId) return 0;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  const before = readerWritingCache.length;
+  saveReaderWriting(readerWritingCache.filter((item)=>{
+    if (item.documentId !== selectionData.documentId) return true;
+    const start = Math.max(0, Number(item.startIndex) || 0);
+    const end = Math.max(start + 1, Number(item.endIndex) || start + 1);
+    return end <= startIndex || start >= endIndex;
+  }));
+  applySavedReaderWritingOverlays();
+  return before - readerWritingCache.length;
+}
+
+function eraseSavedReaderAnnotations(selectionData) {
+  const beforeHighlights = JSON.stringify(readerHighlightsCache);
+  eraseSavedPassageHighlight(selectionData);
+  const writingRemoved = eraseSavedReaderWriting(selectionData);
+  const drawingRemoved = eraseSavedReaderDrawingsBySelection(selectionData);
+  const highlightChanged = beforeHighlights !== JSON.stringify(readerHighlightsCache);
+  return { highlightChanged, writingRemoved, drawingRemoved };
+}
+
+
+function normalizeReaderDrawingColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : '#E9B949';
+}
+
+function normalizeReaderDrawingThickness(value) {
+  const thickness = Number(value) || 4;
+  return Math.min(18, Math.max(1, thickness));
+}
+
+function readerDrawingsForCurrentDocument() {
+  if (!state.documentId) return [];
+  return readerDrawingCache.filter((item) => item.documentId === state.documentId);
+}
+
+function saveReaderDrawings(items) {
+  readerDrawingCache = (Array.isArray(items) ? items : []).slice(0, 5000);
+  void persistReaderAnnotationRecord(READER_DRAWING_CACHE_KEY, readerDrawingCache);
+  return true;
+}
+
+function readerContentPoint(reader, clientX, clientY) {
+  const rect = reader.getBoundingClientRect();
+  return {
+    x: clientX - rect.left + reader.scrollLeft,
+    y: clientY - rect.top + reader.scrollTop
+  };
+}
+
+function renderedReaderAnchors(reader) {
+  return [...reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]')];
+}
+
+function nearestReaderDrawingAnchor(reader, clientX, clientY) {
+  const anchors = renderedReaderAnchors(reader);
+  if (!anchors.length) return null;
+  let best = null;
+  let bestDistance = Infinity;
+  for (const element of anchors) {
+    const range = readerElementRange(element);
+    if (!range) continue;
+    const rect = element.getBoundingClientRect();
+    const dx = clientX < rect.left ? rect.left - clientX : clientX > rect.right ? clientX - rect.right : 0;
+    const dy = clientY < rect.top ? rect.top - clientY : clientY > rect.bottom ? clientY - rect.bottom : 0;
+    const distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = { element, index: range.start };
+    }
+  }
+  return best;
+}
+
+function ensureReaderDrawingLayer(reader) {
+  if (!reader) return null;
+  let layer = reader.querySelector(':scope > [data-reader-drawing-layer]');
+  if (!layer) {
+    layer = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    layer.classList.add('reader-drawing-layer');
+    layer.dataset.readerDrawingLayer = 'true';
+    layer.setAttribute('aria-label','Freehand annotations');
+    reader.appendChild(layer);
+  }
+  layer.setAttribute('width', String(Math.max(reader.clientWidth, reader.scrollWidth)));
+  layer.setAttribute('height', String(Math.max(reader.clientHeight, reader.scrollHeight)));
+  layer.setAttribute('viewBox', `0 0 ${Math.max(reader.clientWidth, reader.scrollWidth)} ${Math.max(reader.clientHeight, reader.scrollHeight)}`);
+  return layer;
+}
+
+function readerDrawingAnchorElement(reader, item) {
+  const index = Number(item.anchorIndex);
+  if (!Number.isFinite(index)) return null;
+  for (const element of renderedReaderAnchors(reader)) {
+    const range = readerElementRange(element);
+    if (range && range.start <= index && range.end > index) return element;
+  }
+  return null;
+}
+
+function readerDrawingAbsolutePoints(reader, item) {
+  const anchor = readerDrawingAnchorElement(reader, item);
+  if (!anchor) return null;
+  const readerRect = reader.getBoundingClientRect();
+  const anchorRect = anchor.getBoundingClientRect();
+  const anchorX = anchorRect.left - readerRect.left + reader.scrollLeft;
+  const anchorY = anchorRect.top - readerRect.top + reader.scrollTop;
+  const baseFontSize = Math.max(1, Number(item.baseFontSize) || 16);
+  const currentFontSize = Math.max(1, parseFloat(getComputedStyle(anchor).fontSize) || parseFloat(getComputedStyle(reader).fontSize) || baseFontSize);
+  const scale = Math.max(.55, Math.min(2.5, currentFontSize / baseFontSize));
+  return (Array.isArray(item.points) ? item.points : []).map((point) => ({
+    x: anchorX + (Number(point.dx) || 0) * scale,
+    y: anchorY + (Number(point.dy) || 0) * scale
+  }));
+}
+
+function readerDrawingPathData(points) {
+  if (!points?.length) return '';
+  if (points.length === 1) return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)} l .01 .01`;
+  let d = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  for (let i = 1; i < points.length; i += 1) d += ` L ${points[i].x.toFixed(2)} ${points[i].y.toFixed(2)}`;
+  return d;
+}
+
+function applySavedReaderDrawings() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return;
+  const items = readerDrawingsForCurrentDocument();
+  let layer = reader.querySelector(':scope > [data-reader-drawing-layer]');
+  if (!items.length && !state.readerDrawingMode) {
+    if (layer) {
+      layer.querySelectorAll('[data-reader-drawing-id], [data-reader-drawing-preview]').forEach((element)=>element.remove());
+      layer.classList.remove('drawing-active','erasing-active');
+    }
+    return;
+  }
+  layer = ensureReaderDrawingLayer(reader);
+  if (!layer) return;
+  const liveIds = new Set(items.map((item) => String(item.id)));
+  layer.querySelectorAll('[data-reader-drawing-id]').forEach((path) => {
+    if (!liveIds.has(path.dataset.readerDrawingId)) path.remove();
+  });
+  for (const item of items) {
+    let path = layer.querySelector(`[data-reader-drawing-id="${CSS.escape(String(item.id))}"]`);
+    if (!path) {
+      path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      path.classList.add('reader-drawing-stroke');
+      path.dataset.readerDrawingId = String(item.id);
+      layer.appendChild(path);
+    }
+    const points = readerDrawingAbsolutePoints(reader, item);
+    if (!points?.length) {
+      path.style.display = 'none';
+      continue;
+    }
+    path.style.display = '';
+    path.setAttribute('d', readerDrawingPathData(points));
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', normalizeReaderDrawingColor(item.color));
+    path.setAttribute('stroke-width', String(normalizeReaderDrawingThickness(item.thickness)));
+    path.setAttribute('stroke-linecap','round');
+    path.setAttribute('stroke-linejoin','round');
+  }
+  layer.classList.toggle('drawing-active', state.readerDrawingMode === 'draw');
+  layer.classList.toggle('erasing-active', state.readerDrawingMode === 'erase');
+  bindReaderDrawingSurface(reader);
+}
+
+function addSavedReaderDrawing(stroke) {
+  if (!stroke?.documentId || !Array.isArray(stroke.points) || !stroke.points.length) return false;
+  readerDrawingCache.push({
+    id:`reader-drawing-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    documentId:stroke.documentId,
+    title:state.title || '',
+    anchorIndex:Number(stroke.anchorIndex) || 0,
+    baseFontSize:Number(stroke.baseFontSize) || 16,
+    color:normalizeReaderDrawingColor(stroke.color),
+    thickness:normalizeReaderDrawingThickness(stroke.thickness),
+    points:stroke.points.slice(0, 5000),
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  });
+  saveReaderDrawings(readerDrawingCache);
+  applySavedReaderDrawings();
+  return true;
+}
+
+function eraseSavedReaderDrawingById(id) {
+  const before = readerDrawingCache.length;
+  saveReaderDrawings(readerDrawingCache.filter((item) => String(item.id) !== String(id)));
+  applySavedReaderDrawings();
+  return before !== readerDrawingCache.length;
+}
+
+function eraseSavedReaderDrawingsBySelection(selectionData) {
+  if (!selectionData?.documentId) return 0;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  const before = readerDrawingCache.length;
+  saveReaderDrawings(readerDrawingCache.filter((item) => {
+    if (item.documentId !== selectionData.documentId) return true;
+    const anchorIndex = Math.max(0, Number(item.anchorIndex) || 0);
+    return anchorIndex < startIndex || anchorIndex >= endIndex;
+  }));
+  applySavedReaderDrawings();
+  return before - readerDrawingCache.length;
+}
+
+function hitTestReaderDrawing(reader, clientX, clientY, radius = 14) {
+  const point = readerContentPoint(reader, clientX, clientY);
+  let best = null;
+  let bestDistance = Infinity;
+  for (const item of readerDrawingsForCurrentDocument()) {
+    const points = readerDrawingAbsolutePoints(reader, item);
+    if (!points?.length) continue;
+    for (const candidate of points) {
+      const dx = candidate.x - point.x;
+      const dy = candidate.y - point.y;
+      const distance = Math.sqrt(dx*dx + dy*dy);
+      if (distance <= radius + normalizeReaderDrawingThickness(item.thickness) / 2 && distance < bestDistance) {
+        best = item;
+        bestDistance = distance;
+      }
+    }
+  }
+  return best;
+}
+
+function ensureReaderDrawingFloatbar(reader) {
+  const frame = reader.closest('#reader-frame') || reader.parentElement;
+  if (!frame) return null;
+  let bar = frame.querySelector(':scope > [data-reader-drawing-floatbar]');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.className = 'reader-drawing-floatbar';
+    bar.dataset.readerDrawingFloatbar = 'true';
+    bar.innerHTML = `<strong>Free Draw</strong><button type="button" data-drawing-tool="draw">✎ Draw</button><button type="button" data-drawing-tool="erase">⌫ Erase</button><label>Color <input type="color" data-drawing-float-color value="#E9B949"></label><label>Thickness <select data-drawing-float-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><button type="button" data-drawing-done>Done</button>`;
+    frame.appendChild(bar);
+    bar.querySelectorAll('[data-drawing-tool]').forEach((button)=>button.addEventListener('click',()=>{
+      state.readerDrawingMode = button.dataset.drawingTool;
+      bar.querySelectorAll('[data-drawing-tool]').forEach((choice)=>choice.classList.toggle('active', choice === button));
+      applySavedReaderDrawings();
+    }));
+    bar.querySelector('[data-drawing-float-color]')?.addEventListener('input',(event)=>{ state.readerDrawingColor = normalizeReaderDrawingColor(event.currentTarget.value); });
+    bar.querySelector('[data-drawing-float-thickness]')?.addEventListener('change',(event)=>{ state.readerDrawingThickness = normalizeReaderDrawingThickness(event.currentTarget.value); });
+    bar.querySelector('[data-drawing-done]')?.addEventListener('click',()=>stopReaderDrawingMode());
+  }
+  return bar;
+}
+
+function startReaderDrawingMode({ color = '#E9B949', thickness = 4 } = {}) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !state.documentId) return false;
+  if (isReaderRunning()) pauseReader();
+  state.readerDrawingMode = 'draw';
+  state.readerDrawingColor = normalizeReaderDrawingColor(color);
+  state.readerDrawingThickness = normalizeReaderDrawingThickness(thickness);
+  const bar = ensureReaderDrawingFloatbar(reader);
+  if (bar) {
+    bar.hidden = false;
+    const colorInput = bar.querySelector('[data-drawing-float-color]');
+    const thicknessInput = bar.querySelector('[data-drawing-float-thickness]');
+    if (colorInput) colorInput.value = state.readerDrawingColor;
+    if (thicknessInput) thicknessInput.value = String(state.readerDrawingThickness);
+    bar.querySelectorAll('[data-drawing-tool]').forEach((choice)=>choice.classList.toggle('active', choice.dataset.drawingTool === 'draw'));
+  }
+  applySavedReaderDrawings();
+  updateReaderStatus('Free Draw active. Draw with the mouse or touch. Choose Erase to remove strokes, then Done when finished.');
+  return true;
+}
+
+function stopReaderDrawingMode() {
+  state.readerDrawingMode = null;
+  state.readerDrawingStroke = null;
+  const reader = app.querySelector('#reader');
+  const frame = reader?.closest('#reader-frame') || reader?.parentElement;
+  const bar = frame?.querySelector(':scope > [data-reader-drawing-floatbar]');
+  if (bar) bar.hidden = true;
+  applySavedReaderDrawings();
+  updateReaderStatus('Free Draw finished.');
+}
+
+function updateReaderDrawingPreview(layer, stroke) {
+  if (!layer || !stroke) return;
+  let path = layer.querySelector('[data-reader-drawing-preview]');
+  if (!path) {
+    path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.dataset.readerDrawingPreview = 'true';
+    path.classList.add('reader-drawing-stroke','reader-drawing-preview');
+    layer.appendChild(path);
+  }
+  const points = stroke.points.map((point)=>({x:stroke.anchorX + point.dx, y:stroke.anchorY + point.dy}));
+  path.setAttribute('d', readerDrawingPathData(points));
+  path.setAttribute('fill','none');
+  path.setAttribute('stroke', normalizeReaderDrawingColor(stroke.color));
+  path.setAttribute('stroke-width', String(normalizeReaderDrawingThickness(stroke.thickness)));
+  path.setAttribute('stroke-linecap','round');
+  path.setAttribute('stroke-linejoin','round');
+}
+
+function clearReaderDrawingPreview(layer) {
+  layer?.querySelector('[data-reader-drawing-preview]')?.remove();
+}
+
+function bindReaderDrawingSurface(reader) {
+  if (!reader) return;
+  const layer = ensureReaderDrawingLayer(reader);
+  if (!layer || layer.dataset.readerDrawingBound === 'true') return;
+  // The virtual Reader can replace this SVG layer. Bind the layer itself, not
+  // the long-lived Reader element, so a newly-created surface gets handlers.
+  layer.dataset.readerDrawingBound = 'true';
+
+  const pointerDown = (event) => {
+    if (!state.readerDrawingMode) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (state.readerDrawingMode === 'erase') {
+      const hit = hitTestReaderDrawing(reader, event.clientX, event.clientY, 16);
+      if (hit) eraseSavedReaderDrawingById(hit.id);
+      return;
+    }
+    const anchor = nearestReaderDrawingAnchor(reader, event.clientX, event.clientY);
+    if (!anchor) return;
+    const readerRect = reader.getBoundingClientRect();
+    const anchorRect = anchor.element.getBoundingClientRect();
+    const anchorX = anchorRect.left - readerRect.left + reader.scrollLeft;
+    const anchorY = anchorRect.top - readerRect.top + reader.scrollTop;
+    const point = readerContentPoint(reader, event.clientX, event.clientY);
+    const baseFontSize = parseFloat(getComputedStyle(anchor.element).fontSize) || parseFloat(getComputedStyle(reader).fontSize) || 16;
+    state.readerDrawingStroke = {
+      pointerId:event.pointerId,
+      documentId:state.documentId,
+      anchorIndex:anchor.index,
+      baseFontSize,
+      color:state.readerDrawingColor || '#E9B949',
+      thickness:state.readerDrawingThickness || 4,
+      anchorX,
+      anchorY,
+      points:[{dx:point.x-anchorX, dy:point.y-anchorY}]
+    };
+    updateReaderDrawingPreview(layer, state.readerDrawingStroke);
+    try { layer.setPointerCapture(event.pointerId); } catch {}
+  };
+
+  const pointerMove = (event) => {
+    if (!state.readerDrawingMode) return;
+    if (state.readerDrawingMode === 'erase' && (event.buttons || event.pressure > 0)) {
+      event.preventDefault();
+      event.stopPropagation();
+      const hit = hitTestReaderDrawing(reader, event.clientX, event.clientY, 18);
+      if (hit) eraseSavedReaderDrawingById(hit.id);
+      return;
+    }
+    const stroke = state.readerDrawingStroke;
+    if (!stroke || stroke.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const point = readerContentPoint(reader, event.clientX, event.clientY);
+    const last = stroke.points[stroke.points.length - 1];
+    const next = {dx:point.x-stroke.anchorX, dy:point.y-stroke.anchorY};
+    if (!last || Math.hypot(next.dx-last.dx, next.dy-last.dy) >= 1.4) {
+      stroke.points.push(next);
+      updateReaderDrawingPreview(layer, stroke);
+    }
+  };
+
+  const pointerUp = (event) => {
+    const stroke = state.readerDrawingStroke;
+    if (!stroke || stroke.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    state.readerDrawingStroke = null;
+    clearReaderDrawingPreview(layer);
+    try { layer.releasePointerCapture(event.pointerId); } catch {}
+    addSavedReaderDrawing(stroke);
+  };
+
+  layer.addEventListener('pointerdown', pointerDown);
+  layer.addEventListener('pointermove', pointerMove);
+  layer.addEventListener('pointerup', pointerUp);
+  layer.addEventListener('pointercancel', pointerUp);
+}
+
+// Reader inserted workspaces --------------------------------------------------
+// A workspace is an annotation block anchored to a document word. It is inserted
+// into the Reader's normal flow, so it reserves real space without changing the
+// underlying book text. Removing it restores the original layout.
+function readerWorkspacesForCurrentDocument() {
+  if (!state.documentId) return [];
+  return readerWorkspaceCache.filter((item) => item.documentId === state.documentId);
+}
+
+function saveReaderWorkspaces(items) {
+  readerWorkspaceCache = (Array.isArray(items) ? items : []).slice(0, 1000);
+  void persistReaderAnnotationRecord(READER_WORKSPACE_CACHE_KEY, readerWorkspaceCache);
+  return true;
+}
+
+function normalizeReaderWorkspaceHeight(value) {
+  return Math.max(140, Math.min(1200, Number(value) || 280));
+}
+
+function normalizeReaderWorkspaceWidth(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? Math.max(220, Math.min(1200, number)) : 0;
+}
+
+function normalizeReaderWorkspaceX(value) {
+  return Math.max(0, Math.min(1, Number(value) || 0));
+}
+
+function addSavedReaderWorkspace(selectionData, height = 280) {
+  if (!selectionData?.documentId) return false;
+  const startIndex = Math.max(0, Number(selectionData.startIndex) || 0);
+  const endIndex = Math.max(startIndex + 1, Number(selectionData.endIndex) || startIndex + 1);
+  readerWorkspaceCache.push({
+    id:`reader-workspace-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+    documentId:selectionData.documentId,
+    title:state.title || '',
+    anchorIndex:endIndex - 1,
+    height:normalizeReaderWorkspaceHeight(height),
+    width:0,
+    x:0,
+    note:'',
+    noteColor:'#0C2340',
+    photoDataUrl:'',
+    photoName:'',
+    strokes:[],
+    collapsed:false,
+    createdAt:new Date().toISOString(),
+    updatedAt:new Date().toISOString()
+  });
+  saveReaderWorkspaces(readerWorkspaceCache);
+  applySavedReaderWorkspaces();
+  return true;
+}
+
+function updateSavedReaderWorkspace(id, patch) {
+  const item = readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
+  if (!item) return false;
+  Object.assign(item, patch || {}, {updatedAt:new Date().toISOString()});
+  if ('height' in (patch || {})) item.height = normalizeReaderWorkspaceHeight(item.height);
+  if ('width' in (patch || {})) item.width = normalizeReaderWorkspaceWidth(item.width);
+  if ('x' in (patch || {})) item.x = normalizeReaderWorkspaceX(item.x);
+  saveReaderWorkspaces(readerWorkspaceCache);
+  return true;
+}
+
+function deleteSavedReaderWorkspace(id) {
+  const before = readerWorkspaceCache.length;
+  saveReaderWorkspaces(readerWorkspaceCache.filter((item)=>String(item.id)!==String(id)));
+  applySavedReaderWorkspaces();
+  return readerWorkspaceCache.length !== before;
+}
+
+function readerWorkspaceAnchorElement(reader, item) {
+  const index = Number(item.anchorIndex);
+  if (!Number.isFinite(index)) return null;
+  // Prefer a word so the workspace follows the exact selection location. If the
+  // current renderer only exposes groups, fall back to the matching group.
+  const words = [...reader.querySelectorAll('.reader-word[data-index]')];
+  for (const element of words) {
+    const range = readerElementRange(element);
+    if (range && range.start <= index && range.end > index) return element;
+  }
+  for (const element of reader.querySelectorAll('.reader-group[data-start-index]')) {
+    const range = readerElementRange(element);
+    if (range && range.start <= index && range.end > index) return element;
+  }
+  return null;
+}
+
+function readerWorkspaceStrokePath(stroke, width, height) {
+  const points = Array.isArray(stroke?.points) ? stroke.points : [];
+  if (!points.length) return '';
+  const abs = points.map((point)=>({x:(Number(point.x)||0)*width, y:(Number(point.y)||0)*height}));
+  return readerDrawingPathData(abs);
+}
+
+function renderReaderWorkspaceStrokes(block, item) {
+  const svg = block.querySelector('[data-workspace-drawing-layer]');
+  if (!svg) return;
+  const rect = svg.getBoundingClientRect();
+  const width = Math.max(1, rect.width || block.clientWidth);
+  const height = Math.max(1, rect.height || block.clientHeight);
+  svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+  svg.innerHTML = (Array.isArray(item.strokes) ? item.strokes : []).map((stroke)=>
+    `<path d="${escapeHtml(readerWorkspaceStrokePath(stroke,width,height))}" fill="none" stroke="${escapeHtml(normalizeReaderDrawingColor(stroke.color))}" stroke-width="${normalizeReaderDrawingThickness(stroke.thickness)}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>`
+  ).join('');
+}
+
+function readerWorkspaceLane(reader) {
+  // Workspaces live inside a single reading lane. In normal scrolling mode the
+  // lane is the visible Reader viewport; in Book Pages it is ONE virtual page,
+  // never the full two-page spread. This keeps inserted markup looking like
+  // part of the page instead of spanning across the gutter/facing page.
+  const gutter = 9;
+  const fullViewportWidth = Math.max(0, Number(reader?.clientWidth) || 0);
+  const bookPages = Boolean(reader?.classList?.contains('book-pages-layout'));
+  const pageWidth = bookPages ? Math.max(1, getBookPageMetrics(reader).pageWidth) : fullViewportWidth;
+  const laneWidth = Math.max(1, pageWidth - (gutter * 2));
+  return { gutter, viewportWidth: pageWidth, laneWidth, bookPages };
+}
+
+function applyReaderWorkspaceGeometry(block, item) {
+  const reader = block.closest('#reader');
+  if (!reader) return;
+  const { gutter, laneWidth } = readerWorkspaceLane(reader);
+  const minWidth = Math.min(220, laneWidth);
+  const requestedWidth = normalizeReaderWorkspaceWidth(item?.width);
+  const width = Math.max(minWidth, Math.min(laneWidth, requestedWidth || laneWidth));
+  const availableX = Math.max(0, laneWidth - width);
+  const left = gutter + (normalizeReaderWorkspaceX(item?.x) * availableX);
+  block.style.width = `${width}px`;
+  block.style.maxWidth = `${laneWidth}px`;
+  block.style.marginLeft = `${left}px`;
+  block.style.marginRight = '0';
+  block.style.minHeight = `${normalizeReaderWorkspaceHeight(item?.height)}px`;
+}
+
+function closestReaderWorkspaceAnchorIndex(reader, clientX, clientY, ignoredBlock) {
+  let bestIndex = null;
+  let bestDistance = Infinity;
+  const candidates = [...reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]')];
+  for (const element of candidates) {
+    if (ignoredBlock && ignoredBlock.contains(element)) continue;
+    const range = readerElementRange(element);
+    if (!range) continue;
+    const rect = element.getBoundingClientRect();
+    if (!rect.width && !rect.height) continue;
+    const cx = Math.max(rect.left, Math.min(clientX, rect.right));
+    const cy = Math.max(rect.top, Math.min(clientY, rect.bottom));
+    const distance = Math.hypot(clientX - cx, clientY - cy);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = Math.max(range.start, range.end - 1);
+    }
+  }
+  return bestIndex;
+}
+
+function bindReaderWorkspace(block, item) {
+  if (block.dataset.workspaceBound === 'true') return;
+  block.dataset.workspaceBound = 'true';
+  const id = item.id;
+  const note = block.querySelector('[data-workspace-note]');
+  const photoInput = block.querySelector('[data-workspace-photo-input]');
+  const drawLayer = block.querySelector('[data-workspace-drawing-layer]');
+  let drawMode = false;
+  let stroke = null;
+  let moveState = null;
+  let resizeState = null;
+  let suppressOpenUntil = 0;
+
+  const currentWorkspace = ()=>readerWorkspaceCache.find((entry)=>String(entry.id)===String(id)) || item;
+
+  const beginWorkspaceMove = (event)=>{
+    if (event.button != null && event.button !== 0) return;
+    event.preventDefault(); event.stopPropagation();
+    const reader = block.closest('#reader');
+    if (!reader) return;
+    const rect = block.getBoundingClientRect();
+    moveState={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,dx:0,dy:0,moved:false,reader,rect};
+    block.classList.add('workspace-moving');
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch {}
+  };
+  const moveWorkspace = (event)=>{
+    if (!moveState || moveState.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    moveState.dx=event.clientX-moveState.startX; moveState.dy=event.clientY-moveState.startY;
+    if (Math.hypot(moveState.dx,moveState.dy)>5) moveState.moved=true;
+    if (moveState.moved) {
+      const readerRect = moveState.reader.getBoundingClientRect();
+      const { gutter } = readerWorkspaceLane(moveState.reader);
+      const minLeft = readerRect.left + gutter;
+      const maxLeft = Math.max(minLeft, readerRect.right - gutter - moveState.rect.width);
+      const desiredLeft = moveState.rect.left + moveState.dx;
+      const clampedLeft = Math.max(minLeft, Math.min(maxLeft, desiredLeft));
+      const clampedDx = clampedLeft - moveState.rect.left;
+      block.style.transform=`translate(${clampedDx}px, ${moveState.dy}px)`;
+      moveState.clampedDx=clampedDx;
+    }
+  };
+  const finishWorkspaceMove = (event)=>{
+    if (!moveState || moveState.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    const wasMoved=moveState.moved;
+    const reader=moveState.reader;
+    const current=currentWorkspace();
+    block.classList.remove('workspace-moving');
+    block.style.transform='';
+    if (wasMoved) {
+      suppressOpenUntil=Date.now()+350;
+      const anchorIndex=closestReaderWorkspaceAnchorIndex(reader,event.clientX,event.clientY,block);
+      const {gutter,laneWidth}=readerWorkspaceLane(reader);
+      const minWidth=Math.min(220,laneWidth);
+      const width=Math.max(minWidth,Math.min(laneWidth,block.getBoundingClientRect().width||normalizeReaderWorkspaceWidth(current.width)||laneWidth));
+      const availableX=Math.max(0,laneWidth-width);
+      const appliedDx=Number.isFinite(moveState.clampedDx)?moveState.clampedDx:moveState.dx;
+      const desiredLeft=Math.max(gutter,Math.min(gutter+availableX,(moveState.rect.left-reader.getBoundingClientRect().left)+appliedDx));
+      const x=availableX>0 ? (desiredLeft-gutter)/availableX : 0;
+      updateSavedReaderWorkspace(id,{...(Number.isFinite(anchorIndex)?{anchorIndex}:{}),x});
+      block.remove();
+      applySavedReaderWorkspaces();
+    }
+    moveState=null;
+  };
+
+  block.querySelectorAll('[data-workspace-move]').forEach((handle)=>{
+    handle.addEventListener('pointerdown',beginWorkspaceMove);
+    handle.addEventListener('pointermove',moveWorkspace);
+    handle.addEventListener('pointerup',finishWorkspaceMove);
+    handle.addEventListener('pointercancel',finishWorkspaceMove);
+  });
+
+  const resizeHandle=block.querySelector('[data-workspace-resize]');
+  resizeHandle?.addEventListener('pointerdown',(event)=>{
+    if (event.button != null && event.button !== 0) return;
+    event.preventDefault(); event.stopPropagation();
+    const rect=block.getBoundingClientRect();
+    resizeState={pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,startWidth:rect.width,startHeight:rect.height};
+    block.classList.add('workspace-resizing');
+    try { resizeHandle.setPointerCapture(event.pointerId); } catch {}
+  });
+  resizeHandle?.addEventListener('pointermove',(event)=>{
+    if (!resizeState || resizeState.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    const reader=block.closest('#reader');
+    if (!reader) return;
+    const {gutter,laneWidth}=readerWorkspaceLane(reader);
+    const readerRect=reader.getBoundingClientRect();
+    const currentLeft=Math.max(gutter,block.getBoundingClientRect().left-readerRect.left);
+    const maxWidth=Math.max(1,(gutter+laneWidth)-currentLeft);
+    const minWidth=Math.min(220,maxWidth);
+    const width=Math.max(minWidth,Math.min(maxWidth,resizeState.startWidth+(event.clientX-resizeState.startX)));
+    const height=normalizeReaderWorkspaceHeight(resizeState.startHeight+(event.clientY-resizeState.startY));
+    block.style.width=`${width}px`; block.style.minHeight=`${height}px`;
+    const current=currentWorkspace();
+    requestAnimationFrame(()=>renderReaderWorkspaceStrokes(block,{...current,width,height}));
+  });
+  const finishWorkspaceResize=(event)=>{
+    if (!resizeState || resizeState.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    block.classList.remove('workspace-resizing');
+    const width=normalizeReaderWorkspaceWidth(block.getBoundingClientRect().width);
+    const height=normalizeReaderWorkspaceHeight(block.getBoundingClientRect().height);
+    updateSavedReaderWorkspace(id,{width,height});
+    resizeState=null;
+    const current=currentWorkspace();
+    applyReaderWorkspaceGeometry(block,current);
+    renderReaderWorkspaceStrokes(block,current);
+  };
+  resizeHandle?.addEventListener('pointerup',finishWorkspaceResize);
+  resizeHandle?.addEventListener('pointercancel',finishWorkspaceResize);
+
+  const setWorkspaceCollapsed = (collapsed)=>{
+    const isCollapsed = Boolean(collapsed);
+    drawMode = false;
+    block.classList.remove('workspace-drawing-active');
+    block.querySelector('[data-workspace-draw-toggle]')?.classList.remove('active');
+    block.classList.toggle('workspace-collapsed', isCollapsed);
+    updateSavedReaderWorkspace(id,{collapsed:isCollapsed});
+    if (isCollapsed && note) note.hidden = !note.value.trim();
+  };
+  block.querySelector('[data-workspace-open]')?.addEventListener('click',(event)=>{
+    event.preventDefault(); event.stopPropagation();
+    if (Date.now() < suppressOpenUntil) return;
+    setWorkspaceCollapsed(false);
+  });
+  block.querySelector('[data-workspace-done]')?.addEventListener('click',(event)=>{
+    event.preventDefault(); event.stopPropagation();
+    setWorkspaceCollapsed(true);
+  });
+
+  block.querySelector('[data-workspace-text-toggle]')?.addEventListener('click',()=>{
+    note.hidden = !note.hidden;
+    if (!note.hidden) requestAnimationFrame(()=>note.focus());
+  });
+  note?.addEventListener('input',()=>updateSavedReaderWorkspace(id,{note:note.value}));
+  block.querySelector('[data-workspace-note-color]')?.addEventListener('input',(event)=>{
+    note.style.color = event.currentTarget.value;
+    updateSavedReaderWorkspace(id,{noteColor:event.currentTarget.value});
+  });
+  block.querySelector('[data-workspace-photo]')?.addEventListener('click',()=>photoInput?.click());
+  photoInput?.addEventListener('change',()=>{
+    const file = photoInput.files?.[0];
+    if (!file || !file.type.startsWith('image/')) return;
+    const readerFile = new FileReader();
+    readerFile.onload = ()=>{
+      updateSavedReaderWorkspace(id,{photoDataUrl:String(readerFile.result||''),photoName:file.name});
+      block.remove();
+      applySavedReaderWorkspaces();
+    };
+    readerFile.readAsDataURL(file);
+  });
+  block.querySelector('[data-workspace-remove-photo]')?.addEventListener('click',()=>{
+    updateSavedReaderWorkspace(id,{photoDataUrl:'',photoName:''});
+    block.remove();
+    applySavedReaderWorkspaces();
+  });
+  block.querySelector('[data-workspace-grow]')?.addEventListener('click',()=>{
+    const current=readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
+    const height=normalizeReaderWorkspaceHeight((current?.height||item.height||280)+80);
+    updateSavedReaderWorkspace(id,{height}); applyReaderWorkspaceGeometry(block,current||item); renderReaderWorkspaceStrokes(block,current||item);
+  });
+  block.querySelector('[data-workspace-shrink]')?.addEventListener('click',()=>{
+    const current=readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
+    const height=normalizeReaderWorkspaceHeight((current?.height||item.height||280)-80);
+    updateSavedReaderWorkspace(id,{height}); applyReaderWorkspaceGeometry(block,current||item); renderReaderWorkspaceStrokes(block,current||item);
+  });
+  block.querySelector('[data-workspace-delete]')?.addEventListener('click',()=>deleteSavedReaderWorkspace(id));
+  block.querySelector('[data-workspace-draw-toggle]')?.addEventListener('click',(event)=>{
+    drawMode = !drawMode;
+    block.classList.toggle('workspace-drawing-active',drawMode);
+    event.currentTarget.classList.toggle('active',drawMode);
+  });
+  block.querySelector('[data-workspace-clear-drawing]')?.addEventListener('click',()=>{
+    updateSavedReaderWorkspace(id,{strokes:[]});
+    const current = readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
+    if (current) renderReaderWorkspaceStrokes(block,current);
+  });
+
+  const pointFor = (event)=>{
+    const rect = drawLayer.getBoundingClientRect();
+    return {x:Math.max(0,Math.min(1,(event.clientX-rect.left)/Math.max(1,rect.width))), y:Math.max(0,Math.min(1,(event.clientY-rect.top)/Math.max(1,rect.height)))};
+  };
+  drawLayer?.addEventListener('pointerdown',(event)=>{
+    if (!drawMode) return;
+    event.preventDefault(); event.stopPropagation();
+    stroke={pointerId:event.pointerId,color:block.querySelector('[data-workspace-draw-color]')?.value||'#E9B949',thickness:block.querySelector('[data-workspace-draw-thickness]')?.value||4,points:[pointFor(event)]};
+    try { drawLayer.setPointerCapture(event.pointerId); } catch {}
+  });
+  drawLayer?.addEventListener('pointermove',(event)=>{
+    if (!stroke || stroke.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    const next=pointFor(event), last=stroke.points[stroke.points.length-1];
+    if (!last || Math.hypot(next.x-last.x,next.y-last.y)>.002) {
+      stroke.points.push(next);
+      const current = {...item, strokes:[...(item.strokes||[]), stroke]};
+      renderReaderWorkspaceStrokes(block,current);
+    }
+  });
+  const finishStroke=(event)=>{
+    if (!stroke || stroke.pointerId!==event.pointerId) return;
+    event.preventDefault(); event.stopPropagation();
+    const current = readerWorkspaceCache.find((entry)=>String(entry.id)===String(id));
+    if (current) {
+      current.strokes = [...(current.strokes||[]), stroke];
+      updateSavedReaderWorkspace(id,{strokes:current.strokes});
+      renderReaderWorkspaceStrokes(block,current);
+    }
+    try { drawLayer.releasePointerCapture(event.pointerId); } catch {}
+    stroke=null;
+  };
+  drawLayer?.addEventListener('pointerup',finishStroke);
+  drawLayer?.addEventListener('pointercancel',finishStroke);
+}
+
+function applySavedReaderWorkspaces() {
+  const reader = app.querySelector('#reader');
+  if (!reader) return;
+  const items = readerWorkspacesForCurrentDocument();
+  const liveIds = new Set(items.map((item)=>String(item.id)));
+  reader.querySelectorAll('[data-reader-workspace-id]').forEach((block)=>{
+    if (!liveIds.has(block.dataset.readerWorkspaceId)) block.remove();
+  });
+  for (const item of items) {
+    const anchor = readerWorkspaceAnchorElement(reader,item);
+    if (!anchor) continue;
+    let block = reader.querySelector(`[data-reader-workspace-id="${CSS.escape(String(item.id))}"]`);
+    const isNew = !block;
+    if (!block) {
+      block=document.createElement('section');
+      block.className='reader-inserted-workspace';
+      block.dataset.readerWorkspaceId=String(item.id);
+      block.innerHTML=`<button type="button" class="reader-workspace-tab" data-workspace-open data-workspace-move title="Click to edit; drag to move workspace" aria-label="Open or move workspace">✎</button><div class="reader-workspace-toolbar"><button type="button" class="reader-workspace-move" data-workspace-move title="Drag workspace to another location">↕ Move</button><strong>Workspace</strong><button type="button" data-workspace-text-toggle>Text</button><button type="button" data-workspace-draw-toggle>Draw</button><label class="reader-workspace-color">Color <input type="color" data-workspace-draw-color value="#E9B949"></label><label>Thickness <select data-workspace-draw-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label><button type="button" data-workspace-photo>Photo</button><input type="file" accept="image/*" data-workspace-photo-input hidden><button type="button" data-workspace-shrink title="Make workspace shorter">−</button><button type="button" data-workspace-grow title="Make workspace taller">＋</button><button type="button" data-workspace-clear-drawing>Clear drawing</button><button type="button" data-workspace-delete>Delete</button><button type="button" class="reader-workspace-done" data-workspace-done>Done</button></div><textarea class="reader-workspace-note" data-workspace-note placeholder="Write anything here…" style="color:${escapeHtml(item.noteColor||'#0C2340')}" ${item.note?'':'hidden'}>${escapeHtml(item.note||'')}</textarea>${item.photoDataUrl?`<figure class="reader-workspace-photo"><img src="${escapeHtml(item.photoDataUrl)}" alt="${escapeHtml(item.photoName||'Inserted image')}"><button type="button" data-workspace-remove-photo>Remove photo</button></figure>`:''}<label class="reader-workspace-note-color">Text color <input type="color" data-workspace-note-color value="${escapeHtml(item.noteColor||'#0C2340')}"></label><svg class="reader-workspace-drawing-layer" data-workspace-drawing-layer aria-label="Workspace drawing surface"></svg><button type="button" class="reader-workspace-resize" data-workspace-resize title="Drag to resize workspace" aria-label="Resize workspace"></button>`;
+    }
+    applyReaderWorkspaceGeometry(block,item);
+    // Workspaces are normally presentation-only: their chrome disappears and
+    // only the reader-created note/photo/drawing remains. Legacy workspaces
+    // without a collapsed flag default to this quiet presentation state.
+    block.classList.toggle('workspace-collapsed', item.collapsed !== false);
+    // Insert after the closest group when possible. This avoids placing a block
+    // inside a word span and gives CSS/book-page flow a real block boundary.
+    const group = anchor.closest('.reader-group');
+    const insertionAnchor = group || anchor;
+    if (block.previousElementSibling !== insertionAnchor) insertionAnchor.insertAdjacentElement('afterend',block);
+    if (isNew) bindReaderWorkspace(block,item);
+    requestAnimationFrame(()=>renderReaderWorkspaceStrokes(block,item));
+  }
+}
+
+function finishPassageHighlightAction() {
+  state.markPersistentSelection = null;
+  state.markSelection = null;
+  state.markSelectionLocked = false;
+  state.markSuppressNextReaderClick = false;
+  clearPersistentMarkSelection();
+  hideMarkToolbar();
+  const selection = window.getSelection?.();
+  if (selection?.rangeCount) selection.removeAllRanges();
+  requestAnimationFrame(applySavedPassageHighlights);
 }
 
 function removeSavedDefinition(id) {
@@ -7049,16 +9841,21 @@ async function clearRemovedBookReferences(removed) {
   const progress = readStoredObject(READING_PROGRESS_KEY);
   let progressChanged = false;
 
+  const removedDocumentIds = [];
   Object.entries(progress).forEach(([documentId, record]) => {
     if (
       (removedDocumentId && documentId === removedDocumentId)
       || sameBookIdentity(record?.title, removedTitle)
     ) {
       delete progress[documentId];
-      localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`);
+      removedDocumentIds.push(documentId);
       progressChanged = true;
     }
   });
+
+  if (removedDocumentIds.length) {
+    await Promise.all(removedDocumentIds.map((documentId) => removeStoredReaderDocument(documentId)));
+  }
 
   if (progressChanged) {
     localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progress));
@@ -7339,44 +10136,181 @@ function saveBookmarks(bookmarks) {
   setBookmarkCookie(trimmed);
 }
 
+function readerDocumentCacheKey(documentId) {
+  return `reader-document:${String(documentId || '')}`;
+}
+
+const readerDocumentMemoryCache = new Map();
+let readerDocumentMigrationPromise = null;
+
+function normalizeStoredReaderDocument(value, documentId = '') {
+  if (!value || typeof value !== 'object') return null;
+  const text = String(value.text || value.currentText || '');
+  if (!text) return null;
+  return {
+    documentId: String(value.documentId || documentId || ''),
+    title: String(value.title || 'Untitled'),
+    text,
+    source: value.source && typeof value.source === 'object' ? value.source : {}
+  };
+}
+
+function readLegacyStoredReaderDocument(documentId) {
+  if (!documentId) return null;
+  try {
+    return normalizeStoredReaderDocument(
+      JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'),
+      documentId
+    );
+  } catch {
+    return null;
+  }
+}
+
+function peekStoredReaderDocument(documentId) {
+  if (!documentId) return null;
+  return readerDocumentMemoryCache.get(String(documentId))
+    || readLegacyStoredReaderDocument(documentId)
+    || null;
+}
+
+async function persistStoredReaderDocument(documentId, value) {
+  const normalized = normalizeStoredReaderDocument(value, documentId);
+  if (!normalized?.documentId || !normalized.text) return false;
+
+  readerDocumentMemoryCache.set(normalized.documentId, normalized);
+
+  const stored = await cacheReadingBook({
+    key: readerDocumentCacheKey(normalized.documentId),
+    type: 'reader-document',
+    documentId: normalized.documentId,
+    title: normalized.title,
+    text: normalized.text,
+    source: normalized.source,
+    savedAt: new Date().toISOString()
+  });
+
+  if (stored) {
+    try { localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${normalized.documentId}`); } catch {}
+  }
+  return Boolean(stored);
+}
+
+async function getStoredReaderDocument(documentId) {
+  const id = String(documentId || '');
+  if (!id) return null;
+
+  const memory = readerDocumentMemoryCache.get(id);
+  if (memory?.text) return memory;
+
+  // Legacy localStorage is migration fallback only.
+  const legacy = readLegacyStoredReaderDocument(id);
+  if (legacy?.text) {
+    readerDocumentMemoryCache.set(id, legacy);
+    void persistStoredReaderDocument(id, legacy);
+    return legacy;
+  }
+
+  const cached = await getCachedReadingBook(readerDocumentCacheKey(id));
+  const normalized = normalizeStoredReaderDocument(cached, id);
+  if (normalized?.text) {
+    readerDocumentMemoryCache.set(id, normalized);
+    return normalized;
+  }
+  return null;
+}
+
+async function removeStoredReaderDocument(documentId) {
+  const id = String(documentId || '');
+  if (!id) return false;
+
+  const existing = await getStoredReaderDocument(id);
+  const originalKey = String(existing?.source?.originalKey || '');
+
+  readerDocumentMemoryCache.delete(id);
+  try { localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${id}`); } catch {}
+  await removeCachedReadingBook(readerDocumentCacheKey(id));
+
+  if (originalKey) await removeBookBuilderOriginal(originalKey);
+  return true;
+}
+
+async function migrateLegacyReaderDocumentsToIndexedDb() {
+  if (readerDocumentMigrationPromise) return readerDocumentMigrationPromise;
+
+  readerDocumentMigrationPromise = (async () => {
+    const keys = [];
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (key?.startsWith(DOCUMENT_STORAGE_PREFIX)) keys.push(key);
+      }
+    } catch {
+      return { migrated:0, failed:0 };
+    }
+
+    let migrated = 0;
+    let failed = 0;
+
+    for (const key of keys) {
+      const documentId = key.slice(DOCUMENT_STORAGE_PREFIX.length);
+      if (!documentId) continue;
+
+      let saved = null;
+      try { saved = JSON.parse(localStorage.getItem(key) || 'null'); } catch {}
+      const normalized = normalizeStoredReaderDocument(saved, documentId);
+      if (!normalized?.text) continue;
+
+      readerDocumentMemoryCache.set(documentId, normalized);
+      const stored = await persistStoredReaderDocument(documentId, normalized);
+      if (stored) migrated += 1;
+      else failed += 1;
+    }
+
+    return { migrated, failed };
+  })();
+
+  return readerDocumentMigrationPromise;
+}
+
+window.MarkSetGoDocumentStore = Object.freeze({
+  get: getStoredReaderDocument,
+  peek: peekStoredReaderDocument,
+  put: persistStoredReaderDocument,
+  remove: removeStoredReaderDocument,
+  migrateLegacy: migrateLegacyReaderDocumentsToIndexedDb,
+  status: () => {
+    let legacyCount = 0;
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        if ((localStorage.key(index) || '').startsWith(DOCUMENT_STORAGE_PREFIX)) legacyCount += 1;
+      }
+    } catch {}
+    return {
+      memoryDocuments: readerDocumentMemoryCache.size,
+      legacyDocumentCount: legacyCount
+    };
+  }
+});
+
+window.setTimeout(() => { void migrateLegacyReaderDocumentsToIndexedDb(); }, 0);
+
 function persistCurrentDocument() {
   if (!state.documentId || !state.currentText) return false;
-  const key = `${DOCUMENT_STORAGE_PREFIX}${state.documentId}`;
-  try {
-    const next = {
-      title: state.title,
-      text: state.currentText,
-      source: state.source
-    };
-    const existingRaw = localStorage.getItem(key);
-    let shouldWrite = !existingRaw;
-    if (existingRaw) {
-      try {
-        const existing = JSON.parse(existingRaw);
-        shouldWrite = existing?.title !== next.title
-          || existing?.text !== next.text
-          || JSON.stringify(existing?.source || {}) !== JSON.stringify(next.source || {});
-      } catch {
-        shouldWrite = true;
-      }
-    }
-    if (shouldWrite) {
-      try {
-        localStorage.setItem(key, JSON.stringify(next));
-      } catch (error) {
-        if (error?.name === 'QuotaExceededError') {
-          try { localStorage.removeItem(MODERN_GUIDE_LIBRARY_KEY); } catch {}
-          localStorage.setItem(key, JSON.stringify(next));
-        } else {
-          throw error;
-        }
-      }
-    }
-    return true;
-  } catch (error) {
-    console.warn('Document could not be stored in this browser.', error);
-    return false;
-  }
+
+  const next = {
+    documentId: state.documentId,
+    title: state.title,
+    text: state.currentText,
+    source: state.source
+  };
+
+  // Keep Reader actions nonblocking. The in-memory cache updates immediately;
+  // IndexedDB persistence finishes in the background.
+  void persistStoredReaderDocument(state.documentId, next).then((stored) => {
+    if (!stored) console.warn('Document could not be stored in IndexedDB.');
+  });
+  return true;
 }
 
 
@@ -7441,7 +10375,16 @@ function classifyStructureLine(line, wordCount) {
   if (exactTypes.has(lower)) return exactTypes.get(lower);
 
   if (/^(?:chapter|chap\.?)(?:\s+|\s*[ivxlcdm\d]+\b)/i.test(clean)) return 'chapter';
-  if (/^(?:book|part)\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(clean)) return 'part';
+
+  // Kindle/PDF trade books often use the number-word itself as the chapter
+  // heading: "One: The First Philosopher", "Twenty-nine: Worlds at War", etc.
+  // Require chapter-style punctuation so ordinary prose beginning with "One"
+  // is not misclassified.
+  const spelledNumber = '(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|(?:twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[-\s](?:one|two|three|four|five|six|seven|eight|nine))?)';
+  if (new RegExp(`^${spelledNumber}\\s*[:.\u2013\u2014-]\\s+\\S`, 'i').test(clean)) return 'chapter';
+
+  if (/^part\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten)\b/i.test(clean)) return 'part';
+  if (/^book(?:\s+(?:[ivxlcdm]+|\d+|one|two|three|four|five|six|seven|eight|nine|ten))?\s*[:.-]?\s*\S*/i.test(clean)) return 'book';
   if (/^(?:section|article)\s+(?:[ivxlcdm]+|\d+|[a-z])\b/i.test(clean)) return 'section';
   if (/^appendix(?:\s+[a-z0-9ivxlcdm]+)?\b/i.test(clean)) return 'appendix';
   if (/^(?:notes?|endnotes?|footnotes?)\s+(?:to|on|for)\b/i.test(clean)) return 'notes';
@@ -7619,7 +10562,7 @@ function jumpToWordIndex(wordIndex) {
         && (index < Number(state.renderedWordStart || 0)
           || index > Number(state.renderedWordEnd || 0) + 1600);
       if (distantTocJump) {
-        virtualRenderer.renderWindowAround(reader, mode, groupSize, index);
+        virtualRenderer.renderWindowAround(reader, readerRenderMode(mode), groupSize, index);
       } else {
         ensureWordsRendered(reader, mode, groupSize, index + 100);
       }
@@ -7636,7 +10579,7 @@ function jumpToWordIndex(wordIndex) {
         } else {
           const readerRect = reader.getBoundingClientRect();
           const targetRect = target.getBoundingClientRect();
-          reader.scrollTop = Math.max(0, reader.scrollTop + targetRect.top - readerRect.top - readerVisibleTopClearance(reader, 20));
+          reader.scrollTop = Math.max(0, reader.scrollTop + targetRect.top - readerRect.top - 20);
         }
       }
     }
@@ -7649,12 +10592,7 @@ function jumpToWordIndex(wordIndex) {
 async function openBookmark(id) {
   const bookmark = getBookmarks().find((item) => item.id === id);
   if (!bookmark) return;
-  let documentData = null;
-  try {
-    documentData = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${bookmark.documentId}`) || 'null');
-  } catch {
-    documentData = null;
-  }
+  let documentData = await getStoredReaderDocument(bookmark.documentId);
 
   try {
     if (!documentData?.text && bookmark.source?.type === 'gutenberg' && bookmark.source.id) {
@@ -7756,7 +10694,17 @@ function renderNavigationPane() {
   pane.querySelectorAll('[data-toc-index]').forEach((button) => {
     button.addEventListener('click', () => jumpToWordIndex(button.dataset.tocIndex));
   });
-  pane.querySelector('#add-bookmark')?.addEventListener('click', addBookmark);
+  // Bookmark creation belongs to the Reader's native addBookmark() implementation.
+  // Bind once to the stable navigation pane so the native button may be moved by
+  // Topic Feeds without losing its click path when the pane contents are rebuilt.
+  if (pane.dataset.nativeBookmarkHandler !== '1') {
+    pane.dataset.nativeBookmarkHandler = '1';
+    pane.addEventListener('click', (event) => {
+      const button = event.target instanceof Element ? event.target.closest('#add-bookmark') : null;
+      if (!button || !pane.contains(button)) return;
+      addBookmark();
+    });
+  }
   pane.querySelectorAll('[data-open-bookmark]').forEach((button) => {
     button.addEventListener('click', () => openBookmark(button.dataset.openBookmark));
   });
@@ -8338,7 +11286,7 @@ function profileDimensionCard(icon, title, score, description) {
 }
 
 
-function currentBookTextForProfile(book = {}) {
+async function currentBookTextForProfile(book = {}) {
   if (state?.title && state?.currentText && sameBookIdentity(state.title, book.title)) {
     return state.currentText;
   }
@@ -8350,13 +11298,8 @@ function currentBookTextForProfile(book = {}) {
   );
 
   if (match?.documentId) {
-    try {
-      const stored = localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${match.documentId}`);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed?.text || parsed?.currentText || '';
-      }
-    } catch {}
+    const stored = await getStoredReaderDocument(match.documentId);
+    if (stored?.text) return stored.text;
   }
   return '';
 }
@@ -8475,7 +11418,7 @@ async function enhanceReadingProfileWithAi({ dialog, book, localProfile, button 
   button.textContent = 'Analyzing with AI…';
 
   try {
-    const text = currentBookTextForProfile(book);
+    const text = await currentBookTextForProfile(book);
     const response = await fetch('/api/reading-profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -8500,9 +11443,100 @@ async function enhanceReadingProfileWithAi({ dialog, book, localProfile, button 
   }
 }
 
+
+function setBookGuideStatus(dialog, message = '', type = '') {
+  const status = dialog?.querySelector('#book-guide-status');
+  if (!status) return;
+  status.hidden = !message;
+  status.className = `status book-guide-status${type ? ` ${type}` : ''}`;
+  status.textContent = message;
+}
+
+function renderBookPreparation(dialog, guide, book) {
+  let panel = dialog.querySelector('#prepare-book-output');
+  if (!panel) {
+    panel = document.createElement('section');
+    panel.id = 'prepare-book-output';
+    panel.className = 'prepare-book-output';
+    dialog.querySelector('.prepare-me-panel')?.appendChild(panel);
+  }
+
+  const context = Array.isArray(guide.context) ? guide.context : [];
+  const themes = Array.isArray(guide.themes) ? guide.themes : [];
+  const tips = Array.isArray(guide.readingTips) ? guide.readingTips : [];
+  const characters = Array.isArray(guide.characters) ? guide.characters : [];
+
+  panel.innerHTML = `
+    <div class="prepare-book-result-heading">
+      <span class="source-category">Ask Mark · Before you read</span>
+      <h3>${escapeHtml(book?.title || 'This book')}</h3>
+    </div>
+    <p>${escapeHtml(guide.overview || 'Here is a concise orientation for the book.')}</p>
+    ${guide.setting ? `<section><h4>Setting</h4><p>${escapeHtml(guide.setting)}</p></section>` : ''}
+    ${context.length ? `<section><h4>Background worth knowing</h4><ul>${context.map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+    ${characters.length ? `<section><h4>People to recognize</h4><ul>${characters.slice(0,8).map((item)=>`<li><strong>${escapeHtml(item.name)}</strong> — ${escapeHtml(item.role)}</li>`).join('')}</ul></section>` : ''}
+    ${themes.length ? `<section><h4>Ideas to watch</h4><ul>${themes.slice(0,8).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+    ${tips.length ? `<section><h4>Recommended approach</h4><ul>${tips.slice(0,6).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+    ${guide.spoilerNote ? `<p class="difficulty-disclaimer">${escapeHtml(guide.spoilerNote)}</p>` : ''}
+  `;
+  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+async function requestBookPreparation({ dialog, book, topics, button }) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Preparing…';
+
+  let status = dialog.querySelector('#prepare-book-status');
+  if (!status) {
+    status = document.createElement('p');
+    status.id = 'prepare-book-status';
+    status.className = 'status book-guide-status';
+    button.insertAdjacentElement('afterend', status);
+  }
+  status.className = 'status book-guide-status';
+  status.textContent = 'Ask Mark is preparing a spoiler-free orientation…';
+
+  try {
+    const text = await currentBookTextForProfile(book);
+    const response = await fetch('/api/book-guide', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body:JSON.stringify({
+        book:{
+          ...book,
+          description:[
+            String(book?.description || '').trim(),
+            topics?.length ? `Preparation topics: ${topics.join('; ')}` : ''
+          ].filter(Boolean).join('\n')
+        },
+        spoilerMode:'none',
+        sample:boundedAiBookSample(text, 22000)
+      })
+    });
+
+    const payload = await response.json().catch(()=>({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || payload.error || `Request failed with HTTP ${response.status}.`);
+    }
+    if (!payload.guide) throw new Error('The server returned no book preparation.');
+
+    renderBookPreparation(dialog, payload.guide, book);
+    status.className = 'status success book-guide-status';
+    status.textContent = 'Preparation ready.';
+  } catch (error) {
+    status.className = 'status error book-guide-status';
+    status.textContent = `Preparation unavailable: ${error.message}`;
+  } finally {
+    button.disabled = false;
+    button.textContent = original;
+  }
+}
+
 async function requestQuickBookGuide({ dialog, book, spoilerMode, button }) {
   const cached = savedBookGuide(book, spoilerMode);
   if (cached?.guide) {
+    setBookGuideStatus(dialog, 'Loaded saved Quick Book Guide.', 'success');
     renderQuickBookGuide(dialog, cached.guide, book, spoilerMode);
     return;
   }
@@ -8510,9 +11544,10 @@ async function requestQuickBookGuide({ dialog, book, spoilerMode, button }) {
   const original = button.textContent;
   button.disabled = true;
   button.textContent = 'Creating guide…';
+  setBookGuideStatus(dialog, 'Creating your Quick Book Guide…');
 
   try {
-    const text = currentBookTextForProfile(book);
+    const text = await currentBookTextForProfile(book);
     const response = await fetch('/api/book-guide', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -8524,12 +11559,16 @@ async function requestQuickBookGuide({ dialog, book, spoilerMode, button }) {
     });
 
     const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.error || payload.detail || `Request failed with HTTP ${response.status}.`);
+    if (!response.ok) {
+      throw new Error(payload.detail || payload.error || `Request failed with HTTP ${response.status}.`);
+    }
+    if (!payload.guide) throw new Error('The server returned no guide.');
 
     saveBookGuide(book, spoilerMode, payload.guide);
     renderQuickBookGuide(dialog, payload.guide, book, spoilerMode);
+    setBookGuideStatus(dialog, 'Quick Book Guide ready.', 'success');
   } catch (error) {
-    window.alert(`Quick Book Guide unavailable: ${error.message}`);
+    setBookGuideStatus(dialog, `Quick Book Guide unavailable: ${error.message}`, 'error');
   } finally {
     button.disabled = false;
     button.textContent = original;
@@ -8640,6 +11679,7 @@ function showBookDifficultyDialog(payload) {
           <option value="full">Full-work guide</option>
         </select>
         <button class="primary" type="button" data-create-book-guide>Create Quick Book Guide</button>
+        <p id="book-guide-status" class="status book-guide-status" hidden></p>
       </div>
     </details>
 
@@ -8694,16 +11734,15 @@ function showBookDifficultyDialog(payload) {
     let request = null;
     try { request = JSON.parse(decodeURIComponent(event.currentTarget.dataset.prepareBook || '')); } catch {}
     if (!request) return;
+
+    queueAskMarkBookPreparation({
+      book: request.book || book,
+      topics: request.topics || topics
+    });
+
     dialog.close();
     ReaderContinuity?.saveBeforeNavigation?.();
     renderAiCenter();
-    window.setTimeout(() => {
-      const input = app.querySelector('textarea, input[type="text"]');
-      if (input) {
-        input.value = `Prepare me to read ${request.book?.title || 'this book'}${request.book?.author ? ` by ${request.book.author}` : ''}. Cover: ${(request.topics || []).join('; ')}. Keep it concise and avoid spoilers.`;
-        input.focus();
-      }
-    }, 0);
   });
 
   dialog.addEventListener('click', (event) => {
@@ -8806,15 +11845,25 @@ function bindBrowseSearchLocalActions(container) {
       const response = await fetch(`/texts/modern-guides/${encodeURIComponent(guide.id)}-guide.txt`, { cache:'no-store' });
       if (!response.ok) throw new Error(`Could not load the ${guide.title} guide.`);
       const text = await response.text();
-      renderReaderWithText(`${guide.title} — Mark, Set, Go! Guide`, text, {
+      const guideTitle = `${guide.title} — Mark, Set, Go! Guide`;
+      const guideSource = {
         type:'modern-guide',
         id:guide.id,
-        title:`${guide.title} — Mark, Set, Go! Guide`,
+        title:guideTitle,
         originalTitle:guide.title,
         originalAuthor:guide.author,
         buyUrl:guide.buyUrl,
         subtitle:`An independent reading guide to ${guide.title}`
-      });
+      };
+      if (shouldDelegateReaderToWorkspaceParent()) {
+        const handoff = window.parent.MSGWorkspaceReaderHandoff;
+        if (typeof handoff?.openText !== 'function') {
+          throw new Error('The main Reader handoff is not ready.');
+        }
+        handoff.openText(guideTitle, text, guideSource);
+      } else {
+        renderReaderWithText(guideTitle, text, guideSource);
+      }
     } catch (error) {
       window.alert(error?.message || 'The guide could not be opened.');
     }
@@ -8830,7 +11879,16 @@ function bindBrowseSearchLocalActions(container) {
     if (item.action.type === 'source') {
       try {
         const loaded = await loadLocalText(item.action.key);
-        renderReaderWithText(loaded.title, loaded.text, { type:'local-library', id:item.action.key, title:loaded.title });
+        const source = { type:'local-library', id:item.action.key, title:loaded.title };
+        if (shouldDelegateReaderToWorkspaceParent()) {
+          const handoff = window.parent.MSGWorkspaceReaderHandoff;
+          if (typeof handoff?.openText !== 'function') {
+            throw new Error('The main Reader handoff is not ready.');
+          }
+          handoff.openText(loaded.title, loaded.text, source);
+        } else {
+          renderReaderWithText(loaded.title, loaded.text, source);
+        }
       } catch (error) {
         window.alert(error?.message || 'That text could not be opened.');
       }
@@ -9041,13 +12099,28 @@ function bindUnifiedLibraryActions(container) {
         const file = new File([blob], `${provider}-${id}.${format}`, { type: format === 'epub' ? 'application/epub+zip' : 'application/pdf' });
         const parsed = format === 'epub' ? await parseEpubFile(file) : await parsePdfFile(file);
         parsed.source = { ...(parsed.source || {}), type: provider, provider, id, remoteFormat: format };
-        renderReaderWithText(parsed.title, parsed.text, parsed.source);
+        const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
+        if (isWorkspacePane) {
+          const handoff = window.parent.MSGWorkspaceReaderHandoff;
+          if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
+          handoff.openText(parsed.title, parsed.text, parsed.source);
+        } else {
+          renderReaderWithText(parsed.title, parsed.text, parsed.source);
+        }
         return;
       }
       const book = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(provider)}&id=${encodeURIComponent(id)}&format=${encodeURIComponent(format)}`);
       const fullTitle = `${book.title}${book.author ? ` — ${book.author}` : ''}`;
       const normalized = normalizeImportedBookText(book.text, { title:book.title, author:book.author });
-      renderReaderWithText(fullTitle, normalized.text, { type: provider, id, sourceUrl: book.sourceUrl, remoteFormat: format === 'best' ? 'text' : format, documentToc: normalized.toc, cleanup: normalized.report });
+      const editionSource = { type: provider, id, sourceUrl: book.sourceUrl, remoteFormat: format === 'best' ? 'text' : format, documentToc: normalized.toc, cleanup: normalized.report };
+      const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
+      if (isWorkspacePane) {
+        const handoff = window.parent.MSGWorkspaceReaderHandoff;
+        if (typeof handoff?.openText !== 'function') throw new Error('The main Reader handoff is not ready.');
+        handoff.openText(fullTitle, normalized.text, editionSource);
+      } else {
+        renderReaderWithText(fullTitle, normalized.text, editionSource);
+      }
     } catch (error) {
       window.alert(error.message);
       button.disabled = false; button.textContent = original;
@@ -9085,8 +12158,10 @@ async function renderReader(kind) {
   if (normalizedKind === 'unified-library') return renderUnifiedLibrary();
   if (normalizedKind === 'gutenberg') return renderGutenbergLibrary();
   if (normalizedKind === 'great-books') return renderGreatBooksLibrary();
-  if (normalizedKind === 'syntopicon') return renderSyntopicon();
+  if (normalizedKind === 'founding-documents') return renderFoundingDocumentsLibrary();
+  if (normalizedKind === 'syntopicon') { void renderSyntopicon(); return; }
   if (normalizedKind === 'bible') return renderBibleStudy();
+  if (normalizedKind === 'bible-guides') return renderBibleGuides();
   if (normalizedKind === 'current-reading') return renderCurrentReading();
   if (normalizedKind === 'weather') return renderWeather();
 
@@ -9112,37 +12187,215 @@ async function renderReader(kind) {
 const MARK_INSIGHTS_KEY = 'markSetGoMarkInsightsV1';
 const MARK_HISTORY_KEY = 'markSetGoMarkHistoryV1';
 
-function getMarkRecords(key) {
-  try { const value=JSON.parse(localStorage.getItem(key)||'[]'); return Array.isArray(value)?value:[]; }
-  catch { return []; }
+// Phase 5 IndexedDB migration: Mark Notebook + Ask Mark history.
+// These collections can contain passages and AI responses and were previously
+// large enough to require QuotaExceededError trimming in localStorage.
+const MARK_STORAGE_KEYS = [MARK_INSIGHTS_KEY, MARK_HISTORY_KEY];
+const MARK_STORAGE_IDB_KEYS = Object.freeze({
+  [MARK_INSIGHTS_KEY]: 'mark-notebook:insights:v1',
+  [MARK_HISTORY_KEY]: 'mark-notebook:history:v1'
+});
+const MARK_STORAGE_LIMIT = 300;
+
+const markStorageCache = new Map();
+const markStorageDirtyKeys = new Set();
+let markStorageHydrated = false;
+let markStorageHydrationPromise = null;
+let markStorageWriteChain = Promise.resolve(true);
+
+function normalizeMarkRecords(records) {
+  const result = [];
+  const seen = new Set();
+  for (const item of Array.isArray(records) ? records : []) {
+    if (!item || typeof item !== 'object') continue;
+    const id = String(item.id || '').trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push(item);
+    if (result.length >= MARK_STORAGE_LIMIT) break;
+  }
+  return result;
 }
-function saveMarkRecords(key, records) {
-  const requested=Array.isArray(records) ? records.slice(0,300) : [];
-  let candidate=requested;
 
-  while(candidate.length){
+function readLegacyMarkRecords(key) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || '[]');
+    return normalizeMarkRecords(value);
+  } catch {
+    return [];
+  }
+}
+
+// Seed synchronously so upgrading users see their Notebook immediately while
+// IndexedDB hydration runs in the background.
+MARK_STORAGE_KEYS.forEach((key) => {
+  markStorageCache.set(key, readLegacyMarkRecords(key));
+});
+
+function getMarkRecords(key) {
+  return markStorageCache.get(key) || [];
+}
+
+function markStorageIdbKey(key) {
+  return MARK_STORAGE_IDB_KEYS[key] || `mark-notebook:${String(key || '')}`;
+}
+
+function removeLegacyMarkRecords(key) {
+  try { localStorage.removeItem(key); } catch {}
+}
+
+function persistLegacyMarkFallback(key, records) {
+  let candidate = normalizeMarkRecords(records);
+  while (candidate.length) {
     try {
-      localStorage.setItem(key,JSON.stringify(candidate));
-      const verified=getMarkRecords(key);
-      return verified.length>0 && verified[0]?.id===candidate[0]?.id;
-    } catch(error) {
-      if(error?.name!=='QuotaExceededError' && error?.name!=='NS_ERROR_DOM_QUOTA_REACHED'){
-        console.warn('Notebook records could not be saved.',error);
+      localStorage.setItem(key, JSON.stringify(candidate));
+      return true;
+    } catch (error) {
+      if (error?.name !== 'QuotaExceededError' && error?.name !== 'NS_ERROR_DOM_QUOTA_REACHED') {
+        console.warn('Notebook fallback storage could not be saved.', error);
         return false;
       }
-
-      // Preserve the newest entry while progressively dropping old notebook
-      // history if browser storage is tight. Never silently claim success.
-      if(candidate.length===1){
-        console.warn('Notebook storage is full; the newest entry could not be saved.',error);
-        return false;
-      }
-      candidate=candidate.slice(0,Math.max(1,Math.floor(candidate.length*.8)));
+      if (candidate.length === 1) return false;
+      candidate = candidate.slice(0, Math.max(1, Math.floor(candidate.length * .8)));
     }
   }
-  return false;
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
 }
-function markRecordsForCurrentBook(key) { return getMarkRecords(key).filter(item=>item.documentId===state.documentId); }
+
+async function persistMarkCollection(key, records = getMarkRecords(key)) {
+  const normalized = normalizeMarkRecords(records);
+  markStorageCache.set(key, normalized);
+
+  if (typeof cacheReadingBook !== 'function') {
+    return persistLegacyMarkFallback(key, normalized);
+  }
+
+  try {
+    const ok = await cacheReadingBook({
+      key: markStorageIdbKey(key),
+      type: key === MARK_INSIGHTS_KEY ? 'mark-notebook-insights' : 'mark-notebook-history',
+      legacyKey: key,
+      items: normalized,
+      updatedAt: new Date().toISOString()
+    });
+
+    if (ok) {
+      removeLegacyMarkRecords(key);
+      return true;
+    }
+  } catch (error) {
+    console.warn('Notebook IndexedDB persistence failed.', error);
+  }
+
+  // Preserve durability if IndexedDB is temporarily unavailable.
+  return persistLegacyMarkFallback(key, normalized);
+}
+
+function refreshMarkStorageUi() {
+  try { renderMarkNotebook?.(); } catch {}
+  try { renderMarkHistory?.(); } catch {}
+  try { renderFullscreenMarkNotebook?.(); } catch {}
+  try { renderGlobalNotebookEntries?.(); } catch {}
+}
+
+async function hydrateMarkStorage() {
+  if (markStorageHydrationPromise) return markStorageHydrationPromise;
+
+  markStorageHydrationPromise = (async () => {
+    let migrated = 0;
+    let failed = 0;
+
+    for (const key of MARK_STORAGE_KEYS) {
+      const legacy = readLegacyMarkRecords(key);
+      const wasDirty = markStorageDirtyKeys.has(key);
+
+      try {
+        const wrapper = typeof getCachedReadingBook === 'function'
+          ? await getCachedReadingBook(markStorageIdbKey(key))
+          : null;
+        const indexed = Array.isArray(wrapper?.items)
+          ? normalizeMarkRecords(wrapper.items)
+          : null;
+
+        if (wasDirty) {
+          // A user save/delete occurred before hydration completed. The live
+          // in-memory state wins and is persisted after the read finishes.
+          const ok = await persistMarkCollection(key, getMarkRecords(key));
+          if (ok) migrated += 1;
+          else failed += 1;
+          continue;
+        }
+
+        if (indexed) {
+          markStorageCache.set(key, indexed);
+          removeLegacyMarkRecords(key);
+          migrated += 1;
+          continue;
+        }
+
+        if (legacy.length) {
+          markStorageCache.set(key, legacy);
+          const ok = await persistMarkCollection(key, legacy);
+          if (ok) migrated += 1;
+          else failed += 1;
+        } else {
+          markStorageCache.set(key, []);
+        }
+      } catch (error) {
+        failed += 1;
+        console.warn(`Notebook migration was deferred for ${key}.`, error);
+        if (legacy.length) markStorageCache.set(key, legacy);
+      }
+    }
+
+    markStorageHydrated = true;
+    refreshMarkStorageUi();
+    return {
+      hydrated: true,
+      migrated,
+      failed,
+      insights: getMarkRecords(MARK_INSIGHTS_KEY).length,
+      history: getMarkRecords(MARK_HISTORY_KEY).length
+    };
+  })();
+
+  return markStorageHydrationPromise;
+}
+
+function queueMarkStorageWrite(key) {
+  markStorageWriteChain = markStorageWriteChain
+    .catch(() => false)
+    .then(async () => {
+      await hydrateMarkStorage();
+      const ok = await persistMarkCollection(key, getMarkRecords(key));
+      if (ok) markStorageDirtyKeys.delete(key);
+      return ok;
+    });
+  return markStorageWriteChain;
+}
+
+function saveMarkRecords(key, records) {
+  if (!MARK_STORAGE_KEYS.includes(key)) return false;
+  const requested = normalizeMarkRecords(records);
+  markStorageCache.set(key, requested);
+  markStorageDirtyKeys.add(key);
+
+  // Keep all existing Notebook callers synchronous. Verification reads the
+  // in-memory collection immediately; durable IndexedDB persistence is queued.
+  void queueMarkStorageWrite(key);
+  return true;
+}
+
+function markRecordsForCurrentBook(key) {
+  return getMarkRecords(key).filter(item => item.documentId === state.documentId);
+}
+
+window.setTimeout(() => { void hydrateMarkStorage(); }, 0);
 
 const MARK_NOTEBOOK_SAVE_PAYLOADS=new Map();
 
@@ -9167,7 +12420,21 @@ function saveRegisteredMarkNotebookInsight(id) {
 
 window.MarkSetGoNotebook = Object.freeze({
   saveInsight:saveRegisteredMarkNotebookInsight,
-  count:()=>getMarkRecords(MARK_INSIGHTS_KEY).length
+  count:()=>getMarkRecords(MARK_INSIGHTS_KEY).length,
+  hydrateStorage:hydrateMarkStorage,
+  storageStatus:()=>{
+    let legacyInsights=false;
+    let legacyHistory=false;
+    try { legacyInsights=Boolean(localStorage.getItem(MARK_INSIGHTS_KEY)); } catch {}
+    try { legacyHistory=Boolean(localStorage.getItem(MARK_HISTORY_KEY)); } catch {}
+    return {
+      hydrated:markStorageHydrated,
+      insights:getMarkRecords(MARK_INSIGHTS_KEY).length,
+      history:getMarkRecords(MARK_HISTORY_KEY).length,
+      legacyInsightsPresent:legacyInsights,
+      legacyHistoryPresent:legacyHistory
+    };
+  }
 });
 
 
@@ -9249,10 +12516,22 @@ function showMarkToolbar(selectionData, rect) {
   const bar=app.querySelector('#mark-selection-toolbar'); if(!bar) return;
   state.markSelection=selectionData;
   persistMarkSelectionHighlight(selectionData);
+  bar.querySelectorAll('[data-mark-annotate-menu], [data-mark-more-menu]').forEach((menu)=>{ menu.hidden=true; });
+  bar.querySelector('[data-mark-annotate-toggle]')?.setAttribute('aria-expanded','false');
+  bar.querySelector('[data-mark-more-toggle]')?.setAttribute('aria-expanded','false');
   bar.hidden=false;
-  const width=bar.offsetWidth||540;
-  bar.style.left=`${Math.max(8,Math.min(window.innerWidth-width-8,rect.left+rect.width/2-width/2))}px`;
-  bar.style.top=`${Math.max(8,rect.top-52)}px`;
+  // The passage toolbar can wrap in narrow Reader/workspace panes. Measure the
+  // rendered toolbar after it is shown so every action, including Chat and
+  // Symposium, remains inside the visible viewport instead of extending offscreen.
+  const width=Math.min(bar.offsetWidth||540,Math.max(0,window.innerWidth-16));
+  const height=bar.offsetHeight||42;
+  const left=Math.max(8,Math.min(window.innerWidth-width-8,rect.left+rect.width/2-width/2));
+  const aboveTop=rect.top-height-8;
+  const belowTop=(Number(rect.bottom)||rect.top)+8;
+  const maxTop=Math.max(8,window.innerHeight-height-8);
+  const top=aboveTop>=8 ? aboveTop : Math.min(maxTop,belowTop);
+  bar.style.left=`${left}px`;
+  bar.style.top=`${Math.max(8,top)}px`;
 }
 function hideMarkToolbar(){ const bar=app.querySelector('#mark-selection-toolbar'); if(bar) bar.hidden=true; }
 function openMarkPanel(tab='selection'){
@@ -9333,7 +12612,7 @@ function renderMarkResult(result, action){
 
   panels.forEach(panel=>{
     panel.hidden=false;
-    panel.innerHTML=`<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<button type="button" class="secondary" data-save-mark-response data-mark-save-id="${escapeHtml(saveId)}">Save to notebook</button>`;
+    panel.innerHTML=`<div class="mark-response-heading"><span>${escapeHtml(currentCompanionIdentity().ask)}</span><strong>${escapeHtml(result.heading||action)}</strong></div><p>${escapeHtml(result.response||'')}</p>${result.keyPoints?.length?`<ul>${result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul>`:''}${result.cautions?.length?`<div class="mark-cautions">${result.cautions.map(x=>`<p>${escapeHtml(x)}</p>`).join('')}</div>`:''}<div class="mark-response-share-actions"><button type="button" class="secondary" data-save-mark-response data-mark-save-id="${escapeHtml(saveId)}">Save to notebook</button><button type="button" class="secondary" data-mark-share-response="chat">💬 Send to Chat</button><button type="button" class="secondary" data-mark-share-response="symposium">🏛 Discuss in Symposium</button></div>`;
 
     panel.querySelector('[data-save-mark-response]')?.addEventListener('click',(event)=>{
       const button=event.currentTarget;
@@ -9346,6 +12625,21 @@ function renderMarkResult(result, action){
         window.setTimeout(()=>{ if(!button.disabled) button.textContent='Save to notebook'; },2200);
       }
     });
+
+    panel.querySelectorAll('[data-mark-share-response]').forEach((button)=>button.addEventListener('click',()=>{
+      const payload={
+        type:'ask-mark-response',
+        title:`${result.heading || action}${selected?.title ? ` · ${selected.title}` : ''}`,
+        text:String(result.response || '').trim(),
+        context:selected?.text || '',
+        sourceLabel:currentCompanionIdentity().ask || 'Ask Mark',
+        documentId:selected?.documentId || state.documentId || '',
+        chapter:selected?.chapter || '',
+        startIndex:Number(selected?.startIndex) || 0
+      };
+      if(button.dataset.markShareResponse==='symposium') window.MSGContentShare?.toSymposium?.(payload);
+      else window.MSGContentShare?.toChat?.(payload);
+    }));
   });
   notifyAskMarkLegacyUpdated('response');
 }
@@ -9420,20 +12714,119 @@ function openComparisonWorkspace(){
   hideMarkToolbar();
 }
 
+function companionQuestionWithAddedContext(question=''){
+  const base=String(question||'').trim();
+  let extra='';
+  try{ extra=String(window.MarkSetGoAskMarkHub?.contextText?.() || '').trim(); }catch{}
+  if(!extra) return base;
+  const header='\n\nAdditional context supplied by the reader:\n';
+  const budget=Math.max(0,1200-base.length-header.length);
+  if(!budget) return base.slice(0,1200);
+  return `${base}${header}${extra.slice(0,budget)}`.slice(0,1200);
+}
+
 async function runMarkAction(action,question=''){
-  const selected=state.markSelection; if(!selected) return;
+  const articleContext=window.MSGInvestorArticleContext;
+  const currentSelection=state.markSelection;
+  const hasRealHighlightedPassage=Boolean(
+    currentSelection?.text &&
+    !currentSelection?.syntheticWholeArticle
+  );
+
+  // Scope priority:
+  // 1. A real user highlight always wins and uses the passage-selection route.
+  // 2. Otherwise, an active Analyze conversation uses the complete article.
+  const useWholeArticle=Boolean(
+    action==='ask' &&
+    String(question||'').trim() &&
+    !hasRealHighlightedPassage &&
+    articleContext?.articleText &&
+    String(articleContext.articleText).trim().length>=40
+  );
+
+  const selected=hasRealHighlightedPassage
+    ? currentSelection
+    : (useWholeArticle ? articleContext.selection : currentSelection);
+
+  if(!selected && !useWholeArticle) return;
+
   if(action==='save'){saveMarkInsight({action:'selection'});return;}
   if(action==='related'){openComparisonWorkspace();return;}
-  if(action==='define' && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false, 'mark'); return; }
-  const responsePanels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean);responsePanels.forEach(p=>{p.hidden=false;p.innerHTML='<p class="status">I’m reading this…</p>';});
+  if(action==='define' && selected && splitWords(selected.text).length===1){ state.contextWord={word:selected.text,index:selected.startIndex,element:app.querySelector(`.reader-word[data-index="${selected.startIndex}"]`)}; openWordPanelForDictionary(); activateMarkTab('tools'); performDictionaryLookup(false, 'mark'); return; }
+
+  const identity=currentCompanionIdentity();
+  const responsePanels=[app.querySelector('#mark-response'),fullscreenMarkResultContainer()].filter(Boolean);
+  responsePanels.forEach(p=>{
+    p.hidden=false;
+    p.innerHTML=`<p class="status">${escapeHtml(identity.name||'Your companion')} is thinking…</p>`;
+  });
   notifyAskMarkLegacyUpdated('response');
+
   try{
-    const targetLanguage=action==='translate'?(window.prompt('Translate into which language?','Spanish')||'').trim():''; if(action==='translate'&&!targetLanguage)return;
-    const response=await fetch('/api/mark-selection',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...selected,selection:selected.text,action,question,targetLanguage})});
-    const payload=await response.json().catch(()=>({})); if(!response.ok) throw new Error(payload.error||payload.detail||`HTTP ${response.status}`);
-    const record={id:`history-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,documentId:state.documentId,title:state.title,selection:selected.text,startIndex:selected.startIndex,chapter:selected.chapter,action,question,result:payload.result,createdAt:new Date().toISOString()};
-    saveMarkRecords(MARK_HISTORY_KEY,[record,...getMarkRecords(MARK_HISTORY_KEY)]); renderMarkResult(payload.result,action);
-  } catch(error){responsePanels.forEach(p=>{p.innerHTML=`<p class="status error">${escapeHtml(error.message)}</p>`;});notifyAskMarkLegacyUpdated('response');}
+    const targetLanguage=action==='translate'?(window.prompt('Translate into which language?','Spanish')||'').trim():'';
+    if(action==='translate'&&!targetLanguage)return;
+    const requestQuestion=action==='ask' ? companionQuestionWithAddedContext(question) : String(question||'').trim();
+
+    let response;
+
+    if(useWholeArticle){
+      const history=Array.isArray(articleContext.history) ? articleContext.history.slice(-8) : [];
+      response=await fetch('/api/read-anything/article-followup',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          companion:identity.id||articleContext.companion?.id||'mark',
+          title:articleContext.title||state.title||'Current article',
+          sourceUrl:articleContext.sourceUrl||'',
+          articleText:articleContext.articleText,
+          analysis:articleContext.analysis||{},
+          history,
+          question:requestQuestion
+        })
+      });
+    }else{
+      response=await fetch('/api/mark-selection',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({...selected,selection:selected.text,action,question:requestQuestion,targetLanguage})
+      });
+    }
+
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(payload.error||payload.detail||`HTTP ${response.status}`);
+
+    if(useWholeArticle){
+      articleContext.history=Array.isArray(articleContext.history) ? articleContext.history : [];
+      articleContext.history.push(
+        {role:'user',text:String(question||'').trim()},
+        {role:'assistant',text:String(payload.result?.response||'').trim()}
+      );
+      articleContext.history=articleContext.history.slice(-12);
+      articleContext.updatedAt=new Date().toISOString();
+    }
+
+    const record={
+      id:`history-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+      documentId:state.documentId,
+      title:state.title,
+      selection:useWholeArticle ? 'Whole article' : (selected?.text||''),
+      startIndex:useWholeArticle ? 0 : (selected?.startIndex||0),
+      chapter:useWholeArticle ? 'Whole article · Investor analysis' : (selected?.chapter||''),
+      scope:useWholeArticle ? 'whole-article' : 'highlighted-passage',
+      action,
+      question,
+      result:payload.result,
+      createdAt:new Date().toISOString()
+    };
+
+    saveMarkRecords(MARK_HISTORY_KEY,[record,...getMarkRecords(MARK_HISTORY_KEY)]);
+    renderMarkResult(payload.result,action);
+  } catch(error){
+    responsePanels.forEach(p=>{
+      p.innerHTML=`<p class="status error">${escapeHtml(error.message)}</p>`;
+    });
+    notifyAskMarkLegacyUpdated('response');
+  }
 }
 function bindMarkPanelActions(){
   app.querySelectorAll('[data-mark-action]').forEach(button=>button.addEventListener('click',()=>runMarkAction(button.dataset.markAction)));
@@ -9451,6 +12844,67 @@ function notebookRecordFullText(item) {
   if (item.result?.keyPoints?.length) parts.push(`\nKey points:\n${item.result.keyPoints.map(x=>`- ${x}`).join('\n')}`);
   if (item.result?.cautions?.length) parts.push(`\nNotes and cautions:\n${item.result.cautions.map(x=>`- ${x}`).join('\n')}`);
   return parts.join('\n');
+}
+
+function markRecordSharePayload(item,{sourceLabel='Notebook',type='notebook-entry'}={}) {
+  if(!item)return null;
+  const passage=String(item.selection||'').trim();
+  const note=String(item.note||'').trim();
+  const question=String(item.question||'').trim();
+  const response=String(item.result?.response||'').trim();
+  const keyPoints=Array.isArray(item.result?.keyPoints) ? item.result.keyPoints.filter(Boolean).map(String) : [];
+  const cautions=Array.isArray(item.result?.cautions) ? item.result.cautions.filter(Boolean).map(String) : [];
+
+  let text='';
+  if(response){
+    const responseParts=[response];
+    if(keyPoints.length)responseParts.push(`Key points:
+${keyPoints.map(x=>`- ${x}`).join('\n')}`);
+    if(cautions.length)responseParts.push(`Notes and cautions:
+${cautions.map(x=>`- ${x}`).join('\n')}`);
+    text=responseParts.join('\n\n');
+  }else{
+    text=passage||note||question;
+  }
+  if(!text)return null;
+
+  const contextParts=[];
+  if(response&&passage)contextParts.push(`Relevant passage:
+${passage}`);
+  if(note)contextParts.push(`My note:
+${note}`);
+  if(response&&question)contextParts.push(`Question:
+${question}`);
+
+  return {
+    type,
+    title:item.title||item.result?.heading||'Notebook entry',
+    text,
+    context:contextParts.join('\n\n'),
+    sourceLabel,
+    documentId:item.documentId||state.documentId||'',
+    chapter:item.chapter||item.pageContext||'',
+    startIndex:Number(item.startIndex)||0,
+    metadata:{
+      recordId:item.id||'',
+      recordType:item.recordType||'',
+      action:item.action||'',
+      question
+    }
+  };
+}
+
+function shareMarkRecord(item,destination,{sourceLabel='Notebook',type='notebook-entry'}={}) {
+  const payload=markRecordSharePayload(item,{sourceLabel,type});
+  if(!payload)return false;
+  const shareApi=window.MSGContentShare;
+  const handler=destination==='symposium' ? shareApi?.toSymposium : shareApi?.toChat;
+  if(typeof handler!=='function'){
+    window.alert(destination==='symposium' ? 'Symposium sharing is not available yet.' : 'Chat sharing is not available yet.');
+    return false;
+  }
+  handler.call(shareApi,payload);
+  return true;
 }
 
 function downloadTextFile(filename, text) {
@@ -9495,53 +12949,670 @@ async function emailNotebookRecords(records,label='Mark Notebook') {
   }
 }
 
+
+const notebookInlineSaveTimers = new Map();
+let notebookSelectionState = null;
+let notebookDrawState = null;
+
+function notebookAnnotations(item) {
+  return Array.isArray(item?.notebookAnnotations)
+    ? item.notebookAnnotations.filter((entry) => entry && typeof entry === 'object').slice(-800)
+    : [];
+}
+
+function notebookDrawings(item) {
+  return Array.isArray(item?.notebookDrawings)
+    ? item.notebookDrawings.filter((entry) => entry && typeof entry === 'object').slice(-250)
+    : [];
+}
+
+function notebookSectionText(item, sectionKey) {
+  const key = String(sectionKey || '');
+  if (key === 'selection') return String(item?.selection || '');
+  if (key === 'question') return String(item?.question || '');
+  if (key === 'response') return String(item?.result?.response || '');
+
+  let match = /^keypoint-(\d+)$/.exec(key);
+  if (match) return String(item?.result?.keyPoints?.[Number(match[1])] || '');
+
+  match = /^caution-(\d+)$/.exec(key);
+  if (match) return String(item?.result?.cautions?.[Number(match[1])] || '');
+
+  return '';
+}
+
+function normalizeNotebookAnnotationColor(value) {
+  const color = String(value || '').trim();
+  return /^#[0-9a-f]{6}$/i.test(color) ? color.toUpperCase() : '#F7D34A';
+}
+
+function notebookAnnotatedHtml(item, sectionKey, textValue) {
+  const text = String(textValue || '');
+  if (!text) return '';
+
+  const relevant = notebookAnnotations(item)
+    .filter((entry) => String(entry.section || '') === String(sectionKey || ''))
+    .map((entry, order) => ({
+      ...entry,
+      order,
+      start:Math.max(0, Math.min(text.length, Number(entry.start) || 0)),
+      end:Math.max(0, Math.min(text.length, Number(entry.end) || 0))
+    }))
+    .filter((entry) => entry.end > entry.start);
+
+  if (!relevant.length) return escapeHtml(text).replace(/\n/g, '<br>');
+
+  const boundaries = new Set([0, text.length]);
+  relevant.forEach((entry) => {
+    boundaries.add(entry.start);
+    boundaries.add(entry.end);
+  });
+  const points = [...boundaries].sort((a,b) => a-b);
+
+  let html = '';
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const start = points[i];
+    const end = points[i + 1];
+    if (end <= start) continue;
+
+    const segment = text.slice(start, end);
+    const active = relevant
+      .filter((entry) => entry.start <= start && entry.end >= end)
+      .sort((a,b) => a.order-b.order)
+      .at(-1);
+
+    const escaped = escapeHtml(segment).replace(/\n/g, '<br>');
+    if (!active) {
+      html += escaped;
+      continue;
+    }
+
+    const note = String(active.note || '').trim();
+    html += `<mark class="notebook-text-highlight${note ? ' has-note' : ''}"
+      data-notebook-annotation-id="${escapeHtml(String(active.id || ''))}"
+      style="--notebook-highlight:${escapeHtml(normalizeNotebookAnnotationColor(active.color))}"
+      ${note ? `title="${escapeHtml(note)}"` : ''}>${escaped}</mark>`;
+  }
+
+  return html;
+}
+
+function updateNotebookRecord(recordId, updater) {
+  const id = String(recordId || '');
+  if (!id || typeof updater !== 'function') return null;
+
+  const current = getMarkRecords(MARK_INSIGHTS_KEY);
+  const index = current.findIndex((item) => String(item.id) === id);
+  if (index < 0) return null;
+
+  const original = current[index];
+  const candidate = updater({ ...original }) || original;
+  const updated = {
+    ...candidate,
+    id:original.id,
+    updatedAt:new Date().toISOString()
+  };
+
+  const next = [...current];
+  next[index] = updated;
+  saveMarkRecords(MARK_INSIGHTS_KEY, next);
+  document.dispatchEvent(new CustomEvent('marksetgo:notebook-changed', {
+    detail:{ id, updated }
+  }));
+  return updated;
+}
+
+function notebookSectionSelector(recordId, sectionKey) {
+  const escape = (value) => window.CSS?.escape
+    ? CSS.escape(String(value))
+    : String(value).replace(/["\\]/g, '\\$&');
+
+  return `[data-notebook-record-id="${escape(recordId)}"] [data-notebook-annotatable="${escape(sectionKey)}"]`;
+}
+
+function refreshNotebookAnnotatedSection(recordId, sectionKey) {
+  const item = getMarkRecords(MARK_INSIGHTS_KEY).find((entry) => String(entry.id) === String(recordId));
+  if (!item) return false;
+  const node = document.querySelector(notebookSectionSelector(recordId, sectionKey));
+  if (!node) return false;
+  const text = notebookSectionText(item, sectionKey);
+  node.innerHTML = notebookAnnotatedHtml(item, sectionKey, text);
+  return true;
+}
+
+function saveNotebookInlineNote(recordId, text, statusNode = null) {
+  const value = String(text || '');
+  const updated = updateNotebookRecord(recordId, (item) => ({
+    ...item,
+    note:value.trimEnd()
+  }));
+  if (!updated) return false;
+
+  if (statusNode) {
+    statusNode.textContent = 'Saved';
+    statusNode.classList.add('saved');
+    window.setTimeout(() => {
+      if (statusNode.isConnected && statusNode.textContent === 'Saved') {
+        statusNode.textContent = '';
+        statusNode.classList.remove('saved');
+      }
+    }, 1200);
+  }
+  return true;
+}
+
+function queueNotebookInlineNoteSave(textarea) {
+  const recordId = String(textarea?.dataset?.notebookNoteEditor || '');
+  if (!recordId) return;
+
+  const article = textarea.closest('[data-notebook-record-id]');
+  const status = article?.querySelector('[data-notebook-note-status]');
+  if (status) {
+    status.textContent = 'Saving…';
+    status.classList.remove('saved');
+  }
+
+  window.clearTimeout(notebookInlineSaveTimers.get(recordId));
+  const timer = window.setTimeout(() => {
+    notebookInlineSaveTimers.delete(recordId);
+    saveNotebookInlineNote(recordId, textarea.value, status);
+  }, 450);
+  notebookInlineSaveTimers.set(recordId, timer);
+}
+
+function captureNotebookSelection(panel) {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+
+  const range = selection.getRangeAt(0);
+  const startElement = range.startContainer.nodeType === Node.ELEMENT_NODE
+    ? range.startContainer
+    : range.startContainer.parentElement;
+  const endElement = range.endContainer.nodeType === Node.ELEMENT_NODE
+    ? range.endContainer
+    : range.endContainer.parentElement;
+
+  const startSection = startElement?.closest?.('[data-notebook-annotatable]');
+  const endSection = endElement?.closest?.('[data-notebook-annotatable]');
+  if (!startSection || startSection !== endSection || !panel.contains(startSection)) return null;
+
+  const article = startSection.closest('[data-notebook-record-id]');
+  const recordId = String(article?.dataset?.notebookRecordId || '');
+  const section = String(startSection.dataset.notebookAnnotatable || '');
+  if (!recordId || !section) return null;
+
+  const prefix = range.cloneRange();
+  prefix.selectNodeContents(startSection);
+  try {
+    prefix.setEnd(range.startContainer, range.startOffset);
+  } catch {
+    return null;
+  }
+
+  const start = prefix.toString().length;
+  const selectedText = range.toString();
+  const end = start + selectedText.length;
+  if (!selectedText.trim() || end <= start) return null;
+
+  return {
+    recordId,
+    section,
+    start,
+    end,
+    text:selectedText,
+    rect:range.getBoundingClientRect()
+  };
+}
+
+function ensureNotebookSelectionToolbar() {
+  let toolbar = document.querySelector('#notebook-selection-toolbar');
+  if (toolbar) return toolbar;
+
+  toolbar = document.createElement('div');
+  toolbar.id = 'notebook-selection-toolbar';
+  toolbar.className = 'notebook-selection-toolbar';
+  toolbar.hidden = true;
+  toolbar.setAttribute('role','toolbar');
+  toolbar.setAttribute('aria-label','Notebook annotation tools');
+  toolbar.innerHTML = `
+    <div class="notebook-selection-toolbar-main">
+      <span class="notebook-selection-label">Annotate</span>
+      <button type="button" class="notebook-highlight-swatch" data-notebook-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button>
+      <button type="button" class="notebook-highlight-swatch" data-notebook-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button>
+      <button type="button" class="notebook-highlight-swatch" data-notebook-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button>
+      <button type="button" class="notebook-highlight-swatch" data-notebook-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button>
+      <button type="button" data-notebook-selection-note title="Write a note on this selection">✎ Note</button>
+      <button type="button" data-notebook-selection-erase title="Erase annotations from this selection">⌫</button>
+      <button type="button" data-notebook-selection-close aria-label="Close annotation tools">×</button>
+    </div>
+    <div class="notebook-selection-note-editor" data-notebook-selection-note-editor hidden>
+      <textarea rows="2" maxlength="1000" placeholder="Write on this selection…" aria-label="Annotation note"></textarea>
+      <div>
+        <button type="button" data-notebook-selection-note-cancel>Cancel</button>
+        <button type="button" data-notebook-selection-note-save>Save note</button>
+      </div>
+    </div>`;
+  document.body.appendChild(toolbar);
+
+  toolbar.addEventListener('mousedown', (event) => {
+    if (!event.target.closest('textarea,input,select')) event.preventDefault();
+  });
+
+  const hide = () => {
+    toolbar.hidden = true;
+    toolbar.querySelector('[data-notebook-selection-note-editor]').hidden = true;
+    notebookSelectionState = null;
+  };
+
+  toolbar.querySelector('[data-notebook-selection-close]')?.addEventListener('click', hide);
+
+  toolbar.querySelectorAll('[data-notebook-highlight-color]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const selected = notebookSelectionState;
+      if (!selected) return;
+
+      const annotation = {
+        id:`nb-ann-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+        section:selected.section,
+        start:selected.start,
+        end:selected.end,
+        color:normalizeNotebookAnnotationColor(button.dataset.notebookHighlightColor),
+        note:'',
+        createdAt:new Date().toISOString()
+      };
+
+      updateNotebookRecord(selected.recordId, (item) => ({
+        ...item,
+        notebookAnnotations:[...notebookAnnotations(item), annotation].slice(-800)
+      }));
+      refreshNotebookAnnotatedSection(selected.recordId, selected.section);
+      window.getSelection()?.removeAllRanges?.();
+      hide();
+    });
+  });
+
+  toolbar.querySelector('[data-notebook-selection-note]')?.addEventListener('click', () => {
+    const editor = toolbar.querySelector('[data-notebook-selection-note-editor]');
+    if (!editor) return;
+    editor.hidden = false;
+    requestAnimationFrame(() => editor.querySelector('textarea')?.focus());
+  });
+
+  toolbar.querySelector('[data-notebook-selection-note-cancel]')?.addEventListener('click', () => {
+    const editor = toolbar.querySelector('[data-notebook-selection-note-editor]');
+    if (editor) editor.hidden = true;
+  });
+
+  toolbar.querySelector('[data-notebook-selection-note-save]')?.addEventListener('click', () => {
+    const selected = notebookSelectionState;
+    const textarea = toolbar.querySelector('[data-notebook-selection-note-editor] textarea');
+    const note = String(textarea?.value || '').trim();
+    if (!selected || !note) {
+      textarea?.focus();
+      return;
+    }
+
+    const annotation = {
+      id:`nb-ann-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+      section:selected.section,
+      start:selected.start,
+      end:selected.end,
+      color:'#F7D34A',
+      note,
+      createdAt:new Date().toISOString()
+    };
+
+    updateNotebookRecord(selected.recordId, (item) => ({
+      ...item,
+      notebookAnnotations:[...notebookAnnotations(item), annotation].slice(-800)
+    }));
+    refreshNotebookAnnotatedSection(selected.recordId, selected.section);
+    if (textarea) textarea.value = '';
+    window.getSelection()?.removeAllRanges?.();
+    hide();
+  });
+
+  toolbar.querySelector('[data-notebook-selection-erase]')?.addEventListener('click', () => {
+    const selected = notebookSelectionState;
+    if (!selected) return;
+
+    updateNotebookRecord(selected.recordId, (item) => ({
+      ...item,
+      notebookAnnotations:notebookAnnotations(item).filter((annotation) => {
+        if (String(annotation.section || '') !== selected.section) return true;
+        const start = Number(annotation.start) || 0;
+        const end = Number(annotation.end) || 0;
+        return end <= selected.start || start >= selected.end;
+      })
+    }));
+    refreshNotebookAnnotatedSection(selected.recordId, selected.section);
+    window.getSelection()?.removeAllRanges?.();
+    hide();
+  });
+
+  return toolbar;
+}
+
+function showNotebookSelectionToolbar(panel) {
+  const selected = captureNotebookSelection(panel);
+  const toolbar = ensureNotebookSelectionToolbar();
+  if (!selected) {
+    toolbar.hidden = true;
+    notebookSelectionState = null;
+    return false;
+  }
+
+  notebookSelectionState = selected;
+  toolbar.querySelector('[data-notebook-selection-note-editor]').hidden = true;
+  const noteText = toolbar.querySelector('[data-notebook-selection-note-editor] textarea');
+  if (noteText) noteText.value = '';
+
+  toolbar.hidden = false;
+  const toolbarRect = toolbar.getBoundingClientRect();
+  const left = Math.max(8, Math.min(
+    window.innerWidth - toolbarRect.width - 8,
+    selected.rect.left + (selected.rect.width / 2) - (toolbarRect.width / 2)
+  ));
+  const top = Math.max(8, selected.rect.top - toolbarRect.height - 8);
+  toolbar.style.left = `${Math.round(left)}px`;
+  toolbar.style.top = `${Math.round(top)}px`;
+  return true;
+}
+
+function notebookCanvasContext(canvas) {
+  return canvas?.getContext?.('2d') || null;
+}
+
+function sizeNotebookDrawingCanvas(article, item) {
+  const canvas = article?.querySelector('[data-notebook-drawing-layer]');
+  if (!canvas) return null;
+
+  const width = Math.max(1, Math.round(article.clientWidth));
+  const height = Math.max(1, Math.round(article.scrollHeight));
+  const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  canvas.style.width = `${width}px`;
+  canvas.style.height = `${height}px`;
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+
+  const context = notebookCanvasContext(canvas);
+  if (!context) return canvas;
+  context.setTransform(dpr,0,0,dpr,0,0);
+  context.clearRect(0,0,width,height);
+  context.lineCap = 'round';
+  context.lineJoin = 'round';
+
+  for (const stroke of notebookDrawings(item)) {
+    const points = Array.isArray(stroke.points) ? stroke.points : [];
+    if (points.length < 2) continue;
+
+    context.beginPath();
+    context.strokeStyle = normalizeNotebookAnnotationColor(stroke.color || '#C98900');
+    context.lineWidth = Math.max(1, Number(stroke.width) || 4);
+    context.moveTo(
+      Math.max(0, Math.min(width, Number(points[0].x) * width)),
+      Math.max(0, Math.min(height, Number(points[0].y) * height))
+    );
+    points.slice(1).forEach((point) => {
+      context.lineTo(
+        Math.max(0, Math.min(width, Number(point.x) * width)),
+        Math.max(0, Math.min(height, Number(point.y) * height))
+      );
+    });
+    context.stroke();
+  }
+  return canvas;
+}
+
+function renderNotebookDrawings(panel, records) {
+  if (!panel) return;
+  requestAnimationFrame(() => {
+    panel.querySelectorAll('[data-notebook-record-id]').forEach((article) => {
+      const item = records.find((record) => String(record.id) === String(article.dataset.notebookRecordId));
+      if (item) sizeNotebookDrawingCanvas(article, item);
+    });
+  });
+
+  if (!window.__MSG_NOTEBOOK_DRAWING_RESIZE_BOUND__) {
+    window.__MSG_NOTEBOOK_DRAWING_RESIZE_BOUND__ = true;
+    window.addEventListener('resize', () => {
+      const activePanel = document.querySelector('#global-notebook-entries')
+        || document.querySelector('#mark-notebook-panel')
+        || document.querySelector('#fullscreen-mark-notebook');
+      if (!activePanel) return;
+      const all = getMarkRecords(MARK_INSIGHTS_KEY);
+      requestAnimationFrame(() => renderNotebookDrawings(activePanel, all));
+    });
+  }
+}
+
+function bindNotebookDrawingTools(panel, records) {
+  panel.querySelectorAll('[data-notebook-draw]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const article = button.closest('[data-notebook-record-id]');
+      const recordId = String(article?.dataset?.notebookRecordId || '');
+      const item = getMarkRecords(MARK_INSIGHTS_KEY).find((record) => String(record.id) === recordId);
+      if (!article || !item) return;
+
+      const canvas = sizeNotebookDrawingCanvas(article, item);
+      const tools = article.querySelector('[data-notebook-drawing-tools]');
+      if (!canvas || !tools) return;
+
+      const enabled = !article.classList.contains('notebook-drawing-active');
+      panel.querySelectorAll('.notebook-drawing-active').forEach((other) => {
+        if (other === article) return;
+        other.classList.remove('notebook-drawing-active');
+        const otherTools = other.querySelector('[data-notebook-drawing-tools]');
+        if (otherTools) otherTools.hidden = true;
+      });
+      article.classList.toggle('notebook-drawing-active', enabled);
+      tools.hidden = !enabled;
+
+      if (!enabled || canvas.dataset.notebookDrawingBound === '1') return;
+      canvas.dataset.notebookDrawingBound = '1';
+
+      const pointFor = (event) => {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x:Math.max(0, Math.min(1, (event.clientX - rect.left) / Math.max(1, rect.width))),
+          y:Math.max(0, Math.min(1, (event.clientY - rect.top) / Math.max(1, rect.height)))
+        };
+      };
+
+      canvas.addEventListener('pointerdown', (event) => {
+        if (!article.classList.contains('notebook-drawing-active')) return;
+        if (event.pointerType === 'mouse' && event.button !== 0) return;
+
+        const color = article.querySelector('[data-notebook-drawing-color]')?.value || '#C98900';
+        const thickness = Number(article.querySelector('[data-notebook-drawing-thickness]')?.value) || 4;
+        notebookDrawState = {
+          article,
+          recordId,
+          pointerId:event.pointerId,
+          stroke:{
+            id:`nb-draw-${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+            color:normalizeNotebookAnnotationColor(color),
+            width:thickness,
+            points:[pointFor(event)],
+            createdAt:new Date().toISOString()
+          }
+        };
+        try { canvas.setPointerCapture(event.pointerId); } catch {}
+        event.preventDefault();
+      });
+
+      canvas.addEventListener('pointermove', (event) => {
+        if (!notebookDrawState || notebookDrawState.article !== article || notebookDrawState.pointerId !== event.pointerId) return;
+        notebookDrawState.stroke.points.push(pointFor(event));
+
+        const liveItem = {
+          ...item,
+          notebookDrawings:[...notebookDrawings(item), notebookDrawState.stroke]
+        };
+        sizeNotebookDrawingCanvas(article, liveItem);
+        event.preventDefault();
+      });
+
+      const finish = (event) => {
+        if (!notebookDrawState || notebookDrawState.article !== article || notebookDrawState.pointerId !== event.pointerId) return;
+        try { canvas.releasePointerCapture(event.pointerId); } catch {}
+        const stroke = notebookDrawState.stroke;
+        notebookDrawState = null;
+        if (stroke.points.length < 2) return;
+
+        const updated = updateNotebookRecord(recordId, (record) => ({
+          ...record,
+          notebookDrawings:[...notebookDrawings(record), stroke].slice(-250)
+        }));
+        if (updated) sizeNotebookDrawingCanvas(article, updated);
+      };
+      canvas.addEventListener('pointerup', finish);
+      canvas.addEventListener('pointercancel', finish);
+    });
+  });
+
+  panel.querySelectorAll('[data-notebook-drawing-done]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const article = button.closest('[data-notebook-record-id]');
+      article?.classList.remove('notebook-drawing-active');
+      const tools = article?.querySelector('[data-notebook-drawing-tools]');
+      if (tools) tools.hidden = true;
+    });
+  });
+
+  panel.querySelectorAll('[data-notebook-drawing-clear]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const article = button.closest('[data-notebook-record-id]');
+      const recordId = String(article?.dataset?.notebookRecordId || '');
+      if (!recordId) return;
+      const updated = updateNotebookRecord(recordId, (item) => ({
+        ...item,
+        notebookDrawings:[]
+      }));
+      if (updated) sizeNotebookDrawingCanvas(article, updated);
+    });
+  });
+}
+
+function bindNotebookFlexibleInteractions(panel, records) {
+  if (!panel) return;
+
+  panel.querySelectorAll('[data-notebook-note-editor]').forEach((textarea) => {
+    textarea.addEventListener('input', () => queueNotebookInlineNoteSave(textarea));
+    textarea.addEventListener('blur', () => {
+      const id = String(textarea.dataset.notebookNoteEditor || '');
+      window.clearTimeout(notebookInlineSaveTimers.get(id));
+      notebookInlineSaveTimers.delete(id);
+      const status = textarea.closest('[data-notebook-record-id]')?.querySelector('[data-notebook-note-status]');
+      saveNotebookInlineNote(id, textarea.value, status);
+    });
+  });
+
+  panel.addEventListener('mouseup', (event) => {
+    if (event.target.closest('button,textarea,input,select,a,summary')) return;
+    window.setTimeout(() => showNotebookSelectionToolbar(panel), 0);
+  });
+
+  panel.addEventListener('keyup', (event) => {
+    if (!event.shiftKey || !['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(event.key)) return;
+    window.setTimeout(() => showNotebookSelectionToolbar(panel), 0);
+  });
+
+  bindNotebookDrawingTools(panel, records);
+  renderNotebookDrawings(panel, records);
+}
+
 function notebookEntryMarkup(item) {
   const response=item.result?.response||'';
-  return `<article class="mark-record expanded-notebook-record">
+  const annotations = notebookAnnotations(item);
+  const drawings = notebookDrawings(item);
+
+  return `<article class="mark-record expanded-notebook-record"
+    data-notebook-record-id="${escapeHtml(String(item.id || ''))}">
     <header class="notebook-record-header">
       <div><strong>${escapeHtml(item.title||'Untitled')}</strong><small>${escapeHtml(item.chapter||item.pageContext||'Notebook entry')} · ${escapeHtml(new Date(item.createdAt||Date.now()).toLocaleString())}</small></div>
       <span>${item.result?'Ask Mark insight':item.recordType==='personal-note'?'Personal note':'Passage'}</span>
     </header>
-    ${item.selection?`<section class="notebook-passage"><h4>Relevant passage</h4><blockquote>${escapeHtml(item.selection)}</blockquote></section>`:''}
-    ${item.note?`<section class="notebook-personal-note"><h4>My note</h4><p>${escapeHtml(item.note)}</p></section>`:''}
-    ${item.question?`<section><h4>Question</h4><p>${escapeHtml(item.question)}</p></section>`:''}
-    ${response?`<section class="notebook-mark-response"><h4>${escapeHtml(item.result?.heading||'Ask Mark’s response')}</h4><p>${escapeHtml(response)}</p></section>`:''}
-    ${item.result?.keyPoints?.length?`<section><h4>Key points</h4><ul>${item.result.keyPoints.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section>`:''}
-    ${item.result?.cautions?.length?`<section><h4>Notes and cautions</h4><ul>${item.result.cautions.map(x=>`<li>${escapeHtml(x)}</li>`).join('')}</ul></section>`:''}
+
+    ${item.selection?`<section class="notebook-passage">
+      <h4>Relevant passage</h4>
+      <blockquote data-notebook-annotatable="selection">${notebookAnnotatedHtml(item,'selection',item.selection)}</blockquote>
+    </section>`:''}
+
+    <section class="notebook-personal-note notebook-inline-note-section">
+      <div class="notebook-inline-note-heading">
+        <h4>My note</h4>
+        <small data-notebook-note-status></small>
+      </div>
+      <textarea class="notebook-inline-note-editor"
+        data-notebook-note-editor="${escapeHtml(String(item.id || ''))}"
+        rows="2"
+        maxlength="12000"
+        placeholder="Write a thought, question, connection, or reminder here…">${escapeHtml(item.note||'')}</textarea>
+    </section>
+
+    ${item.question?`<section><h4>Question</h4><p data-notebook-annotatable="question">${notebookAnnotatedHtml(item,'question',item.question)}</p></section>`:''}
+    ${response?`<section class="notebook-mark-response"><h4>${escapeHtml(item.result?.heading||'Ask Mark’s response')}</h4><p data-notebook-annotatable="response">${notebookAnnotatedHtml(item,'response',response)}</p></section>`:''}
+
+    ${item.result?.keyPoints?.length?`<section><h4>Key points</h4><ul>${item.result.keyPoints.map((x,index)=>`<li data-notebook-annotatable="keypoint-${index}">${notebookAnnotatedHtml(item,`keypoint-${index}`,x)}</li>`).join('')}</ul></section>`:''}
+
+    ${item.result?.cautions?.length?`<section><h4>Notes and cautions</h4><ul>${item.result.cautions.map((x,index)=>`<li data-notebook-annotatable="caution-${index}">${notebookAnnotatedHtml(item,`caution-${index}`,x)}</li>`).join('')}</ul></section>`:''}
+
     <details class="notebook-plain-text"><summary>View as plain text</summary><pre>${escapeHtml(notebookRecordFullText(item))}</pre></details>
-    <div class="notebook-record-actions">
-      ${item.documentId?`<button type="button" data-mark-jump="${Number(item.startIndex)||0}">Return to passage</button>`:''}
-      <button type="button" data-export-notebook-record="${escapeHtml(item.id)}">Save as text</button>
-      <button type="button" data-edit-notebook-note="${escapeHtml(item.id)}">Add/Edit my note</button>
-      <button type="button" data-mark-delete="${escapeHtml(item.id)}">Delete</button>
+
+    <div class="notebook-record-actions compact-action-strip" aria-label="Notebook entry actions">
+      ${item.documentId?`<button type="button" class="notebook-action" data-mark-jump="${Number(item.startIndex)||0}" data-mark-document="${escapeHtml(String(item.documentId || ''))}" title="Return to passage" aria-label="Return to passage">↩ <span>Passage</span></button>`:''}
+      <button type="button" class="notebook-action" data-share-notebook-record="chat" data-share-notebook-id="${escapeHtml(item.id)}" title="Send to Chat">💬 <span>Chat</span></button>
+      <button type="button" class="notebook-action" data-share-notebook-record="symposium" data-share-notebook-id="${escapeHtml(item.id)}" title="Discuss in Symposium">🏛 <span>Symposium</span></button>
+      <button type="button" class="notebook-action" data-notebook-draw title="Draw directly on this entry">✐ <span>Draw</span></button>
+      <button type="button" class="notebook-action" data-export-notebook-record="${escapeHtml(item.id)}" title="Save this entry as text">⇩ <span>Text</span></button>
+      <button type="button" class="notebook-action notebook-delete-action" data-mark-delete="${escapeHtml(item.id)}" title="Delete this entry" aria-label="Delete this notebook entry">×</button>
+    </div>
+
+    <canvas class="notebook-drawing-layer${drawings.length ? ' has-drawing' : ''}" data-notebook-drawing-layer aria-hidden="true"></canvas>
+    <div class="notebook-drawing-tools" data-notebook-drawing-tools hidden>
+      <strong>Draw</strong>
+      <label class="notebook-drawing-color-label">
+        <span>Color</span>
+        <input type="color" data-notebook-drawing-color value="#C98900" aria-label="Drawing color">
+      </label>
+      <label>
+        <span>Size</span>
+        <select data-notebook-drawing-thickness aria-label="Drawing thickness">
+          <option value="2">Thin</option>
+          <option value="4" selected>Medium</option>
+          <option value="7">Thick</option>
+          <option value="12">Marker</option>
+        </select>
+      </label>
+      <button type="button" data-notebook-drawing-clear>Clear</button>
+      <button type="button" data-notebook-drawing-done>Done</button>
     </div>
   </article>`;
 }
-
 function bindExpandedNotebookButtons(panel,records,key=MARK_INSIGHTS_KEY) {
   bindMarkRecordButtons(panel,key);
+
+  panel.querySelectorAll('[data-share-notebook-record]').forEach(button=>button.addEventListener('click',()=>{
+    const item=records.find(x=>x.id===button.dataset.shareNotebookId);
+    if(!item)return;
+    shareMarkRecord(item,button.dataset.shareNotebookRecord,{sourceLabel:'Notebook',type:'notebook-entry'});
+  }));
+
   panel.querySelectorAll('[data-export-notebook-record]').forEach(button=>button.addEventListener('click',()=>{
     const item=records.find(x=>x.id===button.dataset.exportNotebookRecord);
     if(item)exportNotebookRecords([item],`${item.title||'Book'} - Notebook Entry`);
   }));
-  panel.querySelectorAll('[data-edit-notebook-note]').forEach(button=>button.addEventListener('click',()=>{
-    const current=getMarkRecords(MARK_INSIGHTS_KEY);
-    const item=current.find(x=>x.id===button.dataset.editNotebookNote);
-    if(!item)return;
-    const note=window.prompt('Add or edit your personal note:',item.note||'');
-    if(note===null)return;
-    saveMarkRecords(MARK_INSIGHTS_KEY,current.map(x=>x.id===item.id?{...x,note:note.trim(),updatedAt:new Date().toISOString()}:x));
-    renderMarkNotebook();renderFullscreenMarkNotebook();renderGlobalNotebookEntries();
-  }));
-}
 
+  bindNotebookFlexibleInteractions(panel,records);
+}
 function renderNotebookCollection(panel,records,{title='Ask Mark Notebook',includeExport=true}={}) {
   if(!panel)return;
   panel.innerHTML=`<div class="mark-list-heading notebook-list-heading">
     <div><strong>${escapeHtml(title)}</strong><small>${records.length} saved ${records.length===1?'entry':'entries'}</small></div>
-    <div class="notebook-heading-actions">
-      <button type="button" data-email-notebook-all>Email notes</button>
-      ${includeExport?'<button type="button" data-export-notebook-all>Save as text</button>':''}
+    <div class="notebook-heading-actions compact-action-strip">
+      <button type="button" class="notebook-action" data-email-notebook-all title="Email notebook entries">✉ <span>Email</span></button>
+      ${includeExport?'<button type="button" class="notebook-action" data-export-notebook-all title="Save notebook as text">⇩ <span>Text</span></button>':''}
     </div>
   </div>
   ${records.length?records.map(notebookEntryMarkup).join(''):'<p class="mark-empty-note">Capture a passage, a response from Ask Mark, or one of your own thoughts to begin the notebook.</p>'}`;
@@ -9557,11 +13628,52 @@ function renderMarkNotebook(){
 }
 function renderMarkHistory(){
   const panel=app.querySelector('#mark-history-panel'); if(!panel)return; const items=markRecordsForCurrentBook(MARK_HISTORY_KEY);
-  panel.innerHTML=`<div class="mark-list-heading"><strong>Conversation History</strong><small>${items.length} requests</small></div>${items.length?items.map(item=>`<article class="mark-record"><span>${escapeHtml(item.action)}${item.question?` · ${escapeHtml(item.question)}`:''}</span><blockquote>${escapeHtml(item.selection.slice(0,280))}${item.selection.length>280?'…':''}</blockquote><p>${escapeHtml(item.result?.response?.slice(0,500)||'')}</p><div><button type="button" data-mark-jump="${item.startIndex}">Return to passage</button></div></article>`).join(''):'<p class="mark-empty-note">Your requests to Ask Mark for this book will appear here.</p>'}`; bindMarkRecordButtons(panel,MARK_HISTORY_KEY);
+  panel.innerHTML=`<div class="mark-list-heading"><strong>Conversation History</strong><small>${items.length} requests</small></div>${items.length?items.map(item=>`<article class="mark-record"><span>${escapeHtml(item.action)}${item.question?` · ${escapeHtml(item.question)}`:''}</span><blockquote>${escapeHtml(item.selection.slice(0,280))}${item.selection.length>280?'…':''}</blockquote><p>${escapeHtml(item.result?.response?.slice(0,500)||'')}</p><div><button type="button" data-mark-jump="${item.startIndex}">Return to passage</button><button type="button" data-share-mark-history="chat" data-share-history-id="${escapeHtml(item.id)}">💬 Send to Chat</button><button type="button" data-share-mark-history="symposium" data-share-history-id="${escapeHtml(item.id)}">🏛 Discuss in Symposium</button></div></article>`).join(''):'<p class="mark-empty-note">Your requests to Ask Mark for this book will appear here.</p>'}`;
+  bindMarkRecordButtons(panel,MARK_HISTORY_KEY);
+  panel.querySelectorAll('[data-share-mark-history]').forEach(button=>button.addEventListener('click',()=>{
+    const item=items.find(x=>x.id===button.dataset.shareHistoryId);
+    if(!item)return;
+    shareMarkRecord(item,button.dataset.shareMarkHistory,{sourceLabel:'Reading Companion History',type:'companion-history'});
+  }));
 }
 function bindMarkRecordButtons(panel,key){
-  panel.querySelectorAll('[data-mark-jump]').forEach(b=>b.addEventListener('click',()=>{const index=Number(b.dataset.markJump)||0;state.index=index;const reader=app.querySelector('#reader');const mode=state.renderedMode||getSelectedMode();const count=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);restoreReadingAnchor(reader,mode,count,index);updateReaderStatus();}));
-  panel.querySelectorAll('[data-mark-delete]').forEach(b=>b.addEventListener('click',()=>{saveMarkRecords(key,getMarkRecords(key).filter(x=>x.id!==b.dataset.markDelete));key===MARK_INSIGHTS_KEY?renderMarkNotebook():renderMarkHistory();}));
+  panel.querySelectorAll('[data-mark-jump]').forEach(b=>b.addEventListener('click',async()=>{
+    const index=Number(b.dataset.markJump)||0;
+    const documentId=String(b.dataset.markDocument||'').trim();
+
+    if(!app.querySelector('#reader')){
+      if(documentId && documentId!==state.documentId){
+        const data=await getStoredReaderDocument(documentId);
+        if(!data?.text){
+          window.alert('The source text is not stored in this browser.');
+          return;
+        }
+        renderReaderWithText(data.title,data.text,data.source||{type:'saved'});
+      }else{
+        renderCurrentReader();
+      }
+      await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+    }
+
+    state.index=index;
+    const reader=app.querySelector('#reader');
+    if(!reader)return;
+    const mode=state.renderedMode||getSelectedMode();
+    const count=Math.max(1,Number(app.querySelector('#word-count')?.value)||1);
+    restoreReadingAnchor(reader,mode,count,index);
+    updateReaderStatus();
+  }));
+
+  panel.querySelectorAll('[data-mark-delete]').forEach(b=>b.addEventListener('click',()=>{
+    saveMarkRecords(key,getMarkRecords(key).filter(x=>x.id!==b.dataset.markDelete));
+    if(key===MARK_INSIGHTS_KEY){
+      try{renderMarkNotebook();}catch{}
+      try{renderFullscreenMarkNotebook();}catch{}
+      try{renderGlobalNotebookEntries();}catch{}
+    }else{
+      renderMarkHistory();
+    }
+  }));
 }
 function selectReaderParagraphFromEvent(event){
   const reader=app.querySelector('#reader'); if(!reader)return;
@@ -9588,6 +13700,18 @@ function selectReaderParagraphFromEvent(event){
     openMarkPanel('selection');
   }
 }
+
+function readerClickControlsAreEnabled() {
+  const checkbox = app.querySelector('#reader-click-controls');
+  if (checkbox && checkbox.type === 'checkbox') return Boolean(checkbox.checked);
+
+  try {
+    return localStorage.getItem('msg_reader_click_controls_v1') !== 'off';
+  } catch {
+    return readerClickControlsAreEnabled();
+  }
+}
+
 function bindMarkCompanion(reader){
   const toolbar=app.querySelector('#mark-selection-toolbar');
   if(!reader||!toolbar)return;
@@ -9611,12 +13735,9 @@ function bindMarkCompanion(reader){
   state.markSuppressNextReaderClick=false;
   state.markResumeOnNextReaderClick=null;
   state.markSelectionWasRunning=false;
-
-  state.markHighlightObserver?.disconnect?.();
-  state.markHighlightObserver=new MutationObserver(()=>{
-    if(state.markPersistentSelection) requestAnimationFrame(applyPersistentMarkSelectionHighlight);
-  });
-  state.markHighlightObserver.observe(reader,{childList:true,subtree:true});
+  // Reader isolation: persistent selection highlighting is refreshed by explicit
+  // Reader events (scroll/reflow/selection actions), never by DOM mutation watching.
+  state.markHighlightObserver = null;
 
   const pauseForSelection=(interaction)=>{
     if(!interaction || interaction.paused) return;
@@ -9683,7 +13804,7 @@ function bindMarkCompanion(reader){
         state.markSuppressNextReaderClick=false;
         interaction.selecting=false;
         interaction.moved=false;
-        if(interaction.wasRunning && !isReaderRunning()) startReader();
+        if(readerClickControlsAreEnabled() && interaction.wasRunning && !isReaderRunning()) startReader();
       });
     });
   };
@@ -9705,10 +13826,15 @@ function bindMarkCompanion(reader){
     event.preventDefault();
     event.stopImmediatePropagation();
 
+    if(!readerClickControlsAreEnabled()){
+      updateReaderStatus('Reader click controls are off.');
+      return;
+    }
+
     const clickedWord=event.target.closest?.('.reader-word[data-index]');
     const clickedGroup=event.target.closest?.('.reader-group[data-start-index]');
     const mode=getSelectedMode();
-    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','pointing-guide','marquee','auto-scroll']);
+    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','line-sweep','pointing-guide','marquee','auto-scroll']);
 
     // The click that clears an Ask Mark selection must still perform the user's
     // requested reader action. Previously a paused-before-selection state
@@ -9751,7 +13877,7 @@ function bindMarkCompanion(reader){
     // temporary highlight. Playback resumes only if it had been running before
     // the selection began; the click itself is handled in the capture listener.
     if(state.markSelectionLocked){
-      const shouldResume=Boolean(state.markSelectionWasRunning);
+      const shouldResume=readerClickControlsAreEnabled() && Boolean(state.markSelectionWasRunning);
       clearMarkSelectionForReadingResume();
       state.markSelectionWasRunning=false;
       state.markResumeOnNextReaderClick={shouldResume};
@@ -9823,10 +13949,11 @@ function bindMarkCompanion(reader){
   document.addEventListener('selectionchange',state.markSelectionChangeHandler);
 
   const performStableReaderPointerAction=(interaction)=>{
+    if(!readerClickControlsAreEnabled()) return;
     const mode=getSelectedMode();
     if(mode==='two-column') return;
 
-    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','pointing-guide','marquee','auto-scroll']);
+    const seekableModes=new Set(['highlight','bold-focus','smooth-glide','line-sweep','pointing-guide','marquee','auto-scroll']);
     const clickedIndex=Number(interaction?.downWordIndex);
 
     if(interaction?.downWasText && Number.isFinite(clickedIndex) && seekableModes.has(mode)){
@@ -9842,9 +13969,8 @@ function bindMarkCompanion(reader){
       return;
     }
 
-    if(isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
+    // Blank reader space must never start or pause playback.
+    return;
   };
 
   reader.addEventListener('pointerup',(event)=>{
@@ -9855,6 +13981,13 @@ function bindMarkCompanion(reader){
     // or replaces the clicked word before the browser dispatches `click`.
     if(interaction?.active && !interaction.selecting && !interaction.moved){
       interaction.active=false;
+
+      if(!readerClickControlsAreEnabled()){
+        // Passive reading: consume no playback action. Leave the browser's
+        // normal click available for non-playback UI/selection semantics.
+        return;
+      }
+
       performStableReaderPointerAction(interaction);
 
       state.readerSuppressSyntheticClick=true;
@@ -9870,7 +14003,7 @@ function bindMarkCompanion(reader){
     const interaction=state.markSelectionInteraction;
     if(!interaction) return;
     interaction.active=false;
-    if(interaction.paused && !state.markSelectionLocked && interaction.wasRunning && !isReaderRunning()){
+    if(readerClickControlsAreEnabled() && interaction.paused && !state.markSelectionLocked && interaction.wasRunning && !isReaderRunning()){
       state.markSuppressNextReaderClick=false;
       startReader();
     }
@@ -9888,6 +14021,13 @@ function bindMarkCompanion(reader){
 
   // This capture listener runs before the reader's normal click handler.
   reader.addEventListener('click',(event)=>{
+    if(!readerClickControlsAreEnabled() && state.markResumeOnNextReaderClick!==null){
+      state.markResumeOnNextReaderClick=null;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      updateReaderStatus('Reader click controls are off.');
+      return;
+    }
     if(state.markResumeOnNextReaderClick!==null){
       resumeAfterLockedSelectionClick(event);
       return;
@@ -9906,9 +14046,240 @@ function bindMarkCompanion(reader){
     event.stopImmediatePropagation();
   },true);
 
-  reader.addEventListener('dblclick',event=>{if(event.altKey)selectReaderParagraphFromEvent(event);});
-  toolbar.addEventListener('mousedown',e=>e.preventDefault());
+  reader.addEventListener('dblclick',(event)=>{
+    // Preserve the existing Alt+double-click paragraph-selection behavior.
+    if(event.altKey){
+      selectReaderParagraphFromEvent(event);
+      return;
+    }
+    if(event.ctrlKey || event.metaKey) return;
+    if(!readerClickControlsAreEnabled()) return;
+
+    const target=event.target instanceof Element ? event.target : null;
+    if(!target) return;
+    if(target.closest('button, input, textarea, select, a, summary, [contenteditable="true"], [role="textbox"]')) return;
+
+    // A native scrollbar belongs to scrolling only, never playback.
+    const rect=reader.getBoundingClientRect();
+    const verticalScrollbar=Math.max(0,reader.offsetWidth-reader.clientWidth);
+    const horizontalScrollbar=Math.max(0,reader.offsetHeight-reader.clientHeight);
+    const onVerticalScrollbar=verticalScrollbar>0 && event.clientX>=rect.right-verticalScrollbar;
+    const onHorizontalScrollbar=horizontalScrollbar>0 && event.clientY>=rect.bottom-horizontalScrollbar;
+    if(onVerticalScrollbar || onHorizontalScrollbar) return;
+
+    event.preventDefault();
+    if(isReaderRunning()) pauseReader();
+    else startReader();
+    persistReaderSession();
+  });
+  toolbar.addEventListener('mousedown',(event)=>{
+    // Keep the browser text range alive while using toolbar buttons. Native
+    // color inputs need their default pointer behavior in order to open.
+    if (!event.target.closest('input[type="color"], textarea, input[type="text"], select')) event.preventDefault();
+  });
+
+  const annotateMenu = toolbar.querySelector('[data-mark-annotate-menu]');
+  const annotateMenuToggle = toolbar.querySelector('[data-mark-annotate-toggle]');
+  const moreMenu = toolbar.querySelector('[data-mark-more-menu]');
+  const moreMenuToggle = toolbar.querySelector('[data-mark-more-toggle]');
+  const closeAnnotateMenu = () => {
+    if (annotateMenu) annotateMenu.hidden = true;
+    annotateMenuToggle?.setAttribute('aria-expanded','false');
+  };
+  const closeMoreMenu = () => {
+    if (moreMenu) moreMenu.hidden = true;
+    moreMenuToggle?.setAttribute('aria-expanded','false');
+  };
+  annotateMenuToggle?.addEventListener('click',()=>{
+    closeMoreMenu();
+    if (!annotateMenu) return;
+    annotateMenu.hidden = !annotateMenu.hidden;
+    annotateMenuToggle.setAttribute('aria-expanded',String(!annotateMenu.hidden));
+  });
+  moreMenuToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu();
+    if (!moreMenu) return;
+    moreMenu.hidden = !moreMenu.hidden;
+    moreMenuToggle.setAttribute('aria-expanded',String(!moreMenu.hidden));
+  });
+
+  const highlightPicker = toolbar.querySelector('[data-passage-highlight-picker]');
+  const highlightToggle = toolbar.querySelector('[data-passage-highlight-toggle]');
+  const closeHighlightPicker = () => {
+    if (highlightPicker) highlightPicker.hidden = true;
+    highlightToggle?.setAttribute('aria-expanded','false');
+  };
+  highlightToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu();
+    closeMoreMenu();
+    if (!highlightPicker) return;
+    highlightPicker.hidden = !highlightPicker.hidden;
+    highlightToggle.setAttribute('aria-expanded', String(!highlightPicker.hidden));
+  });
+  toolbar.querySelector('[data-mark-annotation-highlight]')?.addEventListener('click',()=>{
+    closeAnnotateMenu();
+    if (highlightPicker?.hidden) highlightToggle?.click();
+  });
+  toolbar.querySelectorAll('[data-passage-highlight-color]').forEach((button)=>button.addEventListener('click',()=>{
+    const selected = state.markSelection ? {...state.markSelection} : null;
+    if (!selected) return;
+    addSavedPassageHighlight(selected, button.dataset.passageHighlightColor);
+    closeHighlightPicker();
+    finishPassageHighlightAction();
+    updateReaderStatus('Passage highlighted.');
+  }));
+  toolbar.querySelector('[data-passage-highlight-custom]')?.addEventListener('input',(event)=>{
+    const selected = state.markSelection ? {...state.markSelection} : null;
+    if (!selected) return;
+    addSavedPassageHighlight(selected, event.currentTarget.value);
+    closeHighlightPicker();
+    finishPassageHighlightAction();
+    updateReaderStatus('Passage highlighted.');
+  });
+  const writingEditor = toolbar.querySelector('[data-reader-writing-editor]');
+  const writingToggle = toolbar.querySelector('[data-reader-writing-toggle]');
+  const writingText = toolbar.querySelector('[data-reader-writing-text]');
+  const writingColor = toolbar.querySelector('[data-reader-writing-color]');
+  const writingFontSize = toolbar.querySelector('[data-reader-writing-font-size]');
+  const closeWritingEditor = () => {
+    if (writingEditor) writingEditor.hidden = true;
+    writingToggle?.setAttribute('aria-expanded','false');
+  };
+  writingToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
+    if (!writingEditor) return;
+    closeHighlightPicker();
+    writingEditor.hidden = !writingEditor.hidden;
+    writingToggle.setAttribute('aria-expanded', String(!writingEditor.hidden));
+    if (!writingEditor.hidden) requestAnimationFrame(()=>writingText?.focus());
+  });
+  toolbar.querySelectorAll('[data-reader-writing-color-choice]').forEach((button)=>button.addEventListener('click',()=>{
+    if (writingColor) writingColor.value = button.dataset.readerWritingColorChoice || '#C98900';
+    toolbar.querySelectorAll('[data-reader-writing-color-choice]').forEach((choice)=>choice.classList.toggle('active', choice === button));
+  }));
+  toolbar.querySelector('[data-reader-writing-save]')?.addEventListener('click',()=>{
+    const selected = state.markSelection ? {...state.markSelection} : null;
+    if (!selected || !writingText) return;
+    if (!addSavedReaderWriting(selected, writingText.value, writingColor?.value, writingFontSize?.value)) {
+      writingText.focus();
+      return;
+    }
+    writingText.value = '';
+    closeWritingEditor();
+    finishPassageHighlightAction();
+    updateReaderStatus('Written annotation saved.');
+  });
+  toolbar.querySelector('[data-reader-writing-cancel]')?.addEventListener('click',()=>{
+    if (writingText) writingText.value = '';
+    closeWritingEditor();
+  });
+  const drawingEditor = toolbar.querySelector('[data-reader-drawing-editor]');
+  const drawingToggle = toolbar.querySelector('[data-reader-drawing-toggle]');
+  const drawingColor = toolbar.querySelector('[data-reader-drawing-color]');
+  const drawingThickness = toolbar.querySelector('[data-reader-drawing-thickness]');
+  const closeDrawingEditor = () => {
+    if (drawingEditor) drawingEditor.hidden = true;
+    drawingToggle?.setAttribute('aria-expanded','false');
+  };
+  drawingToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
+    if (!drawingEditor) return;
+    closeHighlightPicker();
+    closeWritingEditor();
+    drawingEditor.hidden = !drawingEditor.hidden;
+    drawingToggle.setAttribute('aria-expanded', String(!drawingEditor.hidden));
+  });
+  toolbar.querySelectorAll('[data-reader-drawing-color-choice]').forEach((button)=>button.addEventListener('click',()=>{
+    if (drawingColor) drawingColor.value = button.dataset.readerDrawingColorChoice || '#E9B949';
+    toolbar.querySelectorAll('[data-reader-drawing-color-choice]').forEach((choice)=>choice.classList.toggle('active', choice === button));
+  }));
+  toolbar.querySelector('[data-reader-drawing-start]')?.addEventListener('click',()=>{
+    const color = drawingColor?.value || '#E9B949';
+    const thickness = drawingThickness?.value || 4;
+    closeDrawingEditor();
+    finishPassageHighlightAction();
+    startReaderDrawingMode({color, thickness});
+  });
+  toolbar.querySelector('[data-reader-drawing-cancel]')?.addEventListener('click',closeDrawingEditor);
+  const workspaceEditor = toolbar.querySelector('[data-reader-workspace-editor]');
+  const workspaceToggle = toolbar.querySelector('[data-reader-workspace-toggle]');
+  const closeWorkspaceEditor = () => {
+    if (workspaceEditor) workspaceEditor.hidden = true;
+    workspaceToggle?.setAttribute('aria-expanded','false');
+  };
+  workspaceToggle?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
+    if (!workspaceEditor) return;
+    closeHighlightPicker(); closeWritingEditor(); closeDrawingEditor();
+    workspaceEditor.hidden = !workspaceEditor.hidden;
+    workspaceToggle.setAttribute('aria-expanded',String(!workspaceEditor.hidden));
+  });
+  toolbar.querySelector('[data-reader-workspace-cancel]')?.addEventListener('click',closeWorkspaceEditor);
+  toolbar.querySelector('[data-reader-workspace-insert]')?.addEventListener('click',()=>{
+    const selected = state.markSelection ? {...state.markSelection} : null;
+    if (!selected) return;
+    const height = toolbar.querySelector('[data-reader-workspace-height]')?.value || 280;
+    if (!addSavedReaderWorkspace(selected,height)) return;
+    closeWorkspaceEditor();
+    finishPassageHighlightAction();
+    updateReaderStatus('Workspace inserted. Add text, draw, or insert a photo.');
+  });
+  toolbar.querySelector('[data-passage-highlight-erase]')?.addEventListener('click',()=>{
+    closeAnnotateMenu(); closeMoreMenu();
+    const selected = state.markSelection ? {...state.markSelection} : null;
+    if (!selected) return;
+    const result = eraseSavedReaderAnnotations(selected);
+    closeHighlightPicker();
+    closeWritingEditor();
+    closeDrawingEditor();
+    finishPassageHighlightAction();
+    updateReaderStatus(result.highlightChanged || result.writingRemoved || result.drawingRemoved ? 'Markup erased from selected passage.' : 'No saved markup found in the selected passage.');
+  });
+  // Reader isolation: annotation repainting is event-driven. Virtual window changes
+  // are followed by reader scroll/resize or an explicit Reader action, so no DOM
+  // observer is allowed to run during animated reading modes.
+  state.passageHighlightObserver = null;
+  applySavedPassageHighlights();
+  applySavedReaderWritingOverlays();
+  applySavedReaderDrawings();
+  applySavedReaderWorkspaces();
+  bindReaderDrawingSurface(reader);
+  let writingPositionFrame = 0;
+  const scheduleWritingPosition = () => {
+    cancelAnimationFrame(writingPositionFrame);
+    writingPositionFrame = requestAnimationFrame(()=>{
+      if (state.markPersistentSelection) applyPersistentMarkSelectionHighlight();
+      applySavedPassageHighlights();
+      applySavedReaderWritingOverlays();
+      applySavedReaderDrawings();
+      applySavedReaderWorkspaces();
+    });
+  };
+  reader.addEventListener('scroll', scheduleWritingPosition, {passive:true});
+  state.readerWritingResizeObserver?.disconnect?.();
+  state.readerWritingResizeObserver = new ResizeObserver(scheduleWritingPosition);
+  state.readerWritingResizeObserver.observe(reader);
+
+  toolbar.querySelectorAll('[data-msg-share-selection]').forEach((button)=>button.addEventListener('click',()=>{
+    closeMoreMenu(); closeAnnotateMenu();
+    const selected = state.markSelection ? {...state.markSelection} : (state.markPersistentSelection ? {...state.markPersistentSelection} : null);
+    if (!selected?.text) return;
+    const payload = {
+      type:'passage',
+      title:selected.title || state.title || 'Reader passage',
+      text:selected.text,
+      sourceLabel:'Reader',
+      sourceUrl:state.source?.url || state.source?.sourceUrl || '',
+      documentId:selected.documentId || state.documentId || '',
+      chapter:selected.chapter || currentTocTitle() || '',
+      startIndex:Number(selected.startIndex) || 0
+    };
+    if (button.dataset.msgShareSelection === 'symposium') window.MSGContentShare?.toSymposium?.(payload);
+    else window.MSGContentShare?.toChat?.(payload);
+  }));
+
   toolbar.querySelectorAll('[data-mark-toolbar-action]').forEach(b=>b.addEventListener('click',()=>{
+    closeMoreMenu(); closeAnnotateMenu();
     openMarkPanel('selection');
     renderMarkSelectionCard();
     if(b.dataset.markToolbarAction==='ask'){
@@ -9923,7 +14294,26 @@ function bindMarkCompanion(reader){
     }
     runMarkAction(b.dataset.markToolbarAction);
   }));
-  toolbar.querySelector('[data-mark-more]')?.addEventListener('click',()=>{openMarkPanel('selection');renderMarkSelectionCard();});
+  toolbar.querySelectorAll('[data-mark-more-prompt]').forEach((button)=>button.addEventListener('click',()=>{
+    closeMoreMenu();
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    hideMarkToolbar();
+    runMarkAction('ask',button.dataset.markMorePrompt || '');
+  }));
+  toolbar.querySelectorAll('[data-mark-more-tool]').forEach((button)=>button.addEventListener('click',()=>{
+    closeMoreMenu();
+    openMarkPanel('selection');
+    renderMarkSelectionCard();
+    hideMarkToolbar();
+    const tool=button.dataset.markMoreTool;
+    window.requestAnimationFrame(()=>window.MarkSetGoAskMarkHub?.runStudyTool?.(tool));
+  }));
+  toolbar.querySelector('[data-mark-more-comprehension]')?.addEventListener('click',()=>{
+    closeMoreMenu();
+    hideMarkToolbar();
+    window.MarkSetGoStartComprehension?.();
+  });
   app.querySelector('#toggle-mark-panel')?.addEventListener('click',()=>{
     const layout=app.querySelector('#reader-layout');
     const hidden=layout?.classList.contains('word-panel-hidden');
@@ -10090,13 +14480,23 @@ function openModernGuideContextInAskMark(markerIndex) {
   const wasRunning = isReaderRunning();
   if (wasRunning) pauseReader();
 
-  // Preserve the actual guide action position as the Reader's canonical cursor,
-  // but keep the Ask Mark selection as the full section range.
+  // In Book Pages the Discuss control is a synthetic guide-action token, not
+  // ordinary reading text. Anchoring a reflow to that token can resolve to the
+  // first spread after the companion panel changes width. Keep the cursor on
+  // the last real word immediately before the action instead; that word is on
+  // the spread the reader actually clicked from. Normal mode keeps the legacy
+  // action-token position because it does not repaginate.
   const actionIndex = Math.max(0, Math.min(
     Math.max(0, state.words.length - 1),
     Number.isFinite(Number(markerIndex)) ? Number(markerIndex) : context.startIndex
   ));
-  state.index = actionIndex;
+  const sectionTextAnchor = Math.max(
+    context.startIndex,
+    Math.min(Math.max(context.startIndex, context.endIndex - 1), Math.max(0, state.words.length - 1))
+  );
+  const readerAnchorIndex = state.bookPages ? sectionTextAnchor : actionIndex;
+  state.index = readerAnchorIndex;
+  state.viewportAnchorIndex = readerAnchorIndex;
 
   const selection = {
     text: context.text,
@@ -10254,25 +14654,57 @@ function addModernGuideActionToCenter(source = state?.source || {}, trigger = nu
 }
 
 function openModernGuideGreatIdea(source = state?.source || {}) {
-  const config = modernGuideInteractionConfig(source);
-  const idea = config?.greatIdea || '';
-  rememberReaderForReturn();
+  const config = modernGuideInteractionConfig(source) || {};
+  const idea = String(config.greatIdea || (source?.classicGuide ? classicGuideGreatIdea({
+    title: source.originalTitle,
+    author: source.originalAuthor
+  }) : '') || 'Philosophy');
+
+  try {
+    rememberReaderForReturn();
+  } catch (error) {
+    console.warn('Could not save Reader return state before Great Ideas:', error);
+  }
+
   renderSyntopicon();
 
-  requestAnimationFrame(() => {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
     const select = app.querySelector('#syntopicon-idea');
-    if (select && idea && Array.from(select.options).some((option) => option.value === idea)) {
+    const custom = app.querySelector('#syntopicon-custom-idea');
+    const status = app.querySelector('#syntopicon-status');
+
+    if (select && Array.from(select.options).some((option) => option.value === idea)) {
       select.value = idea;
       select.dispatchEvent(new Event('change', { bubbles:true }));
-      select.focus();
-      return;
-    }
-    const custom = app.querySelector('#syntopicon-custom-idea');
-    if (custom) {
+    } else if (custom) {
       custom.value = idea;
-      custom.focus();
+      custom.dispatchEvent(new Event('input', { bubbles:true }));
     }
-  });
+
+    if (source?.classicGuide) {
+      const bookIndex = findGreatBookIndexForClassicGuide({
+        title: source.originalTitle,
+        author: source.originalAuthor
+      });
+      if (bookIndex >= 0) {
+        const checkbox = app.querySelector(`[data-syntopicon-book="${bookIndex}"]`);
+        if (checkbox) {
+          checkbox.checked = true;
+          checkbox.closest('[data-syntopicon-book-card]')?.scrollIntoView({
+            block:'nearest',
+            behavior:'auto'
+          });
+        }
+      }
+
+      if (status) {
+        status.className = 'status';
+        status.textContent = `Great Idea loaded: ${idea}. Your current book has been selected; choose at least one more source to compare.`;
+      }
+    }
+
+    (select || custom)?.focus();
+  }));
 }
 
 async function startModernGuideSectionComprehensionCheck(markerIndex, source = state?.source || {}) {
@@ -10318,32 +14750,231 @@ async function startModernGuideSectionComprehensionCheck(markerIndex, source = s
 
 const WHOLE_GUIDE_QUESTION_HISTORY_KEY = 'marksetgo_whole_guide_question_history_v1';
 
-function wholeGuideQuestionHistory(documentId = state?.documentId) {
-  if (!documentId) return [];
+// Phase 6 IndexedDB migration: whole-guide quiz history.
+// Each guide can retain up to 200 complete MCQ objects, so store each guide in
+// its own IndexedDB record rather than rewriting one potentially huge object.
+const WHOLE_GUIDE_HISTORY_INDEX_KEY = 'whole-guide-questions:index:v1';
+const WHOLE_GUIDE_HISTORY_RECORD_PREFIX = 'whole-guide-questions:v1:';
+const WHOLE_GUIDE_HISTORY_LIMIT = 200;
+
+const wholeGuideHistoryCache = new Map();
+const wholeGuideHistoryDirty = new Set();
+let wholeGuideHistoryHydrated = false;
+let wholeGuideHistoryHydrationPromise = null;
+let wholeGuideHistoryWriteChain = Promise.resolve(true);
+
+function normalizeWholeGuideQuestions(items) {
+  const normalized = [];
+  const seen = new Set();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item || typeof item !== 'object') continue;
+    const question = String(item.question || '').trim();
+    const dedupeKey = question.toLowerCase();
+    if (!question || seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    normalized.push(item);
+    if (normalized.length >= WHOLE_GUIDE_HISTORY_LIMIT) break;
+  }
+
+  return normalized;
+}
+
+function readLegacyWholeGuideHistoryStore() {
   try {
-    const store = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
-    return Array.isArray(store[documentId]) ? store[documentId] : [];
+    const parsed = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
   } catch {
-    return [];
+    return {};
   }
 }
 
-function rememberWholeGuideQuestions(documentId, questions = []) {
-  if (!documentId || !Array.isArray(questions) || !questions.length) return;
-  try {
-    const store = JSON.parse(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY) || '{}');
-    const previous = Array.isArray(store[documentId]) ? store[documentId] : [];
-    const merged = [...questions, ...previous];
-    const seen = new Set();
-    store[documentId] = merged.filter((item) => {
-      const key = String(item?.question || '').trim().toLowerCase();
-      if (!key || seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    }).slice(0, 200);
-    localStorage.setItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY, JSON.stringify(store));
-  } catch {}
+function seedLegacyWholeGuideHistory() {
+  const legacy = readLegacyWholeGuideHistoryStore();
+  Object.entries(legacy).forEach(([documentId, items]) => {
+    const id = String(documentId || '');
+    if (!id) return;
+    wholeGuideHistoryCache.set(id, normalizeWholeGuideQuestions(items));
+  });
 }
+
+seedLegacyWholeGuideHistory();
+
+function wholeGuideHistoryRecordKey(documentId) {
+  return `${WHOLE_GUIDE_HISTORY_RECORD_PREFIX}${String(documentId || '')}`;
+}
+
+function wholeGuideQuestionHistory(documentId = state?.documentId) {
+  const id = String(documentId || '');
+  if (!id) return [];
+  return wholeGuideHistoryCache.get(id) || [];
+}
+
+function removeLegacyWholeGuideHistory() {
+  try { localStorage.removeItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY); } catch {}
+}
+
+async function persistWholeGuideHistoryIndex() {
+  if (typeof cacheReadingBook !== 'function') return false;
+  return Boolean(await cacheReadingBook({
+    key: WHOLE_GUIDE_HISTORY_INDEX_KEY,
+    type: 'whole-guide-question-index',
+    documentIds: [...wholeGuideHistoryCache.keys()].filter(Boolean),
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+async function persistWholeGuideHistoryDocument(documentId, items = wholeGuideQuestionHistory(documentId)) {
+  const id = String(documentId || '');
+  if (!id || typeof cacheReadingBook !== 'function') return false;
+
+  const normalized = normalizeWholeGuideQuestions(items);
+  wholeGuideHistoryCache.set(id, normalized);
+
+  return Boolean(await cacheReadingBook({
+    key: wholeGuideHistoryRecordKey(id),
+    type: 'whole-guide-question-history',
+    documentId: id,
+    questions: normalized,
+    updatedAt: new Date().toISOString()
+  }));
+}
+
+async function hydrateWholeGuideQuestionHistory() {
+  if (wholeGuideHistoryHydrationPromise) return wholeGuideHistoryHydrationPromise;
+
+  wholeGuideHistoryHydrationPromise = (async () => {
+    const legacy = readLegacyWholeGuideHistoryStore();
+    let migratedDocuments = 0;
+    let failed = 0;
+
+    try {
+      const indexRecord = typeof getCachedReadingBook === 'function'
+        ? await getCachedReadingBook(WHOLE_GUIDE_HISTORY_INDEX_KEY)
+        : null;
+
+      const indexedIds = Array.isArray(indexRecord?.documentIds)
+        ? [...new Set(indexRecord.documentIds.map((value) => String(value || '')).filter(Boolean))]
+        : [];
+
+      for (const documentId of indexedIds) {
+        const wrapper = await getCachedReadingBook(wholeGuideHistoryRecordKey(documentId));
+        if (Array.isArray(wrapper?.questions) && !wholeGuideHistoryDirty.has(documentId)) {
+          wholeGuideHistoryCache.set(
+            documentId,
+            normalizeWholeGuideQuestions(wrapper.questions)
+          );
+        }
+      }
+
+      // Migrate every legacy-only guide. If the user modified a guide while
+      // hydration was running, the live in-memory copy wins.
+      for (const [legacyIdRaw, legacyQuestions] of Object.entries(legacy)) {
+        const documentId = String(legacyIdRaw || '');
+        if (!documentId) continue;
+
+        if (!wholeGuideHistoryCache.has(documentId)) {
+          wholeGuideHistoryCache.set(
+            documentId,
+            normalizeWholeGuideQuestions(legacyQuestions)
+          );
+        }
+
+        if (wholeGuideHistoryDirty.has(documentId)) continue;
+
+        if (!indexedIds.includes(documentId)) {
+          const ok = await persistWholeGuideHistoryDocument(
+            documentId,
+            wholeGuideHistoryCache.get(documentId)
+          );
+          if (ok) migratedDocuments += 1;
+          else failed += 1;
+        }
+      }
+
+      // Persist any user-updated guides that changed before hydration completed.
+      for (const documentId of [...wholeGuideHistoryDirty]) {
+        const ok = await persistWholeGuideHistoryDocument(
+          documentId,
+          wholeGuideHistoryCache.get(documentId)
+        );
+        if (ok) wholeGuideHistoryDirty.delete(documentId);
+        else failed += 1;
+      }
+
+      const indexSaved = await persistWholeGuideHistoryIndex();
+      if (indexSaved && failed === 0) removeLegacyWholeGuideHistory();
+      else if (!indexSaved) failed += 1;
+    } catch (error) {
+      failed += 1;
+      console.warn('Whole-guide quiz history migration was deferred.', error);
+    }
+
+    wholeGuideHistoryHydrated = true;
+    return {
+      hydrated: true,
+      guides: wholeGuideHistoryCache.size,
+      migratedDocuments,
+      failed
+    };
+  })();
+
+  return wholeGuideHistoryHydrationPromise;
+}
+
+function queueWholeGuideHistoryWrite(documentId) {
+  const id = String(documentId || '');
+  if (!id) return Promise.resolve(false);
+
+  wholeGuideHistoryWriteChain = wholeGuideHistoryWriteChain
+    .catch(() => false)
+    .then(async () => {
+      await hydrateWholeGuideQuestionHistory();
+      const saved = await persistWholeGuideHistoryDocument(
+        id,
+        wholeGuideHistoryCache.get(id)
+      );
+      if (!saved) return false;
+
+      const indexSaved = await persistWholeGuideHistoryIndex();
+      if (indexSaved) {
+        wholeGuideHistoryDirty.delete(id);
+        removeLegacyWholeGuideHistory();
+      }
+      return Boolean(indexSaved);
+    });
+
+  return wholeGuideHistoryWriteChain;
+}
+
+function rememberWholeGuideQuestions(documentId, questions = []) {
+  const id = String(documentId || '');
+  if (!id || !Array.isArray(questions) || !questions.length) return;
+
+  const previous = wholeGuideQuestionHistory(id);
+  wholeGuideHistoryCache.set(
+    id,
+    normalizeWholeGuideQuestions([...questions, ...previous])
+  );
+  wholeGuideHistoryDirty.add(id);
+  void queueWholeGuideHistoryWrite(id);
+}
+
+window.MarkSetGoWholeGuideHistory = Object.freeze({
+  hydrate: hydrateWholeGuideQuestionHistory,
+  get: (documentId) => wholeGuideQuestionHistory(documentId).map((item) => ({ ...item })),
+  status: () => ({
+    hydrated: wholeGuideHistoryHydrated,
+    guides: wholeGuideHistoryCache.size,
+    totalQuestions: [...wholeGuideHistoryCache.values()].reduce((sum, items) => sum + items.length, 0),
+    legacyPresent: (() => {
+      try { return Boolean(localStorage.getItem(WHOLE_GUIDE_QUESTION_HISTORY_KEY)); }
+      catch { return false; }
+    })()
+  })
+});
+
+window.setTimeout(() => { void hydrateWholeGuideQuestionHistory(); }, 0);
 
 function shuffledWholeGuideQuestions(items = []) {
   const copy = [...items];
@@ -10354,7 +14985,8 @@ function shuffledWholeGuideQuestions(items = []) {
   return copy;
 }
 
-function showModernGuideWholeQuizSetup(source = state?.source || {}) {
+async function showModernGuideWholeQuizSetup(source = state?.source || {}) {
+  await hydrateWholeGuideQuestionHistory();
   const dialog = app.querySelector('#comprehension-dialog');
   if (!dialog) return;
   const historyCount = wholeGuideQuestionHistory().length;
@@ -10367,7 +14999,7 @@ function showModernGuideWholeQuizSetup(source = state?.source || {}) {
       <fieldset class="comprehension-question">
         <legend><span>1</span><div><small>Length</small>How many questions?</div></legend>
         <label>Questions
-          <input id="whole-guide-question-count" type="number" min="5" max="25" step="1" value="10" inputmode="numeric">
+          <input id="whole-guide-question-count" type="number" min="5" max="25" step="1" value="4" inputmode="numeric">
         </label>
       </fieldset>
       <fieldset class="comprehension-question">
@@ -10401,6 +15033,8 @@ async function generateModernGuideWholeComprehensionCheck(source = state?.source
   if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
     return window.MarkSetGoStartComprehension?.();
   }
+
+  await hydrateWholeGuideQuestionHistory();
 
   const passageWords = state.words.filter((word) => !isModernGuideActionToken(word));
   const passage = passageWords.join(' ').replace(/\s+/g, ' ').trim();
@@ -10482,7 +15116,7 @@ async function startModernGuideWholeComprehensionCheck(source = state?.source ||
   if (source?.type !== 'modern-guide' || !state.documentId || !state.words.length) {
     return window.MarkSetGoStartComprehension?.();
   }
-  showModernGuideWholeQuizSetup(source);
+  await showModernGuideWholeQuizSetup(source);
 }
 
 function activateModernGuideInlineAction(button, source = state?.source || {}) {
@@ -10538,18 +15172,164 @@ function bindModernGuideInlineActions(source = state?.source || {}) {
   }, true);
 }
 
+
+function normalizeTopicFeedHeadingWord(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+function realignTopicFeedDocumentToc(text, toc) {
+  const entries = Array.isArray(toc) ? toc : [];
+  if (!entries.length) return [];
+
+  const words = splitWords(String(text || ''));
+  const normalizedWords = words.map(normalizeTopicFeedHeadingWord);
+  if (!normalizedWords.length) return [];
+
+  let previousIndex = -1;
+
+  const exactMatches = (headingWords, start, end) => {
+    const matches = [];
+    const safeStart = Math.max(0, start);
+    const safeEnd = Math.min(normalizedWords.length - headingWords.length, end);
+    for (let index = safeStart; index <= safeEnd; index += 1) {
+      let matched = true;
+      for (let offset = 0; offset < headingWords.length; offset += 1) {
+        if (normalizedWords[index + offset] !== headingWords[offset]) {
+          matched = false;
+          break;
+        }
+      }
+      if (matched) matches.push(index);
+    }
+    return matches;
+  };
+
+  const nearest = (matches, approximate) => {
+    const ordered = matches.filter((index) => index > previousIndex);
+    const pool = ordered.length ? ordered : matches;
+    if (!pool.length) return null;
+    return pool.reduce((best, index) => (
+      best === null || Math.abs(index - approximate) < Math.abs(best - approximate)
+        ? index
+        : best
+    ), null);
+  };
+
+  const aligned = [];
+  for (const entry of entries) {
+    const title = String(entry?.title || '').replace(/\s+/g, ' ').trim();
+    if (!title) continue;
+
+    const headingWords = splitWords(title)
+      .map(normalizeTopicFeedHeadingWord)
+      .filter(Boolean);
+    if (!headingWords.length) continue;
+
+    const approximate = Number.isFinite(Number(entry?.index))
+      ? Math.max(0, Number(entry.index))
+      : Math.max(0, previousIndex + 1);
+
+    // First search near the server-provided position. If the publisher/server
+    // counted words differently, the real heading is normally only a short
+    // distance away.
+    let matches = exactMatches(
+      headingWords,
+      Math.max(previousIndex + 1, approximate - 120),
+      approximate + 120
+    );
+
+    // If needed, search the complete article. This is still exact heading-text
+    // matching, so ordinary body words cannot become headings just because a
+    // numeric index drifted.
+    if (!matches.length) {
+      matches = exactMatches(
+        headingWords,
+        Math.max(0, previousIndex + 1),
+        normalizedWords.length - headingWords.length
+      );
+    }
+
+    const resolved = nearest(matches, approximate);
+    if (resolved === null) {
+      // Do not use an unverified numeric index for Topic Feed styling. A bad
+      // index is what caused fragments such as "Gates," and "sector. A little"
+      // to become bold instead of the actual following heading.
+      continue;
+    }
+
+    previousIndex = resolved;
+    aligned.push({ ...entry, index: resolved });
+  }
+
+  return aligned;
+}
+
 function renderReaderWithText(title, text, source = { type: 'text' }) {
+  if (isSecondaryReaderWorkspace() && !secondaryReaderAllowsDocumentRender()) return false;
+
+  // A Workspace iframe is a secondary control/content surface only. It must
+  // never own a second Reader. Send every readable document through the one
+  // established outer-Reader handoff. This central guard covers Modern Guides,
+  // Classic/Bible guides, generated guides, Free Books, and any future feature
+  // that reaches the canonical Reader renderer.
+  if (shouldDelegateReaderToWorkspaceParent()) {
+    try {
+      const handoff = window.parent.MSGWorkspaceReaderHandoff;
+      if (typeof handoff?.openText === 'function') {
+        return handoff.openText(title, text, source);
+      }
+    } catch (error) {
+      console.warn('Workspace could not hand text to the main Reader.', error);
+    }
+    return false;
+  }
+
   app.dataset.viewKey = 'reader';
+
+  const READER_CLICK_CONTROLS_KEY = 'msg_reader_click_controls_v1';
+  let readerClickControlsEnabled = true;
+  try {
+    readerClickControlsEnabled = localStorage.getItem(READER_CLICK_CONTROLS_KEY) !== 'off';
+  } catch {}
+  state.readerClickControlsEnabled = readerClickControlsEnabled;
+
+  // Topic Feed story handoff: preserve the existing left navigation pane as the
+  // exact same DOM node while the Reader shell is rebuilt. This branch is
+  // intentionally limited to Topic Feed -> Topic Feed navigation so ordinary
+  // books and every other Reader source keep the established render path.
+  const previousSourceType = String(state.source?.type || '');
+  const preserveTopicFeedNavigation = source?.type === 'topic-feed' && previousSourceType === 'topic-feed';
+  const preservedTopicFeedPane = preserveTopicFeedNavigation ? app.querySelector('#navigation-pane') : null;
+  const previousReaderLayout = preserveTopicFeedNavigation ? app.querySelector('#reader-layout') : null;
+  const preservedTopicFeedPaneOpen = Boolean(
+    preservedTopicFeedPane && previousReaderLayout && !previousReaderLayout.classList.contains('navigation-hidden')
+  );
+  const preservedTopicFeedPaneScrollTop = preservedTopicFeedPane
+    ? Math.max(0, Number(preservedTopicFeedPane.scrollTop) || 0)
+    : 0;
+
+  // Detaching before app.innerHTML prevents the browser from destroying the
+  // Topics pane and its existing listeners/state during the Reader rebuild.
+  if (preservedTopicFeedPane) preservedTopicFeedPane.remove();
   const bookModel = new BookModel({ title, text, source, tokenizer: splitWords });
-  const isStructuredBible = Boolean(source?.type === 'bible' || source?.type === 'bible-book');
-  let structure = isStructuredBible && Array.isArray(source?.documentStructure)
+  const suppliedDocumentStructure = Array.isArray(source?.documentStructure) && source.documentStructure.length
+    ? source.documentStructure
+    : null;
+  let structure = suppliedDocumentStructure
     ? source.documentStructure
     : detectDocumentStructure(text);
 
   // EPUBs carry an authoritative navigation document. Prefer that TOC over
   // heuristic heading detection, while still keeping detected structure for
   // reader formatting and illustration placement.
-  const authoritativeToc = Array.isArray(source?.documentToc) ? source.documentToc : null;
+  const rawAuthoritativeToc = Array.isArray(source?.documentToc) ? source.documentToc : null;
+  const authoritativeToc = source?.type === 'topic-feed' && rawAuthoritativeToc
+    ? realignTopicFeedDocumentToc(text, rawAuthoritativeToc)
+    : rawAuthoritativeToc;
   const suppliedToc = Array.isArray(authoritativeToc)
     ? authoritativeToc
     : Array.isArray(source?.epubToc)
@@ -10632,7 +15412,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   }));
 
   app.innerHTML = `
-    <section class="panel reader-page-panel">
+    <section class="panel reader-page-panel${source?.type === 'topic-feed' ? ' topic-feed-reader-page' : ''}">
       <div class="reader-title-row">
         <div class="reader-title-copy">
           <h1>${escapeHtml(title)}</h1>
@@ -10655,7 +15435,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <option value="highlight" selected>Highlight</option>
                 <option value="bold-focus">Bold Focus</option>
                 <option value="smooth-glide">Smooth Glide</option>
+                <option value="line-sweep">Line Sweep</option>
                 <option value="pointing-guide">Pointing Guide</option>
+                <option value="manual">Manual Pace</option>
                 <option value="marquee">Marquee</option>
                 <option value="flash">Flash</option>
                 <option value="digital-sign">Digital Sign</option>
@@ -10677,8 +15459,17 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
               <label for="pointer-color">Pointer color</label>
               <input id="pointer-color" type="color" value="#20a866" aria-label="Pointer color">
             </div>
-            <div class="control"><label for="speed">Speed</label><div class="input-suffix"><input id="speed" type="number" min="30" max="900" value="${Math.min(900, state.wpm)}"><span>WPM</span></div></div>
+            <div class="control"><label for="speed">Speed</label><div class="input-suffix"><input id="speed" type="number" min="0" max="900" value="${Math.min(900, state.wpm)}"><span>WPM</span></div></div>
             <div class="control"><label for="word-count">Words shown</label><input id="word-count" type="number" min="1" max="10" value="1"></div>
+            <div class="control push-training-control">
+              <label class="compact-toggle" title="Gradually increase WPM during active reading time. Designed especially for Flash mode.">
+                <input id="push-training-enabled" type="checkbox"><span>Push Training</span>
+              </label>
+            </div>
+            <div class="control push-training-control"><label for="push-start-wpm">Push start</label><div class="input-suffix"><input id="push-start-wpm" type="number" min="30" max="900" step="25" value="300"><span>WPM</span></div></div>
+            <div class="control push-training-control"><label for="push-target-wpm">Push target</label><div class="input-suffix"><input id="push-target-wpm" type="number" min="30" max="900" step="25" value="500"><span>WPM</span></div></div>
+            <div class="control push-training-control"><label for="push-ramp-rate">Ramp rate</label><div class="input-suffix"><input id="push-ramp-rate" type="number" min="1" max="300" step="5" value="25"><span>WPM/min</span></div></div>
+            <span id="push-training-status" class="status">Off.</span>
             <label class="compact-toggle meaningful-toggle" title="Group words into punctuation- and phrase-aware chunks up to the selected maximum."><input id="meaningful-chunks" type="checkbox"><span>Meaningful chunks</span></label>
           </div>
         </details>
@@ -10744,7 +15535,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 <summary>Reading</summary>
                 <div class="fullscreen-options-grid fullscreen-options-grid-reading">
                   <label>Mode<select id="fs-mode-select">
-                    <option value="highlight">Highlight</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
+                    <option value="highlight">Highlight</option>
+<option value="manual">Manual Pace</option><option value="bold-focus">Bold Focus</option><option value="smooth-glide">Smooth Glide</option><option value="line-sweep">Line Sweep</option><option value="pointing-guide">Pointing Guide</option><option value="marquee">Marquee</option><option value="flash">Flash</option>
                     <option value="digital-sign">Digital Sign</option><option value="auto-scroll">Auto Scroll</option><option value="pacman">Pac-Man Chomp</option>
                   </select></label>
                   <label>Pointer<select id="fs-pointer-style">
@@ -10759,11 +15551,21 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                   </label>
                   <label>Speed<div class="input-suffix"><input id="fs-speed" type="number" min="30" max="900"><span>WPM</span></div></label>
                   <label>Words shown<input id="fs-word-count" type="number" min="1" max="10"></label>
+                  <label class="fullscreen-checkbox"><input id="fs-push-training-enabled" type="checkbox"> Push Training</label>
+                  <label>Push start<div class="input-suffix"><input id="fs-push-start-wpm" type="number" min="30" max="900" step="25"><span>WPM</span></div></label>
+                  <label>Push target<div class="input-suffix"><input id="fs-push-target-wpm" type="number" min="30" max="900" step="25"><span>WPM</span></div></label>
+                  <label>Ramp<div class="input-suffix"><input id="fs-push-ramp-rate" type="number" min="1" max="300" step="5"><span>WPM/min</span></div></label>
                 </div>
                 <div class="fullscreen-option-actions fullscreen-reading-actions">
                   <button id="fs-start" class="primary" type="button">Start</button>
                   <button id="fs-pause" class="secondary" type="button">Pause</button>
                   <button id="fs-reset" class="secondary" type="button">Reset</button>
+                  <label class="fullscreen-reader-click-controls-toggle"
+                         title="When unchecked, clicking or tapping Reader text cannot control playback."
+                         style="display:inline-flex;align-items:center;gap:.35rem;width:max-content;white-space:nowrap;">
+                    <input id="fs-reader-click-controls" type="checkbox" ${readerClickControlsEnabled ? 'checked' : ''}>
+                    <span>Reader click controls</span>
+                  </label>
                   <button id="fs-check-comprehension" class="secondary" type="button">Check comprehension</button>
                 </div>
               </details>
@@ -10818,7 +15620,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
                 </div>
               </details>
 
-              <p class="fullscreen-options-hint">Click text or press <kbd>Space</kbd> to pause/resume. Press <kbd>O</kbd> to restore hidden controls.</p>
+              <p class="fullscreen-options-hint">Use “Reader click controls” to choose whether text clicks control playback. Press <kbd>Space</kbd> for keyboard pause/resume. Press <kbd>O</kbd> to restore hidden controls.</p>
             </section>
           </div>
           <div id="focus-anchor-overlay" class="focus-anchor-overlay" hidden aria-live="off"></div>
@@ -10838,7 +15640,7 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
               <div id="fullscreen-mark-notebook" data-fs-mark-panel="notebook" hidden></div>
               <div id="fullscreen-mark-format" data-fs-mark-panel="format" hidden></div>
             </aside>
-          <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text" title="Click a word to move the reading position; click empty space to pause or resume"></article>
+          <article id="reader" class="reader interactive-reader" style="font-size:14px" aria-label="Reading text"></article>
           </div>
           <div class="reader-viewer-footer" aria-label="Reader pace and page navigation">
             <div id="book-page-controls-home" class="book-page-controls-home">
@@ -10884,8 +15686,70 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         </aside>
       </div>
 
-      <div id="mark-selection-toolbar" class="mark-selection-toolbar" hidden role="toolbar" aria-label="Ask Mark passage actions">
-        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button><button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button><button type="button" data-mark-toolbar-action="simplify">Aa Simplify</button><button type="button" data-mark-toolbar-action="context">⌛ Context</button><button type="button" data-mark-toolbar-action="related">∞ Compare</button><button type="button" data-mark-toolbar-action="save">★ Save</button><button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+      <div id="mark-selection-toolbar" class="mark-selection-toolbar mark-selection-toolbar-v2" hidden role="toolbar" aria-label="Selected passage actions">
+        <div class="mark-toolbar-menu-wrap mark-annotate-wrap" data-mark-annotate-wrap>
+          <div class="mark-annotate-split" role="group" aria-label="Annotation tools">
+            <button type="button" data-passage-highlight-toggle aria-expanded="false" title="Highlight selected text">✎ Annotate</button>
+            <button type="button" class="mark-menu-chevron" data-mark-annotate-toggle aria-expanded="false" aria-label="More annotation tools">▾</button>
+          </div>
+          <div class="mark-toolbar-menu mark-annotate-menu" data-mark-annotate-menu hidden>
+            <button type="button" data-mark-annotation-highlight>🖍 <span>Highlight</span></button>
+            <button type="button" data-reader-writing-toggle aria-expanded="false">✎ <span>Write</span></button>
+            <button type="button" data-reader-drawing-toggle aria-expanded="false">✐ <span>Draw</span></button>
+            <button type="button" data-reader-workspace-toggle aria-expanded="false">▣ <span>Space</span></button>
+            <button type="button" data-passage-highlight-erase>⌫ <span>Erase</span></button>
+          </div>
+        </div>
+
+        <div class="passage-highlight-picker" data-passage-highlight-picker hidden role="group" aria-label="Highlight color">
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7D34A" style="--swatch:#F7D34A" aria-label="Gold highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#B8E6A3" style="--swatch:#B8E6A3" aria-label="Green highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#9FD8FF" style="--swatch:#9FD8FF" aria-label="Blue highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#F7B6C8" style="--swatch:#F7B6C8" aria-label="Pink highlight"></button>
+          <button type="button" class="passage-highlight-swatch" data-passage-highlight-color="#D8C2FF" style="--swatch:#D8C2FF" aria-label="Purple highlight"></button>
+          <label class="passage-highlight-custom" title="Choose a custom highlight color"><span>＋</span><input type="color" data-passage-highlight-custom value="#F7D34A" aria-label="Custom highlight color"></label>
+        </div>
+
+        <div class="reader-writing-editor" data-reader-writing-editor hidden>
+          <textarea data-reader-writing-text maxlength="500" rows="2" placeholder="Write on this passage…" aria-label="Written annotation"></textarea>
+          <div class="reader-writing-colors" role="group" aria-label="Writing color"><button type="button" class="reader-writing-color-choice active" data-reader-writing-color-choice="#C98900" style="--writing-swatch:#C98900" aria-label="Gold writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#C44747" style="--writing-swatch:#C44747" aria-label="Red writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2B6CB0" style="--writing-swatch:#2B6CB0" aria-label="Blue writing"></button><button type="button" class="reader-writing-color-choice" data-reader-writing-color-choice="#2F855A" style="--writing-swatch:#2F855A" aria-label="Green writing"></button><label class="reader-writing-custom-color" title="Choose writing color"><input type="color" data-reader-writing-color value="#C98900" aria-label="Custom writing color"></label></div>
+          <div class="reader-writing-options"><label>Font size <select data-reader-writing-font-size aria-label="Writing font size"><option value="12">12 px</option><option value="14">14 px</option><option value="16" selected>16 px</option><option value="18">18 px</option><option value="20">20 px</option><option value="24">24 px</option><option value="28">28 px</option><option value="32">32 px</option></select></label></div>
+          <div class="reader-writing-editor-actions"><button type="button" data-reader-writing-cancel>Cancel</button><button type="button" data-reader-writing-save>Write</button></div>
+        </div>
+
+        <div class="reader-drawing-editor" data-reader-drawing-editor hidden>
+          <div class="reader-drawing-colors" role="group" aria-label="Drawing color"><button type="button" class="reader-drawing-color-choice active" data-reader-drawing-color-choice="#E9B949" style="--drawing-swatch:#E9B949" aria-label="Gold drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#C44747" style="--drawing-swatch:#C44747" aria-label="Red drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2B6CB0" style="--drawing-swatch:#2B6CB0" aria-label="Blue drawing"></button><button type="button" class="reader-drawing-color-choice" data-reader-drawing-color-choice="#2F855A" style="--drawing-swatch:#2F855A" aria-label="Green drawing"></button><label class="reader-drawing-custom-color" title="Choose drawing color"><input type="color" data-reader-drawing-color value="#E9B949" aria-label="Custom drawing color"></label></div>
+          <label class="reader-drawing-thickness">Thickness <select data-reader-drawing-thickness><option value="2">Thin</option><option value="4" selected>Medium</option><option value="7">Thick</option><option value="12">Marker</option></select></label>
+          <div class="reader-drawing-editor-actions"><button type="button" data-reader-drawing-cancel>Cancel</button><button type="button" data-reader-drawing-start>Start drawing</button></div>
+        </div>
+
+        <div class="reader-workspace-editor" data-reader-workspace-editor hidden><strong>Insert workspace</strong><label>Height <select data-reader-workspace-height><option value="180">Small</option><option value="280" selected>Medium</option><option value="420">Large</option><option value="600">Extra large</option></select></label><div><button type="button" data-reader-workspace-cancel>Cancel</button><button type="button" data-reader-workspace-insert>Insert</button></div></div>
+
+        <button type="button" data-mark-toolbar-action="explain">💡 Explain</button>
+        <button type="button" data-mark-toolbar-action="summarize">≡ Summarize</button>
+        <button type="button" data-mark-toolbar-action="related">∞ Compare</button>
+        <button type="button" data-mark-toolbar-action="save">★ Save</button>
+        <button type="button" data-mark-toolbar-action="ask">✦ Ask Mark</button>
+
+        <div class="mark-toolbar-menu-wrap mark-more-wrap" data-mark-more-wrap>
+          <button type="button" data-mark-more-toggle aria-expanded="false">More <span aria-hidden="true">▾</span></button>
+          <div class="mark-toolbar-menu mark-more-menu" data-mark-more-menu hidden>
+            <div class="mark-toolbar-menu-section"><span>Understand</span>
+              <button type="button" data-mark-toolbar-action="simplify">Aa <span>Simplify</span></button>
+              <button type="button" data-mark-toolbar-action="context">⌛ <span>Historical context</span></button>
+            </div>
+            <div class="mark-toolbar-menu-section"><span>Study</span>
+              <button type="button" data-mark-more-prompt="Create a concise study guide for this selected passage.">▤ <span>Study guide</span></button>
+              <button type="button" data-mark-more-tool="flashcards">▱ <span>Flash cards</span></button>
+              <button type="button" data-mark-more-prompt="Identify the key ideas in this selected passage and explain why they matter.">✦ <span>Key ideas</span></button>
+              <button type="button" data-mark-more-comprehension>🧠 <span>Comprehension</span></button>
+            </div>
+            <div class="mark-toolbar-menu-section"><span>Share</span>
+              <button type="button" data-msg-share-selection="chat">💬 <span>Send to Chat</span></button>
+              <button type="button" data-msg-share-selection="symposium">🏛 <span>Discuss in Symposium</span></button>
+            </div>
+          </div>
+        </div>
       </div>
       <div id="word-context-menu" class="word-context-menu" hidden role="menu" aria-label="Word actions">
         <button type="button" data-dictionary-action="lookup" role="menuitem">Look up word</button>
@@ -10895,13 +15759,34 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       </div>
       <dialog id="comprehension-dialog" class="comprehension-dialog" aria-label="Comprehension check"></dialog>
 
-      <div class="controls playback-controls">
+      <div class="controls playback-controls"
+           style="display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:.45rem;margin:.55rem 0;">
         <button id="start-reader" class="primary">Start</button>
         <button id="pause-reader" class="secondary" disabled>Pause</button>
         <button id="reset-reader" class="secondary">Reset</button>
-        <span id="reader-status" class="status">${state.words.length.toLocaleString()} words loaded. Click a word to continue from there; click empty space or press Space to pause or resume.</span>
+        <label class="reader-click-controls-toggle"
+               title="When unchecked, clicking or tapping the Reader text cannot start, resume, pause, or seek playback."
+               style="display:inline-flex!important;align-items:center;justify-content:flex-start;gap:.35rem;flex:0 0 auto!important;width:max-content!important;max-width:max-content!important;min-height:2.08rem;padding:0 .35rem!important;margin:0!important;border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;white-space:nowrap;">
+          <input id="reader-click-controls" type="checkbox" ${readerClickControlsEnabled ? 'checked' : ''}
+                 style="width:auto!important;height:auto!important;margin:0!important;flex:0 0 auto!important;">
+          <span style="display:inline!important;width:auto!important;white-space:nowrap;">Reader click controls</span>
+        </label>
+        <span id="reader-status" class="status"
+              style="flex:0 0 100%;width:100%;margin:.05rem 0 0;min-height:1.2rem;">
+          ${state.words.length.toLocaleString()} words loaded. ${readerClickControlsEnabled ? 'Click a word to move the reading position.' : 'Reader clicks are off. Read, scroll, and select text normally; use Start, Pause, or Reset only when wanted.'}
+        </span>
       </div>
     </section>`;
+
+  let topicFeedPaneWasPreserved = false;
+  if (preservedTopicFeedPane) {
+    const newPanePlaceholder = app.querySelector('#navigation-pane');
+    if (newPanePlaceholder) {
+      newPanePlaceholder.replaceWith(preservedTopicFeedPane);
+      preservedTopicFeedPane.scrollTop = preservedTopicFeedPaneScrollTop;
+      topicFeedPaneWasPreserved = true;
+    }
+  }
 
   const reader = app.querySelector('#reader');
   const readerFrame = app.querySelector('#reader-frame');
@@ -10912,10 +15797,26 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   bindReaderFullscreen(readerFrame, fullscreenButton);
   bindFullscreenOptions(readerFrame);
   bindReaderPaneControls();
+
+  // bindReaderPaneControls() intentionally starts a newly rendered Reader with
+  // side panes closed. For a preserved Topic Feed pane, restore its prior state
+  // synchronously in the same JavaScript task so there is no closed-frame paint.
+  if (topicFeedPaneWasPreserved) {
+    const layout = app.querySelector('#reader-layout');
+    const navigationButton = app.querySelector('#toggle-navigation-pane');
+    if (layout && navigationButton) {
+      layout.classList.toggle('navigation-hidden', !preservedTopicFeedPaneOpen);
+      navigationButton.setAttribute('aria-pressed', String(preservedTopicFeedPaneOpen));
+      navigationButton.classList.toggle('pane-closed', !preservedTopicFeedPaneOpen);
+      navigationButton.title = `${preservedTopicFeedPaneOpen ? 'Close' : 'Open'} marks and contents`;
+    }
+    preservedTopicFeedPane.scrollTop = preservedTopicFeedPaneScrollTop;
+  }
+
   bindMarkCompanion(reader);
   bindReaderResize(readerFrame, reader);
   observeBookPageReader();
-  renderNavigationPane();
+  if (!topicFeedPaneWasPreserved) renderNavigationPane();
   prepareReaderView('highlight');
   updateModeControls('highlight');
   bindVirtualSpacerGuard(reader);
@@ -10998,7 +15899,17 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
 
   const modeSelect = app.querySelector('#mode-select');
   modeSelect.addEventListener('change', () => {
-    switchReadingMode(modeSelect.value);
+    const nextMode = modeSelect.value;
+    switchReadingMode(nextMode);
+    updatePushTrainingStatus();
+    if (nextMode === 'manual') {
+      modeSelect.blur();
+      const reader = app.querySelector('#reader');
+      if (reader) {
+        if (!reader.hasAttribute('tabindex')) reader.setAttribute('tabindex', '-1');
+        try { reader.focus({ preventScroll:true }); } catch { reader.focus(); }
+      }
+    }
   });
 
   // Spacebar acts as a simple play/pause toggle while the reader is open.
@@ -11016,7 +15927,95 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
     else startReader();
     persistReaderSession();
   };
-  document.addEventListener('keydown', state.spacebarHandler);
+  
+
+function toggleManualPaceWithSpace() {
+  const session = ensureManualPaceSession();
+
+  if (session.timer) {
+    stopManualPaceMotion({ keepDirection:true });
+    session.paused = true;
+    updateReaderStatus('Manual Pace paused.');
+    return;
+  }
+
+  session.paused = false;
+
+  // Space can resume only while a horizontal arrow is physically held.
+  // Releasing the arrow always wins and stops the cursor.
+  if (session.heldRight || session.heldLeft) {
+    session.direction = session.heldRight ? 1 : -1;
+    scheduleManualPaceMotion();
+    const wpm = manualPaceWpm();
+    updateReaderStatus(
+      wpm > 0
+        ? `Manual Pace resumed ${session.direction > 0 ? 'forward' : 'reverse'} at ${wpm} WPM.`
+        : 'Manual Pace ready, but WPM is 0.'
+    );
+  } else {
+    updateReaderStatus('Manual Pace ready. Hold ← or → to move.');
+  }
+}
+
+if (state.manualPaceKeyHandler) {
+  document.removeEventListener('keydown', state.manualPaceKeyHandler, true);
+}
+state.manualPaceKeyHandler = (event) => {
+  const selectedMode = String(app.querySelector('#mode-select')?.value || '').toLowerCase();
+  const manualActive = Boolean(state.manualPaceEnabled) || selectedMode === 'manual';
+  if (!manualActive) return;
+
+  const target = event.target instanceof Element ? event.target : null;
+  const modeSelectorTarget = target?.closest?.('#mode-select, #fs-mode-select');
+  if (target?.closest?.('input, textarea, [contenteditable="true"], [role="textbox"]')) return;
+  if (target?.closest?.('select') && !modeSelectorTarget) return;
+  if (!app.querySelector('#reader')) return;
+
+  if (event.code === 'Space' && !event.repeat && !event.altKey && !event.ctrlKey && !event.metaKey) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    toggleManualPaceWithSpace();
+    persistReaderSession();
+    return;
+  }
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!event.repeat) {
+      startManualPaceHeldDirection(event.key === 'ArrowRight' ? 1 : -1);
+    }
+    return;
+  }
+
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    if (!event.repeat) {
+      manualPaceMoveLine(event.key === 'ArrowDown' ? 1 : -1);
+    }
+  }
+};
+document.addEventListener('keydown', state.manualPaceKeyHandler, true);
+
+if (state.manualPaceKeyUpHandler) {
+  document.removeEventListener('keyup', state.manualPaceKeyUpHandler, true);
+}
+state.manualPaceKeyUpHandler = (event) => {
+  const selectedMode = String(app.querySelector('#mode-select')?.value || '').toLowerCase();
+  const manualActive = Boolean(state.manualPaceEnabled) || selectedMode === 'manual';
+  if (!manualActive) return;
+
+  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    releaseManualPaceHeldDirection(event.key === 'ArrowRight' ? 1 : -1);
+  }
+};
+document.addEventListener('keyup', state.manualPaceKeyUpHandler, true);
+
+
+document.addEventListener('keydown', state.spacebarHandler);
 
   readerFrame.addEventListener('click', (event) => {
     if (state.readerSuppressSyntheticClick) {
@@ -11054,10 +16053,15 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
       return;
     }
 
+    // Passive reading mode: clicks/taps on the Reader text cannot start,
+    // resume, pause, or seek playback. Scrolling, selection, annotations,
+    // translation lookup, and explicit buttons remain available.
+    if (!readerClickControlsAreEnabled()) return;
+
     const clickedWord = target.closest('.reader-word[data-index]');
     const clickedGroup = target.closest('.reader-group[data-start-index]');
     const mode = getSelectedMode();
-    const seekableModes = new Set(['highlight', 'bold-focus', 'smooth-glide', 'pointing-guide', 'marquee', 'auto-scroll']);
+    const seekableModes = new Set(['highlight', 'manual', 'bold-focus', 'smooth-glide', 'line-sweep', 'pointing-guide', 'marquee', 'auto-scroll']);
 
     // In full-text modes, clicking visible text changes the reading position
     // instead of toggling pause. Support both individual word spans and grouped
@@ -11073,16 +16077,19 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
         state.viewportAnchorIndex = state.index;
         persistReaderSession({ immediate: true });
         updateReaderStatus(`Reading position moved to word ${(state.index + 1).toLocaleString()}.`);
-        startReader();
-        if (!wasRunning) window.setTimeout(pauseReader, 0);
+        if (mode === 'manual') {
+          ensureManualPaceSession();
+          renderManualPaceHighlight(reader);
+        } else {
+          startReader();
+          if (!wasRunning) window.setTimeout(pauseReader, 0);
+        }
       }
       return;
     }
 
-    if (mode === 'two-column') return;
-    if (isReaderRunning()) pauseReader();
-    else startReader();
-    persistReaderSession();
+    // Blank reader space must never start or pause playback.
+    return;
   });
   bindDictionaryMenu(reader);
   window.requestAnimationFrame(updateReaderBookmarkMarkers);
@@ -11093,6 +16100,39 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   });
   app.querySelector('#pause-reader').addEventListener('click', () => { pauseReader(); persistReaderSession(); });
   app.querySelector('#reset-reader').addEventListener('click', () => { resetReader(); persistReaderSession(); });
+
+  const syncReaderClickControlCheckboxes = (enabled) => {
+    readerClickControlsEnabled = Boolean(enabled);
+    state.readerClickControlsEnabled = readerClickControlsEnabled;
+
+    const mainCheckbox = app.querySelector('#reader-click-controls');
+    const fullscreenCheckbox = app.querySelector('#fs-reader-click-controls');
+    if (mainCheckbox) mainCheckbox.checked = readerClickControlsEnabled;
+    if (fullscreenCheckbox) fullscreenCheckbox.checked = readerClickControlsEnabled;
+  };
+
+  const setReaderClickControls = (enabled, { announce = true } = {}) => {
+    syncReaderClickControlCheckboxes(enabled);
+    try {
+      localStorage.setItem(READER_CLICK_CONTROLS_KEY, enabled ? 'on' : 'off');
+    } catch {}
+
+    if (announce) {
+      updateReaderStatus(
+        enabled
+          ? 'Reader click controls are on.'
+          : 'Reader click controls are off. Clicking or tapping Reader text will not start, resume, pause, or seek playback.'
+      );
+    }
+  };
+
+  app.querySelector('#reader-click-controls')?.addEventListener('change', (event) => {
+    setReaderClickControls(Boolean(event.currentTarget.checked));
+  });
+  app.querySelector('#fs-reader-click-controls')?.addEventListener('change', (event) => {
+    setReaderClickControls(Boolean(event.currentTarget.checked));
+  });
+  syncReaderClickControlCheckboxes(readerClickControlsEnabled);
   app.querySelector('#check-comprehension')?.addEventListener('click', startComprehensionCheck);
   app.querySelector('#fs-check-comprehension')?.addEventListener('click', startComprehensionCheck);
   app.querySelector('#bionic-reading').addEventListener('change', (event) => {
@@ -11250,8 +16290,14 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   app.querySelector('#translate-text').addEventListener('click', translateCurrentText);
   app.querySelector('#restore-english').addEventListener('click', restoreEnglish);
   const speedBadgeInput = app.querySelector('#speed');
-  speedBadgeInput?.addEventListener('input', updateViewerWpmBadge);
-  speedBadgeInput?.addEventListener('change', updateViewerWpmBadge);
+  const syncReaderWpmInput = () => {
+    const value = Number(speedBadgeInput?.value);
+    if (Number.isFinite(value)) state.wpm = Math.max(0, value);
+    updateViewerWpmBadge();
+    if (state.manualPaceEnabled && state.manualPace?.direction) scheduleManualPaceMotion();
+  };
+  speedBadgeInput?.addEventListener('input', syncReaderWpmInput);
+  speedBadgeInput?.addEventListener('change', syncReaderWpmInput);
   app.querySelector('#viewer-wpm-down')?.addEventListener('click', () => adjustReaderWpm(-25));
   app.querySelector('#viewer-wpm-up')?.addEventListener('click', () => adjustReaderWpm(25));
 
@@ -11261,6 +16307,8 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   if (state.viewerWpmKeyHandler) document.removeEventListener('keydown', state.viewerWpmKeyHandler);
   state.viewerWpmKeyHandler = (event) => {
     if ((event.key !== 'ArrowUp' && event.key !== 'ArrowDown') || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+    const selectedMode = String(app.querySelector('#mode-select')?.value || '').toLowerCase();
+    if (state.manualPaceEnabled || selectedMode === 'manual') return;
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest('input, textarea, select, button, a, summary, [contenteditable="true"], [role="textbox"]')) return;
     if (!app.querySelector('#reader')) return;
@@ -11269,8 +16317,9 @@ function renderReaderWithText(title, text, source = { type: 'text' }) {
   };
   document.addEventListener('keydown', state.viewerWpmKeyHandler);
   updateViewerWpmBadge();
+  bindPushTrainingControls();
 
-  app.querySelectorAll('#mode-select, #speed, #word-count, #pointer-style, #pointer-color, #meaningful-chunks, #focus-anchor-font-size, #focus-anchor-color, #focus-anchor-bold, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode').forEach((control) => {
+  app.querySelectorAll('#mode-select, #speed, #word-count, #pointer-style, #pointer-color, #meaningful-chunks, #focus-anchor-font-size, #focus-anchor-color, #focus-anchor-bold, #font-family, #font-size, #theme-select, #bionic-reading, #book-pages, #illustration-mode, #push-training-enabled, #push-start-wpm, #push-target-wpm, #push-ramp-rate').forEach((control) => {
     control.addEventListener('change', () => persistReaderSession());
     control.addEventListener('input', () => persistReaderSession());
   });
@@ -11341,8 +16390,8 @@ function renderFullscreenMarkFormat() {
       </div>
       <fieldset class="fullscreen-format-scope">
         <legend>Apply to</legend>
-        <label><input type="radio" name="fs-format-scope" value="document" ${hasSelection ? '' : 'checked'}> Entire document</label>
-        <label><input type="radio" name="fs-format-scope" value="selection" ${hasSelection ? 'checked' : ''}> Highlighted passage</label>
+        <label><input type="radio" name="fs-format-scope" value="document" checked> Entire document</label>
+        <label><input type="radio" name="fs-format-scope" value="selection" ${hasSelection ? '' : 'disabled'}> Highlighted passage</label>
       </fieldset>
       <div class="fullscreen-format-actions">
         <button class="primary" type="button" data-fs-format-apply>Format Text</button>
@@ -11370,8 +16419,15 @@ function renderFullscreenMarkFormat() {
       if (scope === 'selection' && !selected) throw new Error('Highlight a passage first, or choose Entire document.');
       if (scope === 'document' && !api.hasActiveDocument?.()) throw new Error('The current Reader text could not be accessed.');
 
-      if (status) status.textContent = level === 'deep' ? 'AI Deep Clean is reviewing the text…' : 'Formatting text…';
-      await api.applyCleanup(level, scope, selected, selectionRange);
+      if (status) status.textContent = level === 'deep'
+        ? (scope === 'document' ? 'AI Deep Clean is preparing the entire document…' : 'AI Deep Clean is reviewing the highlighted passage…')
+        : 'Formatting text…';
+      await api.applyCleanup(level, scope, selected, selectionRange, (progress) => {
+        if (!status || !progress) return;
+        if (progress.totalChunks > 1) {
+          status.textContent = `AI Deep Clean: section ${progress.chunk} of ${progress.totalChunks} (${progress.percent}%)…`;
+        }
+      });
       if (status) status.textContent = 'Formatting complete.';
     } catch (error) {
       if (status) status.textContent = error?.message || 'Formatting could not be completed.';
@@ -11445,6 +16501,10 @@ function bindFullscreenOptions(readerFrame) {
   const pairs = [
     ['#fs-mode-select', '#mode-select'],
     ['#fs-speed', '#speed'],
+    ['#fs-push-training-enabled', '#push-training-enabled'],
+    ['#fs-push-start-wpm', '#push-start-wpm'],
+    ['#fs-push-target-wpm', '#push-target-wpm'],
+    ['#fs-push-ramp-rate', '#push-ramp-rate'],
     ['#fs-word-count', '#word-count'],
     ['#fs-pointer-style', '#pointer-style'],
     ['#fs-pointer-color', '#pointer-color'],
@@ -11613,22 +16673,19 @@ function bindFullscreenOptions(readerFrame) {
     }
   };
   document.addEventListener('fullscreenchange', state.fullscreenOptionsChangeHandler);
-
-  state.fullscreenOptionsObserver = new MutationObserver(() => {
-    if (!readerFrame.isConnected) {
-      state.fullscreenOptionsObserver?.disconnect();
-      state.fullscreenOptionsObserver = null;
-      return;
-    }
-    if (readerFrame.classList.contains('fullscreen-fallback')) {
+  state.fullscreenOptionsObserver = null;
+  const fullscreenToggleButton = app.querySelector('#toggle-reader-fullscreen');
+  fullscreenToggleButton?.addEventListener('click', () => {
+    window.setTimeout(() => {
+      if (!readerFrame.isConnected || !isFullscreen()) return;
       strip.classList.remove('controls-hidden');
       readerFrame.classList.remove('fullscreen-controls-hidden');
       closeMenu();
       closeMarkDrawer();
       syncFromMain();
-    }
+      requestAnimationFrame(refreshFocusAnchorFullscreenLayout);
+    }, 0);
   });
-  state.fullscreenOptionsObserver.observe(readerFrame, { attributes: true, attributeFilter: ['class'] });
 
   closeMenu();
   closeMarkDrawer();
@@ -11831,6 +16888,17 @@ function scheduleBookPageReflow({ delay = 0, anchorIndex = null } = {}) {
             : Number(state.index) || 0
         );
         restoreBookPageWordAnchor(preservedWord);
+
+        // Book Pages can rebuild/reflow the visible word DOM when a side pane
+        // opens, closes, or changes width. Persistent Ask Mark / Reading
+        // Companion selections are stored by canonical word index, so restore
+        // their visual highlight only after the final page geometry is painted.
+        // Without this, Modern Guide “Discuss with reading companion” appears
+        // selected in normal mode but loses its highlight after Book Pages reflows.
+        if (state.markPersistentSelection) {
+          persistMarkSelectionHighlight(state.markPersistentSelection);
+        }
+
         pendingBookPageAnchorIndex = null;
         persistReaderSession();
       });
@@ -11958,7 +17026,7 @@ function bindReaderFullscreen(readerFrame, button) {
           && (anchorIndex < state.renderedWordStart || anchorIndex >= state.renderedWordEnd)) {
         const recover = () => {
           if (sequence !== restoreSequence || !reader.isConnected) return;
-          virtualRenderer.renderWindowAround(reader, mode, groupSize, anchorIndex);
+          virtualRenderer.renderWindowAround(reader, readerRenderMode(mode), groupSize, anchorIndex);
           restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
           positionPointerAtWord(anchorIndex);
         };
@@ -12138,6 +17206,450 @@ function firstReadingIndexInVisibleBookSpread(reader) {
   return Number.isFinite(firstIndex) ? firstIndex : Math.max(0, state.index || 0);
 }
 
+
+function manualPaceChunkSize() {
+  const control = app.querySelector('#word-count, #fs-word-count');
+  const count = Number(control?.value || state.renderedGroupSize || 1);
+  return Number.isFinite(count) && count > 0 ? Math.min(10, Math.max(1, Math.round(count))) : 1;
+}
+
+function resetManualPaceSession() {
+  state.manualPace = {
+    active: false,
+    startedAt: 0,
+    lastStepAt: 0,
+    forwardSteps: 0,
+    backwardSteps: 0,
+    wordsAdvanced: 0,
+    stepIntervals: [],
+    direction: 0,
+    timer: null,
+    paused: false,
+    heldLeft: false,
+    heldRight: false
+  };
+}
+
+function ensureManualPaceSession() {
+  if (!state.manualPace || typeof state.manualPace !== 'object') resetManualPaceSession();
+  if (!state.manualPace.active) {
+    const now = Date.now();
+    state.manualPace.active = true;
+    state.manualPace.startedAt = now;
+    state.manualPace.lastStepAt = now;
+  }
+  return state.manualPace;
+}
+
+function manualPaceSessionStats() {
+  const session = state.manualPace || {};
+  const now = Date.now();
+  const elapsedMs = session.active && session.startedAt ? Math.max(1, now - session.startedAt) : 0;
+  const elapsedMinutes = elapsedMs / 60000;
+  const netWords = Math.max(0, Number(session.wordsAdvanced) || 0);
+  const wpm = elapsedMinutes > 0 ? Math.round(netWords / elapsedMinutes) : 0;
+  const intervals = Array.isArray(session.stepIntervals) ? session.stepIntervals.filter((n)=>n>0) : [];
+  const avgStepMs = intervals.length
+    ? Math.round(intervals.reduce((a,b)=>a+b,0) / intervals.length)
+    : 0;
+
+  return {
+    wpm,
+    forwardSteps:Number(session.forwardSteps)||0,
+    backtracks:Number(session.backwardSteps)||0,
+    wordsAdvanced:netWords,
+    avgStepMs
+  };
+}
+
+function updateManualPaceStatus() {
+  const stats = manualPaceSessionStats();
+  const targets = app.querySelectorAll('[data-manual-pace-status]');
+  targets.forEach((target) => {
+    target.textContent = stats.forwardSteps || stats.backtracks
+      ? `Manual pace ${stats.wpm || 0} WPM · ${stats.backtracks} backtrack${stats.backtracks === 1 ? '' : 's'}`
+      : 'Use ← and → to guide the highlight.';
+  });
+}
+
+function renderManualPaceHighlight(reader) {
+  if (!reader || !state.words?.length) return;
+
+  for (const active of state.activeElements || []) {
+    active?.classList?.remove('active-group', 'active-bold-group');
+  }
+  state.activeElements = [];
+
+  const index = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
+
+  // Manual Pace deliberately does NOT rebuild or rerender the reader.
+  // It rides on the already-rendered Highlight DOM.
+  if (state.virtualized
+      && (index < state.renderedWordStart || index >= state.renderedWordEnd)) {
+    virtualRenderer.renderWindowAround(
+      reader,
+      'highlight',
+      Number(app.querySelector('#word-count')?.value) || 1,
+      index
+    );
+  } else {
+    ensureWordsRendered(
+      reader,
+      'highlight',
+      Number(app.querySelector('#word-count')?.value) || 1,
+      Math.min(state.words.length, index + 250)
+    );
+  }
+
+  let group = Array.from(reader.querySelectorAll('.reader-group[data-start-index][data-end-index]'))
+    .find((element) => {
+      const startIndex = Number(element.dataset.startIndex);
+      const endIndex = Number(element.dataset.endIndex);
+      return startIndex <= index && endIndex > index;
+    });
+
+  if (!group) {
+    const word = reader.querySelector(`.reader-word[data-index="${index}"]`);
+    group = word?.closest?.('.reader-group') || word;
+  }
+
+  if (group) {
+    group.classList.add('active-group');
+    state.activeElements = [group];
+    if (state.bookPages) {
+      const spread = bookSpreadForWordIndex(reader, index);
+      if (spread != null && spread !== getCurrentBookSpread(reader)) {
+        goToBookSpread(spread, {
+          behavior:'auto',
+          ensureRendered:true,
+          syncReaderPosition:false
+        });
+      }
+    } else {
+      group.scrollIntoView?.({ block:'center', inline:'nearest', behavior:'auto' });
+    }
+  }
+
+  state.viewportAnchorIndex = index;
+  updateReaderStatus('Manual Pace: use ← and → to move through the text.');
+  updateManualPaceStatus();
+}
+
+
+function manualPaceWpm() {
+  const control = app.querySelector('#wpm, #wpm-input, #speed, #speed-input, #fs-wpm, [data-reader-wpm]');
+  const value = Number(control?.value ?? state.wpm ?? state.speed ?? 0);
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function stopManualPaceMotion({ keepDirection = false } = {}) {
+  const session = ensureManualPaceSession();
+  if (session.timer) {
+    clearTimeout(session.timer);
+    session.timer = null;
+  }
+  if (!keepDirection) session.direction = 0;
+  updateManualPaceStatus();
+}
+
+function scheduleManualPaceMotion() {
+  const session = ensureManualPaceSession();
+  stopManualPaceMotion({ keepDirection:true });
+
+  const direction = Number(session.direction) || 0;
+  const horizontalHeld = Boolean(session.heldLeft || session.heldRight);
+  const wpm = manualPaceWpm();
+  if (!direction || !horizontalHeld || wpm <= 0) {
+    updateReaderStatus('Manual Pace: WPM is 0. Use ↑/↓ for one line at a time, or raise WPM to move automatically.');
+    updateManualPaceStatus();
+    return;
+  }
+
+  const chunk = manualPaceChunkSize();
+  const delay = Math.max(30, Math.round((60000 * chunk) / Math.max(1, wpm)));
+
+  session.timer = setTimeout(() => {
+    session.timer = null;
+    if (!state.manualPaceEnabled || !session.direction) return;
+    manualPaceStep(session.direction, 1, { fromTimer:true });
+    scheduleManualPaceMotion();
+  }, delay);
+}
+
+function startManualPaceHeldDirection(direction) {
+  const session = ensureManualPaceSession();
+  const next = direction < 0 ? -1 : 1;
+
+  if (next > 0) session.heldRight = true;
+  else session.heldLeft = true;
+
+  // If both are physically held, the most recently pressed key wins.
+  session.direction = next;
+  session.paused = false;
+
+  // A quick key tap must still move one chunk. Previously the first movement
+  // was delayed until the WPM timer fired, so releasing the key before that
+  // timer made Manual Pace appear completely unresponsive. Holding the arrow
+  // continues from this immediate first step on the normal WPM clock.
+  manualPaceStep(next, 1, { fromTimer:false });
+  scheduleManualPaceMotion();
+
+  const wpm = manualPaceWpm();
+  updateReaderStatus(
+    wpm > 0
+      ? `Manual Pace: ${next > 0 ? 'forward' : 'reverse'} while arrow is held · ${wpm} WPM.`
+      : `Manual Pace: ${next > 0 ? 'forward' : 'reverse'} arrow held · WPM is 0.`
+  );
+}
+
+function releaseManualPaceHeldDirection(direction) {
+  const session = ensureManualPaceSession();
+  const released = direction < 0 ? -1 : 1;
+
+  if (released > 0) session.heldRight = false;
+  else session.heldLeft = false;
+
+  // If the opposite key is still being held, immediately continue in that
+  // direction. Otherwise stop as soon as the reader releases the key.
+  if (session.heldRight) {
+    session.direction = 1;
+    session.paused = false;
+    scheduleManualPaceMotion();
+    return;
+  }
+  if (session.heldLeft) {
+    session.direction = -1;
+    session.paused = false;
+    scheduleManualPaceMotion();
+    return;
+  }
+
+  stopManualPaceMotion();
+  session.paused = true;
+  updateReaderStatus('Manual Pace stopped. Hold ← or → to move.');
+}
+
+
+function renderedManualLineMap(reader) {
+  const readerRect = reader.getBoundingClientRect();
+  const tolerance = 3;
+
+  const candidates = Array.from(
+    reader.querySelectorAll('.reader-word[data-index], .reader-group[data-start-index]')
+  )
+    .map((element) => {
+      const rect = element.getBoundingClientRect?.();
+      const index = Number(element.dataset.index ?? element.dataset.startIndex);
+      if (!rect || !Number.isFinite(index) || rect.width <= 0 || rect.height <= 0) return null;
+
+      // Only use elements actually visible in the current reader viewport/spread.
+      const visible = (
+        rect.bottom > readerRect.top + 1 &&
+        rect.top < readerRect.bottom - 1 &&
+        rect.right > readerRect.left + 1 &&
+        rect.left < readerRect.right - 1
+      );
+      if (!visible) return null;
+
+      return {
+        element,
+        index,
+        top: rect.top,
+        left: rect.left,
+        right: rect.right
+      };
+    })
+    .filter(Boolean)
+    .sort((a,b) => a.top - b.top || a.left - b.left || a.index - b.index);
+
+  const lines = [];
+  for (const item of candidates) {
+    let line = lines.find((row) => Math.abs(row.top - item.top) <= tolerance);
+    if (!line) {
+      line = {
+        top:item.top,
+        items:[],
+        minIndex:item.index,
+        maxIndex:item.index
+      };
+      lines.push(line);
+    }
+    line.items.push(item);
+    line.minIndex = Math.min(line.minIndex, item.index);
+    line.maxIndex = Math.max(line.maxIndex, item.index);
+  }
+
+  lines.forEach((line) => {
+    line.items.sort((a,b)=>a.left-b.left || a.index-b.index);
+  });
+
+  return lines.sort((a,b)=>a.top-b.top);
+}
+
+function manualPaceMoveLine(direction) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !state.words?.length) return;
+
+  // Vertical navigation is deliberately manual and pauses horizontal travel,
+  // but remembers the prior direction so Space can resume it.
+  stopManualPaceMotion({ keepDirection:true });
+  const session = ensureManualPaceSession();
+  session.paused = true;
+
+  const lines = renderedManualLineMap(reader);
+  if (!lines.length) return;
+
+  const currentIndex = Math.max(
+    0,
+    Math.min(state.words.length - 1, Number(state.index) || 0)
+  );
+
+  // Find the actual line whose rendered word-index range contains the cursor.
+  let currentLineIndex = lines.findIndex(
+    (line) => currentIndex >= line.minIndex && currentIndex <= line.maxIndex
+  );
+
+  // If the active cursor is between rendered groups, use the nearest line by
+  // index range rather than accidentally choosing the first earlier line.
+  if (currentLineIndex < 0) {
+    currentLineIndex = lines.reduce((best, line, idx) => {
+      const distance = currentIndex < line.minIndex
+        ? line.minIndex - currentIndex
+        : currentIndex > line.maxIndex
+          ? currentIndex - line.maxIndex
+          : 0;
+      return distance < best.distance ? { idx, distance } : best;
+    }, { idx:0, distance:Infinity }).idx;
+  }
+
+  const targetLineIndex = currentLineIndex + (direction > 0 ? 1 : -1);
+
+  if (targetLineIndex < 0 || targetLineIndex >= lines.length) {
+    if (!state.bookPages) {
+      updateReaderStatus(direction > 0
+        ? 'Manual Pace: already at the last visible line.'
+        : 'Manual Pace: already at the first visible line.');
+      return;
+    }
+
+    const currentSpread = getCurrentBookSpread(reader);
+    const maxSpread = Math.max(0, getBookSpreadCount(reader) - 1);
+    const nextSpread = Math.max(0, Math.min(maxSpread, currentSpread + (direction > 0 ? 1 : -1)));
+    if (nextSpread === currentSpread) return;
+
+    goToBookSpread(nextSpread, {
+      behavior:'auto',
+      ensureRendered:true,
+      syncReaderPosition:false
+    });
+
+    // Wait until the exact spread position has painted, then select a visible
+    // line from that spread without asking the normal reader to resync index.
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      const refreshed = renderedManualLineMap(reader);
+      if (!refreshed.length) return;
+      const targetLine = direction > 0 ? refreshed[0] : refreshed[refreshed.length - 1];
+      const targetItem = direction > 0
+        ? targetLine.items[0]
+        : targetLine.items[targetLine.items.length - 1];
+      if (!targetItem) return;
+
+      state.index = targetItem.index;
+      state.viewportAnchorIndex = targetItem.index;
+      renderManualPaceHighlight(reader);
+      updateReaderStatus(`Manual Pace: moved ${direction > 0 ? 'down' : 'up'} one line.`);
+    }));
+    return;
+  }
+
+  const currentLine = lines[currentLineIndex];
+  const targetLine = lines[targetLineIndex];
+
+  // Preserve the horizontal reading position as closely as possible when
+  // moving vertically, like moving the caret up/down in a text editor.
+  const currentItem = currentLine.items.reduce((best,item) => {
+    const distance = Math.abs(item.index - currentIndex);
+    return distance < best.distance ? { item, distance } : best;
+  }, { item:currentLine.items[0], distance:Infinity }).item;
+
+  const targetItem = targetLine.items.reduce((best,item) => {
+    const distance = Math.abs(item.left - currentItem.left);
+    return distance < best.distance ? { item, distance } : best;
+  }, { item:targetLine.items[0], distance:Infinity }).item;
+
+  if (!targetItem) return;
+  state.index = targetItem.index;
+  state.viewportAnchorIndex = targetItem.index;
+  renderManualPaceHighlight(reader);
+  updateReaderStatus(`Manual Pace: moved ${direction > 0 ? 'down' : 'up'} one line.`);
+}
+
+function manualPaceStep(direction = 1, multiplier = 1, { fromTimer = false } = {}) {
+  const reader = app.querySelector('#reader');
+  if (!reader || !state.words?.length) return;
+
+  const session = ensureManualPaceSession();
+  const now = Date.now();
+  const sinceLast = session.lastStepAt ? now - session.lastStepAt : 0;
+  if (sinceLast > 40 && sinceLast < 15000) {
+    session.stepIntervals.push(sinceLast);
+    if (session.stepIntervals.length > 240) session.stepIntervals.shift();
+  }
+  session.lastStepAt = now;
+
+  const chunk = manualPaceChunkSize();
+  const amount = Math.max(1, chunk * Math.max(1, multiplier));
+  const current = Math.max(0, Math.min(state.words.length - 1, Number(state.index) || 0));
+  const next = Math.max(0, Math.min(state.words.length - 1, current + (direction * amount)));
+
+  if (next === current && fromTimer) {
+    stopManualPaceMotion();
+    updateReaderStatus(direction > 0 ? 'Manual Pace reached the end.' : 'Manual Pace reached the beginning.');
+    return;
+  }
+
+  if (direction > 0) {
+    session.forwardSteps += 1;
+    session.wordsAdvanced += Math.max(0, next - current);
+  } else {
+    session.backwardSteps += 1;
+    session.wordsAdvanced = Math.max(0, session.wordsAdvanced - Math.max(0, current - next));
+  }
+
+  state.index = next;
+
+  // In Book Pages mode, ensure the current cursor's spread is visible using
+  // the existing page navigation architecture rather than creating a new one.
+  try {
+    const word = state.words[state.index];
+    if (word && typeof firstReadingIndexInVisibleBookSpread === 'function') {
+      const rect = word.getBoundingClientRect?.();
+      const readerRect = reader.getBoundingClientRect?.();
+      const outside = rect && readerRect && (
+        rect.right < readerRect.left || rect.left > readerRect.right ||
+        rect.bottom < readerRect.top || rect.top > readerRect.bottom
+      );
+      if (outside && typeof ensureReaderIndexVisible === 'function') {
+        ensureReaderIndexVisible(state.index, { behavior:'smooth' });
+      }
+    }
+  } catch {}
+
+  renderManualPaceHighlight(reader);
+}
+
+function setManualPaceMode(active) {
+  if (!active) {
+    if (state.manualPace) state.manualPace.active = false;
+    updateManualPaceStatus();
+    return;
+  }
+
+  ensureManualPaceSession();
+  const reader = app.querySelector('#reader');
+  renderManualPaceHighlight(reader);
+}
+
 function syncReaderToVisibleBookSpread(reader) {
   const nextIndex = firstReadingIndexInVisibleBookSpread(reader);
   state.index = Math.max(0, Math.min(state.words.length - 1, nextIndex));
@@ -12297,7 +17809,7 @@ function updateModeControls(mode) {
   const start = app.querySelector('#start-reader');
   const pause = app.querySelector('#pause-reader');
   const staticMode = mode === 'two-column';
-  const countUnused = mode === 'digital-sign' || mode === 'two-column' || mode === 'auto-scroll' || mode === 'pacman';
+  const countUnused = mode === 'digital-sign' || mode === 'two-column' || mode === 'auto-scroll' || mode === 'pacman' || mode === 'line-sweep';
   const meaningfulInput = app.querySelector('#meaningful-chunks');
   const meaningfulSupported = modeSupportsMeaningfulChunks(mode);
   const bookPagesInput = app.querySelector('#book-pages');
@@ -12341,12 +17853,16 @@ function updateModeControls(mode) {
       : '';
   }
   if (speedInput) {
-    speedInput.disabled = staticMode;
-    speedInput.title = staticMode ? 'Two Columns is intended for self-paced reading.' : '';
+    const manualMode = mode === 'manual';
+    speedInput.disabled = staticMode || manualMode;
+    speedInput.title = manualMode
+      ? 'Manual Pace is controlled with the left and right arrow keys.'
+      : (staticMode ? 'Two Columns is intended for self-paced reading.' : '');
   }
   if (start) {
+    const manualMode = mode === 'manual';
     start.disabled = staticMode;
-    start.textContent = staticMode ? 'Self-paced' : 'Start';
+    start.textContent = manualMode ? 'Manual' : (staticMode ? 'Self-paced' : 'Start');
   }
   if (pause) pause.disabled = true;
 }
@@ -13220,12 +18736,16 @@ function appendWordDocumentChunk(reader, mode, groupSize, targetWordEnd) {
   return virtualRenderer.appendWordDocumentChunk(reader, mode, groupSize, targetWordEnd);
 }
 
+function readerRenderMode(mode) {
+  return mode === 'manual' ? 'highlight' : mode;
+}
+
 function ensureWordsRendered(reader, mode, groupSize, requiredWordEnd) {
-  return virtualRenderer.ensureWordsRendered(reader, mode, groupSize, requiredWordEnd);
+  return virtualRenderer.ensureWordsRendered(reader, readerRenderMode(mode), groupSize, requiredWordEnd);
 }
 
 function renderWordDocument(reader, mode, groupSize = 1) {
-  return virtualRenderer.renderWordDocument(reader, mode, groupSize);
+  return virtualRenderer.renderWordDocument(reader, readerRenderMode(mode), groupSize);
 }
 
 function visibleReadingAnchor(reader, fallbackIndex = state.index) {
@@ -13233,7 +18753,7 @@ function visibleReadingAnchor(reader, fallbackIndex = state.index) {
 }
 
 function restoreReadingAnchor(reader, mode, groupSize, wordIndex) {
-  return virtualRenderer.restoreReadingAnchor(reader, mode, groupSize, wordIndex);
+  return virtualRenderer.restoreReadingAnchor(reader, readerRenderMode(mode), groupSize, wordIndex);
 }
 
 function captureReaderViewport(anchorIndex = state.index) {
@@ -13321,7 +18841,7 @@ function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
           && !['flash', 'digital-sign', 'two-column'].includes(mode)
           && state.virtualized
           && (anchorIndex < state.renderedWordStart || anchorIndex >= state.renderedWordEnd)) {
-        virtualRenderer.renderWindowAround(reader, mode, groupSize, anchorIndex);
+        virtualRenderer.renderWindowAround(reader, readerRenderMode(mode), groupSize, anchorIndex);
       }
       restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
       if (state.bookPages) {
@@ -13341,36 +18861,71 @@ function restoreCapturedReaderLocation(snapshot, { rerendered = false } = {}) {
 
 function switchReadingMode(nextMode) {
   if (nextMode === 'two-column') nextMode = 'highlight';
-  state.pendingReadingMode = nextMode;
+  const manualRequested = nextMode === 'manual';
+  const renderMode = manualRequested ? 'highlight' : nextMode;
 
-  // A fullscreen select can emit several closely spaced input/change events.
-  // Coalesce them into one render on the next frame instead of rebuilding the
-  // word DOM repeatedly while the browser is still painting the menu.
+  state.pendingReadingMode = nextMode;
+  state.manualPaceEnabled = manualRequested;
+
   if (state.modeChangeFrame) cancelAnimationFrame(state.modeChangeFrame);
   state.modeChangeFrame = requestAnimationFrame(() => {
     state.modeChangeFrame = null;
-    const mode = state.pendingReadingMode || nextMode;
+    const requestedMode = state.pendingReadingMode || nextMode;
     state.pendingReadingMode = null;
+    const manual = requestedMode === 'manual';
+    const effectiveMode = manual ? 'highlight' : requestedMode;
     const reader = app.querySelector('#reader');
-    if (!reader || state.renderedMode === mode) {
-      updateModeControls(mode);
-      return;
-    }
+    if (!reader) return;
 
     const snapshot = captureReaderLocation();
     const groupSize = Number(app.querySelector('#word-count')?.value) || 1;
     stopReader();
-    state.index = snapshot.anchorIndex;
-    prepareReaderView(mode, groupSize);
-    updateModeControls(mode);
-    restoreCapturedReaderLocation(snapshot, { rerendered: true });
+
+    if (state.renderedMode !== effectiveMode || state.renderedGroupSize !== groupSize) {
+      state.index = snapshot.anchorIndex;
+      prepareReaderView(effectiveMode, groupSize);
+    }
+
+    // Keep the visible select on Manual Pace even though the protected
+    // renderer itself remains Highlight.
+    const primarySelect = app.querySelector('#mode-select');
+    if (primarySelect && primarySelect.value !== requestedMode) primarySelect.value = requestedMode;
+    const fullSelect = app.querySelector('#fs-mode-select');
+    if (fullSelect && fullSelect.value !== requestedMode) fullSelect.value = requestedMode;
+
+    updateModeControls(manual ? 'manual' : effectiveMode);
+    restoreCapturedReaderLocation(snapshot, { rerendered:true });
+
+    if (manual) {
+      state.manualPaceEnabled = true;
+      state.index = Math.max(0, Math.min(state.words.length - 1, snapshot.anchorIndex || 0));
+      resetManualPaceSession();
+      ensureManualPaceSession();
+      renderManualPaceHighlight(reader);
+      const start = app.querySelector('#start-reader');
+      const pause = app.querySelector('#pause-reader');
+      if (start) {
+        start.disabled = false;
+        start.textContent = 'Manual';
+      }
+      if (pause) pause.disabled = true;
+    } else {
+      state.manualPaceEnabled = false;
+      stopManualPaceMotion();
+      if (state.manualPace) {
+        state.manualPace.heldLeft = false;
+        state.manualPace.heldRight = false;
+        state.manualPace.active = false;
+      }
+    }
   });
 }
 
 function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-count')?.value) || 1) {
+  if (mode === 'manual') mode = 'highlight';
   const reader = app.querySelector('#reader');
   if (!reader) return;
-  reader.classList.remove('flash', 'highlight-mode', 'bold-focus-mode', 'smooth-glide-mode', 'pointing-guide-mode', 'marquee-mode', 'digital-sign-mode', 'two-column-mode', 'auto-scroll-mode', 'pacman-mode', 'reading-guide-enabled', 'book-pages-layout', 'illustrated-reading');
+  reader.classList.remove('flash', 'highlight-mode', 'bold-focus-mode', 'smooth-glide-mode', 'line-sweep-mode', 'pointing-guide-mode', 'marquee-mode', 'digital-sign-mode', 'two-column-mode', 'auto-scroll-mode', 'pacman-mode', 'reading-guide-enabled', 'book-pages-layout', 'illustrated-reading');
   state.renderedMode = mode;
   updateFocusAnchorOverlay();
   state.bookPages = Boolean(app.querySelector('#book-pages')?.checked) && modeSupportsBookPages(mode);
@@ -13419,15 +18974,22 @@ function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-cou
     return;
   }
 
-  if (mode === 'highlight') reader.classList.add('highlight-mode');
+  if (mode === 'highlight' || mode === 'manual') reader.classList.add('highlight-mode');
   else if (mode === 'bold-focus') reader.classList.add('bold-focus-mode');
   else if (mode === 'smooth-glide') reader.classList.add('smooth-glide-mode');
+  else if (mode === 'line-sweep') reader.classList.add('line-sweep-mode');
   else if (mode === 'pointing-guide') reader.classList.add('pointing-guide-mode', 'reading-guide-enabled');
   else reader.classList.add('marquee-mode');
   renderWordDocument(reader, mode, groupSize);
   if (mode === 'smooth-glide') {
     const marker = document.createElement('span');
     marker.className = 'smooth-focus-marker';
+    marker.setAttribute('aria-hidden', 'true');
+    reader.prepend(marker);
+  }
+  if (mode === 'line-sweep') {
+    const marker = document.createElement('span');
+    marker.className = 'line-sweep-marker';
     marker.setAttribute('aria-hidden', 'true');
     reader.prepend(marker);
   }
@@ -13450,30 +19012,6 @@ function prepareReaderView(mode, groupSize = Number(app.querySelector('#word-cou
           : '';
     reader.prepend(guide);
   }
-}
-
-function readerVisibleTopClearance(reader, fallback = 18) {
-  if (!reader) return fallback;
-
-  const frame = reader.closest('#reader-frame');
-  const header = frame?.querySelector(':scope > [data-topic-feed-story-header-external]');
-  if (!header) return fallback;
-
-  const headerStyle = getComputedStyle(header);
-  const headerRect = header.getBoundingClientRect();
-  const readerRect = reader.getBoundingClientRect();
-  const visible = headerStyle.display !== 'none'
-    && headerStyle.visibility !== 'hidden'
-    && Number(headerStyle.opacity || 1) !== 0
-    && headerRect.width > 0
-    && headerRect.height > 0;
-
-  if (!visible) return fallback;
-
-  // Use only the portion of the external Topic Feed band that actually covers
-  // the Reader. Normal/non-topic documents therefore retain the original value.
-  const overlap = Math.max(0, Math.ceil(Math.min(readerRect.bottom, headerRect.bottom + 8) - readerRect.top));
-  return overlap > 0 ? overlap + 12 : fallback;
 }
 
 function scrollActiveGroup(reader, groupIndex) {
@@ -13505,7 +19043,7 @@ function scrollActiveGroup(reader, groupIndex) {
 
   const lowerThreshold = reader.clientHeight - 18;
   if (bottomInsidePane > lowerThreshold) {
-    const desiredTop = readerVisibleTopClearance(reader, 18);
+    const desiredTop = 18;
     reader.scrollTop = Math.max(0, reader.scrollTop + topInsidePane - desiredTop);
   }
 }
@@ -13573,8 +19111,7 @@ function scrollPointingStep(reader, step) {
   const lowerThreshold = reader.clientHeight - 22;
 
   if (bottomInsidePane > lowerThreshold) {
-    const desiredTop = readerVisibleTopClearance(reader, 18);
-    reader.scrollTop = Math.max(0, reader.scrollTop + topInsidePane - desiredTop);
+    reader.scrollTop = Math.max(0, reader.scrollTop + topInsidePane - 18);
   }
 }
 
@@ -13624,13 +19161,219 @@ let lastReaderStatusPaintAt = 0;
 let lastReaderStatusText = '';
 let lastViewerWpmText = '';
 
+
+const PUSH_TRAINING_KEY = 'markSetGoPushTrainingV1';
+
+function pushTrainingModeSupported(mode = getSelectedMode()) {
+  return ['flash', 'highlight', 'bold-focus', 'smooth-glide', 'line-sweep', 'pointing-guide', 'marquee'].includes(String(mode || ''));
+}
+
+function loadPushTrainingConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(PUSH_TRAINING_KEY) || '{}');
+    return {
+      enabled: Boolean(saved.enabled),
+      startWpm: Math.max(30, Math.min(900, Number(saved.startWpm) || 300)),
+      targetWpm: Math.max(30, Math.min(900, Number(saved.targetWpm) || 500)),
+      rampWpmPerMinute: Math.max(1, Math.min(300, Number(saved.rampWpmPerMinute) || 25))
+    };
+  } catch {
+    return { enabled:false, startWpm:300, targetWpm:500, rampWpmPerMinute:25 };
+  }
+}
+
+function ensurePushTrainingState() {
+  if (!state.pushTraining) {
+    const config = loadPushTrainingConfig();
+    state.pushTraining = {
+      ...config,
+      elapsedMs:0,
+      startedAt:0,
+      runtimeActive:false,
+      effectiveWpm:config.startWpm,
+      targetAnnounced:false
+    };
+  }
+  return state.pushTraining;
+}
+
+function persistPushTrainingConfig() {
+  const push = ensurePushTrainingState();
+  try {
+    localStorage.setItem(PUSH_TRAINING_KEY, JSON.stringify({
+      enabled:Boolean(push.enabled),
+      startWpm:Number(push.startWpm) || 300,
+      targetWpm:Number(push.targetWpm) || 500,
+      rampWpmPerMinute:Number(push.rampWpmPerMinute) || 25
+    }));
+  } catch {}
+}
+
+function readPushTrainingControls() {
+  const push = ensurePushTrainingState();
+  const enabled = app.querySelector('#push-training-enabled');
+  const start = app.querySelector('#push-start-wpm');
+  const target = app.querySelector('#push-target-wpm');
+  const ramp = app.querySelector('#push-ramp-rate');
+
+  if (enabled) push.enabled = enabled.checked;
+  if (start) push.startWpm = Math.max(30, Math.min(900, Number(start.value) || push.startWpm || 300));
+  if (target) push.targetWpm = Math.max(push.startWpm, Math.min(900, Number(target.value) || push.targetWpm || 500));
+  if (ramp) push.rampWpmPerMinute = Math.max(1, Math.min(300, Number(ramp.value) || push.rampWpmPerMinute || 25));
+
+  if (start) start.value = String(push.startWpm);
+  if (target) target.value = String(push.targetWpm);
+  if (ramp) ramp.value = String(push.rampWpmPerMinute);
+
+  persistPushTrainingConfig();
+  return push;
+}
+
+function pushTrainingElapsedMs() {
+  const push = ensurePushTrainingState();
+  return push.elapsedMs + (push.runtimeActive && push.startedAt ? performance.now() - push.startedAt : 0);
+}
+
+function syncPushTrainingWpm(wpm) {
+  const value = Math.max(30, Math.min(900, Math.round(Number(wpm) || 300)));
+  state.wpm = value;
+  const speed = app.querySelector('#speed');
+  const fsSpeed = app.querySelector('#fs-speed');
+  if (speed) speed.value = String(value);
+  if (fsSpeed) fsSpeed.value = String(value);
+  updateViewerWpmBadge();
+  return value;
+}
+
+function updatePushTrainingStatus(message = '') {
+  const push = ensurePushTrainingState();
+  const status = app.querySelector('#push-training-status');
+  if (!status) return;
+
+  if (message) {
+    status.textContent = message;
+    return;
+  }
+
+  if (!push.enabled) {
+    status.textContent = 'Off. Turn on to ramp reading speed automatically.';
+    return;
+  }
+
+  const mode = getSelectedMode();
+  if (!pushTrainingModeSupported(mode)) {
+    status.textContent = 'Ready. Use Flash or another guided mode to run Push Training.';
+    return;
+  }
+
+  const current = Math.round(push.effectiveWpm || push.startWpm);
+  status.textContent = `Push: ${current} → ${push.targetWpm} WPM · +${push.rampWpmPerMinute} WPM/min`;
+}
+
+function resetPushTrainingProgress({ syncSpeed = true } = {}) {
+  const push = ensurePushTrainingState();
+  push.elapsedMs = 0;
+  push.startedAt = 0;
+  push.runtimeActive = false;
+  push.effectiveWpm = push.startWpm;
+  push.targetAnnounced = false;
+  if (syncSpeed && push.enabled) syncPushTrainingWpm(push.startWpm);
+  updatePushTrainingStatus();
+}
+
+function beginPushTrainingRuntime(mode = getSelectedMode()) {
+  const push = readPushTrainingControls();
+  if (!push.enabled || !pushTrainingModeSupported(mode)) {
+    push.runtimeActive = false;
+    updatePushTrainingStatus();
+    return false;
+  }
+  if (!push.runtimeActive) {
+    push.startedAt = performance.now();
+    push.runtimeActive = true;
+  }
+  push.effectiveWpm = Math.min(
+    push.targetWpm,
+    push.startWpm + (push.rampWpmPerMinute * (pushTrainingElapsedMs() / 60000))
+  );
+  syncPushTrainingWpm(push.effectiveWpm);
+  updatePushTrainingStatus();
+  return true;
+}
+
+function pausePushTrainingRuntime() {
+  const push = ensurePushTrainingState();
+  if (push.runtimeActive && push.startedAt) {
+    push.elapsedMs += Math.max(0, performance.now() - push.startedAt);
+  }
+  push.startedAt = 0;
+  push.runtimeActive = false;
+  updatePushTrainingStatus();
+}
+
+function currentPushTrainingWpm(fallbackWpm, mode = getSelectedMode()) {
+  const push = ensurePushTrainingState();
+  if (!push.enabled || !pushTrainingModeSupported(mode) || !push.runtimeActive) {
+    return Math.max(30, Number(fallbackWpm) || 300);
+  }
+
+  const effective = Math.min(
+    push.targetWpm,
+    push.startWpm + (push.rampWpmPerMinute * (pushTrainingElapsedMs() / 60000))
+  );
+  push.effectiveWpm = effective;
+  syncPushTrainingWpm(effective);
+
+  if (effective >= push.targetWpm && !push.targetAnnounced) {
+    push.targetAnnounced = true;
+    updatePushTrainingStatus(`Target reached: ${push.targetWpm} WPM. Holding pace.`);
+  } else if (!push.targetAnnounced) {
+    updatePushTrainingStatus();
+  }
+
+  return effective;
+}
+
+function bindPushTrainingControls() {
+  const push = ensurePushTrainingState();
+  const enabled = app.querySelector('#push-training-enabled');
+  const start = app.querySelector('#push-start-wpm');
+  const target = app.querySelector('#push-target-wpm');
+  const ramp = app.querySelector('#push-ramp-rate');
+
+  if (!enabled || !start || !target || !ramp) return;
+
+  enabled.checked = push.enabled;
+  start.value = String(push.startWpm);
+  target.value = String(push.targetWpm);
+  ramp.value = String(push.rampWpmPerMinute);
+
+  const changed = () => {
+    const wasRunning = isReaderRunning();
+    if (wasRunning) pauseReader();
+    readPushTrainingControls();
+    resetPushTrainingProgress({ syncSpeed:true });
+    if (wasRunning && getSelectedMode() !== 'two-column') startReader();
+  };
+
+  enabled.addEventListener('change', changed);
+  start.addEventListener('change', changed);
+  target.addEventListener('change', changed);
+  ramp.addEventListener('change', changed);
+
+  updatePushTrainingStatus();
+}
+
 function adjustReaderWpm(delta) {
   const speedInput = app.querySelector('#speed');
   if (!speedInput) return;
 
-  const min = Number(speedInput.min) || 30;
-  const max = Number(speedInput.max) || 900;
-  const current = Number(speedInput.value) || Number(state.wpm) || 300;
+  const parsedMin = Number(speedInput.min);
+  const parsedMax = Number(speedInput.max);
+  const parsedCurrent = Number(speedInput.value);
+  const min = Number.isFinite(parsedMin) ? parsedMin : 30;
+  const max = Number.isFinite(parsedMax) ? parsedMax : 900;
+  const current = Number.isFinite(parsedCurrent) ? parsedCurrent : (Number(state.wpm) || 300);
   const next = Math.min(max, Math.max(min, Math.round(current + Number(delta || 0))));
   if (next === current) return;
 
@@ -13652,8 +19395,9 @@ function adjustReaderWpm(delta) {
 function updateViewerWpmBadge() {
   const badge = app.querySelector('#viewer-wpm-badge');
   if (!badge) return;
-  const inputSpeed = Number(app.querySelector('#speed')?.value);
-  const speed = Math.max(0, Math.round(Number.isFinite(inputSpeed) && inputSpeed > 0 ? inputSpeed : Number(state.wpm) || 0));
+  const rawSpeed = app.querySelector('#speed')?.value;
+  const inputSpeed = rawSpeed === '' || rawSpeed == null ? NaN : Number(rawSpeed);
+  const speed = Math.max(0, Math.round(Number.isFinite(inputSpeed) ? inputSpeed : Number(state.wpm) || 0));
   const nextText = `${speed.toLocaleString()} WPM`;
   if (nextText === lastViewerWpmText && badge.textContent === nextText) return;
   lastViewerWpmText = nextText;
@@ -13730,9 +19474,210 @@ function startAutoScrollReader({ reader, speed, start, pause }) {
 
 /* Feature block moved to /modules/reading/pacman-mode.js */
 
+// Line Sweep mode -----------------------------------------------------------
+// Port of the Spiffy Teleprompter line-sweep behavior. A single translucent
+// band sits BEHIND the rendered words and continuously grows from the first
+// word to the last word on the active visual line. When the line completes,
+// the band resets to zero width on the next visual line. This intentionally
+// mirrors the teleprompter's geometry model rather than painting words one at
+// a time or drawing an underline.
+function getLineSweepStep(reader, startIndex) {
+  if (!reader || startIndex >= state.words.length) return null;
+
+  // Render enough neighboring words for reliable visual-line measurement.
+  ensureWordsRendered(reader, 'line-sweep', 1, Math.min(state.words.length, startIndex + 240));
+
+  // Book Pages uses horizontal spreads. Before measuring the next visual line,
+  // explicitly bring the spread containing the logical sweep cursor into view.
+  // Other reader modes already do this handoff during playback; Line Sweep's
+  // animation loop needs the same page-controller notification.
+  if (state.bookPages) {
+    const targetSpread = bookSpreadForWordIndex(reader, startIndex);
+    if (targetSpread != null && targetSpread !== getCurrentBookSpread(reader)) {
+      goToBookSpread(targetSpread, {
+        behavior: 'auto',
+        ensureRendered: true,
+        syncReaderPosition: false
+      });
+      state.index = startIndex;
+      state.bookSpreadIndex = targetSpread;
+      updateBookPageStatus(targetSpread);
+    }
+  }
+
+  let target = reader.querySelector(`.reader-word[data-index="${Number(startIndex)}"]`);
+  if (!target && state.virtualized) {
+    virtualRenderer.renderWindowAround(reader, 'line-sweep', 1, startIndex);
+    target = reader.querySelector(`.reader-word[data-index="${Number(startIndex)}"]`);
+  }
+  if (!target) return null;
+
+  const readerRect = reader.getBoundingClientRect();
+  let targetRect = target.getBoundingClientRect();
+  const topSafe = readerRect.top + 46;
+  const bottomSafe = readerRect.bottom - 54;
+  if (targetRect.top < topSafe || targetRect.bottom > bottomSafe) {
+    target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'auto' });
+    targetRect = target.getBoundingClientRect();
+  }
+
+  const lineTop = targetRect.top;
+  const tolerance = Math.max(2, targetRect.height * 0.18);
+  const candidates = Array.from(reader.querySelectorAll('.reader-word[data-index]'));
+  const lineWords = [];
+
+  for (const word of candidates) {
+    const index = Number(word.dataset.index);
+    if (!Number.isFinite(index) || index < startIndex) continue;
+    const rect = word.getBoundingClientRect();
+    if (Math.abs(rect.top - lineTop) <= tolerance) lineWords.push({ word, index, rect });
+    else if (lineWords.length && rect.top > lineTop + tolerance) break;
+  }
+
+  if (!lineWords.length) lineWords.push({ word: target, index: startIndex, rect: targetRect });
+  lineWords.sort((a, b) => a.index - b.index);
+
+  const first = lineWords[0];
+  const last = lineWords[lineWords.length - 1];
+  const left = first.rect.left - readerRect.left + reader.scrollLeft;
+  const right = last.rect.right - readerRect.left + reader.scrollLeft;
+  const top = first.rect.top - readerRect.top + reader.scrollTop;
+  const lineHeight = Math.max(first.rect.height, parseFloat(getComputedStyle(reader).lineHeight) || first.rect.height);
+  const nextIndex = Math.min(state.words.length, last.index + 1);
+
+  return {
+    startIndex,
+    nextIndex,
+    wordCount: Math.max(1, nextIndex - startIndex),
+    lineWords,
+    left,
+    top,
+    height: lineHeight,
+    width: Math.max(12, right - left)
+  };
+}
+
+function positionLineSweepMarker(reader, step) {
+  const marker = reader?.querySelector('.line-sweep-marker');
+  if (!marker || !step) return null;
+  marker.style.display = 'block';
+  marker.style.left = `${step.left}px`;
+  marker.style.top = `${step.top}px`;
+  marker.style.height = `${step.height}px`;
+  marker.style.width = '0px';
+  marker.style.opacity = '1';
+  return marker;
+}
+
+function clearLineSweepHighlight(reader) {
+  const marker = reader?.querySelector('.line-sweep-marker');
+  if (marker) {
+    marker.style.width = '0px';
+    marker.style.display = 'none';
+  }
+  if (state.lineSweepAnimation) {
+    try { state.lineSweepAnimation.cancel(); } catch (_) {}
+    state.lineSweepAnimation = null;
+  }
+}
+
+function startLineSweepReader({ reader, speed }) {
+  const token = ++state.runToken;
+
+  const sweepNextLine = () => {
+    if (token !== state.runToken) return;
+    if (state.index >= state.words.length) {
+      clearLineSweepHighlight(reader);
+      pauseReader();
+      updateReaderStatus('Finished.');
+      return;
+    }
+
+    const step = getLineSweepStep(reader, state.index);
+    if (!step) {
+      clearLineSweepHighlight(reader);
+      pauseReader();
+      updateReaderStatus('Line Sweep could not locate the current text line.');
+      return;
+    }
+
+    updateFocusAnchorOverlay();
+    const marker = positionLineSweepMarker(reader, step);
+    if (!marker) return;
+
+    const liveSpeed = currentPushTrainingWpm(speed, 'line-sweep');
+    const durationMs = Math.max(180, (60000 * step.wordCount) / Math.max(30, liveSpeed));
+    const startedAt = performance.now();
+
+    // Same visual idea as Spiffy: one rectangular highlight grows continuously
+    // across the line. Words remain above it through z-index layering.
+    state.lineSweepAnimation = marker.animate(
+      [{ width: '0px' }, { width: `${step.width}px` }],
+      { duration: durationMs, easing: 'linear', fill: 'forwards' }
+    );
+
+    // Keep MSG's playback cursor approximately aligned with the physical sweep
+    // without changing the underlying reader architecture.
+    const syncCursor = () => {
+      if (token !== state.runToken || !state.lineSweepAnimation) return;
+      const progress = Math.max(0, Math.min(1, (performance.now() - startedAt) / durationMs));
+      const offset = Math.min(step.wordCount - 1, Math.floor(progress * step.wordCount));
+      const liveIndex = Math.min(step.nextIndex - 1, step.startIndex + offset);
+      if (liveIndex >= state.index) {
+        state.index = liveIndex;
+        state.viewportAnchorIndex = liveIndex;
+        updateReaderStatus();
+      }
+      if (progress < 1) state.lineSweepFrame = requestAnimationFrame(syncCursor);
+    };
+    state.lineSweepFrame = requestAnimationFrame(syncCursor);
+
+    state.lineSweepAnimation.onfinish = () => {
+      if (token !== state.runToken) return;
+      if (state.lineSweepFrame) {
+        cancelAnimationFrame(state.lineSweepFrame);
+        state.lineSweepFrame = null;
+      }
+      state.lineSweepAnimation = null;
+      state.index = step.nextIndex;
+      state.viewportAnchorIndex = step.nextIndex;
+
+      // Crossing the right-hand virtual page must advance the horizontal book
+      // spread before the next sweep line is measured. Without this, the cursor
+      // moves into the next spread while the viewport remains on the old pages.
+      if (state.bookPages && step.nextIndex < state.words.length) {
+        const nextSpread = bookSpreadForWordIndex(reader, step.nextIndex);
+        if (nextSpread != null && nextSpread !== getCurrentBookSpread(reader)) {
+          goToBookSpread(nextSpread, {
+            behavior: 'auto',
+            ensureRendered: true,
+            syncReaderPosition: false
+          });
+          state.index = step.nextIndex;
+          state.bookSpreadIndex = nextSpread;
+          updateBookPageStatus(nextSpread);
+        }
+      }
+
+      updateReaderStatus();
+      marker.style.width = '0px';
+      sweepNextLine();
+    };
+  };
+
+  sweepNextLine();
+}
+
 function startReader() {
   if(state.markPersistentSelection || state.markSelectionLocked) clearMarkSelectionForReadingResume();
   const selectedMode = getSelectedMode();
+  if (state.manualPaceEnabled || selectedMode === 'manual') {
+    stopReader();
+    ensureManualPaceSession();
+    renderManualPaceHighlight(app.querySelector('#reader'));
+    updateReaderStatus('Manual Pace: use ← and → to move through the text.');
+    return;
+  }
   if (selectedMode === 'two-column') return;
   const currentTickerStage = app.querySelector('.digital-sign-stage');
   const canResumeTicker = selectedMode === 'digital-sign'
@@ -13749,8 +19694,10 @@ function startReader() {
   const pause = app.querySelector('#pause-reader');
   const mode = getSelectedMode();
 
-  const speed = Math.min(900, Math.max(30, Number(speedInput.value) || 300));
-  const count = (mode === 'digital-sign' || mode === 'auto-scroll' || mode === 'pacman')
+  let speed = Math.min(900, Math.max(30, Number(speedInput.value) || 300));
+  const pushActive = beginPushTrainingRuntime(mode);
+  if (pushActive) speed = currentPushTrainingWpm(speed, mode);
+  const count = (mode === 'digital-sign' || mode === 'auto-scroll' || mode === 'pacman' || mode === 'line-sweep')
     ? 1
     : Math.min(10, Math.max(1, Number(countInput.value) || 1));
   speedInput.value = speed;
@@ -13784,6 +19731,11 @@ function startReader() {
     return;
   }
 
+  if (mode === 'line-sweep') {
+    startLineSweepReader({ reader, speed, start, pause });
+    return;
+  }
+
   // This is the time for one complete group. For example, 2 words at 300 WPM
   // should advance every 400 ms.
   const tickMs = Math.max(40, (60000 * count) / speed);
@@ -13792,6 +19744,7 @@ function startReader() {
 
   const paintStep = () => {
     if (token !== state.runToken) return;
+    const liveSpeed = currentPushTrainingWpm(speed, mode);
     if (state.index >= state.words.length) {
       pauseReader();
       updateReaderStatus('Finished.');
@@ -13863,15 +19816,15 @@ function startReader() {
           // hand lands beneath the visible words rather than their old screen
           // coordinates.
           const refreshed = getPointingLineStep(reader, stepStart, stepEnd - stepStart);
-          moveReadingGuide(reader, refreshed, Math.max(40, (60000 * (stepEnd - stepStart)) / speed));
+          moveReadingGuide(reader, refreshed, Math.max(40, (60000 * (stepEnd - stepStart)) / liveSpeed));
         });
       } else {
         scrollActiveGroup(reader, groupIndex);
       }
       if (mode === 'smooth-glide' && group) {
         const glideMs = expectedMeaningful
-          ? Math.max(40, (60000 * Math.max(1, nextIndex - startIndex)) / speed)
-          : tickMs;
+          ? Math.max(40, (60000 * Math.max(1, nextIndex - startIndex)) / liveSpeed)
+          : Math.max(40, (60000 * count) / liveSpeed);
         window.requestAnimationFrame(() => moveSmoothFocusMarker(reader, group, glideMs));
       }
     }
@@ -13897,8 +19850,8 @@ function startReader() {
     // pauses. If one frame is late, the following delay becomes shorter rather
     // than permanently shifting the reading rhythm.
     const scheduledTickMs = (mode === 'pointing-guide' || expectedMeaningful)
-      ? Math.max(40, (60000 * Math.max(1, nextIndex - startIndex)) / speed)
-      : tickMs;
+      ? Math.max(40, (60000 * Math.max(1, nextIndex - startIndex)) / liveSpeed)
+      : Math.max(40, (60000 * count) / liveSpeed);
     state.nextTickAt += scheduledTickMs;
     const delay = Math.max(0, state.nextTickAt - performance.now());
     state.interval = window.setTimeout(paintStep, delay);
@@ -13908,6 +19861,7 @@ function startReader() {
 }
 
 function stopReader() {
+  pausePushTrainingRuntime();
   if (state.renderedMode === 'pacman') {
     const reader = app.querySelector('#reader');
     const current = reader?.querySelector('.reader-word.pacman-current-word');
@@ -13918,6 +19872,20 @@ function stopReader() {
   if (state.interval) window.clearTimeout(state.interval);
   state.interval = null;
   state.nextTickAt = 0;
+  const lineSweepMarker = app.querySelector('#reader .line-sweep-marker');
+  if (lineSweepMarker) {
+    lineSweepMarker.style.transition = 'none';
+    lineSweepMarker.style.width = '0px';
+    lineSweepMarker.style.display = 'none';
+  }
+  if (state.lineSweepAnimation) {
+    try { state.lineSweepAnimation.cancel(); } catch (_) {}
+    state.lineSweepAnimation = null;
+  }
+  if (state.lineSweepFrame) {
+    cancelAnimationFrame(state.lineSweepFrame);
+    state.lineSweepFrame = null;
+  }
   if (state.tickerStatusTimer) {
     window.clearInterval(state.tickerStatusTimer);
     state.tickerStatusTimer = null;
@@ -13948,7 +19916,7 @@ function pauseReader() {
   const start = app.querySelector('#start-reader');
   const pause = app.querySelector('#pause-reader');
   if (speed) speed.disabled = false;
-  if (count) count.disabled = ['digital-sign', 'two-column', 'auto-scroll', 'pacman'].includes(state.renderedMode);
+  if (count) count.disabled = ['digital-sign', 'two-column', 'auto-scroll', 'pacman', 'line-sweep'].includes(state.renderedMode);
   if (speed) speed.disabled = state.renderedMode === 'two-column';
   if (start) {
     start.disabled = false;
@@ -13958,6 +19926,7 @@ function pauseReader() {
 }
 
 function resetReader() {
+  resetPushTrainingProgress({ syncSpeed:true });
   // Reset is a full restart, not a pause. Cancel the animation and its status
   // timer before replacing the Digital Sign stage so Start cannot accidentally
   // resume an animation whose element is no longer in the document.
@@ -14488,7 +20457,7 @@ async function loadGreatBookEdition(item, status, button) {
 
         const title = loaded.title || candidate.title || item.title;
         const author = loaded.author || candidate.author || item.author || '';
-        renderReaderWithText(`${title}${author ? ` — ${author}` : ''}`, text, {
+        const editionSource = {
           type: candidate.provider,
           id: candidate.id,
           sourceUrl: loaded.sourceUrl || candidate.externalUrl || '',
@@ -14496,7 +20465,18 @@ async function loadGreatBookEdition(item, status, button) {
           greatBooksTitle: item.title,
           greatBooksAuthor: item.author,
           verifiedPrimaryText: true
-        });
+        };
+
+        const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
+        if (isWorkspacePane) {
+          const handoff = window.parent.MSGWorkspaceReaderHandoff;
+          if (typeof handoff?.openText !== 'function') {
+            throw new Error('The main Reader handoff is not ready.');
+          }
+          handoff.openText(`${title}${author ? ` — ${author}` : ''}`, text, editionSource);
+        } else {
+          renderReaderWithText(`${title}${author ? ` — ${author}` : ''}`, text, editionSource);
+        }
         return;
       } catch (error) {
         failed.push(`${provider}: ${error.message}`);
@@ -14514,8 +20494,317 @@ async function loadGreatBookEdition(item, status, button) {
 
 
 const STUDY_LANGUAGE_KEY = 'markSetGoStudyLanguageV1';
+const BIBLE_GUIDE_CATALOG = Object.freeze([
+  { testament:"Old Testament", group:"Law", title:"Genesis", slug:"genesis", status:"ready" },
+  { testament:"Old Testament", group:"Law", title:"Exodus", slug:"exodus", status:"ready" },
+  { testament:"Old Testament", group:"Law", title:"Leviticus", slug:"leviticus", status:"ready" },
+  { testament:"Old Testament", group:"Law", title:"Numbers", slug:"numbers", status:"ready" },
+  { testament:"Old Testament", group:"Law", title:"Deuteronomy", slug:"deuteronomy", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"Joshua", slug:"joshua", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"Judges", slug:"judges", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"Ruth", slug:"ruth", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"1 Samuel", slug:"1-samuel", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"2 Samuel", slug:"2-samuel", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"1 Kings", slug:"1-kings", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"2 Kings", slug:"2-kings", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"1 Chronicles", slug:"1-chronicles", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"2 Chronicles", slug:"2-chronicles", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"Ezra", slug:"ezra", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"Nehemiah", slug:"nehemiah", status:"ready" },
+  { testament:"Old Testament", group:"History", title:"Esther", slug:"esther", status:"ready" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Job", slug:"job", status:"ready" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Psalms", slug:"psalms", status:"ready" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Proverbs", slug:"proverbs", status:"ready" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Ecclesiastes", slug:"ecclesiastes", status:"ready" },
+  { testament:"Old Testament", group:"Wisdom & Poetry", title:"Song of Solomon", slug:"song-of-solomon", status:"ready" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Isaiah", slug:"isaiah", status:"ready" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Jeremiah", slug:"jeremiah", status:"ready" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Lamentations", slug:"lamentations", status:"ready" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Ezekiel", slug:"ezekiel", status:"ready" },
+  { testament:"Old Testament", group:"Major Prophets", title:"Daniel", slug:"daniel", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Hosea", slug:"hosea", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Joel", slug:"joel", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Amos", slug:"amos", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Obadiah", slug:"obadiah", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Jonah", slug:"jonah", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Micah", slug:"micah", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Nahum", slug:"nahum", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Habakkuk", slug:"habakkuk", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Zephaniah", slug:"zephaniah", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Haggai", slug:"haggai", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Zechariah", slug:"zechariah", status:"ready" },
+  { testament:"Old Testament", group:"Minor Prophets", title:"Malachi", slug:"malachi", status:"ready" },
+  { testament:"New Testament", group:"Gospels", title:"Matthew", slug:"matthew", status:"planned" },
+  { testament:"New Testament", group:"Gospels", title:"Mark", slug:"mark", status:"planned" },
+  { testament:"New Testament", group:"Gospels", title:"Luke", slug:"luke", status:"planned" },
+  { testament:"New Testament", group:"Gospels", title:"John", slug:"john", status:"planned" },
+  { testament:"New Testament", group:"History", title:"Acts", slug:"acts", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Romans", slug:"romans", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"1 Corinthians", slug:"1-corinthians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"2 Corinthians", slug:"2-corinthians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Galatians", slug:"galatians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Ephesians", slug:"ephesians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Philippians", slug:"philippians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Colossians", slug:"colossians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"1 Thessalonians", slug:"1-thessalonians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"2 Thessalonians", slug:"2-thessalonians", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"1 Timothy", slug:"1-timothy", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"2 Timothy", slug:"2-timothy", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Titus", slug:"titus", status:"planned" },
+  { testament:"New Testament", group:"Pauline Epistles", title:"Philemon", slug:"philemon", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"Hebrews", slug:"hebrews", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"James", slug:"james", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"1 Peter", slug:"1-peter", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"2 Peter", slug:"2-peter", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"1 John", slug:"1-john", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"2 John", slug:"2-john", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"3 John", slug:"3-john", status:"planned" },
+  { testament:"New Testament", group:"General Epistles", title:"Jude", slug:"jude", status:"planned" },
+  { testament:"New Testament", group:"Apocalyptic", title:"Revelation", slug:"revelation", status:"planned" }
+]);
+
+const BIBLE_GUIDES = Object.freeze({
+  "Genesis": { slug:"genesis", title:"Genesis", greatIdea:"God" },
+  "Exodus": { slug:"exodus", title:"Exodus", greatIdea:"Freedom" },
+  "Leviticus": { slug:"leviticus", title:"Leviticus", greatIdea:"Law" },
+  "Numbers": { slug:"numbers", title:"Numbers", greatIdea:"Faith" },
+  "Deuteronomy": { slug:"deuteronomy", title:"Deuteronomy", greatIdea:"Duty" },
+  "Joshua": { slug:"joshua", title:"Joshua", greatIdea:"War and Peace" },
+  "Judges": { slug:"judges", title:"Judges", greatIdea:"Government" },
+  "Ruth": { slug:"ruth", title:"Ruth", greatIdea:"Love" },
+  "1 Samuel": { slug:"1-samuel", title:"1 Samuel", greatIdea:"Government" },
+  "2 Samuel": { slug:"2-samuel", title:"2 Samuel", greatIdea:"Justice" },
+  "1 Kings": { slug:"1-kings", title:"1 Kings", greatIdea:"Government" },
+  "2 Kings": { slug:"2-kings", title:"2 Kings", greatIdea:"Justice" },
+  "1 Chronicles": { slug:"1-chronicles", title:"1 Chronicles", greatIdea:"History" },
+  "2 Chronicles": { slug:"2-chronicles", title:"2 Chronicles", greatIdea:"Religion" },
+  "Ezra": { slug:"ezra", title:"Ezra", greatIdea:"Law" },
+  "Nehemiah": { slug:"nehemiah", title:"Nehemiah", greatIdea:"Government" },
+  "Esther": { slug:"esther", title:"Esther", greatIdea:"Providence" },
+  "Job": { slug:"job", title:"Job", greatIdea:"Suffering" },
+  "Psalms": { slug:"psalms", title:"Psalms", greatIdea:"Worship" },
+  "Proverbs": { slug:"proverbs", title:"Proverbs", greatIdea:"Wisdom" },
+  "Ecclesiastes": { slug:"ecclesiastes", title:"Ecclesiastes", greatIdea:"Happiness" },
+  "Song of Solomon": { slug:"song-of-solomon", title:"Song of Solomon", greatIdea:"Love" },
+  "Isaiah": { slug:"isaiah", title:"Isaiah", greatIdea:"Prophecy" },
+  "Jeremiah": { slug:"jeremiah", title:"Jeremiah", greatIdea:"Prophecy" },
+  "Lamentations": { slug:"lamentations", title:"Lamentations", greatIdea:"Suffering" },
+  "Ezekiel": { slug:"ezekiel", title:"Ezekiel", greatIdea:"Prophecy" },
+  "Daniel": { slug:"daniel", title:"Daniel", greatIdea:"Government" },
+  "Hosea": { slug:"hosea", title:"Hosea", greatIdea:"Love" },
+  "Joel": { slug:"joel", title:"Joel", greatIdea:"Prophecy" },
+  "Amos": { slug:"amos", title:"Amos", greatIdea:"Justice" },
+  "Obadiah": { slug:"obadiah", title:"Obadiah", greatIdea:"Justice" },
+  "Jonah": { slug:"jonah", title:"Jonah", greatIdea:"Mercy" },
+  "Micah": { slug:"micah", title:"Micah", greatIdea:"Justice" },
+  "Nahum": { slug:"nahum", title:"Nahum", greatIdea:"Justice" },
+  "Habakkuk": { slug:"habakkuk", title:"Habakkuk", greatIdea:"Faith" },
+  "Zephaniah": { slug:"zephaniah", title:"Zephaniah", greatIdea:"Prophecy" },
+  "Haggai": { slug:"haggai", title:"Haggai", greatIdea:"Religion" },
+  "Zechariah": { slug:"zechariah", title:"Zechariah", greatIdea:"Prophecy" },
+  "Malachi": { slug:"malachi", title:"Malachi", greatIdea:"Religion" },
+});
+
 const LAST_BIBLE_PASSAGE_KEY = 'markSetGoLastBiblePassageV1';
 const SYNTOPICON_SAVED_KEY = 'markSetGoSyntopiconSavedV1';
+
+// Phase 7 IndexedDB migration: saved Syntopicon analyses.
+// The collection is capped at 50 studies, so one IndexedDB record keeps this
+// migration small and avoids unnecessary per-analysis index complexity.
+const SYNTOPICON_SAVED_IDB_KEY = 'syntopicon:saved:v1';
+const SYNTOPICON_SAVED_LIMIT = 50;
+
+let syntopiconSavedCache = [];
+let syntopiconStorageHydrated = false;
+let syntopiconStorageHydrationPromise = null;
+let syntopiconStorageWriteChain = Promise.resolve(true);
+let syntopiconStorageDirty = false;
+
+function normalizeSavedSyntopicon(items) {
+  const normalized = [];
+  const seen = new Set();
+
+  for (const item of Array.isArray(items) ? items : []) {
+    if (!item || typeof item !== 'object' || !item.analysis) continue;
+
+    const signature = [
+      String(item.savedAt || ''),
+      String(item.idea || item.analysis?.idea || ''),
+      String(item.analysis?.centralQuestion || '')
+    ].join('|').toLowerCase();
+
+    if (signature && seen.has(signature)) continue;
+    if (signature) seen.add(signature);
+
+    normalized.push(item);
+    if (normalized.length >= SYNTOPICON_SAVED_LIMIT) break;
+  }
+
+  return normalized;
+}
+
+function readLegacySavedSyntopicon() {
+  try {
+    const value = JSON.parse(localStorage.getItem(SYNTOPICON_SAVED_KEY) || '[]');
+    return normalizeSavedSyntopicon(value);
+  } catch {
+    return [];
+  }
+}
+
+// Seed the synchronous cache for upgrading users.
+syntopiconSavedCache = readLegacySavedSyntopicon();
+
+function savedSyntopiconAnalyses() {
+  return syntopiconSavedCache;
+}
+
+function removeLegacySyntopiconStorage() {
+  try { localStorage.removeItem(SYNTOPICON_SAVED_KEY); } catch {}
+}
+
+function persistLegacySyntopiconFallback(items) {
+  try {
+    localStorage.setItem(
+      SYNTOPICON_SAVED_KEY,
+      JSON.stringify(normalizeSavedSyntopicon(items))
+    );
+    return true;
+  } catch (error) {
+    console.warn('Saved Syntopicon studies could not be persisted.', error);
+    return false;
+  }
+}
+
+async function persistSavedSyntopicon(items = syntopiconSavedCache) {
+  const normalized = normalizeSavedSyntopicon(items);
+  syntopiconSavedCache = normalized;
+
+  if (typeof cacheReadingBook !== 'function') {
+    return persistLegacySyntopiconFallback(normalized);
+  }
+
+  try {
+    const ok = await cacheReadingBook({
+      key: SYNTOPICON_SAVED_IDB_KEY,
+      type: 'syntopicon-saved-analyses',
+      items: normalized,
+      updatedAt: new Date().toISOString()
+    });
+
+    if (ok) {
+      removeLegacySyntopiconStorage();
+      return true;
+    }
+  } catch (error) {
+    console.warn('Saved Syntopicon IndexedDB persistence failed.', error);
+  }
+
+  // Durability fallback only if IndexedDB is unavailable.
+  return persistLegacySyntopiconFallback(normalized);
+}
+
+async function hydrateSyntopiconStorage() {
+  if (syntopiconStorageHydrationPromise) return syntopiconStorageHydrationPromise;
+
+  syntopiconStorageHydrationPromise = (async () => {
+    const legacy = readLegacySavedSyntopicon();
+
+    try {
+      const wrapper = typeof getCachedReadingBook === 'function'
+        ? await getCachedReadingBook(SYNTOPICON_SAVED_IDB_KEY)
+        : null;
+
+      if (syntopiconStorageDirty) {
+        const ok = await persistSavedSyntopicon(syntopiconSavedCache);
+        syntopiconStorageHydrated = true;
+        if (ok) syntopiconStorageDirty = false;
+        return {
+          hydrated: true,
+          studies: syntopiconSavedCache.length,
+          migrated: ok
+        };
+      }
+
+      if (Array.isArray(wrapper?.items)) {
+        syntopiconSavedCache = normalizeSavedSyntopicon(wrapper.items);
+        removeLegacySyntopiconStorage();
+        syntopiconStorageHydrated = true;
+        return {
+          hydrated: true,
+          studies: syntopiconSavedCache.length,
+          migrated: true
+        };
+      }
+
+      if (legacy.length) {
+        syntopiconSavedCache = legacy;
+        const ok = await persistSavedSyntopicon(legacy);
+        syntopiconStorageHydrated = true;
+        return {
+          hydrated: true,
+          studies: syntopiconSavedCache.length,
+          migrated: ok
+        };
+      }
+
+      syntopiconSavedCache = [];
+      syntopiconStorageHydrated = true;
+      return { hydrated: true, studies: 0, migrated: true };
+    } catch (error) {
+      console.warn('Saved Syntopicon migration was deferred.', error);
+      if (legacy.length) syntopiconSavedCache = legacy;
+      syntopiconStorageHydrated = true;
+      return {
+        hydrated: true,
+        studies: syntopiconSavedCache.length,
+        migrated: false
+      };
+    }
+  })();
+
+  return syntopiconStorageHydrationPromise;
+}
+
+function queueSyntopiconStorageWrite() {
+  syntopiconStorageWriteChain = syntopiconStorageWriteChain
+    .catch(() => false)
+    .then(async () => {
+      await hydrateSyntopiconStorage();
+      const ok = await persistSavedSyntopicon(syntopiconSavedCache);
+      if (ok) syntopiconStorageDirty = false;
+      return ok;
+    });
+
+  return syntopiconStorageWriteChain;
+}
+
+function saveSyntopiconAnalysis(value) {
+  if (!value || typeof value !== 'object' || !value.analysis) return false;
+
+  syntopiconSavedCache = normalizeSavedSyntopicon([
+    value,
+    ...syntopiconSavedCache
+  ]);
+  syntopiconStorageDirty = true;
+  void queueSyntopiconStorageWrite();
+  return true;
+}
+
+window.MarkSetGoSyntopiconStorage = Object.freeze({
+  hydrate: hydrateSyntopiconStorage,
+  getSaved: () => savedSyntopiconAnalyses().map((item) => ({ ...item })),
+  status: () => ({
+    hydrated: syntopiconStorageHydrated,
+    studies: syntopiconSavedCache.length,
+    legacyPresent: (() => {
+      try { return Boolean(localStorage.getItem(SYNTOPICON_SAVED_KEY)); }
+      catch { return false; }
+    })()
+  })
+});
+
+window.setTimeout(() => { void hydrateSyntopiconStorage(); }, 0);
 
 const studyLanguages = {
   en: 'English',
@@ -14579,19 +20868,6 @@ function saveLastBiblePassage(value) {
   try { localStorage.setItem(LAST_BIBLE_PASSAGE_KEY, JSON.stringify(value)); } catch {}
 }
 
-function savedSyntopiconAnalyses() {
-  try {
-    const value = JSON.parse(localStorage.getItem(SYNTOPICON_SAVED_KEY) || '[]');
-    return Array.isArray(value) ? value : [];
-  } catch { return []; }
-}
-
-function saveSyntopiconAnalysis(value) {
-  const saved = savedSyntopiconAnalyses();
-  saved.unshift(value);
-  localStorage.setItem(SYNTOPICON_SAVED_KEY, JSON.stringify(saved.slice(0, 50)));
-}
-
 async function translateStudyBlock(text, targetLanguage, statusElement) {
   if (!text || !targetLanguage || targetLanguage === 'en') return text;
   if (statusElement) statusElement.textContent = `Translating to ${studyLanguages[targetLanguage] || targetLanguage}…`;
@@ -14631,7 +20907,8 @@ function renderSyntopiconResult(analysis, meta) {
   });
 }
 
-function renderSyntopicon() {
+async function renderSyntopicon() {
+  await hydrateSyntopiconStorage();
   recordLearningActivity('great-ideas', { title:state?.title || '' });
   stopReader();
   const lastBible = getLastBiblePassage();
@@ -14723,6 +21000,120 @@ function renderSyntopicon() {
   }));
 }
 
+
+
+function greatBookStudyIdea(book = {}) {
+  const title = String(book?.title || '').toLowerCase();
+  const author = String(book?.author || '').toLowerCase();
+  const haystack = `${title} ${author}`;
+
+  const rules = [
+    [/genesis|exodus|bible/, 'God'],
+    [/isaiah|jeremiah|revelation/, 'Prophecy'],
+    [/psalms/, 'Worship'],
+    [/proverbs/, 'Wisdom'],
+    [/romans/, 'Justice'],
+    [/gospel|matthew|john/, 'God'],
+    [/acts of the apostles/, 'Religion'],
+    [/bergson|metaphysics|heidegger/, 'Metaphysics'],
+    [/barth/, 'Religion'],
+    [/plato/, 'Philosophy'],
+    [/aristotle/, 'Being'],
+    [/aquinas|augustine/, 'God'],
+    [/hume|berkeley|locke/, 'Knowledge'],
+    [/kant/, 'Duty'],
+    [/darwin|dobzhansky/, 'Evolution'],
+    [/einstein|relativity/, 'Space'],
+    [/bohr|heisenberg/, 'Physics'],
+    [/whitehead|science/, 'Science'],
+    [/freud|psychology/, 'Mind'],
+    [/marx|labor|capital/, 'Labor'],
+    [/keynes|veblen|wealth/, 'Wealth'],
+    [/tocqueville|democracy/, 'Democracy'],
+    [/nietzsche|dostoevsky/, 'Good and Evil'],
+    [/shakespeare|poetry|eliot/, 'Poetry'],
+    [/tolstoy|war/, 'War and Peace'],
+    [/love|romeo|song of solomon/, 'Love'],
+    [/history|gibbon|tacitus|herodotus/, 'History']
+  ];
+
+  for (const [pattern, idea] of rules) {
+    if (pattern.test(haystack) && greatIdeasCatalog.includes(idea)) return idea;
+  }
+
+  const guide = classicGuideForGreatBook(book);
+  if (guide) {
+    const mapped = classicGuideGreatIdea(guide);
+    if (greatIdeasCatalog.includes(mapped)) return mapped;
+  }
+
+  return greatIdeasCatalog.includes('Philosophy') ? 'Philosophy' : (greatIdeasCatalog[0] || '');
+}
+
+function renderGreatBookStudy(book, sourceButton = null) {
+  if (!book) return;
+
+  const selectedIndex = greatBooksCatalog.findIndex((candidate) =>
+    candidate === book ||
+    (
+      String(candidate?.query || '') === String(book?.query || '') &&
+      String(candidate?.title || '') === String(book?.title || '')
+    )
+  );
+
+  const idea = greatBookStudyIdea(book);
+
+  try {
+    renderSyntopicon();
+  } catch (error) {
+    console.error('Great Books study workspace could not open.', error);
+    const cardStatus = sourceButton?.closest?.('.curated-card')?.querySelector?.('.book-load-status');
+    if (cardStatus) {
+      cardStatus.className = 'status error book-load-status';
+      cardStatus.textContent = error?.message || 'Great Ideas study could not be opened.';
+    } else {
+      window.alert(error?.message || 'Great Ideas study could not be opened.');
+    }
+    return;
+  }
+
+  // renderSyntopicon() replaces app.innerHTML. Wait until the new controls exist.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const ideaSelect = app.querySelector('#syntopicon-idea');
+    const customIdea = app.querySelector('#syntopicon-custom-idea');
+    const status = app.querySelector('#syntopicon-status');
+
+    if (ideaSelect && idea) {
+      const optionExists = Array.from(ideaSelect.options).some((option) => option.value === idea);
+      if (optionExists) {
+        ideaSelect.value = idea;
+        if (customIdea) customIdea.value = '';
+      } else if (customIdea) {
+        customIdea.value = idea;
+      }
+    }
+
+    if (selectedIndex >= 0) {
+      const source = app.querySelector(`[data-syntopicon-book="${selectedIndex}"]`);
+      if (source) {
+        source.checked = true;
+        source.closest?.('[data-syntopicon-book-card]')?.scrollIntoView?.({
+          block:'nearest',
+          behavior:'smooth'
+        });
+      }
+    }
+
+    if (status) {
+      status.className = 'status';
+      status.textContent = selectedIndex >= 0
+        ? `${book.title} is selected. Choose at least one more source, then compare.`
+        : `Great Ideas study opened for ${book.title}. Choose at least two sources to compare.`;
+    }
+
+    (ideaSelect || customIdea)?.focus?.();
+  }));
+}
 
 function greatBookGrokipediaUrl(book) {
   return grokipediaSearchUrl(book.title, book.author);
@@ -14918,6 +21309,174 @@ function collectDatasetReferences(payload) {
   return refs.slice(0, 500);
 }
 
+
+function bibleGuideMeta(title = '') {
+  return BIBLE_GUIDES[String(title || '').trim()] || null;
+}
+
+function bibleGuideSource(meta = {}) {
+  return {
+    type:'modern-guide',
+    bibleGuide:true,
+    id:`bible-guide-${meta.slug}`,
+    bibleGuideSlug:meta.slug,
+    originalTitle:meta.title,
+    originalAuthor:'The Bible',
+    subtitle:'An Independent Mark, Set, Go! Bible Guide',
+    guideInteractions:{
+      greatIdea:meta.greatIdea || 'God',
+      actionTitle:`Apply one insight from ${meta.title || 'this Bible book'}`,
+      actionType:'reflection',
+      dueDays:3,
+      dueHour:19,
+      priority:'normal',
+      repeat:'none',
+      reminder:'day1',
+      actionNote:`Choose one important truth or question from ${meta.title || 'this Bible book'}. Record the passage, what it teaches in context, and one concrete implication for study, prayer, character, or action.`
+    }
+  };
+}
+
+async function openBibleGuideInReader(title = '') {
+  const meta = bibleGuideMeta(title);
+  if (!meta) throw new Error('This Bible Guide is not ready yet.');
+  const response = await fetch(`/texts/bible-guides/${encodeURIComponent(meta.slug)}-guide.txt`, { cache:'no-store' });
+  if (!response.ok) throw new Error(`Bible Guide could not be loaded (${response.status}).`);
+  const text = await response.text();
+  if (!String(text || '').trim()) throw new Error('Bible Guide file is empty.');
+  renderReaderWithText(`${meta.title} — Bible Guide`, text, bibleGuideSource(meta));
+}
+
+function renderBibleGuides() {
+  stopReader();
+
+  const grouped = BIBLE_GUIDE_CATALOG.reduce((out, item) => {
+    const key = `${item.testament} · ${item.group}`;
+    (out[key] ||= []).push(item);
+    return out;
+  }, {});
+
+  const readyCount = BIBLE_GUIDE_CATALOG.filter((item) => item.status === 'ready').length;
+
+  app.innerHTML = `
+    <section class="panel curated-library bible-guides-library">
+      <div class="library-heading">
+        <div>
+          <span class="source-category">Bible Study · Book Guides</span>
+          <h1>Bible Guides</h1>
+          <p>Study every book of the Bible as a complete work—structure, context, theology, difficult passages, canonical connections, Great Ideas, discussion, and comprehension.</p>
+        </div>
+        <div class="source-actions">
+          <button class="secondary" type="button" data-read="bible">Bible Study</button>
+          <button class="secondary" type="button" data-action="reader">Return to Reader</button>
+        </div>
+      </div>
+
+      <div class="great-books-study-intro">
+        <article><strong>${BIBLE_GUIDE_CATALOG.length}</strong><span>books in the 66-book guide plan</span></article>
+        <article><strong>${readyCount}</strong><span>guides ready</span></article>
+        <article><strong>Book-by-book</strong><span>not a generic Bible summary</span></article>
+      </div>
+
+      <div class="list-toolbar-row">
+        <label class="curated-filter">Filter Bible Guides
+          <input id="bible-guides-filter" type="search" placeholder="Genesis, Gospel, Psalms, Paul…">
+        </label>
+      </div>
+
+      <div id="bible-guide-groups" class="curated-groups presentation-tiles">
+        ${Object.entries(grouped).map(([group, items]) => `
+          <details class="curated-era" ${group.startsWith('Old Testament · Law') ? 'open' : ''}>
+            <summary>${escapeHtml(group)} <span>${items.length}</span></summary>
+            <div class="curated-grid">
+              ${items.map((item) => `
+                <article class="curated-card" data-bible-guide-card data-search-text="${escapeHtml(`${item.title} ${item.group} ${item.testament}`.toLowerCase())}">
+                  <div>
+                    <span class="source-category">${escapeHtml(item.group)}</span>
+                    <h2>${escapeHtml(item.title)}</h2>
+                    <p>${item.status === 'ready' ? 'Bible Guide ready' : 'Guide planned'}</p>
+                  </div>
+                  <div class="great-book-actions">
+                    ${item.status === 'ready'
+                      ? `<button class="primary" type="button" data-open-bible-guide="${escapeHtml(item.title)}">Open Bible Guide</button>`
+                      : `<button class="secondary" type="button" disabled>Coming soon</button>`}
+                    <button class="secondary" type="button" data-bible-study-book="${escapeHtml(item.title)}">Bible Study</button>
+                  </div>
+                  <p class="status"></p>
+                </article>`).join('')}
+            </div>
+          </details>`).join('')}
+      </div>
+    </section>`;
+
+  app.querySelectorAll('[data-read="bible"]').forEach((button) => {
+    button.addEventListener('click', () => renderBibleStudy());
+  });
+
+  app.querySelectorAll('[data-action="reader"]').forEach((button) => {
+    button.addEventListener('click', () => {
+      try {
+        renderReader();
+      } catch {
+        renderCurrentReading?.();
+      }
+    });
+  });
+
+  const filter = app.querySelector('#bible-guides-filter');
+  filter?.addEventListener('input', () => {
+    const query = filter.value.trim().toLowerCase();
+    app.querySelectorAll('[data-bible-guide-card]').forEach((card) => {
+      card.hidden = Boolean(query) && !card.dataset.searchText.includes(query);
+    });
+    app.querySelectorAll('#bible-guide-groups .curated-era').forEach((group) => {
+      group.hidden = !Array.from(group.querySelectorAll('[data-bible-guide-card]')).some((card) => !card.hidden);
+    });
+  });
+
+  app.querySelectorAll('[data-open-bible-guide]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      try {
+        await openBibleGuideInReader(button.dataset.openBibleGuide);
+      } catch (error) {
+        window.alert(error?.message || 'The Bible Guide could not be opened.');
+      }
+    });
+  });
+
+  app.querySelectorAll('[data-bible-study-book]').forEach((button) => {
+    button.addEventListener('click', () => {
+      try {
+        localStorage.setItem('markSetGoBibleGuideRequestedBookV1', button.dataset.bibleStudyBook || '');
+      } catch {}
+      renderBibleStudy();
+    });
+  });
+}
+
+
+
+
+function openBibleDocumentInReader(title, text, source) {
+  const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
+
+  if (isWorkspacePane) {
+    try {
+      const handoff = window.parent.MSGWorkspaceReaderHandoff;
+      if (typeof handoff?.openText === 'function') {
+        handoff.openText(title, text, source);
+        return true;
+      }
+    } catch (error) {
+      console.warn('Workspace could not hand Bible text to the outer Reader.', error);
+    }
+    return false;
+  }
+
+  renderReaderWithText(title, text, source);
+  return true;
+}
+
 async function renderBibleStudy() {
   stopReader();
   app.innerHTML = `
@@ -14945,6 +21504,7 @@ async function renderBibleStudy() {
         <button id="bible-reader" class="secondary" type="button" disabled>Read Chapter</button>
         <button id="bible-read-book" class="secondary" type="button" disabled>Read Entire Book</button>
         <button id="bible-study-guide" class="secondary" type="button" disabled>Study / Great Ideas</button>
+        <button class="secondary" type="button" data-read="bible-guides">Bible Guides</button>
         <a id="bible-grokipedia" class="secondary button-link" href="${grokipediaSearchUrl('Bible')}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
       </div>
 
@@ -15017,7 +21577,11 @@ async function renderBibleStudy() {
   const notesKey = () => `markSetGoBibleNotesV1:${translationSelect.value}:${bookSelect.value}:${chapterSelect.value}`;
 
   const selectTab = (tab) => {
-    app.querySelectorAll('[data-bible-tab]').forEach((button) => {
+    app.querySelectorAll('[data-read="bible-guides"]').forEach((button) => {
+    button.addEventListener('click', () => renderBibleGuides());
+  });
+
+  app.querySelectorAll('[data-bible-tab]').forEach((button) => {
       const active = button.dataset.bibleTab === tab;
       button.classList.toggle('active', active);
       button.setAttribute('aria-selected', String(active));
@@ -15086,6 +21650,16 @@ async function renderBibleStudy() {
     const books = payload.books || [];
     bookSelect.innerHTML = books.map((book)=>`<option value="${escapeHtml(book.id)}" data-chapters="${Number(book.numberOfChapters)}">${escapeHtml(book.name)}${book.isApocryphal ? ' · Deuterocanonical/Apocryphal' : ''}</option>`).join('');
     bookSelect.disabled = false;
+    try {
+      const requestedBook = localStorage.getItem('markSetGoBibleGuideRequestedBookV1') || '';
+      if (requestedBook) {
+        const requestedOption = Array.from(bookSelect.options).find((option) =>
+          option.textContent.replace(/\s+·.*$/,'').trim().toLowerCase() === requestedBook.trim().toLowerCase()
+        );
+        if (requestedOption) bookSelect.value = requestedOption.value;
+        localStorage.removeItem('markSetGoBibleGuideRequestedBookV1');
+      }
+    } catch {}
     updateChapters();
     setStatus('');
   }
@@ -15304,7 +21878,7 @@ async function renderBibleStudy() {
       }
 
       const title = `${selectedBook} — ${chapters[0]?.translation?.shortName || selectedTranslation}`;
-      renderReaderWithText(title, fullText, {
+      openBibleDocumentInReader(title, fullText, {
         type:'bible-book',
         translation:selectedTranslation,
         book:bookSelect.value,
@@ -15338,7 +21912,7 @@ async function renderBibleStudy() {
       chapterNumber: Number(chapterSelect.value),
       includeChapterHeading: true
     });
-    renderReaderWithText(`${heading} — ${chapterPayload.translation?.shortName || translationSelect.value}`, bibleDoc.text, {
+    openBibleDocumentInReader(`${heading} — ${chapterPayload.translation?.shortName || translationSelect.value}`, bibleDoc.text, {
       type:'bible',
       translation:translationSelect.value,
       book:bookSelect.value,
@@ -15407,13 +21981,235 @@ async function renderBibleStudy() {
   });
 }
 
+
+function foundingDocumentSearchText(item) {
+  return `${item.title} ${item.author} ${item.era} ${item.year} ${item.topics || ''}`.toLowerCase();
+}
+
+function openFoundingDocumentSearch(item, format = 'best') {
+  if (!item) return;
+  localStorage.setItem('markSetGoPendingLibrarySearch', item.query || item.title);
+  localStorage.setItem('markSetGoPendingBrowseScope', 'all');
+  renderUnifiedLibrary({ query:item.query || item.title, scope:'all', provider:'all' });
+  requestAnimationFrame(() => {
+    const formatSelect = app.querySelector('#unified-library-format');
+    if (formatSelect) formatSelect.value = format;
+  });
+}
+
+function downloadFoundingDocumentText(item, button, status) {
+  const original = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Finding text…';
+  status.className = 'status founding-doc-status';
+  status.textContent = 'Searching connected public-text libraries…';
+
+  const queries = [item.query, `${item.title} ${item.author}`, item.title].filter(Boolean);
+  const tryQuery = async (index = 0) => {
+    if (index >= queries.length) throw new Error('No directly downloadable plain-text edition was found. Use Original Source or Find & Read.');
+    const payload = await loadApiPayload(`/api/library/search?q=${encodeURIComponent(queries[index])}&provider=all&format=text`);
+    const candidates = (payload.books || []).filter((book) => book.readable);
+    if (!candidates.length) return tryQuery(index + 1);
+
+    for (const candidate of candidates.slice(0, 6)) {
+      try {
+        const loaded = await loadApiPayload(`/api/library/read?provider=${encodeURIComponent(candidate.provider)}&id=${encodeURIComponent(candidate.id)}&format=text`);
+        const text = String(loaded.text || '').trim();
+        if (splitWords(text).length < 120) continue;
+        const blob = new Blob([text], { type:'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${item.title.replace(/[^\w\s.-]+/g,'').replace(/\s+/g,'-').replace(/-+/g,'-').toLowerCase() || 'founding-document'}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        status.className = 'status success founding-doc-status';
+        status.textContent = `Downloaded readable text from ${LIBRARY_PROVIDERS[candidate.provider]?.label || candidate.provider}.`;
+        return;
+      } catch {}
+    }
+    return tryQuery(index + 1);
+  };
+
+  tryQuery().catch((error) => {
+    status.className = 'status error founding-doc-status';
+    status.textContent = error.message;
+  }).finally(() => {
+    button.disabled = false;
+    button.textContent = original;
+  });
+}
+
+function renderFoundingDocumentsLibrary() {
+  stopReader();
+  const eras = [...new Set(FOUNDING_DOCUMENTS_CATALOG.map((item) => item.era))];
+
+  app.innerHTML = `
+    <section class="panel curated-library founding-documents-library">
+      <div class="library-heading founding-documents-heading">
+        <div>
+          <span class="source-category">Browse · American Founding</span>
+          <h1>Founding Documents</h1>
+          <p>Read the primary sources that shaped American independence, constitutional government, rights, ratification, and the early republic.</p>
+        </div>
+        <div class="source-actions">
+          <button class="secondary" type="button" data-read="great-books">Great Books</button>
+          <button class="secondary" type="button" data-action="browse">Back to Browse</button>
+        </div>
+      </div>
+
+      <div class="founding-featured-grid">
+        ${[
+          ['Declaration of Independence','1776 · Independence'],
+          ['Constitution of the United States','1787 · Constitutional Convention'],
+          ['Bill of Rights (First Ten Amendments)','1791 · Rights & Amendments'],
+          ['Federalist No. 10','1787 · Ratification Debate']
+        ].map(([title,meta]) => {
+          const item = FOUNDING_DOCUMENTS_CATALOG.find((doc) => doc.title === title);
+          return `<button class="founding-feature-card" type="button" data-founding-read="${escapeHtml(item?.id || '')}">
+            <span class="source-category">Featured</span>
+            <strong>${escapeHtml(title)}</strong>
+            <small>${escapeHtml(meta)}</small>
+          </button>`;
+        }).join('')}
+      </div>
+
+      <div class="great-books-study-intro founding-doc-stats">
+        <article><strong>${FOUNDING_DOCUMENTS_CATALOG.length}</strong><span>curated primary documents</span></article>
+        <article><strong>85</strong><span>Federalist essays</span></article>
+        <article><strong>${eras.length}</strong><span>historical collections</span></article>
+      </div>
+
+      <div class="founding-reading-paths">
+        <span class="source-category">Reading paths</span>
+        <div class="browse-collection-list">
+          ${FOUNDING_READING_PATHS.map((path) => `<button class="browse-collection-chip" type="button" data-founding-path="${escapeHtml(path.id)}">${escapeHtml(path.label)}</button>`).join('')}
+          <button class="browse-collection-chip is-active" type="button" data-founding-path="all">All documents</button>
+        </div>
+      </div>
+
+      <div class="founding-filter-bar">
+        <label class="curated-filter">Search documents, authors, years, or ideas
+          <input id="founding-doc-filter" type="search" placeholder="Madison, natural rights, executive power, 1787…">
+        </label>
+        <label>Collection
+          <select id="founding-era-filter">
+            <option value="all">All collections</option>
+            ${eras.map((era) => `<option value="${escapeHtml(era)}">${escapeHtml(era)}</option>`).join('')}
+          </select>
+        </label>
+        <label>Sort
+          <select id="founding-sort">
+            <option value="chronological">Chronological</option>
+            <option value="title">Title</option>
+            <option value="author">Author</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="founding-documents-results" class="curated-groups founding-document-results"></div>
+      <p class="library-note">Core constitutional sources are anchored to authoritative repositories including the National Archives and Library of Congress. “Find & Read” searches Mark, Set, Go!’s connected public-text libraries for a readable edition. “Download TXT” downloads a readable text edition when one is available; “Original Source” opens the curated source record.</p>
+    </section>`;
+
+  let activePath = 'all';
+
+  const renderResults = () => {
+    const query = (app.querySelector('#founding-doc-filter')?.value || '').trim().toLowerCase();
+    const era = app.querySelector('#founding-era-filter')?.value || 'all';
+    const sort = app.querySelector('#founding-sort')?.value || 'chronological';
+    const path = FOUNDING_READING_PATHS.find((item) => item.id === activePath);
+
+    let items = FOUNDING_DOCUMENTS_CATALOG.filter((item) => {
+      if (era !== 'all' && item.era !== era) return false;
+      if (path?.era && item.era !== path.era) return false;
+      if (path?.query) {
+        const wanted = path.query.toLowerCase();
+        const exactEssential = [
+          'Declaration of Independence','Constitution of the United States','Bill of Rights (First Ten Amendments)',
+          'Federalist No. 10','Federalist No. 51','Common Sense','Virginia Declaration of Rights',
+          'Articles of Confederation',"Washington's Farewell Address",'Brutus I'
+        ];
+        if (!exactEssential.includes(item.title)) return false;
+      }
+      return !query || foundingDocumentSearchText(item).includes(query);
+    });
+
+    items = [...items].sort((a,b) => {
+      if (sort === 'title') return a.title.localeCompare(b.title);
+      if (sort === 'author') return a.author.localeCompare(b.author) || a.year - b.year;
+      return a.year - b.year || a.title.localeCompare(b.title);
+    });
+
+    const grouped = groupBy(items, 'era');
+    const orderedEras = eras.filter((name) => grouped[name]?.length);
+    const results = app.querySelector('#founding-documents-results');
+    results.innerHTML = items.length ? orderedEras.map((eraName) => `
+      <details class="curated-era founding-era" open>
+        <summary>${escapeHtml(eraName)} <span>${grouped[eraName].length}</span></summary>
+        <div class="curated-grid founding-doc-grid">
+          ${grouped[eraName].map((item) => `
+            <article class="curated-card founding-document-card" data-founding-card="${escapeHtml(item.id)}">
+              <div>
+                <span class="source-category">${escapeHtml(String(item.year))}</span>
+                <h2>${escapeHtml(item.title)}</h2>
+                <p>${escapeHtml(item.author)}</p>
+                <small>${escapeHtml(item.era)}</small>
+              </div>
+              <div class="founding-doc-actions">
+                <button class="primary" type="button" data-founding-read="${escapeHtml(item.id)}">Find &amp; Read</button>
+                <button class="secondary" type="button" data-founding-download="${escapeHtml(item.id)}">Download TXT</button>
+                ${item.sourceUrl ? `<a class="secondary button-link" href="${escapeHtml(item.sourceUrl)}" target="_blank" rel="noopener noreferrer">Original Source</a>` : ''}
+              </div>
+              <p class="status founding-doc-status"></p>
+            </article>`).join('')}
+        </div>
+      </details>`).join('') : `<div class="empty-library"><h2>No matching documents</h2><p>Try another keyword, collection, or reading path.</p></div>`;
+
+    results.querySelectorAll('[data-founding-read]').forEach((button) => button.addEventListener('click', () => {
+      const item = FOUNDING_DOCUMENTS_CATALOG.find((doc) => doc.id === button.dataset.foundingRead);
+      openFoundingDocumentSearch(item, 'best');
+    }));
+    results.querySelectorAll('[data-founding-download]').forEach((button) => button.addEventListener('click', () => {
+      const item = FOUNDING_DOCUMENTS_CATALOG.find((doc) => doc.id === button.dataset.foundingDownload);
+      if (!item) return;
+      downloadFoundingDocumentText(item, button, button.closest('.founding-document-card')?.querySelector('.founding-doc-status'));
+    }));
+  };
+
+  app.querySelector('#founding-doc-filter')?.addEventListener('input', renderResults);
+  app.querySelector('#founding-era-filter')?.addEventListener('change', renderResults);
+  app.querySelector('#founding-sort')?.addEventListener('change', renderResults);
+  app.querySelectorAll('[data-founding-path]').forEach((button) => button.addEventListener('click', () => {
+    activePath = button.dataset.foundingPath || 'all';
+    app.querySelectorAll('[data-founding-path]').forEach((item) => item.classList.toggle('is-active', item === button));
+    if (activePath !== 'all') {
+      const path = FOUNDING_READING_PATHS.find((item) => item.id === activePath);
+      if (path?.era) app.querySelector('#founding-era-filter').value = path.era;
+      else app.querySelector('#founding-era-filter').value = 'all';
+    } else {
+      app.querySelector('#founding-era-filter').value = 'all';
+    }
+    renderResults();
+  }));
+  app.querySelectorAll('.founding-feature-card').forEach((button) => button.addEventListener('click', () => {
+    const item = FOUNDING_DOCUMENTS_CATALOG.find((doc) => doc.id === button.dataset.foundingRead);
+    openFoundingDocumentSearch(item, 'best');
+  }));
+
+  renderResults();
+}
+
+
 function renderGreatBooksLibrary() {
   stopReader();
-  const grouped = groupBy(greatBooksCatalog, 'volume');
+  const greatBooksOnly = greatBooksCatalog.filter((book) => Number(book.volume) > 0);
+  const grouped = groupBy(greatBooksOnly, 'volume');
   app.innerHTML = `
     <section class="panel curated-library great-books-study-library">
       <div class="library-heading">
-        <div><span class="source-category">Browse · Study</span><h1>Great Books of the Western World</h1><p>The 1990 60-volume framework expanded into individual works, plus the Bible collection referenced by the Syntopicon tradition.</p></div>
+        <div><span class="source-category">Browse · Study</span><h1>Great Books of the Western World</h1><p>The 1990 60-volume framework expanded into individual works. Bible reading and book guides now live in Bible Study.</p></div>
         <div class="source-actions"><button class="secondary" type="button" data-read="gutenberg">Search Gutenberg</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
       </div>
       <div class="study-language-bar">
@@ -15421,7 +22217,7 @@ function renderGreatBooksLibrary() {
         <select id="great-books-study-language">${studyLanguageOptions(getStudyLanguage())}</select>
       </div>
       <div class="great-books-study-intro">
-        <article><strong>${greatBooksCatalog.length}</strong><span>individual works / collections</span></article>
+        <article><strong>${greatBooksOnly.length}</strong><span>individual works / collections</span></article>
         <article><strong>60</strong><span>volume framework</span></article>
         <article><strong>AI</strong><span>Great Ideas study guides</span></article>
       </div>
@@ -15440,6 +22236,7 @@ function renderGreatBooksLibrary() {
                   <button class="primary" type="button" data-load-great-book="${escapeHtml(book.query)}">Find &amp; Import Edition</button>
                   <button class="secondary" type="button" data-study-great-book="${escapeHtml(book.query)}">Study / Great Ideas</button>
                   ${classicGuidePathForGreatBook(book) ? `<button class="secondary" type="button" data-open-classic-guide="${escapeHtml(book.query)}">Classic Guide</button>` : ''}
+                  ${bibleGuideForGreatBook(book) ? `<button class="secondary" type="button" data-open-bible-guide-book="${escapeHtml(book.query)}">Bible Guide</button>` : ''}
                   <a class="secondary button-link" href="${greatBookGrokipediaUrl(book)}" target="_blank" rel="noopener noreferrer">Grokipedia</a>
                 </div>
                 <p class="status book-load-status"></p>
@@ -15488,6 +22285,17 @@ function renderGreatBooksLibrary() {
         await openClassicGuideInReader(item);
       } catch (error) {
         window.alert(error?.message || 'The Classic Guide could not be opened.');
+      }
+    });
+  });
+  app.querySelectorAll('[data-open-bible-guide-book]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const item = greatBooksCatalog.find((book) => book.query === button.dataset.openBibleGuideBook);
+      if (!item) return;
+      try {
+        await openBibleGuideForGreatBook(item);
+      } catch (error) {
+        window.alert(error?.message || 'The Bible Guide could not be opened.');
       }
     });
   });
@@ -16399,60 +23207,213 @@ async function loadPdfJs() {
   return pdfJsModulePromise;
 }
 
-function normalizePdfPageText(items) {
-  const lines = [];
-  let currentLine = '';
-  let previousY = null;
-  let previousEndX = null;
+function normalizePdfPageText(items, pageWidth = null) {
+  // PDF.js exposes enough geometry to distinguish ordinary wrapped lines from
+  // real section/paragraph gaps, but older imports discarded that information
+  // before the text reached the reader. Reconstruct visual lines first, then
+  // preserve meaningful vertical spacing as blank lines.
+  const visualLines = [];
+  let current = null;
+
+  const itemHeight = (item) => {
+    const direct = Number(item?.height) || 0;
+    if (direct > 0) return direct;
+    const t = item?.transform || [];
+    return Math.max(1, Math.hypot(Number(t[2]) || 0, Number(t[3]) || 0));
+  };
+
+  const flush = () => {
+    if (!current || !current.text.trim()) {
+      current = null;
+      return;
+    }
+    current.text = current.text.trim();
+    visualLines.push(current);
+    current = null;
+  };
 
   for (const item of items || []) {
     const value = String(item?.str || '').replace(/\s+/g, ' ').trim();
+    const transform = item?.transform || [];
+    const x = Number(transform[4]) || 0;
+    const y = Number(transform[5]) || 0;
+    const width = Number(item?.width) || 0;
+    const height = itemHeight(item);
+
     if (!value) {
-      if (item?.hasEOL && currentLine.trim()) {
-        lines.push(currentLine.trim());
-        currentLine = '';
-        previousY = null;
-        previousEndX = null;
-      }
+      if (item?.hasEOL) flush();
       continue;
     }
 
-    const transform = item.transform || [];
-    const x = Number(transform[4]) || 0;
-    const y = Number(transform[5]) || 0;
-    const width = Number(item.width) || 0;
-    const changedLine = previousY !== null && Math.abs(y - previousY) > 3;
-    const largeGap = previousEndX !== null && x - previousEndX > Math.max(8, (Number(item.height) || 10) * .8);
+    const changedLine = current
+      && Math.abs(y - current.y) > Math.max(2.5, Math.min(current.height, height) * 0.28);
+    if (changedLine) flush();
 
-    if (changedLine && currentLine.trim()) {
-      lines.push(currentLine.trim());
-      currentLine = '';
+    if (!current) {
+      current = {
+        text: '',
+        y,
+        minX: x,
+        maxX: x + width,
+        height,
+        itemCount: 0
+      };
     }
 
-    if (currentLine && (largeGap || !/[-–—/]$/.test(currentLine))) {
-      currentLine += ' ';
+    const gap = current.itemCount ? x - current.maxX : 0;
+    if (current.text && (gap > Math.max(3, height * 0.25) || !/[-–—/]$/.test(current.text))) {
+      current.text += ' ';
+    }
+    current.text += value;
+    current.minX = Math.min(current.minX, x);
+    current.maxX = Math.max(current.maxX, x + width);
+    current.height = Math.max(current.height, height);
+    current.itemCount += 1;
+
+    if (item?.hasEOL) flush();
+  }
+  flush();
+
+  if (!visualLines.length) return '';
+
+  const median = (values) => {
+    const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
+    if (!sorted.length) return 0;
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  };
+
+  const heights = visualLines.map((line) => line.height).filter((value) => value > 0);
+  const medianHeight = median(heights) || 10;
+  const normalSteps = [];
+  for (let i = 1; i < visualLines.length; i += 1) {
+    const prev = visualLines[i - 1];
+    const line = visualLines[i];
+    const step = Math.abs(line.y - prev.y);
+    // Exclude obvious section gaps when estimating ordinary line spacing.
+    if (step > medianHeight * 0.65 && step < medianHeight * 2.0) normalSteps.push(step);
+  }
+  const normalStep = median(normalSteps) || medianHeight * 1.25;
+  const effectivePageWidth = Number(pageWidth) || Math.max(...visualLines.map((line) => line.maxX), 0);
+
+  const isCentered = (line) => {
+    if (!effectivePageWidth || !line) return false;
+    const center = (line.minX + line.maxX) / 2;
+    return Math.abs(center - effectivePageWidth / 2) <= effectivePageWidth * 0.12;
+  };
+  const isShort = (line) => splitWords(line?.text || '').length <= 12 && String(line?.text || '').length <= 100;
+  const isEmphasized = (line) => line?.height >= medianHeight * 1.22;
+  const looksLikeHeading = (line) => Boolean(
+    line && (
+      isLikelyRealSectionHeading(line.text)
+      || (isShort(line) && isCentered(line) && isEmphasized(line))
+    )
+  );
+
+  const output = [];
+  for (let i = 0; i < visualLines.length; i += 1) {
+    const line = visualLines[i];
+    const prev = i > 0 ? visualLines[i - 1] : null;
+    const next = i + 1 < visualLines.length ? visualLines[i + 1] : null;
+
+    if (prev) {
+      const verticalStep = Math.abs(line.y - prev.y);
+      const largeVisualGap = verticalStep >= Math.max(normalStep * 1.30, medianHeight * 1.45);
+      const headingBoundary = looksLikeHeading(line) || looksLikeHeading(prev);
+      const subtitleBoundary = looksLikeHeading(prev)
+        && isShort(line)
+        && isCentered(line)
+        && (line.height >= medianHeight * 1.08 || (next && Math.abs(next.y - line.y) > normalStep * 1.35));
+
+      if ((largeVisualGap || headingBoundary || subtitleBoundary) && output.at(-1) !== '') {
+        output.push('');
+      }
     }
 
-    currentLine += value;
-    previousY = y;
-    previousEndX = x + width;
+    output.push(line.text);
 
-    if (item.hasEOL && currentLine.trim()) {
-      lines.push(currentLine.trim());
-      currentLine = '';
-      previousY = null;
-      previousEndX = null;
+    // Keep centered chapter subtitles isolated from the prose that follows.
+    if (next) {
+      const nextStep = Math.abs(next.y - line.y);
+      const chapterThenSubtitle = looksLikeHeading(prev)
+        && isShort(line)
+        && isCentered(line);
+      const centeredEmphasis = isShort(line) && isCentered(line) && isEmphasized(line);
+      if ((chapterThenSubtitle || centeredEmphasis || nextStep >= Math.max(normalStep * 1.30, medianHeight * 1.45))
+          && output.at(-1) !== '') {
+        output.push('');
+      }
     }
   }
 
-  if (currentLine.trim()) lines.push(currentLine.trim());
-
-  return lines
+  return output
     .join('\n')
-    .replace(/(\w)-\n(\w)/g, '$1$2')
+    // OCR/searchable-PDF layers sometimes collapse a structural label and its
+    // numeral into one token (PARTI, BOOKII, CHAPTER1). Repair only these
+    // well-known heading prefixes before word indexes are calculated.
+    .replace(/\b(PART|BOOK|CHAPTER)([IVXLCDM]+|\d+)\b/gi, '$1 $2')
+    .replace(/(\w)-\n(?!\n)(\w)/g, '$1$2')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
+}
+
+function detectPdfDocumentStructure(text) {
+  const rawLines = String(text || '').replace(/\r/g, '').split('\n');
+  const structures = [];
+  let wordIndex = 0;
+  let previousNonEmpty = null;
+
+  const nextNonEmptyLine = (start) => {
+    for (let index = start + 1; index < rawLines.length; index += 1) {
+      const clean = rawLines[index].replace(/\s+/g, ' ').trim();
+      if (clean) return { index, text: clean };
+    }
+    return null;
+  };
+
+  for (let lineIndex = 0; lineIndex < rawLines.length; lineIndex += 1) {
+    const raw = rawLines[lineIndex];
+    const line = raw.replace(/\s+/g, ' ').trim();
+    if (!line) continue;
+
+    const count = splitWords(line).length;
+    let type = classifyStructureLine(line, count);
+    const blankBefore = lineIndex > 0 && !rawLines[lineIndex - 1].trim();
+    const next = nextNonEmptyLine(lineIndex);
+    const blankAfter = lineIndex + 1 < rawLines.length && !rawLines[lineIndex + 1].trim();
+    const shortStandalone = count > 0 && count <= 12 && line.length <= 110 && (blankBefore || blankAfter);
+    const previousType = previousNonEmpty?.type || null;
+
+    if (!type && shortStandalone && ['chapter', 'part', 'section'].includes(previousType)) {
+      type = 'subtitle';
+    }
+
+    if (!type && shortStandalone && next) {
+      const nextCount = splitWords(next.text).length;
+      const nextLooksLikeBody = nextCount >= 10 || /[.!?][”"']?$/.test(next.text);
+      if (nextLooksLikeBody && previousNonEmpty?.blankAfter) type = 'subtitle';
+    }
+
+    if (type && count) {
+      const entry = {
+        title: line,
+        type,
+        start: wordIndex,
+        end: wordIndex + count,
+        preferredToc: type !== 'subtitle',
+        authoritative: true
+      };
+      if (type === 'part' || type === 'book') entry.align = 'center';
+      if (type === 'subtitle') entry.italic = true;
+      structures.push(entry);
+    }
+
+    previousNonEmpty = { text: line, type, blankBefore, blankAfter };
+    wordIndex += count;
+  }
+
+  return structures.slice(0, 1500);
 }
 
 function pdfOutlineToToc(outline = [], pageRefs = new Map(), depth = 0) {
@@ -16521,7 +23482,7 @@ async function parsePdfFile(file, onProgress = () => {}) {
         includeMarkedContent: false,
         disableNormalization: false
       });
-      const pageText = normalizePdfPageText(content.items);
+      const pageText = normalizePdfPageText(content.items, page.view?.[2] || null);
       if (pageText.length >= 20) textPages += 1;
       extractedCharacters += pageText.length;
       pages.push({
@@ -16576,18 +23537,80 @@ async function parsePdfFile(file, onProgress = () => {}) {
 
   const outline = await pdf.getOutline().catch(() => null);
   const toc = pdfOutlineToToc(outline || [], pageRefs);
-  let text = pages
-    .map((page) => `\n\n[PDF Page ${page.pageNumber}]\n\n${page.text}`)
-    .join('')
-    .trim();
-  const normalizedPdf = normalizeImportedBookText(text, { title, author:pdfAuthor, removePrintedToc:true, removeRepeatedHeaders:false });
-  text = normalizedPdf.text;
+
+  // PDF imports must be page-authoritative: once PDF.js successfully extracts a
+  // page, that page's text is part of the document. Do not let later TOC cleanup
+  // remove a large range from a long book. Kindle-to-PDF style exports can carry
+  // a visible printed contents page while their embedded PDF outline is partial.
+  // Keep PDF page boundaries as metadata, not visible reader text.
+  // Older builds inserted [PDF Page N] strings into the book itself, which
+  // polluted the reading experience and formatter input.
+  const pageWordStarts = new Map();
+  let runningWordIndex = 0;
+  const rawPdfTextParts = [];
+  pages.forEach((page) => {
+    pageWordStarts.set(page.pageNumber, runningWordIndex);
+    const pageText = String(page.text || '').trim();
+    rawPdfTextParts.push(pageText);
+    runningWordIndex += splitWords(pageText).length;
+  });
+  const rawPdfText = rawPdfTextParts.filter(Boolean).join('\n\n').trim();
+
+  // Keep the printed TOC in the PDF reading text for import reliability. It can
+  // still be represented in the Contents pane, but it must never be allowed to
+  // delete chapter text from the sequential page stream.
+  const normalizedPdf = normalizeImportedBookText(rawPdfText, {
+    title,
+    author: pdfAuthor,
+    removePrintedToc: false,
+    removeRepeatedHeaders: false
+  });
+  let text = normalizedPdf.text || rawPdfText;
+
+  // Safety guard: normalization of a PDF should never discard a meaningful
+  // portion of text that PDF.js already extracted. Fall back to the complete
+  // page stream if a future formatter regression becomes overly destructive.
+  if (rawPdfText.length && text.length < rawPdfText.length * 0.9) {
+    console.warn('PDF cleanup removed too much extracted text; using the complete page stream instead.', {
+      rawCharacters: rawPdfText.length,
+      normalizedCharacters: text.length,
+      pageCount: pdf.numPages
+    });
+    text = rawPdfText;
+  }
+
+  // Reader rendering is word-index based, so newline characters in `text` are
+  // intentionally lost when BookModel tokenizes with splitWords(). Preserve
+  // meaningful PDF paragraph/section gaps separately as word indexes; the
+  // existing VirtualRenderer already renders these as paragraph breaks.
+  const pdfParagraphBreaks = [];
+  let paragraphWordOffset = 0;
+  const pdfParagraphs = String(text || '')
+    .split(/\n\s*\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+  pdfParagraphs.forEach((paragraph, index) => {
+    if (index > 0 && paragraphWordOffset > 0) pdfParagraphBreaks.push(paragraphWordOffset);
+    paragraphWordOffset += splitWords(paragraph).length;
+  });
+
+  const pdfDocumentStructure = detectPdfDocumentStructure(text);
+
   const pdfDocumentToc = toc.map((item) => {
-    const marker = item.pageNumber ? `[PDF Page ${item.pageNumber}]` : '';
-    const position = marker ? text.indexOf(marker) : -1;
-    if (position < 0) return null;
-    return { title:item.title, index:splitWords(text.slice(0, position)).length, type:'chapter', pageNumber:item.pageNumber };
+    const pageWordIndex = item.pageNumber ? pageWordStarts.get(item.pageNumber) : null;
+    if (!Number.isFinite(pageWordIndex)) return null;
+    const cleanTitle = String(item.title || '').replace(/\s+/g, ' ').trim();
+    if (!cleanTitle || /kindletopdf\.com/i.test(cleanTitle)) return null;
+    return { title:cleanTitle, index:pageWordIndex, type:'chapter', pageNumber:item.pageNumber };
   }).filter(Boolean);
+
+  // A partial embedded outline must not override a much richer TOC detected
+  // from the actual book text. This is common in generated Kindle PDFs.
+  const detectedPdfToc = Array.isArray(normalizedPdf.toc) ? normalizedPdf.toc : [];
+  const minimumUsefulOutlineEntries = pdf.numPages >= 100 ? 5 : 2;
+  const outlineLooksComplete = pdfDocumentToc.length >= minimumUsefulOutlineEntries
+    && (!detectedPdfToc.length || pdfDocumentToc.length >= Math.max(2, Math.floor(detectedPdfToc.length * 0.35)));
+  const documentToc = outlineLooksComplete ? pdfDocumentToc : detectedPdfToc;
 
   const textCoverage = pdf.numPages ? textPages / pdf.numPages : 0;
   const likelyScanned = extractedCharacters < Math.max(200, pdf.numPages * 35)
@@ -16612,16 +23635,24 @@ async function parsePdfFile(file, onProgress = () => {}) {
       pageCount: pdf.numPages,
       importedAt: new Date().toISOString(),
       toc,
-      pages: pages.map(({ pageNumber, width, height }) => ({ pageNumber, width, height })),
+      pages: pages.map(({ pageNumber, width, height }) => ({
+        pageNumber,
+        width,
+        height,
+        wordIndex: pageWordStarts.get(pageNumber) || 0
+      })),
       textCoverage,
       cleanup: normalizedPdf.report,
-      documentToc: pdfDocumentToc.length ? pdfDocumentToc : normalizedPdf.toc
+      documentToc,
+      documentStructure: pdfDocumentStructure,
+      paragraphBreaks: pdfParagraphBreaks
     },
     stats: {
       pageCount: pdf.numPages,
       textPages,
       extractedCharacters,
-      tocEntries: toc.length
+      tocEntries: toc.length,
+      detectedSections: documentToc.length
     }
   };
 }
@@ -16666,7 +23697,7 @@ function renderUpload() {
 
       <details class="pdf-import-note compact-note">
         <summary>PDF import details</summary>
-        <p>Modern PDFs with selectable text work best. Page labels such as <em>PDF Page 12</em> are inserted into the extracted text so notes, AI questions, and reading progress retain a connection to the source pages. Image-only scans are not silently imported as blank documents.</p>
+        <p>Modern PDFs with selectable text work best. PDF page positions are retained as hidden document metadata so notes, navigation, and reading progress can stay connected to the source without placing page-marker text inside the book. Image-only scans are not silently imported as blank documents.</p>
       </details>
       <details class="pdf-import-note compact-note">
         <summary>Kindle-format import details</summary>
@@ -16674,16 +23705,25 @@ function renderUpload() {
       </details>
     </section>`;
 
-  app.querySelector('#text-file').addEventListener('change', async (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const uploadInput = app.querySelector('#text-file');
+  let importInFlight = false;
+
+  // Warm PDF.js as soon as the Import page opens so the first file selection
+  // does not also have to initialize the PDF engine.
+  loadPdfJs().catch(() => { /* surfaced normally if/when a PDF is selected */ });
+
+  uploadInput?.addEventListener('click', (event) => {
+    if (!importInFlight) event.currentTarget.value = '';
+  });
+
+  const processUploadFile = async (file, input = uploadInput) => {
+    if (!file || importInFlight) return;
 
     const status = app.querySelector('#upload-status');
     const progress = app.querySelector('#pdf-import-progress');
     const progressLabel = app.querySelector('#pdf-progress-label');
     const progressPercent = app.querySelector('#pdf-progress-percent');
     const progressBar = app.querySelector('#pdf-progress-bar');
-    const input = event.currentTarget;
 
     const setProgress = (percent, label) => {
       progress.hidden = false;
@@ -16693,9 +23733,9 @@ function renderUpload() {
       progressLabel.textContent = label || 'Processing PDF…';
     };
 
-    input.disabled = true;
+    importInFlight = true;
     status.className = 'status import-status';
-    status.textContent = '';
+    status.textContent = `Selected ${file.name}. Preparing import…`;
 
     try {
       const isEpub = /\.epub$/i.test(file.name) || file.type === 'application/epub+zip';
@@ -16716,16 +23756,16 @@ function renderUpload() {
         const book = await parseKindleEbookFile(file);
         status.className = 'status success import-status';
         status.textContent = `${book.stats.format} text extracted. Opening ${book.title}…`;
-        window.setTimeout(() => renderReaderWithText(book.title, book.text, book.source), 180);
+        renderReaderWithText(book.title, book.text, book.source);
         return;
       }
 
       if (isPdf) {
-        setProgress(1, 'Loading PDF support…');
+        setProgress(1, `Opening ${file.name}…`);
         const book = await parsePdfFile(file, setProgress);
         status.className = 'status success import-status';
-        status.textContent = `${book.stats.pageCount} pages extracted. Opening ${book.title}…`;
-        window.setTimeout(() => renderReaderWithText(book.title, book.text, book.source), 250);
+        status.textContent = `${book.stats.pageCount} pages / ${book.stats.textPages} text pages / ${book.stats.extractedCharacters.toLocaleString()} characters extracted. Opening ${book.title}…`;
+        renderReaderWithText(book.title, book.text, book.source);
         return;
       }
 
@@ -16748,10 +23788,25 @@ function renderUpload() {
       progress.hidden = true;
       status.className = 'status error import-status';
       status.textContent = error?.message || 'The file could not be read.';
-      input.disabled = false;
-      input.value = '';
+    } finally {
+      importInFlight = false;
+      try { input.value = ''; } catch {}
     }
+    };
+
+  uploadInput?.addEventListener('change', async (event) => {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    await processUploadFile(file, input);
   });
+
+  // Read Anything may arrive here with a File that was already selected on
+  // the previous page. Consume it once instead of asking the user to choose it again.
+  const pendingUploadFile = window.__markSetGoPendingUploadFile;
+  if (pendingUploadFile instanceof File) {
+    window.__markSetGoPendingUploadFile = null;
+    queueMicrotask(() => processUploadFile(pendingUploadFile, uploadInput));
+  }
 }
 
 
@@ -16919,14 +23974,24 @@ function renderDrmFreeBookFinder(initial={}) {
           const response=await fetch(`/api/library/read?provider=${encodeURIComponent(button.dataset.drmReadProvider||'')}&id=${encodeURIComponent(button.dataset.drmReadId||'')}&format=best`);
           const data=await response.json();
           if(!response.ok) throw new Error(data.error||'The book could not be opened.');
-          renderReaderWithText(data.title||'DRM-Free Book',data.text||'',{
+          const drmFreeSource = {
             type:'drm-free-library',
             provider:button.dataset.drmReadProvider||'',
             id:button.dataset.drmReadId||'',
             title:data.title||'DRM-Free Book',
             author:data.author||'',
             sourceUrl:data.sourceUrl||''
-          });
+          };
+          const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
+          if (isWorkspacePane) {
+            const handoff = window.parent.MSGWorkspaceReaderHandoff;
+            if (typeof handoff?.openText !== 'function') {
+              throw new Error('The main Reader handoff is not ready.');
+            }
+            handoff.openText(data.title||'DRM-Free Book',data.text||'',drmFreeSource);
+          } else {
+            renderReaderWithText(data.title||'DRM-Free Book',data.text||'',drmFreeSource);
+          }
         }catch(error){
           window.alert(error?.message||'The book could not be opened.');
           button.disabled=false;
@@ -17090,6 +24155,7 @@ function renderBrowseHub() {
           <nav class="browse-hero-tags browse-hero-links" aria-label="Jump to Browse section">
             <a href="#browse-modern-guides">Modern Guides</a>
             <a href="#browse-free-books">Free Books</a>
+            <a href="#browse-founding-documents">Founding Documents</a>
             <a href="#browse-drm-free">DRM-Free Finder</a>
             <a href="#browse-collections">Collections</a>
           </nav>
@@ -17176,6 +24242,24 @@ function renderBrowseHub() {
         ${renderShelf(MODERN_GUIDE_SHELF, 'guide')}
       </section>
 
+
+      <section id="browse-founding-documents" class="browse-section browse-founding-documents-section">
+        <div class="founding-browse-banner">
+          <div>
+            <span class="source-category">Primary Sources</span>
+            <h2>Founding Documents</h2>
+            <p>Explore more than 100 documents from colonial foundations through the early republic—including the Declaration, Constitution, Bill of Rights, all 85 Federalist essays, Anti-Federalist writings, Convention materials, and landmark early constitutional texts.</p>
+            <div class="founding-browse-pills">
+              <span>Independence</span><span>Constitution</span><span>Federalist</span><span>Anti-Federalist</span><span>Bill of Rights</span>
+            </div>
+          </div>
+          <div class="founding-browse-actions">
+            <strong>134 documents</strong>
+            <button class="primary" type="button" data-read="founding-documents">Explore collection</button>
+          </div>
+        </div>
+      </section>
+
       <section id="browse-free-books" class="browse-section browse-free-books-section">
         <div class="section-heading">
           <div>
@@ -17239,15 +24323,26 @@ function renderBrowseHub() {
       const response = await fetch(`/texts/modern-guides/${encodeURIComponent(guideId)}-guide.txt`, { cache:'no-store' });
       if (!response.ok) throw new Error(`Could not load the ${guide.title} guide.`);
       const text = await response.text();
-      renderReaderWithText(`${guide.title} — Mark, Set, Go! Guide`, text, {
+      const guideTitle = `${guide.title} — Mark, Set, Go! Guide`;
+      const guideSource = {
         type: 'modern-guide',
         id: guide.id,
-        title: `${guide.title} — Mark, Set, Go! Guide`,
+        title: guideTitle,
         originalTitle: guide.title,
         originalAuthor: guide.author,
         buyUrl: guide.buyUrl,
         subtitle: `An independent reading guide to ${guide.title}`
-      });
+      };
+
+      if (shouldDelegateReaderToWorkspaceParent()) {
+        const handoff = window.parent.MSGWorkspaceReaderHandoff;
+        if (typeof handoff?.openText !== 'function') {
+          throw new Error('The main Reader handoff is not ready.');
+        }
+        handoff.openText(guideTitle, text, guideSource);
+      } else {
+        renderReaderWithText(guideTitle, text, guideSource);
+      }
     } catch (error) {
       window.alert(error?.message || 'The guide could not be opened.');
     }
@@ -17270,10 +24365,9 @@ function renderBrowseHub() {
     }
   }));
 
-  app.querySelectorAll('[data-progress-open]').forEach((button) => button.addEventListener('click', () => {
+  app.querySelectorAll('[data-progress-open]').forEach((button) => button.addEventListener('click', async () => {
     const documentId = button.dataset.progressOpen;
-    let data = null;
-    try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+    const data = await getStoredReaderDocument(documentId);
     if (!data?.text) return renderReadingList();
     renderReaderWithText(data.title, data.text, data.source || { type:'saved' });
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
@@ -17395,6 +24489,58 @@ async function loadBundledModernGuideDocument(source = {}) {
   };
 }
 
+
+function addLibraryDocumentToReadingList(record) {
+  if (!record?.documentId || !String(record.title || '').trim()) return { added:false, reason:'missing' };
+
+  const title = String(record.title || '').trim();
+  const documentId = String(record.documentId || '');
+  const current = getReadingList();
+  const normalizedTitle = title.toLowerCase().replace(/\s+/g, ' ').trim();
+
+  const existing = current.find((item) =>
+    String(item.documentId || '') === documentId
+    || (
+      String(item.title || '').toLowerCase().replace(/\s+/g, ' ').trim() === normalizedTitle
+      && normalizedTitle
+    )
+  );
+
+  if (existing) return { added:false, reason:'exists', item:existing };
+
+  const sourceAuthor = record.source?.author
+    || record.source?.originalAuthor
+    || record.author
+    || '';
+
+  const item = {
+    id:`reading-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    title,
+    author:String(sourceAuthor || '').trim(),
+    status:'want-to-read',
+    note:'',
+    source:record.source || null,
+    documentId,
+    addedAt:new Date().toISOString()
+  };
+
+  saveReadingList([item, ...current]);
+  return { added:true, item };
+}
+
+function libraryDocumentIsOnReadingList(record, readingList = getReadingList()) {
+  if (!record) return false;
+  const documentId = String(record.documentId || '');
+  const normalizedTitle = String(record.title || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  return readingList.some((item) =>
+    (documentId && String(item.documentId || '') === documentId)
+    || (
+      normalizedTitle
+      && String(item.title || '').toLowerCase().replace(/\s+/g, ' ').trim() === normalizedTitle
+    )
+  );
+}
+
 function renderMyLibraryHub() {
   finalizeReadingSession();
   stopReader();
@@ -17461,7 +24607,7 @@ function renderMyLibraryHub() {
 
     delete progressRecords[documentId];
     localStorage.setItem(READING_PROGRESS_KEY, JSON.stringify(progressRecords));
-    localStorage.removeItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`);
+    await removeStoredReaderDocument(documentId);
     writeModernGuideLibrary(readModernGuideLibrary().filter((item) => String(item.documentId || '') !== String(documentId)));
 
     const readingList = getReadingList().filter((item) => String(item.documentId || '') !== String(documentId));
@@ -17484,8 +24630,64 @@ function renderMyLibraryHub() {
   };
 
   const openStoredDocument = async (documentId, wordIndex = null) => {
-    let data = null;
-    try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${documentId}`) || 'null'); } catch {}
+    // Workspace panes must never build their own Reader. If My Library is
+    // rendered inside the secondary workspace iframe, hand the selected
+    // document to the outer application's real Library/Reader path and stop
+    // here before any local Reader state or DOM is touched.
+    const isWorkspacePane = shouldDelegateReaderToWorkspaceParent();
+
+    if (isWorkspacePane) {
+      const id = String(documentId || '').trim();
+      if (!id) return;
+
+      try {
+        if (parent.location.origin === location.origin && parent.document?.body) {
+          const parentDocument = parent.document;
+
+          // Open the outer app's own My Library renderer. The synthetic control
+          // is attached to body rather than the workspace navigation chrome, so
+          // it is handled by the normal outer-app router.
+          const route = parentDocument.createElement('button');
+          route.type = 'button';
+          route.hidden = true;
+          route.dataset.action = 'my-library';
+          parentDocument.body.appendChild(route);
+          route.click();
+          route.remove();
+
+          // My Library owns openStoredDocument as a renderer-local function.
+          // Wait for its real bound document control, then invoke that control
+          // in the OUTER app. Because the outer URL is not a workspace-pane URL,
+          // this guard does not recurse.
+          let attempt = 0;
+          const openInOuterReader = () => {
+            const candidates = [...parentDocument.querySelectorAll('#app [data-library-document]')];
+            const target = candidates.find(
+              (button) => String(button.dataset.libraryDocument || '') === id
+            );
+
+            if (target) {
+              target.click();
+              return;
+            }
+
+            attempt += 1;
+            if (attempt < 40) parent.setTimeout(openInOuterReader, 25);
+          };
+
+          openInOuterReader();
+          return;
+        }
+      } catch (error) {
+        console.warn('Workspace could not delegate My Library document to the outer Reader.', error);
+      }
+
+      // If the iframe cannot safely reach the outer app, do not fall through
+      // and create a second Reader in the workspace pane.
+      return;
+    }
+
+    let data = await getStoredReaderDocument(documentId);
 
     const record = readStoredObject(READING_PROGRESS_KEY)[documentId];
 
@@ -17571,6 +24773,7 @@ function renderMyLibraryHub() {
 
   const continueCards = progress.slice(0, 6).map((item, index) => {
     const difficulty = storedDifficultyForProgress(item);
+    const onReadingList = libraryDocumentIsOnReadingList(item, readingList);
     const percent = item.totalWords
       ? Math.min(100, Math.round((Number(item.furthestWord) || 0) / item.totalWords * 100))
       : 0;
@@ -17589,6 +24792,7 @@ function renderMyLibraryHub() {
         <div class="library-progress-track"><span style="width:${percent}%"></span></div>
         <div class="library-book-actions">
           <button class="${index === 0 ? 'primary' : 'secondary'}" type="button" data-library-document="${escapeHtml(item.documentId)}">Resume reading</button>
+          <button class="secondary library-reading-list-link" type="button" data-library-add-reading="${escapeHtml(item.documentId)}" ${onReadingList ? 'disabled aria-disabled="true"' : ''}>${onReadingList ? '✓ In Reading List' : '＋ Reading List'}</button>
           <button class="secondary library-delete-book" type="button" data-library-delete="${escapeHtml(item.documentId)}" data-library-title="${escapeHtml(item.title || 'Untitled')}" aria-label="Delete ${escapeHtml(item.title || 'book')}">Delete</button>
         </div>
       </div>
@@ -17624,6 +24828,7 @@ function renderMyLibraryHub() {
               <div class="library-progress-track large"><span style="width:${primaryPercent}%"></span></div>
               <div class="focus-actions">
                 <button class="primary" type="button" data-library-document="${escapeHtml(primaryBook.documentId)}">Resume reading</button>
+                <button class="secondary library-reading-list-link" type="button" data-library-add-reading="${escapeHtml(primaryBook.documentId)}" ${libraryDocumentIsOnReadingList(primaryBook, readingList) ? 'disabled aria-disabled="true"' : ''}>${libraryDocumentIsOnReadingList(primaryBook, readingList) ? '✓ In Reading List' : '＋ Reading List'}</button>
                 <button class="secondary" type="button" data-action="reader">Open Reader</button>
                 <button class="secondary library-delete-book" type="button" data-library-delete="${escapeHtml(primaryBook.documentId)}" data-library-title="${escapeHtml(primaryBook.title || 'Untitled')}">Delete</button>
               </div>
@@ -17676,6 +24881,21 @@ function renderMyLibraryHub() {
   app.querySelectorAll('[data-library-document]').forEach((button) => {
     button.addEventListener('click', () => openStoredDocument(button.dataset.libraryDocument));
   });
+  app.querySelectorAll('[data-library-add-reading]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const documentId = button.dataset.libraryAddReading;
+      const record = progress.find((item) => String(item.documentId || '') === String(documentId || ''));
+      if (!record) return;
+      const result = addLibraryDocumentToReadingList(record);
+      if (result.added || result.reason === 'exists') {
+        document.querySelectorAll(`[data-library-add-reading="${CSS.escape(documentId)}"]`).forEach((target) => {
+          target.textContent = '✓ In Reading List';
+          target.disabled = true;
+          target.setAttribute('aria-disabled', 'true');
+        });
+      }
+    });
+  });
   app.querySelectorAll('[data-library-delete]').forEach((button) => {
     button.addEventListener('click', () => deleteStoredDocument(button.dataset.libraryDelete, button.dataset.libraryTitle || 'this book'));
   });
@@ -17702,10 +24922,9 @@ function renderLibraryRecords(kind) {
   </section>`;
 
   bindListPresentationControls({key:`library-${kind}`, root:'#library-record-list', itemSelector:'.record-card', defaultView:'list'});
-  app.querySelectorAll('[data-record-document]').forEach((button) => button.addEventListener('click', () => {
+  app.querySelectorAll('[data-record-document]').forEach((button) => button.addEventListener('click', async () => {
     const id = button.dataset.recordDocument;
-    let data = null;
-    try { data = JSON.parse(localStorage.getItem(`${DOCUMENT_STORAGE_PREFIX}${id}`) || 'null'); } catch {}
+    const data = await getStoredReaderDocument(id);
     if (!data?.text) return window.alert('The source text is not stored in this browser.');
     renderReaderWithText(data.title, data.text, data.source || {type:'saved'});
     requestAnimationFrame(() => jumpToWordIndex(Number(button.dataset.recordIndex)||0));
@@ -17718,7 +24937,8 @@ function renderGlobalNotebookEntries(){
   if(!panel)return;
   const query=(app.querySelector('#global-notebook-search')?.value||'').trim().toLowerCase();
   const records=getMarkRecords(MARK_INSIGHTS_KEY).filter(item=>!query||[
-    item.title,item.chapter,item.selection,item.note,item.question,item.result?.heading,item.result?.response
+    item.title,item.chapter,item.selection,item.note,item.question,item.result?.heading,item.result?.response,
+    ...notebookAnnotations(item).map(annotation=>annotation.note)
   ].filter(Boolean).join(' ').toLowerCase().includes(query));
   renderNotebookCollection(panel,records,{title:'All Notebook Entries'});
 }
@@ -17729,26 +24949,151 @@ function renderGlobalNotebook(){
   app.innerHTML=`<section class="platform-page global-notebook-page">
     <header class="platform-hero">
       <div><span class="source-category">Ask Mark</span><h1>Notebook</h1><p>Keep passages, Mark’s full responses, and your own thoughts together across every book and page in the app.</p></div>
-      <div class="global-notebook-actions"><button class="primary" type="button" id="add-global-notebook-note">＋ New note</button><button class="secondary" type="button" data-action="reader">Return to Reader</button></div>
+      <div class="global-notebook-actions compact-action-strip">
+        <button class="notebook-action" type="button" data-action="reader" title="Return to Reader">↩ <span>Reader</span></button>
+      </div>
     </header>
+
+    <section class="notebook-quick-composer" aria-label="Quick note">
+      <input id="global-notebook-new-title" type="text" maxlength="180" placeholder="Quick note title (optional)">
+      <textarea id="global-notebook-new-note" rows="3" maxlength="12000" placeholder="Write a new note here…"></textarea>
+      <div class="notebook-quick-composer-actions">
+        <small>Ctrl/⌘ + Enter to save</small>
+        <button type="button" class="notebook-action notebook-quick-save" id="add-global-notebook-note">＋ <span>Save note</span></button>
+      </div>
+    </section>
+
     <div class="global-notebook-toolbar">
       <label>Search notebook<input id="global-notebook-search" type="search" placeholder="Book, passage, thought, theme…"></label>
-      <p>Notebook entries are stored locally in this browser. Export important work as text for backup or use elsewhere.</p>
+      <p>Select text anywhere in an entry to highlight it or attach a note. Use Draw for freehand annotation.</p>
     </div>
     <div id="global-notebook-entries"></div>
   </section>`;
 
   app.querySelector('#global-notebook-search')?.addEventListener('input',renderGlobalNotebookEntries);
-  app.querySelector('#add-global-notebook-note')?.addEventListener('click',()=>{
-    const title=window.prompt('Note title or subject:',app.querySelector('h1')?.textContent||'Personal Note');
-    if(title===null)return;
-    const note=window.prompt('Write your note:','');
-    if(!note?.trim())return;
-    saveMarkInsight({recordType:'personal-note',title:title.trim()||'Personal Note',note:note.trim(),selection:'',documentId:'',pageContext:'Mark Notebook'});
+
+  const titleInput=app.querySelector('#global-notebook-new-title');
+  const noteInput=app.querySelector('#global-notebook-new-note');
+  const saveButton=app.querySelector('#add-global-notebook-note');
+
+  const saveQuickNote=()=>{
+    const note=String(noteInput?.value||'').trim();
+    if(!note){
+      noteInput?.focus();
+      return;
+    }
+    const title=String(titleInput?.value||'').trim()||'Personal Note';
+    saveMarkInsight({
+      recordType:'personal-note',
+      title,
+      note,
+      selection:'',
+      documentId:'',
+      pageContext:'Mark Notebook'
+    });
+    if(titleInput)titleInput.value='';
+    if(noteInput)noteInput.value='';
     renderGlobalNotebookEntries();
+    noteInput?.focus();
+  };
+
+  saveButton?.addEventListener('click',saveQuickNote);
+  noteInput?.addEventListener('keydown',(event)=>{
+    if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){
+      event.preventDefault();
+      saveQuickNote();
+    }
   });
+
   renderGlobalNotebookEntries();
+  requestAnimationFrame(()=>noteInput?.focus());
 }
+
+function queueAskMarkBookPreparation({ book, topics = [] } = {}) {
+  const title = String(book?.title || state.title || 'this book').trim();
+  const author = String(book?.author || state.source?.author || '').trim();
+  const cleanTopics = Array.isArray(topics) ? topics.filter(Boolean).map(String) : [];
+
+  window.__markSetGoPendingAskMarkPreparation = {
+    book: {
+      ...(book || {}),
+      title,
+      author
+    },
+    topics: cleanTopics,
+    prompt: `Prepare me to read ${title}${author ? ` by ${author}` : ''}. Give me a concise, spoiler-free orientation. Cover ${cleanTopics.length ? cleanTopics.join(', ') : 'the author, setting, central themes, major characters or figures, historical/intellectual context, and the best way to approach the book'}. Tell me what to pay attention to while reading and what I should know before I begin.`
+  };
+}
+
+async function runPendingAskMarkPreparation(output) {
+  const pending = window.__markSetGoPendingAskMarkPreparation;
+  if (!pending || !output) return false;
+  window.__markSetGoPendingAskMarkPreparation = null;
+
+  output.hidden = false;
+  output.classList.add('ask-mark-auto-prep-output');
+  output.innerHTML = `
+    <div class="ask-mark-auto-prep-heading">
+      <span class="source-category">Ask Mark</span>
+      <h2>Preparing you for ${escapeHtml(pending.book?.title || 'this book')}</h2>
+      <p class="status">Mark is preparing a spoiler-free orientation…</p>
+    </div>`;
+
+  try {
+    const text = await currentBookTextForProfile(pending.book);
+    const response = await fetch('/api/book-guide', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        book:{
+          ...pending.book,
+          description:[
+            String(pending.book?.description || '').trim(),
+            `Ask Mark preparation request: ${pending.prompt}`
+          ].filter(Boolean).join('\n')
+        },
+        spoilerMode:'none',
+        sample:boundedAiBookSample(text, 22000)
+      })
+    });
+
+    const payload = await response.json().catch(()=>({}));
+    if (!response.ok) throw new Error(payload.detail || payload.error || `HTTP ${response.status}`);
+    const guide = payload.guide || {};
+    const context = Array.isArray(guide.context) ? guide.context : [];
+    const characters = Array.isArray(guide.characters) ? guide.characters : [];
+    const themes = Array.isArray(guide.themes) ? guide.themes : [];
+    const readingTips = Array.isArray(guide.readingTips) ? guide.readingTips : [];
+
+    output.innerHTML = `
+      <article class="ask-mark-auto-prep-response">
+        <div class="mark-response-heading">
+          <span>Ask Mark</span>
+          <strong>Before you read ${escapeHtml(pending.book?.title || 'this book')}</strong>
+        </div>
+        <p>${escapeHtml(guide.overview || 'Here is a spoiler-free orientation for the book.')}</p>
+        ${guide.setting ? `<section><h3>Setting</h3><p>${escapeHtml(guide.setting)}</p></section>` : ''}
+        ${context.length ? `<section><h3>What you should know first</h3><ul>${context.map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+        ${characters.length ? `<section><h3>People to recognize</h3><ul>${characters.slice(0,8).map((item)=>`<li><strong>${escapeHtml(item.name || '')}</strong>${item.role ? ` — ${escapeHtml(item.role)}` : ''}</li>`).join('')}</ul></section>` : ''}
+        ${themes.length ? `<section><h3>Ideas and themes to watch</h3><ul>${themes.slice(0,8).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+        ${readingTips.length ? `<section><h3>Recommended approach</h3><ul>${readingTips.slice(0,8).map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul></section>` : ''}
+        ${guide.spoilerNote ? `<p class="difficulty-disclaimer">${escapeHtml(guide.spoilerNote)}</p>` : ''}
+        <div class="ask-mark-auto-prep-question">
+          <strong>Your request</strong>
+          <p>${escapeHtml(pending.prompt)}</p>
+        </div>
+      </article>`;
+    return true;
+  } catch (error) {
+    output.innerHTML = `
+      <article class="ask-mark-auto-prep-response">
+        <div class="mark-response-heading"><span>Ask Mark</span><strong>Preparation unavailable</strong></div>
+        <p class="status error">${escapeHtml(error.message)}</p>
+      </article>`;
+    return false;
+  }
+}
+
 
 function renderAiCenter() {
   stopReader();
@@ -17794,6 +25139,11 @@ function renderAiCenter() {
     output.hidden = false;
     output.innerHTML = `<h2>Current-context summary workspace</h2><p>The AI summary action will use a bounded section around the current reading position rather than sending the entire book. Return to the Reader, position the text, and use the Learn controls for passage-based analysis.</p><blockquote>${escapeHtml(sample.slice(0,700))}${sample.length>700?'…':''}</blockquote><button class="primary" type="button" data-action="reader">Return to Reader</button>`;
   });
+
+  const pendingPreparationOutput = app.querySelector('#ai-center-output');
+  if (window.__markSetGoPendingAskMarkPreparation && pendingPreparationOutput) {
+    requestAnimationFrame(() => runPendingAskMarkPreparation(pendingPreparationOutput));
+  }
 }
 
 function renderKnowledgeGraph() {
@@ -18462,6 +25812,1298 @@ function renderMyLinks(selectedId = '') {
   }));
 }
 
+
+/* ==========================================================================
+   Symposium prototype — isolated learning page
+   --------------------------------------------------------------------------
+   This feature intentionally does not modify reader rendering, playback,
+   pagination, highlighting, or continuity behavior. It only reads bounded
+   current-reading context when the user chooses to bring it into a session.
+   ========================================================================== */
+const SYMPOSIUM_CUSTOM_PEOPLE_KEY = 'markSetGoSymposiumCustomPeopleV1';
+
+function loadSymposiumCustomPeople() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SYMPOSIUM_CUSTOM_PEOPLE_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((person)=>person && typeof person.name === 'string' && person.name.trim())
+      .map((person)=>({
+        id:String(person.id || `custom-${Date.now()}-${Math.random().toString(36).slice(2,8)}`),
+        name:String(person.name || '').trim().slice(0,100),
+        field:String(person.field || 'Guest thinker').trim().slice(0,120),
+        era:'Custom',
+        monogram:String(person.monogram || '').trim().slice(0,4) || '?',
+        category:'My personalities',
+        lens:String(person.lens || `the published work, arguments, methods, and intellectual context of ${person.name}`).trim().slice(0,1000),
+        custom:true
+      }));
+  } catch {
+    return [];
+  }
+}
+
+function saveSymposiumCustomPeople() {
+  try {
+    const customPeople = SYMPOSIUM_PARTICIPANTS
+      .filter((person)=>person.custom)
+      .map(({id,name,field,monogram,lens})=>({id,name,field,monogram,lens}));
+    localStorage.setItem(SYMPOSIUM_CUSTOM_PEOPLE_KEY, JSON.stringify(customPeople.slice(0,100)));
+  } catch (error) {
+    console.warn('Custom Symposium personalities could not be saved.', error);
+  }
+}
+
+const SYMPOSIUM_PARTICIPANTS = [
+  { id:'socrates', name:'Socrates', field:'Philosophy', era:'Classical Greece', monogram:'S', category:'Philosophy', lens:'Socratic questioning, definitions, assumptions, and examination of reasons' },
+  { id:'plato', name:'Plato', field:'Philosophy', era:'Classical Greece', monogram:'P', category:'Philosophy', lens:'forms, justice, education, political philosophy, metaphysics, and dialectic' },
+  { id:'aristotle', name:'Aristotle', field:'Philosophy & Science', era:'Classical Greece', monogram:'A', category:'Philosophy', lens:'logic, causes, virtue, politics, biology, classification, and empirical observation' },
+  { id:'confucius', name:'Confucius', field:'Ethics & Political Thought', era:'Ancient China', monogram:'C', category:'Philosophy', lens:'virtue, ritual, education, humane government, family duty, moral cultivation, and social harmony' },
+  { id:'laozi', name:'Laozi', field:'Philosophy', era:'Ancient China', monogram:'LZ', category:'Philosophy', lens:'the Dao, non-forcing, simplicity, paradox, naturalness, humility, and limits of deliberate control' },
+  { id:'epictetus', name:'Epictetus', field:'Stoic Philosophy', era:'Roman era', monogram:'EPI', category:'Philosophy', lens:'control and responsibility, judgment, discipline, freedom, resilience, and Stoic practice' },
+  { id:'marcus-aurelius', name:'Marcus Aurelius', field:'Stoic Philosophy', era:'Roman era', monogram:'MA', category:'Philosophy', lens:'self-command, duty, impermanence, rational perspective, civic responsibility, and Stoic ethics' },
+  { id:'augustine', name:'Augustine of Hippo', field:'Theology & Philosophy', era:'Late Antiquity', monogram:'AU', category:'Religion & Theology', lens:'will, memory, time, grace, moral psychology, faith and reason, and the nature of evil' },
+  { id:'aquinas', name:'Thomas Aquinas', field:'Theology & Philosophy', era:'Medieval', monogram:'TA', category:'Religion & Theology', lens:'natural law, scholastic argument, metaphysics, ethics, theology, objections and replies' },
+  { id:'maimonides', name:'Maimonides', field:'Philosophy & Theology', era:'Medieval', monogram:'MM', category:'Religion & Theology', lens:'reason and revelation, negative theology, law, ethics, medicine, and disciplined interpretation' },
+  { id:'pascal', name:'Blaise Pascal', field:'Mathematics & Philosophy', era:'17th century', monogram:'BP', category:'Philosophy', lens:'reason and its limits, probability, faith, human grandeur and misery, rhetoric, and decision under uncertainty' },
+  { id:'descartes', name:'René Descartes', field:'Philosophy & Mathematics', era:'17th century', monogram:'RD', category:'Philosophy', lens:'methodic doubt, rationalism, mind and body, certainty, analytic method, and foundations of knowledge' },
+  { id:'spinoza', name:'Baruch Spinoza', field:'Philosophy', era:'17th century', monogram:'BS', category:'Philosophy', lens:'substance, necessity, emotion, freedom through understanding, ethics, and rational analysis' },
+  { id:'locke', name:'John Locke', field:'Philosophy & Political Thought', era:'17th century', monogram:'JL', category:'Political Thought', lens:'natural rights, consent, property, toleration, empiricism, education, and limited government' },
+  { id:'hume', name:'David Hume', field:'Philosophy & History', era:'18th century', monogram:'DH', category:'Philosophy', lens:'empiricism, causation, skepticism, habit, sentiment, probability, and criticism of unwarranted inference' },
+  { id:'rousseau', name:'Jean-Jacques Rousseau', field:'Political Philosophy', era:'18th century', monogram:'JR', category:'Political Thought', lens:'freedom, inequality, education, civic life, the general will, authenticity, and corruption by social convention' },
+  { id:'kant', name:'Immanuel Kant', field:'Philosophy', era:'Enlightenment', monogram:'IK', category:'Philosophy', lens:'duty, autonomy, categories of understanding, limits of reason, universal principles, and human dignity' },
+  { id:'hegel', name:'G. W. F. Hegel', field:'Philosophy', era:'19th century', monogram:'GH', category:'Philosophy', lens:'dialectical development, history, recognition, freedom, institutions, and the evolution of ideas' },
+  { id:'kierkegaard', name:'Søren Kierkegaard', field:'Philosophy & Theology', era:'19th century', monogram:'SK', category:'Philosophy', lens:'choice, anxiety, faith, individuality, inwardness, responsibility, and critiques of crowd thinking' },
+  { id:'nietzsche', name:'Friedrich Nietzsche', field:'Philosophy', era:'19th century', monogram:'FN', category:'Philosophy', lens:'genealogy, values, perspectivism, ressentiment, self-overcoming, culture, and critique of conventional morality' },
+  { id:'mill', name:'John Stuart Mill', field:'Philosophy & Political Economy', era:'19th century', monogram:'JSM', category:'Political Thought', lens:'liberty, utilitarianism, individuality, free speech, representative government, and social reform' },
+  { id:'james', name:'William James', field:'Philosophy & Psychology', era:'19th–20th century', monogram:'WJ', category:'Psychology', lens:'pragmatism, attention, habit, experience, belief, consciousness, and practical consequences' },
+  { id:'russell', name:'Bertrand Russell', field:'Philosophy & Logic', era:'20th century', monogram:'BR', category:'Philosophy', lens:'logic, analytic clarity, skepticism, language, mathematics, education, and criticism of dogma' },
+  { id:'wittgenstein', name:'Ludwig Wittgenstein', field:'Philosophy', era:'20th century', monogram:'LW', category:'Philosophy', lens:'language games, meaning in use, conceptual confusion, logic, ordinary language, and limits of expression' },
+  { id:'popper', name:'Karl Popper', field:'Philosophy of Science', era:'20th century', monogram:'KP', category:'Philosophy', lens:'falsifiability, conjecture and refutation, open society, piecemeal reform, and criticism of historicism' },
+  { id:'arendt', name:'Hannah Arendt', field:'Political Theory', era:'20th century', monogram:'HA', category:'Political Thought', lens:'totalitarianism, power, authority, judgment, public life, responsibility, and the human condition' },
+  { id:'beauvoir', name:'Simone de Beauvoir', field:'Philosophy & Literature', era:'20th century', monogram:'SB', category:'Philosophy', lens:'freedom, ambiguity, ethics, gender, social construction, responsibility, and lived experience' },
+  { id:'bacon', name:'Francis Bacon', field:'Science & Philosophy', era:'Early Modern', monogram:'FB', category:'Science', lens:'induction, experiment, idols of the mind, scientific method, and useful knowledge' },
+  { id:'copernicus', name:'Nicolaus Copernicus', field:'Astronomy', era:'Renaissance', monogram:'NC', category:'Science', lens:'heliocentrism, mathematical astronomy, model comparison, and rethinking inherited cosmology' },
+  { id:'galileo', name:'Galileo Galilei', field:'Physics & Astronomy', era:'Scientific Revolution', monogram:'GG', category:'Science', lens:'experiment, measurement, telescopic evidence, motion, mathematical description, and scientific controversy' },
+  { id:'kepler', name:'Johannes Kepler', field:'Astronomy & Mathematics', era:'Scientific Revolution', monogram:'JK', category:'Science', lens:'planetary motion, mathematical patterns, empirical correction, geometry, and physical astronomy' },
+  { id:'newton', name:'Isaac Newton', field:'Mathematics & Physics', era:'Scientific Revolution', monogram:'N', category:'Science', lens:'mechanics, gravitation, optics, calculus, mathematical modeling, and disciplined inference' },
+  { id:'faraday', name:'Michael Faraday', field:'Physics & Chemistry', era:'19th century', monogram:'MF', category:'Science', lens:'electromagnetism, experimental demonstration, fields, induction, and physical intuition' },
+  { id:'maxwell', name:'James Clerk Maxwell', field:'Physics & Mathematics', era:'19th century', monogram:'JCM', category:'Science', lens:'electromagnetism, field theory, mathematical unification, statistical reasoning, and physical modeling' },
+  { id:'darwin', name:'Charles Darwin', field:'Biology', era:'19th century', monogram:'D', category:'Science', lens:'natural selection, variation, evidence, comparative biology, gradual change, and explanatory mechanisms' },
+  { id:'mendel', name:'Gregor Mendel', field:'Genetics', era:'19th century', monogram:'GM', category:'Science', lens:'inheritance, controlled experiment, quantitative patterns, traits, and probabilistic biological reasoning' },
+  { id:'pasteur', name:'Louis Pasteur', field:'Chemistry & Microbiology', era:'19th century', monogram:'LP', category:'Science', lens:'germ theory, experiment, vaccination, fermentation, laboratory method, and applied science' },
+  { id:'curie', name:'Marie Curie', field:'Physics & Chemistry', era:'Modern Science', monogram:'MC', category:'Science', lens:'radioactivity, experimental rigor, measurement, scientific perseverance, and evidence' },
+  { id:'einstein', name:'Albert Einstein', field:'Physics', era:'Modern Physics', monogram:'E', category:'Science', lens:'relativity, thought experiments, invariance, physical intuition, and conceptual simplicity' },
+  { id:'bohr', name:'Niels Bohr', field:'Physics', era:'20th century', monogram:'NB', category:'Science', lens:'quantum theory, complementarity, measurement, conceptual models, and limits of classical description' },
+  { id:'schrodinger', name:'Erwin Schrödinger', field:'Physics', era:'20th century', monogram:'ES', category:'Science', lens:'wave mechanics, quantum states, thought experiments, physical interpretation, and conceptual paradox' },
+  { id:'heisenberg', name:'Werner Heisenberg', field:'Physics', era:'20th century', monogram:'WH', category:'Science', lens:'quantum mechanics, uncertainty, observables, mathematical formalism, and limits of measurement' },
+  { id:'feynman', name:'Richard Feynman', field:'Physics', era:'20th century', monogram:'RF', category:'Science', lens:'first-principles reasoning, quantum electrodynamics, models, explanatory clarity, skepticism, and scientific playfulness' },
+  { id:'carson', name:'Rachel Carson', field:'Biology & Environmental Science', era:'20th century', monogram:'RC', category:'Science', lens:'ecology, environmental evidence, unintended consequences, public science, and precaution' },
+  { id:'mcclintock', name:'Barbara McClintock', field:'Genetics', era:'20th century', monogram:'BM', category:'Science', lens:'chromosome behavior, transposable elements, careful observation, biological complexity, and patient experimentation' },
+  { id:'sagan', name:'Carl Sagan', field:'Astronomy & Science Communication', era:'20th century', monogram:'CS', category:'Science', lens:'cosmic perspective, skepticism, planetary science, evidence, public understanding of science, and scientific wonder' },
+  { id:'euclid', name:'Euclid', field:'Mathematics', era:'Ancient Greece', monogram:'EU', category:'Mathematics & Computing', lens:'axioms, proof, geometry, deductive structure, definitions, and rigorous mathematical construction' },
+  { id:'archimedes', name:'Archimedes', field:'Mathematics & Engineering', era:'Ancient Greece', monogram:'AR', category:'Mathematics & Computing', lens:'geometry, mechanics, approximation, leverage, buoyancy, and inventive mathematical problem-solving' },
+  { id:'hypatia', name:'Hypatia', field:'Mathematics & Philosophy', era:'Late Antiquity', monogram:'HY', category:'Mathematics & Computing', lens:'mathematical teaching, astronomy, geometry, philosophical inquiry, and preservation of mathematical traditions' },
+  { id:'euler', name:'Leonhard Euler', field:'Mathematics', era:'18th century', monogram:'LE', category:'Mathematics & Computing', lens:'analysis, graph theory, mechanics, notation, mathematical generalization, and prolific problem-solving' },
+  { id:'gauss', name:'Carl Friedrich Gauss', field:'Mathematics', era:'18th–19th century', monogram:'CFG', category:'Mathematics & Computing', lens:'number theory, statistics, geometry, astronomy, precision, and mathematical elegance' },
+  { id:'noether', name:'Emmy Noether', field:'Mathematics & Physics', era:'20th century', monogram:'EN', category:'Mathematics & Computing', lens:'abstract algebra, symmetry, invariants, conservation laws, and structural mathematical reasoning' },
+  { id:'ramanujan', name:'Srinivasa Ramanujan', field:'Mathematics', era:'20th century', monogram:'SR', category:'Mathematics & Computing', lens:'number theory, infinite series, partitions, intuition, identities, and pattern discovery' },
+  { id:'lovelace', name:'Ada Lovelace', field:'Mathematics & Computing', era:'19th century', monogram:'AL', category:'Mathematics & Computing', lens:'symbolic computation, algorithms, mathematical imagination, and the possibilities and limits of machines' },
+  { id:'turing', name:'Alan Turing', field:'Mathematics & Computing', era:'20th century', monogram:'T', category:'Mathematics & Computing', lens:'computation, algorithms, machine intelligence, formal reasoning, and cryptanalysis' },
+  { id:'von-neumann', name:'John von Neumann', field:'Mathematics & Computing', era:'20th century', monogram:'JVN', category:'Mathematics & Computing', lens:'game theory, computing architecture, quantum theory, numerical methods, strategy, and formal modeling' },
+  { id:'shannon', name:'Claude Shannon', field:'Information Theory', era:'20th century', monogram:'CSH', category:'Mathematics & Computing', lens:'information, entropy, coding, communication, Boolean logic, probability, and abstraction' },
+  { id:'hopper', name:'Grace Hopper', field:'Computing', era:'20th century', monogram:'GH', category:'Mathematics & Computing', lens:'programming languages, compilers, debugging, practical computing, standards, and making computers accessible' },
+  { id:'herodotus', name:'Herodotus', field:'History', era:'Classical Greece', monogram:'H', category:'History', lens:'historical inquiry, competing accounts, culture, causation, memory, and the limits of testimony' },
+  { id:'thucydides', name:'Thucydides', field:'History & Political Thought', era:'Classical Greece', monogram:'TH', category:'History', lens:'war, power, fear, interest, rhetoric, evidence, political decision-making, and human nature' },
+  { id:'plutarch', name:'Plutarch', field:'History & Biography', era:'Greco-Roman', monogram:'PL', category:'History', lens:'character, moral biography, leadership, comparison, civic virtue, and the relationship between personality and public action' },
+  { id:'ibn-khaldun', name:'Ibn Khaldun', field:'History & Social Theory', era:'Medieval', monogram:'IKH', category:'History', lens:'dynastic cycles, social cohesion, institutions, economic life, state formation, and historical causation' },
+  { id:'machiavelli', name:'Niccolò Machiavelli', field:'Political Thought & History', era:'Renaissance', monogram:'NM', category:'Strategy & Leadership', lens:'power, statecraft, republican institutions, fortune, necessity, military affairs, and political realism' },
+  { id:'sun-tzu', name:'Sun Tzu', field:'Strategy', era:'Ancient China', monogram:'ST', category:'Strategy & Leadership', lens:'strategy, deception, intelligence, terrain, adaptation, economy of force, and winning without unnecessary conflict' },
+  { id:'clausewitz', name:'Carl von Clausewitz', field:'Military Theory', era:'19th century', monogram:'CvC', category:'Strategy & Leadership', lens:'war and politics, friction, uncertainty, centers of gravity, escalation, and strategic judgment' },
+  { id:'gibbon', name:'Edward Gibbon', field:'History', era:'Enlightenment', monogram:'EG', category:'History', lens:'long-run historical causation, institutions, religion, civic life, sources, and decline' },
+  { id:'tocqueville', name:'Alexis de Tocqueville', field:'Political Thought & Sociology', era:'19th century', monogram:'AT', category:'Political Thought', lens:'democracy, equality, associations, local government, majority power, civic habits, and social change' },
+  { id:'lincoln', name:'Abraham Lincoln', field:'Politics & Leadership', era:'19th century', monogram:'ALN', category:'Strategy & Leadership', lens:'union, constitutional government, slavery, democratic persuasion, wartime leadership, and moral argument' },
+  { id:'douglass', name:'Frederick Douglass', field:'Politics & Literature', era:'19th century', monogram:'FD', category:'Political Thought', lens:'freedom, slavery, constitutional argument, rhetoric, human dignity, education, and civic equality' },
+  { id:'dubois', name:'W. E. B. Du Bois', field:'History & Sociology', era:'Modern', monogram:'WEB', category:'History', lens:'history, sociology, political economy, culture, evidence, institutions, and lived experience' },
+  { id:'churchill', name:'Winston Churchill', field:'Politics & History', era:'20th century', monogram:'WC', category:'Strategy & Leadership', lens:'wartime leadership, rhetoric, grand strategy, democratic resolve, historical analogy, and political judgment' },
+  { id:'adam-smith', name:'Adam Smith', field:'Economics & Moral Philosophy', era:'18th century', monogram:'AS', category:'Economics & Society', lens:'markets, specialization, moral sentiments, institutions, incentives, sympathy, and unintended coordination' },
+  { id:'marx', name:'Karl Marx', field:'Political Economy & Philosophy', era:'19th century', monogram:'KM', category:'Economics & Society', lens:'class, capital, labor, ideology, historical development, alienation, and political economy' },
+  { id:'weber', name:'Max Weber', field:'Sociology', era:'19th–20th century', monogram:'MW', category:'Economics & Society', lens:'bureaucracy, authority, rationalization, institutions, culture, vocation, and social explanation' },
+  { id:'durkheim', name:'Émile Durkheim', field:'Sociology', era:'19th–20th century', monogram:'ED', category:'Economics & Society', lens:'social facts, solidarity, institutions, norms, collective life, and empirical sociology' },
+  { id:'keynes', name:'John Maynard Keynes', field:'Economics', era:'20th century', monogram:'JMK', category:'Economics & Society', lens:'aggregate demand, uncertainty, investment, employment, expectations, macroeconomic policy, and practical economic judgment' },
+  { id:'hayek', name:'F. A. Hayek', field:'Economics & Political Thought', era:'20th century', monogram:'FAH', category:'Economics & Society', lens:'distributed knowledge, prices, spontaneous order, institutions, limits of central planning, and rule of law' },
+  { id:'schumpeter', name:'Joseph Schumpeter', field:'Economics', era:'20th century', monogram:'JS', category:'Economics & Society', lens:'entrepreneurship, innovation, creative destruction, capitalism, business cycles, and institutional change' },
+  { id:'freud', name:'Sigmund Freud', field:'Psychology', era:'19th–20th century', monogram:'SF', category:'Psychology', lens:'unconscious motives, conflict, defense, dreams, development, repression, and psychoanalytic interpretation' },
+  { id:'jung', name:'Carl Jung', field:'Psychology', era:'20th century', monogram:'CJ', category:'Psychology', lens:'archetypes, individuation, symbols, personality, dreams, myth, and the collective unconscious' },
+  { id:'pavlov', name:'Ivan Pavlov', field:'Physiology & Psychology', era:'19th–20th century', monogram:'IP', category:'Psychology', lens:'conditioning, experimental control, reflexes, learning, prediction, and behavioral physiology' },
+  { id:'skinner', name:'B. F. Skinner', field:'Psychology', era:'20th century', monogram:'BFS', category:'Psychology', lens:'operant conditioning, reinforcement, behavior, environment, experimental analysis, and learning' },
+  { id:'piaget', name:'Jean Piaget', field:'Developmental Psychology', era:'20th century', monogram:'JP', category:'Psychology', lens:'cognitive development, schemas, stages, adaptation, learning, and how children construct knowledge' },
+  { id:'vygotsky', name:'Lev Vygotsky', field:'Psychology & Education', era:'20th century', monogram:'LV', category:'Psychology', lens:'social learning, language, cultural tools, scaffolding, development, and the zone of proximal development' },
+  { id:'frankl', name:'Viktor Frankl', field:'Psychiatry & Psychology', era:'20th century', monogram:'VF', category:'Psychology', lens:'meaning, responsibility, suffering, freedom of attitude, logotherapy, and existential resilience' },
+  { id:'homer', name:'Homer', field:'Epic Poetry', era:'Ancient Greece', monogram:'HO', category:'Literature', lens:'heroism, fate, honor, war, homecoming, hospitality, character, and oral epic structure' },
+  { id:'dante', name:'Dante Alighieri', field:'Poetry & Theology', era:'Medieval', monogram:'DA', category:'Literature', lens:'moral order, political exile, spiritual journey, poetic architecture, symbolism, and judgment' },
+  { id:'shakespeare', name:'William Shakespeare', field:'Literature', era:'Renaissance', monogram:'WS', category:'Literature', lens:'character, rhetoric, tragedy, comedy, ambition, power, motive, language, and dramatic irony' },
+  { id:'cervantes', name:'Miguel de Cervantes', field:'Literature', era:'Early Modern', monogram:'MCV', category:'Literature', lens:'idealism and reality, narration, identity, parody, social class, imagination, and self-deception' },
+  { id:'milton', name:'John Milton', field:'Poetry & Political Thought', era:'17th century', monogram:'JM', category:'Literature', lens:'liberty, authority, conscience, epic form, temptation, obedience, rebellion, and religious imagination' },
+  { id:'goethe', name:'Johann Wolfgang von Goethe', field:'Literature & Science', era:'18th–19th century', monogram:'JG', category:'Literature', lens:'formation, striving, art, science, nature, desire, responsibility, and European humanism' },
+  { id:'austen', name:'Jane Austen', field:'Literature', era:'Regency', monogram:'JA', category:'Literature', lens:'character, social convention, moral judgment, irony, class, courtship, and self-knowledge' },
+  { id:'dickens', name:'Charles Dickens', field:'Literature', era:'19th century', monogram:'CD', category:'Literature', lens:'social class, institutions, poverty, character, moral sentiment, satire, and urban modernity' },
+  { id:'tolstoy', name:'Leo Tolstoy', field:'Literature & Moral Thought', era:'19th century', monogram:'LT', category:'Literature', lens:'history, family, war, moral responsibility, spiritual searching, ordinary life, and social institutions' },
+  { id:'dostoevsky', name:'Fyodor Dostoevsky', field:'Literature & Psychology', era:'19th century', monogram:'FDOS', category:'Literature', lens:'freedom, guilt, faith, nihilism, moral psychology, suffering, responsibility, and ideological conflict' },
+  { id:'twain', name:'Mark Twain', field:'Literature & Satire', era:'19th–20th century', monogram:'MT', category:'Literature', lens:'satire, hypocrisy, race, American identity, vernacular voice, moral convention, and social criticism' },
+  { id:'woolf', name:'Virginia Woolf', field:'Literature', era:'20th century', monogram:'VW', category:'Literature', lens:'consciousness, time, gender, perception, interior life, modernism, and literary form' },
+  { id:'orwell', name:'George Orwell', field:'Literature & Political Essay', era:'20th century', monogram:'GO', category:'Literature', lens:'language and politics, propaganda, totalitarianism, class, truth, clarity, and democratic socialism' },
+  { id:'borges', name:'Jorge Luis Borges', field:'Literature', era:'20th century', monogram:'JLB', category:'Literature', lens:'infinity, identity, libraries, labyrinths, memory, interpretation, metaphysics, and literary paradox' },
+  { id:'morrison', name:'Toni Morrison', field:'Literature', era:'20th–21st century', monogram:'TM', category:'Literature', lens:'memory, race, identity, history, language, community, trauma, and moral imagination' },
+  { id:'bach', name:'J. S. Bach', field:'Music', era:'Baroque', monogram:'JSB', category:'Music & Arts', lens:'counterpoint, harmony, form, sacred music, structure, variation, and disciplined musical craft' },
+  { id:'handel', name:'George Frideric Handel', field:'Music', era:'Baroque', monogram:'GFH', category:'Music & Arts', lens:'oratorio, opera, melody, dramatic pacing, large-form structure, adaptation, and public musical communication' },
+  { id:'vivaldi', name:'Antonio Vivaldi', field:'Music', era:'Baroque', monogram:'AV', category:'Music & Arts', lens:'concerto form, rhythm, instrumental color, sequence, contrast, and programmatic musical imagery' },
+  { id:'mozart', name:'Wolfgang Amadeus Mozart', field:'Music', era:'Classical', monogram:'WAM', category:'Music & Arts', lens:'clarity, balance, opera, characterization, formal proportion, melodic invention, and dramatic musical dialogue' },
+  { id:'beethoven', name:'L. van Beethoven', field:'Music', era:'Classical / Romantic', monogram:'LvB', category:'Music & Arts', lens:'motivic development, form, expressive architecture, struggle, transformation, and musical innovation' },
+  { id:'chopin', name:'Frédéric Chopin', field:'Music', era:'Romantic', monogram:'FC', category:'Music & Arts', lens:'piano idiom, lyricism, harmony, rubato, miniature forms, national style, and expressive nuance' },
+  { id:'debussy', name:'Claude Debussy', field:'Music', era:'Modern', monogram:'CDb', category:'Music & Arts', lens:'timbre, harmony, atmosphere, ambiguity, orchestral color, musical suggestion, and formal freedom' },
+  { id:'stravinsky', name:'Igor Stravinsky', field:'Music', era:'20th century', monogram:'IS', category:'Music & Arts', lens:'rhythm, orchestration, form, reinvention, primitivism, neoclassicism, and musical structure' },
+  { id:'ellington', name:'Duke Ellington', field:'Music', era:'20th century', monogram:'DE', category:'Music & Arts', lens:'jazz composition, orchestration, ensemble voice, swing, musical portraiture, improvisation, and American musical culture' },
+  { id:'bernstein', name:'Leonard Bernstein', field:'Music & Education', era:'20th century', monogram:'LB', category:'Music & Arts', lens:'conducting, musical analysis, theater, rhythm, public education, interpretation, and connections across musical traditions' },
+  { id:'leonardo', name:'Leonardo da Vinci', field:'Art, Engineering & Science', era:'Renaissance', monogram:'LDV', category:'Music & Arts', lens:'observation, anatomy, mechanics, drawing, design, proportion, curiosity, and integration of art and science' },
+  { id:'michelangelo', name:'Michelangelo', field:'Art & Architecture', era:'Renaissance', monogram:'MB', category:'Music & Arts', lens:'form, anatomy, sculpture, monumental design, artistic discipline, patronage, and expressive human figure' },
+  { id:'van-gogh', name:'Vincent van Gogh', field:'Art', era:'19th century', monogram:'VVG', category:'Music & Arts', lens:'color, perception, emotion, landscape, portraiture, artistic persistence, and expressive brushwork' },
+  { id:'hinton', name:'Geoffrey Hinton', field:'Computer Science & AI', era:'Contemporary', monogram:'GH', category:'AI & Technology', lens:'neural networks, representation learning, deep learning, machine intelligence, learning systems, and the risks and possibilities of advanced AI' },
+  { id:'lecun', name:'Yann LeCun', field:'Computer Science & AI', era:'Contemporary', monogram:'YL', category:'AI & Technology', lens:'machine learning, convolutional networks, self-supervised learning, world models, open scientific debate, and the architecture of intelligent systems' },
+  { id:'fei-fei-li', name:'Fei-Fei Li', field:'Computer Science & AI', era:'Contemporary', monogram:'FFL', category:'AI & Technology', lens:'computer vision, human-centered AI, large-scale visual learning, responsible AI, scientific collaboration, and the relationship between perception and intelligence' },
+  { id:'andrew-ng', name:'Andrew Ng', field:'Computer Science & AI', era:'Contemporary', monogram:'ANG', category:'AI & Technology', lens:'machine learning engineering, practical AI adoption, education, data-centric development, product deployment, and making AI useful in organizations' },
+  { id:'hassabis', name:'Demis Hassabis', field:'AI & Computational Science', era:'Contemporary', monogram:'DHAS', category:'AI & Technology', lens:'artificial intelligence, reinforcement learning, scientific discovery, computational biology, general-purpose learning systems, and AI as a tool for understanding complex problems' },
+  { id:'kurzweil', name:'Ray Kurzweil', field:'Technology & Futurism', era:'Contemporary', monogram:'RK', category:'AI & Technology', lens:'technological acceleration, computing trends, artificial intelligence, human-machine integration, forecasting, and long-run technological change' },
+  { id:'pearl', name:'Judea Pearl', field:'Computer Science & Statistics', era:'Contemporary', monogram:'JP', category:'AI & Technology', lens:'causal inference, Bayesian networks, counterfactual reasoning, probability, graphical models, and distinguishing correlation from causation' },
+  { id:'berners-lee', name:'Tim Berners-Lee', field:'Computer Science & Web', era:'Contemporary', monogram:'TBL', category:'AI & Technology', lens:'the World Wide Web, open standards, decentralization, interoperability, data ownership, public-interest technology, and the social architecture of the internet' },
+  { id:'goodall', name:'Jane Goodall', field:'Primatology & Conservation', era:'Contemporary', monogram:'JG', category:'Science', lens:'animal behavior, long-term observation, chimpanzee societies, conservation, empathy grounded in evidence, and human responsibilities toward nature' },
+  { id:'brian-greene', name:'Brian Greene', field:'Physics', era:'Contemporary', monogram:'BG', category:'Science', lens:'string theory, cosmology, spacetime, quantum physics, mathematical unification, and clear explanation of difficult physical ideas' },
+  { id:'tyson', name:'Neil deGrasse Tyson', field:'Astrophysics & Science Communication', era:'Contemporary', monogram:'NDT', category:'Science', lens:'astrophysics, scientific literacy, cosmic perspective, evidence, public science communication, and connecting science with culture' },
+  { id:'dawkins', name:'Richard Dawkins', field:'Evolutionary Biology', era:'Contemporary', monogram:'RDW', category:'Science', lens:'evolution, natural selection, genes, adaptation, scientific explanation, skepticism, and communication of evolutionary ideas' },
+  { id:'sean-carroll', name:'Sean Carroll', field:'Physics & Philosophy of Science', era:'Contemporary', monogram:'SC', category:'Science', lens:'cosmology, quantum mechanics, entropy, emergence, scientific naturalism, philosophy of physics, and explanatory models' },
+  { id:'randall', name:'Lisa Randall', field:'Physics', era:'Contemporary', monogram:'LR', category:'Science', lens:'particle physics, cosmology, extra dimensions, dark matter, model building, evidence, and the relationship between theory and experiment' },
+  { id:'kip-thorne', name:'Kip Thorne', field:'Physics', era:'Contemporary', monogram:'KT', category:'Science', lens:'general relativity, black holes, gravitational waves, theoretical prediction, experimental confirmation, and collaboration between theory and observation' },
+  { id:'pinker', name:'Steven Pinker', field:'Psychology & Cognitive Science', era:'Contemporary', monogram:'SP', category:'Psychology', lens:'language, cognition, human nature, violence, progress, statistical reasoning, and explaining behavioral patterns with evidence' },
+  { id:'haidt', name:'Jonathan Haidt', field:'Social Psychology', era:'Contemporary', monogram:'JH', category:'Psychology', lens:'moral psychology, intuition and reasoning, political psychology, social media effects, institutions, group dynamics, and viewpoint diversity' },
+  { id:'sapolsky', name:'Robert Sapolsky', field:'Neuroscience & Biology', era:'Contemporary', monogram:'RS', category:'Psychology', lens:'stress, behavior, neurobiology, hormones, environment, biological constraints, human aggression, and the interaction of biology and context' },
+  { id:'dweck', name:'Carol Dweck', field:'Psychology', era:'Contemporary', monogram:'CDW', category:'Psychology', lens:'motivation, mindset, learning, feedback, achievement, resilience, and how beliefs about ability shape behavior' },
+  { id:'duckworth', name:'Angela Duckworth', field:'Psychology', era:'Contemporary', monogram:'AD', category:'Psychology', lens:'grit, deliberate practice, perseverance, achievement, motivation, measurement, and the limits and uses of character traits' },
+  { id:'acemoglu', name:'Daron Acemoglu', field:'Economics', era:'Contemporary', monogram:'DA', category:'Economics & Society', lens:'institutions, political economy, growth, technology, inequality, labor markets, state capacity, and how rules shape prosperity' },
+  { id:'duflo', name:'Esther Duflo', field:'Economics', era:'Contemporary', monogram:'EDU', category:'Economics & Society', lens:'development economics, randomized evaluation, poverty policy, empirical field research, human behavior, and evidence-based intervention' },
+  { id:'krugman', name:'Paul Krugman', field:'Economics', era:'Contemporary', monogram:'PK', category:'Economics & Society', lens:'macroeconomics, trade, economic geography, recessions, policy analysis, models, and communicating economic arguments to the public' },
+  { id:'sowell', name:'Thomas Sowell', field:'Economics & Social Theory', era:'Contemporary', monogram:'TS', category:'Economics & Society', lens:'incentives, tradeoffs, institutions, dispersed knowledge, economic history, social policy, and comparing intended goals with actual consequences' },
+  { id:'taleb', name:'Nassim Nicholas Taleb', field:'Risk & Decision Theory', era:'Contemporary', monogram:'NNT', category:'Economics & Society', lens:'uncertainty, fat tails, antifragility, optionality, forecasting limits, skin in the game, and decision-making under extreme risk' },
+  { id:'amartya-sen', name:'Amartya Sen', field:'Economics & Philosophy', era:'Contemporary', monogram:'ASEN', category:'Economics & Society', lens:'capabilities, welfare, development, famine, justice, freedom, social choice, and evaluating well-being beyond income' },
+  { id:'nussbaum', name:'Martha Nussbaum', field:'Philosophy', era:'Contemporary', monogram:'MN', category:'Philosophy', lens:'ethics, capabilities, emotion, justice, human dignity, classical philosophy, education, and the moral importance of literature' },
+  { id:'peter-singer', name:'Peter Singer', field:'Philosophy & Ethics', era:'Contemporary', monogram:'PS', category:'Philosophy', lens:'utilitarian ethics, animal welfare, global poverty, effective altruism, moral consistency, and extending ethical consideration' },
+  { id:'sandel', name:'Michael Sandel', field:'Political Philosophy', era:'Contemporary', monogram:'MS', category:'Political Thought', lens:'justice, markets and morals, civic life, merit, community, public reasoning, and the ethical limits of economic valuation' },
+  { id:'judith-butler', name:'Judith Butler', field:'Philosophy & Critical Theory', era:'Contemporary', monogram:'JB', category:'Philosophy', lens:'gender, performativity, identity, power, language, social norms, recognition, and critical analysis of categories' },
+  { id:'cornel-west', name:'Cornel West', field:'Philosophy & Public Thought', era:'Contemporary', monogram:'CW', category:'Philosophy', lens:'democracy, race, justice, prophetic tradition, moral courage, public philosophy, solidarity, and critique of domination' },
+  { id:'fukuyama', name:'Francis Fukuyama', field:'Political Science', era:'Contemporary', monogram:'FF', category:'Political Thought', lens:'political order, institutions, liberal democracy, identity, state capacity, modernization, and long-run political development' },
+  { id:'ferguson', name:'Niall Ferguson', field:'History', era:'Contemporary', monogram:'NF', category:'History', lens:'financial history, empire, institutions, networks, war, economic change, counterfactual analysis, and long-run historical comparison' },
+  { id:'harari', name:'Yuval Noah Harari', field:'History & Public Thought', era:'Contemporary', monogram:'YNH', category:'History', lens:'large-scale historical narratives, cognition, institutions, technology, shared myths, global systems, and speculative futures' },
+  { id:'applebaum', name:'Anne Applebaum', field:'History & Journalism', era:'Contemporary', monogram:'AA', category:'History', lens:'authoritarianism, communism, democratic institutions, propaganda, political networks, civic resilience, and historical comparison' },
+  { id:'drucker', name:'Peter Drucker', field:'Management', era:'20th century', monogram:'PD', category:'Business & Innovation', lens:'management, organizations, knowledge work, objectives, decentralization, innovation, customers, and institutional effectiveness' },
+  { id:'christensen', name:'Clayton Christensen', field:'Business & Innovation', era:'20th–21st century', monogram:'CC', category:'Business & Innovation', lens:'disruptive innovation, technology adoption, business models, organizational incentives, market entry, and why successful firms can fail' },
+  { id:'buffett', name:'Warren Buffett', field:'Investing & Business', era:'Contemporary', monogram:'WB', category:'Business & Innovation', lens:'capital allocation, intrinsic value, competitive advantage, incentives, management quality, patience, risk, and long-term business economics' },
+  { id:'munger', name:'Charlie Munger', field:'Investing & Decision-Making', era:'20th–21st century', monogram:'CM', category:'Business & Innovation', lens:'mental models, incentives, probabilistic thinking, multidisciplinary reasoning, behavioral errors, business quality, and long-term judgment' },
+  { id:'jobs', name:'Steve Jobs', field:'Technology & Product Design', era:'20th–21st century', monogram:'SJ', category:'Business & Innovation', lens:'product design, simplicity, user experience, integration of hardware and software, creative leadership, focus, and technology as a liberal art' },
+  { id:'gates', name:'Bill Gates', field:'Technology & Philanthropy', era:'Contemporary', monogram:'BGAT', category:'Business & Innovation', lens:'software platforms, technology strategy, scaling organizations, global health, philanthropy, energy innovation, and evidence-informed problem solving' },
+  { id:'atwood', name:'Margaret Atwood', field:'Literature', era:'Contemporary', monogram:'MAW', category:'Literature', lens:'dystopia, gender, power, ecology, language, speculative fiction, historical memory, and social institutions' },
+  { id:'rushdie', name:'Salman Rushdie', field:'Literature', era:'Contemporary', monogram:'SRU', category:'Literature', lens:'identity, migration, religion, freedom of expression, magical realism, history, language, and cultural hybridity' },
+  { id:'ishiguro', name:'Kazuo Ishiguro', field:'Literature', era:'Contemporary', monogram:'KI', category:'Literature', lens:'memory, dignity, self-deception, responsibility, identity, technology, unreliable narration, and emotional restraint' },
+  { id:'oates', name:'Joyce Carol Oates', field:'Literature', era:'Contemporary', monogram:'JCO', category:'Literature', lens:'American identity, violence, family, class, psychology, social pressure, literary realism, and formal experimentation' },
+  { id:'john-williams', name:'John Williams', field:'Music & Film Scoring', era:'Contemporary', monogram:'JW', category:'Music & Arts', lens:'film scoring, leitmotif, orchestration, thematic development, narrative music, symphonic tradition, and the relationship between music and story' },
+  { id:'yo-yo-ma', name:'Yo-Yo Ma', field:'Music', era:'Contemporary', monogram:'YYM', category:'Music & Arts', lens:'performance, interpretation, collaboration, cultural exchange, musical communication, listening, and the social role of art' },
+  { id:'marsalis', name:'Wynton Marsalis', field:'Music & Jazz', era:'Contemporary', monogram:'WM', category:'Music & Arts', lens:'jazz history, improvisation, swing, composition, musical education, tradition, ensemble discipline, and American musical culture' },
+  { id:'hans-zimmer', name:'Hans Zimmer', field:'Music & Film Scoring', era:'Contemporary', monogram:'HZ', category:'Music & Arts', lens:'film scoring, sound design, orchestral and electronic integration, thematic atmosphere, collaboration, and music as cinematic architecture' },
+  { id:'scorsese', name:'Martin Scorsese', field:'Film', era:'Contemporary', monogram:'MSCO', category:'Music & Arts', lens:'cinema history, visual storytelling, character, moral conflict, editing, film preservation, and the relationship between style and human behavior' },
+  { id:'nt-wright', name:'N. T. Wright', field:'Theology & Biblical Studies', era:'Contemporary', monogram:'NTW', category:'Religion & Theology', lens:'New Testament history, Pauline theology, resurrection, early Christianity, historical context, biblical interpretation, and Christian ethics' },
+  { id:'rowan-williams', name:'Rowan Williams', field:'Theology & Philosophy', era:'Contemporary', monogram:'RW', category:'Religion & Theology', lens:'Christian theology, spirituality, ethics, language, literature, political responsibility, and reflective engagement across traditions' },
+  { id:'pagels', name:'Elaine Pagels', field:'History of Religion', era:'Contemporary', monogram:'EP', category:'Religion & Theology', lens:'early Christianity, Gnostic texts, religious diversity, historical interpretation, scripture, community formation, and the development of doctrine' },
+  { id:'barron', name:'Robert Barron', field:'Theology & Philosophy', era:'Contemporary', monogram:'RB', category:'Religion & Theology', lens:'Catholic theology, classical philosophy, scripture, culture, evangelization, aesthetics, and explaining religious ideas in public discourse' }
+];
+
+for (const customPerson of loadSymposiumCustomPeople()) {
+  if (!SYMPOSIUM_PARTICIPANTS.some((person)=>person.id === customPerson.id)) {
+    SYMPOSIUM_PARTICIPANTS.push(customPerson);
+  }
+}
+
+
+function symposiumEscape(value) { return escapeHtml(String(value ?? '')); }
+
+function ensureSymposiumStyles() {
+  if (document.getElementById('symposium-prototype-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'symposium-prototype-styles';
+  style.textContent = `
+    .symposium-page{max-width:1500px;margin:0 auto;padding:26px 24px 60px;color:#10233f}
+    .symposium-hero{display:flex;gap:22px;align-items:flex-start;justify-content:space-between;margin-bottom:22px;padding:28px;border:1px solid rgba(36,78,124,.16);border-radius:24px;background:linear-gradient(135deg,#f7fbff,#fffaf0);box-shadow:0 16px 42px rgba(30,58,92,.08)}
+    .symposium-kicker{display:inline-flex;align-items:center;gap:8px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;font-size:.75rem;color:#8a6500}
+    .symposium-hero h1{font-family:Georgia,serif;font-size:clamp(2rem,4vw,3.35rem);line-height:1.02;margin:.45rem 0 .65rem;color:#0c2340}
+    .symposium-hero p{max-width:820px;margin:0;color:#53657a;line-height:1.65}
+    .symposium-badge{min-width:230px;padding:16px 18px;border-radius:18px;background:#0c2340;color:white}.symposium-badge strong{display:block;color:#f0c85a;font-size:1.05rem}.symposium-badge small{display:block;margin-top:6px;line-height:1.45;color:#d7e1ee}
+    .symposium-saved-panel{margin:0 0 22px;border:1px solid rgba(36,78,124,.16);border-radius:20px;background:rgba(255,255,255,.94);box-shadow:0 10px 28px rgba(30,58,92,.06);overflow:hidden}
+    .symposium-saved-head{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;border-bottom:1px solid rgba(36,78,124,.1);background:#f8fbff}.symposium-saved-head strong{display:block;color:#0c2340}.symposium-saved-head small{display:block;color:#6a7a8e;margin-top:2px}.symposium-saved-head button{border:1px solid #cbd7e5;border-radius:9px;background:white;color:#24486f;padding:7px 10px;font-weight:750;cursor:pointer}
+    .symposium-saved-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;padding:12px}.symposium-saved-empty{grid-column:1/-1;padding:14px;color:#6d7c8f;font-size:.88rem}
+    .symposium-saved-item{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;border:1px solid #dfe7f0;border-radius:13px;padding:11px;background:white;min-width:0}.symposium-saved-copy{display:grid;gap:3px;min-width:0}.symposium-saved-copy strong,.symposium-saved-copy span,.symposium-saved-copy small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.symposium-saved-copy strong{color:#0c2340}.symposium-saved-copy span{color:#50647b;font-size:.84rem}.symposium-saved-copy small{color:#7c8998;font-size:.72rem}.symposium-saved-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end}.symposium-saved-actions button{border:1px solid #d4deea;border-radius:8px;background:#f8fbff;color:#24486f;padding:5px 7px;font-size:.72rem;font-weight:750;cursor:pointer}.symposium-saved-actions [data-symposium-resume]{background:#0c2340;color:#f2ca60;border-color:#0c2340}.symposium-saved-actions [data-symposium-delete]{color:#7a2630}
+    .symposium-layout{display:grid;grid-template-columns:minmax(300px,390px) minmax(0,1fr);gap:22px;align-items:start}
+    .symposium-panel{border:1px solid rgba(36,78,124,.16);border-radius:22px;background:white;box-shadow:0 12px 34px rgba(30,58,92,.06);overflow:hidden}
+    .symposium-panel-head{padding:20px 22px 14px;border-bottom:1px solid rgba(36,78,124,.1);background:#f8fbff}.symposium-panel-head h2{margin:0 0 4px;font-size:1.15rem;color:#0c2340}.symposium-panel-head p{margin:0;color:#65758a;font-size:.9rem;line-height:1.45}
+    .symposium-setup{padding:18px 20px 22px;display:grid;gap:16px}.symposium-setup label{display:grid;gap:7px;font-weight:700;font-size:.88rem}.symposium-setup input,.symposium-setup textarea,.symposium-setup select{width:100%;border:1px solid #cbd7e5;border-radius:11px;padding:10px 12px;background:white;color:#10233f;font:inherit;box-sizing:border-box}.symposium-setup textarea{min-height:105px;resize:vertical;line-height:1.45}
+    .symposium-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.symposium-mode{position:relative}.symposium-mode input{position:absolute;opacity:0;pointer-events:none}.symposium-mode span{display:block;padding:11px 12px;border:1px solid #d3deea;border-radius:12px;background:#fbfdff;cursor:pointer;font-weight:800}.symposium-mode small{display:block;margin-top:3px;font-weight:500;color:#6b7c90}.symposium-mode input:checked+span{border-color:#c79a22;background:#fff8e6;box-shadow:inset 0 0 0 1px #e0b94d}
+    .symposium-context-choice{display:flex;gap:8px;flex-wrap:wrap}.symposium-context-choice button,.symposium-mini-button{border:1px solid #cbd7e5;border-radius:999px;background:white;padding:7px 10px;font-weight:700;color:#24476e;cursor:pointer}.symposium-context-choice button:hover,.symposium-mini-button:hover{background:#f2f7fc}
+    .symposium-roster{max-height:355px;overflow:auto;padding-right:4px;display:grid;gap:8px}
+    .symposium-roster-tools{display:grid;grid-template-columns:minmax(0,1fr) 180px;gap:8px;margin:7px 0 8px}
+    .symposium-roster-tools input,.symposium-roster-tools select{width:100%;min-width:0;border:1px solid #cbd7e4;border-radius:9px;padding:8px 9px;background:white;color:#17304e;font:inherit}
+    .symposium-roster-summary{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:.73rem;color:#718095;margin:0 0 6px}
+    .symposium-person[hidden]{display:none!important}
+    .symposium-person-category{display:inline-block;margin-left:5px;padding:1px 5px;border-radius:999px;background:#eef3f8;color:#52677f;font-size:.64rem;font-weight:700}
+    @media(max-width:560px){.symposium-roster-tools{grid-template-columns:1fr}}
+.symposium-person{display:grid;grid-template-columns:auto 42px 1fr;gap:9px;align-items:center;padding:9px;border:1px solid #e0e8f1;border-radius:12px;background:#fff;cursor:pointer}.symposium-person:has(input:checked){border-color:#c99f37;background:#fffaf0}.symposium-person input{width:auto}.symposium-avatar{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#173c66,#0c2340);color:#f2cc68;border:2px solid #e2bd52;font-family:Georgia,serif;font-size:.78rem;font-weight:800;box-shadow:0 4px 12px rgba(12,35,64,.15)}.symposium-person strong{display:block;font-size:.9rem}.symposium-person small{display:block;color:#718095;font-size:.76rem;margin-top:2px}
+    .symposium-custom-row{display:grid;grid-template-columns:1fr auto;gap:8px}.symposium-custom-row button,.symposium-start{border:0;border-radius:11px;background:#0c2340;color:white;font-weight:800;padding:10px 14px;cursor:pointer}.symposium-start{width:100%;padding:13px 16px;color:#f3cc67}.symposium-start:disabled{opacity:.55;cursor:wait}
+    .symposium-stage{min-height:720px;display:flex;flex-direction:column}.symposium-stage-toolbar{padding:14px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;border-bottom:1px solid #e3eaf2;background:#fbfdff;flex-wrap:wrap}.symposium-stage-status{font-weight:800;color:#395a7d}.symposium-stage-actions{display:flex;gap:8px;flex-wrap:wrap}.symposium-stage-actions button{border:1px solid #cbd7e5;background:white;color:#24476e;border-radius:9px;padding:7px 10px;cursor:pointer;font-weight:700}
+    .symposium-transcript{padding:20px;display:flex;flex-direction:column;gap:14px;min-height:430px;max-height:680px;overflow:auto;background:linear-gradient(180deg,#fff,#fbfdff)}
+    .symposium-transcript,.symposium-turn-body p{user-select:text;-webkit-user-select:text}
+    .symposium-transcript ::selection{background:#f2ca60;color:#10233d}
+    .symposium-selection-toolbar{
+      position:fixed;z-index:10050;display:flex;align-items:center;gap:6px;
+      padding:6px;border:1px solid #c7d2df;border-radius:10px;background:#fff;
+      box-shadow:0 8px 24px rgba(12,35,64,.18)
+    }
+    .symposium-selection-toolbar[hidden]{display:none!important}
+    .symposium-selection-toolbar button{
+      border:0;border-radius:8px;padding:7px 10px;font:inherit;font-size:.78rem;
+      font-weight:800;cursor:pointer;white-space:nowrap
+    }
+    .symposium-selection-toolbar [data-symposium-copy-selection]{background:#eaf0f6;color:#17304e}
+    .symposium-selection-toolbar [data-symposium-save-selection]{background:#0c2340;color:#f2ca60}
+    .symposium-selection-toolbar [data-symposium-chat-selection]{background:#173c66;color:#fff}
+
+    .symposium-empty{margin:auto;text-align:center;max-width:520px;color:#718095;padding:44px}.symposium-empty .symposium-empty-icon{font-size:3rem;display:block;margin-bottom:12px}.symposium-empty h2{color:#0c2340;margin:.25rem 0 .5rem;font-family:Georgia,serif}
+    .symposium-turn{display:grid;grid-template-columns:48px minmax(0,1fr);gap:12px;align-items:start}.symposium-turn.user{grid-template-columns:minmax(0,1fr) 48px}.symposium-turn.user .symposium-turn-body{order:1;background:#eef5fc}.symposium-turn.user .symposium-avatar{order:2;background:#405c7a}.symposium-turn.moderator .symposium-avatar{background:linear-gradient(145deg,#80631a,#513d0d);color:white}.symposium-turn-body{border:1px solid #dde6ef;border-radius:16px;padding:13px 15px;background:white;box-shadow:0 5px 16px rgba(38,67,98,.05)}.symposium-turn-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin-bottom:6px}.symposium-turn-head strong{color:#0c2340}.symposium-turn-head span{font-size:.76rem;color:#7a899b}.symposium-turn-body p{margin:0;line-height:1.58;color:#30465f;white-space:pre-wrap}.symposium-turn-tools{margin-top:8px;display:flex;gap:6px}.symposium-turn-tools button{border:0;background:transparent;color:#315d8b;font-size:.78rem;cursor:pointer;padding:2px 0}
+    .symposium-participate{margin-top:auto;border-top:1px solid #e1e8f0;padding:16px 18px;background:#f8fbff}.symposium-participate label{font-size:.8rem;font-weight:800;color:#435b75}.symposium-user-grid{display:grid;grid-template-columns:150px 1fr auto;gap:9px;margin-top:7px}.symposium-user-grid select,.symposium-user-grid textarea{border:1px solid #cbd7e5;border-radius:10px;padding:9px 10px;font:inherit;background:white}.symposium-user-grid textarea{resize:vertical;min-height:52px}.symposium-user-grid button{border:0;border-radius:10px;background:#0c2340;color:#f2ca60;padding:10px 14px;font-weight:800;cursor:pointer}.symposium-hint{font-size:.76rem;color:#758498;margin:7px 0 0}
+    .symposium-custom-personality{display:grid;gap:7px;margin-top:6px}
+    .symposium-custom-personality input,.symposium-custom-personality textarea{width:100%;box-sizing:border-box;border:1px solid #cbd7e4;border-radius:9px;padding:8px 9px;background:white;color:#17304e;font:inherit}
+    .symposium-custom-personality textarea{min-height:70px;resize:vertical}
+    .symposium-custom-personality button{justify-self:start;border:0;border-radius:9px;background:#0c2340;color:#f2ca60;padding:9px 13px;font-weight:800;cursor:pointer}
+    .symposium-source-pill{display:inline-flex;align-items:center;border-radius:999px;background:#edf4fb;color:#365b81;padding:4px 8px;font-size:.72rem;font-weight:800;margin-top:8px}
+    .symposium-loading{display:inline-flex;gap:5px;align-items:center}.symposium-loading i{width:6px;height:6px;border-radius:50%;background:#8da1b6;animation:sympPulse 1.1s infinite alternate}.symposium-loading i:nth-child(2){animation-delay:.2s}.symposium-loading i:nth-child(3){animation-delay:.4s}@keyframes sympPulse{to{opacity:.25;transform:translateY(-2px)}}
+    .symposium-nav-link{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;background:transparent;color:inherit;font:inherit;cursor:pointer;padding:.55rem .7rem;border-radius:8px}.symposium-nav-link:hover{background:rgba(255,255,255,.08)}
+    @media(max-width:900px){.symposium-layout{grid-template-columns:1fr}.symposium-stage{min-height:620px}.symposium-roster{max-height:260px}.symposium-hero{flex-direction:column}.symposium-user-grid{grid-template-columns:1fr}.symposium-mode-grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:560px){.symposium-page{padding:14px 10px 40px}.symposium-hero{padding:20px}.symposium-mode-grid{grid-template-columns:1fr}.symposium-turn{grid-template-columns:40px minmax(0,1fr)}.symposium-turn.user{grid-template-columns:minmax(0,1fr) 40px}.symposium-avatar{width:36px;height:36px}.symposium-badge{min-width:0;width:100%;box-sizing:border-box}}
+  `;
+  document.head.appendChild(style);
+}
+
+function ensureSymposiumNavigationItem() {
+  ensureSymposiumStyles();
+  if (document.querySelector('[data-action="symposium"]')) return true;
+  const nav = document.querySelector('.site-header nav');
+  if (!nav) return false;
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.action = 'symposium';
+  button.className = 'symposium-nav-link';
+  button.innerHTML = '<span aria-hidden="true">◉</span><span>Symposium</span>';
+  button.title = 'Open Symposium';
+  nav.appendChild(button);
+  return true;
+}
+
+function currentSymposiumReadingContext() {
+  const selection = String(state?.markSelection?.text || '').trim();
+  if (selection) return { label:'Highlighted passage', text:selection.slice(0,9000) };
+  const words = Array.isArray(state?.words) ? state.words : [];
+  if (words.length) {
+    const index = Math.max(0, Number(state.index) || 0);
+    const start = Math.max(0, index - 500);
+    const end = Math.min(words.length, index + 900);
+    return { label:`Current reading · ${state.title || 'Untitled'}`, text:words.slice(start,end).map((item)=>typeof item === 'string' ? item : (item?.text || '')).join(' ').slice(0,12000) };
+  }
+  return { label:'No active reading', text:'' };
+}
+
+function symposiumSelectedPeople(root) {
+  return [...root.querySelectorAll('[data-symposium-person]:checked')]
+    .map((input)=>SYMPOSIUM_PARTICIPANTS.find((person)=>person.id===input.value))
+    .filter(Boolean);
+}
+
+function symposiumCategoryOptions() {
+  return [...new Set(SYMPOSIUM_PARTICIPANTS.map((person)=>person.category || person.field || 'Other'))]
+    .sort((a,b)=>a.localeCompare(b));
+}
+
+function symposiumPersonSearchText(person) {
+  return [
+    person.name,
+    person.field,
+    person.era,
+    person.category,
+    person.lens
+  ].filter(Boolean).join(' ').toLocaleLowerCase();
+}
+
+
+function symposiumTurnHtml({name, monogram='?', field='', text='', kind='participant', sourceLabel=''}) {
+  const safeKind = kind === 'user' ? 'user' : (kind === 'moderator' ? 'moderator' : 'participant');
+  return `<article class="symposium-turn ${safeKind}">
+    <div class="symposium-avatar" aria-hidden="true">${symposiumEscape(monogram)}</div>
+    <div class="symposium-turn-body">
+      <div class="symposium-turn-head"><strong>${symposiumEscape(name)}</strong><span>${symposiumEscape(field)}</span></div>
+      <p>${symposiumEscape(text)}</p>
+      ${sourceLabel ? `<span class="symposium-source-pill">${symposiumEscape(sourceLabel)}</span>` : ''}
+      <div class="symposium-turn-tools"><button type="button" data-symposium-share-turn>💬 Chat</button>${safeKind !== 'user' ? '<button type="button" data-symposium-speak-last>🔊 Speak</button>' : ''}</div>
+    </div>
+  </article>`;
+}
+
+function symposiumSpeak(text, name='Speaker') {
+  if (!('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(String(text || ''));
+  utterance.rate = 0.96;
+  utterance.pitch = 1;
+  const voices = window.speechSynthesis.getVoices?.() || [];
+  const english = voices.find((voice)=>/^en[-_]/i.test(voice.lang || ''));
+  if (english) utterance.voice = english;
+  utterance.datasetSpeaker = name;
+  window.speechSynthesis.speak(utterance);
+}
+
+function symposiumResultText(payload) {
+  const result = payload?.result ?? payload;
+  if (typeof result === 'string') return result.trim();
+  return String(result?.response || result?.answer || result?.explanation || result?.summary || result?.text || payload?.response || payload?.answer || '').trim();
+}
+
+async function symposiumAskAi({person, mode, topic, context, transcript, userContribution=''}) {
+  const modeInstructions = {
+    debate:'This is a cordial roundtable debate. State a clear position, engage the strongest prior argument, distinguish fact from inference, and identify at least one point of agreement.',
+    interview:'This is an interview. Answer the moderator or reader directly in a vivid but intellectually serious way, then offer one useful question the interviewer might ask next.',
+    court:'This is a court-style examination of an idea. Treat claims as propositions to be tested. Identify evidence, assumptions, counterevidence, and the standard by which the claim should be judged. Do not pretend to give legal advice.',
+    explain:'This is a collaborative explanation. Clarify the idea from your discipline, use an illuminating example or analogy, and note where another field might see it differently.'
+  };
+  const prior = transcript.slice(-8).map((turn)=>`${turn.name}: ${turn.text}`).join('\n');
+  const readerDirective = userContribution ? `\n\nIMMEDIATE RESPONSE REQUIREMENT — THIS OVERRIDES THE NORMAL FLOW:\nThe reader has just contributed the following point:\n${userContribution}\n\nYou are the participant Athena selected to answer it. Do NOT merely continue the general discussion. Your response must directly engage this reader contribution before doing anything else. In your opening 1–2 sentences, identify the substance of the reader's point in your own words (without saying only “I agree” or “good point”). Then clearly state whether you agree, disagree, or qualify it, and explain why using argument and evidence appropriate to ${person.name}. If the reader asked a question, answer that question explicitly. If the reader supplied evidence, assess that evidence. If the reader challenged a claim, defend, revise, or concede the challenged claim. Only after this direct engagement may you reconnect the point to the broader Symposium topic. Do not ignore, sidestep, or replace the reader's point with a different issue.` : '';
+  const prompt = `You are participating in Mark, Set, Go!'s Symposium as ${person.name}, representing ${person.field}. Use deep knowledge associated with ${person.name}'s work, historical context, methods, and characteristic intellectual concerns (${person.lens}). GENERAL REASONING AND HISTORICAL KNOWLEDGE RULES:\nYou are not a quotation machine or a narrow caricature. Think, reason, compare, infer, question assumptions, and follow arguments with broad human intelligence. Give especially strong weight to the participant's documented specialties, methods, habits of thought, vocabulary, values, and intellectual context.\n\nHowever, the participant's independent factual knowledge is bounded by what could reasonably have been known during that person's lifetime. Do not give a historical participant knowledge of later discoveries, inventions, events, theories, scientific terminology, people, books, technologies, political developments, or cultural references that arose after the participant's lifetime. Do not silently translate modern knowledge backward and pretend the participant already possessed it.\n\nIf the reader or another participant introduces a later concept that this person could not have known, the participant may notice that the term or idea is unfamiliar, ask what it means, request clarification, or reason conditionally from the explanation supplied in the conversation. Once the later concept has been explained, the participant may analyze it using the participant's own historically appropriate concepts and methods, but must clearly frame that analysis as a response to information newly supplied by the reader or conversation. For example, Thomas Aquinas should not independently know what dark energy is; he might ask what the term means, and after it is explained he could examine the claim through Aristotelian-Thomistic ideas of causation, motion, substance, or natural philosophy.\n\nAvoid anachronistic vocabulary in the participant's own voice unless the reader has introduced the term and using it is necessary for clarity. When possible, restate a modern concept in historically appropriate language rather than making the historical participant sound modern.\n\nFor living people, the knowledge horizon extends only to public information and published ideas available during their lifetime up to the present conversation date. Do not imply access to private thoughts, unpublished/current private opinions, confidential knowledge, or real-time personal views. Do not fabricate quotations. Remain cordial, charitable, concise, and substantive.\n\n${modeInstructions[mode] || modeInstructions.debate}\n\nTOPIC:\n${topic}\n\nREADING CONTEXT:\n${context || 'No reading passage supplied.'}\n\nRECENT TRANSCRIPT:\n${prior || 'No prior turns.'}${readerDirective}\n\nRespond as ${person.name} in about 120-220 words. Use reasons and evidence. Reason beyond the participant's specialty when the topic requires it, but let the participant's specialties and intellectual methods shape the strongest parts of the response. Never exceed the participant's historical knowledge horizon except to analyze information explicitly supplied within this conversation. Do not use stage directions.`;
+
+  // IMPORTANT: /api/mark-selection is selection-centered. When the reader has
+  // just spoken, make the reader's exact contribution the primary selection so
+  // the server/model cannot treat it as optional background behind the book text.
+  const primarySelection = String(userContribution || context || topic || '').trim();
+  const response = await fetch('/api/mark-selection', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      text: primarySelection,
+      selection: primarySelection,
+      startIndex:0,
+      endIndex:Math.max(1, splitWords(primarySelection).length),
+      chapter:userContribution ? 'Symposium · Reader contribution' : 'Symposium',
+      action:'ask',
+      question:prompt
+    })
+  });
+  const payload = await response.json().catch(()=>({}));
+  if (!response.ok) throw new Error(payload.error || payload.detail || `HTTP ${response.status}`);
+  const text = symposiumResultText(payload);
+  if (!text) throw new Error('The AI response was empty.');
+  return text;
+}
+
+function symposiumCloudApi() {
+  const api = window.MarkSetGoCloud?.symposium;
+  if (!api?.list || !api?.load || !api?.create || !api?.update || !api?.addTurn || !api?.remove) {
+    throw new Error('Cloud Symposium storage is not available.');
+  }
+  return api;
+}
+
+function symposiumClientId(prefix = 'symposium') {
+  const uuid = window.crypto?.randomUUID?.();
+  return uuid ? `${prefix}-${uuid}` : `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2,12)}`;
+}
+
+function symposiumDefaultSessionTitle(topic = '') {
+  const clean = String(topic || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return 'Untitled Symposium';
+  return clean.length > 84 ? `${clean.slice(0,81).trimEnd()}…` : clean;
+}
+
+function symposiumParticipantSnapshot(person = {}) {
+  return {
+    id:String(person.id || ''),
+    name:String(person.name || 'Participant'),
+    field:String(person.field || ''),
+    era:String(person.era || ''),
+    monogram:String(person.monogram || ''),
+    category:String(person.category || ''),
+    lens:String(person.lens || ''),
+    custom:Boolean(person.custom)
+  };
+}
+
+function symposiumSavedDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
+}
+
+function symposiumSavedSessionsHtml(sessions = []) {
+  if (!sessions.length) {
+    return '<div class="symposium-saved-empty">No saved Symposiums yet. Start one below and it will autosave to your account.</div>';
+  }
+  return sessions.map((item) => `
+    <article class="symposium-saved-item" data-symposium-saved-id="${symposiumEscape(item.id)}">
+      <div class="symposium-saved-copy">
+        <strong>${symposiumEscape(item.title || 'Untitled Symposium')}</strong>
+        <span>${symposiumEscape(item.topic || 'No topic')}</span>
+        <small>${Number(item.turnCount || 0).toLocaleString()} turns · Updated ${symposiumEscape(symposiumSavedDate(item.updatedAt || item.lastTurnAt || item.createdAt))}</small>
+      </div>
+      <div class="symposium-saved-actions">
+        <button type="button" data-symposium-resume="${symposiumEscape(item.id)}">Resume</button>
+        <button type="button" data-symposium-rename="${symposiumEscape(item.id)}">Rename</button>
+        <button type="button" data-symposium-delete="${symposiumEscape(item.id)}">Delete</button>
+      </div>
+    </article>`).join('');
+}
+
+function createSymposiumCloudController({
+  root,
+  session,
+  transcriptEl,
+  statusEl,
+  nextButton,
+  saveButton,
+  chatButton,
+  readerButton,
+  startButton,
+  rosterEl
+}) {
+  const savedListEl = root.querySelector('#symposium-saved-list');
+  const sessionTitleEl = root.querySelector('#symposium-session-title');
+  let refreshing = false;
+
+  const sourceContext = () => ({
+    documentId:String(state?.documentId || ''),
+    documentTitle:String(state?.title || ''),
+    contextLabel:String(root.querySelector('#symposium-context-label')?.textContent || '')
+  });
+
+  const payload = () => ({
+    clientSessionId: session.clientSessionId || symposiumClientId('symposium'),
+    title: String(sessionTitleEl?.value || session.title || symposiumDefaultSessionTitle(session.topic)).trim(),
+    topic: String(root.querySelector('#symposium-topic')?.value || session.topic || '').trim(),
+    mode: root.querySelector('[name="symposium-mode"]:checked')?.value || session.mode || 'debate',
+    contextText: String(root.querySelector('#symposium-context')?.value ?? session.context ?? ''),
+    contextLabel: String(root.querySelector('#symposium-context-label')?.textContent || ''),
+    outputMode: root.querySelector('#symposium-output')?.value || session.output || 'write',
+    participants: (session.people || []).map(symposiumParticipantSnapshot),
+    sourceContext: session.sourceContext && Object.keys(session.sourceContext).length ? session.sourceContext : sourceContext(),
+    status:'active',
+    nextSpeakerIndex: Math.max(0, Number(session.nextIndex) || 0),
+    startedAt: session.startedAt || new Date().toISOString()
+  });
+
+  const setCloudError = (error) => {
+    session.cloudError = error?.message || String(error || 'Cloud save failed.');
+    if (statusEl) statusEl.textContent = `Cloud save problem · ${session.cloudError}`;
+  };
+
+  const enqueue = (task) => {
+    session.cloudWriteQueue = (session.cloudWriteQueue || Promise.resolve())
+      .catch(()=>{})
+      .then(task)
+      .catch((error) => {
+        setCloudError(error);
+        throw error;
+      });
+    return session.cloudWriteQueue;
+  };
+
+  const refreshSaved = async () => {
+    if (!savedListEl || refreshing) return;
+    refreshing = true;
+    savedListEl.innerHTML = '<div class="symposium-saved-empty">Loading saved Symposiums…</div>';
+    try {
+      const result = await symposiumCloudApi().list(false);
+      savedListEl.innerHTML = symposiumSavedSessionsHtml(Array.isArray(result?.sessions) ? result.sessions : []);
+    } catch (error) {
+      const signedOut = Number(error?.status) === 401;
+      savedListEl.innerHTML = `<div class="symposium-saved-empty">${symposiumEscape(signedOut ? 'Sign in to save and resume Symposiums across sessions and devices.' : (error?.message || 'Saved Symposiums could not be loaded.'))}</div>`;
+    } finally {
+      refreshing = false;
+    }
+  };
+
+  const ensureRosterPerson = (person) => {
+    if (!person?.id) return;
+    if (!SYMPOSIUM_PARTICIPANTS.some((entry) => String(entry.id) === String(person.id))) {
+      SYMPOSIUM_PARTICIPANTS.push(symposiumParticipantSnapshot(person));
+    }
+    if (rosterEl.querySelector(`[data-symposium-person][value="${CSS.escape(String(person.id))}"]`)) return;
+    rosterEl.insertAdjacentHTML('afterbegin', `<label class="symposium-person"
+      data-symposium-category="${symposiumEscape(person.category || 'Saved session')}"
+      data-symposium-search="${symposiumEscape(symposiumPersonSearchText(person))}">
+      <input type="checkbox" data-symposium-person value="${symposiumEscape(person.id)}">
+      <span class="symposium-avatar">${symposiumEscape(person.monogram || '?')}</span>
+      <span><strong>${symposiumEscape(person.name || 'Participant')}</strong><small>${symposiumEscape(person.field || 'Saved participant')} · ${symposiumEscape(person.era || 'Saved session')}</small></span>
+    </label>`);
+  };
+
+  const applyParticipants = (people) => {
+    const participantList = Array.isArray(people) ? people.map(symposiumParticipantSnapshot) : [];
+    participantList.forEach(ensureRosterPerson);
+    const ids = new Set(participantList.map((person) => String(person.id)));
+    rosterEl.querySelectorAll('[data-symposium-person]').forEach((checkbox) => {
+      checkbox.checked = ids.has(String(checkbox.value));
+    });
+    return participantList;
+  };
+
+  const resume = async (sessionId) => {
+    if (!sessionId) return;
+    if (statusEl) statusEl.textContent = 'Loading saved Symposium…';
+    const result = await symposiumCloudApi().load(sessionId);
+    const record = result?.session;
+    if (!record) throw new Error('The saved Symposium could not be found.');
+    const turns = Array.isArray(result?.turns) ? result.turns : [];
+
+    session.cloudId = record.id;
+    session.sourceContext = record.sourceContext && typeof record.sourceContext === 'object' ? record.sourceContext : {};
+    session.clientSessionId = record.clientSessionId || symposiumClientId('symposium');
+    session.title = record.title || 'Untitled Symposium';
+    session.mode = record.mode || 'debate';
+    session.topic = record.topic || '';
+    session.context = record.contextText || '';
+    session.output = record.outputMode || 'write';
+    session.people = applyParticipants(record.participants);
+    session.transcript = turns.map((turn) => ({
+      name:turn.name || 'Speaker', monogram:turn.monogram || '', field:turn.field || '',
+      text:turn.text || '', kind:turn.kind || 'participant', sourceLabel:turn.sourceLabel || '',
+      metadata:turn.metadata || {}, clientTurnId:turn.clientTurnId || ''
+    }));
+    session.nextIndex = Math.max(0, Number(record.nextSpeakerIndex) || 0);
+    session.pendingReaderContribution = '';
+    session.startedAt = record.startedAt || record.createdAt || new Date().toISOString();
+    session.active = Boolean(session.topic && session.people.length && session.transcript.length);
+    session.cloudError = '';
+    session.cloudWriteQueue = Promise.resolve();
+
+    if (sessionTitleEl) sessionTitleEl.value = session.title;
+    const topicEl = root.querySelector('#symposium-topic'); if (topicEl) topicEl.value = session.topic;
+    const contextEl = root.querySelector('#symposium-context'); if (contextEl) contextEl.value = session.context;
+    const contextLabelEl = root.querySelector('#symposium-context-label');
+    if (contextLabelEl) contextLabelEl.textContent = record.contextLabel || (session.context ? `Saved reading context · ${splitWords(session.context).length.toLocaleString()} words available` : 'Topic only · no reading passage supplied');
+    const modeEl = root.querySelector(`[name="symposium-mode"][value="${CSS.escape(session.mode)}"]`); if (modeEl) modeEl.checked = true;
+    const outputEl = root.querySelector('#symposium-output'); if (outputEl) outputEl.value = session.output;
+
+    transcriptEl.innerHTML = session.transcript.length
+      ? session.transcript.map(symposiumTurnHtml).join('')
+      : '<div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>This saved Symposium has no transcript yet.</p></div>';
+    transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    nextButton.disabled = !session.active;
+    readerButton.disabled = !session.active;
+    saveButton.disabled = false;
+    if (chatButton) chatButton.disabled = !session.transcript.length;
+    startButton.textContent = session.transcript.length ? 'Begin New Symposium' : 'Begin Symposium';
+    if (statusEl) statusEl.textContent = session.transcript.length
+      ? `Resumed from cloud · ${session.transcript.length} turns · autosave on`
+      : 'Saved setup loaded · begin when ready';
+  };
+
+  const beginNew = async () => {
+    session.clientSessionId = symposiumClientId('symposium');
+    session.cloudId = '';
+    session.sourceContext = sourceContext();
+    session.cloudError = '';
+    session.cloudWriteQueue = Promise.resolve();
+    if (!session.title) session.title = String(sessionTitleEl?.value || '').trim() || symposiumDefaultSessionTitle(session.topic);
+    if (sessionTitleEl && !sessionTitleEl.value.trim()) sessionTitleEl.value = session.title;
+    const created = await symposiumCloudApi().create(payload());
+    session.cloudId = created?.session?.id || '';
+    if (!session.cloudId) throw new Error('The cloud did not return a Symposium ID.');
+    if (statusEl) statusEl.textContent = 'Cloud autosave on';
+    refreshSaved();
+    return created.session;
+  };
+
+  const persistTurn = (turn) => {
+    if (!session.cloudId || !turn?.text) return Promise.resolve(null);
+    if (!turn.clientTurnId) turn.clientTurnId = symposiumClientId('turn');
+    return enqueue(() => symposiumCloudApi().addTurn(session.cloudId, {
+      clientTurnId: turn.clientTurnId,
+      name: turn.name || 'Speaker',
+      monogram: turn.monogram || '',
+      field: turn.field || '',
+      kind: turn.kind || 'participant',
+      text: turn.text || '',
+      sourceLabel: turn.sourceLabel || '',
+      metadata: turn.metadata || {}
+    }));
+  };
+
+  const queueState = () => {
+    if (!session.cloudId) return Promise.resolve(null);
+    const data = payload();
+    return enqueue(() => symposiumCloudApi().update(session.cloudId, {
+      title:data.title,
+      topic:data.topic,
+      mode:data.mode,
+      contextText:data.contextText,
+      contextLabel:data.contextLabel,
+      outputMode:data.outputMode,
+      participants:data.participants,
+      sourceContext:data.sourceContext,
+      nextSpeakerIndex:data.nextSpeakerIndex,
+      status:'active',
+      touchOpen:true
+    }));
+  };
+
+  const saveNow = async () => {
+    if (!session.transcript.length && !session.topic) return false;
+    if (!session.cloudId) {
+      await beginNew();
+      for (const turn of session.transcript) await persistTurn(turn);
+    }
+    await queueState();
+    await session.cloudWriteQueue;
+    session.cloudError = '';
+    if (statusEl) statusEl.textContent = `Saved to cloud · ${session.transcript.length} turns`;
+    await refreshSaved();
+    return true;
+  };
+
+  root.addEventListener('click', async (event) => {
+    const resumeButton = event.target.closest('[data-symposium-resume]');
+    const renameButton = event.target.closest('[data-symposium-rename]');
+    const deleteButton = event.target.closest('[data-symposium-delete]');
+    const refreshButton = event.target.closest('#symposium-refresh-sessions');
+    if (!resumeButton && !renameButton && !deleteButton && !refreshButton) return;
+
+    try {
+      if (refreshButton) return void refreshSaved();
+      if (resumeButton) return void await resume(resumeButton.dataset.symposiumResume);
+      if (renameButton) {
+        const item = renameButton.closest('[data-symposium-saved-id]');
+        const current = item?.querySelector('.symposium-saved-copy strong')?.textContent?.trim() || '';
+        const title = window.prompt('Rename this Symposium:', current);
+        if (title == null || !title.trim()) return;
+        await symposiumCloudApi().update(renameButton.dataset.symposiumRename, { title:title.trim() });
+        if (session.cloudId === renameButton.dataset.symposiumRename) {
+          session.title = title.trim();
+          if (sessionTitleEl) sessionTitleEl.value = session.title;
+        }
+        await refreshSaved();
+        return;
+      }
+      if (deleteButton) {
+        const item = deleteButton.closest('[data-symposium-saved-id]');
+        const title = item?.querySelector('.symposium-saved-copy strong')?.textContent?.trim() || 'this Symposium';
+        if (!window.confirm(`Delete “${title}” and its transcript?`)) return;
+        await symposiumCloudApi().remove(deleteButton.dataset.symposiumDelete);
+        if (session.cloudId === deleteButton.dataset.symposiumDelete) {
+          session.cloudId = '';
+          session.cloudError = '';
+          if (statusEl) statusEl.textContent = 'Saved Symposium deleted. Current view is now temporary.';
+        }
+        await refreshSaved();
+      }
+    } catch (error) {
+      setCloudError(error);
+    }
+  });
+
+  return { refreshSaved, resume, beginNew, persistTurn, queueState, saveNow };
+}
+
+function renderSymposium() {
+  stopReader();
+  ensureSymposiumStyles();
+  app.dataset.viewKey = 'symposium';
+  const readingContext = currentSymposiumReadingContext();
+  const sharedHandoff = window.MSGContentShare?.takeSymposiumHandoff?.() || null;
+  const sharedContextText = String(sharedHandoff?.symposiumContext || '').trim();
+  const sharedContextLabel = sharedHandoff ? `Shared from ${sharedHandoff.sourceLabel || 'app content'}` : '';
+  const defaultTopic = sharedHandoff?.symposiumTopic || (state?.title ? `Explore the central ideas in ${state.title}` : '');
+  const initialContextText = sharedContextText || readingContext.text;
+  const initialContextLabel = sharedContextText ? sharedContextLabel : readingContext.label;
+  const defaultChecked = new Set(['socrates','aristotle','einstein','lovelace']);
+
+  app.innerHTML = `
+    <section class="symposium-page">
+      <header class="symposium-hero">
+        <div>
+          <span class="symposium-kicker">◉ The Symposium · Prototype</span>
+          <h1>Put great minds around the same table.</h1>
+          <p>Explore what you are reading through friendly debate, interview, explanation, or a court-style examination of a claim. AI participants represent the methods and ideas of historical, modern, contemporary, and user-created thinkers while the moderator keeps the exchange charitable, evidence-based, and on topic.</p>
+        </div>
+        <aside class="symposium-badge"><strong>Reader participates</strong><small>Listen, read, question, challenge, supply evidence, or enter your own argument at any point.</small></aside>
+      </header>
+
+      <section class="symposium-saved-panel" aria-label="Saved Symposiums">
+        <div class="symposium-saved-head"><div><strong>Saved Symposiums</strong><small>Cloud-backed sessions you can reopen and continue later.</small></div><button type="button" id="symposium-refresh-sessions">Refresh</button></div>
+        <div class="symposium-saved-list" id="symposium-saved-list"><div class="symposium-saved-empty">Loading saved Symposiums…</div></div>
+      </section>
+
+      <div class="symposium-layout">
+        <aside class="symposium-panel">
+          <div class="symposium-panel-head"><h2>Set the table</h2><p>Choose a format, topic, context, and participants.</p></div>
+          <div class="symposium-setup">
+            <div>
+              <label>Format</label>
+              <div class="symposium-mode-grid">
+                <label class="symposium-mode"><input type="radio" name="symposium-mode" value="debate" checked><span>Roundtable<small>Cordial debate</small></span></label>
+                <label class="symposium-mode"><input type="radio" name="symposium-mode" value="interview"><span>Interview<small>Question a thinker</small></span></label>
+                <label class="symposium-mode"><input type="radio" name="symposium-mode" value="court"><span>Court<small>Put a claim on trial</small></span></label>
+                <label class="symposium-mode"><input type="radio" name="symposium-mode" value="explain"><span>Explain<small>Teach from many lenses</small></span></label>
+              </div>
+            </div>
+
+            <label>Session name
+              <input id="symposium-session-title" type="text" maxlength="240" placeholder="Optional — generated from the topic">
+            </label>
+
+            <label>Topic or question
+              <textarea id="symposium-topic" placeholder="Example: Is technological progress making us wiser?">${symposiumEscape(defaultTopic)}</textarea>
+            </label>
+
+            <div>
+              <label>Reading context</label>
+              <div class="symposium-context-choice">
+                ${sharedContextText ? '<button type="button" data-symposium-context="shared">Use shared content</button>' : ''}
+                <button type="button" data-symposium-context="reading" ${readingContext.text ? '' : 'disabled'}>Use current reading</button>
+                <button type="button" data-symposium-context="none">Topic only</button>
+              </div>
+              <input id="symposium-context" type="hidden" value="${symposiumEscape(initialContextText)}">
+              <p class="symposium-hint" id="symposium-context-label">${symposiumEscape(initialContextLabel)}${initialContextText ? ` · ${splitWords(initialContextText).length.toLocaleString()} words available` : ''}</p>
+            </div>
+
+            <label>Output
+              <select id="symposium-output"><option value="write">Write</option><option value="both">Speak + write</option><option value="speak">Speak (transcript remains visible)</option></select>
+            </label>
+
+            <button class="symposium-start" type="button" id="symposium-start">Begin Symposium</button>
+
+            <div>
+              <label>Participants <span style="font-weight:500;color:#718095">(choose up to 6 from ${SYMPOSIUM_PARTICIPANTS.length})</span></label>
+              <div class="symposium-roster-tools">
+                <input id="symposium-person-search" type="search" placeholder="Search thinkers, fields, eras, or ideas…" autocomplete="off">
+                <select id="symposium-category-filter" aria-label="Filter Symposium participants by category">
+                  <option value="">All categories</option>
+                  ${symposiumCategoryOptions().map((category)=>`<option value="${symposiumEscape(category)}">${symposiumEscape(category)}</option>`).join('')}
+                </select>
+              </div>
+              <div class="symposium-roster-summary">
+                <span id="symposium-roster-count">${SYMPOSIUM_PARTICIPANTS.length} built-in personalities</span>
+                <span>Custom guests can still be added below</span>
+              </div>
+              <div class="symposium-roster" id="symposium-roster">
+                ${SYMPOSIUM_PARTICIPANTS.map((person)=>`<label class="symposium-person"
+                    data-symposium-category="${symposiumEscape(person.category || person.field || 'Other')}"
+                    data-symposium-search="${symposiumEscape(symposiumPersonSearchText(person))}">
+                  <input type="checkbox" data-symposium-person value="${person.id}" ${defaultChecked.has(person.id)?'checked':''}>
+                  <span class="symposium-avatar">${symposiumEscape(person.monogram)}</span>
+                  <span><strong>${symposiumEscape(person.name)}</strong><small>${symposiumEscape(person.field)} · ${symposiumEscape(person.era)} <span class="symposium-person-category">${symposiumEscape(person.category || 'Other')}</span></small></span>
+                </label>`).join('')}
+              </div>
+            </div>
+
+            <div>
+              <label>Add your own personality</label>
+              <div class="symposium-custom-personality">
+                <input id="symposium-custom-person" placeholder="Name">
+                <input id="symposium-custom-field" placeholder="Field or role (optional)">
+                <textarea id="symposium-custom-lens" placeholder="Perspective or instructions (optional)"></textarea>
+                <button type="button" id="symposium-add-person">Save personality</button>
+              </div>
+              <p class="symposium-hint">Custom personalities are included with any saved Symposium that uses them. The AI represents public/published ideas or the perspective you specify; it does not claim to literally be the real person.</p>
+            </div>
+
+          </div>
+        </aside>
+
+        <main class="symposium-panel symposium-stage">
+          <div class="symposium-stage-toolbar">
+            <span class="symposium-stage-status" id="symposium-stage-status">Ready to convene</span>
+            <div class="symposium-stage-actions"><button type="button" id="symposium-next" disabled>Next speaker</button><button type="button" id="symposium-save" disabled>Save now</button><button type="button" id="symposium-chat" disabled>💬 Send to Chat</button><button type="button" id="symposium-stop-speech">Stop speech</button><button type="button" id="symposium-clear">New session</button></div>
+          </div>
+          <div class="symposium-transcript" id="symposium-transcript" aria-live="polite">
+            <div class="symposium-empty"><span class="symposium-empty-icon">🏛️</span><h2>The room is ready.</h2><p>Choose participants and a question. Athena, the moderator, will frame the issue and invite the first response.</p></div>
+          </div>
+          <div class="symposium-selection-toolbar" id="symposium-selection-toolbar" hidden role="toolbar" aria-label="Selected Symposium text actions">
+            <button type="button" data-symposium-copy-selection>Copy</button>
+            <button type="button" data-symposium-save-selection>Save to Notebook</button>
+            <button type="button" data-symposium-chat-selection>💬 Chat</button>
+          </div>
+          <div class="symposium-participate">
+            <label for="symposium-reader-input">Join the discussion</label>
+            <div class="symposium-user-grid"><select id="symposium-reader-kind"><option value="argument">My argument</option><option value="evidence">Add evidence</option><option value="question">Question</option><option value="challenge">Challenge</option></select><textarea id="symposium-reader-input" placeholder="Add your opinion, reasoning, evidence, or question…"></textarea><button type="button" id="symposium-reader-submit" disabled>Enter</button></div>
+            <p class="symposium-hint">The moderator will invite the panel to address your contribution directly. Historical participants reason freely but cannot independently know discoveries, events, or terminology from after their lifetimes; you can explain a later concept and ask them to analyze it from their own perspective.</p>
+          </div>
+        </main>
+      </div>
+    </section>`;
+
+  const root = app.querySelector('.symposium-page');
+  const transcriptEl = root.querySelector('#symposium-transcript');
+  const selectionToolbar = root.querySelector('#symposium-selection-toolbar');
+  const statusEl = root.querySelector('#symposium-stage-status');
+  const nextButton = root.querySelector('#symposium-next');
+  const saveButton = root.querySelector('#symposium-save');
+  const chatButton = root.querySelector('#symposium-chat');
+  const readerButton = root.querySelector('#symposium-reader-submit');
+  const startButton = root.querySelector('#symposium-start');
+  const rosterEl = root.querySelector('#symposium-roster');
+  const personSearchEl = root.querySelector('#symposium-person-search');
+  const categoryFilterEl = root.querySelector('#symposium-category-filter');
+  const rosterCountEl = root.querySelector('#symposium-roster-count');
+  const session = { active:false, mode:'debate', topic:'', title:'', context:'', output:'write', people:[], transcript:[], nextIndex:0, pendingReaderContribution:'', startedAt:'', cloudId:'', clientSessionId:'', cloudWriteQueue:Promise.resolve(), cloudError:'', sourceContext:{} };
+  const symposiumCloud = createSymposiumCloudController({ root, session, transcriptEl, statusEl, nextButton, saveButton, chatButton, readerButton, startButton, rosterEl });
+  symposiumCloud.refreshSaved();
+
+  let symposiumSelection = null;
+
+  const hideSymposiumSelectionToolbar = ({ clearSelection = false } = {}) => {
+    if (selectionToolbar) selectionToolbar.hidden = true;
+    if (clearSelection) {
+      const selection = window.getSelection?.();
+      if (selection && selection.rangeCount) selection.removeAllRanges();
+    }
+  };
+
+  const selectedSymposiumSpeaker = (range) => {
+    const elementForNode = (node) => (
+      node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement
+    );
+    const startTurn = elementForNode(range.startContainer)?.closest?.('.symposium-turn');
+    const endTurn = elementForNode(range.endContainer)?.closest?.('.symposium-turn');
+    if (!startTurn || startTurn !== endTurn) return 'Multiple speakers';
+    return startTurn.querySelector('.symposium-turn-head strong')?.textContent?.trim() || 'Symposium';
+  };
+
+  const captureSymposiumSelection = () => {
+    const selection = window.getSelection?.();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+      symposiumSelection = null;
+      hideSymposiumSelectionToolbar();
+      return null;
+    }
+
+    const range = selection.getRangeAt(0);
+    const containsNode = (node) => {
+      const element = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+      return Boolean(element && transcriptEl.contains(element));
+    };
+    if (!containsNode(range.startContainer) || !containsNode(range.endContainer)) {
+      symposiumSelection = null;
+      hideSymposiumSelectionToolbar();
+      return null;
+    }
+
+    const text = selection.toString().replace(/\s+/g, ' ').trim();
+    if (!text) {
+      symposiumSelection = null;
+      hideSymposiumSelectionToolbar();
+      return null;
+    }
+
+    const topic = String(session.topic || root.querySelector('#symposium-topic')?.value || 'Symposium discussion').trim();
+    symposiumSelection = {
+      text,
+      speaker: selectedSymposiumSpeaker(range),
+      topic,
+      rect: range.getBoundingClientRect()
+    };
+    return symposiumSelection;
+  };
+
+  const positionSymposiumSelectionToolbar = (rect) => {
+    if (!selectionToolbar || !rect) return;
+    selectionToolbar.hidden = false;
+    const width = selectionToolbar.offsetWidth || 230;
+    const height = selectionToolbar.offsetHeight || 42;
+    const left = Math.max(8, Math.min(window.innerWidth - width - 8, rect.left + rect.width / 2 - width / 2));
+    let top = rect.bottom + 8;
+    if (top + height > window.innerHeight - 8) top = Math.max(8, rect.top - height - 8);
+    selectionToolbar.style.left = `${left}px`;
+    selectionToolbar.style.top = `${top}px`;
+  };
+
+  const showSymposiumSelectionToolbar = () => {
+    const selected = captureSymposiumSelection();
+    if (!selected) return;
+    positionSymposiumSelectionToolbar(selected.rect);
+  };
+
+  const copySymposiumSelection = async () => {
+    const text = String(symposiumSelection?.text || '').trim();
+    if (!text) return false;
+
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {}
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    let copied = false;
+    try { copied = document.execCommand('copy'); } catch {}
+    textarea.remove();
+    return copied;
+  };
+
+  const saveSymposiumSelectionToNotebook = () => {
+    const selected = symposiumSelection;
+    if (!selected?.text) return { ok:false, error:'Select Symposium text first.' };
+
+    return saveMarkInsight({
+      recordType:'symposium-excerpt',
+      selection:selected.text,
+      documentId:state.documentId || `symposium-${session.startedAt || Date.now()}`,
+      title:`Symposium · ${selected.topic || 'Discussion'}`,
+      chapter:selected.speaker && selected.speaker !== 'Multiple speakers'
+        ? `${selected.speaker} · Symposium`
+        : 'Symposium transcript',
+      pageContext:'Symposium',
+      symposiumTopic:selected.topic || '',
+      symposiumSpeaker:selected.speaker || ''
+    });
+  };
+
+  // Prevent toolbar clicks from collapsing the browser selection before the
+  // action can use it.
+  selectionToolbar?.addEventListener('pointerdown', (event) => event.preventDefault());
+
+  selectionToolbar?.querySelector('[data-symposium-copy-selection]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget;
+    const copied = await copySymposiumSelection();
+    const original = 'Copy';
+    button.textContent = copied ? 'Copied' : 'Copy failed';
+    if (copied) statusEl.textContent = 'Selected Symposium text copied.';
+    window.setTimeout(() => { if (button.isConnected) button.textContent = original; }, 1400);
+  });
+
+  selectionToolbar?.querySelector('[data-symposium-save-selection]')?.addEventListener('click', (event) => {
+    const button = event.currentTarget;
+    const saved = saveSymposiumSelectionToNotebook();
+    if (saved?.ok) {
+      button.textContent = 'Saved';
+      statusEl.textContent = 'Selected Symposium text saved to Notebook.';
+      window.setTimeout(() => { if (button.isConnected) button.textContent = 'Save to Notebook'; }, 1600);
+    } else {
+      button.textContent = 'Save failed';
+      statusEl.textContent = saved?.error || 'The selected text could not be saved.';
+      window.setTimeout(() => { if (button.isConnected) button.textContent = 'Save to Notebook'; }, 1800);
+    }
+  });
+
+  selectionToolbar?.querySelector('[data-symposium-chat-selection]')?.addEventListener('click', () => {
+    const selected = symposiumSelection;
+    if (!selected?.text) return;
+    window.MSGContentShare?.toChat?.({
+      type:'symposium-excerpt',
+      title:`Symposium · ${selected.topic || session.topic || 'Discussion'}`,
+      text:selected.text,
+      sourceLabel:selected.speaker || 'Symposium',
+      chapter:selected.speaker || '',
+      metadata:{ topic:selected.topic || session.topic || '' }
+    });
+  });
+
+  transcriptEl.addEventListener('pointerup', () => {
+    window.setTimeout(showSymposiumSelectionToolbar, 0);
+  });
+  transcriptEl.addEventListener('keyup', () => {
+    window.setTimeout(showSymposiumSelectionToolbar, 0);
+  });
+  transcriptEl.addEventListener('scroll', () => hideSymposiumSelectionToolbar());
+
+  root.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('#symposium-selection-toolbar')) return;
+    if (event.target.closest('#symposium-transcript')) return;
+    hideSymposiumSelectionToolbar();
+  });
+
+  const filterSymposiumRoster = () => {
+    const query = String(personSearchEl?.value || '').trim().toLocaleLowerCase();
+    const category = String(categoryFilterEl?.value || '').trim();
+    let visible = 0;
+
+    rosterEl?.querySelectorAll('.symposium-person').forEach((row) => {
+      const matchesQuery = !query || String(row.dataset.symposiumSearch || '').includes(query);
+      const matchesCategory = !category || row.dataset.symposiumCategory === category;
+      const show = matchesQuery && matchesCategory;
+      row.hidden = !show;
+      if (show) visible += 1;
+    });
+
+    if (rosterCountEl) {
+      rosterCountEl.textContent = query || category
+        ? `${visible} of ${SYMPOSIUM_PARTICIPANTS.length} personalities shown`
+        : `${SYMPOSIUM_PARTICIPANTS.length} built-in personalities`;
+    }
+  };
+
+  personSearchEl?.addEventListener('input', filterSymposiumRoster);
+  categoryFilterEl?.addEventListener('change', filterSymposiumRoster);
+
+  const scrollTranscript = () => { transcriptEl.scrollTop = transcriptEl.scrollHeight; };
+  const shouldSpeak = () => session.output === 'both' || session.output === 'speak';
+  const appendTurn = (turn, speak=false) => {
+    if (transcriptEl.querySelector('.symposium-empty')) transcriptEl.innerHTML = '';
+    session.transcript.push(turn);
+    transcriptEl.insertAdjacentHTML('beforeend', symposiumTurnHtml(turn));
+    symposiumCloud.persistTurn(turn).catch(()=>{});
+    const liveSelection = window.getSelection?.();
+    const hasTranscriptSelection = Boolean(
+      liveSelection && !liveSelection.isCollapsed && liveSelection.rangeCount
+      && transcriptEl.contains(
+        liveSelection.getRangeAt(0).commonAncestorContainer.nodeType === Node.ELEMENT_NODE
+          ? liveSelection.getRangeAt(0).commonAncestorContainer
+          : liveSelection.getRangeAt(0).commonAncestorContainer.parentElement
+      )
+    );
+    if (!hasTranscriptSelection) scrollTranscript();
+    if (speak && shouldSpeak()) symposiumSpeak(turn.text, turn.name);
+  };
+  const setBusy = (busy, label='') => {
+    startButton.disabled = busy;
+    nextButton.disabled = busy || !session.active;
+    readerButton.disabled = busy || !session.active;
+    if (label) statusEl.innerHTML = busy ? `${symposiumEscape(label)} <span class="symposium-loading"><i></i><i></i><i></i></span>` : symposiumEscape(label);
+  };
+
+  root.querySelectorAll('[data-symposium-context]').forEach((button)=>button.addEventListener('click',()=>{
+    if (button.dataset.symposiumContext === 'shared' && sharedContextText) {
+      root.querySelector('#symposium-context').value = sharedContextText;
+      root.querySelector('#symposium-context-label').textContent = `${sharedContextLabel} · ${splitWords(sharedContextText).length.toLocaleString()} words available`;
+    } else if (button.dataset.symposiumContext === 'reading') {
+      root.querySelector('#symposium-context').value = readingContext.text;
+      root.querySelector('#symposium-context-label').textContent = `${readingContext.label} · ${splitWords(readingContext.text).length.toLocaleString()} words available`;
+    } else {
+      root.querySelector('#symposium-context').value = '';
+      root.querySelector('#symposium-context-label').textContent = 'Topic only · no reading passage supplied';
+    }
+  }));
+
+  rosterEl.addEventListener('change', (event)=>{
+    if (!event.target.matches('[data-symposium-person]')) return;
+    const checked = symposiumSelectedPeople(root);
+    if (checked.length > 6) {
+      event.target.checked = false;
+      window.alert('Choose up to six participants for a readable discussion. You can swap speakers between sessions.');
+    }
+  });
+
+  root.querySelector('#symposium-add-person').addEventListener('click',()=>{
+    const input = root.querySelector('#symposium-custom-person');
+    const fieldInput = root.querySelector('#symposium-custom-field');
+    const lensInput = root.querySelector('#symposium-custom-lens');
+
+    const name = input.value.trim();
+    if (!name) {
+      input.focus();
+      return;
+    }
+
+    const field = String(fieldInput?.value || '').trim() || 'Guest thinker';
+    const customLens = String(lensInput?.value || '').trim();
+    const id = `custom-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const monogram = name.split(/\s+/).slice(0,2).map((part)=>part[0]?.toUpperCase() || '').join('');
+
+    const person = {
+      id,
+      name,
+      field,
+      era:'Custom',
+      monogram:monogram || '?',
+      category:'My personalities',
+      lens:customLens || `the published work, arguments, methods, and intellectual context of ${name}`,
+      custom:true
+    };
+
+    SYMPOSIUM_PARTICIPANTS.push(person);
+    saveSymposiumCustomPeople();
+
+    rosterEl.insertAdjacentHTML('afterbegin', `<label class="symposium-person"
+      data-symposium-category="My personalities"
+      data-symposium-search="${symposiumEscape(symposiumPersonSearchText(person))}">
+      <input type="checkbox" data-symposium-person value="${symposiumEscape(id)}" checked>
+      <span class="symposium-avatar">${symposiumEscape(person.monogram)}</span>
+      <span><strong>${symposiumEscape(name)}</strong><small>${symposiumEscape(field)} · Custom <span class="symposium-person-category">My personalities</span></small></span>
+    </label>`);
+
+    input.value = '';
+    if (fieldInput) fieldInput.value = '';
+    if (lensInput) lensInput.value = '';
+    if (personSearchEl) personSearchEl.value = '';
+    if (categoryFilterEl) categoryFilterEl.value = '';
+    filterSymposiumRoster();
+
+    const checked = symposiumSelectedPeople(root);
+    if (checked.length > 6) {
+      const newCheckbox = rosterEl.querySelector(`[data-symposium-person][value="${CSS.escape(id)}"]`);
+      if (newCheckbox) newCheckbox.checked = false;
+      window.alert('Personality saved. Six speakers are already selected, so it was added to your roster without being selected.');
+    }
+  });
+
+  async function moderatorOpening() {
+    const names = session.people.map((person)=>person.name).join(', ');
+    const modeName = {debate:'roundtable debate', interview:'interview', court:'court-style examination', explain:'collaborative explanation'}[session.mode];
+    return `Welcome. Our subject is “${session.topic}.” We will conduct this as a ${modeName}. Joining us are ${names}. I ask each participant to interpret opposing views charitably, separate evidence from assumption, avoid invented quotations, and respond to the strongest version of an argument. Reader, you may enter your own argument, evidence, question, or challenge at any time.`;
+  }
+
+  async function runSpeaker(person, userContribution='') {
+    setBusy(true, `${person.name} is considering the question`);
+    try {
+      const text = await symposiumAskAi({ person, mode:session.mode, topic:session.topic, context:session.context, transcript:session.transcript, userContribution });
+      appendTurn({ name:person.name, monogram:person.monogram, field:person.field, text, kind:'participant', sourceLabel:`AI representation · ${person.field}` }, true);
+      statusEl.textContent = `${person.name} has finished · ${session.transcript.length} turns`;
+    } catch (error) {
+      appendTurn({ name:person.name, monogram:person.monogram, field:person.field, text:`I could not join this turn because the AI request failed: ${error.message}`, kind:'participant' }, false);
+      statusEl.textContent = 'A speaker request failed';
+    } finally { setBusy(false); }
+  }
+
+  startButton.addEventListener('click', async ()=>{
+    const topic = root.querySelector('#symposium-topic').value.trim();
+    const people = symposiumSelectedPeople(root);
+    if (!topic) { root.querySelector('#symposium-topic').focus(); return window.alert('Enter a topic or question for the Symposium.'); }
+    if (!people.length) return window.alert('Choose at least one participant.');
+    session.active = true;
+    startButton.disabled = true;
+    session.startedAt = new Date().toISOString();
+    hideSymposiumSelectionToolbar({ clearSelection:true });
+    session.mode = root.querySelector('[name="symposium-mode"]:checked')?.value || 'debate';
+    session.topic = topic;
+    session.title = root.querySelector('#symposium-session-title')?.value.trim() || symposiumDefaultSessionTitle(topic);
+    session.context = root.querySelector('#symposium-context').value || '';
+    session.output = root.querySelector('#symposium-output').value || 'write';
+    session.people = people;
+    try {
+      await symposiumCloud.beginNew();
+    } catch (error) {
+      const proceed = window.confirm(`This Symposium cannot be saved to the cloud right now: ${error.message}
+
+Start a temporary session anyway?`);
+      if (!proceed) { session.active = false; startButton.disabled = false; return; }
+      statusEl.textContent = 'Temporary session · cloud save unavailable';
+    }
+    session.transcript = [];
+    session.nextIndex = 0;
+    session.pendingReaderContribution = '';
+    transcriptEl.innerHTML = '';
+    appendTurn({ name:'Athena', monogram:'A', field:'Moderator', text:await moderatorOpening(), kind:'moderator', sourceLabel:'Moderator · decorum & evidence' }, true);
+    nextButton.disabled = false; saveButton.disabled = false; if (chatButton) chatButton.disabled = false; readerButton.disabled = false;
+    await runSpeaker(session.people[0]);
+    session.nextIndex = session.people.length > 1 ? 1 : 0;
+    symposiumCloud.queueState().catch(()=>{});
+  });
+
+  nextButton.addEventListener('click', async ()=>{
+    if (!session.active || !session.people.length) return;
+    const person = session.people[session.nextIndex % session.people.length];
+    session.nextIndex = (session.nextIndex + 1) % session.people.length;
+    const pending = session.pendingReaderContribution;
+    session.pendingReaderContribution = '';
+    await runSpeaker(person, pending);
+    symposiumCloud.queueState().catch(()=>{});
+  });
+
+  readerButton.addEventListener('click', async ()=>{
+    const input = root.querySelector('#symposium-reader-input');
+    const text = input.value.trim();
+    if (!text || !session.active) return;
+    const kind = root.querySelector('#symposium-reader-kind').value;
+    const labels = { argument:'Reader argument', evidence:'Reader evidence', question:'Reader question', challenge:'Reader challenge' };
+    appendTurn({ name:'You', monogram:'You', field:labels[kind] || 'Reader', text, kind:'user' }, false);
+    input.value = '';
+    const readerContribution = `${labels[kind]}: ${text}`;
+    session.pendingReaderContribution = readerContribution;
+    appendTurn({ name:'Athena', monogram:'A', field:'Moderator', text:`Thank you. The next participant will respond to your ${kind} before continuing the broader discussion: first restating the substance of your point, then saying where they agree, disagree, or qualify it, and why.`, kind:'moderator' }, shouldSpeak());
+    const person = session.people[session.nextIndex % session.people.length];
+    session.nextIndex = (session.nextIndex + 1) % session.people.length;
+    session.pendingReaderContribution = '';
+    await runSpeaker(person, readerContribution);
+    symposiumCloud.queueState().catch(()=>{});
+  });
+
+  root.querySelector('#symposium-reader-input').addEventListener('keydown',(event)=>{
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') readerButton.click();
+  });
+
+  transcriptEl.addEventListener('click',(event)=>{
+    const shareButton = event.target.closest('[data-symposium-share-turn]');
+    if (shareButton) {
+      const body = shareButton.closest('.symposium-turn-body');
+      const name = body?.querySelector('.symposium-turn-head strong')?.textContent?.trim() || 'Symposium';
+      const field = body?.querySelector('.symposium-turn-head span')?.textContent?.trim() || '';
+      const text = body?.querySelector('p')?.textContent?.trim() || '';
+      window.MSGContentShare?.toChat?.({ type:'symposium-turn', title:`${name} · ${session.topic || 'Symposium'}`, text, sourceLabel:'Symposium', chapter:field, metadata:{ topic:session.topic || '' } });
+      return;
+    }
+    const button = event.target.closest('[data-symposium-speak-last]');
+    if (!button) return;
+    const body = button.closest('.symposium-turn-body');
+    symposiumSpeak(body?.querySelector('p')?.textContent || '', body?.querySelector('strong')?.textContent || 'Speaker');
+  });
+
+  chatButton?.addEventListener('click',()=>{
+    if (!session.transcript.length) return;
+    const text = session.transcript.map((turn)=>`${turn.name}${turn.field ? ` (${turn.field})` : ''}: ${turn.text}`).join('\n\n');
+    window.MSGContentShare?.toChat?.({
+      type:'symposium-transcript',
+      title:`Symposium · ${session.topic || 'Discussion'}`,
+      text,
+      sourceLabel:'Symposium',
+      metadata:{ mode:session.mode, participants:session.people.map((person)=>person.name).join(', ') }
+    });
+  });
+
+  root.querySelector('#symposium-stop-speech').addEventListener('click',()=>window.speechSynthesis?.cancel?.());
+  root.querySelector('#symposium-clear').addEventListener('click',()=>{ window.speechSynthesis?.cancel?.(); renderSymposium(); });
+  saveButton.addEventListener('click', async ()=>{
+    if (!session.transcript.length) return;
+    const original = saveButton.textContent;
+    saveButton.disabled = true;
+    saveButton.textContent = 'Saving…';
+    try {
+      await symposiumCloud.saveNow();
+      saveButton.textContent = 'Saved ✓';
+    } catch (error) {
+      saveButton.textContent = 'Save failed';
+      statusEl.textContent = `Cloud save problem · ${error.message}`;
+    } finally {
+      window.setTimeout(() => { if (saveButton.isConnected) { saveButton.textContent = original; saveButton.disabled = !session.active; } }, 1300);
+    }
+  });
+}
+
+function installSymposiumPrototype() {
+  if (ensureSymposiumNavigationItem()) return;
+  let attempts = 0;
+  const timer = window.setInterval(()=>{
+    attempts += 1;
+    if (ensureSymposiumNavigationItem() || attempts > 30) window.clearInterval(timer);
+  }, 250);
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', installSymposiumPrototype, { once:true });
+else installSymposiumPrototype();
+
+
 document.addEventListener('click', (event) => {
   const test = event.target.closest('[data-test]');
   const read = event.target.closest('[data-read]');
@@ -18516,6 +27158,7 @@ document.addEventListener('click', (event) => {
   if (actionName === 'browse') renderBrowseHub();
   if (actionName === 'drm-free-books') renderDrmFreeBookFinder();
   if (actionName === 'my-links') renderMyLinks();
+  if (actionName === 'symposium') renderSymposium();
   if (actionName === 'my-library') renderMyLibraryHub();
   if (actionName === 'profile-preferences') renderProfilePreferences();
   if (actionName === 'ai-center') renderAiCenter();
@@ -18541,6 +27184,139 @@ document.addEventListener('click', (event) => {
   restoreViewPosition(targetView);
 });
 
+
+
+// v7.35.1 — standalone page close is based on the actual runtime context, not
+// the user's workspace/profile preference. Framed pages use the outer workspace
+// chrome. A true top-level non-Reader page gets one Reader-style ×.
+const standalonePageClose = document.querySelector('#msg-standalone-page-close');
+standalonePageClose?.addEventListener('click', (event) => {
+  if (window.parent !== window) return;
+
+  // The actual Home DOM is authoritative. A stale viewKey must never turn the
+  // front-page close into "return to Reader".
+  if (app.querySelector('.home-simple')) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    app.replaceChildren();
+    app.dataset.viewKey = 'closed';
+    return;
+  }
+
+  const viewKey = String(app.dataset.viewKey || '');
+  if (viewKey === 'home' || viewKey === 'reader' || viewKey === 'reader-secondary') return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  ReaderContinuity.saveBeforeNavigation();
+  closeMenus();
+
+  if (activeReaderSnapshot?.title && activeReaderSnapshot?.currentText) {
+    renderCurrentReader();
+    app.dataset.viewKey = 'reader';
+    return;
+  }
+
+  // No live Reader to return to: closing is dismissal, not navigation into an
+  // empty Reader. Leave the selected experience background visible.
+  stopReader();
+  app.replaceChildren();
+  app.dataset.viewKey = 'closed';
+}, true);
+
+// v7.35.2 — PAGE-LOCAL CLOSE OWNER
+// The original #msg-standalone-page-close remains the canonical close action,
+// but it is no longer the visible control. A compact Reader-style proxy is
+// mounted inside the active page itself so the X always belongs to the page
+// rather than floating against the browser viewport.
+function standalonePageOwnsClose() {
+  if (window.parent !== window) return false;
+  if (app.querySelector('.home-simple')) return false;
+  const viewKey = String(app.dataset.viewKey || '').trim();
+  if (!viewKey || ['home','reader','reader-secondary','closed'].includes(viewKey)) return false;
+  return Boolean(app.firstElementChild);
+}
+
+function pageCloseOwner() {
+  if (!standalonePageOwnsClose()) return null;
+
+  // Prefer the actual outer page card/wrapper. These are all direct children of
+  // #app in the main document. The generic fallback keeps newer pages covered
+  // automatically without adding page-specific close code.
+  return (
+    app.querySelector(':scope > .beta-admin-page') ||
+    app.querySelector(':scope > .platform-page') ||
+    app.querySelector(':scope > .panel') ||
+    app.querySelector(':scope > section') ||
+    app.querySelector(':scope > article') ||
+    app.firstElementChild
+  );
+}
+
+function installPageLocalClose() {
+  // Remove only our proxy. Any component-level X (Reader, modal, Ask Mark,
+  // Media, Desktop windows) remains completely independent.
+  app.querySelectorAll('[data-msg-page-local-close]').forEach((node) => node.remove());
+  app.querySelectorAll('.msg-page-close-owner').forEach((node) => node.classList.remove('msg-page-close-owner'));
+
+  if (!standalonePageClose || !standalonePageOwnsClose()) return false;
+
+  const owner = pageCloseOwner();
+  if (!owner) return false;
+
+  owner.classList.add('msg-page-close-owner');
+
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'msg-page-local-close';
+  button.dataset.msgPageLocalClose = '1';
+  button.setAttribute('aria-label', 'Close page');
+  button.title = 'Close';
+  button.textContent = '×';
+
+  button.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (app.querySelector('.home-simple')) {
+      event.stopImmediatePropagation();
+      app.replaceChildren();
+      app.dataset.viewKey = 'closed';
+      return;
+    }
+
+    // Proxy to the existing close action for ordinary standalone pages.
+    standalonePageClose.click();
+  });
+
+  owner.appendChild(button);
+  return true;
+}
+
+function schedulePageLocalClose() {
+  // SPA page rendering is synchronous in most paths, but several feature pages
+  // finish on a later task. Bounded retries cover those cases without observers
+  // or background polling.
+  [0, 50, 140, 320].forEach((delay) => {
+    window.setTimeout(installPageLocalClose, delay);
+  });
+}
+
+// Any app navigation can swap #app.innerHTML. Re-check after interaction rather
+// than observing the DOM continuously.
+document.addEventListener('click', (event) => {
+  if (event.target instanceof Element && event.target.closest('[data-msg-page-local-close]')) return;
+  schedulePageLocalClose();
+}, true);
+
+document.addEventListener('marksetgo:document-available', schedulePageLocalClose);
+document.addEventListener('marksetgo:auth-changed', schedulePageLocalClose);
+document.addEventListener('marksetgo:cloud-content-restored', schedulePageLocalClose);
+window.addEventListener('pageshow', schedulePageLocalClose);
+window.addEventListener('popstate', schedulePageLocalClose);
+window.addEventListener('hashchange', schedulePageLocalClose);
+
+schedulePageLocalClose();
 
 document.addEventListener('change', (event) => {
   const control = event.target.closest?.(ReaderContinuity.protectedControlSelector);
@@ -18568,7 +27344,7 @@ document.addEventListener('change', (event) => {
       && state.virtualized
       && (anchorIndex < state.renderedWordStart || anchorIndex >= state.renderedWordEnd)
     ) {
-      virtualRenderer.renderWindowAround(reader, mode, groupSize, anchorIndex);
+      virtualRenderer.renderWindowAround(reader, readerRenderMode(mode), groupSize, anchorIndex);
     }
 
     restoreReadingAnchor(reader, mode, groupSize, anchorIndex);
@@ -18719,10 +27495,27 @@ window.setInterval(checkActionNotifications, 30000);
 window.setTimeout(checkActionNotifications, 1500);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkActionNotifications(); });
 
-// v5.16: startup stays lightweight. The last book is restored only after an explicit Resume action.
-renderHome();
+// v7.31: Reader 2 boots the exact same Reader runtime as Reader 1. Only the
+// surrounding site chrome is suppressed by the secondary-reader document mode.
+if (isSecondaryReaderWorkspace()) {
+  document.documentElement.classList.add('msg-secondary-reader-document');
+  app.classList.add('msg-secondary-reader-app');
+  app.dataset.viewKey = 'reader-secondary';
+  renderEmptyReader();
+} else if (/read-anything-capture=/.test(String(window.location.hash || ''))) {
+  // A Read with Mark capture is about to be opened by read-anything.js. Do not
+  // paint Home first; that brief Home -> Reader swap was the visible import flash.
+  app.dataset.viewKey = 'capture-loading';
+  app.replaceChildren();
+} else {
+  // Normal startup stays lightweight. The last book is restored only after an explicit Resume action.
+  renderHome();
+}
 
 // Keep top navigation popovers over the page rather than in document flow.
+// The top-level menu summaries are controlled explicitly instead of relying on
+// browser-native <details> timing. This prevents Reader/global click handlers
+// from causing a menu to open and immediately close.
 (function initializeOverlayNavigation() {
   const header = document.querySelector('.site-header');
   const topMenus = Array.from(document.querySelectorAll('.site-header nav > details'));
@@ -18731,23 +27524,47 @@ renderHome();
   const updateMenuTop = () => {
     document.documentElement.style.setProperty('--mobile-menu-top', `${Math.ceil(header.getBoundingClientRect().bottom + 4)}px`);
   };
+
+  const closeOthers = (except = null) => {
+    topMenus.forEach((menu) => {
+      if (menu !== except) menu.removeAttribute('open');
+    });
+  };
+
   updateMenuTop();
   window.addEventListener('resize', updateMenuTop, { passive: true });
 
   topMenus.forEach((menu) => {
+    const summary = menu.querySelector(':scope > summary');
+
+    if (summary) {
+      summary.addEventListener('click', (event) => {
+        // Own the toggle so no other delegated click handler can reverse it.
+        event.preventDefault();
+        event.stopPropagation();
+
+        const shouldOpen = !menu.hasAttribute('open');
+        closeOthers(menu);
+
+        if (shouldOpen) {
+          menu.setAttribute('open', '');
+          updateMenuTop();
+        } else {
+          menu.removeAttribute('open');
+        }
+      });
+    }
+
     menu.addEventListener('toggle', () => {
       if (!menu.open) return;
       updateMenuTop();
-      topMenus.forEach((other) => {
-        if (other !== menu) other.removeAttribute('open');
-      });
+      closeOthers(menu);
     });
   });
 
+  // Close only when the pointer is genuinely outside the entire top navigation.
   document.addEventListener('pointerdown', (event) => {
-    if (!event.target.closest('.site-header nav')) {
-      topMenus.forEach((menu) => menu.removeAttribute('open'));
-    }
+    if (!event.target.closest('.site-header nav')) closeOthers();
   });
 })();
 
@@ -18756,3 +27573,29 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') ReaderContinuity.scheduleCheckpoint({ immediate: true });
 });
 
+
+
+// manual-pace-mode-change-hook
+document.addEventListener('change', (event) => {
+  const control = event.target;
+  if (!control?.matches?.('#mode, #reader-mode, [data-setting="mode"], [name="mode"], [data-reader-mode]')) return;
+  const mode = String(control.value || '').toLowerCase();
+  if (mode === 'manual') {
+    state.mode = 'manual';
+    setManualPaceMode(true);
+  } else {
+    setManualPaceMode(false);
+  }
+  app.querySelectorAll('[data-manual-pace-status]').forEach((el) => {
+    el.hidden = mode !== 'manual';
+  });
+});
+
+
+document.addEventListener('input', (event) => {
+  if (!state.manualPaceEnabled) return;
+  const control = event.target;
+  if (!control?.matches?.('#wpm, #wpm-input, #speed, #speed-input, #fs-wpm, [data-reader-wpm]')) return;
+  const session = ensureManualPaceSession();
+  if (session.direction) scheduleManualPaceMotion();
+});

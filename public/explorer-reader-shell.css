@@ -482,124 +482,103 @@ html[data-msg-experience-theme="explorer"]
   display: none !important;
 }
 
-
-/* MSG TOPIC FEED GEOMETRY CORRECTION
-   Matched to the external-header topic-feeds.js baseline.
-   The header starts at the Reader's physical top edge. While scrolling, its
-   surface uses the Reader's actual computed page color, so text is occluded
-   without creating a differently colored cream/yellow band. */
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external {
-  background: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-}
-
+/* v1.0.8 — OPAQUE FIRST-PAGE HEADER BAND WHILE SCROLLING
+   Once the topic article scrolls, the compact external header becomes a solid
+   white band exactly as wide as the first-page header. The lower white shadow
+   provides a small buffer so article text disappears cleanly underneath. */
 html[data-msg-experience-theme="explorer"]
 #reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
   z-index: 20 !important;
-  background: var(--topic-feed-reader-page-color, #ffffff) !important;
+  background: var(--msg-vd-reader-page-color, #ffffff) !important;
+  background-image: none !important;
+  box-shadow: 0 7px 0 var(--msg-vd-reader-page-color, #ffffff) !important;
+}
+
+
+/* v1.0.9 — TOPIC ARTICLE INFORMATION IN NORMAL FLOW
+   The Topic Feed title/source/share/actions live above #reader as ordinary
+   document content. There is no overlay, sticky white band, or occlusion layer. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external,
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
+  position: relative !important;
+  inset: auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  z-index: auto !important;
+  display: block !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 0 10px !important;
+  padding: 0 !important;
+  background: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
+  overflow: visible !important;
+}
+
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external::before,
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external::after {
+  content: none !important;
+  display: none !important;
 }
 
 html[data-msg-experience-theme="explorer"]
 #reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
+> .topic-feed-story-meta-overlay,
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external
 > .topic-feed-story-meta-overlay {
-  display: none !important;
+  display: block !important;
+  position: relative !important;
+  inset: auto !important;
+  width: 100% !important;
+  max-width: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
-/* The header itself owns occlusion. Do not paint a second full-width strip
-   behind Summarize / Analyze / Comprehension. */
+html[data-msg-experience-theme="explorer"]
+#reader-frame > .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  position: relative !important;
+  inset: auto !important;
+  z-index: auto !important;
+  isolation: auto !important;
+  display: flex !important;
+  width: 100% !important;
+  max-width: none !important;
+  min-width: 0 !important;
+  flex-wrap: wrap !important;
+  margin: 3px 0 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
 html[data-msg-experience-theme="explorer"]
 #reader-frame > .topic-feed-story-header-external
 > #read-anything-article-summary-action::before {
   content: none !important;
   display: none !important;
-  background: transparent !important;
-  box-shadow: none !important;
 }
 
-/* Action labels remain visually native to the Reader page. */
+/* Old Reader compensation element is obsolete; keep it harmless if stale DOM
+   from a previous render survives briefly during navigation. */
 html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external
-> #read-anything-article-summary-action {
-  background: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-}
-
+#reader > .topic-feed-story-header-spacer,
 html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external
-> #read-anything-article-summary-action
-:is(.read-anything-inline-article-summary, span[aria-hidden="true"]) {
-  background: transparent !important;
-  box-shadow: none !important;
-}
-
-
-/* ============================================================
-   MSG HARD INVARIANT — TOPIC FEED BAND = CENTER OF THE UNIVERSE
-   The band NEVER changes on scroll, theme, Reader mode, or app state.
-   Any article occlusion is owned by .topic-feed-story-content-mask.
-   ============================================================ */
-
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external,
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled {
-  position: absolute !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  transform: none !important;
-}
-
-/* Source/date/View original/share NEVER disappears. */
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external > .topic-feed-story-meta-overlay,
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external.topic-feed-story-header-scrolled
-> .topic-feed-story-meta-overlay {
-  display: block !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-  transform: none !important;
-}
-
-/* Action row is visually transparent. Kill every legacy yellow/cream backing. */
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action,
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before,
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::after,
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action
-:is(.read-anything-inline-article-summary, span[aria-hidden="true"]) {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-  border: 0 !important;
-}
-
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::before,
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-header-external > #read-anything-article-summary-action::after {
-  content: none !important;
+#reader > [data-topic-feed-story-header-spacer] {
   display: none !important;
-}
-
-/* Separate non-interactive content mask. This may adapt; the band may not. */
-html[data-msg-experience-theme="explorer"]
-#reader-frame > .topic-feed-story-content-mask {
-  position: absolute !important;
-  pointer-events: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
