@@ -84,8 +84,7 @@ html[data-msg-experience-theme="explorer"] #app .reader-page-panel > .reader-tit
 }
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-title-copy h1 {
   margin: 0 0 2px !important;
-  font-size: 1.2rem !important;
-  line-height: 1.2 !important;
+  line-height: 1.12 !important;
   color: #143f3a !important;
 }
 html[data-msg-experience-theme="explorer"] #app .reader-page-panel .reader-title-links {
@@ -681,4 +680,15 @@ html[data-msg-experience-theme="explorer"]
 
 .reader-center-column > #reader-frame {
   order: 0 !important;
+}
+
+
+/* v1.1.2 — Reader article title size, ALL themes.
+   Do not let the article title inherit the app-wide/global H1 scale. */
+#app .reader-page-panel .reader-title-copy h1,
+#app .reader-title-copy h1 {
+  font-size: 1.15rem !important;
+  line-height: 1.2 !important;
+  margin-top: 0 !important;
+  margin-bottom: 2px !important;
 }
