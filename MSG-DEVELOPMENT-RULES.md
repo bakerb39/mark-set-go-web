@@ -107,3 +107,64 @@ A change is done when:
 - no unnecessary architecture was disturbed;
 - the patch is deployable and documented;
 - remaining cosmetic issues are either resolved quickly or logged.
+
+## Reader Intelligence & Data Ownership
+
+Reader Intelligence is a shared foundation for Ask Beth, Training Lab, Chat, and Symposium.
+
+### Architecture
+Use a central, companion-independent layer such as:
+
+`window.MSGReaderIntelligence`
+
+It should expose structured, permission-aware context rather than forcing each feature to scrape the DOM independently.
+
+Reader Intelligence should distinguish:
+- live reading state;
+- recent performance and activity;
+- persistent reader profile;
+- observed facts versus inferred coaching patterns.
+
+### Storage Choice
+The reader must be able to choose where their profile and history are stored.
+
+Supported direction:
+- **Local only** — substantial profile/history data stored in IndexedDB on the user's device;
+- **Cloud** — profile/history stored in the application database;
+- optionally later, **Local + encrypted backup/sync**.
+
+The Reader Intelligence API should use a storage-adapter design so application features do not depend on one storage location.
+
+### Permissioned AI Access
+The reader controls what Ask Beth and other AI features may know.
+
+Profile settings should support:
+- a master “Allow reader context” switch;
+- granular access to reading activity, WPM/performance, comprehension, Training Lab results, goals, reading history, notes/bookmarks, vocabulary, interests/topics, saved insights, and long-term trends.
+
+Only the context relevant to the current request should be sent to the AI. Do not dump the complete profile/history into every prompt.
+
+### User Data Rights
+The reader owns the Reader Intelligence profile.
+
+The reader must be able to:
+- inspect what is stored;
+- see important inferred coaching patterns;
+- export their data;
+- restrict AI access;
+- choose local or cloud storage;
+- delete individual categories of data;
+- delete all Reader Intelligence data.
+
+Deletion must be real:
+- local deletion removes the applicable IndexedDB/local records;
+- cloud deletion removes the applicable server-side records;
+- if both exist, the UI must clearly distinguish **This device**, **Cloud**, and **Everything**.
+
+### AI Accuracy Rule
+AI companions must never invent reader metrics or personal history.
+
+If a requested metric or profile field is unavailable, not yet measured, or access is disabled, the companion should say that explicitly.
+
+### Product Principle
+**The reader owns the reader profile. They can inspect it, export it, restrict AI access to it, choose where it is stored, and delete it.**

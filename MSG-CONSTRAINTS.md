@@ -176,3 +176,40 @@ Before declaring a change successful, protect:
 If runtime diagnostics show the architecture differs from the assumption, stop patching and update the model from the evidence.
 
 Diagnostics beat guesses.
+
+## 21. Reader Intelligence Data Ownership
+Reader Intelligence is user-owned data.
+
+The user must be able to:
+- choose local-only or cloud storage for their reader profile/history;
+- control which categories Ask Beth and other AI features may access;
+- inspect stored profile information and important inferences;
+- export their data;
+- delete selected categories;
+- delete all Reader Intelligence data.
+
+Local substantial data should use IndexedDB rather than relying on localStorage.
+
+## 22. Permissioned AI Context
+Do not send the entire reader profile/history to AI by default.
+
+Build a compact, question-relevant context from permitted data only.
+
+If permission is disabled, or a metric does not exist, Ask Beth/Mark/Chat/Symposium must not invent it.
+
+## 23. Observed vs. Inferred Reader Data
+Keep a conceptual distinction between:
+- observed data, such as WPM, quiz scores, reading position, notes, and activity;
+- inferred data, such as likely strengths, weaknesses, interests, and coaching patterns.
+
+Users should be able to inspect/delete both.
+
+## 24. Storage Abstraction
+Reader Intelligence must not be tightly coupled to one database implementation.
+
+Use a storage-adapter model so the same intelligence layer can work with:
+- local IndexedDB;
+- cloud database storage;
+- future encrypted sync/backup.
+
+AI features should consume Reader Intelligence through a shared API rather than reading arbitrary storage directly.
