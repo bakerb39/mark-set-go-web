@@ -1,0 +1,136 @@
+
+/* Mark, Set, Go! v6.7
+   Surgical Topic Feed header layout fix.
+   Loaded AFTER existing styles so this owns only the live Source/social/action
+   block without changing Reader geometry or Topic Feed rendering code. */
+
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  gap: 0 !important;
+  min-width: 0 !important;
+  margin-left: 24px !important;
+  margin-right: 14px !important;
+  padding: 0 !important;
+}
+
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external
+> .topic-feed-story-meta-overlay {
+  position: static !important;
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: auto !important;
+  max-width: none !important;
+}
+
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+ .topic-feed-reader-credit {
+  position: static !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 5px !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: max-content !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  white-space: nowrap !important;
+  line-height: 1.15 !important;
+}
+
+.topic-feed-reader-page
+.topic-feed-reader-page
+ .topic-feed-reader-credit > a {
+  position: static !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: max-content !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: none !important;
+  white-space: nowrap !important;
+}
+
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+.topic-feed-reader-page
+ .topic-feed-reader-credit > .topic-feed-reader-share {
+  position: static !important;
+  inset: auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 5px !important;
+  flex: 0 0 auto !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: max-content !important;
+  margin: 0 0 0 14px !important;
+  padding: 0 !important;
+  float: none !important;
+  translate: none !important;
+  transform: none !important;
+}
+
+.topic-feed-reader-page
+> .reader-pane-controls
+> .reader-pane-buttons
+> .topic-feed-story-header-external
+> #read-anything-article-summary-action {
+  position: static !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 6px !important;
+  width: auto !important;
+  max-width: none !important;
+  min-width: max-content !important;
+  margin: 1px 0 0 0 !important;
+  padding: 0 !important;
+  line-height: 1.15 !important;
+  white-space: nowrap !important;
+}
+
+/* Keep the Reader immediately below the existing toolbar band. */
+@media (min-width: 861px) {
+  #app .topic-feed-reader-page > .reader-pane-controls,
+  #app .topic-feed-reader-page > .reader-pane-controls.ask-mark-toolbar {
+    margin-bottom: 2px !important;
+    padding-bottom: 0 !important;
+  }
+
+  #app .topic-feed-reader-page #reader-frame {
+    margin-top: 0 !important;
+  }
+}
