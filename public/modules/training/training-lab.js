@@ -7,9 +7,9 @@
   'use strict';
   if (window.MarkSetGoTrainingLab) return;
 
-  const VERSION = '0.2.0-reader-integrated';
+  const VERSION = '0.3.0-ask-beth-embedded';
   const STORAGE_KEY = 'markSetGoTrainingLabV1';
-  const runtime = { raf:0, timer:0, mode:'', startedAt:0, startIndex:0, startWpm:0, burstPhase:0, overlay:null, hud:null, session:null, scopedNodes:null, fixationCursor:0, peripheralCursor:0 };
+  const runtime = { raf:0, timer:0, mode:'', startedAt:0, startIndex:0, startWpm:0, burstPhase:0, overlay:null, hud:null, session:null, scopedNodes:null, fixationCursor:0, peripheralCursor:0, fixationResizeObserver:null, fixationWindowResize:null };
   const DEFAULTS = {
     baselineWpm: 300, comprehension: 85, trainingWpm: 330, stretchWpm: 390,
     visualSpan: 3, fixationsPerLine: 4, regressionLevel: 'soft',
@@ -90,7 +90,11 @@
   }
   function clearRuntime(){
     cancelAnimationFrame(runtime.raf); clearTimeout(runtime.timer); runtime.raf=0; runtime.timer=0;
-    const r=reader(); if(r){ r.classList.remove('training-regression-soft','training-regression-medium','training-regression-strict'); wordNodes().forEach(n=>n.classList.remove('tl-read','tl-fixation-active','tl-peripheral-word','tl-peripheral-center-word')); runtime.scopedNodes=null; runtime.fixationCursor=0; runtime.peripheralCursor=0; }
+    const r=reader(); if(r){ r.classList.remove('training-regression-soft','training-regression-medium','training-regression-strict'); wordNodes().forEach(n=>n.classList.remove('tl-read','tl-fixation-active','tl-peripheral-word','tl-peripheral-center-word'));
+    try { runtime.fixationResizeObserver?.disconnect(); } catch {}
+    if(runtime.fixationWindowResize) window.removeEventListener('resize',runtime.fixationWindowResize);
+    runtime.fixationResizeObserver=null; runtime.fixationWindowResize=null;
+    runtime.scopedNodes=null; runtime.fixationCursor=0; runtime.peripheralCursor=0; }
     $('#training-runtime-layer')?.remove(); runtime.overlay=null; runtime.hud=null; runtime.mode='';
     dispatch('marksetgo:training-stopped');
   }
@@ -126,27 +130,88 @@
     if(!hasDocument()) return notifyNeedReader(); clearRuntime(); runtime.mode='fixation';
     const scope=captureExerciseScope();
     const nodes=exerciseWordNodes();
-    const targetNodes=fixationTargets(nodes,Math.max(2,Math.min(5,targets)));
-    if(!targetNodes.length) return notifyNeedReader();
-    const layer=ensureRuntimeLayer();
-    const dot=document.createElement('span'); dot.className='tl-fixation-dot tl-fixation-dot-active'; layer.appendChild(dot);
-    hud('Fixation Trainer',`${scope} · ${Math.max(2,Math.min(5,targets))} fixations/line`);
-    const step=()=>{
+    const perLine=Math.max(2,Math.min(5,targets));
+    let targetNodes=[];
+    let currentNode=null;
+    let lastWidth=0;
+
+    const rebuildTargets=()=>{
       if(runtime.mode!=='fixation') return;
-      wordNodes().forEach(n=>n.classList.remove('tl-fixation-active'));
-      const node=targetNodes[runtime.fixationCursor % targetNodes.length];
-      if(!node?.isConnected){ clearRuntime(); return; }
-      node.scrollIntoView({block:'nearest',inline:'nearest'});
-      const rect=node.getBoundingClientRect(); const rr=reader().getBoundingClientRect();
+      const liveNodes=nodes.filter(n=>n?.isConnected);
+      targetNodes=fixationTargets(liveNodes,perLine);
+      if(!targetNodes.length) return;
+      if(currentNode?.isConnected){
+        const exact=targetNodes.indexOf(currentNode);
+        if(exact>=0){
+          runtime.fixationCursor=exact;
+        } else {
+          const currentIndex=Number(currentNode.dataset.index);
+          const next=targetNodes.findIndex(n=>Number(n.dataset.index)>=currentIndex);
+          runtime.fixationCursor=next>=0?next:0;
+        }
+      } else {
+        runtime.fixationCursor=Math.min(runtime.fixationCursor,targetNodes.length-1);
+      }
+    };
+
+    rebuildTargets();
+    if(!targetNodes.length) return notifyNeedReader();
+
+    const layer=ensureRuntimeLayer();
+    const dot=document.createElement('span');
+    dot.className='tl-fixation-dot tl-fixation-dot-active';
+    layer.appendChild(dot);
+    hud('Fixation Trainer',`${scope} · ${perLine} fixations/line`);
+
+    const positionDot=()=>{
+      if(runtime.mode!=='fixation' || !currentNode?.isConnected) return;
+      const r=reader(); if(!r) return;
+      const rect=currentNode.getBoundingClientRect();
+      const rr=r.getBoundingClientRect();
+      if(rect.bottom<rr.top || rect.top>rr.bottom){
+        currentNode.scrollIntoView({block:'center',inline:'nearest'});
+        requestAnimationFrame(()=>requestAnimationFrame(positionDot));
+        return;
+      }
       dot.style.left=`${Math.max(rr.left+6,Math.min(rr.right-6,rect.left+rect.width/2))}px`;
       dot.style.top=`${Math.max(rr.top+6,Math.min(rr.bottom-6,rect.bottom+5))}px`;
-      node.classList.add('tl-fixation-active');
+    };
+
+    const step=()=>{
+      if(runtime.mode!=='fixation') return;
+      const r=reader();
+      const width=Math.round(r?.getBoundingClientRect().width||0);
+      if(width && width!==lastWidth){ lastWidth=width; rebuildTargets(); }
+      if(!targetNodes.length){ clearRuntime(); return; }
+      wordNodes().forEach(n=>n.classList.remove('tl-fixation-active'));
+      currentNode=targetNodes[runtime.fixationCursor % targetNodes.length];
+      if(!currentNode?.isConnected){ rebuildTargets(); currentNode=targetNodes[runtime.fixationCursor % Math.max(1,targetNodes.length)]; }
+      if(!currentNode?.isConnected){ clearRuntime(); return; }
+      currentNode.classList.add('tl-fixation-active');
+      currentNode.scrollIntoView({block:'nearest',inline:'nearest'});
+      requestAnimationFrame(()=>requestAnimationFrame(positionDot));
       runtime.fixationCursor++;
       const wordsPerFix=Math.max(1,Math.round(nodes.length/Math.max(1,targetNodes.length)));
       const delay=Math.max(180,Math.round((60000/currentWpm())*wordsPerFix));
       runtime.timer=setTimeout(step,delay);
     };
-    step(); dispatch('marksetgo:training-started',{exercise:'fixation',scope});
+
+    if(typeof ResizeObserver==='function'){
+      runtime.fixationResizeObserver=new ResizeObserver(()=>{
+        if(runtime.mode!=='fixation') return;
+        requestAnimationFrame(()=>{ rebuildTargets(); positionDot(); });
+      });
+      runtime.fixationResizeObserver.observe(reader());
+    } else {
+      runtime.fixationWindowResize=()=>{
+        if(runtime.mode!=='fixation') return;
+        requestAnimationFrame(()=>{ rebuildTargets(); positionDot(); });
+      };
+      window.addEventListener('resize',runtime.fixationWindowResize,{passive:true});
+    }
+
+    step();
+    dispatch('marksetgo:training-started',{exercise:'fixation',scope});
   }
   function runRegression(level=data.regressionLevel||'soft'){
     if(!hasDocument()) return notifyNeedReader(); clearRuntime(); runtime.mode='regression'; const scope=captureExerciseScope(); const r=reader(); r.classList.add(`training-regression-${level}`); hud('Regression Control',`${scope} · ${level[0].toUpperCase()+level.slice(1)} fade behind current position`);
@@ -229,6 +294,107 @@
   }
 
   function exerciseCards(group){ return EXERCISES.filter(x=>x.group===group).map(x=>`<article class="tl-card"><span class="tl-badge ${x.tag==='Ready'||x.tag==='Integrated'?'ready':'experimental'}">${escapeHtml(x.tag)}</span><h4>${escapeHtml(x.title)}</h4><p>${escapeHtml(x.desc)}</p><div class="tl-card-actions"><button class="tl-secondary" type="button" data-tl-run="${x.id}">Start</button></div></article>`).join(''); }
+
+  function askBethShell(){
+    return $('.reader-control-shell.mark-shell');
+  }
+
+  function askBethPremium(){
+    return askBethShell()?.querySelector('[data-askmark-premium]') || null;
+  }
+
+  function activateAskBethView(view='chat'){
+    const host=askBethShell();
+    if(!host)return false;
+    const panels=$$('[data-askmark-view-panel]',host);
+    if(!panels.length)return false;
+    panels.forEach(panel=>panel.classList.toggle('is-active',panel.dataset.askmarkViewPanel===view));
+    host.classList.toggle('askmark-secondary-open',view!=='chat');
+    return Boolean(host.querySelector(`[data-askmark-view-panel="${view}"]`));
+  }
+
+  function ensureAskBethTrainingView(){
+    const host=askBethShell();
+    const premium=askBethPremium();
+    const stage=premium?.querySelector('.askmark-stage');
+    if(!host || !premium || !stage)return null;
+
+    let view=stage.querySelector('[data-askmark-view-panel="training"]');
+    if(!view){
+      view=document.createElement('section');
+      view.className='askmark-view training-lab-askbeth-view';
+      view.dataset.askmarkViewPanel='training';
+      view.innerHTML='<div class="training-lab-askbeth-host" data-training-lab-askbeth-host></div>';
+      stage.appendChild(view);
+    }
+
+    const headerActions=
+      premium.querySelector('.askmark-header-tool-actions') ||
+      premium.querySelector('.askmark-header-actions');
+
+    if(headerActions && !headerActions.querySelector('[data-training-lab-askbeth-button]')){
+      const button=document.createElement('button');
+      button.type='button';
+      button.dataset.trainingLabAskbethButton='1';
+      button.setAttribute('aria-label','Open Training Lab');
+      button.title='Training Lab';
+      button.textContent='◎';
+      button.addEventListener('click',(event)=>{
+        event.preventDefault();
+        event.stopPropagation();
+        openLab('today');
+      });
+      headerActions.appendChild(button);
+    }
+
+    return view.querySelector('[data-training-lab-askbeth-host]');
+  }
+
+  function openAskBethPanel(){
+    const shell=askBethShell();
+    if(shell){
+      const style=getComputedStyle(shell);
+      const visible=style.display!=='none' && style.visibility!=='hidden' && shell.getBoundingClientRect().width>0;
+      if(visible)return true;
+    }
+    const toggle=$('#toggle-mark-panel');
+    if(toggle){
+      toggle.click();
+      return true;
+    }
+    return false;
+  }
+
+  function mountLabInsideAskBeth(){
+    const host=ensureAskBethTrainingView();
+    const lab=$('#training-lab-shell');
+    if(!host || !lab)return false;
+    if(lab.parentElement!==host)host.appendChild(lab);
+    lab.classList.add('training-lab-embedded');
+    const close=$('[data-tl-close]',lab);
+    if(close){
+      close.textContent='←';
+      close.setAttribute('aria-label','Back to Ask Beth');
+      close.title='Back to Ask Beth';
+    }
+    return true;
+  }
+
+  function scheduleAskBethIntegration(){
+    let tries=0;
+    const attempt=()=>{
+      tries+=1;
+      const host=ensureAskBethTrainingView();
+      if(host){
+        buildLab();
+        mountLabInsideAskBeth();
+        return;
+      }
+      if(tries<90)requestAnimationFrame(attempt);
+    };
+    requestAnimationFrame(attempt);
+  }
+
   function buildLab(){
     if($('#training-lab-shell'))return;
     const shell=document.createElement('div'); shell.id='training-lab-shell'; shell.className='training-lab-shell'; shell.hidden=true;
@@ -240,14 +406,55 @@
       <section class="training-lab-view" id="training-view-advanced" hidden><h3>Advanced Training</h3><p class="training-lab-sub">Hooks for semantic phrase boundaries and future difficulty-aware pacing.</p><div class="tl-grid">${exerciseCards('advanced')}</div><div class="tl-notice"><strong>Integration contract:</strong> listen for <code>marksetgo:training-ai-request</code> to connect Ask Mark or another AI endpoint. Return richer results through your app without coupling this module to a specific provider.</div></section>
       <section class="training-lab-view" id="training-view-progress" hidden><h3>Progress</h3><p class="training-lab-sub">Verified performance emphasizes speed × comprehension.</p><div id="tl-progress-content"></div></section>
     </main></div></section>`;
-    document.body.appendChild(shell);
+    const embeddedHost=ensureAskBethTrainingView();
+    (embeddedHost || document.body).appendChild(shell);
+    if(embeddedHost)shell.classList.add('training-lab-embedded');
     shell.addEventListener('click',onLabClick); $('[data-tl-close]',shell).onclick=closeLab; $('#tl-start-daily').onclick=startDailySession; $('#tl-assess-submit').onclick=()=>{const r=submitAssessment($('#tl-assess-wpm').value,$('#tl-assess-comp').value);$('#tl-assess-result').innerHTML=`<div class="tl-result"><strong>Verified rate: ${r.effective} effective WPM.</strong><br>Recommended next training pace: <strong>${r.next} WPM</strong>.</div>`;renderToday();};
     renderToday(); renderProgress();
   }
   function onLabClick(e){ const v=e.target.closest('[data-tl-view]');if(v){openLab(v.dataset.tlView);return;} const b=e.target.closest('[data-tl-run]');if(b){runExercise(b.dataset.tlRun);} }
   function runExercise(id){ closeLab(); ({fixation:runFixation,peripheral:runPeripheral,regression:()=>runRegression(data.regressionLevel),edge:runEdge,burst:runBurst,phrase:runPhrase,tunnel:runTunnel,adaptive:()=>{openLab('speed');$('#tl-assess-wpm').value=currentWpm();$('#tl-assess-comp').focus();},preview:showPreview,recall:promptRecall,prediction:promptPrediction,semantic:runSemantic}[id]||(()=>{}))(); }
-  function openLab(view='today'){ buildLab(); const shell=$('#training-lab-shell');shell.hidden=false; document.body.style.setProperty('--training-lab-open','1'); $$('.training-lab-view',shell).forEach(x=>x.hidden=x.id!==`training-view-${view}`); $$('.training-lab-nav [data-tl-view]',shell).forEach(x=>x.classList.toggle('is-active',x.dataset.tlView===view)); if(view==='progress')renderProgress(); if(view==='today')renderToday(); }
-  function closeLab(){ const shell=$('#training-lab-shell');if(shell)shell.hidden=true; document.body.style.removeProperty('--training-lab-open'); }
+  function openLab(view='today'){
+    openAskBethPanel();
+    buildLab();
+
+    const reveal=()=>{
+      const shell=$('#training-lab-shell');
+      if(!shell)return false;
+      const embedded=mountLabInsideAskBeth();
+      shell.hidden=false;
+      shell.classList.toggle('training-lab-embedded',embedded);
+      if(!embedded)document.body.style.setProperty('--training-lab-open','1');
+      else document.body.style.removeProperty('--training-lab-open');
+
+      $$('.training-lab-view',shell).forEach(x=>x.hidden=x.id!==`training-view-${view}`);
+      $$('.training-lab-nav [data-tl-view]',shell).forEach(x=>x.classList.toggle('is-active',x.dataset.tlView===view));
+      if(view==='progress')renderProgress();
+      if(view==='today')renderToday();
+      if(embedded)activateAskBethView('training');
+      return embedded;
+    };
+
+    if(reveal())return;
+    let tries=0;
+    const retry=()=>{
+      tries+=1;
+      if(reveal() || tries>=45)return;
+      requestAnimationFrame(retry);
+    };
+    requestAnimationFrame(retry);
+  }
+
+  function closeLab(){
+    const shell=$('#training-lab-shell');
+    if(shell?.classList.contains('training-lab-embedded')){
+      activateAskBethView('chat');
+      shell.hidden=false;
+    }else if(shell){
+      shell.hidden=true;
+    }
+    document.body.style.removeProperty('--training-lab-open');
+  }
 
   function renderToday(){ if(!$('#tl-today-metrics'))return; const last=data.assessments[0]; $('#tl-today-metrics').innerHTML=`<div class="tl-metric"><span>Baseline</span><strong>${Math.round(data.baselineWpm||300)}</strong><small>WPM</small></div><div class="tl-metric"><span>Training</span><strong>${Math.round(data.trainingWpm||330)}</strong><small>WPM</small></div><div class="tl-metric"><span>Stretch</span><strong>${Math.round(data.stretchWpm||390)}</strong><small>WPM</small></div><div class="tl-metric"><span>Verified rate</span><strong>${last?.effective||'—'}</strong><small>speed × comprehension</small></div>`;
     const steps=[['Warm-up','Normal reading at training pace','2 min'],['Fixation','Interior fixation targets','3 min'],['Phrase reading','Meaningful phrase presentation','3 min'],['Speed bursts','Short progressive overload','3 min'],['Recall','Retrieve key ideas','2 min'],['Comprehension','Record score and adapt pace','2 min']]; $('#tl-session-plan').innerHTML=`<div class="tl-session-steps">${steps.map((s,i)=>`<div class="tl-step"><span class="tl-step-number">${i+1}</span><div><strong>${s[0]}</strong><br><small>${s[1]}</small></div><small>${s[2]}</small></div>`).join('')}</div>`;
@@ -268,18 +475,39 @@
 
   function boot(){
     buildLab();
+    scheduleAskBethIntegration();
+
     document.addEventListener('click',e=>{
       const trigger=e.target.closest('[data-training-lab-launch]');
-      if(!trigger)return;
-      e.preventDefault();
-      e.stopPropagation();
-      openLab('today');
-      const menu=trigger.closest('details.top-nav-menu');
-      if(menu)menu.open=false;
-    });
+      if(trigger){
+        e.preventDefault();
+        e.stopPropagation();
+        openLab('today');
+        const menu=trigger.closest('details.top-nav-menu');
+        if(menu)menu.open=false;
+        return;
+      }
+
+      if(e.target.closest('#toggle-mark-panel')){
+        window.setTimeout(scheduleAskBethIntegration,0);
+      }
+    },true);
+
+    for(const eventName of [
+      'marksetgo:reader-session-list-changed',
+      'marksetgo:reader-session-activated',
+      'marksetgo:reader-session-changed'
+    ]){
+      document.addEventListener(eventName,()=>window.setTimeout(scheduleAskBethIntegration,0));
+    }
+
     window.addEventListener('keydown',e=>{
-      if(e.key==='Escape'&&!$('#training-lab-shell')?.hidden)closeLab();
+      if(e.key==='Escape'){
+        const lab=$('#training-lab-shell');
+        if(lab && !lab.hidden)closeLab();
+      }
     });
+
     dispatch('marksetgo:training-ready');
   }
 
