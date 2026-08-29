@@ -7,7 +7,7 @@
   'use strict';
   if (window.MarkSetGoTrainingLab) return;
 
-  const VERSION = '0.3.2-side-frame-compatible';
+  const VERSION = '0.3.3-side-frame-grid-fix';
   const STORAGE_KEY = 'markSetGoTrainingLabV1';
   const runtime = { raf:0, timer:0, mode:'', startedAt:0, startIndex:0, startWpm:0, burstPhase:0, overlay:null, hud:null, session:null, scopedNodes:null, fixationCursor:0, peripheralCursor:0, fixationResizeObserver:null, fixationWindowResize:null };
   const DEFAULTS = {
@@ -378,6 +378,7 @@
     const lab=$('#training-lab-shell');
     if(externalHost?.isConnected && lab){
       if(lab.parentElement!==externalHost)externalHost.appendChild(lab);
+      setTrainingLabWide(false);
       lab.classList.add('training-lab-embedded','training-lab-frame-hosted');
       const close=$('[data-tl-close]',lab);
       if(close){
@@ -454,7 +455,17 @@
       $$('.training-lab-nav [data-tl-view]',shell).forEach(x=>x.classList.toggle('is-active',x.dataset.tlView===view));
       if(view==='progress')renderProgress();
       if(view==='today')renderToday();
-      if(embedded)activateAskBethView('training');
+
+      const externalHost=window.MSGTrainingLabFrameHost;
+      const frameHosted=Boolean(externalHost?.isConnected && shell.parentElement===externalHost);
+
+      if(frameHosted){
+        setTrainingLabWide(false);
+        shell.classList.add('training-lab-frame-hosted');
+      }else if(embedded){
+        activateAskBethView('training');
+      }
+
       return embedded;
     };
 

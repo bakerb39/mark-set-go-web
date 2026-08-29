@@ -6,6 +6,8 @@
     mode: '',
     frame: null,
     body: null,
+    desktopContent: null,
+    fallbackHost: null,
     askShell: null,
     askParent: null,
     askNext: null
@@ -13,10 +15,20 @@
 
   const $ = (s, r=document) => r.querySelector(s);
 
-  function ensureFrame() {
-    const layout = $('#reader-layout') || $('.reader-layout');
-    if (!layout) return null;
+  function currentReaderDesktopContent() {
+    const readerWindow =
+      $('.msg-desktop-window.msg-desktop-reader-one-window') ||
+      $('.msg-desktop-window[data-msg-desktop-window-key="reader:1"]');
 
+    return readerWindow?.querySelector(':scope > .msg-desktop-window-content') || null;
+  }
+
+  function currentReaderPrimary(content) {
+    return content?.querySelector(':scope > .msg-workspace-primary') ||
+      content?.querySelector('.msg-workspace-primary') || null;
+  }
+
+  function ensureFrame() {
     let frame = $('#msg-learning-side-frame');
     if (!frame) {
       frame = document.createElement('aside');
@@ -33,12 +45,26 @@
         </header>
         <div class="msg-learning-frame-body" data-learning-frame-body></div>
       `;
-
-      const wordPanel = $('#word-panel', layout);
-      if (wordPanel) layout.insertBefore(frame, wordPanel);
-      else layout.appendChild(frame);
-
       frame.querySelector('[data-learning-frame-close]')?.addEventListener('click', close);
+    }
+
+    const desktopContent = currentReaderDesktopContent();
+    if (desktopContent) {
+      if (frame.parentElement !== desktopContent) desktopContent.appendChild(frame);
+      desktopContent.classList.add('msg-learning-frame-open');
+      currentReaderPrimary(desktopContent)?.classList.add('msg-learning-primary');
+      state.desktopContent = desktopContent;
+      state.fallbackHost = null;
+    } else {
+      // Non-desktop fallback: dock beside the Reader shell, but do not rewrite
+      // its internal reader-layout grid.
+      const readerPage = $('.reader-page-panel');
+      const host = readerPage?.parentElement || $('#app');
+      if (!host) return null;
+      if (frame.parentElement !== host) host.appendChild(frame);
+      host.classList.add('msg-learning-fallback-host-open');
+      state.fallbackHost = host;
+      state.desktopContent = null;
     }
 
     state.frame = frame;
@@ -54,14 +80,18 @@
   }
 
   function openFrame(mode) {
-    const layout = $('#reader-layout') || $('.reader-layout');
     const frame = ensureFrame();
-    if (!layout || !frame) return false;
+    if (!frame) return false;
+
+    // Side-frame width belongs to the learning-frame grid slot, not Ask Beth's
+    // normal word-panel width mode.
+    const layout = $('#reader-layout') || $('.reader-layout');
+    layout?.classList.remove('training-lab-wide-open');
+    $('#word-panel')?.classList.remove('training-lab-wide-open');
 
     if (state.mode && state.mode !== mode) restoreMode();
 
     state.mode = mode;
-    layout.classList.add('msg-learning-side-frame-open');
     frame.hidden = false;
     frame.dataset.learningFrameMode = mode;
     if (state.body) state.body.replaceChildren();
@@ -70,6 +100,7 @@
 
   function restoreAskBeth() {
     if (!state.askShell) return;
+    state.askShell.classList.remove('msg-askbeth-frame-hosted');
     try {
       if (state.askNext?.parentNode === state.askParent) {
         state.askParent.insertBefore(state.askShell, state.askNext);
@@ -86,12 +117,9 @@
     const lab = $('#training-lab-shell');
     if (!lab) return;
     lab.classList.remove('training-lab-frame-hosted');
-    try {
-      delete window.MSGTrainingLabFrameHost;
-    } catch {
-      window.MSGTrainingLabFrameHost = null;
-    }
-    // Return the Lab to its normal Ask Beth integration host when available.
+    try { delete window.MSGTrainingLabFrameHost; }
+    catch { window.MSGTrainingLabFrameHost = null; }
+
     const host = document.querySelector('[data-training-lab-askbeth-host]');
     if (host && lab.parentElement !== host) host.appendChild(lab);
   }
@@ -101,10 +129,22 @@
     if (state.mode === 'training') restoreTraining();
   }
 
+  function releaseDock() {
+    if (state.desktopContent) {
+      state.desktopContent.classList.remove('msg-learning-frame-open');
+      currentReaderPrimary(state.desktopContent)?.classList.remove('msg-learning-primary');
+    }
+    if (state.fallbackHost) {
+      state.fallbackHost.classList.remove('msg-learning-fallback-host-open');
+    }
+    state.desktopContent = null;
+    state.fallbackHost = null;
+  }
+
   function close() {
     restoreMode();
-    const layout = $('#reader-layout') || $('.reader-layout');
-    layout?.classList.remove('msg-learning-side-frame-open');
+    releaseDock();
+
     if (state.frame) {
       state.frame.hidden = true;
       state.frame.removeAttribute('data-learning-frame-mode');
@@ -118,23 +158,29 @@
     setTitle('Training Lab', '◈');
 
     window.MSGTrainingLabFrameHost = state.body;
-    const labApi = window.MarkSetGoTrainingLab;
-    if (!labApi?.open) {
-      state.body.innerHTML = '<p class="msg-learning-frame-status">Training Lab is still loading…</p>';
-      let tries = 0;
-      const retry = () => {
-        tries += 1;
-        if (window.MarkSetGoTrainingLab?.open) {
-          state.body.replaceChildren();
-          window.MarkSetGoTrainingLab.open('today');
-          return;
-        }
-        if (tries < 90) requestAnimationFrame(retry);
-      };
-      requestAnimationFrame(retry);
+
+    const start = () => {
+      if (!window.MarkSetGoTrainingLab?.open) return false;
+      window.MarkSetGoTrainingLab.open('today');
       return true;
-    }
-    labApi.open('today');
+    };
+
+    if (start()) return true;
+
+    state.body.innerHTML =
+      '<p class="msg-learning-frame-status">Training Lab is still loading…</p>';
+
+    let tries = 0;
+    const retry = () => {
+      tries += 1;
+      if (start()) {
+        state.body.replaceChildren();
+        window.MarkSetGoTrainingLab.open('today');
+        return;
+      }
+      if (tries < 90) requestAnimationFrame(retry);
+    };
+    requestAnimationFrame(retry);
     return true;
   }
 
@@ -142,29 +188,23 @@
     if (!openFrame('askbeth')) return false;
     setTitle('Ask Beth', '✦');
 
-    // Ensure the existing companion shell has been built before moving it.
-    const toggle = $('#toggle-mark-panel');
-    let shell = $('.reader-control-shell.mark-shell');
-    if (!shell && toggle) {
-      toggle.click();
-      shell = $('.reader-control-shell.mark-shell');
-    }
-
     const mount = () => {
-      shell = $('.reader-control-shell.mark-shell');
+      const shell = $('.reader-control-shell.mark-shell');
       if (!shell || !state.body) return false;
 
       state.askShell = shell;
       state.askParent = shell.parentNode;
       state.askNext = shell.nextSibling;
-      state.body.appendChild(shell);
 
-      // The frame itself owns width/scroll. Avoid the old side-panel dimensions.
       shell.classList.add('msg-askbeth-frame-hosted');
+      state.body.appendChild(shell);
       return true;
     };
 
     if (mount()) return true;
+
+    // Ask Beth may not be built until its normal button has been opened once.
+    $('#toggle-mark-panel')?.click();
 
     let tries = 0;
     const retry = () => {

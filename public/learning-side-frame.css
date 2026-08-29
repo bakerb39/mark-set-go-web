@@ -1,76 +1,93 @@
-/* Mark, Set, Go! — Learning side-frame experiment v1.0
-   Uses the Reader's existing right-side grid slot, but keeps the implementation
-   separate from app.js / responsive-shell.js / workspace geometry code. */
+/* Mark, Set, Go! — Learning side-frame v1.1
+   IMPORTANT: desktop mode docks at .msg-desktop-window-content, NOT inside
+   #reader-layout. This keeps the side frame at the same architectural level
+   as the Reader desktop window and avoids the blank-area regression. */
 
 .msg-learning-side-frame[hidden] { display:none !important; }
 
-@media (min-width:1051px) {
-  #reader-layout.msg-learning-side-frame-open,
-  .reader-layout.msg-learning-side-frame-open {
-    --msg-learning-frame-width:min(760px,52vw);
-    grid-template-columns:
-      var(--navigation-width)
-      8px
-      minmax(0,1fr)
-      8px
-      var(--msg-learning-frame-width) !important;
-  }
+/* Desktop Reader window: Reader on the left, learning frame on the right. */
+.msg-desktop-window-content.msg-learning-frame-open {
+  display:grid !important;
+  grid-template-columns:minmax(420px,1fr) minmax(520px,760px) !important;
+  grid-template-rows:minmax(0,1fr) !important;
+  gap:0 !important;
+  align-items:stretch !important;
+  overflow:hidden !important;
+  min-width:0 !important;
+  min-height:0 !important;
+}
 
-  #reader-layout.msg-learning-side-frame-open.navigation-hidden,
-  .reader-layout.msg-learning-side-frame-open.navigation-hidden {
-    grid-template-columns:
-      minmax(0,1fr)
-      8px
-      var(--msg-learning-frame-width) !important;
-  }
+.msg-desktop-window-content.msg-learning-frame-open > .msg-workspace-primary.msg-learning-primary {
+  grid-column:1 !important;
+  min-width:0 !important;
+  width:auto !important;
+  max-width:none !important;
+  overflow:hidden !important;
+}
 
-  .msg-learning-side-frame-open #word-panel {
-    display:none !important;
-  }
+.msg-desktop-window-content.msg-learning-frame-open > .msg-learning-side-frame {
+  grid-column:2 !important;
+  display:flex !important;
+  min-width:0 !important;
+  width:auto !important;
+  height:100% !important;
+  min-height:0 !important;
+  max-height:none !important;
+  overflow:hidden !important;
+  box-sizing:border-box !important;
+  flex-direction:column !important;
+  align-self:stretch !important;
+  border:0 !important;
+  border-left:1px solid var(--border,#cbd3db) !important;
+  border-radius:0 !important;
+  background:var(--surface,#fff) !important;
+  color:var(--ink,#18212b) !important;
+  box-shadow:-8px 0 24px rgba(15,23,42,.08) !important;
+}
 
-  .msg-learning-side-frame-open .msg-learning-side-frame {
-    display:flex !important;
-    min-width:0;
-    height:min(64vh,660px,calc(100dvh - 220px));
-    min-height:300px;
-    max-height:calc(100dvh - 220px);
-    overflow:hidden;
-    box-sizing:border-box;
-    flex-direction:column;
-    align-self:start;
-    border:1px solid var(--border,#cbd3db);
-    border-radius:.65rem;
-    background:var(--surface,#fff);
-    color:var(--ink,#18212b);
-    box-shadow:0 10px 28px rgba(15,23,42,.10);
+/* Very wide desktop Reader windows get the requested 760px frame. */
+@media (min-width:1450px) {
+  .msg-desktop-window-content.msg-learning-frame-open {
+    grid-template-columns:minmax(500px,1fr) 760px !important;
   }
 }
 
-@media (max-width:1050px) {
-  .msg-learning-side-frame-open .msg-learning-side-frame {
-    display:flex !important;
-    width:100%;
-    min-height:420px;
-    max-height:70dvh;
-    flex-direction:column;
-    overflow:hidden;
-    border:1px solid var(--border,#cbd3db);
-    border-radius:.65rem;
-    background:var(--surface,#fff);
+/* When the Reader desktop window itself is narrower, preserve a usable Reader
+   instead of producing a blank/zero-width reading column. */
+@media (max-width:1180px) {
+  .msg-desktop-window-content.msg-learning-frame-open {
+    grid-template-columns:minmax(380px,46%) minmax(0,54%) !important;
   }
-  .msg-learning-side-frame-open #word-panel { display:none !important; }
+}
+
+/* Non-desktop fallback only. It does NOT alter #reader-layout. */
+.msg-learning-fallback-host-open {
+  position:relative !important;
+}
+.msg-learning-fallback-host-open > .msg-learning-side-frame {
+  position:absolute !important;
+  top:0 !important;
+  right:0 !important;
+  bottom:0 !important;
+  width:min(760px,52vw) !important;
+  z-index:80 !important;
+  display:flex !important;
+  flex-direction:column !important;
+  overflow:hidden !important;
+  border-left:1px solid var(--border,#cbd3db) !important;
+  background:var(--surface,#fff) !important;
 }
 
 .msg-learning-frame-head {
-  flex:0 0 auto;
-  min-height:42px;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:10px;
-  padding:7px 10px 7px 12px;
-  border-bottom:1px solid var(--border,#cbd3db);
-  background:color-mix(in srgb,var(--surface,#fff) 94%,var(--accent,#2f75b5) 6%);
+  flex:0 0 auto !important;
+  min-height:42px !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:space-between !important;
+  gap:10px !important;
+  padding:7px 10px 7px 12px !important;
+  border-bottom:1px solid var(--border,#cbd3db) !important;
+  background:color-mix(in srgb,var(--surface,#fff) 94%,var(--accent,#2f75b5) 6%) !important;
 }
 
 .msg-learning-frame-title {
@@ -109,10 +126,11 @@
 }
 
 .msg-learning-frame-body {
-  flex:1 1 auto;
-  min-height:0;
-  overflow:auto;
-  background:var(--surface,#fff);
+  flex:1 1 auto !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  overflow:auto !important;
+  background:var(--surface,#fff) !important;
 }
 
 .msg-learning-frame-status {
@@ -120,29 +138,31 @@
   color:var(--muted,#64717f);
 }
 
-/* Training Lab when hosted in the page-style frame. */
-.msg-learning-frame-body > .training-lab-shell.training-lab-frame-hosted,
+/* Training Lab uses every pixel of the dock. */
 .msg-learning-frame-body > .training-lab-shell {
   position:relative !important;
   inset:auto !important;
   z-index:auto !important;
   width:100% !important;
   height:100% !important;
+  min-height:0 !important;
   padding:0 !important;
   display:block !important;
   background:transparent !important;
 }
+
 .msg-learning-frame-body .training-lab-dialog {
   width:100% !important;
   max-width:none !important;
   height:100% !important;
   max-height:none !important;
+  min-height:0 !important;
   border:0 !important;
   border-radius:0 !important;
   box-shadow:none !important;
 }
 
-/* Ask Beth/Mark comparison frame: preserve the real live shell and handlers. */
+/* Ask Beth comparison uses the existing live shell and handlers. */
 .msg-learning-frame-body > .reader-control-shell.mark-shell.msg-askbeth-frame-hosted {
   width:100% !important;
   height:100% !important;
@@ -152,4 +172,32 @@
   border-radius:0 !important;
   box-shadow:none !important;
   overflow:hidden !important;
+}
+
+
+/* v1.2 — Live Reader grid correction.
+   Verified live layout with navigation + word panel hidden:
+   390px | 8px splitter | 760px.
+   The learning frame was auto-placing into column 2 (8px). */
+#reader-layout > #msg-learning-side-frame,
+.reader-layout > #msg-learning-side-frame {
+  grid-column: 3 !important;
+  grid-row: 1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  justify-self: stretch !important;
+  align-self: stretch !important;
+}
+
+/* The existing right splitter remains the middle 8px column if/when visible. */
+#reader-layout > #right-pane-splitter,
+.reader-layout > #right-pane-splitter {
+  grid-column: 2 !important;
+}
+
+/* A side-frame-hosted Training Lab must not invoke the old Ask Beth-wide layout. */
+#reader-layout.msg-learning-side-frame-open.training-lab-wide-open,
+.reader-layout.msg-learning-side-frame-open.training-lab-wide-open {
+  --word-panel-width: 760px !important;
 }
