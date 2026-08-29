@@ -838,6 +838,70 @@
     return overlap;
   }
 
+  function activeReaderOcclusionTarget(reader) {
+    if (!reader) return null;
+
+    // Prefer the Reader's canonical active reading marks. Training Lab uses
+    // tl-fixation-active on the actual Reader word, so it inherits the same
+    // visible-boundary correction without owning Topic Feed geometry.
+    return reader.querySelector(
+      '.active-group, .active-bold-group, .tl-fixation-active, ' +
+      '.reader-word.mark-persistent-selected, .reader-group.mark-persistent-selected'
+    );
+  }
+
+  function keepActiveReaderTargetBelowTopicBand(reader, header) {
+    if (!reader || !header || !reader.isConnected || !header.isConnected) return false;
+
+    const overlap = syncTopicReaderOcclusion(reader, header);
+    if (overlap <= 0) return false;
+
+    const target = activeReaderOcclusionTarget(reader);
+    if (!target?.isConnected) return false;
+
+    const readerRect = reader.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const safeTop = readerRect.top + overlap + 12;
+
+    // The target is geometrically "inside" #reader even while the external
+    // Topic Feed header is painting over it. Correct only that hidden region.
+    if (targetRect.top >= safeTop) return false;
+
+    const amountHidden = Math.ceil(safeTop - targetRect.top);
+    if (amountHidden <= 0) return false;
+
+    reader.scrollTop = Math.max(0, reader.scrollTop - amountHidden);
+    return true;
+  }
+
+  function bindTopicReaderOcclusionCorrection(reader, header) {
+    if (!reader || reader.dataset.msgTopicOcclusionScrollBound === '1') return;
+    reader.dataset.msgTopicOcclusionScrollBound = '1';
+
+    let correctionFrame = 0;
+    const correct = () => {
+      window.cancelAnimationFrame(correctionFrame);
+      correctionFrame = window.requestAnimationFrame(() => {
+        if (!isTopicFeedReaderActive()) return;
+        const liveReader = document.querySelector('#reader');
+        const liveHeader = liveReader
+          ?.closest('#reader-frame')
+          ?.querySelector(':scope > [data-topic-feed-story-header-external]');
+        if (!liveReader || !liveHeader) return;
+        keepActiveReaderTargetBelowTopicBand(liveReader, liveHeader);
+      });
+    };
+
+    // Direct reader.scrollTop assignments, scrollIntoView(), wheel scrolling,
+    // Training Lab, bookmarks, and other programmatic movement all converge here.
+    reader.addEventListener('scroll', correct, { passive: true });
+
+    // Some modes update the active group immediately after scrolling. A click or
+    // Reader state event gets one bounded follow-up without an observer/poller.
+    document.addEventListener('marksetgo:reader-session-changed', correct);
+    document.addEventListener('marksetgo:document-available', correct);
+  }
+
   function topicFeedStoryHeaderParts(reader = document.querySelector('#reader')) {
     if (!reader) return {};
 
@@ -909,6 +973,8 @@
     const { readerFrame, header, spacer, meta, actionRow } = topicFeedStoryHeaderParts(reader);
     if (!readerFrame || !header || !spacer || !meta) return;
 
+    bindTopicReaderOcclusionCorrection(reader, header);
+
     const styles = getComputedStyle(reader);
     const paddingLeft = Number.parseFloat(styles.paddingLeft) || 0;
     const paddingRight = Number.parseFloat(styles.paddingRight) || 0;
@@ -957,6 +1023,8 @@
         spacer.style.height = `${Math.ceil(requiredHeight)}px`;
         scheduleTopicFeedStoryBookReflow();
       }
+
+      keepActiveReaderTargetBelowTopicBand(reader, header);
     });
   }
 
@@ -989,6 +1057,7 @@
     const reader = document.querySelector('#reader');
     const frame = reader?.closest('#reader-frame');
     clearTopicReaderOcclusion(reader);
+    if (reader) delete reader.dataset.msgTopicOcclusionScrollBound;
     frame?.querySelector(':scope > [data-topic-feed-story-header-external]')?.remove();
     reader?.querySelector(':scope > [data-topic-feed-story-header-spacer]')?.remove();
     removeTopicBookDivider();
