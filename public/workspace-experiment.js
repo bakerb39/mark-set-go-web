@@ -1,5 +1,5 @@
 /*
- * Mark, Set, Go! Workspace Experiment v0.15.9 — Native learning panels
+ * Mark, Set, Go! Workspace Experiment v0.15.10 — Ask Beth initial chat activation
  * Opt-in multi-page workspace: keep the outer Reader mounted while app pages
  * open in a compact, resizable side pane. Generic app pages run in a same-origin
  * sandboxed app frame so their renderers cannot destroy the outer Reader.
@@ -1247,6 +1247,33 @@
 
       shell.classList.add('msg-workspace-native-askbeth-shell');
       host.appendChild(shell);
+
+      // Moving the already-configured live companion shell does not rebuild its
+      // handlers, but it can preserve a stale secondary-view presentation from
+      // the Reader panel. Normalize the premium view immediately so the chat
+      // composer is interactive on the FIRST workspace open. This mirrors what
+      // Ask Beth's own Back button does after visiting Settings/Notebook/Format.
+      const premiumViews = [...shell.querySelectorAll('[data-askmark-view-panel]')];
+      premiumViews.forEach((panel) => {
+        const active = panel.dataset.askmarkViewPanel === 'chat';
+        panel.classList.toggle('is-active', active);
+        panel.setAttribute('aria-hidden', active ? 'false' : 'true');
+        try { panel.inert = !active; } catch {}
+      });
+      shell.classList.remove('askmark-secondary-open');
+      shell.removeAttribute('inert');
+      shell.setAttribute('aria-hidden', 'false');
+
+      // Give layout-dependent composer sizing one settled frame after the shell
+      // changes parents. No rebinding and no MutationObserver.
+      window.requestAnimationFrame(() => {
+        const input = shell.querySelector('[data-askmark-input]');
+        if (input) {
+          input.disabled = false;
+          input.removeAttribute('aria-disabled');
+        }
+        shell.querySelector('[data-askmark-send]')?.removeAttribute('aria-disabled');
+      });
 
       return {
         node,
