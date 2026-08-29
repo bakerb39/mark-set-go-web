@@ -25757,6 +25757,36 @@ document.addEventListener('click', (event) => {
 });
 
 /*
+  Profile is a direct top-level destination. Like Help, handle it before the
+  shared navigation pipeline so Reader continuity/state cleanup cannot swallow
+  the click. Profile rendering itself is already proven to work when called
+  directly.
+*/
+document.addEventListener('click', (event) => {
+  const profileButton = event.target.closest?.('[data-action="profile-preferences"]');
+  if (!profileButton) return;
+
+  event.preventDefault();
+  event.stopImmediatePropagation();
+
+  try {
+    captureCurrentViewPosition();
+    ReaderContinuity.saveBeforeNavigation();
+  } catch (error) {
+    console.warn('Profile navigation could not save the current Reader view:', error);
+  }
+
+  closeMenus();
+  renderProfilePreferences();
+  app.dataset.viewKey = 'profile-preferences';
+
+  window.requestAnimationFrame(() => {
+    app.scrollIntoView({ block: 'start' });
+  });
+}, true);
+
+
+/*
   Help is a direct top-level destination. Handle it before the shared navigation
   pipeline so clicks on either the icon or label cannot be swallowed by menu,
   continuity, or reader-state logic.
