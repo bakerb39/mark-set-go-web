@@ -134,3 +134,22 @@
     margin-top: 0 !important;
   }
 }
+
+
+/* v6.8 — User-tuned final values from live console controls.
+   sourceY=14, gap=2, font=14, socialX=23 */
+
+.topic-feed-story-meta-overlay {
+  transform: translateY(14px) !important;
+}
+
+#read-anything-article-summary-action {
+  margin-top: 2px !important;
+  font-size: 14px !important;
+}
+
+.topic-feed-reader-share {
+  position: static !important;
+  margin-left: 14px !important;
+  transform: translateX(23px) !important;
+}
