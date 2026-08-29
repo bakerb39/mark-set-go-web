@@ -260,3 +260,43 @@
     white-space:nowrap !important;
   }
 }
+
+
+/* v0.3.1 — Training Lab gets a deliberately wide Ask Beth workspace.
+   Normal Ask Beth keeps its existing width. Desktop Reader default is 380px;
+   Training Lab opens at 760px (2x) where viewport space allows. */
+@media (min-width:1500px){
+  #reader-layout.training-lab-wide-open,
+  .reader-layout.training-lab-wide-open{
+    --word-panel-width:760px !important;
+  }
+}
+
+/* Still substantially wider on medium desktop screens without forcing the
+   Reader completely off-screen. The app's <=1050px stacked layout remains untouched. */
+@media (min-width:1051px) and (max-width:1499px){
+  #reader-layout.training-lab-wide-open,
+  .reader-layout.training-lab-wide-open{
+    --word-panel-width:min(760px,52vw) !important;
+  }
+}
+
+#word-panel.training-lab-wide-open{
+  min-width:0 !important;
+}
+
+/* Use the additional horizontal space for exercises rather than leaving
+   everything in a single narrow card column. */
+@media (min-width:1051px){
+  .training-lab-wide-open .training-lab-shell.training-lab-embedded .tl-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+
+  .training-lab-wide-open .training-lab-shell.training-lab-embedded .tl-metrics{
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+  }
+
+  .training-lab-wide-open .training-lab-shell.training-lab-embedded .training-lab-body{
+    grid-template-columns:128px minmax(0,1fr) !important;
+  }
+}

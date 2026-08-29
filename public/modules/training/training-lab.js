@@ -7,7 +7,7 @@
   'use strict';
   if (window.MarkSetGoTrainingLab) return;
 
-  const VERSION = '0.3.0-ask-beth-embedded';
+  const VERSION = '0.3.1-ask-beth-wide';
   const STORAGE_KEY = 'markSetGoTrainingLabV1';
   const runtime = { raf:0, timer:0, mode:'', startedAt:0, startIndex:0, startWpm:0, burstPhase:0, overlay:null, hud:null, session:null, scopedNodes:null, fixationCursor:0, peripheralCursor:0, fixationResizeObserver:null, fixationWindowResize:null };
   const DEFAULTS = {
@@ -303,6 +303,13 @@
     return askBethShell()?.querySelector('[data-askmark-premium]') || null;
   }
 
+  function setTrainingLabWide(enabled){
+    const layout=$('#reader-layout') || $('.reader-layout');
+    const panel=$('#word-panel');
+    layout?.classList.toggle('training-lab-wide-open',Boolean(enabled));
+    panel?.classList.toggle('training-lab-wide-open',Boolean(enabled));
+  }
+
   function activateAskBethView(view='chat'){
     const host=askBethShell();
     if(!host)return false;
@@ -310,6 +317,7 @@
     if(!panels.length)return false;
     panels.forEach(panel=>panel.classList.toggle('is-active',panel.dataset.askmarkViewPanel===view));
     host.classList.toggle('askmark-secondary-open',view!=='chat');
+    setTrainingLabWide(view==='training');
     return Boolean(host.querySelector(`[data-askmark-view-panel="${view}"]`));
   }
 
@@ -453,6 +461,7 @@
     }else if(shell){
       shell.hidden=true;
     }
+    setTrainingLabWide(false);
     document.body.style.removeProperty('--training-lab-open');
   }
 
@@ -490,6 +499,11 @@
 
       if(e.target.closest('#toggle-mark-panel')){
         window.setTimeout(scheduleAskBethIntegration,0);
+      }
+
+      const otherAskBethView=e.target.closest('[data-askmark-view]');
+      if(otherAskBethView && !e.target.closest('[data-training-lab-askbeth-button]')){
+        setTrainingLabWide(false);
       }
     },true);
 
