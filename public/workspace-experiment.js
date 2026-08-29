@@ -1335,7 +1335,7 @@
   }
 
 
-  function openDocsPanel() {
+  function openMsgDocsPanel() {
     const key = 'tool:msg-docs';
     if (PANELS.has(key)) return activatePanel(key);
 
@@ -1347,7 +1347,28 @@
     const node = document.createElement('div');
     node.className = 'msg-workspace-panel msg-workspace-app-page msg-workspace-docs-page';
     node.innerHTML = '<iframe class="msg-workspace-page-frame msg-workspace-docs-frame" title="MSG Docs" src="/msg-docs.html" loading="eager"></iframe>';
-    return registerPanel(key, 'MSG Docs', node, { secondaryWidth: 760, nativeKind:'docs' });
+
+    return registerPanel(key, 'MSG Docs', node, {
+      secondaryWidth: 760,
+      nativeKind: 'docs'
+    });
+  }
+
+  function ensureMsgDocsMenuItem() {
+    const root = document.querySelector('details.learn-menu-root');
+    const menu = root?.querySelector(':scope > .menu-popover');
+    if (!menu || menu.querySelector('[data-msg-docs-launch]')) return false;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.setAttribute('role', 'menuitem');
+    button.dataset.msgDocsLaunch = '1';
+    button.innerHTML = '<span class="menu-icon">▤</span><span class="menu-copy"><strong>MSG Docs</strong><small>Development rules, constraints, and project documentation</small></span>';
+
+    const learningTools = menu.querySelector('details.learn-skills-submenu');
+    if (learningTools) menu.insertBefore(button, learningTools);
+    else menu.appendChild(button);
+    return true;
   }
 
   function openAppPage(mode, value, label = '') {
@@ -1763,14 +1784,13 @@
       return;
     }
 
-    const docsLaunch = event.target.closest?.('[data-msg-docs-launch]');
-    if (docsLaunch) {
+    const msgDocsLaunch = event.target.closest?.('[data-msg-docs-launch]');
+    if (msgDocsLaunch) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      try { closeMenus?.(); } catch {}
-      const menu = docsLaunch.closest?.('details.top-nav-menu');
+      const menu = msgDocsLaunch.closest?.('details.top-nav-menu');
       if (menu) menu.open = false;
-      openDocsPanel();
+      openMsgDocsPanel();
       return;
     }
 
@@ -1830,15 +1850,18 @@
   // case another startup script finishes arranging the header after our first pass.
   ensureWorkspaceControls();
   ensurePrimaryReaderStandaloneControls();
+  ensureMsgDocsMenuItem();
   let navAttempts = 0;
   const navTimer = window.setInterval(() => {
     navAttempts += 1;
+    ensureMsgDocsMenuItem();
     if (ensureWorkspaceControls() || navAttempts > 40) window.clearInterval(navTimer);
   }, 250);
   [1200, 3000, 6000].forEach((delay) => window.setTimeout(ensureWorkspaceControls, delay));
   window.addEventListener('pageshow', () => {
     ensureWorkspaceControls();
     ensurePrimaryReaderStandaloneControls();
+    ensureMsgDocsMenuItem();
   });
   window.addEventListener('resize', () => {
     if (!document.body.classList.contains('msg-primary-reader-resized')) return;
@@ -1859,7 +1882,7 @@
     open: showWorkspacePanel,
     openPage: openAppPage,
     openLearning: openNativeLearningPanel,
-    docs: openDocsPanel,
+    docs: openMsgDocsPanel,
     close: closeWorkspacePanel,
     browser: () => showWorkspacePanel('browser'),
     symposium: (handoff = null) => showWorkspacePanel('symposium', { handoff }),
